@@ -40,6 +40,14 @@ const SECRET_KEYS = new Set<string>([
   'BYOK_ENCRYPTION_KEY',
 ]);
 
+const CI_PLACEHOLDER_VALUES: Record<string, string> = {
+  NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
+  POSTGRES_URL:
+    process.env.POSTGRES_URL || 'postgresql://postgres:postgres@localhost:5432/postgres',
+  STRIPE_SECRET_KEY: 'sk_test_setup_smoke_placeholder',
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_setup_smoke_placeholder',
+};
+
 // ---------------------------------------------------------------------------
 // Repo root detection (reuses `findRepoRoot` convention from dev/local/cli.ts)
 // ---------------------------------------------------------------------------
@@ -155,6 +163,15 @@ function buildDescription(key: string): string | undefined {
   return KEY_DESCRIPTIONS[key];
 }
 
+function isCiMode(): boolean {
+  return process.argv.includes('--ci');
+}
+
+function collectCiValue(key: string, defaultValue: string, isSecret: boolean): string {
+  if (isSecret) return generateSecret();
+  return CI_PLACEHOLDER_VALUES[key] ?? defaultValue;
+}
+
 // ---------------------------------------------------------------------------
 // User interaction
 // ---------------------------------------------------------------------------
@@ -198,6 +215,7 @@ async function promptForValue(
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
+  const ciMode = isCiMode();
   const repoRoot = findRepoRoot();
   const examplePath = path.join(repoRoot, '.env.local.example');
   const envLocalPath = path.join(repoRoot, '.env.local');
@@ -220,6 +238,13 @@ async function main(): Promise<void> {
     if (existingContent.length > 0) {
       envLocalExists = true;
     }
+  }
+
+  if (envLocalExists && ciMode) {
+    console.error(
+      `${RED}.env.local already exists; refusing to overwrite it in --ci mode.${RESET}`
+    );
+    process.exit(1);
   }
 
   if (envLocalExists) {
@@ -250,7 +275,9 @@ async function main(): Promise<void> {
     const description = buildDescription(key);
     const isSecret = SECRET_KEYS.has(key);
 
-    const answer = await promptForValue(key, defaultValue, description, isSecret);
+    const answer = ciMode
+      ? collectCiValue(key, defaultValue, isSecret)
+      : await promptForValue(key, defaultValue, description, isSecret);
 
     if (answer === '') {
       if (isSecret) {

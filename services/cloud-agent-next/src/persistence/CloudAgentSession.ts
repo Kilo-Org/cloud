@@ -98,6 +98,8 @@ import {
   clearWrapperRuntimeIdentity,
   getWrapperLease,
   getWrapperRuntimeState,
+  isWrapperDeliveryHeld,
+  isWrapperRunFinalizing,
   nextWrapperCleanupDeadline,
   nextWrapperLeaseDeadline,
 } from '../session/wrapper-runtime-state.js';
@@ -494,10 +496,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             ...event,
           });
         },
-        hasObservedWrapperIdle: async () => {
-          const state = await getWrapperRuntimeState(this.ctx.storage);
-          return state.lastWrapperIdleAt !== undefined;
-        },
+        hasObservedWrapperIdle: async () => false,
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         getSessionIdForLogs: () => this.sessionId,
       });
@@ -549,6 +548,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         hasActiveIngestConnection: async params =>
           (await this.getIngestHandler()).hasActiveConnection(params),
         clearInterruptRequest: () => this.executionQueries.clearInterrupt(),
+        ensureAcceptedMessageBeforeTerminal: (messageId, wrapperRunId) =>
+          this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId),
         stopWrappers: async request => {
           if (this.physicalWrapperStopper) return this.physicalWrapperStopper(request);
           if (this.orchestrator || (!this.env.Sandbox && !this.env.SandboxSmall)) {
@@ -604,6 +605,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           return retryAt === undefined ? null : { retryAt };
         },
         deliver: plan => this.executeDirectly(plan),
+        isDeliveryHeld: async () =>
+          isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage)),
         ensureQueuedMessageEvent: event => {
           this.ensureQueuedMessageEvent({
             executionId: '' as EventSourceId,
@@ -2013,9 +2016,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         nextAlarmAt = existingAlarm;
       }
 
+      const pendingDeliveryHeld = isWrapperDeliveryHeld(
+        await getWrapperRuntimeState(this.ctx.storage),
+        await getWrapperLease(this.ctx.storage)
+      );
       if (
         pendingFlushRetryAt === undefined &&
         pendingCount > 0 &&
+        !pendingDeliveryHeld &&
         currentTime + PENDING_FLUSH_DEBOUNCE_MS < nextAlarmAt
       ) {
         nextAlarmAt = currentTime + PENDING_FLUSH_DEBOUNCE_MS;
@@ -2918,6 +2926,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     status: 'completed' | 'failed' | 'interrupted';
     error?: string;
     gateResult?: 'pass' | 'fail';
+    messageIds?: string[];
   }): Promise<void> {
     await this.resolveSessionId();
     await this.getWrapperSupervisor().onTerminalEvent(params);

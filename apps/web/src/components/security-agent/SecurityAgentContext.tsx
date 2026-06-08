@@ -2,7 +2,7 @@
 
 import { createContext, use, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTRPC } from '@/lib/trpc/utils';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
@@ -49,7 +49,12 @@ type SecurityAgentContextValue = {
 
   // Mutation handlers
   handleSync: (repoFullName?: string) => void;
-  handleDismiss: (finding: SecurityFinding, reason: DismissReason, comment?: string) => void;
+  handleDismiss: (
+    finding: SecurityFinding,
+    reason: DismissReason,
+    comment?: string,
+    onSuccess?: () => void
+  ) => void;
   handleSaveConfig: (
     config: SlaConfig & {
       repositorySelectionMode: 'all' | 'selected';
@@ -73,7 +78,7 @@ type SecurityAgentContextValue = {
     }
   ) => void;
   handleStartAnalysis: (findingId: string, options?: { retrySandboxOnly?: boolean }) => void;
-  handleDeleteFindings: (repoFullName: string) => void;
+  handleDeleteFindings: (repoFullName: string, onSuccess?: () => void) => void;
 
   // Mutation states
   isSyncing: boolean;
@@ -110,23 +115,35 @@ function getOptionalStringField(source: unknown, key: string): string | undefine
   return typeof value === 'string' ? value : undefined;
 }
 
-const ACCEPTED_QUEUE_POLL_INTERVAL_MS = 3000;
-const ACCEPTED_QUEUE_POLL_TIMEOUT_MS = 18000;
+const COMMAND_POLL_INTERVAL_MS = 3000;
 
-function listFindingsDataHasActiveAnalysis(data: unknown): boolean {
-  if (typeof data !== 'object' || data === null) return false;
+type SecurityAgentCommand = {
+  id: string;
+  commandType: 'sync' | 'dismiss_finding' | 'start_analysis';
+  findingId: string | null;
+  status: 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
+  resultCode: string | null;
+  lastErrorRedacted: string | null;
+};
 
-  const runningCount = Reflect.get(data, 'runningCount');
-  if (typeof runningCount === 'number' && runningCount > 0) return true;
-
-  const findings = Reflect.get(data, 'findings');
-  if (!Array.isArray(findings)) return false;
-
-  return findings.some(finding => {
-    if (typeof finding !== 'object' || finding === null) return false;
-    const analysisStatus = Reflect.get(finding, 'analysis_status');
-    return analysisStatus === 'pending' || analysisStatus === 'running';
-  });
+function commandFailureDescription(command: SecurityAgentCommand): string {
+  switch (command.resultCode) {
+    case 'OWNER_CAP_REACHED':
+      return 'Analysis capacity is full. Wait for an active analysis to finish, then retry.';
+    case 'GITHUB_TOKEN_UNAVAILABLE':
+    case 'GITHUB_AUTH_INVALID':
+      return 'GitHub authorization needs attention. Re-authorize GitHub App, then retry.';
+    case 'FINDING_UNAVAILABLE':
+      return 'Finding is no longer available. Refresh findings and retry if it remains open.';
+    case 'REPOSITORY_UNAVAILABLE':
+      return 'Repository is no longer available to GitHub App. Refresh repository access, then retry.';
+    case 'INVALID_DISMISS_TARGET':
+      return 'Finding cannot be dismissed because its Dependabot target is invalid.';
+    case 'COMMAND_STALLED':
+      return 'Queued action did not finish in time. Retry action.';
+    default:
+      return command.lastErrorRedacted ?? 'Queued action failed. Retry action.';
+  }
 }
 
 type SecurityAgentProviderProps = {
@@ -139,21 +156,20 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const queryClient = useQueryClient();
   const isOrg = !!organizationId;
 
-  const [startingAnalysisIds, setStartingAnalysisIds] = useState<Set<string>>(new Set());
+  const [optimisticStartingAnalysisIds, setOptimisticStartingAnalysisIds] = useState<Set<string>>(
+    new Set()
+  );
+  const [trackedCommandIds, setTrackedCommandIds] = useState<Set<string>>(new Set());
   const [gitHubError, setGitHubError] = useState<string | null>(null);
   const toggleEnabledInFlightRef = useRef(false);
-  const acceptedQueuePollRef = useRef<{ intervalId: number; timeoutId: number } | null>(null);
-  const acceptedQueuePollHasSeenActiveRef = useRef(false);
+  const processedTerminalCommandIdsRef = useRef(new Set<string>());
+  const recoveredCommandIdsRef = useRef(new Set<string>());
+  const commandSuccessCallbacksRef = useRef(new Map<string, () => void>());
 
-  const clearAcceptedQueuePoll = useCallback(() => {
-    const activePoll = acceptedQueuePollRef.current;
-    if (!activePoll) return;
-    window.clearInterval(activePoll.intervalId);
-    window.clearTimeout(activePoll.timeoutId);
-    acceptedQueuePollRef.current = null;
+  const trackCommand = useCallback((commandId: string, onSuccess?: () => void) => {
+    if (onSuccess) commandSuccessCallbacksRef.current.set(commandId, onSuccess);
+    setTrackedCommandIds(previous => new Set(previous).add(commandId));
   }, []);
-
-  useEffect(() => clearAcceptedQueuePoll, [clearAcceptedQueuePoll]);
 
   const invalidateAcceptedQueueQueries = useCallback(() => {
     if (isOrg && organizationId) {
@@ -186,6 +202,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
         queryClient.invalidateQueries({
           queryKey: trpc.organizations.securityAgent.getAutoDismissEligible.queryKey(ownerInput),
         }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getPermissionStatus.queryKey(ownerInput),
+        }),
       ]);
       return;
     }
@@ -204,41 +223,11 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       queryClient.invalidateQueries({
         queryKey: trpc.securityAgent.getAutoDismissEligible.queryKey(),
       }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getPermissionStatus.queryKey(),
+      }),
     ]);
   }, [isOrg, organizationId, queryClient, trpc]);
-
-  const cachedListFindingsHasActiveAnalysis = useCallback(() => {
-    const queryKey = isOrg
-      ? trpc.organizations.securityAgent.listFindings.queryKey(
-          organizationId ? { organizationId } : undefined
-        )
-      : trpc.securityAgent.listFindings.queryKey();
-
-    return queryClient
-      .getQueriesData({ queryKey })
-      .some(([, data]) => listFindingsDataHasActiveAnalysis(data));
-  }, [isOrg, organizationId, queryClient, trpc]);
-
-  const pollAcceptedQueueMutation = useCallback(() => {
-    clearAcceptedQueuePoll();
-    acceptedQueuePollHasSeenActiveRef.current = false;
-    invalidateAcceptedQueueQueries();
-
-    const intervalId = window.setInterval(() => {
-      invalidateAcceptedQueueQueries();
-      const hasActiveAnalysis = cachedListFindingsHasActiveAnalysis();
-      if (hasActiveAnalysis) {
-        acceptedQueuePollHasSeenActiveRef.current = true;
-        return;
-      }
-      if (acceptedQueuePollHasSeenActiveRef.current) {
-        clearAcceptedQueuePoll();
-      }
-    }, ACCEPTED_QUEUE_POLL_INTERVAL_MS);
-
-    const timeoutId = window.setTimeout(clearAcceptedQueuePoll, ACCEPTED_QUEUE_POLL_TIMEOUT_MS);
-    acceptedQueuePollRef.current = { intervalId, timeoutId };
-  }, [cachedListFindingsHasActiveAnalysis, clearAcceptedQueuePoll, invalidateAcceptedQueueQueries]);
 
   // Permission status query
   const { data: permissionData, isLoading: isLoadingPermission } = useQuery(
@@ -272,13 +261,109 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       : trpc.securityAgent.getOrphanedRepositories.queryOptions()
   );
 
+  const { data: activeCommandsData } = useQuery({
+    ...(isOrg
+      ? trpc.organizations.securityAgent.listActiveCommands.queryOptions({ organizationId })
+      : trpc.securityAgent.listActiveCommands.queryOptions()),
+    refetchInterval: query =>
+      query.state.data && query.state.data.length > 0 ? COMMAND_POLL_INTERVAL_MS : false,
+  });
+
+  useEffect(() => {
+    for (const command of activeCommandsData ?? []) recoveredCommandIdsRef.current.add(command.id);
+  }, [activeCommandsData]);
+
+  const commandIdsToPoll = new Set([...trackedCommandIds, ...recoveredCommandIdsRef.current]);
+  for (const command of activeCommandsData ?? []) commandIdsToPoll.add(command.id);
+
+  const commandStatusQueries = useQueries({
+    queries: [...commandIdsToPoll].map(commandId => ({
+      ...(isOrg
+        ? trpc.organizations.securityAgent.getCommandStatus.queryOptions({
+            organizationId,
+            commandId,
+          })
+        : trpc.securityAgent.getCommandStatus.queryOptions({ commandId })),
+      refetchInterval: (query: { state: { data?: SecurityAgentCommand } }) =>
+        query.state.data?.status === 'accepted' || query.state.data?.status === 'running'
+          ? COMMAND_POLL_INTERVAL_MS
+          : false,
+    })),
+  });
+  const activeCommands = useMemo(
+    () => [
+      ...(activeCommandsData ?? []),
+      ...commandStatusQueries.flatMap(query =>
+        query.data?.status === 'accepted' || query.data?.status === 'running' ? [query.data] : []
+      ),
+    ],
+    [activeCommandsData, commandStatusQueries]
+  );
+  const hasActiveSyncCommand = activeCommands.some(command => command.commandType === 'sync');
+  const hasActiveDismissCommand = activeCommands.some(
+    command => command.commandType === 'dismiss_finding'
+  );
+  const startingAnalysisIds = useMemo(() => {
+    const ids = new Set(optimisticStartingAnalysisIds);
+    for (const command of activeCommands) {
+      if (command.commandType === 'start_analysis' && command.findingId) {
+        ids.add(command.findingId);
+      }
+    }
+    return ids;
+  }, [activeCommands, optimisticStartingAnalysisIds]);
+
+  useEffect(() => {
+    for (const query of commandStatusQueries) {
+      const command = query.data;
+      if (!command || command.status === 'accepted' || command.status === 'running') continue;
+      if (processedTerminalCommandIdsRef.current.has(command.id)) continue;
+      processedTerminalCommandIdsRef.current.add(command.id);
+      recoveredCommandIdsRef.current.delete(command.id);
+      invalidateAcceptedQueueQueries();
+      if (command.findingId) {
+        setOptimisticStartingAnalysisIds(previous => {
+          const next = new Set(previous);
+          next.delete(command.findingId ?? '');
+          return next;
+        });
+      }
+      const successCallback = commandSuccessCallbacksRef.current.get(command.id);
+      commandSuccessCallbacksRef.current.delete(command.id);
+      if (command.status === 'failed') {
+        const title =
+          command.commandType === 'sync'
+            ? 'Sync failed'
+            : command.commandType === 'dismiss_finding'
+              ? 'Failed to dismiss finding'
+              : 'Failed to start analysis';
+        if (command.resultCode === 'GITHUB_AUTH_INVALID') {
+          setGitHubError(commandFailureDescription(command));
+        }
+        toast.error(title, { description: commandFailureDescription(command), duration: 8000 });
+      } else {
+        successCallback?.();
+        if (command.commandType === 'dismiss_finding') {
+          toast.success(
+            command.status === 'no_op' ? 'Finding already dismissed' : 'Finding dismissed'
+          );
+        }
+      }
+      setTrackedCommandIds(previous => {
+        const next = new Set(previous);
+        next.delete(command.id);
+        return next;
+      });
+    }
+  }, [commandStatusQueries, invalidateAcceptedQueueQueries]);
+
   // ---- Mutations (org) ----
   const { mutate: orgSyncMutate, isPending: isOrgSyncPending } = useMutation(
     trpc.organizations.securityAgent.triggerSync.mutationOptions({
-      onSuccess: () => {
+      onSuccess: data => {
         setGitHubError(null);
         toast.success('Sync queued');
-        pollAcceptedQueueMutation();
+        trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -297,9 +382,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: orgDismissMutate, isPending: isOrgDismissPending } = useMutation(
     trpc.organizations.securityAgent.dismissFinding.mutationOptions({
-      onSuccess: () => {
-        toast.success('Finding dismissed');
-        pollAcceptedQueueMutation();
+      onSuccess: data => {
+        toast.success('Dismissal queued');
+        trackCommand(data.commandId);
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -309,9 +394,15 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: orgSaveConfigMutate, isPending: isOrgSaveConfigPending } = useMutation(
     trpc.organizations.securityAgent.saveConfig.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async data => {
         toast.success('Configuration saved');
+        if (data.backlogAdmissionWarning) {
+          toast.warning('Existing findings not queued', {
+            description: data.backlogAdmissionWarning,
+          });
+        }
         await refetchConfig();
+        invalidateAcceptedQueueQueries();
       },
       onError: error => {
         toast.error('Failed to save configuration', { description: error.message });
@@ -322,10 +413,15 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const { mutate: orgSetEnabledMutate, isPending: isOrgSetEnabledPending } = useMutation(
     trpc.organizations.securityAgent.setEnabled.mutationOptions({
       onSuccess: async data => {
-        if ('initialSync' in data && data.initialSync) {
+        if ('initialSyncAdmissionFailed' in data && data.initialSyncAdmissionFailed) {
+          toast.warning('Security Agent enabled', {
+            description: 'Initial sync could not be queued. Run Sync to retry.',
+          });
+        } else if ('initialSync' in data && data.initialSync) {
           toast.success('Security Agent enabled', {
             description: 'Initial sync queued. Findings update as processing completes.',
           });
+          trackCommand(data.initialSync.commandId);
         } else {
           toast.success('Security Agent setting updated');
         }
@@ -343,15 +439,10 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: orgStartAnalysisMutate } = useMutation(
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async (_data, variables) => {
+      onSuccess: async data => {
         setGitHubError(null);
         toast.success(manualAnalysisAdmissionCopy.successTitle);
-        pollAcceptedQueueMutation();
-        setStartingAnalysisIds(prev => {
-          const next = new Set(prev);
-          next.delete(variables.findingId);
-          return next;
-        });
+        trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -368,7 +459,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
           });
         }
         void queryClient.invalidateQueries();
-        setStartingAnalysisIds(prev => {
+        setOptimisticStartingAnalysisIds(prev => {
           const next = new Set(prev);
           next.delete(variables.findingId);
           return next;
@@ -394,10 +485,10 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   // ---- Mutations (personal) ----
   const { mutate: personalSyncMutate, isPending: isPersonalSyncPending } = useMutation(
     trpc.securityAgent.triggerSync.mutationOptions({
-      onSuccess: () => {
+      onSuccess: data => {
         setGitHubError(null);
         toast.success('Sync queued');
-        pollAcceptedQueueMutation();
+        trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
@@ -416,9 +507,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: personalDismissMutate, isPending: isPersonalDismissPending } = useMutation(
     trpc.securityAgent.dismissFinding.mutationOptions({
-      onSuccess: () => {
-        toast.success('Finding dismissed');
-        pollAcceptedQueueMutation();
+      onSuccess: data => {
+        toast.success('Dismissal queued');
+        trackCommand(data.commandId);
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -428,9 +519,15 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: personalSaveConfigMutate, isPending: isPersonalSaveConfigPending } = useMutation(
     trpc.securityAgent.saveConfig.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async data => {
         toast.success('Configuration saved');
+        if (data.backlogAdmissionWarning) {
+          toast.warning('Existing findings not queued', {
+            description: data.backlogAdmissionWarning,
+          });
+        }
         await refetchConfig();
+        invalidateAcceptedQueueQueries();
       },
       onError: error => {
         toast.error('Failed to save configuration', { description: error.message });
@@ -441,10 +538,15 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const { mutate: personalSetEnabledMutate, isPending: isPersonalSetEnabledPending } = useMutation(
     trpc.securityAgent.setEnabled.mutationOptions({
       onSuccess: async data => {
-        if ('initialSync' in data && data.initialSync) {
+        if ('initialSyncAdmissionFailed' in data && data.initialSyncAdmissionFailed) {
+          toast.warning('Security Agent enabled', {
+            description: 'Initial sync could not be queued. Run Sync to retry.',
+          });
+        } else if ('initialSync' in data && data.initialSync) {
           toast.success('Security Agent enabled', {
             description: 'Initial sync queued. Findings update as processing completes.',
           });
+          trackCommand(data.initialSync.commandId);
         } else {
           toast.success('Security Agent setting updated');
         }
@@ -462,15 +564,10 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: personalStartAnalysisMutate } = useMutation(
     trpc.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async (_data, variables) => {
+      onSuccess: async data => {
         setGitHubError(null);
         toast.success(manualAnalysisAdmissionCopy.successTitle);
-        pollAcceptedQueueMutation();
-        setStartingAnalysisIds(prev => {
-          const next = new Set(prev);
-          next.delete(variables.findingId);
-          return next;
-        });
+        trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -487,7 +584,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
           });
         }
         void queryClient.invalidateQueries();
-        setStartingAnalysisIds(prev => {
+        setOptimisticStartingAnalysisIds(prev => {
           const next = new Set(prev);
           next.delete(variables.findingId);
           return next;
@@ -524,14 +621,20 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   );
 
   const handleDismiss = useCallback(
-    (finding: SecurityFinding, reason: DismissReason, comment?: string) => {
+    (finding: SecurityFinding, reason: DismissReason, comment?: string, onSuccess?: () => void) => {
       if (isOrg && organizationId) {
-        orgDismissMutate({ organizationId, findingId: finding.id, reason, comment });
+        orgDismissMutate(
+          { organizationId, findingId: finding.id, reason, comment },
+          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
+        );
       } else {
-        personalDismissMutate({ findingId: finding.id, reason, comment });
+        personalDismissMutate(
+          { findingId: finding.id, reason, comment },
+          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
+        );
       }
     },
-    [isOrg, organizationId, orgDismissMutate, personalDismissMutate]
+    [isOrg, organizationId, orgDismissMutate, personalDismissMutate, trackCommand]
   );
 
   const handleSaveConfig = useCallback(
@@ -618,7 +721,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const handleStartAnalysis = useCallback(
     (findingId: string, { retrySandboxOnly }: { retrySandboxOnly?: boolean } = {}) => {
-      setStartingAnalysisIds(prev => new Set(prev).add(findingId));
+      setOptimisticStartingAnalysisIds(prev => new Set(prev).add(findingId));
       if (isOrg && organizationId) {
         orgStartAnalysisMutate({ organizationId, findingId, retrySandboxOnly });
       } else {
@@ -629,11 +732,11 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   );
 
   const handleDeleteFindings = useCallback(
-    (repoFullName: string) => {
+    (repoFullName: string, onSuccess?: () => void) => {
       if (isOrg && organizationId) {
-        orgDeleteFindingsMutate({ organizationId, repoFullName });
+        orgDeleteFindingsMutate({ organizationId, repoFullName }, { onSuccess });
       } else {
-        personalDeleteFindingsMutate({ repoFullName });
+        personalDeleteFindingsMutate({ repoFullName }, { onSuccess });
       }
     },
     [isOrg, organizationId, orgDeleteFindingsMutate, personalDeleteFindingsMutate]
@@ -692,8 +795,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       handleToggleEnabled,
       handleStartAnalysis,
       handleDeleteFindings,
-      isSyncing: isOrg ? isOrgSyncPending : isPersonalSyncPending,
-      isDismissing: isOrg ? isOrgDismissPending : isPersonalDismissPending,
+      isSyncing: hasActiveSyncCommand || (isOrg ? isOrgSyncPending : isPersonalSyncPending),
+      isDismissing:
+        hasActiveDismissCommand || (isOrg ? isOrgDismissPending : isPersonalDismissPending),
       isSavingConfig: isOrg ? isOrgSaveConfigPending : isPersonalSaveConfigPending,
       isTogglingEnabled: isOrg ? isOrgSetEnabledPending : isPersonalSetEnabledPending,
       isDeletingFindings: isOrg ? isOrgDeleteFindingsPending : isPersonalDeleteFindingsPending,
@@ -722,6 +826,8 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       handleDeleteFindings,
       isOrgSyncPending,
       isPersonalSyncPending,
+      hasActiveSyncCommand,
+      hasActiveDismissCommand,
       isOrgDismissPending,
       isPersonalDismissPending,
       isOrgSaveConfigPending,

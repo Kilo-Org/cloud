@@ -81,6 +81,17 @@ import {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  MCPGatewayOwnerScope,
+  MCPGatewayAuthMode,
+  MCPGatewaySharingMode,
+  MCPGatewayRouteStatus,
+  MCPGatewayInstanceStatus,
+  MCPGatewayProviderGrantStatus,
+  MCPGatewaySecretKind,
+  MCPGatewayOAuthClientAuthMethod,
+  MCPGatewayAuthorizationRequestStatus,
+  MCPGatewayPendingProviderAuthorizationStatus,
+  MCPGatewayAuditOutcome,
 } from './schema-types';
 import type {
   CustomLlmDefinition,
@@ -91,6 +102,7 @@ import type {
   KiloClawScheduledActionNotificationStatus,
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
+  CustomLlmMetadata,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -107,6 +119,9 @@ import type {
   BuildStatus,
   Provider,
   CodeReviewAgentConfig,
+  ReviewMemoryEvidenceItem,
+  ReviewMemoryPlatform,
+  ReviewMemoryProposalStatus,
   DependabotAlertRaw,
   SecurityFindingAnalysis,
   NormalizedOpenRouterResponse,
@@ -197,6 +212,17 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  MCPGatewayOwnerScope,
+  MCPGatewayAuthMode,
+  MCPGatewaySharingMode,
+  MCPGatewayRouteStatus,
+  MCPGatewayInstanceStatus,
+  MCPGatewayProviderGrantStatus,
+  MCPGatewaySecretKind,
+  MCPGatewayOAuthClientAuthMethod,
+  MCPGatewayAuthorizationRequestStatus,
+  MCPGatewayPendingProviderAuthorizationStatus,
+  MCPGatewayAuditOutcome,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -3913,6 +3939,102 @@ export const cloud_agent_code_reviews = pgTable(
 
 export type CloudAgentCodeReview = typeof cloud_agent_code_reviews.$inferSelect;
 
+export const code_review_feedback_events = pgTable(
+  'code_review_feedback_events',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    repo_full_name: text().notNull(),
+    pr_number: integer(),
+    kilo_comment_id: text().notNull(),
+    reply_excerpt: text().notNull(),
+    kilo_comment_excerpt: text(),
+    dedupe_hash: text().notNull(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_code_review_feedback_events_dedupe_hash').on(table.dedupe_hash),
+    index('idx_code_review_feedback_events_owned_by_org_id').on(table.owned_by_organization_id),
+    index('idx_code_review_feedback_events_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_feedback_events_platform_repo').on(table.platform, table.repo_full_name),
+    index('idx_code_review_feedback_events_created_at').on(table.created_at),
+    check(
+      'code_review_feedback_events_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewFeedbackEvent = typeof code_review_feedback_events.$inferSelect;
+
+export const code_review_memory_proposals = pgTable(
+  'code_review_memory_proposals',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    repo_full_name: text().notNull(),
+    status: text().$type<ReviewMemoryProposalStatus>().notNull().default('open'),
+    title: text().notNull(),
+    rationale: text().notNull(),
+    proposed_markdown: text().notNull(),
+    evidence: jsonb().$type<ReviewMemoryEvidenceItem[]>().default([]).notNull(),
+    positive_count: integer().notNull().default(0),
+    negative_count: integer().notNull().default(0),
+    neutral_count: integer().notNull().default(0),
+    change_request_url: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('idx_code_review_memory_proposals_owned_by_org_id').on(table.owned_by_organization_id),
+    index('idx_code_review_memory_proposals_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_memory_proposals_platform_repo_status').on(
+      table.platform,
+      table.repo_full_name,
+      table.status
+    ),
+    index('idx_code_review_memory_proposals_updated_at').on(table.updated_at),
+    uniqueIndex('UQ_code_review_memory_proposals_org_active_scope')
+      .on(table.owned_by_organization_id, table.platform, table.repo_full_name)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+      ),
+    uniqueIndex('UQ_code_review_memory_proposals_user_active_scope')
+      .on(table.owned_by_user_id, table.platform, table.repo_full_name)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+      ),
+    check(
+      'code_review_memory_proposals_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewMemoryProposal = typeof code_review_memory_proposals.$inferSelect;
+
 export const cloud_agent_code_review_attempts = pgTable(
   'cloud_agent_code_review_attempts',
   {
@@ -4805,6 +4927,117 @@ export const security_analysis_owner_state = pgTable(
 );
 
 export type SecurityAnalysisOwnerState = typeof security_analysis_owner_state.$inferSelect;
+
+export type SecurityAgentCommandType = 'sync' | 'dismiss_finding' | 'start_analysis';
+export type SecurityAgentCommandOrigin = 'manual' | 'dashboard_refresh' | 'enable_initial_sync';
+export type SecurityAgentCommandStatus = 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
+
+export const security_agent_commands = pgTable(
+  'security_agent_commands',
+  {
+    id: idPrimaryKeyColumn,
+    command_type: text().$type<SecurityAgentCommandType>().notNull(),
+    origin: text().$type<SecurityAgentCommandOrigin>().notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    finding_id: uuid().references(() => security_findings.id, { onDelete: 'set null' }),
+    repo_full_name: text(),
+    status: text().$type<SecurityAgentCommandStatus>().notNull().default('accepted'),
+    result_code: text(),
+    last_error_redacted: text(),
+    accepted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_agent_commands_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'security_agent_commands_type_check',
+      sql`${table.command_type} IN ('sync', 'dismiss_finding', 'start_analysis')`
+    ),
+    check(
+      'security_agent_commands_origin_check',
+      sql`${table.origin} IN ('manual', 'dashboard_refresh', 'enable_initial_sync')`
+    ),
+    check(
+      'security_agent_commands_status_check',
+      sql`${table.status} IN ('accepted', 'running', 'succeeded', 'failed', 'no_op')`
+    ),
+    index('idx_security_agent_commands_org_created').on(
+      table.owned_by_organization_id,
+      table.created_at.desc()
+    ),
+    index('idx_security_agent_commands_user_created').on(
+      table.owned_by_user_id,
+      table.created_at.desc()
+    ),
+    index('idx_security_agent_commands_status_updated').on(table.status, table.updated_at),
+    index('idx_security_agent_commands_finding_created').on(
+      table.finding_id,
+      table.created_at.desc()
+    ),
+  ]
+);
+
+export type SecurityAgentCommand = typeof security_agent_commands.$inferSelect;
+export type NewSecurityAgentCommand = typeof security_agent_commands.$inferInsert;
+
+export const security_agent_repository_sync_state = pgTable(
+  'security_agent_repository_sync_state',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    repo_full_name: text().notNull(),
+    last_attempted_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_succeeded_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_failure_code: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_agent_repository_sync_state_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    uniqueIndex('UQ_security_agent_repository_sync_state_org_repo')
+      .on(table.owned_by_organization_id, table.repo_full_name)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_security_agent_repository_sync_state_user_repo')
+      .on(table.owned_by_user_id, table.repo_full_name)
+      .where(isNotNull(table.owned_by_user_id)),
+  ]
+);
+
+export type SecurityAgentRepositorySyncState =
+  typeof security_agent_repository_sync_state.$inferSelect;
+export type NewSecurityAgentRepositorySyncState =
+  typeof security_agent_repository_sync_state.$inferInsert;
 
 // Security Audit Log — SOC2-compliant audit trail for security agent actions
 export const security_audit_log = pgTable(
@@ -7152,6 +7385,7 @@ export const model_experiment = pgTable(
     public_model_id: text().notNull(),
     name: text().notNull(),
     description: text(),
+    metadata: jsonb().$type<CustomLlmMetadata>(),
     // status: draft | active | paused | completed
     status: text().notNull().default('draft'),
     is_archived: boolean().notNull().default(false),
@@ -7292,4 +7526,615 @@ export const model_experiment_request = pgTable(
 );
 
 export type ModelExperimentRequest = typeof model_experiment_request.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// MCP Gateway
+// ---------------------------------------------------------------------------
+
+export const mcp_gateway_configs = pgTable(
+  'mcp_gateway_configs',
+  {
+    config_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    name: text().notNull(),
+    remote_url: text().notNull(),
+    auth_mode: text().$type<MCPGatewayAuthMode>().notNull(),
+    sharing_mode: text().$type<MCPGatewaySharingMode>().notNull(),
+    enabled: boolean().notNull().default(true),
+    path_passthrough: boolean().notNull().default(false),
+    config_version: integer().notNull().default(1),
+    discovered_provider_metadata: jsonb().$type<Record<string, unknown> | null>(),
+    registry_metadata: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    auxiliary_headers: jsonb().$type<Record<string, string>>().notNull().default({}),
+    created_by_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_mcp_gateway_configs_owner').on(table.owner_scope, table.owner_id),
+    index('IDX_mcp_gateway_configs_enabled').on(table.enabled),
+    index('IDX_mcp_gateway_configs_remote_url').on(table.remote_url),
+    check('mcp_gateway_configs_name_not_empty', sql`length(trim(${table.name})) > 0`),
+    check('mcp_gateway_configs_config_version_positive', sql`${table.config_version} > 0`),
+    check(
+      'mcp_gateway_configs_personal_single_user',
+      sql`${table.owner_scope} <> 'personal' OR ${table.sharing_mode} = 'single_user'`
+    ),
+    enumCheck('mcp_gateway_configs_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
+    enumCheck('mcp_gateway_configs_auth_mode', table.auth_mode, MCPGatewayAuthMode),
+    enumCheck('mcp_gateway_configs_sharing_mode', table.sharing_mode, MCPGatewaySharingMode),
+  ]
+);
+
+export type MCPGatewayConfig = typeof mcp_gateway_configs.$inferSelect;
+export type NewMCPGatewayConfig = typeof mcp_gateway_configs.$inferInsert;
+
+export const mcp_gateway_connect_resources = pgTable(
+  'mcp_gateway_connect_resources',
+  {
+    connect_resource_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    route_key: text().notNull(),
+    canonical_url: text().notNull(),
+    route_status: text().$type<MCPGatewayRouteStatus>().notNull().default('active'),
+    route_version: integer().notNull().default(1),
+    rotated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_connect_resources_route_key').on(table.route_key),
+    uniqueIndex('UQ_mcp_gateway_connect_resources_active_config')
+      .on(table.config_id)
+      .where(sql`${table.route_status} = 'active'`),
+    index('IDX_mcp_gateway_connect_resources_config').on(table.config_id),
+    index('IDX_mcp_gateway_connect_resources_canonical_url').on(table.canonical_url),
+    check(
+      'mcp_gateway_connect_resources_route_key_format',
+      sql`${table.route_key} ~ '^[A-Za-z0-9_-]{32,}$'`
+    ),
+    check('mcp_gateway_connect_resources_route_version_positive', sql`${table.route_version} > 0`),
+    enumCheck('mcp_gateway_connect_resources_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
+    enumCheck(
+      'mcp_gateway_connect_resources_route_status',
+      table.route_status,
+      MCPGatewayRouteStatus
+    ),
+  ]
+);
+
+export type MCPGatewayConnectResource = typeof mcp_gateway_connect_resources.$inferSelect;
+export type NewMCPGatewayConnectResource = typeof mcp_gateway_connect_resources.$inferInsert;
+
+export const mcp_gateway_assignments = pgTable(
+  'mcp_gateway_assignments',
+  {
+    assignment_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    assigned_by_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    single_user_slot: text(),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_assignments_active')
+      .on(table.config_id, table.kilo_user_id)
+      .where(isNull(table.revoked_at)),
+    uniqueIndex('UQ_mcp_gateway_assignments_single_user_slot')
+      .on(table.config_id, table.single_user_slot)
+      .where(sql`${table.revoked_at} is null and ${table.single_user_slot} is not null`),
+    index('IDX_mcp_gateway_assignments_config').on(table.config_id),
+    index('IDX_mcp_gateway_assignments_user').on(table.kilo_user_id),
+  ]
+);
+
+export type MCPGatewayAssignment = typeof mcp_gateway_assignments.$inferSelect;
+export type NewMCPGatewayAssignment = typeof mcp_gateway_assignments.$inferInsert;
+
+export const mcp_gateway_connection_instances = pgTable(
+  'mcp_gateway_connection_instances',
+  {
+    instance_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    instance_status: text().$type<MCPGatewayInstanceStatus>().notNull().default('active'),
+    instance_version: integer().notNull().default(1),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    removed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_connection_instances_non_terminal')
+      .on(table.owner_scope, table.owner_id, table.kilo_user_id, table.config_id)
+      .where(sql`${table.instance_status} IN ('active', 'needs_reauth')`),
+    index('IDX_mcp_gateway_connection_instances_config').on(table.config_id),
+    index('IDX_mcp_gateway_connection_instances_user').on(table.kilo_user_id),
+    check('mcp_gateway_connection_instances_version_positive', sql`${table.instance_version} > 0`),
+    enumCheck(
+      'mcp_gateway_connection_instances_owner_scope',
+      table.owner_scope,
+      MCPGatewayOwnerScope
+    ),
+    enumCheck(
+      'mcp_gateway_connection_instances_status',
+      table.instance_status,
+      MCPGatewayInstanceStatus
+    ),
+  ]
+);
+
+export type MCPGatewayConnectionInstance = typeof mcp_gateway_connection_instances.$inferSelect;
+export type NewMCPGatewayConnectionInstance = typeof mcp_gateway_connection_instances.$inferInsert;
+
+export const mcp_gateway_provider_grants = pgTable(
+  'mcp_gateway_provider_grants',
+  {
+    provider_grant_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    instance_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_connection_instances.instance_id, { onDelete: 'cascade' }),
+    encrypted_grant: text().notNull(),
+    provider_subject: text(),
+    grant_scope: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    grant_status: text().$type<MCPGatewayProviderGrantStatus>().notNull().default('active'),
+    grant_version: integer().notNull().default(1),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_provider_grants_active_instance')
+      .on(table.instance_id)
+      .where(sql`${table.grant_status} = 'active'`),
+    index('IDX_mcp_gateway_provider_grants_instance').on(table.instance_id),
+    check('mcp_gateway_provider_grants_version_positive', sql`${table.grant_version} > 0`),
+    enumCheck(
+      'mcp_gateway_provider_grants_status',
+      table.grant_status,
+      MCPGatewayProviderGrantStatus
+    ),
+  ]
+);
+
+export type MCPGatewayProviderGrant = typeof mcp_gateway_provider_grants.$inferSelect;
+export type NewMCPGatewayProviderGrant = typeof mcp_gateway_provider_grants.$inferInsert;
+
+export const mcp_gateway_config_secrets = pgTable(
+  'mcp_gateway_config_secrets',
+  {
+    config_secret_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    secret_kind: text().$type<MCPGatewaySecretKind>().notNull(),
+    encrypted_secret: text().notNull(),
+    secret_version: integer().notNull().default(1),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_config_secrets_active_kind')
+      .on(table.config_id, table.secret_kind)
+      .where(isNull(table.revoked_at)),
+    index('IDX_mcp_gateway_config_secrets_config').on(table.config_id),
+    check('mcp_gateway_config_secrets_version_positive', sql`${table.secret_version} > 0`),
+    enumCheck('mcp_gateway_config_secrets_kind', table.secret_kind, MCPGatewaySecretKind),
+  ]
+);
+
+export type MCPGatewayConfigSecret = typeof mcp_gateway_config_secrets.$inferSelect;
+export type NewMCPGatewayConfigSecret = typeof mcp_gateway_config_secrets.$inferInsert;
+
+export const mcp_gateway_oauth_clients = pgTable(
+  'mcp_gateway_oauth_clients',
+  {
+    oauth_client_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    client_id: text().notNull(),
+    client_name: text(),
+    registration_token_hash: text().notNull(),
+    client_secret_hash: text(),
+    token_endpoint_auth_method: text().$type<MCPGatewayOAuthClientAuthMethod>().notNull(),
+    redirect_uris: text().array().notNull(),
+    grant_types: text().array().notNull(),
+    response_types: text().array().notNull(),
+    declared_scopes: text().array().notNull(),
+    registration_access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_oauth_clients_client_id').on(table.client_id),
+    uniqueIndex('UQ_mcp_gateway_oauth_clients_registration_token_hash').on(
+      table.registration_token_hash
+    ),
+    index('IDX_mcp_gateway_oauth_clients_deleted_at').on(table.deleted_at),
+    check(
+      'mcp_gateway_oauth_clients_client_id_format',
+      sql`${table.client_id} ~ '^[A-Za-z0-9._-]+:[A-Za-z0-9._-]+$'`
+    ),
+    enumCheck(
+      'mcp_gateway_oauth_clients_auth_method',
+      table.token_endpoint_auth_method,
+      MCPGatewayOAuthClientAuthMethod
+    ),
+  ]
+);
+
+export type MCPGatewayOAuthClient = typeof mcp_gateway_oauth_clients.$inferSelect;
+export type NewMCPGatewayOAuthClient = typeof mcp_gateway_oauth_clients.$inferInsert;
+
+export const mcp_gateway_authorization_requests = pgTable(
+  'mcp_gateway_authorization_requests',
+  {
+    authorization_request_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    request_state_hash: text().notNull(),
+    oauth_client_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    client_id: text().notNull(),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    route_key: text().notNull(),
+    canonical_resource_url: text().notNull(),
+    redirect_uri: text().notNull(),
+    requested_scopes: text().array().notNull(),
+    granted_scopes: text().array().notNull(),
+    oauth_state: text(),
+    code_challenge: text(),
+    code_challenge_method: text().notNull().default('S256'),
+    execution_context: jsonb().$type<Record<string, unknown>>().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    instance_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_connection_instances.instance_id, { onDelete: 'cascade' }),
+    request_status: text()
+      .$type<MCPGatewayAuthorizationRequestStatus>()
+      .notNull()
+      .default('pending'),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_authorization_requests_state_hash').on(table.request_state_hash),
+    index('IDX_mcp_gateway_authorization_requests_config').on(table.config_id),
+    index('IDX_mcp_gateway_authorization_requests_user').on(table.kilo_user_id),
+    index('IDX_mcp_gateway_authorization_requests_expires_at').on(table.expires_at),
+    enumCheck(
+      'mcp_gateway_authorization_requests_owner_scope',
+      table.owner_scope,
+      MCPGatewayOwnerScope
+    ),
+    enumCheck(
+      'mcp_gateway_authorization_requests_status',
+      table.request_status,
+      MCPGatewayAuthorizationRequestStatus
+    ),
+  ]
+);
+
+export type MCPGatewayAuthorizationRequest = typeof mcp_gateway_authorization_requests.$inferSelect;
+export type NewMCPGatewayAuthorizationRequest =
+  typeof mcp_gateway_authorization_requests.$inferInsert;
+
+export const mcp_gateway_authorization_codes = pgTable(
+  'mcp_gateway_authorization_codes',
+  {
+    authorization_code_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    code_hash: text().notNull(),
+    authorization_request_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_authorization_requests.authorization_request_id, {
+        onDelete: 'cascade',
+      }),
+    oauth_client_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    client_id: text().notNull(),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    route_key: text().notNull(),
+    canonical_resource_url: text().notNull(),
+    redirect_uri: text().notNull(),
+    granted_scopes: text().array().notNull(),
+    code_challenge: text(),
+    code_challenge_method: text().notNull().default('S256'),
+    execution_context: jsonb().$type<Record<string, unknown>>().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    instance_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_connection_instances.instance_id, { onDelete: 'cascade' }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_authorization_codes_code_hash').on(table.code_hash),
+    index('IDX_mcp_gateway_authorization_codes_expires_at').on(table.expires_at),
+    index('IDX_mcp_gateway_authorization_codes_client').on(table.oauth_client_id),
+    enumCheck(
+      'mcp_gateway_authorization_codes_owner_scope',
+      table.owner_scope,
+      MCPGatewayOwnerScope
+    ),
+  ]
+);
+
+export type MCPGatewayAuthorizationCode = typeof mcp_gateway_authorization_codes.$inferSelect;
+export type NewMCPGatewayAuthorizationCode = typeof mcp_gateway_authorization_codes.$inferInsert;
+
+export const mcp_gateway_refresh_tokens = pgTable(
+  'mcp_gateway_refresh_tokens',
+  {
+    refresh_token_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    token_hash: text().notNull(),
+    rotated_from_refresh_token_id: uuid(),
+    oauth_client_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    client_id: text().notNull(),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    route_key: text().notNull(),
+    canonical_resource_url: text().notNull(),
+    granted_scopes: text().array().notNull(),
+    execution_context: jsonb().$type<Record<string, unknown>>().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    instance_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_connection_instances.instance_id, { onDelete: 'cascade' }),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_refresh_tokens_token_hash').on(table.token_hash),
+    index('IDX_mcp_gateway_refresh_tokens_user').on(table.kilo_user_id),
+    index('IDX_mcp_gateway_refresh_tokens_config').on(table.config_id),
+    index('IDX_mcp_gateway_refresh_tokens_consumed_at').on(table.consumed_at),
+    enumCheck('mcp_gateway_refresh_tokens_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
+  ]
+);
+
+export type MCPGatewayRefreshToken = typeof mcp_gateway_refresh_tokens.$inferSelect;
+export type NewMCPGatewayRefreshToken = typeof mcp_gateway_refresh_tokens.$inferInsert;
+
+export const mcp_gateway_pending_provider_authorizations = pgTable(
+  'mcp_gateway_pending_provider_authorizations',
+  {
+    pending_provider_authorization_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    state_hash: text().notNull(),
+    authorization_request_id: uuid().references(
+      () => mcp_gateway_authorization_requests.authorization_request_id,
+      { onDelete: 'cascade' }
+    ),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    instance_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_connection_instances.instance_id, { onDelete: 'cascade' }),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    route_key: text().notNull(),
+    canonical_resource_url: text().notNull(),
+    remote_url: text().notNull(),
+    auth_mode: text().$type<MCPGatewayAuthMode>().notNull(),
+    provider_authorization_endpoint: text().notNull(),
+    provider_token_endpoint: text().notNull(),
+    encrypted_state: text().notNull(),
+    execution_context: jsonb().$type<Record<string, unknown>>().notNull(),
+    config_version: integer().notNull(),
+    pending_status: text()
+      .$type<MCPGatewayPendingProviderAuthorizationStatus>()
+      .notNull()
+      .default('pending'),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_pending_provider_authorizations_state_hash').on(table.state_hash),
+    index('IDX_mcp_gateway_pending_provider_authorizations_config').on(table.config_id),
+    index('IDX_mcp_gateway_pending_provider_authorizations_expires_at').on(table.expires_at),
+    check(
+      'mcp_gateway_pending_provider_authorizations_config_version_positive',
+      sql`${table.config_version} > 0`
+    ),
+    enumCheck(
+      'mcp_gateway_pending_provider_authorizations_owner_scope',
+      table.owner_scope,
+      MCPGatewayOwnerScope
+    ),
+    enumCheck(
+      'mcp_gateway_pending_provider_authorizations_auth_mode',
+      table.auth_mode,
+      MCPGatewayAuthMode
+    ),
+    enumCheck(
+      'mcp_gateway_pending_provider_authorizations_status',
+      table.pending_status,
+      MCPGatewayPendingProviderAuthorizationStatus
+    ),
+  ]
+);
+
+export type MCPGatewayPendingProviderAuthorization =
+  typeof mcp_gateway_pending_provider_authorizations.$inferSelect;
+export type NewMCPGatewayPendingProviderAuthorization =
+  typeof mcp_gateway_pending_provider_authorizations.$inferInsert;
+
+export const mcp_gateway_rate_limit_windows = pgTable(
+  'mcp_gateway_rate_limit_windows',
+  {
+    rate_limit_window_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    ip_hash: text().notNull(),
+    window_started_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    attempt_count: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_rate_limit_windows_ip_window').on(
+      table.ip_hash,
+      table.window_started_at
+    ),
+    index('IDX_mcp_gateway_rate_limit_windows_window').on(table.window_started_at),
+    check(
+      'mcp_gateway_rate_limit_windows_attempt_count_non_negative',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type MCPGatewayRateLimitWindow = typeof mcp_gateway_rate_limit_windows.$inferSelect;
+export type NewMCPGatewayRateLimitWindow = typeof mcp_gateway_rate_limit_windows.$inferInsert;
+
+export const mcp_gateway_audit_events = pgTable(
+  'mcp_gateway_audit_events',
+  {
+    audit_event_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    actor_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    config_id: uuid().references(() => mcp_gateway_configs.config_id, { onDelete: 'set null' }),
+    connect_resource_id: uuid().references(
+      () => mcp_gateway_connect_resources.connect_resource_id,
+      {
+        onDelete: 'set null',
+      }
+    ),
+    instance_id: uuid().references(() => mcp_gateway_connection_instances.instance_id, {
+      onDelete: 'set null',
+    }),
+    event_type: text().notNull(),
+    outcome: text().$type<MCPGatewayAuditOutcome>().notNull(),
+    correlation_metadata: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_mcp_gateway_audit_events_config').on(table.config_id),
+    index('IDX_mcp_gateway_audit_events_owner').on(table.owner_scope, table.owner_id),
+    index('IDX_mcp_gateway_audit_events_created_at').on(table.created_at),
+    enumCheck('mcp_gateway_audit_events_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
+    enumCheck('mcp_gateway_audit_events_outcome', table.outcome, MCPGatewayAuditOutcome),
+  ]
+);
+
+export type MCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferSelect;
+export type NewMCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferInsert;
 export type NewModelExperimentRequest = typeof model_experiment_request.$inferInsert;

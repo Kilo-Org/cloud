@@ -1,4 +1,10 @@
 import { timingSafeEqual as nodeTSE } from 'crypto';
+import {
+  createSecurityAgentCommand,
+  markSecurityAgentCommandQueueAdmissionFailed,
+  type SecurityAgentCommandOwner,
+} from '@kilocode/db';
+import { getWorkerDb } from '@kilocode/db/client';
 import { verifyCallbackToken } from '@kilocode/worker-utils';
 import { consumeOwnerBatch } from './consumer.js';
 import { dispatchDueOwners } from './dispatcher.js';
@@ -6,7 +12,7 @@ import {
   consumeAnalysisCallbackBatch,
   SecurityAnalysisCallbackPayloadSchema,
 } from './callbacks.js';
-import { consumeManualAnalysisBatch, ManualAnalysisStartCommandSchema } from './manual-analysis.js';
+import { consumeManualAnalysisBatch, ManualAnalysisStartRequestSchema } from './manual-analysis.js';
 
 async function sendBetterStackHeartbeat(
   heartbeatUrl: string | undefined,
@@ -79,15 +85,32 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     } catch {
       return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
-    const parsedPayload = ManualAnalysisStartCommandSchema.safeParse(payload);
+    const parsedPayload = ManualAnalysisStartRequestSchema.safeParse(payload);
     if (!parsedPayload.success) {
       return Response.json(
         { error: 'Invalid manual analysis command', issues: parsedPayload.error.issues },
         { status: 400 }
       );
     }
-    await env.MANUAL_ANALYSIS_QUEUE.sendBatch([{ body: parsedPayload.data, contentType: 'json' }]);
-    return Response.json({ success: true, accepted: true }, { status: 202 });
+    const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
+    const owner: SecurityAgentCommandOwner = parsedPayload.data.owner.organizationId
+      ? { type: 'org', id: parsedPayload.data.owner.organizationId }
+      : { type: 'user', id: parsedPayload.data.owner.userId ?? parsedPayload.data.actorUserId };
+    const command = await createSecurityAgentCommand(db, {
+      commandType: 'start_analysis',
+      origin: 'manual',
+      owner,
+      findingId: parsedPayload.data.findingId,
+    });
+    try {
+      await env.MANUAL_ANALYSIS_QUEUE.sendBatch([
+        { body: { ...parsedPayload.data, commandId: command.id }, contentType: 'json' },
+      ]);
+    } catch (error) {
+      await markSecurityAgentCommandQueueAdmissionFailed(db, command.id, 'Queue admission failed');
+      throw error;
+    }
+    return Response.json({ success: true, accepted: true, commandId: command.id }, { status: 202 });
   }
 
   const callbackMatch = url.pathname.match(

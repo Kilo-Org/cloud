@@ -14,6 +14,7 @@ vi.mock('./launch.js', () => ({
 
 const command: ManualAnalysisStartCommand = {
   schemaVersion: 1,
+  commandId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
   findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
   actorUserId: 'user-123',
@@ -416,7 +417,7 @@ describe('processManualAnalysisStart', () => {
         } as unknown as CloudflareEnv,
         command,
       })
-    ).rejects.toThrow('Insufficient credits');
+    ).resolves.toEqual({ status: 'failed', resultCode: 'INSUFFICIENT_CREDITS' });
 
     expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
       db,

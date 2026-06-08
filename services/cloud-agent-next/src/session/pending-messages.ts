@@ -68,6 +68,7 @@ const PendingFlushFailureCodeSchema = z.enum([
   'WORKSPACE_SETUP_FAILED',
   'KILO_SERVER_FAILED',
   'WRAPPER_START_FAILED',
+  'WRAPPER_FINALIZING',
   'NOT_FOUND',
   'BAD_REQUEST',
   'INTERNAL',

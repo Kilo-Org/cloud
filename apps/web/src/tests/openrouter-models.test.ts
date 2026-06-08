@@ -1,13 +1,20 @@
-import { test, expect, describe, afterEach, jest, beforeEach } from '@jest/globals';
+import { test, expect, describe, afterEach, beforeEach } from '@jest/globals';
 import { mockOpenRouterModels, createMockResponse } from './helpers/openrouter-models.helper';
 import { GET } from '../app/api/openrouter/models/route';
 import { NextRequest } from 'next/server';
 
 jest.mock('@/lib/user/server', () => ({
-  getUserByAuthorizationHeader: jest.fn().mockImplementation(async () => ({
+  getUserFromAuth: jest.fn(async () => ({
     user: { id: 'test-user-id' },
-    authFailedResponse: null,
+    organizationId: null,
   })),
+}));
+
+jest.mock('@/lib/model-stats/terminal-bench', () => ({
+  getTerminalBenchSummaries: jest.fn(
+    async () => new Map([['some-other-model', { overallScore: 0.551, avgAttemptCostUsd: 53.37 }]])
+  ),
+  terminalBenchFor: jest.fn((summaries: Map<string, unknown>, id: string) => summaries.get(id)),
 }));
 
 function createTestRequest(path: string) {
@@ -18,8 +25,7 @@ function createTestRequest(path: string) {
 
 describe('GET /api/openrouter/models', () => {
   beforeEach(() => {
-    // Reset all mocks before each test
-    jest.resetAllMocks();
+    jest.clearAllMocks();
   });
 
   test('should handle OpenRouter API errors', async () => {
@@ -85,6 +91,28 @@ describe('GET /api/openrouter/models', () => {
     expect(response.status).toBe(200);
     expect(responseData.data).toBeDefined();
     expect(Array.isArray(responseData.data)).toBe(true);
+  });
+
+  test('should include publishable Terminal Bench summaries for canonical models', async () => {
+    const request = createTestRequest('/api/openrouter/models');
+
+    global.fetch = jest.fn(() => {
+      return Promise.resolve(
+        createMockResponse({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          jsonData: mockOpenRouterModels,
+        })
+      );
+    }) as unknown as typeof fetch;
+
+    const response = await GET(request);
+    const responseData = await response.json();
+    const model = responseData.data.find((item: { id: string }) => item.id === 'some-other-model');
+
+    expect(response.status).toBe(200);
+    expect(model.terminalBench).toEqual({ overallScore: 0.551, avgAttemptCostUsd: 53.37 });
   });
 });
 

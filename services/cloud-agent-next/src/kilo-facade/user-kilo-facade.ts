@@ -637,6 +637,7 @@ function promptAdmissionError(
     case 'WORKSPACE_SETUP_FAILED':
     case 'KILO_SERVER_FAILED':
     case 'WRAPPER_START_FAILED':
+    case 'WRAPPER_FINALIZING':
       return facadeError(503, result.code, result.error);
     case 'INTERNAL':
       return facadeError(500, 'KILO_PROMPT_ADMISSION_FAILED', result.error);

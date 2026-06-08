@@ -1,15 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createSecurityAgentCommand,
+  markSecurityAgentCommandQueueAdmissionFailed,
+} from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import { syncOwner } from './sync.js';
 
+vi.mock('@kilocode/db', () => ({
+  createSecurityAgentCommand: vi.fn(),
+  markSecurityAgentCommandQueueAdmissionFailed: vi.fn(),
+  transitionSecurityAgentCommand: vi.fn(),
+}));
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
 vi.mock('./sync.js', () => ({ syncOwner: vi.fn() }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getWorkerDb).mockReturnValue({} as never);
+  vi.mocked(createSecurityAgentCommand).mockResolvedValue({
+    id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  } as never);
 });
 
 describe('collectScheduledSyncOwners', () => {
@@ -112,6 +125,39 @@ describe('scheduled sync dispatch', () => {
 });
 
 describe('manual sync dispatch', () => {
+  it('compensates the accepted command when sync queue admission fails', async () => {
+    await expect(
+      worker.fetch(
+        new Request('https://security-sync.test/internal/manual-sync', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-internal-api-key': 'worker-secret',
+          },
+          body: JSON.stringify({
+            schemaVersion: 1,
+            owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+            actor: { id: 'user-123' },
+          }),
+        }),
+        {
+          INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+          HYPERDRIVE: { connectionString: 'postgres://worker' },
+          SYNC_QUEUE: {
+            sendBatch: async () => {
+              throw new Error('queue unavailable');
+            },
+          },
+        } as unknown as CloudflareEnv
+      )
+    ).rejects.toThrow('queue unavailable');
+    expect(markSecurityAgentCommandQueueAdmissionFailed).toHaveBeenCalledWith(
+      {},
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      'Queue admission failed'
+    );
+  });
+
   it('accepts an authenticated repository command and enqueues worker processing', async () => {
     const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
     const response = await worker.fetch(
@@ -134,6 +180,7 @@ describe('manual sync dispatch', () => {
       }),
       {
         INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
         SYNC_QUEUE: {
           sendBatch: async batch => {
             queuedBatches.push(batch);
@@ -201,6 +248,7 @@ describe('manual sync dispatch', () => {
       }),
       {
         INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
         SYNC_QUEUE: {
           sendBatch: async batch => {
             queuedBatches.push(batch);
@@ -280,6 +328,7 @@ describe('manual dismissal dispatch', () => {
       }),
       {
         INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
         SYNC_QUEUE: {
           sendBatch: async batch => {
             queuedBatches.push(batch);
@@ -327,6 +376,7 @@ describe('manual dismissal dispatch', () => {
       }),
       {
         INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
         SYNC_QUEUE: {
           sendBatch: async batch => {
             queuedBatches.push(batch);
@@ -369,6 +419,7 @@ describe('manual dismissal dispatch', () => {
             body: {
               schemaVersion: 1,
               kind: 'dismiss',
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
               runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
               messageId: 'dismiss-message-123',
               dispatchedAt: '2026-05-18T08:30:00.000Z',

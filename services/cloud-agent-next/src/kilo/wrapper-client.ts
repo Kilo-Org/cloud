@@ -131,7 +131,7 @@ export type WrapperPty = {
 };
 
 export type JobStatus = {
-  state: 'idle' | 'active';
+  state: 'idle' | 'active' | 'finalizing';
   sessionId?: string;
   lastError?: {
     code: string;
@@ -168,6 +168,16 @@ export class WrapperError extends Error {
   }
 }
 
+export class WrapperFinalizingError extends WrapperError {
+  constructor(
+    message: string,
+    public readonly wrapperRunId?: string
+  ) {
+    super(message, 'WRAPPER_FINALIZING', 409);
+    this.name = 'WrapperFinalizingError';
+  }
+}
+
 export class WrapperNotReadyError extends WrapperError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, 'NOT_READY', 503, options);
@@ -198,6 +208,7 @@ const ERROR_STATUS_CODES: Record<string, number> = {
   WORKSPACE_SETUP_FAILED: 503,
   KILO_SERVER_FAILED: 503,
   SEND_ERROR: 500,
+  WRAPPER_FINALIZING: 409,
 };
 
 // ---------------------------------------------------------------------------
@@ -469,6 +480,7 @@ export class WrapperClient {
         error?: string;
         message?: string;
         retryable?: boolean;
+        wrapperRunId?: string;
       };
 
       // Check for error response
@@ -484,6 +496,12 @@ export class WrapperClient {
         }
         if (errorCode === 'JOB_CONFLICT') {
           throw new WrapperJobConflictError(parsed.message ?? 'Job conflict');
+        }
+        if (errorCode === 'WRAPPER_FINALIZING') {
+          throw new WrapperFinalizingError(
+            parsed.message ?? 'Wrapper batch is finalizing',
+            parsed.wrapperRunId
+          );
         }
 
         throw new WrapperError(parsed.message ?? errorCode, errorCode, statusCode);

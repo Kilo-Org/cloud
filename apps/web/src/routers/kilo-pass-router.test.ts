@@ -12,6 +12,8 @@ import {
   kilo_pass_scheduled_changes,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
+  kiloclaw_instances,
+  kiloclaw_subscriptions,
   microdollar_usage,
   microdollar_usage_daily,
   user_affiliate_attributions,
@@ -163,7 +165,12 @@ type KiloPassCaller = {
       nextYearlyIssueAt: string | null;
     } | null;
     creditsAwarded: boolean;
+    hostingIntent: 'none' | 'expired_commit' | 'standard' | 'commit';
     welcomePromoIneligibleDueToReusedFingerprint: boolean;
+  }>;
+  activateCheckoutHosting: (input: { sessionId: string }) => Promise<{
+    activated: boolean;
+    hostingIntent: 'none' | 'expired_commit' | 'standard' | 'commit';
   }>;
   getCustomerPortalUrl: (input: { returnUrl?: string }) => Promise<{ url: string }>;
   getChurnkeyAuthHash: () => Promise<{ hash: string; customerId: string }>;
@@ -1934,6 +1941,7 @@ describe('kiloPassRouter', () => {
       expect(result).toEqual({
         subscription: null,
         creditsAwarded: false,
+        hostingIntent: 'none',
         welcomePromoIneligibleDueToReusedFingerprint: false,
       });
     });
@@ -1954,6 +1962,7 @@ describe('kiloPassRouter', () => {
       const stripeMock = getStripeMock();
       stripeMock.checkout.sessions.retrieve.mockResolvedValue({
         subscription: 'sub_test_return_no_credits',
+        metadata: {},
       });
 
       const caller = await createCallerForUser(user.id);
@@ -1962,6 +1971,61 @@ describe('kiloPassRouter', () => {
       expect(result.creditsAwarded).toBe(false);
       expect(result.welcomePromoIneligibleDueToReusedFingerprint).toBe(false);
       expect(result.subscription?.stripeSubscriptionId).toBe('sub_test_return_no_credits');
+    });
+
+    it('retains verified hosting intent while Kilo Pass settlement is pending', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-checkout-return-pending-hosting@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_return_pending_hosting',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+      });
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        subscription: 'sub_test_return_pending_hosting',
+        metadata: { kiloclawHostingPlan: 'standard' },
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCheckoutReturnState({
+        sessionId: 'cs_pending_hosting',
+      });
+
+      expect(result.creditsAwarded).toBe(false);
+      expect(result.hostingIntent).toBe('standard');
+    });
+
+    it('preserves expired Commit intent so the client can surface recovery', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-checkout-return-expired-commit@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_return_expired_commit',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+      });
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        subscription: 'sub_test_return_expired_commit',
+        metadata: { kiloclawHostingPlan: 'commit' },
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_return_expired_commit',
+        created: Math.floor(new Date('2026-06-06T00:00:00.000Z').getTime() / 1000),
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCheckoutReturnState({
+        sessionId: 'cs_expired_commit',
+      });
+
+      expect(result.hostingIntent).toBe('expired_commit');
     });
 
     it('returns creditsAwarded=true once base credits have been issued for the current subscription', async () => {
@@ -1982,6 +2046,7 @@ describe('kiloPassRouter', () => {
       const stripeMock = getStripeMock();
       stripeMock.checkout.sessions.retrieve.mockResolvedValue({
         subscription: 'sub_test_return_credits',
+        metadata: {},
       });
 
       const caller = await createCallerForUser(user.id);
@@ -2014,6 +2079,7 @@ describe('kiloPassRouter', () => {
       const stripeMock = getStripeMock();
       stripeMock.checkout.sessions.retrieve.mockResolvedValue({
         subscription: 'sub_test_return_reused_card',
+        metadata: {},
       });
 
       const caller = await createCallerForUser(user.id);
@@ -2022,6 +2088,93 @@ describe('kiloPassRouter', () => {
       expect(stripeMock.checkout.sessions.retrieve).toHaveBeenCalledWith('cs_reused_card');
       expect(result.creditsAwarded).toBe(true);
       expect(result.welcomePromoIneligibleDueToReusedFingerprint).toBe(true);
+    });
+  });
+
+  describe('activateCheckoutHosting', () => {
+    it('activates verified pre-cutoff Commit hosting after cutoff as checkout-qualified', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-qualified-commit-hosting@example.com',
+        total_microdollars_acquired: 400_000_000,
+      });
+      const instanceId = crypto.randomUUID();
+      await db.insert(kiloclaw_instances).values({
+        id: instanceId,
+        user_id: user.id,
+        sandbox_id: `test-${instanceId}`,
+      });
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        instance_id: instanceId,
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: '2026-05-10',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_qualified_commit_hosting',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+      });
+
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        status: 'complete',
+        subscription: 'sub_qualified_commit_hosting',
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          kiloclawHostingPlan: 'commit',
+          kiloclawInstanceId: instanceId,
+          kiloclawPriceVersion: '2026-05-10',
+        },
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_qualified_commit_hosting',
+        created: Math.floor(new Date('2026-06-05T23:59:59.000Z').getTime() / 1000),
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_qualified_commit_hosting' })
+      ).resolves.toEqual({ activated: true, hostingIntent: 'commit' });
+
+      const [hosting] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.instance_id, instanceId))
+        .limit(1);
+      expect(hosting).toMatchObject({
+        plan: 'commit',
+      });
+    });
+
+    it('expires Commit hosting intent confirmed at the cutoff from verified Stripe metadata', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-expired-commit-hosting@example.com',
+      });
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        status: 'complete',
+        subscription: 'sub_expired_commit_hosting',
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          kiloclawHostingPlan: 'commit',
+          kiloclawInstanceId: crypto.randomUUID(),
+          kiloclawPriceVersion: '2026-05-10',
+        },
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_expired_commit_hosting',
+        created: Math.floor(new Date('2026-06-06T00:00:00.000Z').getTime() / 1000),
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_expired_commit_hosting' })
+      ).resolves.toEqual({ activated: false, hostingIntent: 'expired_commit' });
     });
   });
 

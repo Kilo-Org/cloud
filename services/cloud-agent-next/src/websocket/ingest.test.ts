@@ -48,7 +48,7 @@ function createFakeDOContext(): IngestDOContext {
       isCurrentConnection: vi.fn().mockResolvedValue(true),
       observePong: vi.fn().mockResolvedValue(undefined),
       observeMeaningfulOutput: vi.fn().mockResolvedValue(undefined),
-      observeRootIdle: vi.fn().mockResolvedValue(undefined),
+      observeFinalizing: vi.fn().mockResolvedValue(undefined),
       onTerminalEvent: vi.fn().mockResolvedValue(undefined),
     },
   };
@@ -891,7 +891,7 @@ describe('createIngestHandler', () => {
       expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
     });
 
-    it('terminalizes on terminal assistant message.updated (with time.completed)', async () => {
+    it('observes activity without terminalizing on completed assistant message.updated', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
       const handler = createIngestHandler(
@@ -922,15 +922,8 @@ describe('createIngestHandler', () => {
 
       await handler.handleIngestMessage(ws, message);
 
-      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
-        'msg_user_222',
-        expect.objectContaining({
-          kind: 'completed',
-          assistantMessageId: 'asst_222',
-          completionSource: 'assistant_message_event',
-        }),
-        WRAPPER_RUN_ID
-      );
+      expect(doContext.observeCorrelatedAgentActivity).toHaveBeenCalledWith('msg_user_222');
+      expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
     });
 
     it('terminalizes on wrapper cloud.message.completed control event', async () => {
@@ -1124,7 +1117,7 @@ describe('createIngestHandler', () => {
       );
     });
 
-    it('ingests duplicate terminal updates without error (idempotency at DO level)', async () => {
+    it('ingests duplicate completed assistant updates as non-terminal activity', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
       doContext.terminalizeSessionMessageOnce = vi.fn().mockResolvedValue(undefined);
@@ -1158,13 +1151,25 @@ describe('createIngestHandler', () => {
       await handler.handleIngestMessage(ws, makeMessage());
       await handler.handleIngestMessage(ws, makeMessage());
 
-      // Both events trigger terminalizeSessionMessageOnce; the DO handles idempotency
-      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledTimes(2);
-      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
-        'msg_user_444',
-        expect.objectContaining({ kind: 'completed' }),
-        WRAPPER_RUN_ID
+      expect(doContext.observeCorrelatedAgentActivity).toHaveBeenCalledTimes(2);
+      expect(doContext.observeCorrelatedAgentActivity).toHaveBeenCalledWith('msg_user_444');
+      expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
+    });
+
+    it('marks the current run finalizing from wrapper control event', async () => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
       );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('wrapper_finalizing'));
+
+      expect(doContext.wrapperSupervisor.observeFinalizing).toHaveBeenCalledWith(WRAPPER_RUN_ID);
     });
 
     it('does NOT terminalize on wrapper complete event (new path)', async () => {
@@ -1182,7 +1187,7 @@ describe('createIngestHandler', () => {
 
       const message = JSON.stringify({
         streamEventType: 'complete',
-        data: { exitCode: 0 },
+        data: { exitCode: 0, messageIds: ['msg_user_complete'] },
         timestamp: new Date().toISOString(),
       });
 
@@ -1192,6 +1197,27 @@ describe('createIngestHandler', () => {
       expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'completed', wrapperRunId: WRAPPER_RUN_ID })
       );
+    });
+
+    it('forwards legacy wrapper complete events without sealed membership', async () => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('complete', { exitCode: 0 }));
+
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        status: 'completed',
+        wrapperRunId: WRAPPER_RUN_ID,
+        gateResult: undefined,
+        messageIds: undefined,
+      });
     });
   });
 

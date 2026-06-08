@@ -336,6 +336,7 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
       await instance.handleWrapperTerminalEvent({
         wrapperRunId: wrapperRunId!,
         status: 'completed',
+        messageIds: [messageId],
       });
 
       const wrapperRuntimeState = await getWrapperRuntimeState(instance.ctx.storage);

@@ -141,7 +141,6 @@ const createCallbacks = (): ConnectionCallbacks & {
   onRootSessionActivity: ReturnType<typeof vi.fn>;
   onSseEvent: ReturnType<typeof vi.fn>;
 } => ({
-  onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
@@ -1143,7 +1142,26 @@ describe('ingest WS reconnection', () => {
     expect(state.observedGateResult).toBe('fail');
   });
 
-  it('reports root activity before a terminal root message completion after idle', async () => {
+  it('does not treat trailing root session.turn.close as resumed execution', async () => {
+    callbacks.onSessionIdle = vi.fn();
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          { type: 'session.idle', properties: { sessionID: 'kilo_sess_456' } },
+          { type: 'session.turn.close', properties: { sessionID: 'kilo_sess_456' } },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onSessionIdle).toHaveBeenCalledOnce();
+    expect(callbacks.onRootSessionActivity).not.toHaveBeenCalled();
+  });
+
+  it('does not treat the post-idle root session epilogue as resumed execution', async () => {
     const callbackOrder: string[] = [];
     callbacks.onSessionIdle = vi.fn(() => {
       callbackOrder.push('idle');
@@ -1151,17 +1169,14 @@ describe('ingest WS reconnection', () => {
     callbacks.onRootSessionActivity.mockImplementation(() => {
       callbackOrder.push('activity');
     });
-    callbacks.onMessageComplete = vi.fn((messageId: string) => {
-      callbackOrder.push(`complete:${messageId}`);
-    });
 
     const kiloClient = createMockKiloClient({
       subscribeEvents: vi.fn().mockResolvedValue({
         stream: createEventStream([
-          {
-            type: 'session.idle',
-            properties: { sessionID: 'kilo_sess_456' },
-          },
+          { type: 'session.idle', properties: { sessionID: 'kilo_sess_456' } },
+          { type: 'session.turn.close', properties: { sessionID: 'kilo_sess_456' } },
+          { type: 'session.updated', properties: { sessionID: 'kilo_sess_456' } },
+          { type: 'session.diff', properties: { sessionID: 'kilo_sess_456' } },
           {
             type: 'message.updated',
             properties: {
@@ -1183,10 +1198,30 @@ describe('ingest WS reconnection', () => {
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(callbacks.onSessionIdle).toHaveBeenCalledTimes(1);
-    expect(callbacks.onRootSessionActivity).toHaveBeenCalledTimes(1);
-    expect(callbacks.onMessageComplete).toHaveBeenCalledWith('msg_root_user_123');
-    expect(callbackOrder).toEqual(['idle', 'activity', 'complete:msg_root_user_123']);
+    expect(callbacks.onSessionIdle).toHaveBeenCalledOnce();
+    expect(callbacks.onRootSessionActivity).not.toHaveBeenCalled();
+    expect(callbacks.onCompletionSignal).toHaveBeenCalledTimes(2);
+    expect(callbackOrder).toEqual(['idle']);
+  });
+
+  it('treats root turn-open and busy-status events as resumed execution', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          { type: 'session.turn.open', properties: { sessionID: 'kilo_sess_456' } },
+          {
+            type: 'session.status',
+            properties: { sessionID: 'kilo_sess_456', status: { type: 'busy' } },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onRootSessionActivity).toHaveBeenCalledTimes(2);
   });
 
   it('rejects real-time code-review questions without disconnecting', async () => {
@@ -1212,7 +1247,6 @@ describe('ingest WS reconnection', () => {
     expect(questionEvents).toHaveLength(0);
     expect(rejectQuestion).toHaveBeenCalledWith('q_123');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
-    expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
   });
 
   it('rejects real-time code-review permissions without disconnecting', async () => {
@@ -1245,7 +1279,6 @@ describe('ingest WS reconnection', () => {
       CODE_REVIEW_PERMISSION_REJECTION_MESSAGE
     );
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
-    expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
   });
 
   it.each(['question', 'permission'])(
@@ -1281,7 +1314,6 @@ describe('ingest WS reconnection', () => {
       });
       expect(statusEvents).toHaveLength(0);
       expect(callbacks.onDisconnect).not.toHaveBeenCalled();
-      expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
     }
   );
 
@@ -1331,7 +1363,6 @@ describe('ingest WS reconnection', () => {
     });
     expect(callbacks.onTerminalError).toHaveBeenCalledWith('Insufficient credits');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
-    expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------

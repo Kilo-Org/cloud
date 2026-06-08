@@ -1,0 +1,1 @@
+ALTER TABLE "model_experiment" ADD COLUMN "metadata" jsonb;

@@ -14,7 +14,8 @@ export type RetryableErrorCode =
   | 'SANDBOX_CONNECT_FAILED' // Sandbox may be waking up or network issue
   | 'WORKSPACE_SETUP_FAILED' // Git clone/network transient failure
   | 'KILO_SERVER_FAILED' // Kilo server starting up
-  | 'WRAPPER_START_FAILED'; // Wrapper process starting
+  | 'WRAPPER_START_FAILED' // Wrapper process starting
+  | 'WRAPPER_FINALIZING'; // Wrapper sealed the current run before this delivery
 
 /**
  * Error codes for non-retryable failures (4xx/5xx).

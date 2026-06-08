@@ -60,7 +60,7 @@ function createMockDeps(state: WrapperState) {
     closeConnection: vi.fn().mockResolvedValue(undefined),
     setAborted: vi.fn(),
     resetLifecycle: vi.fn(),
-    onMessageComplete: vi.fn(),
+    onDeliveryAcknowledged: vi.fn(),
     readySession: vi.fn(),
     materializePromptAttachments: vi.fn(async prompt => prompt),
     configureCommitCoAuthor: vi.fn().mockResolvedValue(undefined),
@@ -968,7 +968,7 @@ describe('createCommandHandler', () => {
       },
       timestamp: expect.any(String),
     });
-    expect(deps.onMessageComplete).toHaveBeenCalledWith('msg_compact');
+    expect(deps.onDeliveryAcknowledged).toHaveBeenCalledWith('sync-command');
     expect(state.getMessageConfig('msg_compact')).toEqual({
       autoCommit: false,
       condenseOnComplete: false,
@@ -1024,7 +1024,7 @@ describe('createCommandHandler', () => {
       message: 'Failed to send command: summarize failed',
     });
     expect(sendToIngest).not.toHaveBeenCalled();
-    expect(deps.onMessageComplete).not.toHaveBeenCalled();
+    expect(deps.onDeliveryAcknowledged).toHaveBeenCalledWith('failed');
     expect(state.getMessageConfig('msg_compact')).toBeNull();
   });
 });
@@ -1073,6 +1073,45 @@ describe('createSessionReadyHandler', () => {
       kiloSessionId: 'kilo_sess_1',
     });
     expect(deps.readySession).toHaveBeenCalledOnce();
+  });
+
+  it('preserves finalizing retry metadata from readiness', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    deps.readySession.mockResolvedValue({
+      status: 'error',
+      error: {
+        code: 'WRAPPER_FINALIZING',
+        message: 'Wrapper batch is finalizing',
+        retryable: true,
+        wrapperRunId: 'run_finalizing',
+      },
+    });
+    const handler = createSessionReadyHandler(deps);
+
+    const response = await handler(
+      jsonRequest({
+        agentSessionId: 'agent_test',
+        userId: 'user_test',
+        sandboxId: 'usr-test',
+        kiloSessionId: 'kilo_sess_1',
+        workspace: {
+          workspacePath: '/workspace',
+          sessionHome: '/home/agent_test',
+          branchName: 'main',
+        },
+        materialized: { env: { KILOCODE_TOKEN: 'kilo-token' } },
+        session: completeBinding,
+      })
+    );
+
+    expect(response.status).toBe(503);
+    await expect(readJson(response)).resolves.toEqual({
+      error: 'WRAPPER_FINALIZING',
+      message: 'Wrapper batch is finalizing',
+      retryable: true,
+      wrapperRunId: 'run_finalizing',
+    });
   });
 
   it('maps typed bootstrap errors to JSON error responses', async () => {

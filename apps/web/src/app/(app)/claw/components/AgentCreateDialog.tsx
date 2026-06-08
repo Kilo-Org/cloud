@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { AnimatedDots } from './AnimatedDots';
+import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useClawAgentMutations } from '../hooks/useClawHooks';
+import { useClawModelOptions } from '../hooks/useClawModelOptions';
 
 // Mirror of the controller's normalizeAgentId (openclaw-agent-config.ts) so the
 // derived workspace is 1:1 with the agent id the controller will assign. Using
@@ -50,6 +52,7 @@ export function AgentCreateDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { createAgent } = useClawAgentMutations();
+  const { modelOptions, isLoading: isLoadingModels } = useClawModelOptions();
   const [name, setName] = useState('');
   const [model, setModel] = useState('');
 
@@ -115,13 +118,16 @@ export function AgentCreateDialog({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="agent-model">Model (optional)</Label>
-            <Input
-              id="agent-model"
+            <Label>Model (optional)</Label>
+            <ModelCombobox
+              label=""
+              models={modelOptions}
               value={model}
-              maxLength={256}
-              placeholder="Leave blank to use the default model"
-              onChange={e => setModel(e.target.value)}
+              onValueChange={setModel}
+              isLoading={isLoadingModels}
+              placeholder="Use the default model"
+              modal
+              className="w-full"
             />
           </div>
         </div>

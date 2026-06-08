@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { AnimatedDots } from './AnimatedDots';
+import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -14,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -26,6 +26,7 @@ import {
 import type { AgentUpdateInput } from '@/lib/kiloclaw/agent-schemas';
 import type { AgentSummary } from '@/lib/kiloclaw/types';
 import { useClawAgentMutations } from '../hooks/useClawHooks';
+import { useClawModelOptions } from '../hooks/useClawModelOptions';
 
 const INHERIT = 'inherit';
 const THINKING = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'adaptive', 'max'] as const;
@@ -90,6 +91,7 @@ export function AgentEditDialog({
   etag: string;
 }) {
   const { updateAgent } = useClawAgentMutations();
+  const { modelOptions, isLoading: isLoadingModels } = useClawModelOptions();
 
   const initial = useMemo(() => ownModel(agent), [agent]);
   // An agent owns a model when rawModel is set — including a fallback-only model
@@ -220,12 +222,15 @@ export function AgentEditDialog({
             </div>
             {!inheritModel && (
               <>
-                <Input
-                  id="agent-edit-model"
+                <ModelCombobox
+                  label=""
+                  models={modelOptions}
                   value={primary}
-                  maxLength={256}
-                  placeholder="Model id (e.g. kilocode/kilo-auto/balanced)"
-                  onChange={e => setPrimary(e.target.value)}
+                  onValueChange={setPrimary}
+                  isLoading={isLoadingModels}
+                  placeholder="Select a model"
+                  modal
+                  className="w-full"
                 />
                 {initial.fallbacks.length > 0 && (
                   <p className="text-muted-foreground text-xs">

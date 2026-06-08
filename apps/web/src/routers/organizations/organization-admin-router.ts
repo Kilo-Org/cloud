@@ -174,7 +174,13 @@ const AddMemberInputSchema = z.object({
 
 export const organizationAdminRouter = createTRPCRouter({
   create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async opts => {
-    const organization = await createOrganization(opts.input.name);
+    const organization = await createOrganization(
+      opts.input.name,
+      undefined,
+      true,
+      undefined,
+      'enterprise'
+    );
     // create stripe customer id on org creation
     await getOrCreateStripeCustomerIdForOrganization(organization.id);
     return { organization };

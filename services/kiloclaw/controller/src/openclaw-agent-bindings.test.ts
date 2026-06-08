@@ -59,6 +59,86 @@ function makeDeps(overrides: Partial<AgentBindingsDeps> = {}): AgentBindingsDeps
   } as AgentBindingsDeps;
 }
 
+type FakeOpts = {
+  conflictOn?: string[]; // specs another agent owns → conflict
+  accountResolve?: string[]; // channels whose bare bind/unbind resolves to :default
+  unbindThrows?: boolean; // unbind always fails (rollback cannot complete)
+};
+
+// A stateful in-memory CLI fake: bind/unbind mutate a route list like the real
+// OpenClaw CLI, so the before/after diff, rollback, and restoration-check run end
+// to end. `accountResolve` channels model a bare bind/unbind that resolves to the
+// default account (the finding-1 / F5 class of channel).
+function statefulDeps(
+  initial: CliBinding[],
+  opts: FakeOpts = {}
+): { deps: AgentBindingsDeps; routes: () => CliBinding[] } {
+  let routes: CliBinding[] = initial.map(r => ({ ...r, match: { ...r.match } }));
+  const keyOf = (m: Record<string, unknown>) =>
+    Object.keys(m)
+      .sort()
+      .map(k => `${k}=${JSON.stringify(m[k])}`)
+      .join('&');
+
+  const bind = vi.fn(async (id: string, specs: string[]) => {
+    const added: string[] = [];
+    const skipped: string[] = [];
+    const conflicts: string[] = [];
+    for (const spec of specs) {
+      if (opts.conflictOn?.includes(spec)) {
+        conflicts.push(`${spec} (agent=other)`);
+        continue;
+      }
+      const match = opts.accountResolve?.includes(spec)
+        ? { channel: spec, accountId: 'default' }
+        : { channel: spec };
+      if (
+        routes.some(
+          r => r.agentId === id && keyOf(r.match as Record<string, unknown>) === keyOf(match)
+        )
+      ) {
+        skipped.push(spec);
+      } else {
+        routes.push({ agentId: id, match, description: spec });
+        added.push(spec);
+      }
+    }
+    return { agentId: id, added, updated: [], skipped, conflicts };
+  });
+
+  const unbind = vi.fn(async (id: string, specs: string[]) => {
+    if (opts.unbindThrows) throw new Error('unbind failed');
+    const removed: string[] = [];
+    const missing: string[] = [];
+    for (const spec of specs) {
+      const [channel, explicitAccount] = spec.split(':');
+      const accountId =
+        explicitAccount ?? (opts.accountResolve?.includes(channel) ? 'default' : undefined);
+      const idx = routes.findIndex(
+        r =>
+          r.agentId === id &&
+          r.match.channel === channel &&
+          (accountId !== undefined
+            ? (r.match as Record<string, unknown>).accountId === accountId
+            : !('accountId' in r.match))
+      );
+      if (idx >= 0) {
+        routes.splice(idx, 1);
+        removed.push(spec);
+      } else {
+        missing.push(spec);
+      }
+    }
+    return { agentId: id, removed, missing, conflicts: [] };
+  });
+
+  const listBindings = vi.fn(async (id?: string) =>
+    routes.filter(r => !id || r.agentId === id).map(r => ({ ...r, match: { ...r.match } }))
+  );
+
+  return { deps: makeDeps({ bind, unbind, listBindings }), routes: () => routes };
+}
+
 describe('updateAgentBindings', () => {
   it('binds channels missing from the current set', async () => {
     const deps = makeDeps({ listBindings: vi.fn(async () => [route('research', 'slack')]) });
@@ -107,53 +187,45 @@ describe('updateAgentBindings', () => {
     expect(deps.unbind).not.toHaveBeenCalled();
   });
 
-  it('rolls back added routes and removes nothing else when the CLI reports a conflict', async () => {
-    const unbind = vi.fn(async (agentId: string, specs: string[]) => ({
-      agentId,
-      removed: specs,
-      missing: [],
-      conflicts: [],
-    }));
-    const deps = makeDeps({
-      listBindings: vi.fn(async () => [route('research', 'discord')]),
-      // OpenClaw applies the free channel and still reports the owned one as a conflict.
-      bind: vi.fn(async (agentId: string) => ({
-        agentId,
-        added: ['kilo-chat'],
-        updated: [],
-        skipped: [],
-        conflicts: ['slack (agent=ops)'],
-      })),
-      unbind,
+  it('rolls back only the routes the conflicting invocation created (409)', async () => {
+    const { deps, routes } = statefulDeps([route('research', 'discord')], {
+      conflictOn: ['slack'], // owned by another agent
     });
 
     await expect(
       updateAgentBindings('research', { channels: ['discord', 'slack', 'kilo-chat'] }, deps)
     ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
-    // Rollback unbinds exactly the attempted additions (toBind); the pre-existing
-    // discord route is never removed because we throw before the unbind phase.
-    expect(unbind).toHaveBeenCalledTimes(1);
-    expect(unbind).toHaveBeenCalledWith('research', ['slack', 'kilo-chat']);
+
+    // kilo-chat was added then rolled back; the pre-existing discord route stays.
+    expect(routes().map(r => r.match.channel)).toEqual(['discord']);
   });
 
-  it('still rejects with 409 if the post-conflict rollback itself fails', async () => {
-    const deps = makeDeps({
-      listBindings: vi.fn(async () => []),
-      bind: vi.fn(async (agentId: string) => ({
-        agentId,
-        added: ['free'],
-        updated: [],
-        skipped: [],
-        conflicts: ['slack (agent=ops)'],
-      })),
-      unbind: vi.fn(async () => {
-        throw new Error('rollback boom');
-      }),
-    });
+  it('does not delete a pre-existing account-scoped route when a conflict rolls back', async () => {
+    // whatsapp's bare bind/unbind resolves to :default, and the agent already
+    // owns whatsapp:default — so the whatsapp bind is skipped (not created here).
+    const { deps, routes } = statefulDeps(
+      [route('research', 'whatsapp', { accountId: 'default' })],
+      {
+        conflictOn: ['slack'],
+        accountResolve: ['whatsapp'],
+      }
+    );
 
     await expect(
-      updateAgentBindings('research', { channels: ['free', 'slack'] }, deps)
+      updateAgentBindings('research', { channels: ['whatsapp', 'slack'] }, deps)
     ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
+
+    // The pre-existing whatsapp:default route must survive (it wasn't created here).
+    expect(routes()).toHaveLength(1);
+    expect(routes()[0].match).toEqual({ channel: 'whatsapp', accountId: 'default' });
+  });
+
+  it('reports a state-uncertain failure (500) when a rollback cannot be confirmed', async () => {
+    const { deps } = statefulDeps([], { conflictOn: ['slack'], unbindThrows: true });
+
+    await expect(
+      updateAgentBindings('research', { channels: ['kilo-chat', 'slack'] }, deps)
+    ).rejects.toMatchObject({ code: 'agent_binding_rollback_failed', status: 500 });
   });
 
   it('accepts a bare bind that yields a channel-key-only route (guard no-op)', async () => {
@@ -171,26 +243,14 @@ describe('updateAgentBindings', () => {
   });
 
   it('fails closed (422) and rolls back when a bare bind resolves to an account-scoped route', async () => {
-    let call = 0;
-    const listBindings = vi.fn(async () => {
-      call += 1;
-      // before: empty; after the bind: OpenClaw produced an account-scoped route.
-      return call === 1 ? [] : [route('research', 'whatsapp', { accountId: 'default' })];
-    });
-    const unbind = vi.fn(async (agentId: string, specs: string[]) => ({
-      agentId,
-      removed: specs,
-      missing: [],
-      conflicts: [],
-    }));
-    const deps = makeDeps({ listBindings, unbind });
+    const { deps, routes } = statefulDeps([], { accountResolve: ['whatsapp'] });
 
     await expect(
       updateAgentBindings('research', { channels: ['whatsapp'] }, deps)
     ).rejects.toMatchObject({ code: 'invalid_agent_config', status: 422 });
 
-    // Rolls back exactly the route OpenClaw created, by its canonical spec.
-    expect(unbind).toHaveBeenCalledWith('research', ['whatsapp:default']);
+    // The account-scoped route OpenClaw produced is rolled back, leaving nothing.
+    expect(routes()).toHaveLength(0);
   });
 
   it('does not flag a pre-existing account-scoped route as produced by the bind', async () => {

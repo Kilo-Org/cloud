@@ -125,11 +125,12 @@ describe('agent config mutation routes', () => {
     expect(await response.json()).toMatchObject({
       ok: true,
       etag: 'etag-1',
-      agent: { id: 'research' },
+      // CLI-sourced bindings are attached so a create with --bind isn't reported empty.
+      agent: { id: 'research', bindings: [{ channel: 'slack', accountId: null, advanced: false }] },
     });
   });
 
-  it('updates allowed per-agent settings', async () => {
+  it('updates allowed per-agent settings and returns CLI-sourced bindings', async () => {
     const deps = createDeps();
     const response = await makeApp(deps).request('/_kilo/config/agents/research', {
       method: 'PATCH',
@@ -142,6 +143,10 @@ describe('agent config mutation routes', () => {
       'research',
       expect.objectContaining({ set: { verboseDefault: 'off' } })
     );
+    // The settings-update response must not falsely report an empty binding set.
+    expect(await response.json()).toMatchObject({
+      agent: { bindings: [{ channel: 'slack', accountId: null, advanced: false }] },
+    });
   });
 
   it('updates agent defaults on the unambiguous defaults route', async () => {

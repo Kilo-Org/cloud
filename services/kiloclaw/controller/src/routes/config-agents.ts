@@ -125,7 +125,14 @@ export function registerAgentConfigRoutes(app: Hono, deps: AgentRouteDeps = defa
       const result = await deps.serializeMutation(async () => {
         const created = await deps.createViaCli(parsed.data);
         const { snapshot, agent } = deps.readSummary(created.agentId);
-        return { etag: snapshot.etag, agent, created };
+        // summarizeAgentConfig can't see bindings; attach the CLI's view so a
+        // create with `--bind` doesn't report an empty binding set.
+        const bindingsByAgent = await deps.listBindingSummaries(agent.id);
+        return {
+          etag: snapshot.etag,
+          agent: { ...agent, bindings: bindingsByAgent.get(agent.id) ?? [] },
+          created,
+        };
       });
       return c.json({ ok: true, ...result });
     } catch (error) {
@@ -143,7 +150,14 @@ export function registerAgentConfigRoutes(app: Hono, deps: AgentRouteDeps = defa
         );
       }
       const result = await deps.updateSettings(c.req.param('agentId'), parsed.data);
-      return c.json({ ok: true, etag: result.snapshot.etag, agent: result.agent });
+      // Attach the CLI's binding view so a settings update on an already-bound
+      // agent doesn't report an empty binding set (summarize omits bindings).
+      const bindingsByAgent = await deps.listBindingSummaries(result.agent.id);
+      return c.json({
+        ok: true,
+        etag: result.snapshot.etag,
+        agent: { ...result.agent, bindings: bindingsByAgent.get(result.agent.id) ?? [] },
+      });
     } catch (error) {
       return respondError(c, error);
     }

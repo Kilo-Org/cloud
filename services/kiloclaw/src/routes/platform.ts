@@ -1166,6 +1166,7 @@ const AGENT_CONFIG_ERROR_CODES = new Set([
   'invalid_agent_request',
   'invalid_agent_config',
   'invalid_config_after_patch',
+  'agent_binding_rollback_failed', // 500 — binding change rejected but routing left uncertain
   'openclaw_cli_failed', // 502 — controller CLI message is generic
   'openclaw_cli_timeout', // 504
 ]);

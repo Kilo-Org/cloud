@@ -160,24 +160,53 @@ export async function updateAgentBindings(
     const toBind = desired.filter(channel => !currentSet.has(channel));
     const toUnbind = current.filter(channel => !desiredSet.has(channel));
 
+    const beforeKeys = new Set(before.map(routeKey));
+
+    // Undo exactly the routes a rejected/aborted bind produced, then CONFIRM the
+    // agent's routes match the pre-bind snapshot. We diff against `before` rather
+    // than unbinding `toBind` blindly: a bare unbind can resolve to an
+    // account-scoped route, so unbinding requested channels could delete a
+    // pre-existing route this request never created. If restoration can't be
+    // confirmed (CLI timeout, write conflict, …), surface a distinct
+    // state-uncertain error instead of reporting a clean rejection over mutated
+    // routing.
+    const restoreToBefore = async (created: CliBinding[]): Promise<void> => {
+      try {
+        if (created.length > 0) {
+          await deps.unbind(normalized, created.map(routeToUnbindSpec));
+        }
+      } catch (rollbackError) {
+        console.error(
+          '[controller] Agent binding rollback unbind failed:',
+          rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+        );
+      }
+      const afterRollback = await deps.listBindings(normalized);
+      const afterKeys = new Set(afterRollback.map(routeKey));
+      const drifted =
+        afterRollback.some(binding => !beforeKeys.has(routeKey(binding))) ||
+        before.some(binding => !afterKeys.has(routeKey(binding)));
+      if (drifted) {
+        throw new AgentConfigError(
+          500,
+          'agent_binding_rollback_failed',
+          'Binding change was rejected but could not be fully rolled back; routing state is uncertain — re-read bindings before retrying'
+        );
+      }
+    };
+
     // Bind first, before removing anything. OpenClaw applies every
-    // non-conflicting addition and THEN reports the conflict (exit 1), so on a
-    // conflict we must roll back the routes it already added to keep the
-    // declarative request atomic — otherwise a partial set stays active.
+    // non-conflicting addition and THEN reports the conflict (exit 1), so we
+    // diff the agent's routes against the pre-bind snapshot to see exactly what
+    // this invocation produced, and roll those back on any rejection.
     if (toBind.length > 0) {
       const result = await deps.bind(normalized, toBind);
+      const created = (await deps.listBindings(normalized)).filter(
+        binding => !beforeKeys.has(routeKey(binding))
+      );
+
       if (result.conflicts.length > 0) {
-        try {
-          // Every channel in `toBind` was absent from the agent's managed routes
-          // before this call, so unbinding the whole set removes exactly what we
-          // just added; channels that conflicted aren't ours, so unbind no-ops.
-          await deps.unbind(normalized, toBind);
-        } catch (rollbackError) {
-          console.error(
-            '[controller] Failed to roll back partial agent bindings after conflict:',
-            rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
-          );
-        }
+        await restoreToBefore(created);
         throw new AgentConfigError(
           409,
           'agent_binding_conflict',
@@ -188,25 +217,12 @@ export async function updateAgentBindings(
       // Defense-in-depth: a channel's bare bind could (for some channel plugin)
       // resolve into an account-scoped route this endpoint can't manage as a
       // default route — a later `channels: []` clear would then silently leave
-      // it. Diff the agent's routes against the pre-bind snapshot and confirm
-      // every route this invocation produced is a channel-key-only default
-      // route. If not, roll back exactly the routes it created (never the
-      // pre-existing ones) and fail closed. The cloud channels all bind cleanly,
-      // so this only guards a future channel whose bare bind auto-resolves.
-      const beforeKeys = new Set(before.map(routeKey));
-      const created = (await deps.listBindings(normalized)).filter(
-        binding => !beforeKeys.has(routeKey(binding))
-      );
+      // it. Confirm every route this invocation produced is a channel-key-only
+      // default route; if not, roll back and fail closed. The cloud channels all
+      // bind cleanly, so this only guards a future auto-resolving channel.
       const unmanageable = created.filter(binding => !isManagedDefaultRoute(binding));
       if (unmanageable.length > 0) {
-        try {
-          await deps.unbind(normalized, created.map(routeToUnbindSpec));
-        } catch (rollbackError) {
-          console.error(
-            '[controller] Failed to roll back unmanageable agent bindings:',
-            rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
-          );
-        }
+        await restoreToBefore(created);
         const channels = [
           ...new Set(unmanageable.map(binding => toBindingSummary(binding).channel)),
         ];

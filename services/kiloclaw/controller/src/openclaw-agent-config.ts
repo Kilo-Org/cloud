@@ -351,6 +351,10 @@ export function summarizeAgentConfig(config: OpenClawAgentConfig): AgentConfigSu
         },
         rawModel: entry.model ?? null,
         settings: settingsOf(entry),
+        // Bindings come from the OpenClaw CLI, not the config summary. Routes
+        // attach the CLI's view to every response that returns AgentSummary
+        // (list, read, create, settings-update, bindings-update); this empty
+        // placeholder must never reach a caller.
         bindings: [],
       };
     }),

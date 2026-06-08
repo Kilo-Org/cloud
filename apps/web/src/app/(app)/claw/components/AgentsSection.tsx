@@ -32,16 +32,20 @@ function settingChips(settings: AgentSettingsSummary): string[] {
 
 function AgentRow({
   agent,
+  canUpdate,
+  canDelete,
   onEdit,
   onDelete,
 }: {
   agent: AgentSummary;
+  canUpdate: boolean;
+  canDelete: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const settings = settingChips(agent.settings);
   // `main` is reserved and cannot be deleted (controller rejects it).
-  const canDelete = agent.id !== 'main';
+  const deletable = canDelete && agent.id !== 'main';
 
   return (
     <div className="px-4 py-3">
@@ -55,28 +59,32 @@ function AgentRow({
             </Badge>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2"
-            onClick={onEdit}
-            aria-label="Edit agent"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          {canDelete && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive h-7 px-2"
-              onClick={onDelete}
-              aria-label="Delete agent"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
+        {(canUpdate || deletable) && (
+          <div className="flex shrink-0 items-center gap-1">
+            {canUpdate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={onEdit}
+                aria-label="Edit agent"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {deletable && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive h-7 px-2"
+                onClick={onDelete}
+                aria-label="Delete agent"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="text-muted-foreground mt-1 text-xs">
@@ -139,12 +147,25 @@ function DefaultsRow({ defaults }: { defaults: AgentDefaultsSummary }) {
  * routed to each, with create / edit / delete. Gated by the controller's
  * `config.agents.read` capability and admin status at the call site.
  */
-export function AgentsSection({ enabled }: { enabled: boolean }) {
+export function AgentsSection({
+  enabled,
+  canCreate,
+  canUpdate,
+  canDelete,
+}: {
+  enabled: boolean;
+  canCreate: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+}) {
   const { data, isLoading, error } = useClawAgents(enabled);
   const { deleteAgent } = useClawAgentMutations();
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<AgentSummary | null>(null);
+  // Freeze the agent AND the etag together when opening the editor, so a
+  // background list refetch can't advance the etag under a stale form (which
+  // would let a save bypass the optimistic-concurrency check).
+  const [editTarget, setEditTarget] = useState<{ agent: AgentSummary; etag: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AgentSummary | null>(null);
 
   const onConfirmDelete = async () => {
@@ -162,7 +183,7 @@ export function AgentsSection({ enabled }: { enabled: boolean }) {
 
   return (
     <div>
-      {enabled && data && (
+      {enabled && data && canCreate && (
         <div className="mb-3 flex justify-end">
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -191,7 +212,9 @@ export function AgentsSection({ enabled }: { enabled: boolean }) {
               <AgentRow
                 key={agent.id}
                 agent={agent}
-                onEdit={() => setEditTarget(agent)}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                onEdit={() => setEditTarget({ agent, etag: data.etag })}
                 onDelete={() => setDeleteTarget(agent)}
               />
             ))}
@@ -206,14 +229,14 @@ export function AgentsSection({ enabled }: { enabled: boolean }) {
 
       <AgentCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
 
-      {data && editTarget && (
+      {editTarget && (
         <AgentEditDialog
           open
           onOpenChange={open => {
             if (!open) setEditTarget(null);
           }}
-          agent={editTarget}
-          etag={data.etag}
+          agent={editTarget.agent}
+          etag={editTarget.etag}
         />
       )}
 

@@ -17,16 +17,29 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useClawAgentMutations } from '../hooks/useClawHooks';
 
+// Mirror of the controller's normalizeAgentId (openclaw-agent-config.ts) so the
+// derived workspace is 1:1 with the agent id the controller will assign. Using
+// the controller's exact charset (underscores preserved, not collapsed to '-')
+// is what keeps distinct agents like `foo_bar` and `foo-bar` from sharing a
+// workspace directory.
+function normalizeAgentId(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'main';
+  const lower = trimmed.toLowerCase();
+  if (/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(trimmed)) return lower;
+  return (
+    lower
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '')
+      .slice(0, 64) || 'main'
+  );
+}
+
 // Derive a stable, unix-safe workspace path from the agent name so users never
-// have to type a machine path. Mirrors the controller's id normalization closely
-// enough to give each agent its own workspace directory.
+// have to type a machine path. Keyed on the normalized agent id for uniqueness.
 function workspaceFromName(name: string): string {
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return `/root/.openclaw/workspace-${slug || 'agent'}`;
+  return `/root/.openclaw/workspace-${normalizeAgentId(name)}`;
 }
 
 export function AgentCreateDialog({

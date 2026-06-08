@@ -57,8 +57,12 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
   // instances see an upgrade prompt rather than a broken page.
   const running = status?.status === 'running';
   const versionQuery = useClawControllerVersion(running);
-  const supportsAgentsRead =
-    controllerVersionOk(versionQuery.data)?.capabilities?.includes('config.agents.read') === true;
+  // Each agent operation advertises its own capability — gate read AND each
+  // mutation control independently so a controller that supports reads but not
+  // a given write never shows a control that can only fail.
+  const capabilities = controllerVersionOk(versionQuery.data)?.capabilities;
+  const has = (cap: string) => capabilities?.includes(cap) === true;
+  const supportsAgentsRead = has('config.agents.read');
 
   const clawUrl = organizationId ? `/organizations/${organizationId}/claw/new` : '/claw/new';
   const shouldRedirect = !isLoading && !error && (!status || status.status === null);
@@ -87,9 +91,23 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
   let content: ReactNode;
   if (!running) {
     // Machine stopped — AgentsSection renders the "start your machine" hint.
-    content = <AgentsSection enabled={false} />;
+    content = (
+      <AgentsSection enabled={false} canCreate={false} canUpdate={false} canDelete={false} />
+    );
   } else if (versionQuery.isLoading) {
     content = <LoadingCard />;
+  } else if (versionQuery.error) {
+    // Distinguish a transient/operational version-read failure from a genuinely
+    // unsupported machine — don't tell an admin to "upgrade" on a network blip.
+    content = (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <p className="text-destructive text-sm">
+            Couldn’t determine this machine’s capabilities. Try again in a moment.
+          </p>
+        </CardContent>
+      </Card>
+    );
   } else if (!supportsAgentsRead) {
     content = (
       <Card>
@@ -102,7 +120,14 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
       </Card>
     );
   } else {
-    content = <AgentsSection enabled />;
+    content = (
+      <AgentsSection
+        enabled
+        canCreate={has('config.agents.create.basic.cli')}
+        canUpdate={has('config.agents.update')}
+        canDelete={has('config.agents.delete.cli')}
+      />
+    );
   }
 
   // Personal context uses BillingWrapper for access-lock dialogs/banners.

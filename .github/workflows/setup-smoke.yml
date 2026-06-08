@@ -53,7 +53,9 @@ jobs:
           corepack prepare pnpm@11.1.2 --activate
 
       - name: Expose pnpm to tmux shells
-        run: sudo ln -sf "$PNPM_HOME/pnpm" /usr/local/bin/pnpm
+        run: |
+          printf '#!/usr/bin/env bash\nexec "%s/pnpm" "$@"\n' "$PNPM_HOME" | sudo tee /usr/local/bin/pnpm >/dev/null
+          sudo chmod +x /usr/local/bin/pnpm
 
       - name: Install tmux
         run: |

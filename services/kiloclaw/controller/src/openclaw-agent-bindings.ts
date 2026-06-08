@@ -34,6 +34,12 @@ export const AgentBindingsPutBodySchema = z
           .refine(value => !value.startsWith('-'), {
             message: 'Channel must not begin with a dash',
           })
+          // `:` is OpenClaw's `channel:accountId` separator. This endpoint manages
+          // only channel-level default-account routes, so an account spec would
+          // create a route the declarative clear could never remove again.
+          .refine(value => !value.includes(':'), {
+            message: 'Channel must not include an account specifier',
+          })
       )
       .max(50),
   })
@@ -59,21 +65,28 @@ const defaultDeps: AgentBindingsDeps = {
   readSummary: readAgentSummary,
 };
 
-// The CLI emits canonical match data, so mapping is trivial: account-default
-// (absent or "default") → null; anything beyond channel/accountId → advanced.
+// Map a CLI binding to a read summary. We report the account id verbatim (any
+// value, including the literal "default", means the route is account-scoped) and
+// flag anything beyond a plain channel(/account) route as advanced. We do NOT
+// coerce account ids here — see isManagedDefaultRoute for why.
 function toBindingSummary(binding: CliBinding): AgentBindingSummary {
   const match = binding.match as Record<string, unknown>;
   const accountIdRaw = typeof match.accountId === 'string' ? match.accountId.trim() : '';
-  const accountId =
-    accountIdRaw === '' || accountIdRaw.toLowerCase() === 'default' ? null : accountIdRaw;
+  const accountId = accountIdRaw === '' ? null : accountIdRaw;
   const advanced = Object.keys(match).some(key => key !== 'channel' && key !== 'accountId');
   return { channel: binding.match.channel, accountId, advanced };
 }
 
-// A binding the declarative set manages: a default-account channel route.
+// A binding the declarative set manages: a channel-level default-account route.
+// This is defined as the EXACT shape `agents bind <channel>` writes — a match
+// with only a `channel` key (no accountId, no peer/guild/etc.) — because that is
+// also the only shape `agents unbind <channel>` can remove. Treating any route
+// that carries an accountId (even the literal "default", or runtime-normalized
+// values) as account-scoped keeps classification consistent with what the CLI
+// can actually clear, instead of replicating OpenClaw's account normalization.
 function isManagedDefaultRoute(binding: CliBinding): boolean {
-  const summary = toBindingSummary(binding);
-  return summary.accountId === null && !summary.advanced;
+  const keys = Object.keys(binding.match);
+  return keys.length === 1 && keys[0] === 'channel';
 }
 
 /** Per-agent binding summaries, sourced from the CLI (the routing source of truth). */
@@ -93,8 +106,9 @@ export async function listAgentBindingSummaries(
 
 /**
  * Declaratively set an agent's channel-level routes by diffing the CLI's current
- * view and issuing `bind`/`unbind`. Bind runs first so a conflict (→ 409) leaves
- * existing routes intact. The CLI owns conflict/canonicalization/$include/order.
+ * view and issuing `bind`/`unbind`. Binds run first; on a conflict we roll back
+ * the additions and remove nothing, so a rejected request (→ 409) leaves the
+ * agent's routing unchanged. The CLI owns conflict/canonicalization/$include/order.
  */
 export async function updateAgentBindings(
   agentId: string,
@@ -128,10 +142,24 @@ export async function updateAgentBindings(
     const toBind = desired.filter(channel => !currentSet.has(channel));
     const toUnbind = current.filter(channel => !desiredSet.has(channel));
 
-    // Bind first: a conflict aborts before anything is removed.
+    // Bind first, before removing anything. OpenClaw applies every
+    // non-conflicting addition and THEN reports the conflict (exit 1), so on a
+    // conflict we must roll back the routes it already added to keep the
+    // declarative request atomic — otherwise a partial set stays active.
     if (toBind.length > 0) {
       const result = await deps.bind(normalized, toBind);
       if (result.conflicts.length > 0) {
+        try {
+          // Every channel in `toBind` was absent from the agent's managed routes
+          // before this call, so unbinding the whole set removes exactly what we
+          // just added; channels that conflicted aren't ours, so unbind no-ops.
+          await deps.unbind(normalized, toBind);
+        } catch (rollbackError) {
+          console.error(
+            '[controller] Failed to roll back partial agent bindings after conflict:',
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+          );
+        }
         throw new AgentConfigError(
           409,
           'agent_binding_conflict',

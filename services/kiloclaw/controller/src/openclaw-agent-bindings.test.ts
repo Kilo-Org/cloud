@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  AgentBindingsPutBodySchema,
   listAgentBindingSummaries,
   updateAgentBindings,
   type AgentBindingsDeps,
@@ -94,34 +95,65 @@ describe('updateAgentBindings', () => {
     expect(deps.unbind).toHaveBeenCalledWith('research', ['slack']);
   });
 
-  it('treats accountId "default" as the default account', async () => {
+  it('leaves an account-scoped route (incl. literal "default") intact on clear', async () => {
     const deps = makeDeps({
       listBindings: vi.fn(async () => [route('research', 'slack', { accountId: 'default' })]),
     });
 
-    // The "default" route is managed → clearing removes it.
+    // A route carrying any accountId — even "default" — is account-scoped: bare
+    // `unbind <channel>` cannot remove it, so it is not managed and survives clear.
     await updateAgentBindings('research', { channels: [] }, deps);
 
-    expect(deps.unbind).toHaveBeenCalledWith('research', ['slack']);
+    expect(deps.unbind).not.toHaveBeenCalled();
   });
 
-  it('surfaces a CLI conflict as 409 without unbinding (bind runs first)', async () => {
+  it('rolls back added routes and removes nothing else when the CLI reports a conflict', async () => {
+    const unbind = vi.fn(async (agentId: string, specs: string[]) => ({
+      agentId,
+      removed: specs,
+      missing: [],
+      conflicts: [],
+    }));
     const deps = makeDeps({
       listBindings: vi.fn(async () => [route('research', 'discord')]),
+      // OpenClaw applies the free channel and still reports the owned one as a conflict.
       bind: vi.fn(async (agentId: string) => ({
         agentId,
-        added: [],
+        added: ['kilo-chat'],
         updated: [],
         skipped: [],
         conflicts: ['slack (agent=ops)'],
       })),
+      unbind,
     });
 
     await expect(
-      updateAgentBindings('research', { channels: ['slack'] }, deps)
+      updateAgentBindings('research', { channels: ['discord', 'slack', 'kilo-chat'] }, deps)
     ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
-    // discord would have been unbound — but bind failed first, so it is untouched.
-    expect(deps.unbind).not.toHaveBeenCalled();
+    // Rollback unbinds exactly the attempted additions (toBind); the pre-existing
+    // discord route is never removed because we throw before the unbind phase.
+    expect(unbind).toHaveBeenCalledTimes(1);
+    expect(unbind).toHaveBeenCalledWith('research', ['slack', 'kilo-chat']);
+  });
+
+  it('still rejects with 409 if the post-conflict rollback itself fails', async () => {
+    const deps = makeDeps({
+      listBindings: vi.fn(async () => []),
+      bind: vi.fn(async (agentId: string) => ({
+        agentId,
+        added: ['free'],
+        updated: [],
+        skipped: [],
+        conflicts: ['slack (agent=ops)'],
+      })),
+      unbind: vi.fn(async () => {
+        throw new Error('rollback boom');
+      }),
+    });
+
+    await expect(
+      updateAgentBindings('research', { channels: ['free', 'slack'] }, deps)
+    ).rejects.toMatchObject({ code: 'agent_binding_conflict', status: 409 });
   });
 
   it('rejects a stale etag without touching the CLI', async () => {
@@ -163,11 +195,23 @@ describe('listAgentBindingSummaries', () => {
 
     expect(map.get('research')).toEqual([
       { channel: 'slack', accountId: null, advanced: false },
-      { channel: 'discord', accountId: null, advanced: false }, // "default" → null
+      { channel: 'discord', accountId: 'default', advanced: false }, // accountId reported verbatim
     ]);
     expect(map.get('ops')).toEqual([
       { channel: 'telegram', accountId: 'biz', advanced: false },
       { channel: 'whatsapp', accountId: null, advanced: true }, // guildId → advanced
     ]);
+  });
+});
+
+describe('AgentBindingsPutBodySchema', () => {
+  it('rejects a channel that carries an account specifier', () => {
+    const result = AgentBindingsPutBodySchema.safeParse({ channels: ['slack:team'] });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts plain channel ids', () => {
+    const result = AgentBindingsPutBodySchema.safeParse({ channels: ['slack', 'discord'] });
+    expect(result.success).toBe(true);
   });
 });

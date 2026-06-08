@@ -38,25 +38,31 @@ function row(overrides: Partial<Parameters<typeof summarizeTerminalBench>[0][num
   return {
     openrouterId: 'openai/model',
     isActive: true,
-    isStealth: false,
     benchmarks: benchmarks(),
     ...overrides,
   };
 }
 
 describe('summarizeTerminalBench', () => {
-  it('publishes only eligible summaries', () => {
+  it('publishes only eligible non-internal summaries', () => {
+    const stealth = { ...row({ openrouterId: 'stealth/model' }), isStealth: true };
     const summaries = summarizeTerminalBench([
       row(),
+      stealth,
+      row({ openrouterId: 'kilo-internal/custom', benchmarks: benchmarks() }),
       row({ isActive: false }),
-      row({ isStealth: true }),
       row({ benchmarks: benchmarks({ nAttempts: 4 }) }),
       row({ benchmarks: benchmarks({ avgAttemptCostUsd: null }) }),
       row({ benchmarks: { kiloBench: { overallScore: 0.4, evals: {} } } }),
       row({ benchmarks: { kiloBench: { overallScore: 'invalid' } } }),
     ]);
 
-    expect(summaries).toEqual(new Map([['openai/model', summary]]));
+    expect(summaries).toEqual(
+      new Map([
+        ['openai/model', summary],
+        ['stealth/model', summary],
+      ])
+    );
   });
 });
 

@@ -1,8 +1,9 @@
+import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { readDb } from '@/lib/drizzle';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
 import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, notLike } from 'drizzle-orm';
 
 const TTL = process.env.NODE_ENV === 'test' ? 0 : 5 * 60 * 1000;
 
@@ -16,7 +17,6 @@ export type TerminalBenchSummaries = ReadonlyMap<string, TerminalBenchSummary>;
 type Row = {
   openrouterId: string;
   isActive: boolean | null;
-  isStealth: boolean;
   benchmarks: unknown;
 };
 
@@ -24,7 +24,7 @@ export function summarizeTerminalBench(rows: readonly Row[]): TerminalBenchSumma
   const summaries = new Map<string, TerminalBenchSummary>();
 
   for (const row of rows) {
-    if (!row.isActive || row.isStealth) continue;
+    if (!row.isActive || row.openrouterId.startsWith(CUSTOM_LLM_PREFIX)) continue;
     const result = ModelStatsBenchmarksSchema.safeParse(row.benchmarks);
     if (!result.success) continue;
     const bench = result.data?.kiloBench?.evals['terminal-bench'];
@@ -60,11 +60,12 @@ async function loadTerminalBench(): Promise<TerminalBenchSummaries> {
     .select({
       openrouterId: modelStats.openrouterId,
       isActive: modelStats.isActive,
-      isStealth: modelStats.isStealth,
       benchmarks: modelStats.benchmarks,
     })
     .from(modelStats)
-    .where(and(eq(modelStats.isActive, true), eq(modelStats.isStealth, false)));
+    .where(
+      and(eq(modelStats.isActive, true), notLike(modelStats.openrouterId, `${CUSTOM_LLM_PREFIX}%`))
+    );
   return summarizeTerminalBench(rows);
 }
 

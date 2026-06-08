@@ -785,14 +785,6 @@ export async function handleKiloPassInvoicePaid(params: {
 
       return null;
     });
-
-    if (duplicateCardEnforcement) {
-      await enforceDuplicateCardBlock({
-        enforcement: duplicateCardEnforcement,
-        eventId,
-        stripe,
-      });
-    }
   } catch (error) {
     // Write failure audit log outside the transaction (non-transactional)
     // so it persists even when the transaction rolls back. Omit
@@ -817,6 +809,14 @@ export async function handleKiloPassInvoicePaid(params: {
     }
 
     throw error;
+  }
+
+  if (duplicateCardEnforcement) {
+    await enforceDuplicateCardBlock({
+      enforcement: duplicateCardEnforcement,
+      eventId,
+      stripe,
+    });
   }
 
   if (

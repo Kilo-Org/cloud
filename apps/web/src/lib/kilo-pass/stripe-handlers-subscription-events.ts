@@ -171,7 +171,10 @@ export async function handleKiloPassSubscriptionEvent(params: {
     });
   } catch (error) {
     captureException(error, {
-      tags: { source: 'kilo_pass_subscription_reconciliation', stage: 'stripe_retrieve' },
+      tags: {
+        source: 'kilo_pass_subscription_reconciliation',
+        stage: 'subscription_reconciliation',
+      },
       extra: {
         stripeEventId: eventId,
         stripeEventType: eventType,

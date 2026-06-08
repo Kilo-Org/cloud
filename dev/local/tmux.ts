@@ -124,12 +124,35 @@ function attachSession(sessionName: string): void {
 // Window management
 // ---------------------------------------------------------------------------
 
-function createWindow(sessionName: string, windowName: string): number {
-  const output = execSync(
-    `tmux new-window -d -t ${sessionName} -n ${windowName} -P -F "#{window_index}"`,
-    { encoding: 'utf-8' }
-  ).trim();
+function createWindow(sessionName: string, windowName: string, startupCommand?: string): number {
+  const args = [
+    'new-window',
+    '-d',
+    '-t',
+    sessionName,
+    '-n',
+    windowName,
+    '-c',
+    getWorktreeRoot(),
+    '-P',
+    '-F',
+    '#{window_index}',
+  ];
+  if (startupCommand) {
+    args.push(buildInteractiveShellCommand(startupCommand));
+  }
+
+  const output = execFileSync('tmux', args, { encoding: 'utf-8' }).trim();
   return parseInt(output, 10);
+}
+
+function buildInteractiveShellCommand(
+  startupCommand: string,
+  shell = process.env.SHELL || '/bin/sh'
+): string {
+  return `${escapeForShell(shell)} -lc ${escapeForShell(
+    `${startupCommand}; exec ${escapeForShell(shell)} -l`
+  )}`;
 }
 
 function paneTarget(sessionName: string, windowTarget: string | number, pane?: number): string {
@@ -442,6 +465,7 @@ export {
   killSession,
   attachSession,
   createWindow,
+  buildInteractiveShellCommand,
   sendKeys,
   sendInterrupt,
   selectWindow,

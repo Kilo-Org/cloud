@@ -1,6 +1,6 @@
 #!/bin/sh
 # Run `wrangler dev` with a local Docker socket proxy that injects
-# HostConfig.Privileged=true for SandboxSmall (Docker-in-Docker).
+# HostConfig.Privileged=true for SandboxDIND containers only.
 #
 # See scripts/docker-privileged-proxy.mjs for context.
 # Args after `--` are forwarded to wrangler dev.

@@ -61,9 +61,8 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
   const repoRoot = getWorktreeRoot();
   // When another tmux server is already running (e.g. from a sibling worktree),
   // `tmux new-session` attaches to that existing server and inherits its
-  // environment — NOT our current process.env. Pass critical vars with -e and
-  // set them on the session so later windows see values like KILO_PORT_OFFSET
-  // and CI-provided PATH updates.
+  // environment — NOT our current process.env. Pass critical vars with -e so
+  // panes see this worktree's values (e.g. KILO_PORT_OFFSET).
   const envArgs = env
     ? Object.entries(env)
         .map(([k, v]) => `-e ${escapeForShell(`${k}=${v}`)}`)
@@ -73,12 +72,6 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
   execSync(`tmux new-session -d ${envPrefix}-s ${sessionName} -n dashboard -c ${repoRoot}`, {
     stdio: 'ignore',
   });
-  for (const [key, value] of Object.entries(env ?? {})) {
-    execSync(
-      `tmux set-environment -t ${sessionName} ${escapeForShell(key)} ${escapeForShell(value)}`,
-      { stdio: 'ignore' }
-    );
-  }
   // Destroy the session when no clients are attached (e.g. terminal window closed).
   // The session starts detached (-d) so we must defer the option via a hook;
   // setting it immediately would destroy the session before any client attaches.
@@ -385,11 +378,7 @@ function enablePaneBorders(sessionName: string, windowTarget: string | number): 
     stdio: 'ignore',
   });
   // Prevent shells from overwriting pane titles via OSC escape sequences
-  try {
-    execSync(`tmux set-window-option -t ${target} allow-set-title off`, { stdio: 'ignore' });
-  } catch {
-    // Older tmux versions do not support this cosmetic option.
-  }
+  execSync(`tmux set-window-option -t ${target} allow-set-title off`, { stdio: 'ignore' });
 }
 
 // ---------------------------------------------------------------------------

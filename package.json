@@ -11,7 +11,6 @@
     "typecheck": "scripts/typecheck-all.sh",
     "build": "pnpm --filter web build",
     "test": "pnpm --filter web test",
-    "test:setup-smoke": "pnpm --filter web run test:setup-smoke",
     "lint": "scripts/lint-all.sh",
     "format": "oxfmt .",
     "format:check": "oxfmt --list-different .",

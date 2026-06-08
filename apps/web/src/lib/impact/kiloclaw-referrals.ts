@@ -26,7 +26,6 @@ import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { IMPACT_REFERRAL_TOUCH_VALIDITY_MS } from '@/lib/impact/referral-utils';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
 import { getClawPlanForStripePriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
-import { resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
 import { client as stripe } from '@/lib/stripe-client';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
@@ -731,6 +730,12 @@ function toStripeTimestamp(value: string): number {
   return Math.floor(new Date(value).getTime() / 1000);
 }
 
+function resolveSchedulePhasePrice(phase: Stripe.SubscriptionSchedule.Phase): string | null {
+  const price = phase.items[0]?.price;
+  if (!price) return null;
+  return typeof price === 'string' ? price : (price.id ?? null);
+}
+
 function buildExtendedRetirementSchedulePhases(params: {
   schedule: Stripe.SubscriptionSchedule;
   previousBoundary: string;
@@ -754,8 +759,8 @@ function buildExtendedRetirementSchedulePhases(params: {
   );
   const currentPhase = params.schedule.phases[currentPhaseIndex];
   const standardPhase = params.schedule.phases[currentPhaseIndex + 1];
-  const currentPrice = currentPhase ? resolvePhasePrice(currentPhase) : null;
-  const standardPrice = standardPhase ? resolvePhasePrice(standardPhase) : null;
+  const currentPrice = currentPhase ? resolveSchedulePhasePrice(currentPhase) : null;
+  const standardPrice = standardPhase ? resolveSchedulePhasePrice(standardPhase) : null;
   if (
     currentPhaseIndex < 0 ||
     !currentPhase ||

@@ -1,4 +1,3 @@
-import { REASONING_VARIANTS_BINARY } from '@/lib/ai-gateway/providers/model-settings';
 import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
 import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
@@ -23,6 +22,5 @@ export default {
         max_completion_tokens: 131072,
       },
     ],
-    variants: REASONING_VARIANTS_BINARY,
   }),
 } satisfies DirectByokProvider;

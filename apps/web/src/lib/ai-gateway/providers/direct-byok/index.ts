@@ -11,7 +11,7 @@ import { readDb } from '@/lib/drizzle';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OpenCodeSettings } from '@kilocode/db';
-import { getCreatorRecommendedAiSdkProvider } from '@/lib/ai-gateway/providers/model-settings';
+import { getAiSdkProvider, getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
@@ -58,8 +58,8 @@ function convertModel(
     default_parameters: {},
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     opencode: {
-      ai_sdk_provider: getCreatorRecommendedAiSdkProvider(id) ?? provider.default_ai_sdk_provider,
-      variants: model.variants,
+      ai_sdk_provider: getAiSdkProvider(id) ?? provider.default_ai_sdk_provider,
+      variants: getModelVariants(id),
     } satisfies OpenCodeSettings,
   };
 }
@@ -110,23 +110,14 @@ export async function getDirectByokModelsForUser(userId: string) {
 }
 
 export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {
-  if (
-    directByokProvider.default_ai_sdk_provider === 'openai-compatible' ||
-    directByokProvider.default_ai_sdk_provider === 'openrouter' ||
-    directByokProvider.default_ai_sdk_provider === 'alibaba' ||
-    directByokProvider.ai_sdk_provider === 'mistral'
-  ) {
-    return createOpenAICompatible({
-      baseURL: directByokProvider.base_url,
-      apiKey,
-      name: 'openaiCompatible',
-      fetch: (url, init) => {
-        const headers = new Headers(init?.headers);
-        headers.set('user-agent', COMPATIBLE_USER_AGENT);
-        return fetch(url, init ? { ...init, headers } : { headers });
-      },
-    });
-  } else {
-    throw new Error('Unrecognized AI SDK provider: ' + directByokProvider.default_ai_sdk_provider);
-  }
+  return createOpenAICompatible({
+    baseURL: directByokProvider.base_url,
+    apiKey,
+    name: 'openaiCompatible',
+    fetch: (url, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set('user-agent', COMPATIBLE_USER_AGENT);
+      return fetch(url, init ? { ...init, headers } : { headers });
+    },
+  });
 }

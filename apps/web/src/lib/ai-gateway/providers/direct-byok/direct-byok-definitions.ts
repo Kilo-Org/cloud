@@ -2,8 +2,8 @@ import type { DirectByokProvider } from './types';
 import byteplusCoding from './byteplus-coding';
 import chutesByok from './chutes-byok';
 import crofai from './crofai';
-import kimiCoding from './kimi-coding';
 import inceptronByok from './inceptron-byok';
+import kimiCoding from './kimi-coding';
 import martian from './martian';
 import neuralwatt from './neurowatt';
 import ollamaCloud from './ollama-cloud';
@@ -17,8 +17,8 @@ export default [
   byteplusCoding,
   chutesByok,
   crofai,
-  kimiCoding,
   inceptronByok,
+  kimiCoding,
   martian,
   neuralwatt,
   ollamaCloud,

@@ -205,6 +205,19 @@ describe('updateAgentBindings', () => {
     ).rejects.toMatchObject({ code: 'agent_binding_rollback_failed', status: 500 });
   });
 
+  it('treats a blank account id as account-scoped (verbatim read, unmanaged on clear)', async () => {
+    // A hand-authored { channel, accountId: "  " } must not read as a plain
+    // default route and then be silently skipped by a clear.
+    const { deps, routes } = statefulDeps([route('research', 'slack', { accountId: '  ' })]);
+
+    const map = await listAgentBindingSummaries('research', deps);
+    expect(map.get('research')).toEqual([{ channel: 'slack', accountId: '  ', advanced: false }]);
+
+    await updateAgentBindings('research', { channels: [] }, deps);
+    expect(deps.unbind).not.toHaveBeenCalled();
+    expect(routes()).toHaveLength(1);
+  });
+
   it('leaves an account-scoped route (incl. literal "default") intact on clear', async () => {
     const deps = makeDeps({
       listBindings: vi.fn(async () => [route('research', 'slack', { accountId: 'default' })]),

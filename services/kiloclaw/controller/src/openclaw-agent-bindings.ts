@@ -65,14 +65,15 @@ const defaultDeps: AgentBindingsDeps = {
   readSummary: readAgentSummary,
 };
 
-// Map a CLI binding to a read summary. We report the account id verbatim (any
-// value, including the literal "default", means the route is account-scoped) and
-// flag anything beyond a plain channel(/account) route as advanced. We do NOT
-// coerce account ids here — see isManagedDefaultRoute for why.
+// Map a CLI binding to a read summary. account id is reported verbatim and is
+// null ONLY when the key is absent — never coerced from a blank/whitespace value
+// — so the read stays consistent with isManagedDefaultRoute (which treats ANY
+// present accountId as account-scoped). Otherwise a hand-authored
+// `{ channel, accountId: "  " }` would read as a plain default route while a
+// clear silently left it in place. Anything beyond channel/accountId is advanced.
 function toBindingSummary(binding: CliBinding): AgentBindingSummary {
   const match = binding.match as Record<string, unknown>;
-  const accountIdRaw = typeof match.accountId === 'string' ? match.accountId.trim() : '';
-  const accountId = accountIdRaw === '' ? null : accountIdRaw;
+  const accountId = 'accountId' in match ? String(match.accountId) : null;
   const advanced = Object.keys(match).some(key => key !== 'channel' && key !== 'accountId');
   return { channel: binding.match.channel, accountId, advanced };
 }

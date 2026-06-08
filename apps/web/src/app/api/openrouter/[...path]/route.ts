@@ -720,7 +720,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       ttfbMs,
       statusCode: response.status,
     },
-    response.clone(),
+    response,
     requestStartedAt
   );
   usageContext.status_code = response.status;
@@ -773,7 +773,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
   await handleRequestLogging({
-    clonedResponse: response.clone(),
+    response,
     user: maybeUser,
     organization_id: organizationId || null,
     provider: effectiveProviderContext.provider.id,
@@ -801,6 +801,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     effectiveProviderContext.provider.id,
     requestBodyParsed.kind
   );
+
   if (rewrittenResponse) {
     return rewrittenResponse;
   }

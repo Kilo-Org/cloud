@@ -290,6 +290,9 @@ export function getOutputHeaders(response: Response) {
   }
   outputHeaders.set('Content-Encoding', 'identity');
   // Content-Encoding: identity is here because Vercel modifies encoding/compression and causes issues
+  if (outputHeaders.get('content-type')?.includes('text/event-stream')) {
+    outputHeaders.set('Cache-Control', 'no-cache, no-transform');
+  }
 
   return outputHeaders;
 }

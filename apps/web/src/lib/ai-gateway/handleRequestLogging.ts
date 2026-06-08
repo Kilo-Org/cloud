@@ -28,7 +28,7 @@ async function isLoggingEnabledForUser(
 }
 
 export async function handleRequestLogging(params: {
-  clonedResponse: Response;
+  response: Response;
   user: User | null;
   organization_id: string | null;
   session_id: string | null;
@@ -36,15 +36,17 @@ export async function handleRequestLogging(params: {
   model: string;
   request: GatewayRequest;
 }) {
-  const { clonedResponse, user, organization_id, session_id, provider, model, request } = params;
+  const { response, user, organization_id, session_id, provider, model, request } = params;
   if (!(await isLoggingEnabledForUser(user, organization_id))) {
     return;
   }
+
+  const clonedResponse = response.clone();
   after(async () => {
-    let response: string | undefined;
+    let responseText: string | undefined;
     try {
-      response = await clonedResponse.text();
-      const error = detectToolCallArgumentErrors(response, request);
+      responseText = await clonedResponse.text();
+      const error = detectToolCallArgumentErrors(responseText, request);
       const apiRequestLogId = await db
         .insert(api_request_log)
         .values({
@@ -55,7 +57,7 @@ export async function handleRequestLogging(params: {
           model,
           provider,
           request: request.body,
-          response,
+          response: responseText,
           error,
         })
         .returning({ id: api_request_log.id });

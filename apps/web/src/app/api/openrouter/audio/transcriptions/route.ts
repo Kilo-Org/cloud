@@ -219,7 +219,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       ttfbMs,
       statusCode: response.status,
     },
-    response.clone(),
+    response,
     requestStartedAt
   );
 

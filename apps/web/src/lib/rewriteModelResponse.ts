@@ -21,6 +21,98 @@ function rewriteUsage(usage: OpenRouterUsage) {
   }
 }
 
+function createRewrittenSseStream<T>(
+  body: ReadableStream<Uint8Array> | null,
+  rewriteJson: (json: T) => void
+): ReadableStream<Uint8Array> {
+  const reader = body?.getReader() ?? null;
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  let outputController: ReadableStreamDefaultController<Uint8Array> | null = null;
+  let doneReceived = false;
+  let cancelled = false;
+  let finished = false;
+  let released = false;
+  let enqueueCount = 0;
+
+  const release = () => {
+    if (!reader || released) return;
+    released = true;
+    reader.releaseLock();
+  };
+  const enqueue = (value: string) => {
+    if (cancelled || !outputController) return;
+    outputController.enqueue(encoder.encode(value));
+    enqueueCount++;
+  };
+  const parser = createParser({
+    onEvent(event: EventSourceMessage) {
+      if (event.data === '[DONE]') {
+        doneReceived = true;
+        return;
+      }
+
+      const json = JSON.parse(event.data) as T;
+      rewriteJson(json);
+      const idLine = event.id === undefined ? '' : `id: ${event.id}\n`;
+      const eventLine = event.event ? `event: ${event.event}\n` : '';
+      enqueue(`${idLine}${eventLine}data: ${JSON.stringify(json)}\n\n`);
+    },
+    onComment() {
+      enqueue(': KILO PROCESSING\n\n');
+    },
+  });
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      outputController = controller;
+      if (!reader) {
+        finished = true;
+        controller.close();
+      }
+    },
+    async pull(controller) {
+      if (!reader || finished || cancelled) return;
+
+      try {
+        const enqueueCountBeforePull = enqueueCount;
+        while (!finished && !cancelled && enqueueCount === enqueueCountBeforePull) {
+          const { done, value } = await reader.read();
+          if (cancelled) return;
+          if (!done) {
+            parser.feed(decoder.decode(value, { stream: true }));
+            continue;
+          }
+
+          finished = true;
+          const finalText = decoder.decode();
+          if (finalText) parser.feed(finalText);
+          // Be permissive at EOF and dispatch a complete final data line even
+          // when the upstream omitted its trailing blank SSE delimiter.
+          parser.feed('\n\n');
+          if (doneReceived) enqueue('data: [DONE]\n\n');
+          release();
+          controller.close();
+        }
+      } catch (error) {
+        finished = true;
+        release();
+        if (!cancelled) controller.error(error);
+      }
+    },
+    cancel(reason) {
+      cancelled = true;
+      finished = true;
+      if (reader) {
+        void reader
+          .cancel(reason)
+          .catch(() => undefined)
+          .finally(release);
+      }
+    },
+  });
+}
+
 export async function rewriteFreeModelResponse_ChatCompletions(response: Response, model: string) {
   const headers = getOutputHeaders(response);
 
@@ -55,67 +147,25 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
     });
   }
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const reader = response.body?.getReader();
-      if (!reader) {
-        controller.close();
-        return;
-      }
+  const stream = createRewrittenSseStream<ChatCompletionChunk>(response.body, json => {
+    if (json.model) {
+      json.model = model;
+    }
 
-      let doneReceived = false;
-      const parser = createParser({
-        onEvent(event: EventSourceMessage) {
-          if (event.data === '[DONE]') {
-            doneReceived = true;
-            return;
-          }
-          const json = JSON.parse(event.data) as ChatCompletionChunk;
-          if (json.model) {
-            json.model = model;
-          }
+    const delta = json.choices?.[0]?.delta;
+    if (delta?.role === null) {
+      // Some APIs set null here, which is not accepted by OpenCode
+      delete delta.role;
+    }
 
-          const delta = json.choices?.[0]?.delta;
-          if (delta) {
-            // Some APIs set null here, which is not accepted by OpenCode
-            if (delta?.role === null) {
-              delete delta.role;
-            }
-          }
+    if (!json.choices) {
+      // Some APIs leave this out when returning usage, which is not accepted by OpenCode
+      json.choices = [];
+    }
 
-          if (!json.choices) {
-            // Some APIs leave this out when returning usage, which is not accepted by OpenCode
-            json.choices = [];
-          }
-
-          if (json.usage) {
-            rewriteUsage(json.usage);
-          }
-
-          const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
-          controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
-        },
-        onComment() {
-          controller.enqueue(': KILO PROCESSING\n\n');
-        },
-      });
-
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Flush any event left buffered when the stream ends without a
-          // trailing blank line, so its data isn't silently dropped.
-          parser.reset({ consume: true });
-          if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
-          }
-          controller.close();
-          break;
-        }
-        parser.feed(decoder.decode(value, { stream: true }));
-      }
-    },
+    if (json.usage) {
+      rewriteUsage(json.usage);
+    }
   });
 
   return new NextResponse(stream, {
@@ -179,67 +229,25 @@ export async function rewriteFreeModelResponse_Messages(response: Response, mode
     });
   }
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const reader = response.body?.getReader();
-      if (!reader) {
-        controller.close();
-        return;
+  const stream = createRewrittenSseStream<
+    MessagesApiMessageStart | MessagesApiMessageDelta | Anthropic.Messages.MessageStreamEvent
+  >(response.body, json => {
+    if (json.type === 'message_start') {
+      const event = json as MessagesApiMessageStart;
+      if (event.message.model) {
+        event.message.model = model;
       }
-
-      let doneReceived = false;
-      const parser = createParser({
-        onEvent(event: EventSourceMessage) {
-          if (event.data === '[DONE]') {
-            doneReceived = true;
-            return;
-          }
-          const json = JSON.parse(event.data) as
-            | MessagesApiMessageStart
-            | MessagesApiMessageDelta
-            | Anthropic.Messages.MessageStreamEvent;
-
-          if (json.type === 'message_start') {
-            const e = json as MessagesApiMessageStart;
-            if (e.message.model) {
-              e.message.model = model;
-            }
-            if (e.message.usage) {
-              rewriteMessagesUsage(e.message.usage);
-            }
-          }
-
-          if (json.type === 'message_delta') {
-            const e = json as MessagesApiMessageDelta;
-            if (e.usage) {
-              rewriteMessagesUsage(e.usage);
-            }
-          }
-
-          const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
-          controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
-        },
-        onComment() {
-          controller.enqueue(': KILO PROCESSING\n\n');
-        },
-      });
-
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Flush any event left buffered when the stream ends without a
-          // trailing blank line, so its data isn't silently dropped.
-          parser.reset({ consume: true });
-          if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
-          }
-          controller.close();
-          break;
-        }
-        parser.feed(decoder.decode(value, { stream: true }));
+      if (event.message.usage) {
+        rewriteMessagesUsage(event.message.usage);
       }
-    },
+    }
+
+    if (json.type === 'message_delta') {
+      const event = json as MessagesApiMessageDelta;
+      if (event.usage) {
+        rewriteMessagesUsage(event.usage);
+      }
+    }
   });
 
   return new NextResponse(stream, {
@@ -285,54 +293,15 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
     });
   }
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const reader = response.body?.getReader();
-      if (!reader) {
-        controller.close();
-        return;
+  const stream = createRewrittenSseStream<ResponsesApiEvent>(response.body, json => {
+    if (json.response) {
+      if (json.response.model) {
+        json.response.model = model;
       }
-
-      let doneReceived = false;
-      const parser = createParser({
-        onEvent(event: EventSourceMessage) {
-          if (event.data === '[DONE]') {
-            doneReceived = true;
-            return;
-          }
-          const json = JSON.parse(event.data) as ResponsesApiEvent;
-          if (json.response) {
-            if (json.response.model) {
-              json.response.model = model;
-            }
-            if (json.response.usage) {
-              rewriteUsage(json.response.usage);
-            }
-          }
-          const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
-          controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
-        },
-        onComment() {
-          controller.enqueue(': KILO PROCESSING\n\n');
-        },
-      });
-
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Flush any event left buffered when the stream ends without a
-          // trailing blank line, so its data isn't silently dropped.
-          parser.reset({ consume: true });
-          if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
-          }
-          controller.close();
-          break;
-        }
-        parser.feed(decoder.decode(value, { stream: true }));
+      if (json.response.usage) {
+        rewriteUsage(json.response.usage);
       }
-    },
+    }
   });
 
   return new NextResponse(stream, {

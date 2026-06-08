@@ -313,4 +313,215 @@ describe('rewriteFreeModelResponse_Responses', () => {
     expect(sse).toContain('event: response.completed');
     expect(dataPayloads(sse)).toContain('[DONE]');
   });
+
+  test('emits byte chunks that can be consumed through the Response body API', async () => {
+    const upstream = sseResponse(
+      'event: response.completed\n' +
+        'data: {"type":"response.completed","sequence_number":0,"response":{"model":"upstream-model","status":"completed"}}\n\n'
+    );
+
+    const result = await rewriteFreeModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const output = await result.text();
+
+    expect(dataObjects(output)).toEqual([
+      {
+        type: 'response.completed',
+        sequence_number: 0,
+        response: { model: REWRITTEN_MODEL, status: 'completed' },
+      },
+    ]);
+    expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
+  });
+
+  test('preserves contiguous events across one-byte chunks and split UTF-8 code points', async () => {
+    const events = Array.from({ length: 58 }, (_, sequenceNumber) => {
+      const type = sequenceNumber === 57 ? 'response.completed' : 'response.output_text.delta';
+      const response =
+        sequenceNumber === 57 ? `,"response":{"model":"upstream-model","status":"completed"}` : '';
+      return `event: ${type}\ndata: {"type":"${type}","sequence_number":${sequenceNumber},"delta":"café"${response}}\n\n`;
+    }).join('');
+    const bytes = new TextEncoder().encode(events);
+    let chunkIndex = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        if (chunkIndex === bytes.length) {
+          controller.close();
+          return;
+        }
+        if (chunkIndex === 7 || chunkIndex === Math.floor(bytes.length / 2)) {
+          await new Promise(resolve => setTimeout(resolve, 1));
+        }
+        controller.enqueue(bytes.slice(chunkIndex, chunkIndex + 1));
+        chunkIndex++;
+      },
+    });
+    const upstream = new Response(stream, {
+      headers: { 'content-type': 'text/event-stream' },
+    });
+
+    const result = await rewriteFreeModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const output = await result.text();
+    const parsed = dataObjects(output) as Array<{
+      type: string;
+      sequence_number: number;
+      delta: string;
+      response?: { model: string; status: string };
+    }>;
+
+    expect(parsed).toHaveLength(58);
+    expect(parsed.map(event => event.sequence_number)).toEqual(
+      Array.from({ length: 58 }, (_, index) => index)
+    );
+    expect(parsed.every(event => event.delta === 'café')).toBe(true);
+    expect(parsed.at(-1)).toMatchObject({
+      type: 'response.completed',
+      sequence_number: 57,
+      response: { model: REWRITTEN_MODEL, status: 'completed' },
+    });
+  });
+
+  test('forwards an empty reasoning item and a complete response without [DONE]', async () => {
+    const upstream = sseResponse(
+      'event: response.output_item.done\n' +
+        'data: {"type":"response.output_item.done","sequence_number":0,"item":{"type":"reasoning","summary":[],"encrypted_content":"encrypted"}}\n\n' +
+        'event: response.completed\n' +
+        'data: {"type":"response.completed","sequence_number":1,"response":{"model":"upstream-model","status":"completed"}}\n\n'
+    );
+
+    const result = await rewriteFreeModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const output = await result.text();
+    const events = dataObjects(output) as Array<{
+      type: string;
+      item?: { type: string; summary: unknown[]; encrypted_content: string };
+    }>;
+
+    expect(events[0]).toMatchObject({
+      type: 'response.output_item.done',
+      item: { type: 'reasoning', summary: [], encrypted_content: 'encrypted' },
+    });
+    expect(events[1]).toMatchObject({ type: 'response.completed' });
+    expect(dataPayloads(output)).not.toContain('[DONE]');
+  });
+
+  test('propagates a source error instead of converting it to clean EOF', async () => {
+    const sourceError = new Error('source failed before response.completed');
+    let pullCount = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pullCount++ === 0) {
+          controller.enqueue(
+            new TextEncoder().encode(
+              'event: response.in_progress\ndata: {"type":"response.in_progress","sequence_number":0}\n\n'
+            )
+          );
+          return;
+        }
+        controller.error(sourceError);
+      },
+    });
+    const upstream = new Response(stream, {
+      headers: { 'content-type': 'text/event-stream' },
+    });
+
+    const result = await rewriteFreeModelResponse_Responses(upstream, REWRITTEN_MODEL);
+
+    await expect(result.text()).rejects.toBe(sourceError);
+  });
+
+  test('propagates downstream cancellation to the upstream reader', async () => {
+    let cancelReason: unknown;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            'event: response.in_progress\ndata: {"type":"response.in_progress","sequence_number":0}\n\n'
+          )
+        );
+      },
+      cancel(reason) {
+        cancelReason = reason;
+      },
+    });
+    const upstream = new Response(stream, {
+      headers: { 'content-type': 'text/event-stream' },
+    });
+    const result = await rewriteFreeModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const reader = result.body?.getReader();
+    expect(reader).toBeDefined();
+    await reader?.read();
+
+    const reason = new Error('downstream stopped');
+    await reader?.cancel(reason);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(cancelReason).toBe(reason);
+  });
+
+  test('dispatches a complete final event without a trailing blank delimiter', async () => {
+    const upstream = sseResponse(
+      'event: response.completed\n' +
+        'data: {"type":"response.completed","sequence_number":0,"response":{"model":"upstream-model","status":"completed"}}'
+    );
+
+    const result = await rewriteFreeModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const output = await result.text();
+
+    expect(dataObjects(output)).toEqual([
+      {
+        type: 'response.completed',
+        sequence_number: 0,
+        response: { model: REWRITTEN_MODEL, status: 'completed' },
+      },
+    ]);
+  });
+
+  test('preserves SSE event IDs while normalizing comments and multiline data', async () => {
+    const upstream = sseResponse(
+      ': upstream heartbeat\n\n' +
+        'unknown: ignored\n' +
+        'id: event-57\n' +
+        'event: response.completed\n' +
+        'data: {"type":\n' +
+        'data: "response.completed","response":{"model":"upstream-model","status":"completed"}}\n\n'
+    );
+
+    const result = await rewriteFreeModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const output = await result.text();
+
+    expect(output).toContain(': KILO PROCESSING\n\n');
+    expect(output).toContain('id: event-57\n');
+    expect(output).toContain('event: response.completed\n');
+    expect(dataObjects(output)).toEqual([
+      {
+        type: 'response.completed',
+        response: { model: REWRITTEN_MODEL, status: 'completed' },
+      },
+    ]);
+  });
+
+  test('delivers the same complete response while concurrent clones are drained', async () => {
+    const body =
+      'event: response.created\n' +
+      'data: {"type":"response.created","sequence_number":0,"response":{"model":"upstream-model","status":"in_progress"}}\n\n' +
+      'event: response.completed\n' +
+      'data: {"type":"response.completed","sequence_number":1,"response":{"model":"upstream-model","status":"completed"}}\n\n';
+    const upstream = sseResponse(body);
+    const usageClone = upstream.clone();
+    const loggingClone = upstream.clone();
+
+    const result = await rewriteFreeModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const [callerOutput, usageOutput, loggingOutput] = await Promise.all([
+      result.text(),
+      usageClone.text(),
+      loggingClone.text(),
+    ]);
+
+    expect(
+      (dataObjects(callerOutput) as Array<{ sequence_number: number }>).map(
+        event => event.sequence_number
+      )
+    ).toEqual([0, 1]);
+    expect(usageOutput).toBe(body);
+    expect(loggingOutput).toBe(body);
+  });
 });

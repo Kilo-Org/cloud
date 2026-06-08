@@ -202,12 +202,13 @@ export function emitApiMetrics(params: ApiMetricsParams) {
 
 export function emitApiMetricsForResponse(
   params: Omit<ApiMetricsParams, 'clientSecret' | 'completeRequestMs'>,
-  responseToDrain: Response,
+  response: Response,
   requestStartedAt: number
 ) {
   if (!apiMetricsUrl) return;
   if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
 
+  const responseToDrain = response.clone();
   after(async () => {
     let inferenceProvider: string | undefined;
     try {

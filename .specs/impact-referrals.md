@@ -19,6 +19,7 @@ Updated 2026-05-12 -- note price-versioned KiloClaw billing preserves referral s
 Updated 2026-05-22 -- renamed to `.specs/impact-referrals.md` and expanded to Kilo Pass referrals.
 Updated 2026-05-28 -- classify enforced Stripe EFW refunds as adverse payments.
 Updated 2026-05-29 -- name the Impact-facing Kilo Pass reward unit `Kilo Pass Bonus Credits`.
+Updated 2026-06-05 -- final Commit term reward-extension behavior.
 
 ## Conventions
 
@@ -96,8 +97,9 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
   calendar month. It is not a general account credit.
 - **Calendar month**: Billing-period extension that preserves day-of-month semantics of the current KiloClaw billing
   calendar, clamping to the last valid day of the target month when necessary.
-- **Active eligible personal KiloClaw subscription**: Personal KiloClaw subscription that is active, not canceling at
-  period end, not suspended, and not past due.
+- **Active eligible personal KiloClaw subscription**: Personal KiloClaw subscription that is active, not ordinarily
+  user-canceling at period end, not suspended, and not past due. A final Commit term made non-renewing solely by the
+  Commit retirement guard remains eligible for free-month reward application.
 - **Personal KiloClaw subscription**: KiloClaw subscription owned by an individual user. Organization/team-scoped
   KiloClaw subscriptions are not eligible.
 
@@ -429,9 +431,9 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 
 91. For month-to-month KiloClaw subscriptions, one reward MUST delay the next monthly renewal by one calendar month.
 
-92. For six-month commitment KiloClaw subscriptions, one reward MUST delay the next six-month renewal by one calendar
-    month. The reward MUST NOT convert the subscription to month-to-month and MUST NOT reduce the next invoice by one
-    sixth.
+92. For a final six-month Commit term, one reward MUST extend the final Commit boundary by one calendar month. It MUST
+    NOT authorize another Commit renewal, convert the current term immediately to Standard, or reduce a future invoice by
+    one sixth. Cancellation or a scheduled Standard transition MUST move to the extended boundary.
 
 93. For pure-credit KiloClaw subscriptions, reward application MUST update local renewal state so the credit renewal
     sweep does not deduct KiloClaw hosting credits until the extended renewal time.
@@ -440,9 +442,12 @@ application, and Kilo Pass redeems after local referral bonus allocation.
     billing state consistent. The system MUST NOT create a local-only renewal delay for a Stripe-funded subscription
     while allowing Stripe to charge on the original schedule.
 
-95. KiloClaw reward application MUST respect cancellation state. If a subscription is canceled or canceling before
-    reward application, the reward MUST remain pending until the beneficiary has an active eligible personal KiloClaw
-    subscription.
+95. KiloClaw reward application MUST respect cancellation state. If a subscription is canceled or ordinarily
+    user-canceling before reward application, the reward MUST remain pending until the beneficiary has an active eligible
+    personal KiloClaw subscription. A final Commit term canceling solely because of the retirement guard remains eligible;
+    reward application MUST preserve non-renewal while atomically extending the current period, credit-renewal boundary,
+    commitment end, authorized final Commit boundary, and any scheduled Standard transition. Ambiguous provider or
+    schedule outcomes MUST enter Commit retirement manual review.
 
 96. Price-versioned KiloClaw billing does not change referral eligibility, attribution priority, first-paid-conversion
     timing, reward caps, or free-month fulfillment.
@@ -776,6 +781,10 @@ application, and Kilo Pass redeems after local referral bonus allocation.
     retry unchanged payloads, except an already-redeemed response MAY be treated as idempotent success.
 
 ## Changelog
+
+### 2026-06-05 -- Extend guarded final Commit terms
+
+Allowed KiloClaw free-month rewards to extend final Commit terms guarded for retirement while preserving ordinary user-cancellation ineligibility, non-renewal, authorized final boundary, and scheduled Standard timing.
 
 ### 2026-05-29 -- Name the Kilo Pass Impact reward unit
 

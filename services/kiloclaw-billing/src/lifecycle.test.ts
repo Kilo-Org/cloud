@@ -23,12 +23,14 @@ vi.mock('./snowflake.js', () => ({
 
 import {
   buildOrganizationKiloClawLifecycleNotification,
+  decideCommitRetirementCreditRenewal,
   processCreditRenewalDiscovery,
   processCreditRenewalItem,
   processOrganizationTrialExpiryPage,
   processTrialExpiryPage,
   processTrialInactivityStopCandidate,
   recordCreditRenewalTerminalFailure,
+  runCommitRetirementGuardSweep,
   runCreditRenewalSweep,
   runSweep,
   selectOrganizationKiloClawLifecycleRecipients,
@@ -248,6 +250,8 @@ function createTestBillingSummary() {
     credit_renewals_past_due: 0,
     credit_renewals_auto_top_up: 0,
     credit_renewals_skipped_duplicate: 0,
+    commit_retirement_guard_candidates: 0,
+    commit_retirement_guard_requests: 0,
     interrupted_auto_resume_requests: 0,
     trial_inactivity_candidates: 0,
     trial_inactivity_batches: 0,
@@ -307,6 +311,7 @@ function creditRenewalRow(overrides: Partial<Record<string, unknown>> = {}) {
     status: 'active',
     kiloclaw_price_version: '2026-03-19',
     credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    current_period_start: '2026-05-01T00:00:00.000Z',
     current_period_end: '2026-06-01T00:00:00.000Z',
     cancel_at_period_end: false,
     scheduled_plan: null,
@@ -315,6 +320,12 @@ function creditRenewalRow(overrides: Partial<Record<string, unknown>> = {}) {
     suspended_at: null,
     auto_resume_attempt_count: 0,
     auto_top_up_triggered_for_period: null,
+    commit_retirement_state: null,
+    commit_retirement_qualified_at: null,
+    commit_retirement_qualification_source: null,
+    commit_retirement_final_ends_at: null,
+    commit_retirement_standard_opted_in_at: null,
+    commit_retirement_guarded_at: null,
     total_microdollars_acquired: 20_000_000,
     microdollars_used: 0,
     auto_top_up_enabled: false,
@@ -450,6 +461,310 @@ function createEnvWithQueueMocks(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch'
     trialInactivitySendBatch,
   };
 }
+
+describe('Commit retirement credit renewal decisions', () => {
+  it('cancels final Commit boundary without requiring cancel-at-period-end', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-06T00:00:00.000Z',
+          commit_retirement_state: 'final_term',
+          commit_retirement_final_ends_at: '2026-06-06T00:00:00.000Z',
+          current_period_end: '2026-06-06T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'cancel_final_commit' });
+  });
+
+  it('continues explicitly opted-in final Commit as Standard', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          scheduled_plan: 'standard',
+          commit_retirement_state: 'standard_scheduled',
+          credit_renewal_at: '2026-06-01T00:00:00.000Z',
+          commit_retirement_final_ends_at: '2026-06-01T00:00:00.000Z',
+          commit_retirement_standard_opted_in_at: '2026-05-10T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'continue_standard' });
+  });
+
+  it('opens review when Standard continuation renewal boundary mismatches final boundary', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          scheduled_plan: 'standard',
+          credit_renewal_at: '2026-06-01T00:00:00.001Z',
+          commit_retirement_state: 'standard_scheduled',
+          commit_retirement_final_ends_at: '2026-06-01T00:00:00.000Z',
+          commit_retirement_standard_opted_in_at: '2026-05-10T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'open_manual_review' });
+  });
+
+  it('honors qualified pending Standard-to-Commit switch once', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'standard',
+          scheduled_plan: 'commit',
+          credit_renewal_at: '2026-07-01T00:00:00.000Z',
+          commit_retirement_state: 'pending_final_term',
+          commit_retirement_qualified_at: '2026-06-05T23:59:59.999Z',
+          commit_retirement_qualification_source: 'switch_requested_before_cutoff',
+        }) as never
+      )
+    ).toEqual({
+      kind: 'allow_final_commit',
+      qualificationSource: 'switch_requested_before_cutoff',
+    });
+  });
+
+  it('sends every unqualified scheduled Commit switch to manual review', () => {
+    for (const creditRenewalAt of ['2026-06-05T23:59:59.999Z', '2026-07-01T00:00:00.000Z']) {
+      expect(
+        decideCommitRetirementCreditRenewal(
+          creditRenewalRow({
+            plan: 'standard',
+            scheduled_plan: 'commit',
+            credit_renewal_at: creditRenewalAt,
+          }) as never
+        )
+      ).toEqual({ kind: 'open_manual_review' });
+    }
+  });
+
+  it('does not authorize pre-cutoff recovery after a final term is already proven', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-05T23:59:59.999Z',
+          commit_retirement_state: 'final_term',
+          commit_retirement_final_ends_at: '2026-12-05T23:59:59.999Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'open_manual_review' });
+  });
+
+  it('authorizes pre-cutoff recovery only when no exhaustion state exists', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-05T23:59:59.999Z',
+          commit_retirement_state: null,
+          commit_retirement_final_ends_at: null,
+        }) as never
+      )
+    ).toEqual({
+      kind: 'allow_final_commit',
+      qualificationSource: 'renewal_due_before_cutoff',
+    });
+  });
+
+  it('opens review instead of canceling before a proven final boundary', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-06T00:00:00.000Z',
+          commit_retirement_state: 'final_term',
+          commit_retirement_final_ends_at: '2026-12-06T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'open_manual_review' });
+  });
+
+  it('does not authorize a qualified pending switch after final-term exhaustion', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'standard',
+          scheduled_plan: 'commit',
+          credit_renewal_at: '2026-07-01T00:00:00.000Z',
+          commit_retirement_state: 'completed',
+          commit_retirement_qualified_at: '2026-06-05T23:59:59.999Z',
+          commit_retirement_qualification_source: 'switch_requested_before_cutoff',
+          commit_retirement_final_ends_at: '2026-06-01T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'open_manual_review' });
+  });
+
+  it('skips manual-review retirement rows', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          commit_retirement_state: 'manual_review',
+        }) as never
+      )
+    ).toEqual({ kind: 'skip_manual_review' });
+  });
+});
+
+describe('Commit retirement guard discovery', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-06T00:00:00.000Z'));
+  });
+
+  it('delegates active Stripe-backed Commit rows with lazy final boundary to web verification', async () => {
+    const candidate = {
+      id: '11111111-1111-4111-8111-111111111111',
+      user_id: 'user-1',
+      instance_id: '22222222-2222-4222-8222-222222222222',
+      final_boundary: '2026-07-01 00:00:00+00',
+    };
+    const { db } = createMockDb([[candidate]]);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+    const timeoutSignal = new AbortController().signal;
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutSignal);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ guarded: true }));
+    const summary = createTestBillingSummary();
+
+    await runCommitRetirementGuardSweep(
+      db as never,
+      env,
+      {
+        billingFlow: 'kiloclaw_billing',
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'commit_retirement_guard',
+        billingAttempt: 1,
+      } as never,
+      summary
+    );
+
+    expect(summary.commit_retirement_guard_candidates).toBe(1);
+    expect(summary.commit_retirement_guard_requests).toBe(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://app.kilo.ai/api/internal/kiloclaw/billing-side-effects',
+      expect.objectContaining({
+        body: JSON.stringify({
+          action: 'commit_retirement_guard',
+          input: {
+            subscriptionId: candidate.id,
+            expectedFinalBoundary: '2026-07-01T00:00:00.000Z',
+          },
+        }),
+        signal: timeoutSignal,
+      })
+    );
+    expect(timeoutSpy).toHaveBeenCalledWith(30_000);
+  });
+
+  it('processes one bounded guard page and emits stable continuation', async () => {
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
+    const candidates = Array.from({ length: 4 }, (_, index) => ({
+      id: `${String(index).padStart(8, '0')}-1111-4111-8111-111111111111`,
+      user_id: `user-${index}`,
+      instance_id: null,
+      final_boundary: '2026-07-01T00:00:00.000Z',
+    }));
+    const { db, selectBuilders } = createMockDb([[...candidates]]);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ guarded: true }));
+    const summary = createTestBillingSummary();
+
+    const result = await runCommitRetirementGuardSweep(
+      db as never,
+      env,
+      {
+        billingFlow: 'kiloclaw_billing',
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'commit_retirement_guard',
+        billingAttempt: 1,
+      } as never,
+      summary,
+      {
+        kind: 'commit_retirement_guard_page',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'commit_retirement_guard',
+        cutoffTime: '2026-06-06T00:00:00.000Z',
+        pageBudget: 3,
+      }
+    );
+
+    expect(selectBuilders[0]?.orderBy).toHaveBeenCalled();
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(4);
+    expect(summary.commit_retirement_guard_candidates).toBe(3);
+    expect(summary.commit_retirement_guard_requests).toBe(3);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'commit_retirement_guard_continuation',
+      runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      sweep: 'commit_retirement_guard',
+      cutoffTime: '2026-06-06T00:00:00.000Z',
+      cursorSubscriptionId: candidates[2]?.id,
+      cursorFinalBoundary: '2026-07-01T00:00:00.000Z',
+      pageBudget: 3,
+      wallClockBudgetMs: undefined,
+    });
+    expect(findLogRecord('Processed bounded Commit retirement guard batch')).toMatchObject({
+      batchSize: 3,
+      fetchedCount: 4,
+      guardBacklogLikely: true,
+      batchLimit: 3,
+      concurrency: 3,
+      continuationEnqueued: true,
+    });
+  });
+
+  it('advances cursor past failed guard candidates so later rows are not starved', async () => {
+    const candidates = Array.from({ length: 3 }, (_, index) => ({
+      id: `${String(index).padStart(8, '0')}-1111-4111-8111-111111111111`,
+      user_id: `user-${index}`,
+      instance_id: null,
+      final_boundary: '2026-07-01T00:00:00.000Z',
+    }));
+    const { db } = createMockDb([[...candidates]]);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+    vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('persistent provider failure'))
+      .mockResolvedValue(Response.json({ guarded: true }));
+    const summary = createTestBillingSummary();
+
+    const result = await runCommitRetirementGuardSweep(
+      db as never,
+      env,
+      {
+        billingFlow: 'kiloclaw_billing',
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'commit_retirement_guard',
+        billingAttempt: 1,
+      } as never,
+      summary,
+      {
+        kind: 'commit_retirement_guard_page',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'commit_retirement_guard',
+        cutoffTime: '2026-06-06T00:00:00.000Z',
+        pageBudget: 2,
+      }
+    );
+
+    expect(summary.errors).toBe(1);
+    expect(summary.commit_retirement_guard_requests).toBe(1);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'commit_retirement_guard_continuation',
+        cursorSubscriptionId: candidates[1]?.id,
+      })
+    );
+  });
+});
 
 describe('credit renewal fanout queue processing', () => {
   beforeEach(() => {
@@ -872,6 +1187,67 @@ describe('credit renewal fanout queue processing', () => {
         renewalBoundary: '2026-06-01T00:00:00.000Z',
       })
     );
+  });
+
+  it('arms pure-credit final-term cancellation with retirement guard marker', async () => {
+    const row = creditRenewalRow({
+      plan: 'commit',
+      credit_renewal_at: '2026-06-06T00:00:00.000Z',
+      current_period_end: '2026-06-06T00:00:00.000Z',
+      commit_retirement_state: 'final_term',
+      commit_retirement_final_ends_at: '2026-06-06T00:00:00.000Z',
+    });
+    const { db, txUpdates } = createMockDb([[row], [row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await processCreditRenewalItem(
+      createEnvWithQueueMocks(vi.fn()).env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: row.id,
+        userId: row.user_id,
+        renewalBoundary: '2026-06-06T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals_canceled).toBe(1);
+    expect(txUpdates).toContainEqual(
+      expect.objectContaining({
+        status: 'canceled',
+        commit_retirement_state: 'completed',
+        commit_retirement_guarded_at: expect.anything(),
+      })
+    );
+  });
+
+  it('skips queued work when an open retirement review exists after discovery', async () => {
+    const row = creditRenewalRow();
+    const { db, txInserts, txUpdates, updates, selectBuilders } = createMockDb([[row], []]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+
+    const summary = await processCreditRenewalItem(
+      env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: row.id,
+        userId: row.user_id,
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_past_due).toBe(0);
+    expect(txInserts).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+    expect(updates).toHaveLength(0);
+    expect(selectBuilders).toHaveLength(2);
   });
 
   it('skips stale, transferred, or hybrid item messages once no current pure-credit boundary matches', async () => {
@@ -4377,10 +4753,13 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 'active',
             kiloclaw_price_version: '2026-05-10',
             credit_renewal_at: renewalAt,
+            current_period_start: '2026-04-01T10:00:00.000Z',
             current_period_end: renewalAt,
             cancel_at_period_end: false,
             scheduled_plan: null,
             commit_ends_at: renewalAt,
+            commit_retirement_state: null,
+            commit_retirement_final_ends_at: null,
             past_due_since: null,
             suspended_at: null,
             auto_resume_attempt_count: 0,
@@ -4572,6 +4951,10 @@ describe('credit renewal sweep affiliate tracking', () => {
             current_period_end: renewalAt,
             cancel_at_period_end: false,
             scheduled_plan: 'commit',
+            commit_retirement_state: 'pending_final_term',
+            commit_retirement_qualified_at: '2026-04-08T10:00:00.000Z',
+            commit_retirement_qualification_source: 'switch_requested_before_cutoff',
+            commit_retirement_final_ends_at: null,
             commit_ends_at: null,
             past_due_since: null,
             suspended_at: null,

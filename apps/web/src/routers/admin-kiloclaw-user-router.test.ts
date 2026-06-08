@@ -4,6 +4,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import {
   kiloclaw_admin_audit_logs,
+  kiloclaw_commit_retirement_review_cases,
   kiloclaw_subscription_change_log,
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -75,6 +76,7 @@ describe('admin.users.getKiloClawState', () => {
       subscription: null,
       effectiveSubscriptionId: null,
       subscriptions: [],
+      openRetirementReviewCases: [],
       hasAccess: false,
       accessReason: null,
       earlybird: null,
@@ -549,6 +551,49 @@ describe('admin.users.getKiloClawState', () => {
     expect(result.needsSupportReview).toBe(true);
   });
 
+  it('shows retirement evidence and open review cases for the user', async () => {
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'commit',
+        status: 'active',
+        payment_source: 'credits',
+        current_period_end: '2026-12-06T00:00:00.000Z',
+        commit_retirement_state: 'manual_review',
+        commit_retirement_qualified_at: '2026-06-05T12:00:00.000Z',
+        commit_retirement_qualification_source: 'active_at_cutoff',
+        commit_retirement_final_ends_at: '2026-12-06T00:00:00.000Z',
+        commit_retirement_review_reason: 'boundary_mismatch',
+      })
+      .returning();
+    await db.insert(kiloclaw_commit_retirement_review_cases).values({
+      dedupe_key: `admin_state:${subscription.id}`,
+      subscription_id: subscription.id,
+      reason_code: 'boundary_mismatch',
+      summary: 'Local final boundary conflicts with verified evidence.',
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
+
+    expect(result.subscriptions[0]).toEqual(
+      expect.objectContaining({
+        commit_retirement_state: 'manual_review',
+        commit_retirement_qualification_source: 'active_at_cutoff',
+        commit_retirement_final_ends_at: expect.any(String),
+        commit_retirement_review_reason: 'boundary_mismatch',
+      })
+    );
+    expect(result.openRetirementReviewCases).toEqual([
+      expect.objectContaining({
+        subscription_id: subscription.id,
+        status: 'open',
+        reason_code: 'boundary_mismatch',
+      }),
+    ]);
+  });
+
   it('returns subscription rows without eager-loading change log history', async () => {
     const [instance] = await db
       .insert(kiloclaw_instances)
@@ -747,6 +792,350 @@ describe('admin.users.getKiloClawState', () => {
     const canceledSub = result.subscriptions.find(s => s.status === 'canceled');
     expect(activeSub?.instance?.id).toBe(instanceNew.id);
     expect(canceledSub?.instance?.id).toBe(instanceOld.id);
+  });
+});
+
+describe('admin.commitRetirementReviews', () => {
+  it('bounds concurrent provider reads while listing review cases', async () => {
+    const subscriptions = await db
+      .insert(kiloclaw_subscriptions)
+      .values(
+        Array.from({ length: 12 }, (_, index) => ({
+          user_id: targetUser.id,
+          plan: 'commit' as const,
+          status: 'active' as const,
+          payment_source: 'stripe' as const,
+          stripe_subscription_id: `sub_admin_review_list_${index}`,
+          commit_retirement_state: 'manual_review' as const,
+          commit_retirement_review_reason: 'provider_outcome_unknown' as const,
+        }))
+      )
+      .returning();
+    await db.insert(kiloclaw_commit_retirement_review_cases).values(
+      subscriptions.map((subscription, index) => ({
+        dedupe_key: `admin_review_list:${subscription.id}`,
+        subscription_id: subscription.id,
+        stripe_subscription_id: subscription.stripe_subscription_id,
+        reason_code: 'provider_outcome_unknown' as const,
+        summary: `Review provider state ${index}.`,
+      }))
+    );
+
+    let activeReads = 0;
+    let maximumActiveReads = 0;
+    let releaseProviderReads = () => {};
+    const providerReadsReleased = new Promise<void>(resolve => {
+      releaseProviderReads = resolve;
+    });
+    let initialBatchStarted = () => {};
+    const initialBatch = new Promise<void>(resolve => {
+      initialBatchStarted = resolve;
+    });
+    jest.spyOn(stripeMock.subscriptions, 'retrieve').mockImplementation(async id => {
+      activeReads++;
+      maximumActiveReads = Math.max(maximumActiveReads, activeReads);
+      if (activeReads === 5) initialBatchStarted();
+      await providerReadsReleased;
+      activeReads--;
+      return {
+        id,
+        status: 'active',
+        items: { data: [] },
+        cancel_at_period_end: false,
+        schedule: null,
+      } as never;
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const resultPromise = caller.admin.commitRetirementReviews.list({ status: 'open', limit: 100 });
+    await initialBatch;
+
+    expect(stripeMock.subscriptions.retrieve).toHaveBeenCalledTimes(5);
+    releaseProviderReads();
+    const result = await resultPromise;
+
+    expect(result.rows).toHaveLength(12);
+    expect(result.nextCursor).toBeNull();
+    expect(stripeMock.subscriptions.retrieve).toHaveBeenCalledTimes(12);
+    expect(maximumActiveReads).toBe(5);
+  });
+
+  it('paginates stable created-at ties without duplicates and reaches older open cases', async () => {
+    const sameCreatedAt = '2026-06-05T12:00:00.000Z';
+    const olderCreatedAt = '2026-06-04T12:00:00.000Z';
+    const cases = Array.from({ length: 105 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      dedupe_key: `admin_review_page:${index}`,
+      stripe_event_id: `evt_admin_review_page_${index}`,
+      reason_code: 'provider_outcome_unknown' as const,
+      summary: `Review page case ${index}.`,
+      created_at: index < 103 ? sameCreatedAt : olderCreatedAt,
+    }));
+    await db.insert(kiloclaw_commit_retirement_review_cases).values(cases);
+
+    jest.spyOn(stripeMock.events, 'retrieve').mockImplementation(
+      async id =>
+        ({
+          id,
+          type: 'customer.subscription.updated',
+          created: 1_780_272_000,
+        }) as never
+    );
+
+    const caller = await createCallerForUser(adminUser.id);
+    const firstPage = await caller.admin.commitRetirementReviews.list({
+      status: 'open',
+      limit: 100,
+    });
+    expect(firstPage.rows).toHaveLength(100);
+    expect(firstPage.nextCursor).toEqual({
+      createdAt: sameCreatedAt,
+      id: firstPage.rows.at(-1)?.reviewCase.id,
+    });
+
+    const secondPage = await caller.admin.commitRetirementReviews.list({
+      status: 'open',
+      limit: 100,
+      cursor: firstPage.nextCursor ?? undefined,
+    });
+    expect(secondPage.rows).toHaveLength(5);
+    expect(secondPage.nextCursor).toBeNull();
+    expect(
+      secondPage.rows.slice(0, 3).map(row => new Date(row.reviewCase.created_at).toISOString())
+    ).toEqual(Array.from({ length: 3 }, () => sameCreatedAt));
+    expect(
+      secondPage.rows.slice(3).map(row => new Date(row.reviewCase.created_at).toISOString())
+    ).toEqual(Array.from({ length: 2 }, () => olderCreatedAt));
+
+    const ids = [...firstPage.rows, ...secondPage.rows].map(row => row.reviewCase.id);
+    expect(ids).toHaveLength(105);
+    expect(new Set(ids).size).toBe(105);
+  });
+
+  it('resolves a known-row case stale-safely and never authorizes Commit renewal', async () => {
+    const finalBoundary = '2026-12-06T00:00:00.000Z';
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'commit',
+        status: 'active',
+        payment_source: 'credits',
+        current_period_start: '2026-05-06T00:00:00.000Z',
+        current_period_end: finalBoundary,
+        credit_renewal_at: finalBoundary,
+        commit_retirement_state: 'manual_review',
+        commit_retirement_qualified_at: '2026-05-06T00:00:00.000Z',
+        commit_retirement_qualification_source: 'active_at_cutoff',
+        commit_retirement_final_ends_at: finalBoundary,
+        commit_retirement_review_reason: 'boundary_mismatch',
+      })
+      .returning();
+    const [reviewCase] = await db
+      .insert(kiloclaw_commit_retirement_review_cases)
+      .values({
+        dedupe_key: `admin_resolve:${subscription.id}`,
+        subscription_id: subscription.id,
+        reason_code: 'boundary_mismatch',
+        summary: 'Boundary needs operator reconciliation.',
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.commitRetirementReviews.resolve({
+      caseId: reviewCase.id,
+      expectedCaseUpdatedAt: new Date(reviewCase.updated_at).toISOString(),
+      expectedSubscriptionUpdatedAt: new Date(subscription.updated_at).toISOString(),
+      expectedFinalBoundary: finalBoundary,
+      expectedProvider: { kind: 'none' },
+      disposition: 'deny_future_commit',
+      reason: 'Verified current paid period and denied future Commit.',
+    });
+
+    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+      where: eq(kiloclaw_subscriptions.id, subscription.id),
+    });
+    expect(updated).toEqual(
+      expect.objectContaining({
+        plan: 'commit',
+        commit_retirement_state: 'final_term',
+        commit_retirement_review_reason: null,
+        commit_retirement_standard_opted_in_at: null,
+        cancel_at_period_end: true,
+        scheduled_plan: null,
+        scheduled_by: null,
+      })
+    );
+    expectSameInstant(updated?.commit_retirement_final_ends_at, finalBoundary);
+    expectSameInstant(updated?.current_period_end, finalBoundary);
+
+    const resolved = await db.query.kiloclaw_commit_retirement_review_cases.findFirst({
+      where: eq(kiloclaw_commit_retirement_review_cases.id, reviewCase.id),
+    });
+    expect(resolved).toEqual(
+      expect.objectContaining({
+        status: 'resolved',
+        resolution_disposition: 'deny_future_commit',
+        resolution_actor_type: 'operator',
+        resolution_actor_id: adminUser.id,
+      })
+    );
+
+    const [changeLog] = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+    expect(changeLog).toEqual(
+      expect.objectContaining({
+        action: 'commit_retirement_changed',
+        actor_id: adminUser.id,
+        reason: 'operator_deny_future_commit',
+      })
+    );
+  });
+
+  it('rejects stale final-boundary resolution without mutating the case', async () => {
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'commit',
+        status: 'active',
+        payment_source: 'credits',
+        current_period_end: '2026-12-06T00:00:00.000Z',
+        commit_retirement_state: 'manual_review',
+        commit_retirement_final_ends_at: '2026-12-06T00:00:00.000Z',
+        commit_retirement_review_reason: 'boundary_mismatch',
+      })
+      .returning();
+    const [reviewCase] = await db
+      .insert(kiloclaw_commit_retirement_review_cases)
+      .values({
+        dedupe_key: `admin_stale:${subscription.id}`,
+        subscription_id: subscription.id,
+        reason_code: 'boundary_mismatch',
+        summary: 'Boundary needs operator reconciliation.',
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.commitRetirementReviews.resolve({
+        caseId: reviewCase.id,
+        expectedCaseUpdatedAt: new Date(reviewCase.updated_at).toISOString(),
+        expectedSubscriptionUpdatedAt: new Date(subscription.updated_at).toISOString(),
+        expectedFinalBoundary: '2027-01-06T00:00:00.000Z',
+        expectedProvider: { kind: 'none' },
+        disposition: 'deny_future_commit',
+        reason: 'Attempted stale decision.',
+      })
+    ).rejects.toThrow('Retirement review state changed');
+
+    const unchanged = await db.query.kiloclaw_commit_retirement_review_cases.findFirst({
+      where: eq(kiloclaw_commit_retirement_review_cases.id, reviewCase.id),
+    });
+    expect(unchanged?.status).toBe('open');
+  });
+
+  it('preserves rowless provider disposition and forbids dismissal', async () => {
+    const [reviewCase] = await db
+      .insert(kiloclaw_commit_retirement_review_cases)
+      .values({
+        dedupe_key: 'admin_rowless:evt_provider_only',
+        stripe_event_id: 'evt_provider_only',
+        reason_code: 'unqualified_post_cutoff_commit',
+        summary: 'Provider event has no canonical subscription row.',
+      })
+      .returning();
+    jest.spyOn(stripeMock.events, 'retrieve').mockResolvedValue({
+      id: 'evt_provider_only',
+      type: 'customer.subscription.created',
+      created: 1_780_272_000,
+    } as never);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const expectedProvider = {
+      kind: 'event' as const,
+      id: 'evt_provider_only',
+      type: 'customer.subscription.created',
+      createdAt: new Date(1_780_272_000 * 1000).toISOString(),
+    };
+
+    await expect(
+      caller.admin.commitRetirementReviews.dismiss({
+        caseId: reviewCase.id,
+        expectedCaseUpdatedAt: new Date(reviewCase.updated_at).toISOString(),
+        expectedSubscriptionUpdatedAt: null,
+        expectedFinalBoundary: null,
+        expectedProvider,
+        reason: 'No subscription row.',
+      })
+    ).rejects.toThrow('Rowless provider cases cannot be dismissed');
+
+    await caller.admin.commitRetirementReviews.resolve({
+      caseId: reviewCase.id,
+      expectedCaseUpdatedAt: new Date(reviewCase.updated_at).toISOString(),
+      expectedSubscriptionUpdatedAt: null,
+      expectedFinalBoundary: null,
+      expectedProvider,
+      disposition: 'deny_future_commit',
+      reason: 'Keep provider-level denial authoritative.',
+    });
+
+    const resolved = await db.query.kiloclaw_commit_retirement_review_cases.findFirst({
+      where: eq(kiloclaw_commit_retirement_review_cases.id, reviewCase.id),
+    });
+    expect(resolved).toEqual(
+      expect.objectContaining({
+        subscription_id: null,
+        stripe_event_id: 'evt_provider_only',
+        status: 'resolved',
+        resolution_disposition: 'deny_future_commit',
+      })
+    );
+  });
+
+  it('dismisses only a known case whose subscription is already reconciled', async () => {
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        commit_retirement_state: 'completed',
+      })
+      .returning();
+    const [reviewCase] = await db
+      .insert(kiloclaw_commit_retirement_review_cases)
+      .values({
+        dedupe_key: `admin_dismiss:${subscription.id}`,
+        subscription_id: subscription.id,
+        reason_code: 'provider_outcome_unknown',
+        summary: 'Provider outcome was later reconciled.',
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.commitRetirementReviews.dismiss({
+      caseId: reviewCase.id,
+      expectedCaseUpdatedAt: new Date(reviewCase.updated_at).toISOString(),
+      expectedSubscriptionUpdatedAt: new Date(subscription.updated_at).toISOString(),
+      expectedFinalBoundary: null,
+      expectedProvider: { kind: 'none' },
+      reason: 'Current state is reconciled and needs no further action.',
+    });
+
+    const dismissed = await db.query.kiloclaw_commit_retirement_review_cases.findFirst({
+      where: eq(kiloclaw_commit_retirement_review_cases.id, reviewCase.id),
+    });
+    expect(dismissed).toEqual(
+      expect.objectContaining({
+        status: 'dismissed',
+        resolution_disposition: 'dismiss_no_issue',
+        resolution_actor_id: adminUser.id,
+      })
+    );
   });
 });
 

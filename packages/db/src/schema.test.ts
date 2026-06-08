@@ -229,6 +229,40 @@ describe('database schema', () => {
       KiloClawSubscriptionStatus: ['trialing', 'active', 'past_due', 'canceled', 'unpaid'],
       KiloClawSubscriptionAccessOrigin: ['earlybird'],
       KiloClawSubscriptionChangeActorType: ['user', 'system'],
+      KiloClawCommitRetirementState: [
+        'pending_final_term',
+        'final_term',
+        'standard_scheduled',
+        'completed',
+        'manual_review',
+      ],
+      KiloClawCommitRetirementQualificationSource: [
+        'active_at_cutoff',
+        'checkout_confirmed_before_cutoff',
+        'switch_requested_before_cutoff',
+        'renewal_due_before_cutoff',
+      ],
+      KiloClawCommitRetirementReviewReason: [
+        'unqualified_post_cutoff_commit',
+        'missing_qualification_evidence',
+        'conflicting_qualification_evidence',
+        'boundary_mismatch',
+        'provider_state_mismatch',
+        'provider_outcome_unknown',
+        'forbidden_commit_invoice',
+        'ambiguous_subscription_lineage',
+        'referral_reward_ambiguous_standard_schedule',
+      ],
+      KiloClawCommitRetirementReviewCaseStatus: ['open', 'resolved', 'dismissed'],
+      KiloClawCommitRetirementResolutionDisposition: [
+        'deny_future_commit',
+        'recognize_paid_period_as_final',
+        'correct_state',
+        'cancel_subscription',
+        'refund_and_cancel',
+        'dismiss_no_issue',
+      ],
+      KiloClawCommitRetirementResolutionActorType: ['operator', 'system'],
       KiloClawSubscriptionChangeAction: [
         'created',
         'status_changed',
@@ -243,6 +277,7 @@ describe('database schema', () => {
         'payment_source_changed',
         'schedule_changed',
         'admin_override',
+        'commit_retirement_changed',
       ],
       KiloClawTerminalRenewalFailureStatus: ['unresolved', 'resolved', 'waived', 'superseded'],
       KiloClawTerminalRenewalFailureCode: [
@@ -360,6 +395,35 @@ describe('database schema', () => {
         );
       }
     }
+  });
+
+  it('defines the Commit retirement guard sweep keyset index', () => {
+    const currentSchema = generateDrizzleJson(schema, crypto.randomUUID());
+    const subscriptionTable = currentSchema.tables['public.kiloclaw_subscriptions'];
+    const guardSweepIndex = subscriptionTable?.indexes[
+      'IDX_kiloclaw_subscriptions_commit_retirement_guard_sweep'
+    ] as
+      | {
+          columns: { expression: string; isExpression: boolean }[];
+          where?: string;
+        }
+      | undefined;
+
+    expect(guardSweepIndex?.columns).toMatchObject([
+      {
+        expression: 'COALESCE("commit_retirement_final_ends_at", "current_period_end")',
+        isExpression: true,
+      },
+      { expression: 'id', isExpression: false },
+    ]);
+    expect(guardSweepIndex?.where).toContain('"kiloclaw_subscriptions"."plan" = \'commit\'');
+    expect(guardSweepIndex?.where).toContain('"kiloclaw_subscriptions"."status" = \'active\'');
+    expect(guardSweepIndex?.where).toContain(
+      '"kiloclaw_subscriptions"."transferred_to_subscription_id" IS NULL'
+    );
+    expect(guardSweepIndex?.where).toContain(
+      '"kiloclaw_subscriptions"."commit_retirement_guarded_at" IS NULL'
+    );
   });
 
   it('exposes provider-aware Kilo Pass store tables', () => {

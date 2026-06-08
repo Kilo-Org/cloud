@@ -14,6 +14,7 @@ vi.mock('cloudflare:workers', () => ({
 vi.mock('./lifecycle.js', () => ({
   runSweep: vi.fn(),
   processTrialInactivityStopCandidate: vi.fn(),
+  processCommitRetirementGuardPage: vi.fn(),
   processCreditRenewalDiscovery: vi.fn(),
   processCreditRenewalItem: vi.fn(),
   processOrganizationTrialExpiryPage: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('./bootstrap.js', () => ({
 import { handler, KiloClawBillingService } from './index.js';
 import { bootstrapProvisionSubscription } from './bootstrap.js';
 import {
+  processCommitRetirementGuardPage,
   processCreditRenewalDiscovery,
   processCreditRenewalItem,
   processOrganizationTrialExpiryPage,
@@ -111,6 +113,8 @@ describe('kiloclaw billing worker handler', () => {
       credit_renewals_past_due: 0,
       credit_renewals_auto_top_up: 0,
       credit_renewals_skipped_duplicate: 0,
+      commit_retirement_guard_candidates: 0,
+      commit_retirement_guard_requests: 0,
       interrupted_auto_resume_requests: 0,
       trial_inactivity_candidates: 0,
       trial_inactivity_batches: 0,
@@ -139,6 +143,10 @@ describe('kiloclaw billing worker handler', () => {
     vi.mocked(processTrialInactivityStopCandidate).mockResolvedValue(emptySummary);
     vi.mocked(processCreditRenewalDiscovery).mockResolvedValue(emptySummary);
     vi.mocked(processCreditRenewalItem).mockResolvedValue(emptySummary);
+    vi.mocked(processCommitRetirementGuardPage).mockResolvedValue({
+      summary: emptySummary,
+      continuationEnqueued: false,
+    });
     vi.mocked(processTrialExpiryPage).mockResolvedValue({
       summary: emptySummary,
       continuationEnqueued: false,
@@ -296,10 +304,83 @@ describe('kiloclaw billing worker handler', () => {
     expect(lifecycleSend).toHaveBeenNthCalledWith(2, {
       kind: 'lifecycle',
       runId,
-      sweep: 'interrupted_auto_resume',
+      sweep: 'commit_retirement_guard',
     });
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('starts paginated Commit retirement guard without advancing lifecycle', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '12121212-1212-4212-8212-121212121212';
+    const message = {
+      body: { kind: 'lifecycle', runId, sweep: 'commit_retirement_guard' },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'commit_retirement_guard_page',
+      runId,
+      sweep: 'commit_retirement_guard',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+  });
+
+  it('advances lifecycle only after final Commit retirement guard page', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '13131313-1313-4313-8313-131313131313';
+    const message = {
+      body: {
+        kind: 'commit_retirement_guard_continuation',
+        runId,
+        sweep: 'commit_retirement_guard',
+        cutoffTime: '2026-06-06T00:00:00.000Z',
+        cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+        cursorFinalBoundary: '2026-07-01T00:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCommitRetirementGuardPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'lifecycle',
+      runId,
+      sweep: 'interrupted_auto_resume',
+    });
+  });
+
+  it('does not advance lifecycle while Commit retirement guard continuation remains', async () => {
+    const { env, lifecycleSend } = createEnv();
+    vi.mocked(processCommitRetirementGuardPage).mockResolvedValueOnce({
+      summary: {} as never,
+      continuationEnqueued: true,
+    });
+    const message = {
+      body: {
+        kind: 'commit_retirement_guard_page',
+        runId: '14141414-1414-4414-8414-141414141414',
+        sweep: 'commit_retirement_guard',
+        pageBudget: 3,
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCommitRetirementGuardPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).not.toHaveBeenCalled();
   });
 
   it('runs standalone instance destruction without chaining later lifecycle sweeps', async () => {
@@ -402,6 +483,8 @@ describe('kiloclaw billing worker handler', () => {
         credit_renewals_past_due: 0,
         credit_renewals_auto_top_up: 0,
         credit_renewals_skipped_duplicate: 0,
+        commit_retirement_guard_candidates: 0,
+        commit_retirement_guard_requests: 0,
         interrupted_auto_resume_requests: 0,
         trial_inactivity_candidates: 0,
         trial_inactivity_batches: 0,
@@ -519,6 +602,8 @@ describe('kiloclaw billing worker handler', () => {
         credit_renewals_past_due: 0,
         credit_renewals_auto_top_up: 0,
         credit_renewals_skipped_duplicate: 0,
+        commit_retirement_guard_candidates: 0,
+        commit_retirement_guard_requests: 0,
         interrupted_auto_resume_requests: 0,
         trial_inactivity_candidates: 0,
         trial_inactivity_batches: 0,

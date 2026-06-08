@@ -27,6 +27,7 @@ import {
   Megaphone,
   Coins,
   Scale,
+  ShieldAlert,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -148,6 +149,11 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'KiloClaw referrals',
     url: '/admin/kiloclaw-referrals',
     icon: () => <KiloCrabIcon className="size-4" />,
+  },
+  {
+    title: () => 'Commit retirement reviews',
+    url: '/admin/kiloclaw-retirement-reviews',
+    icon: () => <ShieldAlert />,
   },
   {
     title: () => 'Community Contributions',

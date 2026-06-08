@@ -49,6 +49,12 @@ import {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
+  KiloClawCommitRetirementState,
+  KiloClawCommitRetirementQualificationSource,
+  KiloClawCommitRetirementReviewReason,
+  KiloClawCommitRetirementReviewCaseStatus,
+  KiloClawCommitRetirementResolutionDisposition,
+  KiloClawCommitRetirementResolutionActorType,
   KiloClawTerminalRenewalFailureStatus,
   KiloClawTerminalRenewalFailureCode,
   KiloClawTerminalRenewalFailureResolutionActorType,
@@ -177,6 +183,12 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
+  KiloClawCommitRetirementState,
+  KiloClawCommitRetirementQualificationSource,
+  KiloClawCommitRetirementReviewReason,
+  KiloClawCommitRetirementReviewCaseStatus,
+  KiloClawCommitRetirementResolutionDisposition,
+  KiloClawCommitRetirementResolutionActorType,
   KiloClawTerminalRenewalFailureStatus,
   KiloClawTerminalRenewalFailureCode,
   KiloClawTerminalRenewalFailureResolutionActorType,
@@ -6476,6 +6488,14 @@ export const kiloclaw_subscriptions = pgTable(
     current_period_end: timestamp({ withTimezone: true, mode: 'string' }),
     credit_renewal_at: timestamp({ withTimezone: true, mode: 'string' }),
     commit_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
+    commit_retirement_state: text().$type<KiloClawCommitRetirementState>(),
+    commit_retirement_qualified_at: timestamp({ withTimezone: true, mode: 'string' }),
+    commit_retirement_qualification_source:
+      text().$type<KiloClawCommitRetirementQualificationSource>(),
+    commit_retirement_final_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
+    commit_retirement_standard_opted_in_at: timestamp({ withTimezone: true, mode: 'string' }),
+    commit_retirement_guarded_at: timestamp({ withTimezone: true, mode: 'string' }),
+    commit_retirement_review_reason: text().$type<KiloClawCommitRetirementReviewReason>(),
     past_due_since: timestamp({ withTimezone: true, mode: 'string' }),
     suspended_at: timestamp({ withTimezone: true, mode: 'string' }),
     destruction_deadline: timestamp({ withTimezone: true, mode: 'string' }),
@@ -6497,6 +6517,14 @@ export const kiloclaw_subscriptions = pgTable(
     index('IDX_kiloclaw_subscriptions_transferred_to').on(table.transferred_to_subscription_id),
     index('IDX_kiloclaw_subscriptions_stripe_schedule_id').on(table.stripe_schedule_id),
     index('IDX_kiloclaw_subscriptions_auto_resume_retry_after').on(table.auto_resume_retry_after),
+    index('IDX_kiloclaw_subscriptions_commit_retirement_guard_sweep')
+      .on(
+        sql`COALESCE(${table.commit_retirement_final_ends_at}, ${table.current_period_end})`,
+        table.id
+      )
+      .where(
+        sql`${table.plan} = 'commit' AND ${table.status} = 'active' AND ${table.transferred_to_subscription_id} IS NULL AND ${table.stripe_subscription_id} IS NOT NULL AND ${table.current_period_end} IS NOT NULL AND ${table.commit_retirement_state} IS DISTINCT FROM 'manual_review' AND ${table.commit_retirement_state} IS DISTINCT FROM 'standard_scheduled' AND ${table.commit_retirement_standard_opted_in_at} IS NULL AND ${table.commit_retirement_guarded_at} IS NULL`
+      ),
     check(
       'kiloclaw_subscriptions_price_version_check',
       sql`${table.kiloclaw_price_version} IN (${sql.join(
@@ -6512,6 +6540,37 @@ export const kiloclaw_subscriptions = pgTable(
     ),
     enumCheck('kiloclaw_subscriptions_scheduled_by_check', table.scheduled_by, KiloClawScheduledBy),
     enumCheck('kiloclaw_subscriptions_status_check', table.status, KiloClawSubscriptionStatus),
+    enumCheck(
+      'kiloclaw_subscriptions_commit_retirement_state_check',
+      table.commit_retirement_state,
+      KiloClawCommitRetirementState
+    ),
+    enumCheck(
+      'kiloclaw_subscriptions_commit_retirement_qualification_source_check',
+      table.commit_retirement_qualification_source,
+      KiloClawCommitRetirementQualificationSource
+    ),
+    enumCheck(
+      'kiloclaw_subscriptions_commit_retirement_review_reason_check',
+      table.commit_retirement_review_reason,
+      KiloClawCommitRetirementReviewReason
+    ),
+    check(
+      'kiloclaw_subscriptions_commit_retirement_qualification_check',
+      sql`(${table.commit_retirement_qualified_at} IS NULL) = (${table.commit_retirement_qualification_source} IS NULL)`
+    ),
+    check(
+      'kiloclaw_subscriptions_commit_retirement_standard_consent_check',
+      sql`${table.commit_retirement_state} <> 'standard_scheduled' OR ${table.commit_retirement_standard_opted_in_at} IS NOT NULL`
+    ),
+    check(
+      'kiloclaw_subscriptions_commit_retirement_manual_review_reason_check',
+      sql`${table.commit_retirement_state} <> 'manual_review' OR ${table.commit_retirement_review_reason} IS NOT NULL`
+    ),
+    check(
+      'kiloclaw_subscriptions_commit_retirement_final_boundary_check',
+      sql`${table.commit_retirement_state} NOT IN ('final_term', 'standard_scheduled') OR ${table.commit_retirement_final_ends_at} IS NOT NULL`
+    ),
     enumCheck(
       'kiloclaw_subscriptions_access_origin_check',
       table.access_origin,
@@ -6576,6 +6635,100 @@ export const kiloclaw_subscription_change_log = pgTable(
 
 export type KiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferSelect;
 export type NewKiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferInsert;
+
+export const kiloclaw_commit_retirement_review_cases = pgTable(
+  'kiloclaw_commit_retirement_review_cases',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    dedupe_key: text().notNull().unique(),
+    subscription_id: uuid().references(() => kiloclaw_subscriptions.id),
+    stripe_subscription_id: text(),
+    stripe_event_id: text(),
+    reason_code: text().notNull().$type<KiloClawCommitRetirementReviewReason>(),
+    summary: text().notNull(),
+    status: text()
+      .notNull()
+      .$type<KiloClawCommitRetirementReviewCaseStatus>()
+      .default(KiloClawCommitRetirementReviewCaseStatus.Open),
+    resolution_disposition: text().$type<KiloClawCommitRetirementResolutionDisposition>(),
+    resolution_actor_type: text().$type<KiloClawCommitRetirementResolutionActorType>(),
+    resolution_actor_id: text(),
+    resolution_at: timestamp({ withTimezone: true, mode: 'string' }),
+    resolution_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_kiloclaw_commit_retirement_review_cases_open_subscription')
+      .on(table.subscription_id)
+      .where(sql`${table.status} = 'open'`),
+    index('IDX_kiloclaw_commit_retirement_review_cases_open_created_at')
+      .on(table.created_at)
+      .where(sql`${table.status} = 'open'`),
+    index('IDX_kiloclaw_commit_retirement_review_cases_stripe_subscription').on(
+      table.stripe_subscription_id
+    ),
+    index('IDX_kiloclaw_commit_retirement_review_cases_stripe_event').on(table.stripe_event_id),
+    uniqueIndex('UQ_kiloclaw_commit_retirement_review_cases_open_subscription')
+      .on(table.subscription_id)
+      .where(sql`${table.status} = 'open' AND ${table.subscription_id} IS NOT NULL`),
+    enumCheck(
+      'kiloclaw_commit_retirement_review_cases_reason_code_check',
+      table.reason_code,
+      KiloClawCommitRetirementReviewReason
+    ),
+    enumCheck(
+      'kiloclaw_commit_retirement_review_cases_status_check',
+      table.status,
+      KiloClawCommitRetirementReviewCaseStatus
+    ),
+    enumCheck(
+      'kiloclaw_commit_retirement_review_cases_resolution_disposition_check',
+      table.resolution_disposition,
+      KiloClawCommitRetirementResolutionDisposition
+    ),
+    enumCheck(
+      'kiloclaw_commit_retirement_review_cases_resolution_actor_type_check',
+      table.resolution_actor_type,
+      KiloClawCommitRetirementResolutionActorType
+    ),
+    check(
+      'kiloclaw_commit_retirement_review_cases_identifier_check',
+      sql`${table.subscription_id} IS NOT NULL OR ${table.stripe_subscription_id} IS NOT NULL OR ${table.stripe_event_id} IS NOT NULL`
+    ),
+    check(
+      'kiloclaw_commit_retirement_review_cases_dedupe_key_check',
+      sql`length(${table.dedupe_key}) BETWEEN 1 AND 255 AND ${table.dedupe_key} ~ '^[A-Za-z0-9:_-]+$'`
+    ),
+    check(
+      'kiloclaw_commit_retirement_review_cases_summary_check',
+      sql`length(${table.summary}) BETWEEN 1 AND 500`
+    ),
+    check(
+      'kiloclaw_commit_retirement_review_cases_resolution_reason_check',
+      sql`${table.resolution_reason} IS NULL OR length(${table.resolution_reason}) BETWEEN 1 AND 500`
+    ),
+    check(
+      'kiloclaw_commit_retirement_review_cases_resolution_check',
+      sql`(${table.status} = 'open' AND ${table.resolution_disposition} IS NULL AND ${table.resolution_actor_type} IS NULL AND ${table.resolution_actor_id} IS NULL AND ${table.resolution_at} IS NULL AND ${table.resolution_reason} IS NULL) OR (${table.status} IN ('resolved', 'dismissed') AND ${table.resolution_disposition} IS NOT NULL AND ${table.resolution_actor_type} IS NOT NULL AND ${table.resolution_actor_id} IS NOT NULL AND ${table.resolution_at} IS NOT NULL AND ${table.resolution_reason} IS NOT NULL)`
+    ),
+    check(
+      'kiloclaw_commit_retirement_review_cases_dismissal_disposition_check',
+      sql`(${table.status} = 'dismissed') = (${table.resolution_disposition} = 'dismiss_no_issue')`
+    ),
+  ]
+);
+
+export type KiloClawCommitRetirementReviewCase =
+  typeof kiloclaw_commit_retirement_review_cases.$inferSelect;
+export type NewKiloClawCommitRetirementReviewCase =
+  typeof kiloclaw_commit_retirement_review_cases.$inferInsert;
 
 // KiloClaw credit-renewal terminal failures — durable record of
 // (subscription_id, renewal_boundary) pairs whose automatic retry has been

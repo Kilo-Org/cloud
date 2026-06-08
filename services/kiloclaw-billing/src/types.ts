@@ -6,6 +6,7 @@ export const TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP = 'trial_inactivity_stop_cand
 
 export const BILLING_SWEEP_ORDER = [
   'credit_renewal',
+  'commit_retirement_guard',
   'interrupted_auto_resume',
   'trial_expiry',
   'organization_trial_expiry',
@@ -94,6 +95,32 @@ export type CreditRenewalTerminalFailureQueueMessage = {
   failureMessage?: string;
 };
 
+export type CommitRetirementGuardPageQueueMessage = {
+  kind: 'commit_retirement_guard_page';
+  runId: string;
+  sweep: 'commit_retirement_guard';
+  cutoffTime?: string;
+  cursorSubscriptionId?: string;
+  cursorFinalBoundary?: string;
+  pageBudget?: number;
+  wallClockBudgetMs?: number;
+};
+
+export type CommitRetirementGuardContinuationQueueMessage = {
+  kind: 'commit_retirement_guard_continuation';
+  runId: string;
+  sweep: 'commit_retirement_guard';
+  cutoffTime: string;
+  cursorSubscriptionId: string;
+  cursorFinalBoundary: string;
+  pageBudget?: number;
+  wallClockBudgetMs?: number;
+};
+
+export type CommitRetirementGuardQueueMessage =
+  | CommitRetirementGuardPageQueueMessage
+  | CommitRetirementGuardContinuationQueueMessage;
+
 export type CreditRenewalQueueMessage =
   | CreditRenewalDiscoveryQueueMessage
   | CreditRenewalDiscoveryContinuationQueueMessage
@@ -156,6 +183,7 @@ export type LifecycleProducerQueueMessage =
   | LifecycleQueueMessage
   | StandaloneInstanceDestructionQueueMessage
   | CreditRenewalQueueMessage
+  | CommitRetirementGuardQueueMessage
   | TrialExpiryQueueMessage
   | OrganizationTrialExpiryQueueMessage;
 
@@ -182,6 +210,7 @@ export type BillingQueueMessage =
   | LifecycleQueueMessage
   | StandaloneInstanceDestructionQueueMessage
   | CreditRenewalQueueMessage
+  | CommitRetirementGuardQueueMessage
   | TrialExpiryQueueMessage
   | OrganizationTrialExpiryQueueMessage
   | TrialInactivityQueueMessage;

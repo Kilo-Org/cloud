@@ -23,6 +23,7 @@ Draft -- created 2026-04-15.
 Updated 2026-05-12 -- required KiloClaw price-version lineage invariants.
 Updated 2026-05-27 -- required durable fresh-provision admission reservations.
 Updated 2026-05-28 -- fraud-enforcement subscription mutation invariants.
+Updated 2026-06-05 -- Commit retirement state and review-case invariants.
 
 ## Conventions
 
@@ -178,6 +179,85 @@ Canceled historical rows MUST retain their recorded
 seed legacy eligibility for later fresh subscription rows. Fresh rows
 after fully canceled history use the current price version defined by
 KiloClaw billing.
+
+### Commit Retirement State
+
+Commit retirement MUST use additive durable state on the subscription lineage;
+it MUST NOT add a replacement subscription status. Existing status continues
+to describe payment and access lifecycle.
+
+1. Retirement-involved subscription rows MUST be able to record these states:
+   `pending_final_term`, `final_term`, `standard_scheduled`, `completed`, and
+   `manual_review`. Standard, trial, and historical rows not involved in
+   retirement MAY keep retirement state absent. Durable retirement fields have
+   these canonical meanings:
+
+   | Field | Meaning |
+   |---|---|
+   | `commit_retirement_state` | Current retirement classification |
+   | `commit_retirement_qualified_at` | Authoritative grandfathering timestamp |
+   | `commit_retirement_qualification_source` | Evidence source authorizing final term |
+   | `commit_retirement_final_ends_at` | Authorized final Commit boundary, including approved reward extensions |
+   | `commit_retirement_standard_opted_in_at` | Current explicit Standard continuation consent |
+   | `commit_retirement_guarded_at` | Time retirement guard made subscription non-renewing |
+   | `commit_retirement_review_reason` | Non-sensitive reason for manual review |
+
+2. A qualified final Commit obligation MUST record authoritative qualification
+   time and source. Allowed sources are `active_at_cutoff`,
+   `checkout_confirmed_before_cutoff`, `switch_requested_before_cutoff`, and
+   `renewal_due_before_cutoff`. A final term starting after cutoff without
+   verified qualification MUST enter manual review.
+3. Retirement state MUST record the authorized final Commit boundary,
+   including approved referral extensions; current explicit Standard consent;
+   time the retirement guard made the subscription non-renewing; and a
+   non-sensitive review reason when applicable.
+4. The authorized final Commit boundary MAY move later only for an approved
+   KiloClaw free-month referral reward. Commit renewal MUST NOT advance it.
+5. `standard_scheduled` MUST require explicit user consent. Provider schedule
+   shape alone MUST NOT establish consent. Canceling continuation MUST clear
+   current consent and restore final-boundary cancellation.
+6. Missing, conflicting, or misaligned qualification, boundary, provider, or
+   schedule evidence MUST set `manual_review`. That state MUST block renewal
+   and destructive enforcement until operator resolution.
+7. Runtime MUST NOT bulk-populate active Commit behavior state at the cutoff.
+   Before cutoff, the system MAY capture qualification metadata for already-
+   pending obligations that cannot be reconstructed later, but MUST NOT change
+   plan, period, cancellation, or provider schedule state during capture.
+8. Retirement state MUST follow the current live personal subscription lineage
+   during reprovision transfer only when billing period and provider ownership
+   remain consistent. The successor MUST preserve qualification, final
+   boundary, consent, guard state, and review state. A mismatch MUST enter
+   manual review rather than grant a fresh Commit term.
+9. Canceled and transferred-out predecessor rows MUST retain retirement state
+   as history but MUST NOT authorize or seed another Commit term.
+10. Every retirement transition MUST write a subscription change log entry
+    using the consistent action label `commit_retirement_changed` with
+    non-sensitive before/after state and reason.
+
+### Commit Retirement Review Cases
+
+1. The data model MUST support durable, idempotently deduplicated Commit
+   retirement review cases for known subscriptions and rowless/provider-only
+   anomalies.
+2. A review case MUST record nullable subscription and provider identifiers,
+   non-sensitive reason code and summary, open/resolved/dismissed status,
+   resolution disposition, actor, reason, and timestamps. It MUST NOT store
+   email addresses, raw provider payloads, tokens, payment details, or secrets.
+3. For a known subscription, an open review case and subscription
+   `manual_review` state MUST agree. Resolution MUST update both and write
+   subscription change history.
+4. A rowless/provider-only resolution MUST remain canonical for its provider
+   identifiers and dedupe key. Later webhook, import, settlement, or
+   reconciliation work MUST consult it before creating or mutating a
+   subscription row. Resolving or dismissing a case MUST NOT erase its
+   provider-level deny or final-term disposition.
+5. Operator resolution MAY correct, cancel, refund, or recognize an already-
+   paid period as final, but MUST NOT intentionally create another Commit
+   period. Resolution MUST revalidate current provider/local evidence and
+   reject stale expected-boundary decisions.
+6. Any actor identifier or review summary that contains PII MUST be covered by
+   GDPR soft-delete or anonymization behavior while preserving canonical audit
+   meaning.
 
 ### Multi-Instance Support
 
@@ -394,6 +474,11 @@ not yet enforced in the current codebase:
    complete cross-service coverage remains the intended invariant.
 
 ## Changelog
+
+### 2026-06-05 -- Commit retirement state and review cases
+
+- Defined additive lineage-scoped retirement state, qualification evidence, final boundary, explicit Standard consent, guard state, and audit action.
+- Defined durable known-row and provider-only review cases, successor transfer, historical-row restrictions, and GDPR-safe review data.
 
 ### 2026-05-28 -- Fraud-enforcement subscription mutations
 

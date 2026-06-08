@@ -3,10 +3,14 @@ import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
 import {
+  classifyKiloClawCommitTerm,
   countUnresolvedTerminalRenewalFailures,
+  createCommitRetirementReviewCase,
   findUnresolvedTerminalRenewalFailure,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
+  KILOCLAW_COMMIT_SALES_CUTOFF,
+  KILOCLAW_COMMIT_STRIPE_GUARD_LEAD_DAYS,
   KILOCLAW_PRICE_VERSIONS,
   listUnresolvedTerminalRenewalFailures,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
@@ -39,6 +43,7 @@ import {
   credit_transactions,
   kilo_pass_pause_events,
   kilo_pass_subscriptions,
+  kiloclaw_commit_retirement_review_cases,
   kiloclaw_email_log,
   kiloclaw_instances,
   kiloclaw_subscription_change_log,
@@ -48,7 +53,10 @@ import {
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
-import { KiloClawTerminalRenewalFailureCode } from '@kilocode/db/schema-types';
+import {
+  KiloClawCommitRetirementReviewReason,
+  KiloClawTerminalRenewalFailureCode,
+} from '@kilocode/db/schema-types';
 import type {
   KiloClawPlan,
   KiloClawSubscriptionChangeAction,
@@ -70,6 +78,8 @@ import type {
   CreditRenewalDiscoveryQueueMessage,
   CreditRenewalItemQueueMessage,
   CreditRenewalTerminalFailureQueueMessage,
+  CommitRetirementGuardContinuationQueueMessage,
+  CommitRetirementGuardPageQueueMessage,
   OrganizationTrialExpiryContinuationQueueMessage,
   OrganizationTrialExpiryPageQueueMessage,
   TrialExpiryContinuationQueueMessage,
@@ -87,6 +97,7 @@ const DESTRUCTION_WARNING_DAYS = 2;
 const EARLYBIRD_WARNING_DAYS = 14;
 const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
+const BILLING_SIDE_EFFECT_TIMEOUT_MS = 30_000;
 // Per-cron-tick destruction batch size. Each row's destroy takes ~7-8s
 // (Fly API + DO finalize), and the Cloudflare queue consumer's wall-clock
 // budget per message is 15 minutes — so safe ceiling for the current
@@ -95,6 +106,9 @@ const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
 // only after parallelizing the destroy loop, or batches will start
 // hitting the wall-clock limit and getting retried.
 const INSTANCE_DESTRUCTION_BATCH_SIZE = 75;
+const COMMIT_RETIREMENT_GUARD_DEFAULT_PAGE_BUDGET = 12;
+const COMMIT_RETIREMENT_GUARD_DEFAULT_WALL_CLOCK_BUDGET_MS = 90_000;
+const COMMIT_RETIREMENT_GUARD_CONCURRENCY = 3;
 const TRIAL_INACTIVITY_BATCH_SIZE = 50;
 const SOFT_DELETED_EMAIL_SUFFIX = '@deleted.invalid';
 const TRIAL_ENDING_SOON_MIN_DURATION_DAYS = 2;
@@ -139,6 +153,8 @@ type BillingSummary = {
   credit_renewals_past_due: number;
   credit_renewals_auto_top_up: number;
   credit_renewals_skipped_duplicate: number;
+  commit_retirement_guard_candidates: number;
+  commit_retirement_guard_requests: number;
   interrupted_auto_resume_requests: number;
   trial_inactivity_candidates: number;
   trial_inactivity_batches: number;
@@ -177,6 +193,7 @@ type CreditRenewalRow = {
   kiloclaw_price_version: string;
   stripe_subscription_id: string | null;
   credit_renewal_at: string | null;
+  current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   scheduled_plan: KiloClawScheduledPlan | null;
@@ -185,6 +202,11 @@ type CreditRenewalRow = {
   suspended_at: string | null;
   auto_resume_attempt_count: number;
   auto_top_up_triggered_for_period: string | null;
+  commit_retirement_state: KiloClawSubscription['commit_retirement_state'];
+  commit_retirement_qualified_at: string | null;
+  commit_retirement_qualification_source: KiloClawSubscription['commit_retirement_qualification_source'];
+  commit_retirement_final_ends_at: string | null;
+  commit_retirement_standard_opted_in_at: string | null;
   total_microdollars_acquired: number;
   microdollars_used: number;
   auto_top_up_enabled: boolean;
@@ -321,6 +343,10 @@ type SideEffectRequest =
       };
     }
   | {
+      action: 'commit_retirement_guard';
+      input: { subscriptionId: string; expectedFinalBoundary: string };
+    }
+  | {
       action: 'process_paid_conversion';
       input: {
         userId: string;
@@ -347,14 +373,16 @@ type SideEffectResponse<T extends SideEffectRequest> = T['action'] extends 'send
       ? { repaired: boolean }
       : T['action'] extends 'enqueue_affiliate_event'
         ? { enqueued: boolean }
-        : T['action'] extends 'process_paid_conversion'
-          ? {
-              affiliateSaleEnqueued: boolean;
-              winningTouchType: 'referral' | 'affiliate' | 'none';
-              conversionId: string | null;
-              disqualificationReason: string | null;
-            }
-          : { ok: true };
+        : T['action'] extends 'commit_retirement_guard'
+          ? { guarded: boolean }
+          : T['action'] extends 'process_paid_conversion'
+            ? {
+                affiliateSaleEnqueued: boolean;
+                winningTouchType: 'referral' | 'affiliate' | 'none';
+                conversionId: string | null;
+                disqualificationReason: string | null;
+              }
+            : { ok: true };
 
 export class KiloClawApiError extends Error {
   readonly statusCode: number;
@@ -394,6 +422,8 @@ function createSummary(): BillingSummary {
     credit_renewals_past_due: 0,
     credit_renewals_auto_top_up: 0,
     credit_renewals_skipped_duplicate: 0,
+    commit_retirement_guard_candidates: 0,
+    commit_retirement_guard_requests: 0,
     interrupted_auto_resume_requests: 0,
     trial_inactivity_candidates: 0,
     trial_inactivity_batches: 0,
@@ -618,6 +648,17 @@ function isSoftDeletedUserEmail(email: string): boolean {
 
 function currentSubscriptionRowFilter() {
   return isNull(kiloclaw_subscriptions.transferred_to_subscription_id);
+}
+
+function commitRetirementEnforcementProtectionFilter() {
+  return and(
+    sql`${kiloclaw_subscriptions.commit_retirement_state} IS DISTINCT FROM 'manual_review'`,
+    sql`NOT EXISTS (
+      SELECT 1 FROM ${kiloclaw_commit_retirement_review_cases}
+      WHERE ${kiloclaw_commit_retirement_review_cases.subscription_id} = ${kiloclaw_subscriptions.id}
+        AND ${kiloclaw_commit_retirement_review_cases.status} = 'open'
+    )`
+  );
 }
 
 function legacyInstanceReadyEmailType(sandboxId: string) {
@@ -1004,6 +1045,7 @@ async function callBillingSideEffect<T extends SideEffectRequest>(
           method: 'POST',
           headers,
           body: JSON.stringify(request),
+          signal: AbortSignal.timeout(BILLING_SIDE_EFFECT_TIMEOUT_MS),
         }
       );
 
@@ -1638,6 +1680,7 @@ async function fetchLockedCreditRenewalItemRow(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         isNull(kiloclaw_subscriptions.stripe_subscription_id),
         currentSubscriptionRowFilter(),
+        commitRetirementEnforcementProtectionFilter(),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due'])
       )
     )
@@ -1646,12 +1689,122 @@ async function fetchLockedCreditRenewalItemRow(
   return rows[0] ?? null;
 }
 
+type CommitRetirementRenewalDecision =
+  | { kind: 'cancel_final_commit' }
+  | { kind: 'continue_standard' }
+  | {
+      kind: 'allow_final_commit';
+      qualificationSource: 'renewal_due_before_cutoff' | 'switch_requested_before_cutoff';
+    }
+  | { kind: 'skip_manual_review' }
+  | { kind: 'open_manual_review' }
+  | { kind: 'ordinary' };
+
+function isBeforeCommitSalesCutoff(timestamp: string | null): boolean {
+  return timestamp !== null && Date.parse(timestamp) < Date.parse(KILOCLAW_COMMIT_SALES_CUTOFF);
+}
+
+export function decideCommitRetirementCreditRenewal(
+  current: Pick<
+    CreditRenewalRow,
+    | 'plan'
+    | 'scheduled_plan'
+    | 'credit_renewal_at'
+    | 'current_period_start'
+    | 'current_period_end'
+    | 'commit_retirement_state'
+    | 'commit_retirement_qualified_at'
+    | 'commit_retirement_qualification_source'
+    | 'commit_retirement_final_ends_at'
+    | 'commit_retirement_standard_opted_in_at'
+  >
+): CommitRetirementRenewalDecision {
+  if (current.commit_retirement_state === 'manual_review') {
+    return { kind: 'skip_manual_review' };
+  }
+
+  const hasExplicitStandardContinuation =
+    current.scheduled_plan === 'standard' &&
+    current.commit_retirement_state === 'standard_scheduled' &&
+    current.commit_retirement_standard_opted_in_at !== null;
+  if (current.plan === 'commit' && hasExplicitStandardContinuation) {
+    return current.credit_renewal_at !== null &&
+      current.commit_retirement_final_ends_at !== null &&
+      Date.parse(current.credit_renewal_at) === Date.parse(current.commit_retirement_final_ends_at)
+      ? { kind: 'continue_standard' }
+      : { kind: 'open_manual_review' };
+  }
+
+  const finalTermAlreadyExhausted =
+    current.commit_retirement_state === 'final_term' ||
+    current.commit_retirement_state === 'standard_scheduled' ||
+    current.commit_retirement_state === 'completed' ||
+    (current.commit_retirement_final_ends_at !== null &&
+      current.commit_retirement_final_ends_at !== undefined);
+
+  if (current.scheduled_plan === 'commit') {
+    if (
+      current.plan === 'standard' &&
+      !finalTermAlreadyExhausted &&
+      current.commit_retirement_state === 'pending_final_term' &&
+      current.commit_retirement_qualification_source === 'switch_requested_before_cutoff' &&
+      isBeforeCommitSalesCutoff(current.commit_retirement_qualified_at)
+    ) {
+      return { kind: 'allow_final_commit', qualificationSource: 'switch_requested_before_cutoff' };
+    }
+    return { kind: 'open_manual_review' };
+  }
+
+  if (
+    current.plan === 'commit' &&
+    !finalTermAlreadyExhausted &&
+    current.commit_retirement_state == null &&
+    current.commit_retirement_final_ends_at == null &&
+    isBeforeCommitSalesCutoff(current.credit_renewal_at)
+  ) {
+    return { kind: 'allow_final_commit', qualificationSource: 'renewal_due_before_cutoff' };
+  }
+
+  if (
+    current.plan === 'commit' &&
+    (current.commit_retirement_state === 'final_term' ||
+      current.commit_retirement_state === 'standard_scheduled' ||
+      current.commit_retirement_state === 'completed')
+  ) {
+    return current.commit_retirement_final_ends_at &&
+      current.credit_renewal_at &&
+      Date.parse(current.credit_renewal_at) < Date.parse(current.commit_retirement_final_ends_at)
+      ? { kind: 'open_manual_review' }
+      : { kind: 'cancel_final_commit' };
+  }
+
+  if (current.plan === 'commit') {
+    const classification = classifyKiloClawCommitTerm({
+      plan: current.plan,
+      scheduledPlan: current.scheduled_plan,
+      currentPeriodStart: current.current_period_start,
+      currentPeriodEnd: current.current_period_end,
+      retirementState: current.commit_retirement_state,
+      qualifiedAt: current.commit_retirement_qualified_at,
+      qualificationSource: current.commit_retirement_qualification_source,
+      finalEndsAt: current.commit_retirement_final_ends_at,
+      standardOptedInAt: current.commit_retirement_standard_opted_in_at,
+    });
+    return classification === 'ambiguous'
+      ? { kind: 'open_manual_review' }
+      : { kind: 'cancel_final_commit' };
+  }
+
+  return { kind: 'ordinary' };
+}
+
 function buildCreditRenewalAdvanceUpdateSet(params: {
   applyingPlanSwitch: boolean;
   current: CreditRenewalRow;
   effectivePlan: 'commit' | 'standard';
   newPeriodEnd: string;
   newPeriodStart: string;
+  retirementDecision: CommitRetirementRenewalDecision;
   wasPastDue: boolean;
 }): Partial<typeof kiloclaw_subscriptions.$inferInsert> {
   const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
@@ -1671,7 +1824,22 @@ function buildCreditRenewalAdvanceUpdateSet(params: {
         : null;
   }
 
-  if (
+  if (params.retirementDecision.kind === 'allow_final_commit') {
+    updateSet.commit_retirement_state = 'final_term';
+    updateSet.commit_retirement_qualified_at =
+      params.current.commit_retirement_qualified_at ?? params.newPeriodStart;
+    updateSet.commit_retirement_qualification_source =
+      params.retirementDecision.qualificationSource;
+    updateSet.commit_retirement_final_ends_at = params.newPeriodEnd;
+    updateSet.commit_retirement_guarded_at = new Date().toISOString();
+    updateSet.cancel_at_period_end = true;
+  } else if (params.retirementDecision.kind === 'continue_standard') {
+    updateSet.commit_retirement_state = 'completed';
+    updateSet.commit_retirement_final_ends_at =
+      params.current.commit_retirement_final_ends_at ?? params.newPeriodStart;
+    updateSet.commit_ends_at = null;
+    updateSet.cancel_at_period_end = false;
+  } else if (
     params.effectivePlan === 'commit' &&
     !params.applyingPlanSwitch &&
     params.current.commit_ends_at &&
@@ -1758,7 +1926,61 @@ async function processCreditRenewalRow(
     }
 
     const userId = current.user_id;
-    if (current.cancel_at_period_end) {
+    const retirementDecision = decideCommitRetirementCreditRenewal(current);
+    if (retirementDecision.kind === 'skip_manual_review') {
+      logSkippedSubscriptionRow(
+        'Skipping credit renewal during Commit retirement manual review',
+        current,
+        {
+          reason: 'commit_retirement_manual_review',
+        }
+      );
+      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    if (retirementDecision.kind === 'open_manual_review') {
+      const reviewReason =
+        current.scheduled_plan === 'standard'
+          ? KiloClawCommitRetirementReviewReason.BoundaryMismatch
+          : current.scheduled_plan === 'commit'
+            ? KiloClawCommitRetirementReviewReason.UnqualifiedPostCutoffCommit
+            : KiloClawCommitRetirementReviewReason.MissingQualificationEvidence;
+      const before = await getSubscriptionById(tx, current.id);
+      const [updated] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({
+          commit_retirement_state: 'manual_review',
+          commit_retirement_review_reason: reviewReason,
+        })
+        .where(eq(kiloclaw_subscriptions.id, current.id))
+        .returning();
+      await createCommitRetirementReviewCase(tx, {
+        dedupeKey: `commit-retirement:credit-renewal:${current.id}:${Date.parse(renewalAt)}`,
+        subscriptionId: current.id,
+        reasonCode: reviewReason,
+        summary:
+          current.scheduled_plan === 'standard'
+            ? 'Standard continuation boundary does not match authorized final Commit boundary'
+            : current.scheduled_plan === 'commit'
+              ? 'Commit credit-renewal switch lacks unused pre-cutoff qualification'
+              : 'Commit credit-renewal boundary lacks verified retirement qualification',
+      });
+      if (!updated) {
+        throw new Error('Failed to contain ambiguous Commit credit renewal');
+      }
+      await insertKiloClawSubscriptionChangeLog(tx, {
+        subscriptionId: current.id,
+        actor: LIFECYCLE_ACTOR,
+        action: 'commit_retirement_changed',
+        reason: 'commit_retirement_credit_renewal_ambiguous',
+        before,
+        after: updated,
+      });
+      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+    }
+
+    const cancelAtFinalCommitBoundary = retirementDecision.kind === 'cancel_final_commit';
+    if (current.cancel_at_period_end || cancelAtFinalCommitBoundary) {
       const before = await getSubscriptionById(tx, current.id);
       const [updated] = await tx
         .update(kiloclaw_subscriptions)
@@ -1766,6 +1988,14 @@ async function processCreditRenewalRow(
           status: 'canceled',
           cancel_at_period_end: false,
           auto_top_up_triggered_for_period: null,
+          ...(cancelAtFinalCommitBoundary
+            ? {
+                commit_retirement_state: 'completed' as const,
+                commit_retirement_final_ends_at:
+                  current.commit_retirement_final_ends_at ?? renewalAt,
+                commit_retirement_guarded_at: sql`COALESCE(${kiloclaw_subscriptions.commit_retirement_guarded_at}, now())`,
+              }
+            : {}),
         })
         .where(eq(kiloclaw_subscriptions.id, current.id))
         .returning();
@@ -1775,7 +2005,9 @@ async function processCreditRenewalRow(
           subscriptionId: current.id,
           actor: LIFECYCLE_ACTOR,
           action: 'canceled',
-          reason: 'credit_renewal_cancel_at_period_end',
+          reason: cancelAtFinalCommitBoundary
+            ? 'commit_retirement_final_boundary_canceled'
+            : 'credit_renewal_cancel_at_period_end',
           before,
           after: updated,
         });
@@ -1846,6 +2078,7 @@ async function processCreditRenewalRow(
         effectivePlan,
         newPeriodEnd,
         newPeriodStart,
+        retirementDecision,
         wasPastDue,
       });
       const changeAction = creditRenewalAdvanceChangeAction({ applyingPlanSwitch, wasPastDue });
@@ -2185,6 +2418,7 @@ export async function runCreditRenewalSweep(
       kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version,
       stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
       credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
+      current_period_start: kiloclaw_subscriptions.current_period_start,
       current_period_end: kiloclaw_subscriptions.current_period_end,
       cancel_at_period_end: kiloclaw_subscriptions.cancel_at_period_end,
       scheduled_plan: kiloclaw_subscriptions.scheduled_plan,
@@ -2193,6 +2427,13 @@ export async function runCreditRenewalSweep(
       suspended_at: kiloclaw_subscriptions.suspended_at,
       auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
       auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
+      commit_retirement_state: kiloclaw_subscriptions.commit_retirement_state,
+      commit_retirement_qualified_at: kiloclaw_subscriptions.commit_retirement_qualified_at,
+      commit_retirement_qualification_source:
+        kiloclaw_subscriptions.commit_retirement_qualification_source,
+      commit_retirement_final_ends_at: kiloclaw_subscriptions.commit_retirement_final_ends_at,
+      commit_retirement_standard_opted_in_at:
+        kiloclaw_subscriptions.commit_retirement_standard_opted_in_at,
       total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
       microdollars_used: kilocode_users.microdollars_used,
       auto_top_up_enabled: kilocode_users.auto_top_up_enabled,
@@ -2208,6 +2449,7 @@ export async function runCreditRenewalSweep(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         isNull(kiloclaw_subscriptions.stripe_subscription_id),
         currentSubscriptionRowFilter(),
+        commitRetirementEnforcementProtectionFilter(),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
         lte(kiloclaw_subscriptions.credit_renewal_at, now)
       )
@@ -2245,6 +2487,7 @@ function creditRenewalEligibilityFilter(nowIso: string) {
     eq(kiloclaw_subscriptions.payment_source, 'credits'),
     isNull(kiloclaw_subscriptions.stripe_subscription_id),
     currentSubscriptionRowFilter(),
+    commitRetirementEnforcementProtectionFilter(),
     inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
     lte(kiloclaw_subscriptions.credit_renewal_at, nowIso)
   );
@@ -2281,6 +2524,7 @@ function selectCreditRenewalRowFields() {
     kiloclaw_price_version: kiloclaw_subscriptions.kiloclaw_price_version,
     stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
     credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
+    current_period_start: kiloclaw_subscriptions.current_period_start,
     current_period_end: kiloclaw_subscriptions.current_period_end,
     cancel_at_period_end: kiloclaw_subscriptions.cancel_at_period_end,
     scheduled_plan: kiloclaw_subscriptions.scheduled_plan,
@@ -2289,6 +2533,13 @@ function selectCreditRenewalRowFields() {
     suspended_at: kiloclaw_subscriptions.suspended_at,
     auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
     auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
+    commit_retirement_state: kiloclaw_subscriptions.commit_retirement_state,
+    commit_retirement_qualified_at: kiloclaw_subscriptions.commit_retirement_qualified_at,
+    commit_retirement_qualification_source:
+      kiloclaw_subscriptions.commit_retirement_qualification_source,
+    commit_retirement_final_ends_at: kiloclaw_subscriptions.commit_retirement_final_ends_at,
+    commit_retirement_standard_opted_in_at:
+      kiloclaw_subscriptions.commit_retirement_standard_opted_in_at,
     total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
     microdollars_used: kilocode_users.microdollars_used,
     auto_top_up_enabled: kilocode_users.auto_top_up_enabled,
@@ -2335,6 +2586,7 @@ async function fetchCreditRenewalItemRow(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         isNull(kiloclaw_subscriptions.stripe_subscription_id),
         currentSubscriptionRowFilter(),
+        commitRetirementEnforcementProtectionFilter(),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due'])
       )
     )
@@ -2525,6 +2777,212 @@ export async function recordCreditRenewalTerminalFailure(
     oldestUnresolvedTerminalFailureSubscriptionId: oldestFailure?.subscription_id,
     oldestUnresolvedTerminalFailureRenewalBoundary: oldestFailure?.renewal_boundary,
   });
+}
+
+type CommitRetirementGuardMessage =
+  | CommitRetirementGuardPageQueueMessage
+  | CommitRetirementGuardContinuationQueueMessage;
+
+type CommitRetirementGuardCandidate = {
+  id: string;
+  user_id: string;
+  instance_id: string | null;
+  final_boundary: string;
+};
+
+function commitRetirementGuardCursorFilter(message: CommitRetirementGuardMessage) {
+  if (!message.cursorSubscriptionId || !message.cursorFinalBoundary) return undefined;
+
+  return or(
+    gt(
+      sql<string>`COALESCE(${kiloclaw_subscriptions.commit_retirement_final_ends_at}, ${kiloclaw_subscriptions.current_period_end})`,
+      message.cursorFinalBoundary
+    ),
+    and(
+      eq(
+        sql<string>`COALESCE(${kiloclaw_subscriptions.commit_retirement_final_ends_at}, ${kiloclaw_subscriptions.current_period_end})`,
+        message.cursorFinalBoundary
+      ),
+      gt(kiloclaw_subscriptions.id, message.cursorSubscriptionId)
+    )
+  );
+}
+
+async function processCommitRetirementGuardCandidate(
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  summary: BillingSummary,
+  candidate: CommitRetirementGuardCandidate
+): Promise<void> {
+  try {
+    const result = await callBillingSideEffect(
+      env,
+      context,
+      {
+        action: 'commit_retirement_guard',
+        input: {
+          subscriptionId: candidate.id,
+          expectedFinalBoundary: serializeBillingTimestamp(candidate.final_boundary),
+        },
+      },
+      {
+        userId: candidate.user_id,
+        instanceId: candidate.instance_id ?? undefined,
+      }
+    );
+    if (result.guarded) summary.commit_retirement_guard_requests++;
+  } catch (error) {
+    summary.errors++;
+    log('error', 'Commit retirement guard request failed', {
+      event: 'commit_retirement_guard',
+      outcome: 'failed',
+      subscriptionId: candidate.id,
+      userId: candidate.user_id,
+      instanceId: candidate.instance_id ?? undefined,
+      finalBoundary: candidate.final_boundary,
+      error: errorMessage(error),
+    });
+  }
+}
+
+export async function runCommitRetirementGuardSweep(
+  database: WorkerDb,
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  summary: BillingSummary,
+  message: CommitRetirementGuardMessage = {
+    kind: 'commit_retirement_guard_page',
+    runId: context.billingRunId,
+    sweep: 'commit_retirement_guard',
+  }
+): Promise<{ continuationEnqueued: boolean }> {
+  const cutoffTime = message.cutoffTime ?? new Date().toISOString();
+  if (Date.parse(cutoffTime) < Date.parse(KILOCLAW_COMMIT_SALES_CUTOFF)) {
+    return { continuationEnqueued: false };
+  }
+
+  const startedAt = Date.now();
+  const pageBudget = message.pageBudget ?? COMMIT_RETIREMENT_GUARD_DEFAULT_PAGE_BUDGET;
+  const wallClockBudgetMs =
+    message.wallClockBudgetMs ?? COMMIT_RETIREMENT_GUARD_DEFAULT_WALL_CLOCK_BUDGET_MS;
+  const guardCutoff = new Date(
+    Date.parse(cutoffTime) + KILOCLAW_COMMIT_STRIPE_GUARD_LEAD_DAYS * MS_PER_DAY
+  ).toISOString();
+  const finalBoundary = sql<string>`COALESCE(${kiloclaw_subscriptions.commit_retirement_final_ends_at}, ${kiloclaw_subscriptions.current_period_end})`;
+  const candidates = await database
+    .select({
+      id: kiloclaw_subscriptions.id,
+      user_id: kiloclaw_subscriptions.user_id,
+      instance_id: kiloclaw_subscriptions.instance_id,
+      final_boundary: finalBoundary,
+    })
+    .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.plan, 'commit'),
+        eq(kiloclaw_subscriptions.status, 'active'),
+        currentSubscriptionRowFilter(),
+        isNull(kiloclaw_instances.organization_id),
+        isNotNull(kiloclaw_subscriptions.stripe_subscription_id),
+        isNotNull(kiloclaw_subscriptions.current_period_end),
+        lte(finalBoundary, guardCutoff),
+        commitRetirementEnforcementProtectionFilter(),
+        sql`${kiloclaw_subscriptions.commit_retirement_state} IS DISTINCT FROM 'standard_scheduled'`,
+        isNull(kiloclaw_subscriptions.commit_retirement_standard_opted_in_at),
+        isNull(kiloclaw_subscriptions.commit_retirement_guarded_at),
+        commitRetirementGuardCursorFilter(message)
+      )
+    )
+    .orderBy(asc(finalBoundary), asc(kiloclaw_subscriptions.id))
+    .limit(pageBudget + 1);
+
+  let processedCount = 0;
+  let lastProcessed: CommitRetirementGuardCandidate | null = null;
+  const boundedCandidates = candidates.slice(0, pageBudget);
+  for (
+    let index = 0;
+    index < boundedCandidates.length;
+    index += COMMIT_RETIREMENT_GUARD_CONCURRENCY
+  ) {
+    if (Date.now() - startedAt >= wallClockBudgetMs && processedCount > 0) break;
+
+    const chunk = boundedCandidates.slice(index, index + COMMIT_RETIREMENT_GUARD_CONCURRENCY);
+    await Promise.all(
+      chunk.map(candidate =>
+        processCommitRetirementGuardCandidate(env, context, summary, candidate)
+      )
+    );
+    processedCount += chunk.length;
+    lastProcessed = chunk.at(-1) ?? lastProcessed;
+  }
+  summary.commit_retirement_guard_candidates += processedCount;
+
+  const shouldContinue = candidates.length > processedCount;
+  const nextCursorFinalBoundary =
+    shouldContinue && lastProcessed
+      ? serializeBillingTimestamp(lastProcessed.final_boundary)
+      : undefined;
+  if (shouldContinue && (!lastProcessed || !nextCursorFinalBoundary)) {
+    throw new Error('Cannot continue Commit retirement guard page without a complete cursor');
+  }
+
+  if (lastProcessed && nextCursorFinalBoundary) {
+    await env.LIFECYCLE_QUEUE.send({
+      kind: 'commit_retirement_guard_continuation',
+      runId: message.runId,
+      sweep: 'commit_retirement_guard',
+      cutoffTime,
+      cursorSubscriptionId: lastProcessed.id,
+      cursorFinalBoundary: nextCursorFinalBoundary,
+      pageBudget: message.pageBudget,
+      wallClockBudgetMs: message.wallClockBudgetMs,
+    });
+  }
+
+  const continuationEnqueued = nextCursorFinalBoundary !== undefined;
+  log('info', 'Processed bounded Commit retirement guard batch', {
+    event: 'commit_retirement_guard_batch',
+    outcome: 'completed',
+    cutoffTime,
+    cursorSubscriptionId: message.cursorSubscriptionId,
+    cursorFinalBoundary: message.cursorFinalBoundary,
+    batchSize: processedCount,
+    fetchedCount: candidates.length,
+    guardBacklogLikely: shouldContinue,
+    batchLimit: pageBudget,
+    concurrency: COMMIT_RETIREMENT_GUARD_CONCURRENCY,
+    continuationEnqueued,
+    nextCursorSubscriptionId: lastProcessed?.id,
+    nextCursorFinalBoundary,
+  });
+
+  return { continuationEnqueued };
+}
+
+export async function processCommitRetirementGuardPage(
+  env: BillingWorkerEnv,
+  message: CommitRetirementGuardMessage,
+  attempt = 1
+): Promise<{ summary: BillingSummary; continuationEnqueued: boolean }> {
+  const context = createSweepContext(message, attempt);
+  return await withLogTags(
+    {
+      source: 'processCommitRetirementGuardPage',
+      tags: { ...context, billingComponent: 'worker' },
+    },
+    async () => {
+      const summary = createSummary();
+      const result = await runCommitRetirementGuardSweep(
+        getDb(env),
+        env,
+        context,
+        summary,
+        message
+      );
+      return { summary, continuationEnqueued: result.continuationEnqueued };
+    }
+  );
 }
 
 async function runInterruptedAutoResumeSweep(
@@ -3576,6 +4034,7 @@ async function runSubscriptionExpirySweep(
       and(
         eq(kiloclaw_subscriptions.status, 'canceled'),
         currentSubscriptionRowFilter(),
+        commitRetirementEnforcementProtectionFilter(),
         lt(kiloclaw_subscriptions.current_period_end, now),
         isNull(kiloclaw_subscriptions.suspended_at),
         isNull(kiloclaw_instances.destroyed_at)
@@ -3718,6 +4177,7 @@ async function runInstanceDestructionSweep(
       and(
         lt(kiloclaw_subscriptions.destruction_deadline, now),
         currentSubscriptionRowFilter(),
+        commitRetirementEnforcementProtectionFilter(),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         inArray(kiloclaw_subscriptions.status, ['canceled', 'past_due', 'unpaid'])
       )
@@ -4033,6 +4493,7 @@ async function runPastDueCleanupSweep(
       and(
         eq(kiloclaw_subscriptions.status, 'past_due'),
         currentSubscriptionRowFilter(),
+        commitRetirementEnforcementProtectionFilter(),
         lt(kiloclaw_subscriptions.past_due_since, fourteenDaysAgo),
         isNull(kiloclaw_subscriptions.suspended_at)
       )
@@ -4208,6 +4669,7 @@ async function runDestructionWarningSweep(
         gte(kiloclaw_subscriptions.destruction_deadline, advisoryNow),
         lte(kiloclaw_subscriptions.destruction_deadline, twoDaysFromNow),
         currentSubscriptionRowFilter(),
+        commitRetirementEnforcementProtectionFilter(),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         isNull(kiloclaw_instances.destroyed_at)
       )
@@ -5095,6 +5557,13 @@ export async function runSweep(
               kind: 'credit_renewal_discovery',
               runId: message.runId,
               sweep: 'credit_renewal_discovery',
+            });
+            break;
+          case 'commit_retirement_guard':
+            await env.LIFECYCLE_QUEUE.send({
+              kind: 'commit_retirement_guard_page',
+              runId: message.runId,
+              sweep: 'commit_retirement_guard',
             });
             break;
           case 'interrupted_auto_resume':

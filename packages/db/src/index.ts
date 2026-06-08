@@ -1,6 +1,21 @@
 export * from './schema';
 export * from './schema-types';
 export * from './kiloclaw-pricing-catalog';
+export * from './kiloclaw-commit-retirement';
+export {
+  containKnownSubscriptionCommitRetirementReview,
+  createCommitRetirementReviewCase,
+  findOpenCommitRetirementReviewCase,
+  findProviderCommitRetirementDisposition,
+  hasOpenCommitRetirementReviewCase,
+  resolveCommitRetirementReviewCase,
+  type CommitRetirementReviewCaseRepository,
+  type ContainKnownSubscriptionCommitRetirementReviewInput,
+  type CreateCommitRetirementReviewCaseInput,
+  type ProviderCommitRetirementDispositionKey,
+  type ResolveCommitRetirementReviewCaseInput,
+  type TransactionalCommitRetirementReviewCaseRepository,
+} from './kiloclaw-commit-retirement-review-case-repository';
 export {
   createDrizzleClient,
   type CreateDrizzleClientOptions,

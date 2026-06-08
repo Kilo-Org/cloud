@@ -14,7 +14,7 @@ here only where Kilo Pass adds product-specific behavior.
 ## Status
 
 Draft -- current-code alignment revision created 2026-06-01. The first-fingerprint-claim cooldown in Duplicate-Card
-Rules 51-55 were implemented on 2026-06-05.
+Rules 51-55 and verified KiloClaw hosting intent at Kilo Pass checkout were implemented on 2026-06-05.
 
 ## Conventions
 
@@ -216,6 +216,29 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 37. The KiloClaw pending-balance projection and scheduled-change renewal UI use narrower direct-multiplication
     calculations. They MUST NOT be treated as canonical bonus computations.
 
+### KiloClaw Hosting Intent
+
+1. A Kilo Pass checkout MAY carry an intent to activate KiloClaw hosting after
+   purchase, but the Kilo Pass purchase and the hosting activation are
+   independent decisions. Failure or expiry of hosting intent MUST NOT
+   invalidate an otherwise valid Kilo Pass purchase.
+2. Hosting intent MUST be stored in payment-provider checkout metadata and
+   MUST include the selected KiloClaw plan, target instance, and intended
+   KiloClaw price version. Callback and query-string values MAY support display
+   or navigation but MUST NOT authorize hosting activation.
+3. Before auto-activation, the server MUST retrieve and validate the completed
+   Kilo Pass checkout, its verified hosting metadata, and the Stripe
+   subscription creation timestamp. The browser MUST NOT be authoritative for
+   plan, instance, price version, or confirmation time.
+4. A pending Commit hosting intent is valid only when the Kilo Pass checkout
+   completed before the KiloClaw Commit sales cutoff defined by
+   `.specs/kiloclaw-billing.md`. A Kilo Pass purchase completed at or after the
+   cutoff remains valid, but its Commit hosting intent MUST expire and the
+   customer MUST be directed to activate Standard.
+5. Standard hosting intent remains eligible after the Commit cutoff, subject
+   to KiloClaw credit enrollment, balance sufficiency, and instance ownership
+   rules.
+
 ### Projections and UI
 
 38. The Kilo Pass state read path MUST compute current-period and next-period UI bonus projections from tier, cadence,
@@ -416,6 +439,11 @@ promo or Kilo Pass referral conversion.
   Kilo Pass referral conversions.
 - Defined blocked-audit and committed-issuance replay authority while preserving exact-settlement resolution,
   fail-open evidence handling, and the existing duplicate cancellation outcome.
+
+### 2026-06-05 -- Verified KiloClaw hosting intent
+
+- Defined server-verified checkout metadata and completion time as KiloClaw hosting activation authority.
+- Kept completed Kilo Pass purchases valid when post-cutoff Commit hosting intent expires.
 
 ### 2026-06-01 -- Initial spec
 

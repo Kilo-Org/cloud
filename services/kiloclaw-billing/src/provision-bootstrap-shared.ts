@@ -2,8 +2,11 @@ import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import {
   CURRENT_KILOCLAW_PRICE_VERSION,
   LEGACY_KILOCLAW_PRICE_VERSION,
+  classifyKiloClawCommitTerm,
+  createCommitRetirementReviewCase,
   getKiloClawPricingCatalogEntry,
   insertKiloClawSubscriptionChangeLog,
+  kiloclaw_commit_retirement_review_cases,
   kiloclaw_earlybird_purchases,
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -18,6 +21,7 @@ import {
   type OrganizationSeatsPurchase,
   type WorkerDb,
 } from '@kilocode/db';
+import { KiloClawCommitRetirementReviewReason } from '@kilocode/db/schema-types';
 import { classifyOrganizationEntitlement } from '@kilocode/organization-entitlement';
 
 const ORGANIZATION_TRIAL_DURATION_DAYS = 14;
@@ -512,6 +516,123 @@ function parseSubscriptionTimestamp(value: string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+type RetirementTransferResult = {
+  values: Pick<
+    KiloClawSubscription,
+    | 'commit_retirement_state'
+    | 'commit_retirement_qualified_at'
+    | 'commit_retirement_qualification_source'
+    | 'commit_retirement_final_ends_at'
+    | 'commit_retirement_standard_opted_in_at'
+    | 'commit_retirement_guarded_at'
+    | 'commit_retirement_review_reason'
+  >;
+  reviewReason: KiloClawSubscription['commit_retirement_review_reason'];
+  unsafe: boolean;
+};
+
+function retirementTransferReviewReason(
+  subscription: KiloClawSubscription
+): KiloClawSubscription['commit_retirement_review_reason'] {
+  if (subscription.commit_retirement_state === 'manual_review') {
+    return (
+      subscription.commit_retirement_review_reason ??
+      KiloClawCommitRetirementReviewReason.AmbiguousSubscriptionLineage
+    );
+  }
+  const providerOwnershipMismatch =
+    (subscription.payment_source === 'stripe' && !subscription.stripe_subscription_id) ||
+    (subscription.stripe_subscription_id !== null && subscription.payment_source === null) ||
+    (!!subscription.stripe_schedule_id && !subscription.stripe_subscription_id);
+  if (providerOwnershipMismatch) {
+    return KiloClawCommitRetirementReviewReason.ProviderStateMismatch;
+  }
+  if (subscription.commit_retirement_state === 'completed') {
+    return null;
+  }
+
+  const classification = classifyKiloClawCommitTerm({
+    plan: subscription.plan,
+    scheduledPlan: subscription.scheduled_plan,
+    currentPeriodStart: subscription.current_period_start,
+    currentPeriodEnd: subscription.current_period_end,
+    retirementState: subscription.commit_retirement_state,
+    qualifiedAt: subscription.commit_retirement_qualified_at,
+    qualificationSource: subscription.commit_retirement_qualification_source,
+    finalEndsAt: subscription.commit_retirement_final_ends_at,
+    standardOptedInAt: subscription.commit_retirement_standard_opted_in_at,
+  });
+  if (classification === 'ambiguous') {
+    if (
+      (subscription.commit_retirement_state === 'final_term' ||
+        subscription.commit_retirement_state === 'standard_scheduled') &&
+      subscription.commit_retirement_final_ends_at &&
+      subscription.current_period_end &&
+      Date.parse(subscription.commit_retirement_final_ends_at) !==
+        Date.parse(subscription.current_period_end)
+    ) {
+      return KiloClawCommitRetirementReviewReason.BoundaryMismatch;
+    }
+    return KiloClawCommitRetirementReviewReason.MissingQualificationEvidence;
+  }
+  if (!subscription.commit_retirement_state) {
+    return subscription.scheduled_plan === 'commit'
+      ? KiloClawCommitRetirementReviewReason.MissingQualificationEvidence
+      : null;
+  }
+  if (subscription.commit_retirement_state === 'pending_final_term') {
+    return classification === 'pending_final_term'
+      ? null
+      : KiloClawCommitRetirementReviewReason.MissingQualificationEvidence;
+  }
+  if (!subscription.commit_retirement_final_ends_at || !subscription.current_period_end) {
+    return KiloClawCommitRetirementReviewReason.BoundaryMismatch;
+  }
+  return Date.parse(subscription.commit_retirement_final_ends_at) ===
+    Date.parse(subscription.current_period_end)
+    ? null
+    : KiloClawCommitRetirementReviewReason.BoundaryMismatch;
+}
+
+function retirementTransferResult(source: KiloClawSubscription): RetirementTransferResult {
+  const reviewReason = retirementTransferReviewReason(source);
+  if (!reviewReason) {
+    return {
+      reviewReason: null,
+      unsafe: false,
+      values: {
+        commit_retirement_state: source.commit_retirement_state ?? null,
+        commit_retirement_qualified_at: source.commit_retirement_qualified_at ?? null,
+        commit_retirement_qualification_source:
+          source.commit_retirement_qualification_source ?? null,
+        commit_retirement_final_ends_at: source.commit_retirement_final_ends_at ?? null,
+        commit_retirement_standard_opted_in_at:
+          source.commit_retirement_standard_opted_in_at ?? null,
+        commit_retirement_guarded_at: source.commit_retirement_guarded_at ?? null,
+        commit_retirement_review_reason: source.commit_retirement_review_reason ?? null,
+      },
+    };
+  }
+
+  return {
+    reviewReason,
+    unsafe: true,
+    values: {
+      commit_retirement_state: 'manual_review',
+      commit_retirement_qualified_at: source.commit_retirement_qualified_at ?? null,
+      commit_retirement_qualification_source: source.commit_retirement_qualification_source ?? null,
+      commit_retirement_final_ends_at: source.commit_retirement_final_ends_at ?? null,
+      commit_retirement_standard_opted_in_at: null,
+      commit_retirement_guarded_at: source.commit_retirement_guarded_at ?? null,
+      commit_retirement_review_reason: reviewReason,
+    },
+  };
+}
+
+export function retirementTransferValues(source: KiloClawSubscription) {
+  return retirementTransferResult(source).values;
+}
+
 function currentSubscriptionRecency(subscription: KiloClawSubscription): number {
   return Math.max(
     parseSubscriptionTimestamp(subscription.current_period_end),
@@ -573,9 +694,11 @@ async function createSuccessorPersonalSubscription(
       throw new Error('Target instance already has a subscription row');
     }
 
+    const retirementTransfer = retirementTransferResult(before);
     const [insertedSuccessor] = await tx
       .insert(kiloclaw_subscriptions)
       .values({
+        ...retirementTransfer.values,
         user_id: before.user_id,
         instance_id: input.instanceId,
         stripe_subscription_id: null,
@@ -584,8 +707,8 @@ async function createSuccessorPersonalSubscription(
         payment_source: before.payment_source,
         kiloclaw_price_version: before.kiloclaw_price_version,
         plan: before.plan,
-        scheduled_plan: before.scheduled_plan,
-        scheduled_by: before.scheduled_by,
+        scheduled_plan: retirementTransfer.unsafe ? null : before.scheduled_plan,
+        scheduled_by: retirementTransfer.unsafe ? null : before.scheduled_by,
         status: before.status,
         cancel_at_period_end: before.cancel_at_period_end,
         pending_conversion: before.pending_conversion,
@@ -636,12 +759,12 @@ async function createSuccessorPersonalSubscription(
     }
 
     const successor =
-      before.stripe_subscription_id || before.stripe_schedule_id
+      before.stripe_subscription_id || (!retirementTransfer.unsafe && before.stripe_schedule_id)
         ? await tx
             .update(kiloclaw_subscriptions)
             .set({
               stripe_subscription_id: before.stripe_subscription_id,
-              stripe_schedule_id: before.stripe_schedule_id,
+              stripe_schedule_id: retirementTransfer.unsafe ? null : before.stripe_schedule_id,
             })
             .where(eq(kiloclaw_subscriptions.id, insertedSuccessor.id))
             .returning()
@@ -650,6 +773,31 @@ async function createSuccessorPersonalSubscription(
 
     if (!successor) {
       throw new Error('Failed to restore successor Stripe ownership');
+    }
+
+    const retargetedReviewCases = await tx
+      .update(kiloclaw_commit_retirement_review_cases)
+      .set({ subscription_id: successor.id })
+      .where(
+        and(
+          eq(kiloclaw_commit_retirement_review_cases.subscription_id, before.id),
+          eq(kiloclaw_commit_retirement_review_cases.status, 'open')
+        )
+      )
+      .returning();
+
+    if (
+      retirementTransfer.unsafe &&
+      retirementTransfer.reviewReason &&
+      retargetedReviewCases.length === 0
+    ) {
+      await createCommitRetirementReviewCase(tx, {
+        dedupeKey: `commit-retirement:successor-transfer:${successor.id}`,
+        subscriptionId: successor.id,
+        stripeSubscriptionId: successor.stripe_subscription_id,
+        reasonCode: retirementTransfer.reviewReason,
+        summary: 'Successor transfer could not preserve retirement boundary and provider ownership',
+      });
     }
 
     await insertKiloClawSubscriptionChangeLog(tx, {

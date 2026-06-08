@@ -86,6 +86,11 @@ function formatPlanLabel(plan: Subscription['plan']) {
   return plan.charAt(0).toUpperCase() + plan.slice(1);
 }
 
+function formatRetirementLabel(value: string | null | undefined) {
+  if (!value) return '—';
+  return value.replaceAll('_', ' ');
+}
+
 function formatScopeLabel(type: 'personal' | 'organization') {
   return type === 'personal' ? 'Personal' : 'Organization';
 }
@@ -599,6 +604,58 @@ function getRelevantFields(
       value: <DateWithRelative date={sub.destruction_deadline} severity="warn" withTime />,
     });
   }
+  if (sub.commit_retirement_state || sub.plan === 'commit') {
+    fields.push({
+      label: 'Retirement state',
+      value: formatRetirementLabel(sub.commit_retirement_state),
+    });
+    fields.push({
+      label: 'Qualification evidence',
+      value: sub.commit_retirement_qualification_source ? (
+        <span>
+          {formatRetirementLabel(sub.commit_retirement_qualification_source)}{' '}
+          <span className="text-muted-foreground text-xs">
+            (
+            {sub.commit_retirement_qualified_at
+              ? formatDate(sub.commit_retirement_qualified_at)
+              : 'time missing'}
+            )
+          </span>
+        </span>
+      ) : (
+        '—'
+      ),
+    });
+    fields.push({
+      label: 'Authorized final boundary',
+      value: (
+        <DateWithRelative date={sub.commit_retirement_final_ends_at} severity="warn" withTime />
+      ),
+    });
+    fields.push({
+      label: 'Standard consent',
+      value: sub.commit_retirement_standard_opted_in_at ? (
+        <DateWithRelative date={sub.commit_retirement_standard_opted_in_at} withTime />
+      ) : (
+        'not recorded'
+      ),
+    });
+    fields.push({
+      label: 'Retirement guard',
+      value: sub.commit_retirement_guarded_at ? (
+        <DateWithRelative date={sub.commit_retirement_guarded_at} withTime />
+      ) : (
+        'not applied'
+      ),
+    });
+    if (sub.commit_retirement_review_reason) {
+      fields.push({
+        label: 'Review reason',
+        value: <span className="font-mono text-xs">{sub.commit_retirement_review_reason}</span>,
+      });
+    }
+  }
+
   if (sub.scheduled_plan) {
     fields.push({
       label: 'Scheduled plan',
@@ -1311,6 +1368,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
 
   const hasOrgSubs = organizationChains.length > 0;
   const cancelingSubscription = subscriptions.find(s => s.id === cancelSubscriptionId) ?? null;
+  const openRetirementReviewCases = data.openRetirementReviewCases;
 
   return (
     <>
@@ -1350,6 +1408,30 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           ) : null}
 
           {subscriptions.length > 0 ? <SummaryStrip state={data} effective={effective} /> : null}
+
+          {openRetirementReviewCases.length > 0 ? (
+            <div className="rounded-lg border bg-yellow-500/10 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-medium text-yellow-300">
+                    {openRetirementReviewCases.length} open Commit retirement review case
+                    {openRetirementReviewCases.length === 1 ? '' : 's'}
+                  </h4>
+                  <div className="mt-2 space-y-1 text-xs text-yellow-100/80">
+                    {openRetirementReviewCases.map(reviewCase => (
+                      <p key={reviewCase.id}>
+                        <span className="font-mono">{reviewCase.reason_code}</span>:{' '}
+                        {reviewCase.summary}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/admin/kiloclaw-retirement-reviews">Open retirement reviews</Link>
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           <EarlyAccessRow userId={userId} initialValue={data.kiloclawEarlyAccess} />
 

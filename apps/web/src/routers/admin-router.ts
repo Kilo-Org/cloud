@@ -14,6 +14,7 @@ import {
   credit_transactions,
   kiloclaw_subscriptions,
   kiloclaw_subscription_change_log,
+  kiloclaw_commit_retirement_review_cases,
   kiloclaw_email_log,
   kiloclaw_instances,
   organizations,
@@ -49,6 +50,7 @@ import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
 import { adminKiloclawReferralsRouter } from '@/routers/admin/kiloclaw-referrals-router';
 import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-router';
 import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
+import { adminCommitRetirementReviewsRouter } from '@/routers/admin/commit-retirement-reviews-router';
 import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
@@ -722,33 +724,48 @@ export const adminRouter = createTRPCRouter({
       }
 
       const now = new Date();
-      const [allSubscriptions, earlybirdState, activeInstance, allInstances] = await Promise.all([
-        db
-          .select()
-          .from(kiloclaw_subscriptions)
-          .where(eq(kiloclaw_subscriptions.user_id, input.userId))
-          .orderBy(desc(kiloclaw_subscriptions.created_at)),
-        getKiloClawEarlybirdStateForUser(input.userId, now),
-        db.query.kiloclaw_instances.findFirst({
-          columns: { id: true },
-          where: and(
-            eq(kiloclaw_instances.user_id, input.userId),
-            isNull(kiloclaw_instances.destroyed_at)
-          ),
-        }),
-        db
-          .select({
-            id: kiloclaw_instances.id,
-            name: kiloclaw_instances.name,
-            sandbox_id: kiloclaw_instances.sandbox_id,
-            destroyed_at: kiloclaw_instances.destroyed_at,
-            organization_id: kiloclaw_instances.organization_id,
-            organization_name: organizations.name,
-          })
-          .from(kiloclaw_instances)
-          .leftJoin(organizations, eq(organizations.id, kiloclaw_instances.organization_id))
-          .where(eq(kiloclaw_instances.user_id, input.userId)),
-      ]);
+      const [allSubscriptions, reviewCases, earlybirdState, activeInstance, allInstances] =
+        await Promise.all([
+          db
+            .select()
+            .from(kiloclaw_subscriptions)
+            .where(eq(kiloclaw_subscriptions.user_id, input.userId))
+            .orderBy(desc(kiloclaw_subscriptions.created_at)),
+          db
+            .select()
+            .from(kiloclaw_commit_retirement_review_cases)
+            .innerJoin(
+              kiloclaw_subscriptions,
+              eq(kiloclaw_subscriptions.id, kiloclaw_commit_retirement_review_cases.subscription_id)
+            )
+            .where(
+              and(
+                eq(kiloclaw_subscriptions.user_id, input.userId),
+                eq(kiloclaw_commit_retirement_review_cases.status, 'open')
+              )
+            )
+            .orderBy(desc(kiloclaw_commit_retirement_review_cases.created_at)),
+          getKiloClawEarlybirdStateForUser(input.userId, now),
+          db.query.kiloclaw_instances.findFirst({
+            columns: { id: true },
+            where: and(
+              eq(kiloclaw_instances.user_id, input.userId),
+              isNull(kiloclaw_instances.destroyed_at)
+            ),
+          }),
+          db
+            .select({
+              id: kiloclaw_instances.id,
+              name: kiloclaw_instances.name,
+              sandbox_id: kiloclaw_instances.sandbox_id,
+              destroyed_at: kiloclaw_instances.destroyed_at,
+              organization_id: kiloclaw_instances.organization_id,
+              organization_name: organizations.name,
+            })
+            .from(kiloclaw_instances)
+            .leftJoin(organizations, eq(organizations.id, kiloclaw_instances.organization_id))
+            .where(eq(kiloclaw_instances.user_id, input.userId)),
+        ]);
 
       let billingStateError: string | null = null;
       let effectiveSub: KiloClawSubscription | null = null;
@@ -806,6 +823,9 @@ export const adminRouter = createTRPCRouter({
         subscription: effectiveSub,
         effectiveSubscriptionId: effectiveSub?.id ?? null,
         subscriptions,
+        openRetirementReviewCases: reviewCases.map(
+          row => row.kiloclaw_commit_retirement_review_cases
+        ),
         hasAccess,
         accessReason: effectiveAccessReason,
         earlybird: earlybirdState.purchased
@@ -1898,6 +1918,7 @@ export const adminRouter = createTRPCRouter({
   kiloPass: adminKiloPassRouter,
   disputes: adminStripeDisputesRouter,
   earlyFraudWarnings: adminStripeEarlyFraudWarningsRouter,
+  commitRetirementReviews: adminCommitRetirementReviewsRouter,
   // Key kept as `securityAdvisorContent` for tRPC client compatibility —
   // admin UI consumers reference `trpc.admin.securityAdvisorContent.*`.
   // Backing router renamed to `adminShellSecurityContentRouter` as part of

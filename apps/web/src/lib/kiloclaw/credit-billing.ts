@@ -50,6 +50,14 @@ import {
   CurrentPersonalSubscriptionResolutionError,
   resolveCurrentPersonalSubscriptionRow,
 } from '@/lib/kiloclaw/current-personal-subscription';
+import {
+  assertKiloClawCommitAdmission,
+  findKiloClawProviderRetirementDisposition,
+  getStripeFundedRetirementSettlementDecision,
+  makeKiloClawStripeSubscriptionNonRenewing,
+  putKiloClawCommitRetirementInReview,
+  type KiloClawCommitEnrollmentQualification,
+} from '@/lib/kiloclaw/commit-retirement';
 
 const logInfo = sentryLogger('kiloclaw-credit-billing', 'info');
 const logWarning = sentryLogger('kiloclaw-credit-billing', 'warning');
@@ -430,6 +438,8 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   amountMicrodollars: number;
   periodStart: string;
   periodEnd: string;
+  stripeEventId?: string;
+  checkoutConfirmedAt?: string;
 }): Promise<boolean> {
   const {
     userId,
@@ -446,6 +456,41 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   const amountCents = Math.round(amountMicrodollars / 10_000);
   const periodStartDate = periodStart.slice(0, 10); // YYYY-MM-DD
 
+  const providerDisposition = await findKiloClawProviderRetirementDisposition({
+    stripeSubscriptionId,
+    stripeEventId: params.stripeEventId,
+  });
+  const recognizeRowlessPaidFinal =
+    providerDisposition?.status === 'resolved' &&
+    providerDisposition.resolution_disposition === 'recognize_paid_period_as_final';
+  if (providerDisposition && !recognizeRowlessPaidFinal) {
+    if (plan === 'commit') {
+      try {
+        await makeKiloClawStripeSubscriptionNonRenewing(stripeSubscriptionId);
+      } catch (error) {
+        logError('Blocked provider disposition could not confirm non-renewal', {
+          stripe_subscription_id: stripeSubscriptionId,
+          stripe_event_id: params.stripeEventId ?? null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    logWarning('Stripe-funded settlement blocked by provider retirement disposition', {
+      stripe_subscription_id: stripeSubscriptionId,
+      stripe_event_id: params.stripeEventId ?? null,
+      provider_disposition:
+        providerDisposition.resolution_disposition ?? providerDisposition.status,
+    });
+    return false;
+  }
+  if (recognizeRowlessPaidFinal && plan !== 'commit') {
+    logWarning('Stripe-funded non-Commit settlement blocked by paid-final disposition', {
+      stripe_subscription_id: stripeSubscriptionId,
+      stripe_event_id: params.stripeEventId ?? null,
+    });
+    return false;
+  }
+
   let wasSuspended = false;
   let resolvedInstanceId: string | undefined;
   let resolvedSubscriptionId: string | undefined;
@@ -456,6 +501,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   // not send the "subscription started" email. See
   // shouldSendSubscriptionStartedEmailForActivation.
   let shouldSendSubscriptionStartedEmailForNewSettlement = false;
+  let requiresProviderNonRenewal = recognizeRowlessPaidFinal;
   // Set when the primary settlement insert was a duplicate (processTopUp
   // returned false). In that case the downstream email side effect may not
   // have run yet and we attempt best-effort recovery after commit.
@@ -563,6 +609,53 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     resolvedInstanceId = targetRow.instance_id ?? undefined;
     resolvedSubscriptionId = targetRow.id;
 
+    if (
+      recognizeRowlessPaidFinal &&
+      (targetRow.plan === 'commit' || targetRow.commit_retirement_state !== null)
+    ) {
+      logWarning('Later settlement blocked after recognized rowless paid final ingestion', {
+        user_id: userId,
+        stripe_subscription_id: stripeSubscriptionId,
+        subscription_id: targetRow.id,
+        stripe_event_id: params.stripeEventId ?? null,
+      });
+      return;
+    }
+
+    const ingestRecognizedRowlessPaidFinal = recognizeRowlessPaidFinal;
+    const retirementDecision = ingestRecognizedRowlessPaidFinal
+      ? {
+          authorization: 'authorized_final_term' as const,
+          reviewReason: null,
+          retirementUpdate: {
+            cancel_at_period_end: true,
+            commit_retirement_state: 'final_term' as const,
+            commit_retirement_final_ends_at: periodEnd,
+            commit_retirement_guarded_at: new Date().toISOString(),
+            commit_retirement_review_reason: null,
+          },
+        }
+      : getStripeFundedRetirementSettlementDecision({
+          subscription: targetRow,
+          plan,
+          periodStart,
+          periodEnd,
+          checkoutConfirmedAt: params.checkoutConfirmedAt,
+        });
+    requiresProviderNonRenewal ||= retirementDecision.reviewReason !== null;
+    if (retirementDecision.reviewReason) {
+      await putKiloClawCommitRetirementInReview({
+        tx,
+        subscription: targetRow,
+        reason: retirementDecision.reviewReason,
+        stripeEventId: params.stripeEventId,
+        summary:
+          plan === 'commit'
+            ? 'Paid Commit invoice requires retirement review; paid access is preserved.'
+            : 'Standard invoice lacks verified explicit retirement continuation consent.',
+      });
+    }
+
     const shouldClearSchedule = targetRow.scheduled_plan === plan;
     if (targetRow.plan !== plan && !shouldClearSchedule) {
       logWarning('Stripe-funded settlement invoice plan differs from local subscription plan', {
@@ -635,6 +728,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       current_period_end: periodEnd,
       credit_renewal_at: periodEnd,
       commit_ends_at: commitEndsAt,
+      ...retirementDecision.retirementUpdate,
       past_due_since: null,
       auto_top_up_triggered_for_period: null,
       ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
@@ -673,6 +767,19 @@ export async function applyStripeFundedKiloClawPeriod(params: {
         before,
         after,
       });
+      if (
+        before.commit_retirement_state !== after.commit_retirement_state ||
+        before.commit_retirement_final_ends_at !== after.commit_retirement_final_ends_at
+      ) {
+        await insertKiloClawSubscriptionChangeLog(tx, {
+          subscriptionId: after.id,
+          actor: CREDIT_BILLING_ACTOR,
+          action: 'commit_retirement_changed',
+          reason: 'stripe_invoice_settlement_retirement',
+          before,
+          after,
+        });
+      }
     }
 
     applied = true;
@@ -680,6 +787,36 @@ export async function applyStripeFundedKiloClawPeriod(params: {
 
   if (!applied) {
     return false;
+  }
+
+  if (requiresProviderNonRenewal) {
+    try {
+      await makeKiloClawStripeSubscriptionNonRenewing(stripeSubscriptionId);
+    } catch (error) {
+      if (resolvedSubscriptionId) {
+        const [current] = await db
+          .select()
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.id, resolvedSubscriptionId))
+          .limit(1);
+        if (current) {
+          await db.transaction(async tx => {
+            await putKiloClawCommitRetirementInReview({
+              tx,
+              subscription: current,
+              reason: 'provider_outcome_unknown',
+              stripeEventId: params.stripeEventId,
+              summary: 'Paid retirement settlement could not confirm provider non-renewal.',
+            });
+          });
+        }
+      }
+      logError('Paid retirement settlement could not confirm provider non-renewal', {
+        stripe_subscription_id: stripeSubscriptionId,
+        stripe_event_id: params.stripeEventId ?? null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   if (wasSuspended) {
@@ -1118,8 +1255,10 @@ export async function enrollWithCredits(params: {
   plan: 'commit' | 'standard';
   hadPaidSubscription: boolean;
   actor?: KiloClawSubscriptionChangeActor;
+  commitQualification?: KiloClawCommitEnrollmentQualification;
 }): Promise<void> {
   const { userId, instanceId, plan, hadPaidSubscription } = params;
+  assertKiloClawCommitAdmission({ plan, qualification: params.commitQualification });
 
   // Step 1: Read current state
   const [user] = await db
@@ -1281,6 +1420,17 @@ export async function enrollWithCredits(params: {
 
     // 5c: Upsert subscription row as pure credit
     const commitEndsAt = plan === 'commit' ? periodEndIso : null;
+    const commitRetirementSet =
+      plan === 'commit'
+        ? {
+            commit_retirement_state: 'final_term' as const,
+            commit_retirement_qualified_at:
+              params.commitQualification?.qualifiedAt ?? periodStartIso,
+            commit_retirement_qualification_source:
+              params.commitQualification?.source ?? ('active_at_cutoff' as const),
+            commit_retirement_final_ends_at: periodEndIso,
+          }
+        : {};
     const [mutatedSubscription] = await tx
       .insert(kiloclaw_subscriptions)
       .values({
@@ -1295,6 +1445,7 @@ export async function enrollWithCredits(params: {
         credit_renewal_at: periodEndIso,
         stripe_subscription_id: null,
         commit_ends_at: commitEndsAt,
+        ...commitRetirementSet,
         past_due_since: null,
         cancel_at_period_end: false,
         trial_started_at: null,
@@ -1315,6 +1466,7 @@ export async function enrollWithCredits(params: {
           credit_renewal_at: periodEndIso,
           stripe_subscription_id: null,
           commit_ends_at: commitEndsAt,
+          ...commitRetirementSet,
           past_due_since: null,
           cancel_at_period_end: false,
           ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
@@ -1335,6 +1487,16 @@ export async function enrollWithCredits(params: {
         before: currentSubscription ?? null,
         after: mutatedSubscription,
       });
+      if (plan === 'commit') {
+        await insertKiloClawSubscriptionChangeLog(tx, {
+          subscriptionId: mutatedSubscription.id,
+          actor: params.actor ?? CREDIT_BILLING_ACTOR,
+          action: 'commit_retirement_changed',
+          reason: 'credit_enrollment_final_commit',
+          before: currentSubscription ?? null,
+          after: mutatedSubscription,
+        });
+      }
     }
   });
 

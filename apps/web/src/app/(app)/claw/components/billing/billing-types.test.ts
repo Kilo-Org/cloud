@@ -5,6 +5,7 @@ import {
   deriveBannerState,
   deriveLockReason,
   formatKiloClawPlanPrice,
+  getKiloClawRetirementDisplay,
   type ClawBillingStatus,
   type KiloPassUpsellActivationPreview,
 } from './billing-types';
@@ -162,6 +163,57 @@ describe('KiloClaw billing display helpers', () => {
     expect(formatKiloClawPlanPrice({ plan: 'commit', priceVersion: '2026-05-10' })).toBe(
       '$306/6-month commit'
     );
+  });
+});
+
+describe('KiloClaw retirement display helpers', () => {
+  it('preserves explicit server retirement display fields', () => {
+    expect(
+      getKiloClawRetirementDisplay({
+        plan: 'commit',
+        paymentSource: 'credits',
+        hasStripeFunding: false,
+        commitEndsAt: '2026-12-06T00:00:00.000Z',
+        isFinalCommitTerm: true,
+        commitRetirementState: 'standard_scheduled',
+        finalCommitEndsAt: '2027-01-06T00:00:00.000Z',
+        standardContinuationPriceMicrodollars: 9_000_000,
+        currentFundingSource: 'stripe',
+        futureFundingSource: 'credits',
+        standardContinuationScheduled: true,
+        needsSupportReview: false,
+      })
+    ).toEqual({
+      isFinalCommitTerm: true,
+      commitRetirementState: 'standard_scheduled',
+      finalCommitEndsAt: '2027-01-06T00:00:00.000Z',
+      standardContinuationPriceMicrodollars: 9_000_000,
+      currentFundingSource: 'stripe',
+      futureFundingSource: 'credits',
+      standardContinuationScheduled: true,
+      needsSupportReview: false,
+    });
+  });
+
+  it('gracefully derives funding and review state when optional display fields are absent', () => {
+    expect(
+      getKiloClawRetirementDisplay({
+        plan: 'commit',
+        paymentSource: 'credits',
+        hasStripeFunding: true,
+        commitEndsAt: '2026-12-06T00:00:00.000Z',
+        commitRetirementState: 'manual_review',
+      })
+    ).toEqual({
+      isFinalCommitTerm: false,
+      commitRetirementState: 'manual_review',
+      finalCommitEndsAt: null,
+      standardContinuationPriceMicrodollars: null,
+      currentFundingSource: 'stripe',
+      futureFundingSource: 'stripe',
+      standardContinuationScheduled: false,
+      needsSupportReview: true,
+    });
   });
 });
 

@@ -19,6 +19,7 @@ import { logImpactReferralDebug } from '@/lib/impact/debug';
 import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { projectPendingKiloPassBonusMicrodollars } from '@/lib/kiloclaw/credit-billing';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
+import { enforceKiloClawCommitRetirementGuard } from '@/lib/kiloclaw/commit-retirement';
 
 const personalBillingTemplateNames = [
   'clawSuspendedTrial',
@@ -333,6 +334,13 @@ const BodySchema = z.discriminatedUnion('action', [
     }),
   }),
   z.object({
+    action: z.literal('commit_retirement_guard'),
+    input: z.object({
+      subscriptionId: z.uuid(),
+      expectedFinalBoundary: z.string().datetime(),
+    }),
+  }),
+  z.object({
     action: z.literal('process_paid_conversion'),
     input: z.object({
       userId: z.string().min(1),
@@ -387,6 +395,8 @@ function getActionLogFields(body: z.infer<typeof BodySchema>): {
       };
     case 'enqueue_affiliate_event':
       return { userId: body.input.userId };
+    case 'commit_retirement_guard':
+      return {};
     case 'process_paid_conversion':
       return { userId: body.input.userId };
     case 'project_pending_kilo_pass_bonus':
@@ -439,6 +449,7 @@ export async function POST(request: NextRequest) {
       | SendEmailResult
       | { ok: true }
       | { repaired: boolean }
+      | { guarded: boolean }
       | { enqueued: boolean }
       | {
           affiliateSaleEnqueued: boolean;
@@ -473,6 +484,10 @@ export async function POST(request: NextRequest) {
         payload = { repaired: true };
         break;
       }
+
+      case 'commit_retirement_guard':
+        payload = await enforceKiloClawCommitRetirementGuard(parsed.data.input);
+        break;
 
       case 'enqueue_affiliate_event':
         logImpactReferralDebug('KiloClaw billing side effect enqueueing affiliate event', {

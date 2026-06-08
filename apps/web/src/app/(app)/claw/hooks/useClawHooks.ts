@@ -94,6 +94,27 @@ export function useClawControllerVersion(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
+// Agents (read-only fleet)
+
+export function useClawAgents(enabled = true) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.listAgents.queryOptions(undefined),
+    enabled: enabled && !organizationId,
+  });
+
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.listAgents.queryOptions({
+      organizationId: organizationId ?? '',
+    }),
+    enabled: enabled && !!organizationId,
+  });
+
+  return organizationId ? org : personal;
+}
+
 export function useClawMorningBriefingStatus(enabled: boolean) {
   const trpc = useTRPC();
   const { organizationId } = useClawContext();

@@ -98,6 +98,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       url: '/claw/subscription',
     },
     {
+      title: 'Agents',
+      icon: Bot,
+      url: '/claw/agents',
+    },
+    {
       title: 'Settings',
       icon: Settings,
       url: '/claw/settings',

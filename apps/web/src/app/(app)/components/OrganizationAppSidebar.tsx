@@ -142,6 +142,11 @@ export default function OrganizationAppSidebar({
       url: `/organizations/${organizationId}/claw/chat`,
     },
     {
+      title: 'Agents',
+      icon: Bot,
+      url: `/organizations/${organizationId}/claw/agents`,
+    },
+    {
       title: 'Settings',
       icon: Settings,
       url: `/organizations/${organizationId}/claw/settings`,

@@ -6,6 +6,8 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { client as stripeClient } from '@/lib/stripe-client';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
+  classifyKiloClawCommitTerm,
+  findLatestPreCutoffUserCommitSwitchQualification,
   insertKiloClawSubscriptionChangeLog,
   KiloClawCommitRetirementResolutionDisposition,
   KiloClawCommitRetirementReviewCaseStatus,
@@ -145,7 +147,9 @@ function assertExpectedLocalState(params: {
 }) {
   const caseUpdatedAt = normalizeTimestamp(params.reviewCase.updated_at);
   const subscriptionUpdatedAt = normalizeTimestamp(params.subscription?.updated_at);
-  const finalBoundary = normalizeTimestamp(params.subscription?.commit_retirement_final_ends_at);
+  const finalBoundary = normalizeTimestamp(
+    params.subscription?.commit_ends_at ?? params.subscription?.current_period_end
+  );
 
   if (
     params.reviewCase.status !== KiloClawCommitRetirementReviewCaseStatus.Open ||
@@ -175,6 +179,32 @@ async function lockReviewCase(tx: DrizzleTransaction, caseId: string) {
   return reviewCase;
 }
 
+async function assertDismissibleOperationalState(
+  tx: DrizzleTransaction,
+  subscription: KiloClawSubscription
+): Promise<void> {
+  const switchQualification =
+    subscription.plan === 'standard' && subscription.scheduled_plan === 'commit'
+      ? await findLatestPreCutoffUserCommitSwitchQualification(tx, subscription.id)
+      : null;
+  const classification = classifyKiloClawCommitTerm({
+    plan: subscription.plan,
+    scheduledPlan: subscription.scheduled_plan,
+    scheduledBy: subscription.scheduled_by,
+    currentPeriodStart: subscription.current_period_start,
+    currentPeriodEnd: subscription.current_period_end,
+    commitEndsAt: subscription.commit_ends_at,
+    qualifiedAt: switchQualification?.qualifiedAt,
+    qualificationSource: switchQualification?.qualificationSource,
+  });
+  if (classification === 'ambiguous') {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Subscription remains ambiguous. Correct or resolve it instead of dismissing.',
+    });
+  }
+}
+
 async function lockReviewSubscription(tx: DrizzleTransaction, subscriptionId: string | null) {
   if (!subscriptionId) return null;
 
@@ -201,9 +231,9 @@ function safeFinalBoundary(params: {
 }): string | null {
   if (params.provider.kind === 'subscription') return params.provider.currentPeriodEnd;
   return normalizeTimestamp(
-    params.subscription.current_period_end ??
-      params.subscription.credit_renewal_at ??
-      params.subscription.commit_retirement_final_ends_at
+    params.subscription.commit_ends_at ??
+      params.subscription.current_period_end ??
+      params.subscription.credit_renewal_at
   );
 }
 
@@ -372,11 +402,11 @@ export const adminCommitRetirementReviewsRouter = createTRPCRouter({
           subscription.plan === 'commit' &&
           (subscription.status === 'active' || subscription.status === 'past_due')
         ) {
-          if (subscription.commit_retirement_standard_opted_in_at || subscription.scheduled_plan) {
+          if (subscription.scheduled_plan === 'standard' && subscription.scheduled_by === 'user') {
             throw new TRPCError({
               code: 'CONFLICT',
               message:
-                'Subscription has Standard continuation state. Reconcile that consent before resolving the review.',
+                'Subscription has explicit Standard continuation. Reconcile that schedule before resolving the review.',
             });
           }
           const finalBoundary = safeFinalBoundary({ subscription, provider });
@@ -387,17 +417,12 @@ export const adminCommitRetirementReviewsRouter = createTRPCRouter({
             });
           }
           nextState = {
-            commit_retirement_state: 'final_term',
-            commit_retirement_final_ends_at: finalBoundary,
-            commit_retirement_guarded_at: new Date().toISOString(),
-            commit_retirement_review_reason: null,
-            commit_retirement_standard_opted_in_at: null,
             cancel_at_period_end: true,
             stripe_schedule_id: null,
             scheduled_plan: null,
             scheduled_by: null,
             ...(input.disposition === 'recognize_paid_period_as_final'
-              ? { current_period_end: finalBoundary }
+              ? { current_period_end: finalBoundary, commit_ends_at: finalBoundary }
               : {}),
           };
         } else {
@@ -414,11 +439,7 @@ export const adminCommitRetirementReviewsRouter = createTRPCRouter({
                 'Current Commit state has no safe final-boundary disposition. Cancel or reconcile it before resolving the case.',
             });
           }
-          nextState = {
-            commit_retirement_state: 'completed',
-            commit_retirement_review_reason: null,
-            commit_retirement_standard_opted_in_at: null,
-          };
+          nextState = {};
         }
 
         const [updatedSubscription] = await tx
@@ -428,12 +449,12 @@ export const adminCommitRetirementReviewsRouter = createTRPCRouter({
             and(
               eq(kiloclaw_subscriptions.id, subscription.id),
               eq(kiloclaw_subscriptions.updated_at, subscription.updated_at),
-              subscription.commit_retirement_final_ends_at
-                ? eq(
-                    kiloclaw_subscriptions.commit_retirement_final_ends_at,
-                    subscription.commit_retirement_final_ends_at
-                  )
-                : isNull(kiloclaw_subscriptions.commit_retirement_final_ends_at)
+              subscription.commit_ends_at
+                ? eq(kiloclaw_subscriptions.commit_ends_at, subscription.commit_ends_at)
+                : isNull(kiloclaw_subscriptions.commit_ends_at),
+              subscription.current_period_end
+                ? eq(kiloclaw_subscriptions.current_period_end, subscription.current_period_end)
+                : isNull(kiloclaw_subscriptions.current_period_end)
             )
           )
           .returning();
@@ -512,13 +533,13 @@ export const adminCommitRetirementReviewsRouter = createTRPCRouter({
         expectedSubscriptionUpdatedAt: input.expectedSubscriptionUpdatedAt,
         expectedFinalBoundary: input.expectedFinalBoundary,
       });
-      if (!subscription || subscription.commit_retirement_state === 'manual_review') {
+      if (!subscription) {
         throw new TRPCError({
           code: 'CONFLICT',
-          message:
-            'Known-subscription cases can be dismissed only after current retirement state no longer requires review.',
+          message: 'Known-subscription case no longer has a subscription row.',
         });
       }
+      await assertDismissibleOperationalState(tx, subscription);
 
       const dismissed = await resolveCommitRetirementReviewCase(tx, {
         dedupeKey: reviewCase.dedupe_key,

@@ -7,7 +7,6 @@ import { db } from '@/lib/drizzle';
 import { client as stripe } from '@/lib/stripe-client';
 import {
   classifyKiloClawCommitInvoice,
-  classifyKiloClawCommitTerm,
   createCommitRetirementReviewCase,
   deriveKiloClawCommitFinalBoundary,
   findLatestPreCutoffUserCommitSwitchQualification,
@@ -88,7 +87,7 @@ export async function findPendingCommitSwitchQualification(
 export type StripeFundedRetirementSettlementDecision = {
   authorization: KiloClawCommitInvoiceAuthorization | 'standard_authorized' | 'not_involved';
   reviewReason: KiloClawCommitRetirementReviewReason | null;
-  retirementUpdate: Partial<typeof kiloclaw_subscriptions.$inferInsert>;
+  subscriptionUpdate: Partial<typeof kiloclaw_subscriptions.$inferInsert>;
 };
 
 type CommitQualificationEvidence = {
@@ -107,8 +106,6 @@ export function isQualifiedKiloClawCommitPreCutoffRecovery(params: {
   const boundary = params.subscription.current_period_end;
   return (
     params.subscription.plan === 'commit' &&
-    params.subscription.commit_retirement_state !== 'manual_review' &&
-    params.subscription.commit_retirement_final_ends_at === null &&
     boundary !== null &&
     params.incomingPeriodStart !== null &&
     isBeforeKiloClawCommitSalesCutoff(boundary) &&
@@ -123,76 +120,44 @@ export function getStripeFundedRetirementSettlementDecision(params: {
   periodEnd: string;
   checkoutConfirmedAt?: string;
   switchQualification?: KiloClawCommitEnrollmentQualification;
+  openReviewCase?: Awaited<ReturnType<typeof findOpenCommitRetirementReviewCase>>;
 }): StripeFundedRetirementSettlementDecision {
   const { subscription, plan, periodStart, periodEnd } = params;
 
-  if (subscription.commit_retirement_state === 'manual_review') {
+  if (params.openReviewCase) {
     return {
       authorization: 'ambiguous',
-      reviewReason: subscription.commit_retirement_review_reason ?? 'provider_state_mismatch',
-      retirementUpdate: { cancel_at_period_end: true },
+      reviewReason: params.openReviewCase.reason_code,
+      subscriptionUpdate: { cancel_at_period_end: true },
     };
   }
 
   if (plan === 'standard') {
-    const retirementInvolved =
-      subscription.plan === 'commit' || subscription.commit_retirement_state !== null;
-    if (!retirementInvolved) {
-      return { authorization: 'not_involved', reviewReason: null, retirementUpdate: {} };
+    if (subscription.plan !== 'commit' && subscription.commit_ends_at === null) {
+      return { authorization: 'not_involved', reviewReason: null, subscriptionUpdate: {} };
     }
-
-    const finalBoundary = subscription.commit_retirement_final_ends_at;
     if (
-      subscription.commit_retirement_state === 'standard_scheduled' &&
-      subscription.commit_retirement_standard_opted_in_at &&
-      finalBoundary &&
-      timestampsEqual(finalBoundary, periodStart)
+      subscription.scheduled_plan === 'standard' &&
+      subscription.scheduled_by === 'user' &&
+      timestampsEqual(subscription.commit_ends_at, periodStart)
     ) {
       return {
         authorization: 'standard_authorized',
         reviewReason: null,
-        retirementUpdate: {
-          commit_retirement_state: 'completed',
-          commit_retirement_review_reason: null,
-          commit_ends_at: null,
-        },
+        subscriptionUpdate: { commit_ends_at: null, cancel_at_period_end: false },
       };
     }
-
     return {
       authorization: 'ambiguous',
       reviewReason: 'provider_state_mismatch',
-      retirementUpdate: { cancel_at_period_end: true },
+      subscriptionUpdate: { cancel_at_period_end: true },
     };
   }
 
-  const classificationFinalBoundary =
-    subscription.commit_retirement_state === 'pending_final_term'
-      ? null
-      : subscription.commit_retirement_final_ends_at;
   const qualifiedPreCutoffRecovery = isQualifiedKiloClawCommitPreCutoffRecovery({
     subscription,
     incomingPeriodStart: periodStart,
   });
-  const incomingStartsAtOrAfterExistingBoundary =
-    subscription.plan === 'commit' &&
-    subscription.current_period_end !== null &&
-    new Date(periodStart).getTime() >= new Date(subscription.current_period_end).getTime();
-  const incomingExtendsExistingCommitPeriod =
-    subscription.plan === 'commit' &&
-    subscription.current_period_end !== null &&
-    new Date(periodEnd).getTime() > new Date(subscription.current_period_end).getTime();
-  if (
-    !qualifiedPreCutoffRecovery &&
-    (incomingStartsAtOrAfterExistingBoundary || incomingExtendsExistingCommitPeriod)
-  ) {
-    return {
-      authorization: 'forbidden_renewal',
-      reviewReason: 'forbidden_commit_invoice',
-      retirementUpdate: { cancel_at_period_end: true },
-    };
-  }
-
   const qualification = getCommitSettlementQualification({
     subscription,
     periodStart,
@@ -205,7 +170,7 @@ export function getStripeFundedRetirementSettlementDecision(params: {
     : classifyKiloClawCommitInvoice({
         invoicePeriodStart: periodStart,
         invoicePeriodEnd: periodEnd,
-        finalEndsAt: classificationFinalBoundary,
+        commitEndsAt: subscription.commit_ends_at,
         qualifiedAt: qualification?.qualifiedAt,
         qualificationSource: qualification?.source,
       });
@@ -214,34 +179,21 @@ export function getStripeFundedRetirementSettlementDecision(params: {
     return {
       authorization,
       reviewReason: 'forbidden_commit_invoice',
-      retirementUpdate: { cancel_at_period_end: true },
+      subscriptionUpdate: { cancel_at_period_end: true },
     };
   }
-  if (authorization === 'ambiguous') {
-    return {
-      authorization,
-      reviewReason: 'boundary_mismatch',
-      retirementUpdate: { cancel_at_period_end: true },
-    };
-  }
-
-  if (!qualification) {
+  if (authorization === 'ambiguous' || !qualification) {
     return {
       authorization: 'ambiguous',
-      reviewReason: 'missing_qualification_evidence',
-      retirementUpdate: { cancel_at_period_end: true },
+      reviewReason: qualification ? 'boundary_mismatch' : 'missing_qualification_evidence',
+      subscriptionUpdate: { cancel_at_period_end: true },
     };
   }
 
   return {
     authorization,
     reviewReason: null,
-    retirementUpdate: {
-      commit_retirement_state: 'final_term',
-      commit_retirement_final_ends_at: periodEnd,
-      commit_retirement_review_reason: null,
-      cancel_at_period_end: false,
-    },
+    subscriptionUpdate: { commit_ends_at: periodEnd, cancel_at_period_end: false },
   };
 }
 
@@ -286,11 +238,7 @@ export async function putKiloClawCommitRetirementInReview(params: {
 
   const [after] = await params.tx
     .update(kiloclaw_subscriptions)
-    .set({
-      commit_retirement_state: 'manual_review',
-      commit_retirement_review_reason: activeReviewReason,
-      cancel_at_period_end: true,
-    })
+    .set({ cancel_at_period_end: true })
     .where(eq(kiloclaw_subscriptions.id, params.subscription.id))
     .returning();
 
@@ -334,8 +282,7 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
     subscription.plan !== 'commit' ||
     subscription.status !== 'active' ||
     !subscription.stripe_subscription_id ||
-    subscription.commit_retirement_standard_opted_in_at ||
-    subscription.commit_retirement_state === 'standard_scheduled'
+    (subscription.scheduled_plan === 'standard' && subscription.scheduled_by === 'user')
   ) {
     return { guarded: false };
   }
@@ -351,15 +298,14 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
   const liveSubscription = await stripe.subscriptions.retrieve(subscription.stripe_subscription_id);
   const providerBoundary = getStripeSubscriptionPeriodEnd(liveSubscription);
   const boundary = deriveKiloClawCommitFinalBoundary({
-    durableFinalEndsAt: subscription.commit_retirement_final_ends_at,
-    localPeriodEndsAt: subscription.current_period_end,
+    commitEndsAt: subscription.commit_ends_at,
+    currentPeriodEndsAt: subscription.current_period_end,
     providerPeriodEndsAt: providerBoundary,
   });
 
   if (
     boundary.kind !== 'verified' ||
-    !timestampsEqual(boundary.finalEndsAt, params.expectedFinalBoundary) ||
-    classifyKiloClawCommitTerm(toRetirementEvidence(subscription)) === 'ambiguous'
+    !timestampsEqual(boundary.finalEndsAt, params.expectedFinalBoundary)
   ) {
     await markReviewOutsideTransaction(
       subscription,
@@ -389,7 +335,6 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
     throw error;
   }
 
-  const guardedAt = new Date().toISOString();
   let guarded = false;
   let localWinnerChanged = false;
   await db.transaction(async tx => {
@@ -400,13 +345,13 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
       .for('update')
       .limit(1);
     if (!before) return;
-    const durableBoundaryMatches = before.commit_retirement_final_ends_at
-      ? timestampsEqual(before.commit_retirement_final_ends_at, params.expectedFinalBoundary)
+    const openReviewCase = await findOpenCommitRetirementReviewCase(tx, before.id);
+    const durableBoundaryMatches = before.commit_ends_at
+      ? timestampsEqual(before.commit_ends_at, params.expectedFinalBoundary)
       : true;
     if (
-      before.commit_retirement_standard_opted_in_at ||
-      before.commit_retirement_state === 'standard_scheduled' ||
-      before.commit_retirement_state === 'manual_review' ||
+      (before.scheduled_plan === 'standard' && before.scheduled_by === 'user') ||
+      openReviewCase ||
       before.plan !== 'commit' ||
       before.status !== 'active' ||
       before.stripe_subscription_id !== subscription.stripe_subscription_id ||
@@ -417,25 +362,11 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
       return;
     }
 
-    const activeTermStartedAt = before.current_period_start;
-    if (!activeTermStartedAt || !isBeforeKiloClawCommitSalesCutoff(activeTermStartedAt)) {
-      await putKiloClawCommitRetirementInReview({
-        tx,
-        subscription: before,
-        reason: 'missing_qualification_evidence',
-        summary: 'Retirement guard found a final Commit term without a pre-cutoff period start.',
-      });
-      return;
-    }
-
     const [after] = await tx
       .update(kiloclaw_subscriptions)
       .set({
         cancel_at_period_end: true,
-        commit_retirement_state: 'final_term',
-        commit_retirement_final_ends_at: params.expectedFinalBoundary,
-        commit_retirement_guarded_at: guardedAt,
-        commit_retirement_review_reason: null,
+        commit_ends_at: params.expectedFinalBoundary,
       })
       .where(
         and(
@@ -444,8 +375,8 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
           eq(kiloclaw_subscriptions.status, 'active'),
           sql`${kiloclaw_subscriptions.stripe_subscription_id} IS NOT DISTINCT FROM ${subscription.stripe_subscription_id}`,
           or(
-            isNull(kiloclaw_subscriptions.commit_retirement_final_ends_at),
-            eq(kiloclaw_subscriptions.commit_retirement_final_ends_at, params.expectedFinalBoundary)
+            isNull(kiloclaw_subscriptions.commit_ends_at),
+            eq(kiloclaw_subscriptions.commit_ends_at, params.expectedFinalBoundary)
           ),
           sql`${kiloclaw_subscriptions.current_period_end} IS NOT DISTINCT FROM ${before.current_period_end}`
         )
@@ -492,8 +423,7 @@ export async function continueKiloClawCommitAsStandard(params: {
   const row = await readPersonalSubscription(params.subscriptionId, params.userId);
   if (!row) throw new Error('KiloClaw subscription not found.');
   const subscription = row.subscription;
-  const boundary = requireLiveFinalCommitBoundary(subscription);
-  const optedInAt = new Date().toISOString();
+  const boundary = await requireLiveFinalCommitBoundary(subscription);
 
   let scheduleId: string | null = null;
   if (subscription.stripe_subscription_id) {
@@ -527,19 +457,16 @@ export async function continueKiloClawCommitAsStandard(params: {
       )
       .for('update')
       .limit(1);
-    const durableBoundaryMatches = before?.commit_retirement_final_ends_at
-      ? timestampsEqual(before.commit_retirement_final_ends_at, boundary)
-      : before?.current_period_end
-        ? timestampsEqual(before.current_period_end, boundary)
-        : false;
+    const openReviewCase = before ? await findOpenCommitRetirementReviewCase(tx, before.id) : null;
+    const durableBoundaryMatches = before?.commit_ends_at
+      ? timestampsEqual(before.commit_ends_at, boundary)
+      : false;
     if (
       !before ||
+      openReviewCase ||
       before.plan !== 'commit' ||
       before.status !== 'active' ||
       before.stripe_subscription_id !== subscription.stripe_subscription_id ||
-      before.commit_retirement_state !== subscription.commit_retirement_state ||
-      before.commit_retirement_standard_opted_in_at !==
-        subscription.commit_retirement_standard_opted_in_at ||
       !durableBoundaryMatches ||
       !timestampsEqual(before.current_period_end, subscription.current_period_end)
     ) {
@@ -554,25 +481,15 @@ export async function continueKiloClawCommitAsStandard(params: {
         stripe_schedule_id: scheduleId,
         pending_conversion: params.convertToCredits ?? false,
         cancel_at_period_end: params.convertToCredits ?? false,
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: boundary,
-        commit_retirement_standard_opted_in_at: optedInAt,
-        commit_retirement_guarded_at: null,
-        commit_retirement_review_reason: null,
+        commit_ends_at: boundary,
       })
       .where(
         and(
           eq(kiloclaw_subscriptions.id, before.id),
           eq(kiloclaw_subscriptions.plan, 'commit'),
           eq(kiloclaw_subscriptions.status, 'active'),
-          sql`${kiloclaw_subscriptions.commit_retirement_state} IS NOT DISTINCT FROM ${before.commit_retirement_state}`,
-          sql`${kiloclaw_subscriptions.current_period_end} IS NOT DISTINCT FROM ${before.current_period_end}`,
-          before.commit_retirement_standard_opted_in_at
-            ? eq(
-                kiloclaw_subscriptions.commit_retirement_standard_opted_in_at,
-                before.commit_retirement_standard_opted_in_at
-              )
-            : isNull(kiloclaw_subscriptions.commit_retirement_standard_opted_in_at)
+          sql`${kiloclaw_subscriptions.commit_ends_at} IS NOT DISTINCT FROM ${before.commit_ends_at}`,
+          sql`${kiloclaw_subscriptions.current_period_end} IS NOT DISTINCT FROM ${before.current_period_end}`
         )
       )
       .returning();
@@ -611,11 +528,8 @@ export async function undoKiloClawCommitStandardContinuation(params: {
   const row = await readPersonalSubscription(params.subscriptionId, params.userId);
   if (!row) throw new Error('KiloClaw subscription not found.');
   const subscription = row.subscription;
-  requireLiveFinalCommitBoundary(subscription);
-  if (
-    subscription.commit_retirement_state !== 'standard_scheduled' ||
-    !subscription.commit_retirement_standard_opted_in_at
-  ) {
+  await requireLiveFinalCommitBoundary(subscription);
+  if (subscription.scheduled_plan !== 'standard' || subscription.scheduled_by !== 'user') {
     throw new Error('No Standard continuation is scheduled.');
   }
 
@@ -631,7 +545,7 @@ export async function undoKiloClawCommitStandardContinuation(params: {
     await makeKiloClawStripeSubscriptionNonRenewing(subscription.stripe_subscription_id);
   }
 
-  const boundary = subscription.commit_retirement_final_ends_at;
+  const boundary = subscription.commit_ends_at;
   let localWinnerChanged = false;
   await db.transaction(async tx => {
     const [before] = await tx
@@ -651,10 +565,9 @@ export async function undoKiloClawCommitStandardContinuation(params: {
       before.status !== 'active' ||
       before.stripe_subscription_id !== subscription.stripe_subscription_id ||
       before.stripe_schedule_id !== subscription.stripe_schedule_id ||
-      before.commit_retirement_state !== 'standard_scheduled' ||
-      before.commit_retirement_standard_opted_in_at !==
-        subscription.commit_retirement_standard_opted_in_at ||
-      !timestampsEqual(before.commit_retirement_final_ends_at, boundary) ||
+      before.scheduled_plan !== 'standard' ||
+      before.scheduled_by !== 'user' ||
+      !timestampsEqual(before.commit_ends_at, boundary) ||
       !timestampsEqual(before.current_period_end, subscription.current_period_end)
     ) {
       localWinnerChanged = true;
@@ -668,17 +581,15 @@ export async function undoKiloClawCommitStandardContinuation(params: {
         stripe_schedule_id: null,
         pending_conversion: false,
         cancel_at_period_end: true,
-        commit_retirement_state: 'final_term',
-        commit_retirement_standard_opted_in_at: null,
-        commit_retirement_guarded_at: new Date().toISOString(),
+        commit_ends_at: boundary,
       })
       .where(
         and(
           eq(kiloclaw_subscriptions.id, before.id),
           eq(kiloclaw_subscriptions.plan, 'commit'),
           eq(kiloclaw_subscriptions.status, 'active'),
-          eq(kiloclaw_subscriptions.commit_retirement_state, 'standard_scheduled'),
-          sql`${kiloclaw_subscriptions.commit_retirement_standard_opted_in_at} IS NOT DISTINCT FROM ${before.commit_retirement_standard_opted_in_at}`,
+          eq(kiloclaw_subscriptions.scheduled_plan, 'standard'),
+          eq(kiloclaw_subscriptions.scheduled_by, 'user'),
           sql`${kiloclaw_subscriptions.current_period_end} IS NOT DISTINCT FROM ${before.current_period_end}`
         )
       )
@@ -815,38 +726,22 @@ async function readPersonalSubscription(subscriptionId: string, userId?: string)
   return row ?? null;
 }
 
-function requireLiveFinalCommitBoundary(subscription: KiloClawSubscription): string {
+async function requireLiveFinalCommitBoundary(subscription: KiloClawSubscription): Promise<string> {
   if (subscription.plan !== 'commit' || subscription.status !== 'active') {
     throw new Error('Subscription is not an active final Commit term.');
   }
-  const classification = classifyKiloClawCommitTerm(toRetirementEvidence(subscription));
-  if (
-    classification !== 'final_term' ||
-    subscription.commit_retirement_state === 'manual_review' ||
-    subscription.commit_retirement_state === 'completed'
-  ) {
+  if (await findOpenCommitRetirementReviewCase(db, subscription.id)) {
     throw new Error('Commit retirement state requires support review.');
   }
-  const boundary = subscription.commit_retirement_final_ends_at ?? subscription.current_period_end;
-  if (!boundary || Date.parse(boundary) <= Date.now()) {
-    throw new Error('Commit final boundary has passed.');
+  const boundary = subscription.commit_ends_at;
+  if (
+    !boundary ||
+    !timestampsEqual(boundary, subscription.current_period_end) ||
+    Date.parse(boundary) <= Date.now()
+  ) {
+    throw new Error('Commit final boundary has passed or is unverified.');
   }
   return new Date(boundary).toISOString();
-}
-
-function toRetirementEvidence(subscription: KiloClawSubscription) {
-  const qualification = getDirectCommitQualification(subscription);
-  return {
-    plan: subscription.plan,
-    scheduledPlan: subscription.scheduled_plan,
-    currentPeriodStart: subscription.current_period_start,
-    currentPeriodEnd: subscription.current_period_end,
-    retirementState: subscription.commit_retirement_state,
-    qualifiedAt: qualification?.qualifiedAt,
-    qualificationSource: qualification?.source,
-    finalEndsAt: subscription.commit_retirement_final_ends_at,
-    standardOptedInAt: subscription.commit_retirement_standard_opted_in_at,
-  };
 }
 
 function getDirectCommitQualification(

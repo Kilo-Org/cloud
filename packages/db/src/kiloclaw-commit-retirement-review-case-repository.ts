@@ -1,7 +1,6 @@
 import { and, eq, or, sql } from 'drizzle-orm';
 
 import type { WorkerDb } from './client';
-import { insertKiloClawSubscriptionChangeLog } from './kiloclaw-subscription-change-log';
 import {
   kiloclaw_commit_retirement_review_cases,
   kiloclaw_subscriptions,
@@ -10,13 +9,10 @@ import {
 import {
   KiloClawCommitRetirementResolutionDisposition,
   KiloClawCommitRetirementReviewCaseStatus,
-  KiloClawCommitRetirementState,
-  KiloClawSubscriptionChangeAction,
   type KiloClawCommitRetirementResolutionActorType,
   type KiloClawCommitRetirementReviewReason,
   type KiloClawCommitRetirementResolutionDisposition as KiloClawCommitRetirementResolutionDispositionType,
   type KiloClawCommitRetirementReviewCaseStatus as KiloClawCommitRetirementReviewCaseStatusType,
-  type KiloClawSubscriptionChangeActorType,
 } from './schema-types';
 
 export type CommitRetirementReviewCaseRepository = Pick<WorkerDb, 'insert' | 'select' | 'update'>;
@@ -35,10 +31,7 @@ export type ResolveCommitRetirementReviewCaseInput = {
   dedupeKey: string;
   status: Exclude<KiloClawCommitRetirementReviewCaseStatusType, 'open'>;
   disposition: KiloClawCommitRetirementResolutionDispositionType;
-  actor: {
-    type: KiloClawCommitRetirementResolutionActorType;
-    id: string;
-  };
+  actor: { type: KiloClawCommitRetirementResolutionActorType; id: string };
   resolvedAt: string;
   reason: string;
 };
@@ -49,13 +42,7 @@ export type ProviderCommitRetirementDispositionKey = {
 };
 
 export type ContainKnownSubscriptionCommitRetirementReviewInput =
-  CreateCommitRetirementReviewCaseInput & {
-    subscriptionId: string;
-    actor: {
-      type: KiloClawSubscriptionChangeActorType;
-      id: string;
-    };
-  };
+  CreateCommitRetirementReviewCaseInput & { subscriptionId: string };
 
 export async function containKnownSubscriptionCommitRetirementReview(
   database: TransactionalCommitRetirementReviewCaseRepository,
@@ -65,12 +52,11 @@ export async function containKnownSubscriptionCommitRetirementReview(
 
   return database.transaction(async transaction => {
     const [subscription] = await transaction
-      .select()
+      .select({ id: kiloclaw_subscriptions.id })
       .from(kiloclaw_subscriptions)
       .where(eq(kiloclaw_subscriptions.id, input.subscriptionId))
       .for('update')
       .limit(1);
-
     if (!subscription) throw new Error('commit_retirement_review_subscription_missing');
 
     const [existingOpenCase] = await transaction
@@ -91,41 +77,11 @@ export async function containKnownSubscriptionCommitRetirementReview(
     if (existingOpenCase && existingOpenCase.dedupe_key !== input.dedupeKey) {
       throw new Error('commit_retirement_review_subscription_has_different_open_case');
     }
-
-    if (existingOpenCase) assertIdempotentCreateInput(existingOpenCase, input);
-    const reviewCase =
-      existingOpenCase ?? (await createCommitRetirementReviewCase(transaction, input));
-
-    if (reviewCase.status !== KiloClawCommitRetirementReviewCaseStatus.Open) {
-      throw new Error('commit_retirement_review_case_dedupe_key_not_open');
+    if (existingOpenCase) {
+      assertIdempotentCreateInput(existingOpenCase, input);
+      return existingOpenCase;
     }
-
-    if (subscription.commit_retirement_state !== KiloClawCommitRetirementState.ManualReview) {
-      const [updatedSubscription] = await transaction
-        .update(kiloclaw_subscriptions)
-        .set({
-          commit_retirement_state: KiloClawCommitRetirementState.ManualReview,
-          commit_retirement_review_reason: input.reasonCode,
-        })
-        .where(eq(kiloclaw_subscriptions.id, input.subscriptionId))
-        .returning();
-
-      if (!updatedSubscription)
-        throw new Error('commit_retirement_review_subscription_update_failed');
-
-      await insertKiloClawSubscriptionChangeLog(transaction, {
-        subscriptionId: input.subscriptionId,
-        actor: { actorType: input.actor.type, actorId: input.actor.id },
-        action: KiloClawSubscriptionChangeAction.CommitRetirementChanged,
-        reason: input.reasonCode,
-        before: subscription,
-        after: updatedSubscription,
-      });
-    } else if (subscription.commit_retirement_review_reason !== input.reasonCode) {
-      throw new Error('commit_retirement_review_subscription_reason_mismatch');
-    }
-
-    return reviewCase;
+    return createCommitRetirementReviewCase(transaction, input);
   });
 }
 
@@ -134,7 +90,6 @@ export async function createCommitRetirementReviewCase(
   input: CreateCommitRetirementReviewCaseInput
 ): Promise<KiloClawCommitRetirementReviewCase> {
   assertValidCreateInput(input);
-
   const [created] = await database
     .insert(kiloclaw_commit_retirement_review_cases)
     .values({
@@ -148,7 +103,6 @@ export async function createCommitRetirementReviewCase(
     })
     .onConflictDoNothing({ target: kiloclaw_commit_retirement_review_cases.dedupe_key })
     .returning();
-
   if (created) return created;
 
   const [existing] = await database
@@ -156,7 +110,6 @@ export async function createCommitRetirementReviewCase(
     .from(kiloclaw_commit_retirement_review_cases)
     .where(eq(kiloclaw_commit_retirement_review_cases.dedupe_key, input.dedupeKey))
     .limit(1);
-
   if (!existing) throw new Error('commit_retirement_review_case_conflict_row_missing');
   assertIdempotentCreateInput(existing, input);
   return existing;
@@ -179,7 +132,6 @@ export async function findOpenCommitRetirementReviewCase(
       )
     )
     .limit(1);
-
   return row ?? null;
 }
 
@@ -197,7 +149,6 @@ export async function resolveCommitRetirementReviewCase(
   if (!input.actor.id || !input.reason || input.reason.length > 500) {
     throw new Error('invalid_commit_retirement_review_case_resolution');
   }
-
   if (input.status === KiloClawCommitRetirementReviewCaseStatus.Dismissed) {
     if (input.disposition !== KiloClawCommitRetirementResolutionDisposition.DismissNoIssue) {
       throw new Error('dismissed_commit_retirement_review_case_requires_dismiss_disposition');
@@ -227,7 +178,6 @@ export async function resolveCommitRetirementReviewCase(
       )
     )
     .returning();
-
   return row ?? null;
 }
 
@@ -238,7 +188,6 @@ export async function findProviderCommitRetirementDisposition(
   if (!key.stripeSubscriptionId && !key.stripeEventId) {
     throw new Error('commit_retirement_provider_identifier_required');
   }
-
   const identifier = or(
     key.stripeSubscriptionId
       ? eq(kiloclaw_commit_retirement_review_cases.stripe_subscription_id, key.stripeSubscriptionId)
@@ -247,7 +196,6 @@ export async function findProviderCommitRetirementDisposition(
       ? eq(kiloclaw_commit_retirement_review_cases.stripe_event_id, key.stripeEventId)
       : undefined
   );
-
   if (!identifier) throw new Error('commit_retirement_provider_identifier_required');
 
   const [row] = await database
@@ -282,7 +230,6 @@ export async function findProviderCommitRetirementDisposition(
     )
     .orderBy(kiloclaw_commit_retirement_review_cases.created_at)
     .limit(1);
-
   return row ?? null;
 }
 

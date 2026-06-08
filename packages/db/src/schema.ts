@@ -49,7 +49,6 @@ import {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
-  KiloClawCommitRetirementState,
   KiloClawCommitRetirementReviewReason,
   KiloClawCommitRetirementReviewCaseStatus,
   KiloClawCommitRetirementResolutionDisposition,
@@ -182,7 +181,6 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawSubscriptionAccessOrigin,
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
-  KiloClawCommitRetirementState,
   KiloClawCommitRetirementReviewReason,
   KiloClawCommitRetirementReviewCaseStatus,
   KiloClawCommitRetirementResolutionDisposition,
@@ -6486,11 +6484,6 @@ export const kiloclaw_subscriptions = pgTable(
     current_period_end: timestamp({ withTimezone: true, mode: 'string' }),
     credit_renewal_at: timestamp({ withTimezone: true, mode: 'string' }),
     commit_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
-    commit_retirement_state: text().$type<KiloClawCommitRetirementState>(),
-    commit_retirement_final_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
-    commit_retirement_standard_opted_in_at: timestamp({ withTimezone: true, mode: 'string' }),
-    commit_retirement_guarded_at: timestamp({ withTimezone: true, mode: 'string' }),
-    commit_retirement_review_reason: text().$type<KiloClawCommitRetirementReviewReason>(),
     past_due_since: timestamp({ withTimezone: true, mode: 'string' }),
     suspended_at: timestamp({ withTimezone: true, mode: 'string' }),
     destruction_deadline: timestamp({ withTimezone: true, mode: 'string' }),
@@ -6512,13 +6505,10 @@ export const kiloclaw_subscriptions = pgTable(
     index('IDX_kiloclaw_subscriptions_transferred_to').on(table.transferred_to_subscription_id),
     index('IDX_kiloclaw_subscriptions_stripe_schedule_id').on(table.stripe_schedule_id),
     index('IDX_kiloclaw_subscriptions_auto_resume_retry_after').on(table.auto_resume_retry_after),
-    index('IDX_kiloclaw_subscriptions_commit_retirement_guard_sweep')
-      .on(
-        sql`COALESCE(${table.commit_retirement_final_ends_at}, ${table.current_period_end})`,
-        table.id
-      )
+    index('IDX_kiloclaw_subscriptions_active_stripe_commit_boundary')
+      .on(table.commit_ends_at, table.current_period_end, table.id)
       .where(
-        sql`${table.plan} = 'commit' AND ${table.status} = 'active' AND ${table.transferred_to_subscription_id} IS NULL AND ${table.stripe_subscription_id} IS NOT NULL AND ${table.current_period_end} IS NOT NULL AND ${table.commit_retirement_state} IS DISTINCT FROM 'manual_review' AND ${table.commit_retirement_state} IS DISTINCT FROM 'standard_scheduled' AND ${table.commit_retirement_standard_opted_in_at} IS NULL AND ${table.commit_retirement_guarded_at} IS NULL`
+        sql`${table.plan} = 'commit' AND ${table.status} = 'active' AND ${table.transferred_to_subscription_id} IS NULL AND ${table.stripe_subscription_id} IS NOT NULL AND ${table.commit_ends_at} IS NOT NULL AND ${table.current_period_end} IS NOT NULL AND ${table.cancel_at_period_end} = false`
       ),
     check(
       'kiloclaw_subscriptions_price_version_check',
@@ -6535,28 +6525,6 @@ export const kiloclaw_subscriptions = pgTable(
     ),
     enumCheck('kiloclaw_subscriptions_scheduled_by_check', table.scheduled_by, KiloClawScheduledBy),
     enumCheck('kiloclaw_subscriptions_status_check', table.status, KiloClawSubscriptionStatus),
-    enumCheck(
-      'kiloclaw_subscriptions_commit_retirement_state_check',
-      table.commit_retirement_state,
-      KiloClawCommitRetirementState
-    ),
-    enumCheck(
-      'kiloclaw_subscriptions_commit_retirement_review_reason_check',
-      table.commit_retirement_review_reason,
-      KiloClawCommitRetirementReviewReason
-    ),
-    check(
-      'kiloclaw_subscriptions_commit_retirement_standard_consent_check',
-      sql`${table.commit_retirement_state} <> 'standard_scheduled' OR ${table.commit_retirement_standard_opted_in_at} IS NOT NULL`
-    ),
-    check(
-      'kiloclaw_subscriptions_commit_retirement_manual_review_reason_check',
-      sql`${table.commit_retirement_state} <> 'manual_review' OR ${table.commit_retirement_review_reason} IS NOT NULL`
-    ),
-    check(
-      'kiloclaw_subscriptions_commit_retirement_final_boundary_check',
-      sql`${table.commit_retirement_state} NOT IN ('final_term', 'standard_scheduled') OR ${table.commit_retirement_final_ends_at} IS NOT NULL`
-    ),
     enumCheck(
       'kiloclaw_subscriptions_access_origin_check',
       table.access_origin,

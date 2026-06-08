@@ -423,8 +423,6 @@ async function insertFinalCommitFixture(params?: {
       current_period_end: FINAL_COMMIT_END,
       credit_renewal_at: params?.stripeSubscriptionId ? null : FINAL_COMMIT_END,
       commit_ends_at: FINAL_COMMIT_END,
-      commit_retirement_state: 'final_term',
-      commit_retirement_final_ends_at: FINAL_COMMIT_END,
     })
     .returning();
   if (!subscription) throw new Error('Failed to insert final Commit fixture');
@@ -1558,8 +1556,6 @@ describe('subscription center procedures', () => {
     expect(row).toEqual(
       expect.objectContaining({
         cancel_at_period_end: true,
-        commit_retirement_state: 'final_term',
-        commit_retirement_final_ends_at: '2026-11-01 00:00:00+00',
       })
     );
   });
@@ -1588,13 +1584,8 @@ describe('subscription center procedures', () => {
           scheduled_plan: 'standard',
           scheduled_by: 'user',
           cancel_at_period_end: false,
-          commit_retirement_state: 'standard_scheduled',
         })
       );
-      expect(new Date(row.commit_retirement_final_ends_at ?? '').toISOString()).toBe(
-        FINAL_COMMIT_END
-      );
-      expect(row.commit_retirement_standard_opted_in_at).not.toBeNull();
     }
   );
 
@@ -1626,8 +1617,6 @@ describe('subscription center procedures', () => {
         plan: 'commit',
         scheduled_plan: 'standard',
         cancel_at_period_end: false,
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: '2026-11-01 00:00:00+00',
       })
     );
     expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
@@ -1649,12 +1638,7 @@ describe('subscription center procedures', () => {
           current_period_start: '2026-06-06T00:00:00.000Z',
           current_period_end: FINAL_COMMIT_END,
           credit_renewal_at: FINAL_COMMIT_END,
-          ...(reviewKind === 'manual review state'
-            ? {
-                commit_retirement_state: 'manual_review' as const,
-                commit_retirement_review_reason: 'provider_state_mismatch' as const,
-              }
-            : {}),
+          ...(reviewKind === 'manual review state' ? {} : {}),
         })
         .returning();
       if (!subscription) throw new Error('Failed to insert reactivation review fixture');
@@ -1816,11 +1800,7 @@ describe('subscription center procedures', () => {
       expect.objectContaining({
         stripe_schedule_id: 'sched_final_continuation',
         scheduled_plan: 'standard',
-        commit_retirement_state: 'standard_scheduled',
       })
-    );
-    expect(new Date(row.commit_retirement_final_ends_at ?? '').toISOString()).toBe(
-      FINAL_COMMIT_END
     );
   });
 
@@ -1876,13 +1856,8 @@ describe('subscription center procedures', () => {
           scheduled_plan: 'standard',
           pending_conversion: true,
           cancel_at_period_end: true,
-          commit_retirement_state: 'standard_scheduled',
         })
       );
-      expect(new Date(row.commit_retirement_final_ends_at ?? '').toISOString()).toBe(
-        FINAL_COMMIT_END
-      );
-      expect(row.commit_retirement_standard_opted_in_at).not.toBeNull();
     }
   );
 
@@ -2228,8 +2203,6 @@ describe('subscription center procedures', () => {
           scheduled_by: 'user',
           pending_conversion: true,
           cancel_at_period_end: true,
-          commit_retirement_state: 'standard_scheduled',
-          commit_retirement_standard_opted_in_at: '2026-06-07T00:00:00.000Z',
         })
         .where(eq(kiloclaw_subscriptions.instance_id, instance.id));
 
@@ -2249,12 +2222,7 @@ describe('subscription center procedures', () => {
           scheduled_plan: null,
           pending_conversion: false,
           cancel_at_period_end: true,
-          commit_retirement_state: 'final_term',
-          commit_retirement_standard_opted_in_at: null,
         })
-      );
-      expect(new Date(row.commit_retirement_final_ends_at ?? '').toISOString()).toBe(
-        FINAL_COMMIT_END
       );
     }
   );
@@ -2272,7 +2240,6 @@ describe('subscription center procedures', () => {
       current_period_start: '2026-05-01T00:00:00.000Z',
       current_period_end: '2026-06-01T00:00:00.000Z',
       credit_renewal_at: '2026-06-01T00:00:00.000Z',
-      commit_retirement_state: 'pending_final_term',
     });
 
     const caller = await createCallerForUser(user.id);
@@ -2286,8 +2253,6 @@ describe('subscription center procedures', () => {
       expect.objectContaining({
         plan: 'standard',
         scheduled_plan: null,
-        commit_retirement_state: null,
-        commit_retirement_final_ends_at: null,
       })
     );
   });
@@ -3074,7 +3039,6 @@ describe('handleKiloClawSubscriptionUpdated', () => {
         plan: 'commit',
         current_period_start: '2026-05-01 00:00:00+00',
         current_period_end: '2026-11-01 00:00:00+00',
-        commit_retirement_state: 'manual_review',
         cancel_at_period_end: true,
       })
     );
@@ -3090,13 +3054,13 @@ describe('handleKiloClawSubscriptionUpdated', () => {
         stripeSubscriptionId: `sub_manual_review_update_${stripeStatus}`,
         cancelAtPeriodEnd: true,
       });
-      await db
-        .update(kiloclaw_subscriptions)
-        .set({
-          commit_retirement_state: 'manual_review',
-          commit_retirement_review_reason: 'provider_state_mismatch',
-        })
-        .where(eq(kiloclaw_subscriptions.id, existing.id));
+      await db.insert(kiloclaw_commit_retirement_review_cases).values({
+        dedupe_key: `manual_review_update:${existing.id}`,
+        subscription_id: existing.id,
+        stripe_subscription_id: existing.stripe_subscription_id,
+        reason_code: 'provider_state_mismatch',
+        summary: 'Provider state requires review.',
+      });
       const subscription = makeStripeSubscription({
         id: `sub_manual_review_update_${stripeStatus}`,
         metadata: { type: 'kiloclaw', plan: 'standard', kiloUserId: user.id },
@@ -3134,8 +3098,6 @@ describe('handleKiloClawSubscriptionUpdated', () => {
           current_period_start: '2026-05-01 00:00:00+00',
           current_period_end: '2026-11-01 00:00:00+00',
           commit_ends_at: '2026-11-01 00:00:00+00',
-          commit_retirement_state: 'manual_review',
-          commit_retirement_review_reason: 'provider_state_mismatch',
           cancel_at_period_end: true,
         })
       );
@@ -3192,7 +3154,6 @@ describe('handleKiloClawSubscriptionUpdated', () => {
         status: 'active',
         current_period_start: '2026-06-05 00:00:00+00',
         current_period_end: '2026-12-05 00:00:00+00',
-        commit_retirement_state: null,
         cancel_at_period_end: false,
       })
     );
@@ -3351,11 +3312,16 @@ describe('handleKiloClawSubscriptionDeleted', () => {
         current_period_start: FINAL_COMMIT_START,
         current_period_end: FINAL_COMMIT_END,
         credit_renewal_at: FINAL_COMMIT_END,
-        commit_retirement_state: 'manual_review',
-        commit_retirement_review_reason: 'provider_state_mismatch',
       })
       .returning();
     if (!existing) throw new Error('Failed to insert deleted manual-review fixture');
+    await db.insert(kiloclaw_commit_retirement_review_cases).values({
+      dedupe_key: `manual_review_delete:${existing.id}`,
+      subscription_id: existing.id,
+      stripe_subscription_id: existing.stripe_subscription_id,
+      reason_code: 'provider_state_mismatch',
+      summary: 'Provider deletion requires review.',
+    });
     const subscription = makeStripeSubscription({
       id: 'sub_deleted_manual_review',
       metadata: { type: 'kiloclaw', plan: 'commit', kiloUserId: user.id, instanceId: instance.id },
@@ -3379,8 +3345,6 @@ describe('handleKiloClawSubscriptionDeleted', () => {
         plan: 'commit',
         stripe_subscription_id: 'sub_deleted_manual_review',
         cancel_at_period_end: true,
-        commit_retirement_state: 'manual_review',
-        commit_retirement_review_reason: 'provider_state_mismatch',
       })
     );
   });
@@ -4277,7 +4241,6 @@ describe('handleKiloClawScheduleEvent', () => {
       scheduled_by: 'user',
       current_period_start: '2026-05-01T00:00:00.000Z',
       current_period_end: '2026-06-10T00:00:00.000Z',
-      commit_retirement_state: 'pending_final_term',
     });
     const { handleKiloClawScheduleEvent } = await import('@/lib/kiloclaw/stripe-handlers');
 
@@ -4299,10 +4262,8 @@ describe('handleKiloClawScheduleEvent', () => {
         plan: 'standard',
         scheduled_plan: null,
         stripe_schedule_id: null,
-        commit_retirement_state: 'pending_final_term',
       })
     );
-    expect(row.commit_retirement_state).toBe('pending_final_term');
   });
 });
 

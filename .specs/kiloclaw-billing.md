@@ -104,13 +104,14 @@ capitals, as shown here.
 - **Final Commit term**: The one and only Commit term authorized for a
   grandfathered Commit obligation at retirement. Its final boundary may
   move later only through an approved KiloClaw free-month referral reward.
-- **Commit retirement guard**: System-owned non-renewal state applied to a
-  final Commit term. It differs from ordinary user cancellation because an
-  approved referral reward may extend its final boundary.
-- **Manual-review containment**: Durable retirement state that preserves
-  current paid access while blocking renewal and destructive enforcement
-  until an operator resolves missing, conflicting, or forbidden Commit
-  evidence.
+- **Commit retirement guard**: System-owned non-renewal operation applied to a
+  final Commit term through current schedule and cancellation state. It differs
+  from ordinary user cancellation because source evidence shows why it was
+  applied and an approved referral reward may extend its final boundary.
+- **Manual-review containment**: An open Commit retirement review case that
+  preserves current paid access while blocking renewal and destructive
+  enforcement until an operator resolves missing, conflicting, or forbidden
+  Commit evidence. The case is the sole containment marker and reason authority.
 
 ## Overview
 
@@ -305,7 +306,9 @@ lapses, with email notifications at each stage.
    recovery. Checkout-session creation time, webhook arrival time, browser time,
    and query-string values are not confirmation evidence. Qualification MUST be
    evaluated from these canonical sources rather than duplicate qualification
-   fields on the subscription row.
+   fields on the subscription row. `commit_ends_at` is the canonical final
+   boundary. `plan`, `scheduled_plan`, `scheduled_by`, and
+   `cancel_at_period_end` describe current operational state.
 4. Each qualified obligation MUST receive at most one final Commit term. A
    final Commit term MUST NOT renew into another Commit term. Its final
    boundary MAY move later only when an approved KiloClaw free-month reward
@@ -315,11 +318,12 @@ lapses, with email notifications at each stage.
    subscription lineage's price version, and use that lineage's Standard
    price. Standard continuation MUST preserve the current funding source
    unless the customer explicitly accepts Stripe-to-credits conversion.
-6. Standard continuation MUST require durable explicit user consent. Provider
-   schedule shape, cancellation removal, viewing a billing surface, or any
-   inferred behavior MUST NOT count as consent. A customer MAY undo Standard
-   continuation before the boundary; undo MUST clear current consent and
-   restore cancellation at the final Commit boundary, never Commit renewal.
+6. Standard continuation MUST require explicit user consent recorded as
+   `scheduled_plan = 'standard'` and `scheduled_by = 'user'`. Provider schedule
+   shape, cancellation removal, viewing a billing surface, or inferred behavior
+   MUST NOT count as consent. A customer MAY undo Standard continuation before
+   the boundary; undo MUST clear the scheduled Standard state and restore
+   cancellation at the final Commit boundary, never Commit renewal.
 7. Without explicit Standard continuation, a final Commit subscription MUST
    cancel at its final boundary. A pure-credit final term MUST cancel without
    a Commit deduction, bonus projection, auto top-up, past-due transition, or
@@ -337,20 +341,21 @@ lapses, with email notifications at each stage.
     are proven to be the authorized final term, a pre-cutoff confirmed
     checkout, a qualified pending switch, or recovery for a pre-cutoff renewal
     boundary. Standard settlement after a final Commit boundary MUST require
-    durable explicit Standard consent.
+    explicit Standard consent recorded in current schedule state.
 11. A paid post-cutoff Commit term that lacks authorization MUST preserve the
     paid access already granted, block future renewal, and enter manual-review
     containment. Missing, conflicting, or misaligned qualification, boundary,
     schedule, provider, or timeout-after-commit evidence MUST also enter
     manual-review containment rather than guessing.
-12. Manual-review containment MUST block renewal and downstream suspension or
+12. An open Commit retirement review case is the sole containment marker and
+    reason authority. It MUST block renewal and downstream suspension or
     destruction enforcement until resolved. Resolution MAY correct, cancel,
     refund, or recognize an already-paid period as final, but MUST NOT create
     another Commit term.
 13. Runtime enforcement MUST NOT bulk-change active Commit subscriptions or
     provider schedules at the cutoff. Qualification MUST be reconstructed and
     validated from its source-specific canonical authority; no qualification
-    capture or backfill is required.
+    capture, retirement-column backfill, or dual-write agreement is required.
 14. Every KiloClaw billing surface MUST communicate final-term state and offer
     a direct `Continue month-to-month` action. The system MUST NOT add
     retirement-specific transactional emails; customer outreach is a separate
@@ -1165,7 +1170,7 @@ rows renew.
     - If applying a qualified pre-cutoff switch to Commit: set the final
       Commit boundary to six calendar months from the transition date and arm
       final-boundary cancellation.
-    - If switching to Standard: require durable explicit Standard consent,
+    - If switching to Standard: require explicit Standard consent recorded in current schedule state,
       clear the active commitment end date, and complete retirement.
       After the plan change is applied, subsequent sweeps MUST NOT
       reapply it (the cleared scheduled-plan field prevents this).

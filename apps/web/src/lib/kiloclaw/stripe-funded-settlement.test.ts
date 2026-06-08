@@ -286,8 +286,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
     expect(later).toBe(true);
     await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
       current_period_end: '2027-06-05 00:00:00+00',
-      commit_retirement_final_ends_at: '2026-12-05 00:00:00+00',
-      commit_retirement_state: 'manual_review',
+      commit_ends_at: '2026-12-05 00:00:00+00',
       cancel_at_period_end: true,
     });
   });
@@ -312,8 +311,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       current_period_end: '2026-07-01T00:00:00.000Z',
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
-      commit_retirement_state: 'final_term',
-      commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
     });
     const firstDedupeKey = `commit-retirement:forbidden_commit_invoice:${subscriptionId}:episode:1`;
     await createCommitRetirementReviewCase(db, {
@@ -359,7 +356,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
     expect(applied).toBe(true);
     expect(retried).toBe(true);
     await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
-      commit_retirement_state: 'manual_review',
       cancel_at_period_end: true,
     });
     const reviewCases = await db
@@ -398,8 +394,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       current_period_end: '2026-07-01T00:00:00.000Z',
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
-      commit_retirement_state: 'final_term',
-      commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
     });
 
     const applied = await applyStripeFundedKiloClawPeriod({
@@ -420,9 +414,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
       plan: 'commit',
       current_period_end: '2027-01-01 00:00:00+00',
       cancel_at_period_end: true,
-      commit_retirement_state: 'manual_review',
-      commit_retirement_final_ends_at: '2026-07-01 00:00:00+00',
-      commit_retirement_review_reason: 'forbidden_commit_invoice',
+      commit_ends_at: '2026-07-01 00:00:00+00',
     });
     await expect(
       db
@@ -451,8 +443,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       current_period_end: '2026-07-01T00:00:00.000Z',
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
-      commit_retirement_state: 'final_term',
-      commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
     });
 
     const applied = await applyStripeFundedKiloClawPeriod({
@@ -473,8 +463,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       plan: 'standard',
       current_period_end: '2026-08-01 00:00:00+00',
       cancel_at_period_end: true,
-      commit_retirement_state: 'manual_review',
-      commit_retirement_review_reason: 'provider_state_mismatch',
     });
   });
 
@@ -499,9 +487,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       current_period_end: '2026-07-01T00:00:00.000Z',
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
-      commit_retirement_state: 'standard_scheduled',
-      commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
-      commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
     });
 
     const applied = await applyStripeFundedKiloClawPeriod({
@@ -521,8 +506,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       plan: 'standard',
       scheduled_plan: null,
       commit_ends_at: null,
-      commit_retirement_state: 'completed',
-      commit_retirement_review_reason: null,
     });
   });
 
@@ -559,8 +542,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
     expect(applied).toBe(true);
     await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
       plan: 'commit',
-      commit_retirement_state: 'final_term',
-      commit_retirement_final_ends_at: '2026-12-10 00:00:00+00',
+      commit_ends_at: '2026-12-10 00:00:00+00',
     });
   });
 
@@ -598,8 +580,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
     await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
       plan: 'commit',
       cancel_at_period_end: true,
-      commit_retirement_state: 'manual_review',
-      commit_retirement_review_reason: 'forbidden_commit_invoice',
     });
   });
 
@@ -622,8 +602,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       current_period_end: '2026-07-01T00:00:00.000Z',
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
-      commit_retirement_state: 'final_term',
-      commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
     });
 
     const applied = await applyStripeFundedKiloClawPeriod({
@@ -642,8 +620,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
     expect(applied).toBe(true);
     await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
       current_period_end: '2027-01-01 00:00:00+00',
-      commit_retirement_final_ends_at: '2026-07-01 00:00:00+00',
-      commit_retirement_state: 'manual_review',
+      commit_ends_at: '2026-07-01 00:00:00+00',
       cancel_at_period_end: true,
     });
   });
@@ -714,9 +691,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
     await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
       plan: 'commit',
       current_period_end: '2026-12-10 00:00:00+00',
-      commit_retirement_state: 'manual_review',
-      commit_retirement_final_ends_at: '2026-12-10 00:00:00+00',
-      commit_retirement_review_reason: 'provider_outcome_unknown',
+      commit_ends_at: '2026-12-10 00:00:00+00',
       cancel_at_period_end: true,
     });
     const transactions = await db
@@ -743,7 +718,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       status: 'active',
       current_period_start: '2026-04-01T00:00:00.000Z',
       current_period_end: '2026-05-01T00:00:00.000Z',
-      commit_retirement_state: 'pending_final_term',
     });
 
     const applied = await applyStripeFundedKiloClawPeriod({
@@ -754,6 +728,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
       plan: 'commit',
       priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 12_340_000,
+      checkoutConfirmedAt: '2026-06-05T12:00:00.000Z',
       periodStart: '2026-06-10T12:00:00.000Z',
       periodEnd: '2026-12-10T12:00:00.000Z',
     });

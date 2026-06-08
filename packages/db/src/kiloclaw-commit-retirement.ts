@@ -1,11 +1,11 @@
 import {
   KiloClawCommitRetirementQualificationSource,
-  KiloClawCommitRetirementState,
   KiloClawPlan,
+  KiloClawScheduledBy,
   KiloClawScheduledPlan,
   type KiloClawCommitRetirementQualificationSource as KiloClawCommitRetirementQualificationSourceType,
-  type KiloClawCommitRetirementState as KiloClawCommitRetirementStateType,
   type KiloClawPlan as KiloClawPlanType,
+  type KiloClawScheduledBy as KiloClawScheduledByType,
   type KiloClawScheduledPlan as KiloClawScheduledPlanType,
 } from './schema-types';
 
@@ -19,13 +19,14 @@ type Timestamp = string | Date;
 export type KiloClawCommitRetirementEvidence = {
   plan: KiloClawPlanType;
   scheduledPlan?: KiloClawScheduledPlanType | null;
+  scheduledBy?: KiloClawScheduledByType | null;
   currentPeriodStart?: Timestamp | null;
   currentPeriodEnd?: Timestamp | null;
-  retirementState?: KiloClawCommitRetirementStateType | null;
+  commitEndsAt?: Timestamp | null;
   qualifiedAt?: Timestamp | null;
   qualificationSource?: KiloClawCommitRetirementQualificationSourceType | null;
-  finalEndsAt?: Timestamp | null;
-  standardOptedInAt?: Timestamp | null;
+  hasOpenReview?: boolean;
+  hasStandardConsent?: boolean;
 };
 
 export type KiloClawCommitTermClassification =
@@ -50,7 +51,6 @@ export type KiloClawCommitUserFacingRetirementState =
   | 'pending_final_term'
   | 'final_term_cancels'
   | 'standard_scheduled'
-  | 'completed'
   | 'manual_review';
 
 export function maySelectKiloClawCommit(now: Timestamp): boolean {
@@ -64,58 +64,15 @@ export function isBeforeKiloClawCommitSalesCutoff(timestamp: Timestamp): boolean
 export function classifyKiloClawCommitTerm(
   evidence: KiloClawCommitRetirementEvidence
 ): KiloClawCommitTermClassification {
-  if (evidence.retirementState === KiloClawCommitRetirementState.ManualReview) {
-    return 'ambiguous';
-  }
-
-  if (evidence.retirementState === KiloClawCommitRetirementState.PendingFinalTerm) {
-    const scheduledPlanIsConsistent =
-      evidence.scheduledPlan === null ||
-      evidence.scheduledPlan === undefined ||
-      evidence.scheduledPlan === KiloClawScheduledPlan.Commit;
-    return evidence.plan === KiloClawPlan.Standard &&
-      scheduledPlanIsConsistent &&
-      evidence.qualificationSource ===
-        KiloClawCommitRetirementQualificationSource.SwitchRequestedBeforeCutoff &&
-      hasValidPreCutoffQualification(evidence)
-      ? 'pending_final_term'
-      : 'ambiguous';
-  }
-
-  if (
-    evidence.retirementState === KiloClawCommitRetirementState.FinalTerm ||
-    evidence.retirementState === KiloClawCommitRetirementState.StandardScheduled
-  ) {
-    const hasRequiredStandardConsent =
-      evidence.retirementState !== KiloClawCommitRetirementState.StandardScheduled ||
-      Boolean(evidence.standardOptedInAt);
-    const hasQualificationEvidence = Boolean(evidence.qualifiedAt || evidence.qualificationSource);
-    return evidence.plan === KiloClawPlan.Commit &&
-      evidence.finalEndsAt &&
-      hasRequiredStandardConsent &&
-      (!hasQualificationEvidence || hasValidPreCutoffQualification(evidence))
-      ? 'final_term'
-      : 'ambiguous';
-  }
-
-  if (evidence.retirementState === KiloClawCommitRetirementState.Completed) {
-    return 'not_involved';
-  }
-
-  if (evidence.retirementState) {
-    return 'ambiguous';
-  }
+  if (evidence.hasOpenReview) return 'ambiguous';
 
   if (evidence.plan === KiloClawPlan.Commit) {
-    if (!evidence.currentPeriodStart || !evidence.currentPeriodEnd) {
+    if (!evidence.currentPeriodStart || !evidence.currentPeriodEnd || !evidence.commitEndsAt) {
       return 'ambiguous';
     }
-
-    if (isBeforeKiloClawCommitSalesCutoff(evidence.currentPeriodStart)) {
-      return 'final_term';
-    }
-
-    return hasValidPreCutoffQualification(evidence) ? 'final_term' : 'ambiguous';
+    return optionalIso(evidence.currentPeriodEnd) === optionalIso(evidence.commitEndsAt)
+      ? 'final_term'
+      : 'ambiguous';
   }
 
   if (evidence.scheduledPlan === KiloClawScheduledPlan.Commit) {
@@ -126,44 +83,37 @@ export function classifyKiloClawCommitTerm(
 }
 
 export function deriveKiloClawCommitFinalBoundary(input: {
-  durableFinalEndsAt?: Timestamp | null;
-  localPeriodEndsAt?: Timestamp | null;
+  commitEndsAt?: Timestamp | null;
+  currentPeriodEndsAt?: Timestamp | null;
   providerPeriodEndsAt?: Timestamp | null;
   allowLocalOnly?: boolean;
 }): KiloClawCommitFinalBoundaryResult {
-  const durable = optionalIso(input.durableFinalEndsAt);
-  const local = optionalIso(input.localPeriodEndsAt);
+  const commit = optionalIso(input.commitEndsAt);
+  const local = optionalIso(input.currentPeriodEndsAt);
   const provider = optionalIso(input.providerPeriodEndsAt);
 
   if (local && provider && local !== provider) {
     return { kind: 'conflicting', localEndsAt: local, providerEndsAt: provider };
   }
+  if (!commit) return { kind: 'missing' };
+  if (!local && !provider) return { kind: 'missing' };
 
-  if (durable) {
-    if (!local && !provider) return { kind: 'missing' };
-
-    const verifiedEvidence = local ?? provider;
-    if (verifiedEvidence !== durable) {
-      return {
-        kind: 'conflicting',
-        localEndsAt: local ?? durable,
-        providerEndsAt: provider ?? durable,
-      };
-    }
-    return { kind: 'verified', finalEndsAt: durable };
+  const verifiedEvidence = local ?? provider;
+  if (verifiedEvidence !== commit) {
+    return {
+      kind: 'conflicting',
+      localEndsAt: local ?? commit,
+      providerEndsAt: provider ?? commit,
+    };
   }
-
-  if (local && input.allowLocalOnly && !provider) {
-    return { kind: 'verified', finalEndsAt: local };
-  }
-  if (!local || !provider) return { kind: 'missing' };
-  return { kind: 'verified', finalEndsAt: local };
+  if (!provider && !input.allowLocalOnly) return { kind: 'missing' };
+  return { kind: 'verified', finalEndsAt: commit };
 }
 
 export function classifyKiloClawCommitInvoice(input: {
   invoicePeriodStart: Timestamp;
   invoicePeriodEnd: Timestamp;
-  finalEndsAt?: Timestamp | null;
+  commitEndsAt?: Timestamp | null;
   qualifiedAt?: Timestamp | null;
   qualificationSource?: KiloClawCommitRetirementQualificationSourceType | null;
 }): KiloClawCommitInvoiceAuthorization {
@@ -171,17 +121,13 @@ export function classifyKiloClawCommitInvoice(input: {
   const periodEnd = timestampMillis(input.invoicePeriodEnd);
   if (periodEnd <= periodStart) return 'ambiguous';
 
-  if (input.finalEndsAt) {
-    const finalEndsAt = timestampMillis(input.finalEndsAt);
-    if (periodEnd === finalEndsAt) return 'authorized_final_term';
-    if (periodStart >= finalEndsAt) return 'forbidden_renewal';
+  if (input.commitEndsAt) {
+    const commitEndsAt = timestampMillis(input.commitEndsAt);
+    if (periodEnd === commitEndsAt) return 'authorized_final_term';
+    if (periodStart >= commitEndsAt) return 'forbidden_renewal';
     return 'ambiguous';
   }
-
-  if (periodStart < timestampMillis(KILOCLAW_COMMIT_SALES_CUTOFF)) {
-    return 'pre_cutoff_recovery';
-  }
-
+  if (periodStart < timestampMillis(KILOCLAW_COMMIT_SALES_CUTOFF)) return 'pre_cutoff_recovery';
   if (
     input.qualifiedAt &&
     input.qualificationSource &&
@@ -189,52 +135,48 @@ export function classifyKiloClawCommitInvoice(input: {
   ) {
     return 'authorized_final_term';
   }
-
   return 'forbidden_renewal';
 }
 
 export function isKiloClawCommitStripeGuardDue(input: {
   now: Timestamp;
-  finalEndsAt: Timestamp;
-  guardedAt?: Timestamp | null;
-  standardOptedInAt?: Timestamp | null;
+  commitEndsAt: Timestamp;
+  cancelAtPeriodEnd: boolean;
+  hasStandardConsent: boolean;
 }): boolean {
-  if (input.guardedAt || input.standardOptedInAt) return false;
-
+  if (input.cancelAtPeriodEnd || input.hasStandardConsent) return false;
   const now = timestampMillis(input.now);
-  const finalEndsAt = timestampMillis(input.finalEndsAt);
-  return now < finalEndsAt && now >= finalEndsAt - STRIPE_GUARD_LEAD_MS;
+  const commitEndsAt = timestampMillis(input.commitEndsAt);
+  return now < commitEndsAt && now >= commitEndsAt - STRIPE_GUARD_LEAD_MS;
 }
 
 export function getKiloClawCommitUserFacingRetirementState(
   evidence: KiloClawCommitRetirementEvidence
 ): KiloClawCommitUserFacingRetirementState {
-  if (evidence.retirementState === KiloClawCommitRetirementState.ManualReview)
-    return 'manual_review';
-  if (evidence.retirementState === KiloClawCommitRetirementState.Completed) return 'completed';
-
   const classification = classifyKiloClawCommitTerm(evidence);
   if (classification === 'ambiguous') return 'manual_review';
   if (classification === 'pending_final_term') return 'pending_final_term';
   if (classification === 'not_involved') return 'not_involved';
+  return hasStandardConsent(evidence) ? 'standard_scheduled' : 'final_term_cancels';
+}
 
-  return evidence.standardOptedInAt ||
-    evidence.retirementState === KiloClawCommitRetirementState.StandardScheduled
-    ? 'standard_scheduled'
-    : 'final_term_cancels';
+function hasStandardConsent(evidence: KiloClawCommitRetirementEvidence): boolean {
+  return (
+    evidence.hasStandardConsent === true ||
+    (evidence.scheduledPlan === KiloClawScheduledPlan.Standard &&
+      evidence.scheduledBy === KiloClawScheduledBy.User)
+  );
 }
 
 function hasValidPreCutoffQualification(evidence: KiloClawCommitRetirementEvidence): boolean {
   if (!evidence.qualifiedAt || !evidence.qualificationSource) return false;
   if (!isBeforeKiloClawCommitSalesCutoff(evidence.qualifiedAt)) return false;
-
   if (evidence.scheduledPlan === KiloClawScheduledPlan.Commit) {
     return (
       evidence.qualificationSource ===
       KiloClawCommitRetirementQualificationSource.SwitchRequestedBeforeCutoff
     );
   }
-
   return true;
 }
 

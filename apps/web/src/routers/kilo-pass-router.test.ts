@@ -2118,7 +2118,6 @@ describe('kiloPassRouter', () => {
         .limit(1);
       expect(hosting).toMatchObject({
         plan: 'commit',
-        commit_retirement_state: 'final_term',
       });
     });
 

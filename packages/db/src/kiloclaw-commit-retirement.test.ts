@@ -12,10 +12,17 @@ import {
 } from './kiloclaw-commit-retirement';
 import {
   KiloClawCommitRetirementQualificationSource,
-  KiloClawCommitRetirementState,
   KiloClawPlan,
+  KiloClawScheduledBy,
   KiloClawScheduledPlan,
 } from './schema-types';
+
+const finalCommit = {
+  plan: KiloClawPlan.Commit,
+  currentPeriodStart: '2026-05-01T00:00:00.000Z',
+  currentPeriodEnd: '2026-11-01T00:00:00.000Z',
+  commitEndsAt: '2026-11-01T00:00:00.000Z',
+} as const;
 
 describe('KiloClaw Commit retirement policy', () => {
   it('enforces exclusive cutoff boundary', () => {
@@ -24,20 +31,12 @@ describe('KiloClaw Commit retirement policy', () => {
     expect(isBeforeKiloClawCommitSalesCutoff('2026-06-06T00:00:00.001Z')).toBe(false);
   });
 
-  it('classifies active-at-cutoff and qualified pending final terms', () => {
-    expect(
-      classifyKiloClawCommitTerm({
-        plan: KiloClawPlan.Commit,
-        currentPeriodStart: '2026-05-01T00:00:00.000Z',
-        currentPeriodEnd: '2026-11-01T00:00:00.000Z',
-      })
-    ).toBe('final_term');
-
+  it('classifies final and qualified pending terms from operational evidence', () => {
+    expect(classifyKiloClawCommitTerm(finalCommit)).toBe('final_term');
     expect(
       classifyKiloClawCommitTerm({
         plan: KiloClawPlan.Standard,
         scheduledPlan: KiloClawScheduledPlan.Commit,
-        retirementState: KiloClawCommitRetirementState.PendingFinalTerm,
         qualifiedAt: '2026-06-05T23:59:59.999Z',
         qualificationSource:
           KiloClawCommitRetirementQualificationSource.SwitchRequestedBeforeCutoff,
@@ -45,136 +44,65 @@ describe('KiloClaw Commit retirement policy', () => {
     ).toBe('pending_final_term');
   });
 
-  it('keeps durable pending-final classification after schedule tracking clears', () => {
-    const durablePendingEvidence = {
-      plan: KiloClawPlan.Standard,
-      retirementState: KiloClawCommitRetirementState.PendingFinalTerm,
-      qualifiedAt: '2026-06-05T23:59:59.999Z',
-      qualificationSource: KiloClawCommitRetirementQualificationSource.SwitchRequestedBeforeCutoff,
-    } as const;
-
-    expect(classifyKiloClawCommitTerm(durablePendingEvidence)).toBe('pending_final_term');
+  it('fails closed for review cases and missing or mismatched boundaries', () => {
+    expect(classifyKiloClawCommitTerm({ ...finalCommit, hasOpenReview: true })).toBe('ambiguous');
+    expect(classifyKiloClawCommitTerm({ ...finalCommit, commitEndsAt: null })).toBe('ambiguous');
     expect(
       classifyKiloClawCommitTerm({
-        ...durablePendingEvidence,
-        scheduledPlan: KiloClawScheduledPlan.Standard,
+        ...finalCommit,
+        currentPeriodEnd: '2026-12-01T00:00:00.000Z',
       })
     ).toBe('ambiguous');
   });
 
-  it('trusts complete durable states and rejects conflicting persisted evidence', () => {
-    expect(
-      classifyKiloClawCommitTerm({
-        plan: KiloClawPlan.Commit,
-        retirementState: KiloClawCommitRetirementState.FinalTerm,
-        finalEndsAt: '2026-11-01T00:00:00.000Z',
-      })
-    ).toBe('final_term');
-
-    expect(
-      classifyKiloClawCommitTerm({
-        plan: KiloClawPlan.Commit,
-        retirementState: KiloClawCommitRetirementState.StandardScheduled,
-        finalEndsAt: '2026-11-01T00:00:00.000Z',
-        standardOptedInAt: '2026-06-07T00:00:00.000Z',
-      })
-    ).toBe('final_term');
-
-    expect(
-      classifyKiloClawCommitTerm({
-        plan: KiloClawPlan.Commit,
-        retirementState: KiloClawCommitRetirementState.StandardScheduled,
-        finalEndsAt: '2026-11-01T00:00:00.000Z',
-        qualifiedAt: '2026-05-01T00:00:00.000Z',
-        qualificationSource: KiloClawCommitRetirementQualificationSource.ActiveAtCutoff,
-      })
-    ).toBe('ambiguous');
-
-    expect(
-      classifyKiloClawCommitTerm({
-        plan: KiloClawPlan.Commit,
-        retirementState: KiloClawCommitRetirementState.FinalTerm,
-        finalEndsAt: '2026-11-01T00:00:00.000Z',
-        qualifiedAt: '2026-05-01T00:00:00.000Z',
-        qualificationSource: KiloClawCommitRetirementQualificationSource.ActiveAtCutoff,
-      })
-    ).toBe('final_term');
-
-    expect(
-      classifyKiloClawCommitTerm({
-        plan: KiloClawPlan.Commit,
-        retirementState: KiloClawCommitRetirementState.FinalTerm,
-        finalEndsAt: '2026-11-01T00:00:00.000Z',
-        qualifiedAt: KILOCLAW_COMMIT_SALES_CUTOFF,
-        qualificationSource: KiloClawCommitRetirementQualificationSource.ActiveAtCutoff,
-      })
-    ).toBe('ambiguous');
-  });
-
-  it('treats unqualified post-cutoff Commit terms as ambiguous', () => {
-    expect(
-      classifyKiloClawCommitTerm({
-        plan: KiloClawPlan.Commit,
-        currentPeriodStart: KILOCLAW_COMMIT_SALES_CUTOFF,
-        currentPeriodEnd: '2026-12-06T00:00:00.000Z',
-      })
-    ).toBe('ambiguous');
-  });
-
-  it('requires local or provider evidence for a durable final boundary', () => {
+  it('uses commit_ends_at as canonical final boundary', () => {
     expect(
       deriveKiloClawCommitFinalBoundary({
-        durableFinalEndsAt: '2026-11-01T00:00:00.000Z',
+        commitEndsAt: finalCommit.commitEndsAt,
+        currentPeriodEndsAt: finalCommit.currentPeriodEnd,
+        providerPeriodEndsAt: finalCommit.currentPeriodEnd,
       })
-    ).toEqual({ kind: 'missing' });
-  });
-
-  it('requires matching local and provider evidence for final boundary', () => {
+    ).toEqual({ kind: 'verified', finalEndsAt: finalCommit.commitEndsAt });
     expect(
       deriveKiloClawCommitFinalBoundary({
-        localPeriodEndsAt: '2026-11-01T00:00:00.000Z',
-        providerPeriodEndsAt: '2026-11-01T00:00:00.000Z',
+        commitEndsAt: finalCommit.commitEndsAt,
+        currentPeriodEndsAt: finalCommit.currentPeriodEnd,
       })
-    ).toEqual({ kind: 'verified', finalEndsAt: '2026-11-01T00:00:00.000Z' });
-
-    expect(
-      deriveKiloClawCommitFinalBoundary({ localPeriodEndsAt: '2026-11-01T00:00:00.000Z' })
     ).toEqual({ kind: 'missing' });
     expect(
       deriveKiloClawCommitFinalBoundary({
-        localPeriodEndsAt: '2026-11-01T00:00:00.000Z',
+        commitEndsAt: finalCommit.commitEndsAt,
+        currentPeriodEndsAt: finalCommit.currentPeriodEnd,
         allowLocalOnly: true,
       })
-    ).toEqual({ kind: 'verified', finalEndsAt: '2026-11-01T00:00:00.000Z' });
-
+    ).toEqual({ kind: 'verified', finalEndsAt: finalCommit.commitEndsAt });
     expect(
       deriveKiloClawCommitFinalBoundary({
-        localPeriodEndsAt: '2026-11-01T00:00:00.000Z',
+        commitEndsAt: finalCommit.commitEndsAt,
+        currentPeriodEndsAt: finalCommit.currentPeriodEnd,
         providerPeriodEndsAt: '2026-12-01T00:00:00.000Z',
       })
     ).toEqual({
       kind: 'conflicting',
-      localEndsAt: '2026-11-01T00:00:00.000Z',
+      localEndsAt: finalCommit.currentPeriodEnd,
       providerEndsAt: '2026-12-01T00:00:00.000Z',
     });
   });
 
-  it('classifies authorized final invoices, pre-cutoff recovery, and forbidden renewal', () => {
+  it('classifies invoice authorization against commit_ends_at', () => {
     expect(
       classifyKiloClawCommitInvoice({
         invoicePeriodStart: '2026-06-01T00:00:00.000Z',
         invoicePeriodEnd: '2026-12-01T00:00:00.000Z',
-        finalEndsAt: '2026-12-01T00:00:00.000Z',
+        commitEndsAt: '2026-12-01T00:00:00.000Z',
       })
     ).toBe('authorized_final_term');
-
     expect(
       classifyKiloClawCommitInvoice({
         invoicePeriodStart: '2026-06-05T00:00:00.000Z',
         invoicePeriodEnd: '2026-12-05T00:00:00.000Z',
       })
     ).toBe('pre_cutoff_recovery');
-
     expect(
       classifyKiloClawCommitInvoice({
         invoicePeriodStart: KILOCLAW_COMMIT_SALES_CUTOFF,
@@ -183,40 +111,34 @@ describe('KiloClaw Commit retirement policy', () => {
     ).toBe('forbidden_renewal');
   });
 
-  it('starts Stripe guard exactly 30 days before final boundary', () => {
-    const finalEndsAt = '2026-11-01T00:00:00.000Z';
-    expect(isKiloClawCommitStripeGuardDue({ now: '2026-10-01T23:59:59.999Z', finalEndsAt })).toBe(
+  it('starts guard exactly 30 days before boundary unless canceled or continuing', () => {
+    const input = {
+      commitEndsAt: finalCommit.commitEndsAt,
+      cancelAtPeriodEnd: false,
+      hasStandardConsent: false,
+    };
+    expect(isKiloClawCommitStripeGuardDue({ ...input, now: '2026-10-01T23:59:59.999Z' })).toBe(
       false
     );
-    expect(isKiloClawCommitStripeGuardDue({ now: '2026-10-02T00:00:00.000Z', finalEndsAt })).toBe(
+    expect(isKiloClawCommitStripeGuardDue({ ...input, now: '2026-10-02T00:00:00.000Z' })).toBe(
       true
     );
     expect(
       isKiloClawCommitStripeGuardDue({
+        ...input,
         now: '2026-10-02T00:00:00.000Z',
-        finalEndsAt,
-        standardOptedInAt: '2026-09-01T00:00:00.000Z',
+        cancelAtPeriodEnd: true,
       })
     ).toBe(false);
   });
 
-  it('derives user-facing state without mutation', () => {
+  it('derives Standard consent from user-scheduled Standard', () => {
+    expect(getKiloClawCommitUserFacingRetirementState(finalCommit)).toBe('final_term_cancels');
     expect(
       getKiloClawCommitUserFacingRetirementState({
-        plan: KiloClawPlan.Commit,
-        currentPeriodStart: '2026-05-01T00:00:00.000Z',
-        currentPeriodEnd: '2026-11-01T00:00:00.000Z',
-      })
-    ).toBe('final_term_cancels');
-
-    expect(
-      getKiloClawCommitUserFacingRetirementState({
-        plan: KiloClawPlan.Commit,
-        retirementState: KiloClawCommitRetirementState.StandardScheduled,
-        finalEndsAt: '2026-11-01T00:00:00.000Z',
-        standardOptedInAt: '2026-06-07T00:00:00.000Z',
-        qualifiedAt: '2026-05-01T00:00:00.000Z',
-        qualificationSource: KiloClawCommitRetirementQualificationSource.ActiveAtCutoff,
+        ...finalCommit,
+        scheduledPlan: KiloClawScheduledPlan.Standard,
+        scheduledBy: KiloClawScheduledBy.User,
       })
     ).toBe('standard_scheduled');
   });

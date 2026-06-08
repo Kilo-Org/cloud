@@ -86,11 +86,6 @@ function formatPlanLabel(plan: Subscription['plan']) {
   return plan.charAt(0).toUpperCase() + plan.slice(1);
 }
 
-function formatRetirementLabel(value: string | null | undefined) {
-  if (!value) return '—';
-  return value.replaceAll('_', ' ');
-}
-
 function formatScopeLabel(type: 'personal' | 'organization') {
   return type === 'personal' ? 'Personal' : 'Organization';
 }
@@ -604,55 +599,48 @@ function getRelevantFields(
       value: <DateWithRelative date={sub.destruction_deadline} severity="warn" withTime />,
     });
   }
-  if (sub.commit_retirement_state || sub.plan === 'commit') {
+  if (sub.plan === 'commit' || sub.scheduled_plan === 'commit') {
+    const pendingFinalTerm = sub.plan === 'standard' && sub.scheduled_plan === 'commit';
+    const standardConsent = sub.scheduled_plan === 'standard' && sub.scheduled_by === 'user';
     fields.push({
-      label: 'Retirement state',
-      value: formatRetirementLabel(sub.commit_retirement_state),
+      label: 'Commit retirement',
+      value: pendingFinalTerm
+        ? 'Pending final term'
+        : standardConsent
+          ? 'Standard scheduled'
+          : sub.cancel_at_period_end
+            ? 'Final term non-renewing'
+            : 'Final term',
     });
     fields.push({
       label: 'Qualification authority',
-      value:
-        sub.commit_retirement_state === 'pending_final_term' ? (
-          'Subscription change log'
-        ) : sub.plan === 'commit' && sub.current_period_start ? (
-          <span>
-            Current period{' '}
-            <span className="text-muted-foreground text-xs">
-              ({formatDate(sub.current_period_start)})
-            </span>
+      value: pendingFinalTerm ? (
+        'Subscription change log'
+      ) : sub.plan === 'commit' && sub.current_period_start ? (
+        <span>
+          Current period{' '}
+          <span className="text-muted-foreground text-xs">
+            ({formatDate(sub.current_period_start)})
           </span>
-        ) : (
-          '—'
-        ),
+        </span>
+      ) : (
+        '—'
+      ),
     });
     fields.push({
-      label: 'Authorized final boundary',
+      label: 'Final term boundary',
       value: (
-        <DateWithRelative date={sub.commit_retirement_final_ends_at} severity="warn" withTime />
+        <DateWithRelative
+          date={sub.commit_ends_at ?? sub.current_period_end}
+          severity="warn"
+          withTime
+        />
       ),
     });
     fields.push({
       label: 'Standard consent',
-      value: sub.commit_retirement_standard_opted_in_at ? (
-        <DateWithRelative date={sub.commit_retirement_standard_opted_in_at} withTime />
-      ) : (
-        'not recorded'
-      ),
+      value: standardConsent ? 'Recorded by user schedule' : 'Not recorded',
     });
-    fields.push({
-      label: 'Retirement guard',
-      value: sub.commit_retirement_guarded_at ? (
-        <DateWithRelative date={sub.commit_retirement_guarded_at} withTime />
-      ) : (
-        'not applied'
-      ),
-    });
-    if (sub.commit_retirement_review_reason) {
-      fields.push({
-        label: 'Review reason',
-        value: <span className="font-mono text-xs">{sub.commit_retirement_review_reason}</span>,
-      });
-    }
   }
 
   if (sub.scheduled_plan) {

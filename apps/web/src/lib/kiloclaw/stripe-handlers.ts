@@ -2,11 +2,10 @@ import 'server-only';
 
 import type Stripe from 'stripe';
 import { eq, and, isNull, sql } from 'drizzle-orm';
-import { addMonths } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
 import {
-  classifyKiloClawCommitTerm,
+  findOpenCommitRetirementReviewCase,
   insertKiloClawSubscriptionChangeLog,
   isKiloClawPriceVersion,
   type KiloClawCommitRetirementReviewReason,
@@ -1135,20 +1134,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
       .where(eq(kiloclaw_subscriptions.id, existingRow.id))
       .limit(1);
 
-    // For commit plans, derive commit_ends_at. Pre-launch subscriptions
-    // had a delayed-billing trial_end — the 6-month commit term starts
-    // after the trial boundary, not at subscription creation time.
-    const commitEndsAt =
-      plan === 'commit'
-        ? addMonths(
-            subscription.trial_end
-              ? new Date(subscription.trial_end * 1000)
-              : periods.current_period_start
-                ? new Date(periods.current_period_start)
-                : new Date(),
-            6
-          ).toISOString()
-        : null;
+    const commitEndsAt = plan === 'commit' ? periods.current_period_end : null;
 
     const [afterSubscription] = await tx
       .update(kiloclaw_subscriptions)
@@ -1163,13 +1149,6 @@ export async function handleKiloClawSubscriptionCreated(params: {
         current_period_end: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.current_period_end} ELSE ${periods.current_period_end}::timestamptz END`,
         credit_renewal_at: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.credit_renewal_at} ELSE NULL END`,
         commit_ends_at: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.commit_ends_at} ELSE ${commitEndsAt}::timestamptz END`,
-        ...(plan === 'commit'
-          ? {
-              commit_retirement_state: 'final_term' as const,
-              commit_retirement_final_ends_at: commitEndsAt,
-              commit_retirement_review_reason: null,
-            }
-          : {}),
         past_due_since: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.past_due_since} ELSE NULL END`,
         suspended_at: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.suspended_at} ELSE NULL END`,
         destruction_deadline: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.destruction_deadline} ELSE NULL END`,
@@ -1315,7 +1294,10 @@ export async function handleKiloClawSubscriptionUpdated(params: {
     .from(kiloclaw_subscriptions)
     .where(eq(kiloclaw_subscriptions.id, preRead.id))
     .limit(1);
-  if (currentRow?.commit_retirement_state === 'manual_review') {
+  const openReviewCase = currentRow
+    ? await findOpenCommitRetirementReviewCase(db, currentRow.id)
+    : null;
+  if (currentRow && openReviewCase) {
     if (subscription.status !== 'canceled' && subscription.status !== 'incomplete_expired') {
       await containProviderNonRenewal({
         stripeSubscriptionId: subscription.id,
@@ -1334,28 +1316,16 @@ export async function handleKiloClawSubscriptionUpdated(params: {
   const incomingCommitStartsPostCutoff =
     !periods.current_period_start ||
     !isBeforeKiloClawCommitSalesCutoff(periods.current_period_start);
-  const currentCommitClassification = currentRow
-    ? classifyKiloClawCommitTerm({
-        plan: currentRow.plan,
-        scheduledPlan: currentRow.scheduled_plan,
-        currentPeriodStart: currentRow.current_period_start,
-        currentPeriodEnd: currentRow.current_period_end,
-        retirementState: currentRow.commit_retirement_state,
-        qualifiedAt: currentRow.current_period_start,
-        qualificationSource:
-          currentRow.plan === 'commit' &&
-          currentRow.current_period_start &&
-          isBeforeKiloClawCommitSalesCutoff(currentRow.current_period_start)
-            ? 'active_at_cutoff'
-            : null,
-        finalEndsAt: currentRow.commit_retirement_final_ends_at,
-        standardOptedInAt: currentRow.commit_retirement_standard_opted_in_at,
-      })
-    : null;
+  const currentCommitIsAmbiguous =
+    currentRow?.plan === 'commit' &&
+    (!currentRow.current_period_start ||
+      !currentRow.current_period_end ||
+      !currentRow.commit_ends_at ||
+      !timestampsEqual(currentRow.commit_ends_at, currentRow.current_period_end));
   const incomingExtendsVerifiedFinalBoundary =
-    currentRow?.commit_retirement_final_ends_at && periods.current_period_end
+    currentRow?.commit_ends_at && periods.current_period_end
       ? new Date(periods.current_period_end).getTime() >
-        new Date(currentRow.commit_retirement_final_ends_at).getTime()
+        new Date(currentRow.commit_ends_at).getTime()
       : false;
   const incomingStartsAtOrAfterExistingBoundary =
     currentRow?.plan === 'commit' &&
@@ -1373,7 +1343,7 @@ export async function handleKiloClawSubscriptionUpdated(params: {
     plan === 'commit' &&
     currentRow &&
     !qualifiedPreCutoffRecovery &&
-    ((incomingCommitStartsPostCutoff && currentCommitClassification === 'ambiguous') ||
+    ((incomingCommitStartsPostCutoff && currentCommitIsAmbiguous) ||
       incomingExtendsVerifiedFinalBoundary ||
       incomingStartsAtOrAfterExistingBoundary);
   if (unqualifiedCommitUpdate && currentRow) {
@@ -1397,13 +1367,12 @@ export async function handleKiloClawSubscriptionUpdated(params: {
   const retirementInvolvedStandardWithoutConsent =
     plan === 'standard' &&
     currentRow !== undefined &&
-    (currentRow.plan === 'commit' || currentRow.commit_retirement_state !== null) &&
+    (currentRow.plan === 'commit' || currentRow.commit_ends_at !== null) &&
     !(
-      currentRow.commit_retirement_state === 'standard_scheduled' &&
-      currentRow.commit_retirement_standard_opted_in_at &&
-      currentRow.commit_retirement_final_ends_at &&
+      currentRow.scheduled_plan === 'standard' &&
+      currentRow.scheduled_by === 'user' &&
       periods.current_period_start &&
-      timestampsEqual(currentRow.commit_retirement_final_ends_at, periods.current_period_start)
+      timestampsEqual(currentRow.commit_ends_at, periods.current_period_start)
     );
   if (retirementInvolvedStandardWithoutConsent && currentRow) {
     await db.transaction(async tx => {
@@ -1617,7 +1586,7 @@ export async function handleKiloClawSubscriptionDeleted(params: {
 
     const targetRow = resolvedTarget.subscription;
 
-    if (targetRow.commit_retirement_state === 'manual_review') {
+    if (await findOpenCommitRetirementReviewCase(tx, targetRow.id)) {
       logInfo('KiloClaw subscription.deleted preserved manual-review subscription state', {
         stripe_event_id: eventId,
         user_id: targetRow.user_id,
@@ -1634,8 +1603,7 @@ export async function handleKiloClawSubscriptionDeleted(params: {
     if (targetRow.pending_conversion) {
       if (
         targetRow.plan === 'commit' &&
-        (targetRow.commit_retirement_state !== 'standard_scheduled' ||
-          !targetRow.commit_retirement_standard_opted_in_at)
+        (targetRow.scheduled_plan !== 'standard' || targetRow.scheduled_by !== 'user')
       ) {
         await putKiloClawCommitRetirementInReview({
           tx,
@@ -1665,9 +1633,11 @@ export async function handleKiloClawSubscriptionDeleted(params: {
           credit_renewal_at: targetRow.current_period_end,
           cancel_at_period_end: false,
           pending_conversion: false,
-          scheduled_plan:
-            targetRow.commit_retirement_state === 'standard_scheduled' ? 'standard' : null,
-          scheduled_by: targetRow.commit_retirement_state === 'standard_scheduled' ? 'user' : null,
+          scheduled_plan: targetRow.scheduled_plan === 'standard' ? 'standard' : null,
+          scheduled_by:
+            targetRow.scheduled_plan === 'standard' && targetRow.scheduled_by === 'user'
+              ? 'user'
+              : null,
           stripe_schedule_id: null,
         })
         .where(eq(kiloclaw_subscriptions.id, targetRow.id))

@@ -35,7 +35,7 @@ import {
   CURRENT_KILOCLAW_PRICE_VERSION,
   classifyKiloClawCommitTerm,
   deriveKiloClawCommitFinalBoundary,
-  getKiloClawCommitUserFacingRetirementState,
+  findLatestPreCutoffUserCommitSwitchQualification,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
   hasOpenCommitRetirementReviewCase,
@@ -1473,7 +1473,7 @@ const KiloclawInstanceSwitchPlanInputSchema = z.object({
   toPlan: z.enum(['commit', 'standard']),
 });
 const KiloclawCommitRetirementStateSchema = z
-  .enum(['pending_final_term', 'final_term', 'standard_scheduled', 'completed', 'manual_review'])
+  .enum(['pending_final_term', 'final_term', 'standard_scheduled', 'manual_review'])
   .nullable();
 const KiloclawActivationStateSchema = z.enum(['pending_settlement', 'activated']);
 const KiloclawReferralRewardRoleSchema = z.enum(['referrer', 'referee']);
@@ -1624,45 +1624,57 @@ function assertKiloClawCommitAdmission(
   }
 }
 
-function getCommitSwitchRetirementUpdate(toPlan: 'commit' | 'standard') {
-  return toPlan === 'commit' ? { commit_retirement_state: 'pending_final_term' as const } : {};
-}
-
-function getCommitRetirementEvidence(subscription: typeof kiloclaw_subscriptions.$inferSelect) {
+async function getCommitRetirementEvidence(
+  subscription: typeof kiloclaw_subscriptions.$inferSelect
+) {
+  const pendingQualification =
+    subscription.scheduled_plan === 'commit'
+      ? await findLatestPreCutoffUserCommitSwitchQualification(db, subscription.id)
+      : null;
   const activeTermQualified =
     subscription.plan === 'commit' &&
     subscription.current_period_start &&
     maySelectKiloClawCommit(subscription.current_period_start);
+
   return {
     plan: subscription.plan,
     scheduledPlan: subscription.scheduled_plan,
+    scheduledBy: subscription.scheduled_by,
     currentPeriodStart: subscription.current_period_start,
     currentPeriodEnd: subscription.current_period_end,
-    retirementState: subscription.commit_retirement_state,
-    qualifiedAt: activeTermQualified ? subscription.current_period_start : null,
-    qualificationSource: activeTermQualified ? ('active_at_cutoff' as const) : null,
-    finalEndsAt: subscription.commit_retirement_final_ends_at,
-    standardOptedInAt: subscription.commit_retirement_standard_opted_in_at,
+    commitEndsAt: subscription.commit_ends_at,
+    qualifiedAt:
+      pendingQualification?.qualifiedAt ??
+      (activeTermQualified ? subscription.current_period_start : null),
+    qualificationSource:
+      pendingQualification?.qualificationSource ??
+      (activeTermQualified ? ('active_at_cutoff' as const) : null),
+    hasStandardConsent:
+      subscription.scheduled_plan === 'standard' && subscription.scheduled_by === 'user',
   };
 }
 
 function getFinalCommitBoundary(
   subscription: typeof kiloclaw_subscriptions.$inferSelect
 ): string | null {
-  return normalizeTimestamp(
-    subscription.commit_retirement_final_ends_at ??
-      subscription.commit_ends_at ??
-      subscription.current_period_end
-  );
+  return normalizeTimestamp(subscription.commit_ends_at ?? subscription.current_period_end);
 }
 
-function getCommitRetirementDisplayState(subscription: typeof kiloclaw_subscriptions.$inferSelect) {
-  const userFacing = getKiloClawCommitUserFacingRetirementState(
-    getCommitRetirementEvidence(subscription)
-  );
-  if (userFacing === 'final_term_cancels') return 'final_term' as const;
-  if (userFacing === 'not_involved') return null;
-  return userFacing;
+async function getCommitRetirementDisplayState(
+  subscription: typeof kiloclaw_subscriptions.$inferSelect
+) {
+  if (await hasOpenCommitRetirementReviewCase(db, subscription.id)) {
+    return 'manual_review' as const;
+  }
+
+  const evidence = await getCommitRetirementEvidence(subscription);
+  const classification = classifyKiloClawCommitTerm(evidence);
+  if (classification === 'ambiguous') return 'manual_review' as const;
+  if (classification === 'pending_final_term') return 'pending_final_term' as const;
+  if (classification !== 'final_term') return null;
+  return subscription.scheduled_plan === 'standard' && subscription.scheduled_by === 'user'
+    ? ('standard_scheduled' as const)
+    : ('final_term' as const);
 }
 
 async function getHasActiveKiloPassForUser(userId: string): Promise<boolean> {
@@ -1883,9 +1895,9 @@ async function getPersonalBillingStatus(user: {
       })
     : null;
 
-  const subscriptionCommitRetirementState = sub ? getCommitRetirementDisplayState(sub) : null;
+  const subscriptionCommitRetirementState = sub ? await getCommitRetirementDisplayState(sub) : null;
   const subscriptionIsFinalCommitTerm = sub
-    ? classifyKiloClawCommitTerm(getCommitRetirementEvidence(sub)) === 'final_term'
+    ? classifyKiloClawCommitTerm(await getCommitRetirementEvidence(sub)) === 'final_term'
     : false;
   const subscriptionData = hasPaidSubscription
     ? {
@@ -2248,9 +2260,10 @@ async function serializeKiloclawPersonalSubscription(
     userId: row.subscription.user_id,
     subscriptionId: row.subscription.id,
   });
-  const commitRetirementState = getCommitRetirementDisplayState(row.subscription);
+  const commitRetirementState = await getCommitRetirementDisplayState(row.subscription);
   const isFinalCommitTerm =
-    classifyKiloClawCommitTerm(getCommitRetirementEvidence(row.subscription)) === 'final_term';
+    classifyKiloClawCommitTerm(await getCommitRetirementEvidence(row.subscription)) ===
+    'final_term';
   const standardContinuationScheduled = commitRetirementState === 'standard_scheduled';
 
   return {
@@ -2620,14 +2633,10 @@ async function reactivateKiloclawSubscriptionForRow(params: {
   }
 
   const commitClassification = classifyKiloClawCommitTerm(
-    getCommitRetirementEvidence(subscription)
+    await getCommitRetirementEvidence(subscription)
   );
   const hasOpenReview = await hasOpenCommitRetirementReviewCase(db, subscription.id);
-  if (
-    subscription.commit_retirement_state === 'manual_review' ||
-    commitClassification === 'ambiguous' ||
-    hasOpenReview
-  ) {
+  if (commitClassification === 'ambiguous' || hasOpenReview) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Commit retirement state requires support review.',
@@ -2703,7 +2712,6 @@ async function switchKiloclawPlanForRow(params: {
   const { subscription, toPlan, userId } = params;
   const requestedAt = new Date();
   assertKiloClawCommitAdmission(toPlan, 'switch_plan_for_row', requestedAt);
-  const commitSwitchRetirementUpdate = getCommitSwitchRetirementUpdate(toPlan);
 
   if (subscription.status !== 'active') {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to switch.' });
@@ -2788,7 +2796,6 @@ async function switchKiloclawPlanForRow(params: {
                 stripe_schedule_id: effectiveScheduleId,
                 scheduled_plan: toPlan,
                 scheduled_by: 'user',
-                ...commitSwitchRetirementUpdate,
               })
               .where(eq(kiloclaw_subscriptions.id, subscription.id))
               .returning();
@@ -2881,7 +2888,6 @@ async function switchKiloclawPlanForRow(params: {
               stripe_schedule_id: schedule.id,
               scheduled_plan: toPlan,
               scheduled_by: 'user',
-              ...commitSwitchRetirementUpdate,
             })
             .where(
               and(
@@ -2936,7 +2942,6 @@ async function switchKiloclawPlanForRow(params: {
           .set({
             scheduled_plan: toPlan,
             scheduled_by: 'user',
-            ...commitSwitchRetirementUpdate,
           })
           .where(eq(kiloclaw_subscriptions.id, subscription.id))
           .returning();
@@ -2990,8 +2995,8 @@ async function continueFinalCommitAsStandardForRow(params: {
   }
 
   const boundary = deriveKiloClawCommitFinalBoundary({
-    durableFinalEndsAt: params.subscription.commit_retirement_final_ends_at,
-    localPeriodEndsAt: params.subscription.current_period_end,
+    commitEndsAt: params.subscription.commit_ends_at,
+    currentPeriodEndsAt: params.subscription.current_period_end,
     providerPeriodEndsAt,
     allowLocalOnly: !params.subscription.stripe_subscription_id,
   });
@@ -3055,7 +3060,7 @@ async function putCommitRetirementMutationInReview(params: {
         )
       )
       .limit(1);
-    if (!current || current.commit_retirement_state === 'manual_review') return;
+    if (!current || (await hasOpenCommitRetirementReviewCase(tx, current.id))) return;
     await putKiloClawCommitRetirementInReview({
       tx,
       subscription: current,
@@ -3091,8 +3096,9 @@ async function cancelKiloclawPlanSwitchForRow(params: {
 
   const cancelsFinalCommitContinuation =
     subscription.plan === 'commit' &&
+    subscription.commit_ends_at !== null &&
     subscription.scheduled_plan === 'standard' &&
-    subscription.commit_retirement_standard_opted_in_at !== null;
+    subscription.scheduled_by === 'user';
   if (cancelsFinalCommitContinuation) {
     try {
       await undoKiloClawCommitStandardContinuation({
@@ -3119,19 +3125,6 @@ async function cancelKiloclawPlanSwitchForRow(params: {
     }
   }
 
-  const cancelsPendingFinalTerm =
-    subscription.plan === 'standard' && subscription.scheduled_plan === 'commit';
-  const pendingFinalTermRetirementUpdate =
-    cancelsPendingFinalTerm && subscription.commit_retirement_state === 'pending_final_term'
-      ? {
-          commit_retirement_state: null,
-          commit_retirement_final_ends_at: null,
-          commit_retirement_standard_opted_in_at: null,
-          commit_retirement_guarded_at: null,
-          commit_retirement_review_reason: null,
-        }
-      : {};
-
   if (subscription.stripe_schedule_id) {
     const released = await releaseScheduleIfActive(subscription.stripe_schedule_id);
     if (!released) {
@@ -3153,7 +3146,6 @@ async function cancelKiloclawPlanSwitchForRow(params: {
             stripe_schedule_id: null,
             scheduled_plan: null,
             scheduled_by: null,
-            ...pendingFinalTermRetirementUpdate,
           })
           .where(eq(kiloclaw_subscriptions.id, subscription.id))
           .returning();
@@ -3186,7 +3178,6 @@ async function cancelKiloclawPlanSwitchForRow(params: {
         .set({
           scheduled_plan: null,
           scheduled_by: null,
-          ...pendingFinalTermRetirementUpdate,
         })
         .where(eq(kiloclaw_subscriptions.id, subscription.id))
         .returning();
@@ -4933,7 +4924,8 @@ export const kiloclawRouter = createTRPCRouter({
         instanceId: input.instanceId,
       });
       if (
-        classifyKiloClawCommitTerm(getCommitRetirementEvidence(row.subscription)) === 'final_term'
+        classifyKiloClawCommitTerm(await getCommitRetirementEvidence(row.subscription)) ===
+        'final_term'
       ) {
         await continueFinalCommitAsStandardForRow({
           subscription: row.subscription,
@@ -5445,7 +5437,9 @@ export const kiloclawRouter = createTRPCRouter({
     if (!subscription) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to convert.' });
     }
-    if (classifyKiloClawCommitTerm(getCommitRetirementEvidence(subscription)) === 'final_term') {
+    if (
+      classifyKiloClawCommitTerm(await getCommitRetirementEvidence(subscription)) === 'final_term'
+    ) {
       await continueFinalCommitAsStandardForRow({
         subscription,
         userId: ctx.user.id,
@@ -5476,7 +5470,6 @@ export const kiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const requestedAt = new Date();
       assertKiloClawCommitAdmission(input.toPlan, 'legacy_switch_plan', requestedAt);
-      const commitSwitchRetirementUpdate = getCommitSwitchRetirementUpdate(input.toPlan);
       const { subscription: sub } = await getDisplayedPersonalKiloclawSubscription({
         userId: ctx.user.id,
       });
@@ -5572,7 +5565,6 @@ export const kiloclawRouter = createTRPCRouter({
                     stripe_schedule_id: effectiveScheduleId,
                     scheduled_plan: input.toPlan,
                     scheduled_by: 'user',
-                    ...commitSwitchRetirementUpdate,
                   })
                   .where(eq(kiloclaw_subscriptions.id, sub.id))
                   .returning();
@@ -5646,7 +5638,6 @@ export const kiloclawRouter = createTRPCRouter({
                   stripe_schedule_id: schedule.id,
                   scheduled_plan: input.toPlan,
                   scheduled_by: 'user',
-                  ...commitSwitchRetirementUpdate,
                 })
                 .where(
                   and(
@@ -5706,7 +5697,6 @@ export const kiloclawRouter = createTRPCRouter({
             .set({
               scheduled_plan: input.toPlan,
               scheduled_by: 'user',
-              ...commitSwitchRetirementUpdate,
             })
             .where(eq(kiloclaw_subscriptions.id, sub.id))
             .returning();

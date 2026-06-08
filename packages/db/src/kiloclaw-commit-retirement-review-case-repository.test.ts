@@ -11,7 +11,6 @@ import {
 } from './kiloclaw-commit-retirement-review-case-repository';
 import {
   kiloclaw_commit_retirement_review_cases,
-  kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
 } from './schema';
@@ -20,9 +19,7 @@ import {
   KiloClawCommitRetirementResolutionDisposition,
   KiloClawCommitRetirementReviewCaseStatus,
   KiloClawCommitRetirementReviewReason,
-  KiloClawCommitRetirementState,
   KiloClawPlan,
-  KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionStatus,
 } from './schema-types';
 
@@ -62,7 +59,6 @@ describe('KiloClaw Commit retirement review cases', () => {
       subscriptionId,
       reasonCode: KiloClawCommitRetirementReviewReason.ProviderOutcomeUnknown,
       summary: 'Provider outcome requires review',
-      actor: { type: KiloClawSubscriptionChangeActorType.System, id: 'db-test' },
     };
 
     try {
@@ -77,23 +73,13 @@ describe('KiloClaw Commit retirement review cases', () => {
         .select()
         .from(kiloclaw_subscriptions)
         .where(eq(kiloclaw_subscriptions.id, subscriptionId));
-      expect(subscription?.commit_retirement_state).toBe(
-        KiloClawCommitRetirementState.ManualReview
-      );
-      expect(subscription?.commit_retirement_review_reason).toBe(
-        KiloClawCommitRetirementReviewReason.ProviderOutcomeUnknown
-      );
-
-      const changeLogs = await testDatabase.db
-        .select()
-        .from(kiloclaw_subscription_change_log)
-        .where(eq(kiloclaw_subscription_change_log.subscription_id, subscriptionId));
-      expect(changeLogs).toHaveLength(1);
-      expect(changeLogs[0]?.action).toBe('commit_retirement_changed');
+      expect(subscription).toMatchObject({
+        id: subscriptionId,
+        plan: KiloClawPlan.Commit,
+      });
+      expect(created.subscription_id).toBe(subscriptionId);
+      expect(created.status).toBe(KiloClawCommitRetirementReviewCaseStatus.Open);
     } finally {
-      await testDatabase.db
-        .delete(kiloclaw_subscription_change_log)
-        .where(eq(kiloclaw_subscription_change_log.subscription_id, subscriptionId));
       await testDatabase.db
         .delete(kiloclaw_commit_retirement_review_cases)
         .where(eq(kiloclaw_commit_retirement_review_cases.dedupe_key, dedupeKey));

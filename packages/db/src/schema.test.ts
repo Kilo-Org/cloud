@@ -229,13 +229,6 @@ describe('database schema', () => {
       KiloClawSubscriptionStatus: ['trialing', 'active', 'past_due', 'canceled', 'unpaid'],
       KiloClawSubscriptionAccessOrigin: ['earlybird'],
       KiloClawSubscriptionChangeActorType: ['user', 'system'],
-      KiloClawCommitRetirementState: [
-        'pending_final_term',
-        'final_term',
-        'standard_scheduled',
-        'completed',
-        'manual_review',
-      ],
       KiloClawCommitRetirementReviewReason: [
         'unqualified_post_cutoff_commit',
         'missing_qualification_evidence',
@@ -436,11 +429,11 @@ describe('database schema', () => {
     }
   });
 
-  it('defines the Commit retirement guard sweep keyset index', () => {
+  it('defines the active Stripe Commit boundary keyset index', () => {
     const currentSchema = generateDrizzleJson(schema, crypto.randomUUID());
     const subscriptionTable = currentSchema.tables['public.kiloclaw_subscriptions'];
-    const guardSweepIndex = subscriptionTable?.indexes[
-      'IDX_kiloclaw_subscriptions_commit_retirement_guard_sweep'
+    const boundaryIndex = subscriptionTable?.indexes[
+      'IDX_kiloclaw_subscriptions_active_stripe_commit_boundary'
     ] as
       | {
           columns: { expression: string; isExpression: boolean }[];
@@ -448,20 +441,18 @@ describe('database schema', () => {
         }
       | undefined;
 
-    expect(guardSweepIndex?.columns).toMatchObject([
-      {
-        expression: 'COALESCE("commit_retirement_final_ends_at", "current_period_end")',
-        isExpression: true,
-      },
+    expect(boundaryIndex?.columns).toMatchObject([
+      { expression: 'commit_ends_at', isExpression: false },
+      { expression: 'current_period_end', isExpression: false },
       { expression: 'id', isExpression: false },
     ]);
-    expect(guardSweepIndex?.where).toContain('"kiloclaw_subscriptions"."plan" = \'commit\'');
-    expect(guardSweepIndex?.where).toContain('"kiloclaw_subscriptions"."status" = \'active\'');
-    expect(guardSweepIndex?.where).toContain(
+    expect(boundaryIndex?.where).toContain('"kiloclaw_subscriptions"."plan" = \'commit\'');
+    expect(boundaryIndex?.where).toContain('"kiloclaw_subscriptions"."status" = \'active\'');
+    expect(boundaryIndex?.where).toContain(
       '"kiloclaw_subscriptions"."transferred_to_subscription_id" IS NULL'
     );
-    expect(guardSweepIndex?.where).toContain(
-      '"kiloclaw_subscriptions"."commit_retirement_guarded_at" IS NULL'
+    expect(boundaryIndex?.where).toContain(
+      '"kiloclaw_subscriptions"."cancel_at_period_end" = false'
     );
   });
 

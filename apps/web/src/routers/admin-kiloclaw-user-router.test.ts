@@ -560,9 +560,6 @@ describe('admin.users.getKiloClawState', () => {
         status: 'active',
         payment_source: 'credits',
         current_period_end: '2026-12-06T00:00:00.000Z',
-        commit_retirement_state: 'manual_review',
-        commit_retirement_final_ends_at: '2026-12-06T00:00:00.000Z',
-        commit_retirement_review_reason: 'boundary_mismatch',
       })
       .returning();
     await db.insert(kiloclaw_commit_retirement_review_cases).values({
@@ -575,13 +572,7 @@ describe('admin.users.getKiloClawState', () => {
     const caller = await createCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
-    expect(result.subscriptions[0]).toEqual(
-      expect.objectContaining({
-        commit_retirement_state: 'manual_review',
-        commit_retirement_final_ends_at: expect.any(String),
-        commit_retirement_review_reason: 'boundary_mismatch',
-      })
-    );
+    expect(result.subscriptions[0]).toEqual(expect.objectContaining({}));
     expect(result.openRetirementReviewCases).toEqual([
       expect.objectContaining({
         subscription_id: subscription.id,
@@ -803,8 +794,6 @@ describe('admin.commitRetirementReviews', () => {
           status: 'active' as const,
           payment_source: 'stripe' as const,
           stripe_subscription_id: `sub_admin_review_list_${index}`,
-          commit_retirement_state: 'manual_review' as const,
-          commit_retirement_review_reason: 'provider_outcome_unknown' as const,
         }))
       )
       .returning();
@@ -921,9 +910,6 @@ describe('admin.commitRetirementReviews', () => {
         current_period_start: '2026-05-06T00:00:00.000Z',
         current_period_end: finalBoundary,
         credit_renewal_at: finalBoundary,
-        commit_retirement_state: 'manual_review',
-        commit_retirement_final_ends_at: finalBoundary,
-        commit_retirement_review_reason: 'boundary_mismatch',
       })
       .returning();
     const [reviewCase] = await db
@@ -953,15 +939,11 @@ describe('admin.commitRetirementReviews', () => {
     expect(updated).toEqual(
       expect.objectContaining({
         plan: 'commit',
-        commit_retirement_state: 'final_term',
-        commit_retirement_review_reason: null,
-        commit_retirement_standard_opted_in_at: null,
         cancel_at_period_end: true,
         scheduled_plan: null,
         scheduled_by: null,
       })
     );
-    expectSameInstant(updated?.commit_retirement_final_ends_at, finalBoundary);
     expectSameInstant(updated?.current_period_end, finalBoundary);
 
     const resolved = await db.query.kiloclaw_commit_retirement_review_cases.findFirst({
@@ -998,9 +980,6 @@ describe('admin.commitRetirementReviews', () => {
         status: 'active',
         payment_source: 'credits',
         current_period_end: '2026-12-06T00:00:00.000Z',
-        commit_retirement_state: 'manual_review',
-        commit_retirement_final_ends_at: '2026-12-06T00:00:00.000Z',
-        commit_retirement_review_reason: 'boundary_mismatch',
       })
       .returning();
     const [reviewCase] = await db
@@ -1098,7 +1077,6 @@ describe('admin.commitRetirementReviews', () => {
         plan: 'standard',
         status: 'active',
         payment_source: 'credits',
-        commit_retirement_state: 'completed',
       })
       .returning();
     const [reviewCase] = await db

@@ -446,8 +446,8 @@ application, and Kilo Pass redeems after local referral bonus allocation.
     user-canceling before reward application, the reward MUST remain pending until the beneficiary has an active eligible
     personal KiloClaw subscription. A final Commit term canceling solely because of the retirement guard remains eligible;
     reward application MUST preserve non-renewal while atomically extending the current period, credit-renewal boundary,
-    commitment end, authorized final Commit boundary, and any scheduled Standard transition. Ambiguous provider or
-    schedule outcomes MUST enter Commit retirement manual review.
+    canonical `commit_ends_at` final boundary, and any scheduled Standard transition. Ambiguous provider or schedule
+    outcomes MUST create an open Commit retirement review case.
 
 96. Price-versioned KiloClaw billing does not change referral eligibility, attribution priority, first-paid-conversion
     timing, reward caps, or free-month fulfillment.

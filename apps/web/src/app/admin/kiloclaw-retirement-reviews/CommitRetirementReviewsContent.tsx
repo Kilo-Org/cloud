@@ -120,9 +120,12 @@ export function CommitRetirementReviewsContent() {
       expectedSubscriptionUpdatedAt: selected.subscription
         ? new Date(selected.subscription.updated_at).toISOString()
         : null,
-      expectedFinalBoundary: selected.subscription?.commit_retirement_final_ends_at
-        ? new Date(selected.subscription.commit_retirement_final_ends_at).toISOString()
-        : null,
+      expectedFinalBoundary:
+        (selected.subscription?.commit_ends_at ?? selected.subscription?.current_period_end)
+          ? new Date(
+              selected.subscription.commit_ends_at ?? selected.subscription.current_period_end ?? ''
+            ).toISOString()
+          : null,
       expectedProvider: selected.provider,
       reason,
     };
@@ -216,9 +219,24 @@ export function CommitRetirementReviewsContent() {
           {rows.map(row => {
             const reviewCase = row.reviewCase;
             const subscription = row.subscription;
-            const canDismiss = Boolean(
-              subscription && subscription.commit_retirement_state !== 'manual_review'
+            const canDismiss = Boolean(subscription);
+            const pendingFinalTerm = Boolean(
+              subscription?.plan === 'standard' && subscription.scheduled_plan === 'commit'
             );
+            const standardConsent = Boolean(
+              subscription?.scheduled_plan === 'standard' && subscription.scheduled_by === 'user'
+            );
+            const operationalState = !subscription
+              ? 'Provider only'
+              : pendingFinalTerm
+                ? 'Pending final term'
+                : standardConsent
+                  ? 'Standard scheduled'
+                  : subscription.plan === 'commit'
+                    ? subscription.cancel_at_period_end
+                      ? 'Final term non-renewing'
+                      : 'Final term'
+                    : 'Not Commit-involved';
             return (
               <Card key={reviewCase.id}>
                 <CardHeader className="gap-3">
@@ -269,7 +287,7 @@ export function CommitRetirementReviewsContent() {
                     <Field
                       title="Qualification authority"
                       value={
-                        subscription?.commit_retirement_state === 'pending_final_term'
+                        pendingFinalTerm
                           ? 'Subscription change log'
                           : subscription?.plan === 'commit'
                             ? 'Current period'
@@ -279,26 +297,22 @@ export function CommitRetirementReviewsContent() {
                     <Field
                       title="Qualification time"
                       value={
-                        subscription?.commit_retirement_state === 'pending_final_term'
+                        pendingFinalTerm
                           ? 'See subscription audit history'
                           : timestamp(subscription?.current_period_start)
                       }
                     />
                     <Field
                       title="Final boundary"
-                      value={timestamp(subscription?.commit_retirement_final_ends_at)}
+                      value={timestamp(
+                        subscription?.commit_ends_at ?? subscription?.current_period_end
+                      )}
                     />
-                    <Field
-                      title="Retirement state"
-                      value={label(subscription?.commit_retirement_state)}
-                    />
+                    <Field title="Operational state" value={operationalState} />
+                    <Field title="Case reason" value={label(reviewCase.reason_code)} mono />
                     <Field
                       title="Standard consent"
-                      value={timestamp(subscription?.commit_retirement_standard_opted_in_at)}
-                    />
-                    <Field
-                      title="Guarded at"
-                      value={timestamp(subscription?.commit_retirement_guarded_at)}
+                      value={standardConsent ? 'Recorded by user schedule' : 'Not recorded'}
                     />
                     <Field title="Provider evidence" value={providerSummary(row.provider)} mono />
                   </div>

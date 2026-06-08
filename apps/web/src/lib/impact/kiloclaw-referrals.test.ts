@@ -335,18 +335,13 @@ describe('kiloclaw referrals', () => {
         current_period_end: '2026-12-01T12:00:00.000Z',
         credit_renewal_at: '2026-12-01T12:00:00.000Z',
         commit_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_state: 'final_term',
-        commit_retirement_final_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_guarded_at: '2026-11-01T12:00:00.000Z',
       });
       await insertActivePersonalSubscription(userCanceledUser.id, {
         plan: 'commit',
         cancel_at_period_end: true,
         current_period_end: '2026-12-01T12:00:00.000Z',
         credit_renewal_at: '2026-12-01T12:00:00.000Z',
-        commit_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_state: 'final_term',
-        commit_retirement_final_ends_at: '2026-12-01T12:00:00.000Z',
+        commit_ends_at: '2027-01-01T12:00:00.000Z',
       });
       await insertEarnedReferralRewardForUser(guardedUser.id);
       await insertEarnedReferralRewardForUser(userCanceledUser.id);
@@ -367,13 +362,11 @@ describe('kiloclaw referrals', () => {
             current_period_end: '2027-01-01 12:00:00+00',
             credit_renewal_at: '2027-01-01 12:00:00+00',
             commit_ends_at: '2027-01-01 12:00:00+00',
-            commit_retirement_final_ends_at: '2027-01-01 12:00:00+00',
             cancel_at_period_end: true,
           }),
           expect.objectContaining({
             user_id: userCanceledUser.id,
             current_period_end: '2026-12-01 12:00:00+00',
-            commit_retirement_final_ends_at: '2026-12-01 12:00:00+00',
           }),
         ])
       );
@@ -396,10 +389,6 @@ describe('kiloclaw referrals', () => {
         current_period_end: '2026-12-01T12:00:00.000Z',
         credit_renewal_at: '2026-12-01T12:00:00.000Z',
         commit_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
-        commit_retirement_guarded_at: null,
       });
       await insertEarnedReferralRewardForUser(user.id);
       const newBoundary = Math.floor(new Date('2027-01-01T12:00:00.000Z').getTime() / 1000);
@@ -432,10 +421,6 @@ describe('kiloclaw referrals', () => {
           current_period_end: '2027-01-01 12:00:00+00',
           credit_renewal_at: '2027-01-01 12:00:00+00',
           commit_ends_at: '2027-01-01 12:00:00+00',
-          commit_retirement_state: 'standard_scheduled',
-          commit_retirement_final_ends_at: '2027-01-01 12:00:00+00',
-          commit_retirement_standard_opted_in_at: '2026-06-10 00:00:00+00',
-          commit_retirement_guarded_at: null,
         })
       );
     });
@@ -455,9 +440,6 @@ describe('kiloclaw referrals', () => {
         current_period_end: '2026-12-01T12:00:00.000Z',
         credit_renewal_at: null,
         commit_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
       });
       await insertEarnedReferralRewardForUser(user.id);
       const previousBoundary = Math.floor(new Date('2026-12-01T12:00:00.000Z').getTime() / 1000);
@@ -507,8 +489,6 @@ describe('kiloclaw referrals', () => {
         expect.objectContaining({
           current_period_end: '2027-01-01 12:00:00+00',
           commit_ends_at: '2027-01-01 12:00:00+00',
-          commit_retirement_final_ends_at: '2027-01-01 12:00:00+00',
-          commit_retirement_state: 'standard_scheduled',
         })
       );
     });
@@ -528,9 +508,6 @@ describe('kiloclaw referrals', () => {
         current_period_end: '2026-12-01T12:00:00.000Z',
         credit_renewal_at: null,
         commit_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
       });
       await insertEarnedReferralRewardForUser(user.id);
       const previousBoundary = Math.floor(new Date('2026-12-01T12:00:00.000Z').getTime() / 1000);
@@ -584,9 +561,6 @@ describe('kiloclaw referrals', () => {
         current_period_end: '2026-12-01T12:00:00.000Z',
         credit_renewal_at: null,
         commit_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: '2026-12-01T12:00:00.000Z',
-        commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
       });
       await insertEarnedReferralRewardForUser(user.id);
       mockStripeScheduleRetrieve.mockResolvedValueOnce({
@@ -594,21 +568,14 @@ describe('kiloclaw referrals', () => {
         status: 'active',
         phases: [],
       } as never);
-      mockStripeSubscriptionRetrieve.mockResolvedValueOnce({
-        id: 'sub_ambiguous_final_commit',
-        schedule: 'sched_ambiguous_final_commit',
-        cancel_at_period_end: false,
-      } as never);
 
       const summary = await processQueuedKiloClawReferralRewards({ beneficiaryUserIds: [user.id] });
 
       expect(summary).toEqual({ claimed: 1, applied: 0, expired: 0, pending: 1, failed: 0 });
       expect(mockStripeScheduleUpdate).not.toHaveBeenCalled();
-      expect(mockStripeSubscriptionRetrieve).toHaveBeenCalledWith('sub_ambiguous_final_commit');
-      expect(mockStripeScheduleRelease).toHaveBeenCalledWith('sched_ambiguous_final_commit');
-      expect(mockStripeSubscriptionUpdate).toHaveBeenCalledWith('sub_ambiguous_final_commit', {
-        cancel_at_period_end: true,
-      });
+      expect(mockStripeSubscriptionRetrieve).not.toHaveBeenCalled();
+      expect(mockStripeScheduleRelease).not.toHaveBeenCalled();
+      expect(mockStripeSubscriptionUpdate).not.toHaveBeenCalled();
       const [subscription] = await db
         .select()
         .from(kiloclaw_subscriptions)
@@ -616,8 +583,7 @@ describe('kiloclaw referrals', () => {
       expect(subscription).toEqual(
         expect.objectContaining({
           current_period_end: '2026-12-01 12:00:00+00',
-          commit_retirement_state: 'manual_review',
-          commit_retirement_review_reason: 'referral_reward_ambiguous_standard_schedule',
+          commit_ends_at: '2026-12-01 12:00:00+00',
           scheduled_plan: 'standard',
           plan: 'commit',
         })

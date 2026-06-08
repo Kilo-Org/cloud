@@ -8,6 +8,7 @@ import {
   CURRENT_KILOCLAW_PRICE_VERSION,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
+  findOpenCommitRetirementReviewCase,
   insertKiloClawSubscriptionChangeLog,
   type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeAction,
@@ -610,10 +611,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     resolvedInstanceId = targetRow.instance_id ?? undefined;
     resolvedSubscriptionId = targetRow.id;
 
-    if (
-      recognizeRowlessPaidFinal &&
-      (targetRow.plan === 'commit' || targetRow.commit_retirement_state !== null)
-    ) {
+    if (recognizeRowlessPaidFinal && targetRow.commit_ends_at !== null) {
       logWarning('Later settlement blocked after recognized rowless paid final ingestion', {
         user_id: userId,
         stripe_subscription_id: stripeSubscriptionId,
@@ -626,17 +624,12 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     const ingestRecognizedRowlessPaidFinal = recognizeRowlessPaidFinal;
     const switchQualification =
       plan === 'commit' ? await findPendingCommitSwitchQualification(targetRow.id, tx) : null;
+    const openReviewCase = await findOpenCommitRetirementReviewCase(tx, targetRow.id);
     const retirementDecision = ingestRecognizedRowlessPaidFinal
       ? {
           authorization: 'authorized_final_term' as const,
           reviewReason: null,
-          retirementUpdate: {
-            cancel_at_period_end: true,
-            commit_retirement_state: 'final_term' as const,
-            commit_retirement_final_ends_at: periodEnd,
-            commit_retirement_guarded_at: new Date().toISOString(),
-            commit_retirement_review_reason: null,
-          },
+          subscriptionUpdate: { cancel_at_period_end: true, commit_ends_at: periodEnd },
         }
       : getStripeFundedRetirementSettlementDecision({
           subscription: targetRow,
@@ -645,6 +638,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
           periodEnd,
           checkoutConfirmedAt: params.checkoutConfirmedAt,
           switchQualification: switchQualification ?? undefined,
+          openReviewCase,
         });
     requiresProviderNonRenewal ||= retirementDecision.reviewReason !== null;
     if (retirementDecision.reviewReason) {
@@ -670,7 +664,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
         invoice_plan: plan,
       });
     }
-    const commitEndsAt = plan === 'commit' ? periodEnd : null;
+    const commitEndsAt = plan === 'commit' ? targetRow.commit_ends_at : null;
 
     const deposited = await processTopUp(
       user,
@@ -732,7 +726,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       current_period_end: periodEnd,
       credit_renewal_at: periodEnd,
       commit_ends_at: commitEndsAt,
-      ...retirementDecision.retirementUpdate,
+      ...retirementDecision.subscriptionUpdate,
       past_due_since: null,
       auto_top_up_triggered_for_period: null,
       ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
@@ -772,8 +766,9 @@ export async function applyStripeFundedKiloClawPeriod(params: {
         after,
       });
       if (
-        before.commit_retirement_state !== after.commit_retirement_state ||
-        before.commit_retirement_final_ends_at !== after.commit_retirement_final_ends_at
+        before.commit_ends_at !== after.commit_ends_at ||
+        before.scheduled_plan !== after.scheduled_plan ||
+        before.scheduled_by !== after.scheduled_by
       ) {
         await insertKiloClawSubscriptionChangeLog(tx, {
           subscriptionId: after.id,
@@ -1424,13 +1419,6 @@ export async function enrollWithCredits(params: {
 
     // 5c: Upsert subscription row as pure credit
     const commitEndsAt = plan === 'commit' ? periodEndIso : null;
-    const commitRetirementSet =
-      plan === 'commit'
-        ? {
-            commit_retirement_state: 'final_term' as const,
-            commit_retirement_final_ends_at: periodEndIso,
-          }
-        : {};
     const [mutatedSubscription] = await tx
       .insert(kiloclaw_subscriptions)
       .values({
@@ -1445,7 +1433,6 @@ export async function enrollWithCredits(params: {
         credit_renewal_at: periodEndIso,
         stripe_subscription_id: null,
         commit_ends_at: commitEndsAt,
-        ...commitRetirementSet,
         past_due_since: null,
         cancel_at_period_end: false,
         trial_started_at: null,
@@ -1466,7 +1453,6 @@ export async function enrollWithCredits(params: {
           credit_renewal_at: periodEndIso,
           stripe_subscription_id: null,
           commit_ends_at: commitEndsAt,
-          ...commitRetirementSet,
           past_due_since: null,
           cancel_at_period_end: false,
           ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,

@@ -6,8 +6,6 @@ import { getClawPlanForStripePriceId } from '@/lib/kiloclaw/stripe-price-ids.ser
 import {
   KILOCLAW_COMMIT_SALES_CUTOFF,
   KiloClawCommitRetirementReviewCaseStatus,
-  classifyKiloClawCommitTerm,
-  deriveKiloClawCommitFinalBoundary,
   isBeforeKiloClawCommitSalesCutoff,
 } from '@kilocode/db';
 import {
@@ -29,6 +27,27 @@ type ScheduleEvidence = {
 };
 type CheckoutCounts = { directCommit: number; kiloPassCommitIntents: number };
 type PendingSwitchEvidence = { requestedAt: string | null; issue: string | null };
+type OpenReviewCase = {
+  id: string;
+  subscriptionId: string | null;
+  reasonCode: string;
+  createdAt: string;
+};
+
+function normalizedTimestamp(value: string | null): string | null {
+  return value ? new Date(value).toISOString() : null;
+}
+
+function compareBoundaryEvidence(
+  localBoundary: string | null,
+  providerBoundary: string | null
+): 'verified' | 'missing' | 'conflicting' {
+  if (!localBoundary) return 'missing';
+  if (providerBoundary && normalizedTimestamp(localBoundary) !== providerBoundary) {
+    return 'conflicting';
+  }
+  return 'verified';
+}
 
 function stripeSubscriptionPeriodEnd(subscription: Stripe.Subscription): string | null {
   const periodEnd = subscription.items.data[0]?.current_period_end;
@@ -199,32 +218,47 @@ async function main() {
     })
   );
 
+  const openReviewCases: OpenReviewCase[] = await db
+    .select({
+      id: kiloclaw_commit_retirement_review_cases.id,
+      subscriptionId: kiloclaw_commit_retirement_review_cases.subscription_id,
+      reasonCode: kiloclaw_commit_retirement_review_cases.reason_code,
+      createdAt: kiloclaw_commit_retirement_review_cases.created_at,
+    })
+    .from(kiloclaw_commit_retirement_review_cases)
+    .where(
+      eq(
+        kiloclaw_commit_retirement_review_cases.status,
+        KiloClawCommitRetirementReviewCaseStatus.Open
+      )
+    );
+  const openReviewCasesBySubscription = new Map(
+    openReviewCases.flatMap(reviewCase =>
+      reviewCase.subscriptionId ? [[reviewCase.subscriptionId, reviewCase] as const] : []
+    )
+  );
+
   let ambiguousEvidence = 0;
   for (const subscription of [...commitSubscriptions, ...pendingCommitSwitches]) {
     const pendingSwitchEvidence =
       subscription.plan === 'standard' ? await getPendingSwitchEvidence(subscription.id) : null;
-    const classification =
-      pendingSwitchEvidence?.issue === null
-        ? 'pending_final_term'
-        : classifyKiloClawCommitTerm({
-            plan: subscription.plan,
-            scheduledPlan: subscription.scheduled_plan,
-            currentPeriodStart: subscription.current_period_start,
-            currentPeriodEnd: subscription.current_period_end,
-            retirementState: subscription.commit_retirement_state,
-            finalEndsAt: subscription.commit_retirement_final_ends_at,
-            standardOptedInAt: subscription.commit_retirement_standard_opted_in_at,
-          });
     const provider = await inspectProviderEvidence(subscription);
-    const boundary = deriveKiloClawCommitFinalBoundary({
-      durableFinalEndsAt: subscription.commit_retirement_final_ends_at,
-      localPeriodEndsAt: subscription.current_period_end,
-      providerPeriodEndsAt: provider.providerPeriodEnd,
-    });
+    const boundaryEvidence = compareBoundaryEvidence(
+      subscription.commit_ends_at,
+      provider.providerPeriodEnd
+    );
+    const openReviewCase = openReviewCasesBySubscription.get(subscription.id);
+    const classification = openReviewCase
+      ? 'manual_review'
+      : pendingSwitchEvidence?.issue === null
+        ? 'pending_final_term'
+        : subscription.plan === 'commit' && subscription.commit_ends_at
+          ? 'final_term'
+          : 'ambiguous';
     const issues = [
       classification === 'ambiguous' ? 'ambiguous_retirement_classification' : null,
-      boundary.kind === 'missing' ? 'missing_period_boundary_evidence' : null,
-      boundary.kind === 'conflicting' ? 'conflicting_period_boundary_evidence' : null,
+      boundaryEvidence === 'missing' ? 'missing_commit_ends_at' : null,
+      boundaryEvidence === 'conflicting' ? 'conflicting_period_boundary_evidence' : null,
       provider.issue,
       pendingSwitchEvidence?.issue ?? null,
     ].filter((issue): issue is string => issue !== null);
@@ -245,8 +279,14 @@ async function main() {
         switchRequestedAt: pendingSwitchEvidence?.requestedAt ?? null,
         qualificationAuthority:
           subscription.plan === 'standard' ? 'subscription_change_log' : 'current_period',
-        finalBoundary: boundary.kind === 'verified' ? boundary.finalEndsAt : null,
-        boundaryEvidence: boundary.kind,
+        finalBoundary:
+          boundaryEvidence === 'verified' ? normalizedTimestamp(subscription.commit_ends_at) : null,
+        boundaryEvidence,
+        scheduledPlan: subscription.scheduled_plan,
+        scheduledBy: subscription.scheduled_by,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        openReviewCaseId: openReviewCase?.id ?? null,
+        reviewReasonCode: openReviewCase?.reasonCode ?? null,
         providerStatus: provider.status,
         issues,
       })
@@ -265,21 +305,6 @@ async function main() {
       })
     );
   }
-
-  const openReviewCases = await db
-    .select({
-      id: kiloclaw_commit_retirement_review_cases.id,
-      subscriptionId: kiloclaw_commit_retirement_review_cases.subscription_id,
-      reasonCode: kiloclaw_commit_retirement_review_cases.reason_code,
-      createdAt: kiloclaw_commit_retirement_review_cases.created_at,
-    })
-    .from(kiloclaw_commit_retirement_review_cases)
-    .where(
-      eq(
-        kiloclaw_commit_retirement_review_cases.status,
-        KiloClawCommitRetirementReviewCaseStatus.Open
-      )
-    );
 
   for (const reviewCase of openReviewCases) {
     console.log(

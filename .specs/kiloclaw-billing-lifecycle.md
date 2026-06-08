@@ -75,8 +75,9 @@ capitals, as shown here.
 - **Final Commit boundary cancellation**: Expected pure-credit outcome where
   a final Commit term reaches its authorized boundary without explicit
   Standard continuation and cancels without deduction or period advancement.
-- **Commit retirement review**: Durable manual-review containment for missing,
-  conflicting, ambiguous, or forbidden Commit retirement state.
+- **Commit retirement review**: An open review case for missing, conflicting,
+  ambiguous, or forbidden Commit evidence. The case is the sole containment
+  marker and reason authority.
 - **Stripe retirement guard sweep**: Lifecycle activity that makes an eligible
   Stripe-funded final Commit term non-renewing beginning 30 days before its
   verified final boundary.
@@ -144,8 +145,9 @@ downstream enforcement can proceed.
 3. If the subscription's current credit-renewal boundary no longer
    matches the item boundary, the item MUST be treated as stale or
    superseded and MUST NOT apply another deduction for that boundary.
-4. Before any renewal mutation, processing MUST skip a subscription in Commit
-   retirement review and preserve current access for operator resolution. If
+4. Before any renewal mutation, processing MUST skip a subscription with an
+   open Commit retirement review case and preserve current access for operator
+   resolution. If
    the subscription is otherwise no longer a current eligible pure-credit row,
    the item MUST be skipped without billing mutation.
 5. If the associated instance or ownership context makes the row
@@ -272,10 +274,10 @@ downstream enforcement can proceed.
 6. If credit-renewal backlog or retry age creates credible risk of
    false suspension or destruction, the system SHOULD add a stronger
    protection mechanism before continuing rollout.
-7. Downstream enforcement MUST skip every subscription in Commit retirement
-   review, including suspension, stop, warning, and destruction actions, until
-   the review is resolved. This protection is independent of terminal renewal
-   failure protection and MUST NOT block unrelated subscriptions.
+7. Downstream enforcement MUST skip every subscription with an open Commit
+   retirement review case, including suspension, stop, warning, and destruction
+   actions, until the case is resolved. This protection is independent of
+   terminal renewal failure protection and MUST NOT block unrelated subscriptions.
 
 ### Observability and Operator Control
 

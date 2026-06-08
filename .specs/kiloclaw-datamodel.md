@@ -182,59 +182,42 @@ KiloClaw billing.
 
 ### Commit Retirement State
 
-Commit retirement MUST use additive durable state on the subscription lineage;
-it MUST NOT add a replacement subscription status. Existing status continues
-to describe payment and access lifecycle.
+Commit retirement MUST use existing subscription fields plus source-specific
+evidence and review cases. It MUST NOT add retirement columns or a replacement
+subscription status.
 
-1. Retirement-involved subscription rows MUST be able to record these states:
-   `pending_final_term`, `final_term`, `standard_scheduled`, `completed`, and
-   `manual_review`. Standard, trial, and historical rows not involved in
-   retirement MAY keep retirement state absent. Durable retirement fields have
-   these canonical meanings:
-
-   | Field | Meaning |
-   |---|---|
-   | `commit_retirement_state` | Current retirement classification |
-   | `commit_retirement_final_ends_at` | Authorized final Commit boundary, including approved reward extensions |
-   | `commit_retirement_standard_opted_in_at` | Current explicit Standard continuation consent |
-   | `commit_retirement_guarded_at` | Time retirement guard made subscription non-renewing |
-   | `commit_retirement_review_reason` | Non-sensitive reason for manual review |
-
-2. Qualification MUST be derived from the canonical authority for each source:
+1. `commit_ends_at` is the canonical final Commit boundary. It includes approved
+   referral extensions and MUST NOT advance for another Commit renewal.
+2. `plan`, `scheduled_plan`, `scheduled_by`, and `cancel_at_period_end` describe
+   current operational state. `scheduled_plan = 'standard'` with
+   `scheduled_by = 'user'` is explicit Standard continuation. Provider schedule
+   shape alone MUST NOT establish consent. Removing continuation MUST clear the
+   scheduled Standard state and restore final-boundary cancellation.
+3. Qualification MUST be derived from the canonical authority for each source:
    the subscription change log entry for a pending Standard-to-Commit switch;
    the current billing period for a Commit term active at cutoff; the Stripe
    subscription creation timestamp for completed checkout; or the invoice or
    renewal boundary for payment recovery. Qualification timestamps and source
-   labels MUST NOT be copied into duplicate subscription columns. A final term
-   starting after cutoff without verified canonical evidence MUST enter manual
-   review.
-3. Retirement state MUST record the authorized final Commit boundary,
-   including approved referral extensions; current explicit Standard consent;
-   time the retirement guard made the subscription non-renewing; and a
-   non-sensitive review reason when applicable.
-4. The authorized final Commit boundary MAY move later only for an approved
-   KiloClaw free-month referral reward. Commit renewal MUST NOT advance it.
-5. `standard_scheduled` MUST require explicit user consent. Provider schedule
-   shape alone MUST NOT establish consent. Canceling continuation MUST clear
-   current consent and restore final-boundary cancellation.
-6. Missing, conflicting, or misaligned qualification, boundary, provider, or
-   schedule evidence MUST set `manual_review`. That state MUST block renewal
-   and destructive enforcement until operator resolution.
-7. Runtime MUST NOT bulk-populate active Commit behavior state at the cutoff or
-   run a qualification backfill. It MUST validate qualification directly from
-   the source-specific canonical evidence without changing plan, period,
-   cancellation, or provider schedule state.
-8. Retirement state MUST follow the current live personal subscription lineage
-   during reprovision transfer only when billing period and provider ownership
-   remain consistent. The successor MUST preserve final boundary, consent,
-   guard state, and review state; source-specific qualification remains with its
-   canonical authority. A mismatch MUST enter
-   manual review rather than grant a fresh Commit term.
-9. Canceled and transferred-out predecessor rows MUST retain retirement state
-   as history but MUST NOT authorize or seed another Commit term.
-10. Every retirement transition MUST write a subscription change log entry
-    using the consistent action label `commit_retirement_changed` with
-    non-sensitive before/after state and reason.
+   labels MUST NOT be copied into subscription columns.
+4. Missing, conflicting, misaligned, or forbidden qualification, boundary,
+   provider, or schedule evidence MUST create an open Commit retirement review
+   case. The open case is the sole containment marker and reason authority. It
+   MUST block renewal and destructive enforcement until operator resolution.
+5. Runtime MUST NOT bulk-populate Commit behavior state at the cutoff, run a
+   qualification backfill, or dual-write retirement classifications. It MUST
+   validate source-specific evidence without changing plan, period,
+   cancellation, or provider schedule state merely to classify a term.
+6. During reprovision transfer, the successor MUST preserve `commit_ends_at`,
+   current schedule state, and cancellation state when billing period and
+   provider ownership remain consistent. Open review cases MUST be retargeted
+   to the live successor. A mismatch MUST open a review case rather than grant
+   a fresh Commit term.
+7. Canceled and transferred-out predecessor rows retain their operational and
+   change-log history but MUST NOT authorize or seed another Commit term.
+8. Every retirement-related subscription mutation MUST write the normal
+   subscription change log entry for the fields changed, with non-sensitive
+   before/after state and reason.
+
 
 ### Commit Retirement Review Cases
 
@@ -245,9 +228,9 @@ to describe payment and access lifecycle.
    non-sensitive reason code and summary, open/resolved/dismissed status,
    resolution disposition, actor, reason, and timestamps. It MUST NOT store
    email addresses, raw provider payloads, tokens, payment details, or secrets.
-3. For a known subscription, an open review case and subscription
-   `manual_review` state MUST agree. Resolution MUST update both and write
-   subscription change history.
+3. For a known subscription, an open review case is the sole containment and
+   reason authority. Resolution MUST update the case and write subscription
+   change history for any resulting subscription mutation.
 4. A rowless/provider-only resolution MUST remain canonical for its provider
    identifiers and dedupe key. Later webhook, import, settlement, or
    reconciliation work MUST consult it before creating or mutating a
@@ -479,8 +462,8 @@ not yet enforced in the current codebase:
 
 ### 2026-06-05 -- Commit retirement state and review cases
 
-- Defined additive lineage-scoped retirement state, source-specific canonical qualification evidence, final boundary, explicit Standard consent, guard state, and audit action.
-- Defined durable known-row and provider-only review cases, successor transfer, historical-row restrictions, and GDPR-safe review data.
+- Defined the field-free retirement model: `commit_ends_at` as final boundary, existing operational fields as current state, and source-specific qualification evidence.
+- Defined open review cases as sole containment/reason authority, including provider-only cases, successor transfer, historical-row restrictions, and GDPR-safe review data.
 
 ### 2026-05-28 -- Fraud-enforcement subscription mutations
 

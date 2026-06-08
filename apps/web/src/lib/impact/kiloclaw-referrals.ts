@@ -24,10 +24,6 @@ import {
 import { logImpactReferralDebug } from '@/lib/impact/debug';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { IMPACT_REFERRAL_TOUCH_VALIDITY_MS } from '@/lib/impact/referral-utils';
-import {
-  makeKiloClawStripeSubscriptionNonRenewing,
-  putKiloClawCommitRetirementInReview,
-} from '@/lib/kiloclaw/commit-retirement';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
 import { getClawPlanForStripePriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
@@ -45,6 +41,7 @@ import {
   impact_referral_reward_decisions,
   impact_referral_rewards,
   impact_referrals,
+  kiloclaw_commit_retirement_review_cases,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
@@ -379,29 +376,17 @@ async function hasDeletedUserEmailTombstone(params: {
   return Boolean(row);
 }
 
-function hasPendingConversionStandardRetirementTransition(
-  subscription: KiloClawSubscription
-): boolean {
-  return (
-    subscription.plan === 'commit' &&
-    subscription.stripe_subscription_id !== null &&
-    subscription.pending_conversion &&
-    subscription.cancel_at_period_end &&
-    subscription.commit_retirement_state === 'standard_scheduled' &&
-    subscription.commit_retirement_standard_opted_in_at !== null &&
-    subscription.scheduled_plan === 'standard' &&
-    subscription.stripe_schedule_id === null
-  );
+function hasUserScheduledStandardContinuation(subscription: KiloClawSubscription): boolean {
+  return subscription.scheduled_plan === 'standard' && subscription.scheduled_by === 'user';
 }
 
-function isRetirementGuardCancellation(subscription: KiloClawSubscription): boolean {
+function isEligibleFinalCommitCancellation(subscription: KiloClawSubscription): boolean {
   return (
-    (subscription.plan === 'commit' &&
-      subscription.cancel_at_period_end &&
-      subscription.commit_retirement_guarded_at !== null &&
-      (subscription.commit_retirement_state === 'final_term' ||
-        subscription.commit_retirement_state === 'standard_scheduled')) ||
-    hasPendingConversionStandardRetirementTransition(subscription)
+    subscription.plan === 'commit' &&
+    subscription.commit_ends_at !== null &&
+    subscription.current_period_end === subscription.commit_ends_at &&
+    subscription.cancel_at_period_end &&
+    (hasUserScheduledStandardContinuation(subscription) || subscription.scheduled_plan === null)
   );
 }
 
@@ -409,7 +394,7 @@ function hasActiveEligibleSubscriptionRow(subscription: KiloClawSubscription): b
   return (
     subscription.plan !== 'trial' &&
     subscription.status === 'active' &&
-    (!subscription.cancel_at_period_end || isRetirementGuardCancellation(subscription)) &&
+    (!subscription.cancel_at_period_end || isEligibleFinalCommitCancellation(subscription)) &&
     subscription.suspended_at === null &&
     subscription.past_due_since === null
   );
@@ -723,24 +708,22 @@ function logRewardBearingReferralConfigurationFailure(params: {
 }
 
 function getNextRenewalBoundary(subscription: KiloClawSubscription): string | null {
+  if (subscription.plan === 'commit') {
+    return subscription.commit_ends_at;
+  }
   return subscription.credit_renewal_at ?? subscription.current_period_end;
 }
 
-function hasScheduledStandardRetirementTransition(subscription: KiloClawSubscription): boolean {
+function hasScheduledStandardTransition(subscription: KiloClawSubscription): boolean {
   return (
     subscription.plan === 'commit' &&
-    subscription.commit_retirement_state === 'standard_scheduled' &&
-    subscription.commit_retirement_standard_opted_in_at !== null &&
-    subscription.scheduled_plan === 'standard' &&
+    hasUserScheduledStandardContinuation(subscription) &&
     subscription.stripe_schedule_id !== null
   );
 }
 
 function requiresDeferredStripeRewardApplication(subscription: KiloClawSubscription): boolean {
-  if (
-    hasScheduledStandardRetirementTransition(subscription) ||
-    hasPendingConversionStandardRetirementTransition(subscription)
-  ) {
+  if (hasUserScheduledStandardContinuation(subscription)) {
     return false;
   }
   return Boolean(subscription.stripe_schedule_id || subscription.scheduled_plan);
@@ -815,28 +798,21 @@ function buildExtendedRetirementSchedulePhases(params: {
   ];
 }
 
-async function markReferralRetirementScheduleForReview(params: {
+async function createReferralRetirementScheduleReviewCase(params: {
   subscriptionId: string;
+  stripeSubscriptionId: string;
   reason: KiloClawCommitRetirementReviewReason;
 }): Promise<void> {
-  await db.transaction(async tx => {
-    const [subscription] = await tx
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.id, params.subscriptionId))
-      .for('update')
-      .limit(1);
-    if (!subscription) {
-      return;
-    }
-
-    await putKiloClawCommitRetirementInReview({
-      tx,
-      subscription,
-      reason: params.reason,
+  await db
+    .insert(kiloclaw_commit_retirement_review_cases)
+    .values({
+      dedupe_key: `commit-retirement:${params.reason}:${params.subscriptionId}`,
+      subscription_id: params.subscriptionId,
+      stripe_subscription_id: params.stripeSubscriptionId,
+      reason_code: params.reason,
       summary: 'Referral reward could not safely move scheduled Standard transition',
-    });
-  });
+    })
+    .onConflictDoNothing();
 }
 
 async function applyReferralRewardById(
@@ -976,7 +952,7 @@ async function applyReferralRewardById(
     const stripeIdempotencyKey = `kiloclaw-referral-reward:${reward.id}:stripe-apply`;
 
     if (subscription.stripe_subscription_id && !options?.stripeAlreadyApplied) {
-      if (hasScheduledStandardRetirementTransition(subscription)) {
+      if (hasScheduledStandardTransition(subscription)) {
         const scheduleId = subscription.stripe_schedule_id;
         if (!scheduleId) {
           return 'pending';
@@ -1010,17 +986,7 @@ async function applyReferralRewardById(
         current_period_end: newBoundary,
         credit_renewal_at:
           subscription.payment_source === 'credits' ? newBoundary : subscription.credit_renewal_at,
-        commit_ends_at:
-          subscription.plan === 'commit' && subscription.commit_ends_at
-            ? addMonths(new Date(subscription.commit_ends_at), reward.months_granted).toISOString()
-            : subscription.commit_ends_at,
-        commit_retirement_final_ends_at:
-          subscription.plan === 'commit' && subscription.commit_retirement_final_ends_at
-            ? addMonths(
-                new Date(subscription.commit_retirement_final_ends_at),
-                reward.months_granted
-              ).toISOString()
-            : subscription.commit_retirement_final_ends_at,
+        commit_ends_at: subscription.plan === 'commit' ? newBoundary : subscription.commit_ends_at,
       })
       .where(eq(kiloclaw_subscriptions.id, subscription.id))
       .returning();
@@ -1115,13 +1081,9 @@ async function applyReferralRewardById(
     }
     await stripe.subscriptionSchedules.update(result.scheduleId, { phases });
   } catch {
-    try {
-      await makeKiloClawStripeSubscriptionNonRenewing(result.stripeSubscriptionId);
-    } catch {
-      // Manual review below retains provider uncertainty while paid access and reward state stay unchanged.
-    }
-    await markReferralRetirementScheduleForReview({
+    await createReferralRetirementScheduleReviewCase({
       subscriptionId: result.subscriptionId,
+      stripeSubscriptionId: result.stripeSubscriptionId,
       reason: 'referral_reward_ambiguous_standard_schedule',
     });
     return 'pending';

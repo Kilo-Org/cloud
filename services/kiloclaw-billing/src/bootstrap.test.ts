@@ -3,10 +3,17 @@ import type * as DbModule from '@kilocode/db';
 
 const {
   mockCreateCommitRetirementReviewCase,
+  mockFindLatestPreCutoffUserCommitSwitchQualification,
   mockGetWorkerDb,
   mockInsertKiloClawSubscriptionChangeLog,
 } = vi.hoisted(() => ({
   mockCreateCommitRetirementReviewCase: vi.fn(async () => ({ id: 'review-case' })),
+  mockFindLatestPreCutoffUserCommitSwitchQualification: vi.fn<
+    () => Promise<{
+      qualifiedAt: string;
+      qualificationSource: 'switch_requested_before_cutoff';
+    } | null>
+  >(async () => null),
   mockGetWorkerDb: vi.fn(),
   mockInsertKiloClawSubscriptionChangeLog: vi.fn(async () => undefined),
 }));
@@ -21,7 +28,8 @@ vi.mock('@kilocode/db', async importOriginal => {
     CURRENT_KILOCLAW_PRICE_VERSION: currentPriceVersion,
     LEGACY_KILOCLAW_PRICE_VERSION: legacyPriceVersion,
     createCommitRetirementReviewCase: mockCreateCommitRetirementReviewCase,
-    findLatestPreCutoffUserCommitSwitchQualification: vi.fn(async () => null),
+    findLatestPreCutoffUserCommitSwitchQualification:
+      mockFindLatestPreCutoffUserCommitSwitchQualification,
     getKiloClawPricingCatalogEntry: vi.fn((priceVersion: string) => {
       if (priceVersion === legacyPriceVersion) {
         return {
@@ -52,7 +60,6 @@ vi.mock('@kilocode/db', async importOriginal => {
 });
 
 import { bootstrapProvisionSubscription, resolveProvisionEntitlement } from './bootstrap.js';
-import { retirementTransferValues } from './provision-bootstrap-shared.js';
 import type { BillingWorkerEnv } from './types.js';
 
 type SelectBuilder<T> = PromiseLike<T[]> & {
@@ -101,6 +108,7 @@ function createMockDb(params: {
     select: vi.fn(() => createSelectBuilder(topLevelSelectQueue.shift() ?? [])),
     transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
       const tx = {
+        execute: vi.fn(async () => ({ rows: [] })),
         select: vi.fn(() => createSelectBuilder(txSelectQueue.shift() ?? [])),
         insert: vi.fn(() => ({
           values: vi.fn((values: Record<string, unknown>) => {
@@ -154,204 +162,52 @@ function createEnv(): BillingWorkerEnv {
   };
 }
 
-describe('Commit retirement successor transfer', () => {
-  it('preserves matching retirement state', () => {
-    expect(
-      retirementTransferValues({
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
-        commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
-        commit_retirement_guarded_at: null,
-        commit_retirement_review_reason: null,
-        plan: 'commit',
-        scheduled_plan: 'standard',
-        current_period_end: '2026-12-01T00:00:00.000Z',
-        payment_source: 'stripe',
-        stripe_subscription_id: 'sub_provider',
-      } as never)
-    ).toMatchObject({
-      commit_retirement_state: 'standard_scheduled',
-      commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
-    });
-  });
-
-  it('sends standard-scheduled transfer state without explicit consent to review', () => {
-    expect(
-      retirementTransferValues({
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
-        commit_retirement_standard_opted_in_at: null,
-        commit_retirement_guarded_at: null,
-        commit_retirement_review_reason: null,
-        plan: 'commit',
-        scheduled_plan: 'standard',
-        current_period_end: '2026-12-01T00:00:00.000Z',
-        payment_source: 'credits',
-        stripe_subscription_id: null,
-      } as never)
-    ).toMatchObject({
-      commit_retirement_state: 'manual_review',
-      commit_retirement_standard_opted_in_at: null,
-      commit_retirement_review_reason: 'missing_qualification_evidence',
-    });
-  });
-
-  it('preserves canonically qualified pending final-term switch evidence', () => {
-    expect(
-      retirementTransferValues(
-        {
-          commit_retirement_state: 'pending_final_term',
-          commit_retirement_final_ends_at: null,
-          commit_retirement_standard_opted_in_at: null,
-          commit_retirement_guarded_at: null,
-          commit_retirement_review_reason: null,
-          plan: 'standard',
-          scheduled_plan: 'commit',
-          current_period_end: '2026-07-01T00:00:00.000Z',
-          payment_source: 'credits',
-          stripe_subscription_id: null,
-        } as never,
-        {
-          qualifiedAt: '2026-06-05T23:59:59.999Z',
-          qualificationSource: 'switch_requested_before_cutoff',
-        }
-      )
-    ).toMatchObject({
-      commit_retirement_state: 'pending_final_term',
-      commit_retirement_review_reason: null,
-    });
-  });
-
-  it('sends invalid pending final-term transfer state to review', () => {
-    expect(
-      retirementTransferValues({
-        commit_retirement_state: 'pending_final_term',
-        commit_retirement_final_ends_at: null,
-        commit_retirement_standard_opted_in_at: null,
-        commit_retirement_guarded_at: null,
-        commit_retirement_review_reason: null,
-        plan: 'standard',
-        scheduled_plan: 'commit',
-        current_period_end: '2026-07-01T00:00:00.000Z',
-        payment_source: 'credits',
-        stripe_subscription_id: null,
-      } as never)
-    ).toMatchObject({
-      commit_retirement_state: 'manual_review',
-      commit_retirement_review_reason: 'missing_qualification_evidence',
-    });
-  });
-
-  it('preserves an existing matching manual-review reason for retargeting', () => {
-    expect(
-      retirementTransferValues({
-        commit_retirement_state: 'manual_review',
-        commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
-        commit_retirement_standard_opted_in_at: null,
-        commit_retirement_guarded_at: null,
-        commit_retirement_review_reason: 'provider_outcome_unknown',
-        current_period_end: '2026-12-01T00:00:00.000Z',
-        payment_source: 'stripe',
-        stripe_subscription_id: 'sub_provider',
-      } as never)
-    ).toMatchObject({
-      commit_retirement_state: 'manual_review',
-      commit_retirement_review_reason: 'provider_outcome_unknown',
-    });
-  });
-
-  it('preserves matching hybrid provider ownership and retirement consent', () => {
-    expect(
-      retirementTransferValues({
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
-        commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
-        commit_retirement_guarded_at: '2026-11-01T00:00:00.000Z',
-        commit_retirement_review_reason: null,
-        plan: 'commit',
-        scheduled_plan: 'standard',
-        current_period_end: '2026-12-01T00:00:00.000Z',
-        payment_source: 'credits',
-        stripe_subscription_id: 'sub_provider',
-        stripe_schedule_id: 'schedule_provider',
-      } as never)
-    ).toMatchObject({
-      commit_retirement_state: 'standard_scheduled',
-      commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
-      commit_retirement_guarded_at: '2026-11-01T00:00:00.000Z',
-      commit_retirement_review_reason: null,
-    });
-  });
-
-  it('preserves completed retirement boundary without retired qualification fields', () => {
-    expect(
-      retirementTransferValues({
-        commit_retirement_state: 'completed',
-        commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
-        commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
-        commit_retirement_guarded_at: null,
-        commit_retirement_review_reason: null,
-        current_period_end: '2027-01-01T00:00:00.000Z',
-        payment_source: 'credits',
-        stripe_subscription_id: null,
-        stripe_schedule_id: null,
-      } as never)
-    ).toMatchObject({
-      commit_retirement_state: 'completed',
-      commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
-    });
-  });
-
-  it('classifies real boundary mismatch for review', () => {
-    expect(
-      retirementTransferValues({
-        commit_retirement_state: 'final_term',
-        commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
-        commit_retirement_standard_opted_in_at: null,
-        commit_retirement_guarded_at: null,
-        commit_retirement_review_reason: null,
-        plan: 'commit',
-        scheduled_plan: null,
-        current_period_end: '2027-01-01T00:00:00.000Z',
-        payment_source: 'credits',
-        stripe_subscription_id: null,
-        stripe_schedule_id: null,
-      } as never)
-    ).toMatchObject({
-      commit_retirement_state: 'manual_review',
-      commit_retirement_review_reason: 'boundary_mismatch',
-    });
-  });
-
-  it('classifies real provider ownership mismatch for review', () => {
-    expect(
-      retirementTransferValues({
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
-        commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
-        commit_retirement_guarded_at: null,
-        commit_retirement_review_reason: null,
-        current_period_end: '2026-12-01T00:00:00.000Z',
-        payment_source: 'stripe',
-        stripe_subscription_id: null,
-        stripe_schedule_id: null,
-      } as never)
-    ).toMatchObject({
-      commit_retirement_state: 'manual_review',
-      commit_retirement_standard_opted_in_at: null,
-      commit_retirement_review_reason: 'provider_state_mismatch',
-    });
-  });
-});
+function createTransferSource(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'sub-source',
+    user_id: 'user-1',
+    instance_id: 'instance-old',
+    stripe_subscription_id: 'stripe-live',
+    stripe_schedule_id: 'schedule-live',
+    transferred_to_subscription_id: null,
+    access_origin: null,
+    payment_source: 'credits',
+    kiloclaw_price_version: '2026-03-19',
+    plan: 'standard',
+    scheduled_plan: null,
+    scheduled_by: null,
+    status: 'active',
+    cancel_at_period_end: false,
+    pending_conversion: false,
+    trial_started_at: null,
+    trial_ends_at: null,
+    current_period_start: '2026-05-01T00:00:00.000Z',
+    current_period_end: '2026-06-01T00:00:00.000Z',
+    credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    commit_ends_at: null,
+    past_due_since: null,
+    suspended_at: null,
+    destruction_deadline: null,
+    auto_resume_requested_at: null,
+    auto_resume_retry_after: null,
+    auto_resume_attempt_count: 0,
+    auto_top_up_triggered_for_period: null,
+    created_at: '2026-05-01T00:00:00.000Z',
+    updated_at: '2026-05-10T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 describe('bootstrapProvisionSubscription successor transfer', () => {
   beforeEach(() => {
     mockCreateCommitRetirementReviewCase.mockClear();
+    mockFindLatestPreCutoffUserCommitSwitchQualification.mockReset();
+    mockFindLatestPreCutoffUserCommitSwitchQualification.mockResolvedValue(null);
     mockGetWorkerDb.mockReset();
     mockInsertKiloClawSubscriptionChangeLog.mockReset();
   });
 
-  it('preserves hybrid retirement and provider state during successor transfer', async () => {
+  it('preserves safe final-term operational and provider state during successor transfer', async () => {
     const source = {
       id: 'sub-source-unsafe',
       user_id: 'user-1',
@@ -374,11 +230,6 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
       current_period_end: '2026-12-01T00:00:00.000Z',
       credit_renewal_at: '2026-12-01T00:00:00.000Z',
       commit_ends_at: '2026-12-01T00:00:00.000Z',
-      commit_retirement_state: 'standard_scheduled',
-      commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
-      commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
-      commit_retirement_guarded_at: null,
-      commit_retirement_review_reason: null,
       past_due_since: null,
       suspended_at: null,
       destruction_deadline: null,
@@ -423,9 +274,7 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
       expect.objectContaining({
         scheduled_plan: 'standard',
         scheduled_by: 'user',
-        commit_retirement_state: 'standard_scheduled',
-        commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
-        commit_retirement_review_reason: null,
+        commit_ends_at: '2026-12-01T00:00:00.000Z',
       })
     );
     expect(updateSets).toContainEqual(
@@ -434,6 +283,182 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
         stripe_schedule_id: 'schedule-live',
       })
     );
+    expect(mockCreateCommitRetirementReviewCase).not.toHaveBeenCalled();
+  });
+
+  it('preserves a pending Commit switch with pre-cutoff change-log qualification', async () => {
+    const source = createTransferSource({
+      scheduled_plan: 'commit',
+      scheduled_by: 'user',
+    });
+    mockFindLatestPreCutoffUserCommitSwitchQualification.mockResolvedValue({
+      qualifiedAt: '2026-06-05T00:00:00.000Z',
+      qualificationSource: 'switch_requested_before_cutoff',
+    });
+    const insertedSuccessor = {
+      ...source,
+      id: 'sub-successor',
+      instance_id: 'instance-new',
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+    };
+    const predecessorAfter = {
+      ...source,
+      status: 'canceled',
+      transferred_to_subscription_id: insertedSuccessor.id,
+    };
+    const restoredSuccessor = {
+      ...insertedSuccessor,
+      stripe_subscription_id: source.stripe_subscription_id,
+      stripe_schedule_id: source.stripe_schedule_id,
+    };
+    const { db, insertValues } = createMockDb({
+      selectRows: [
+        [],
+        [source],
+        [
+          { id: 'instance-old', destroyedAt: '2026-06-07T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      txSelectRows: [[source], [{ id: 'instance-new' }], [], []],
+      insertReturningRows: [[insertedSuccessor]],
+      updateReturningRows: [[predecessorAfter], [restoredSuccessor]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await bootstrapProvisionSubscription(createEnv(), {
+      userId: source.user_id,
+      instanceId: 'instance-new',
+      orgId: null,
+    });
+
+    expect(insertValues[0]).toEqual(
+      expect.objectContaining({ scheduled_plan: 'commit', scheduled_by: 'user' })
+    );
+    expect(mockCreateCommitRetirementReviewCase).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'missing pending Commit qualification',
+      source: createTransferSource({ scheduled_plan: 'commit', scheduled_by: 'user' }),
+      reason: 'missing_qualification_evidence',
+    },
+    {
+      name: 'Commit final boundary mismatch',
+      source: createTransferSource({
+        plan: 'commit',
+        current_period_start: '2026-05-01T00:00:00.000Z',
+        current_period_end: '2026-11-01T00:00:00.000Z',
+        commit_ends_at: '2026-12-01T00:00:00.000Z',
+      }),
+      reason: 'boundary_mismatch',
+    },
+  ])('contains unsafe transfer with $name', async ({ source, reason }) => {
+    const insertedSuccessor = {
+      ...source,
+      id: 'sub-successor',
+      instance_id: 'instance-new',
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+    };
+    const containedSuccessor = {
+      ...insertedSuccessor,
+      scheduled_plan: null,
+      scheduled_by: null,
+      cancel_at_period_end: true,
+      stripe_subscription_id: source.stripe_subscription_id,
+    };
+    const { db, insertValues, updateSets } = createMockDb({
+      selectRows: [
+        [],
+        [source],
+        [
+          { id: 'instance-old', destroyedAt: '2026-06-07T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      txSelectRows: [[source], [{ id: 'instance-new' }], [], []],
+      insertReturningRows: [[insertedSuccessor]],
+      updateReturningRows: [[{ ...source, status: 'canceled' }], [containedSuccessor]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const result = await bootstrapProvisionSubscription(createEnv(), {
+      userId: source.user_id,
+      instanceId: 'instance-new',
+      orgId: null,
+    });
+
+    expect(insertValues[0]).toEqual(
+      expect.objectContaining({
+        scheduled_plan: null,
+        scheduled_by: null,
+        cancel_at_period_end: true,
+        commit_ends_at: source.commit_ends_at,
+      })
+    );
+    expect(updateSets[1]).toEqual(
+      expect.objectContaining({ stripe_subscription_id: 'stripe-live', stripe_schedule_id: null })
+    );
+    expect(result).toEqual(containedSuccessor);
+    expect(mockCreateCommitRetirementReviewCase).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ subscriptionId: 'sub-successor', reasonCode: reason })
+    );
+  });
+
+  it('retargets existing open review case without replacing its reason authority', async () => {
+    const source = createTransferSource({ scheduled_plan: 'commit', scheduled_by: 'user' });
+    const openReviewCase = {
+      id: 'review-existing',
+      reason_code: 'provider_state_mismatch',
+      summary: 'Existing provider mismatch',
+    };
+    const insertedSuccessor = {
+      ...source,
+      id: 'sub-successor',
+      instance_id: 'instance-new',
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+    };
+    const containedSuccessor = {
+      ...insertedSuccessor,
+      scheduled_plan: null,
+      scheduled_by: null,
+      cancel_at_period_end: true,
+      stripe_subscription_id: source.stripe_subscription_id,
+    };
+    const { db, updateSets } = createMockDb({
+      selectRows: [
+        [],
+        [source],
+        [
+          { id: 'instance-old', destroyedAt: '2026-06-07T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      txSelectRows: [[source], [{ id: 'instance-new' }], [], [openReviewCase]],
+      insertReturningRows: [[insertedSuccessor]],
+      updateReturningRows: [
+        [{ ...source, status: 'canceled' }],
+        [containedSuccessor],
+        [{ ...openReviewCase, subscription_id: 'sub-successor' }],
+      ],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await bootstrapProvisionSubscription(createEnv(), {
+      userId: source.user_id,
+      instanceId: 'instance-new',
+      orgId: null,
+    });
+
+    expect(updateSets[2]).toEqual({ subscription_id: 'sub-successor' });
     expect(mockCreateCommitRetirementReviewCase).not.toHaveBeenCalled();
   });
 
@@ -525,7 +550,7 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
         kiloclaw_price_version: '2026-03-19',
       })
     );
-    expect(updateSets).toHaveLength(3);
+    expect(updateSets).toHaveLength(2);
     expect(updateSets[0]).toEqual(
       expect.objectContaining({
         transferred_to_subscription_id: insertedSuccessor.id,
@@ -538,7 +563,6 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
         stripe_schedule_id: source.stripe_schedule_id,
       })
     );
-    expect(updateSets[2]).toEqual({ subscription_id: restoredSuccessor.id });
     expect(result).toEqual(restoredSuccessor);
   });
 

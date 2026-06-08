@@ -324,15 +324,13 @@ function creditRenewalRow(overrides: Partial<Record<string, unknown>> = {}) {
     current_period_end: '2026-06-01T00:00:00.000Z',
     cancel_at_period_end: false,
     scheduled_plan: null,
+    scheduled_by: null,
     commit_ends_at: null,
+    has_open_commit_review: false,
     past_due_since: null,
     suspended_at: null,
     auto_resume_attempt_count: 0,
     auto_top_up_triggered_for_period: null,
-    commit_retirement_state: null,
-    commit_retirement_final_ends_at: null,
-    commit_retirement_standard_opted_in_at: null,
-    commit_retirement_guarded_at: null,
     total_microdollars_acquired: 20_000_000,
     microdollars_used: 0,
     auto_top_up_enabled: false,
@@ -476,9 +474,8 @@ describe('Commit retirement credit renewal decisions', () => {
         creditRenewalRow({
           plan: 'commit',
           credit_renewal_at: '2026-06-06T00:00:00.000Z',
-          commit_retirement_state: 'final_term',
-          commit_retirement_final_ends_at: '2026-06-06T00:00:00.000Z',
           current_period_end: '2026-06-06T00:00:00.000Z',
+          commit_ends_at: '2026-06-06T00:00:00.000Z',
         }) as never
       )
     ).toEqual({ kind: 'cancel_final_commit' });
@@ -490,10 +487,9 @@ describe('Commit retirement credit renewal decisions', () => {
         creditRenewalRow({
           plan: 'commit',
           scheduled_plan: 'standard',
-          commit_retirement_state: 'standard_scheduled',
+          scheduled_by: 'user',
           credit_renewal_at: '2026-06-01T00:00:00.000Z',
-          commit_retirement_final_ends_at: '2026-06-01T00:00:00.000Z',
-          commit_retirement_standard_opted_in_at: '2026-05-10T00:00:00.000Z',
+          commit_ends_at: '2026-06-01T00:00:00.000Z',
         }) as never
       )
     ).toEqual({ kind: 'continue_standard' });
@@ -505,10 +501,9 @@ describe('Commit retirement credit renewal decisions', () => {
         creditRenewalRow({
           plan: 'commit',
           scheduled_plan: 'standard',
+          scheduled_by: 'user',
           credit_renewal_at: '2026-06-01T00:00:00.001Z',
-          commit_retirement_state: 'standard_scheduled',
-          commit_retirement_final_ends_at: '2026-06-01T00:00:00.000Z',
-          commit_retirement_standard_opted_in_at: '2026-05-10T00:00:00.000Z',
+          commit_ends_at: '2026-06-01T00:00:00.000Z',
         }) as never
       )
     ).toEqual({ kind: 'open_manual_review' });
@@ -521,7 +516,6 @@ describe('Commit retirement credit renewal decisions', () => {
           plan: 'standard',
           scheduled_plan: 'commit',
           credit_renewal_at: '2026-07-01T00:00:00.000Z',
-          commit_retirement_state: 'pending_final_term',
         }) as never,
         true
       )
@@ -551,8 +545,7 @@ describe('Commit retirement credit renewal decisions', () => {
         creditRenewalRow({
           plan: 'commit',
           credit_renewal_at: '2026-06-05T23:59:59.999Z',
-          commit_retirement_state: 'final_term',
-          commit_retirement_final_ends_at: '2026-12-05T23:59:59.999Z',
+          commit_ends_at: '2026-12-05T23:59:59.999Z',
         }) as never
       )
     ).toEqual({ kind: 'open_manual_review' });
@@ -564,8 +557,6 @@ describe('Commit retirement credit renewal decisions', () => {
         creditRenewalRow({
           plan: 'commit',
           credit_renewal_at: '2026-06-05T23:59:59.999Z',
-          commit_retirement_state: null,
-          commit_retirement_final_ends_at: null,
         }) as never
       )
     ).toEqual({
@@ -580,8 +571,6 @@ describe('Commit retirement credit renewal decisions', () => {
         creditRenewalRow({
           plan: 'commit',
           credit_renewal_at: '2026-06-06T00:00:00.000Z',
-          commit_retirement_state: 'final_term',
-          commit_retirement_final_ends_at: '2026-12-06T00:00:00.000Z',
         }) as never
       )
     ).toEqual({ kind: 'open_manual_review' });
@@ -594,8 +583,6 @@ describe('Commit retirement credit renewal decisions', () => {
           plan: 'standard',
           scheduled_plan: 'commit',
           credit_renewal_at: '2026-07-01T00:00:00.000Z',
-          commit_retirement_state: 'completed',
-          commit_retirement_final_ends_at: '2026-06-01T00:00:00.000Z',
         }) as never
       )
     ).toEqual({ kind: 'open_manual_review' });
@@ -606,7 +593,7 @@ describe('Commit retirement credit renewal decisions', () => {
       decideCommitRetirementCreditRenewal(
         creditRenewalRow({
           plan: 'commit',
-          commit_retirement_state: 'manual_review',
+          has_open_commit_review: true,
         }) as never
       )
     ).toEqual({ kind: 'skip_manual_review' });
@@ -1198,8 +1185,7 @@ describe('credit renewal fanout queue processing', () => {
       plan: 'commit',
       credit_renewal_at: '2026-06-06T00:00:00.000Z',
       current_period_end: '2026-06-06T00:00:00.000Z',
-      commit_retirement_state: 'final_term',
-      commit_retirement_final_ends_at: '2026-06-06T00:00:00.000Z',
+      commit_ends_at: '2026-06-06T00:00:00.000Z',
     });
     const { db, txUpdates } = createMockDb([[row], [row]]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -1221,8 +1207,7 @@ describe('credit renewal fanout queue processing', () => {
     expect(txUpdates).toContainEqual(
       expect.objectContaining({
         status: 'canceled',
-        commit_retirement_state: 'completed',
-        commit_retirement_guarded_at: expect.anything(),
+        cancel_at_period_end: false,
       })
     );
   });
@@ -4686,7 +4671,7 @@ describe('credit renewal sweep affiliate tracking', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('charges pure-credit renewals from the subscription price version catalog', async () => {
+  it('charges Standard renewals from catalog and cancels final Commit without another charge', async () => {
     const renewalAt = '2026-04-09T10:00:00.000Z';
     const { db, txInserts } = createMockDb(
       [
@@ -4761,9 +4746,9 @@ describe('credit renewal sweep affiliate tracking', () => {
             current_period_end: renewalAt,
             cancel_at_period_end: false,
             scheduled_plan: null,
+            scheduled_by: null,
             commit_ends_at: renewalAt,
-            commit_retirement_state: null,
-            commit_retirement_final_ends_at: null,
+            has_open_commit_review: false,
             past_due_since: null,
             suspended_at: null,
             auto_resume_attempt_count: 0,
@@ -4822,7 +4807,8 @@ describe('credit renewal sweep affiliate tracking', () => {
       'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
     );
 
-    expect(summary.credit_renewals).toBe(3);
+    expect(summary.credit_renewals).toBe(2);
+    expect(summary.credit_renewals_canceled).toBe(1);
     expect(summary.errors).toBe(0);
     expect(txInserts).toEqual(
       expect.arrayContaining([
@@ -4835,11 +4821,6 @@ describe('credit renewal sweep affiliate tracking', () => {
           kilo_user_id: 'current-user',
           amount_microdollars: -55_000_000,
           credit_category: 'kiloclaw-subscription:current-instance:2026-04',
-        }),
-        expect.objectContaining({
-          kilo_user_id: 'current-commit-user',
-          amount_microdollars: -306_000_000,
-          credit_category: 'kiloclaw-subscription-commit:current-commit-instance:2026-04',
         }),
       ])
     );
@@ -4869,13 +4850,6 @@ describe('credit renewal sweep affiliate tracking', () => {
           itemCategory: 'kiloclaw-standard-2026-05-10',
           itemName: 'KiloClaw Standard Plan',
           itemSku: 'kiloclaw-standard-2026-05-10',
-        }),
-        expect.objectContaining({
-          userId: 'current-commit-user',
-          amount: 306,
-          itemCategory: 'kiloclaw-commit-2026-05-10',
-          itemName: 'KiloClaw Commit Plan',
-          itemSku: 'kiloclaw-commit-2026-05-10',
         }),
       ])
     );
@@ -4959,8 +4933,8 @@ describe('credit renewal sweep affiliate tracking', () => {
             current_period_end: renewalAt,
             cancel_at_period_end: false,
             scheduled_plan: 'commit',
-            commit_retirement_state: 'pending_final_term',
-            commit_retirement_final_ends_at: null,
+            scheduled_by: 'user',
+            has_open_commit_review: false,
             commit_ends_at: null,
             past_due_since: null,
             suspended_at: null,
@@ -4988,7 +4962,9 @@ describe('credit renewal sweep affiliate tracking', () => {
             current_period_end: renewalAt,
             cancel_at_period_end: false,
             scheduled_plan: 'standard',
+            scheduled_by: 'user',
             commit_ends_at: renewalAt,
+            has_open_commit_review: false,
             past_due_since: null,
             suspended_at: null,
             auto_resume_attempt_count: 0,

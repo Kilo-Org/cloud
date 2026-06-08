@@ -99,11 +99,22 @@ function routeKey(binding: CliBinding): string {
     .join('&');
 }
 
-// The `--bind` spec that removes a given route: bare `channel` for a default
-// route, `channel:accountId` for an account-scoped one.
-function routeToUnbindSpec(binding: CliBinding): string {
+// The canonical `--bind`/`--unbind` spec for a route: bare `channel` for a
+// default route, `channel:accountId` for an account-scoped one. Used both to
+// remove a created route and to re-create a removed one during restoration.
+function routeToSpec(binding: CliBinding): string {
   const summary = toBindingSummary(binding);
   return summary.accountId === null ? summary.channel : `${summary.channel}:${summary.accountId}`;
+}
+
+// The set of channels an agent catches via a managed (channel-key-only) default
+// route, lower-cased for comparison against the desired set.
+function managedChannelSet(bindings: CliBinding[]): Set<string> {
+  return new Set(
+    bindings
+      .filter(isManagedDefaultRoute)
+      .map(binding => toBindingSummary(binding).channel.toLowerCase())
+  );
 }
 
 /** Per-agent binding summaries, sourced from the CLI (the routing source of truth). */
@@ -123,9 +134,14 @@ export async function listAgentBindingSummaries(
 
 /**
  * Declaratively set an agent's channel-level routes by diffing the CLI's current
- * view and issuing `bind`/`unbind`. Binds run first; on a conflict we roll back
- * the additions and remove nothing, so a rejected request (→ 409) leaves the
- * agent's routing unchanged. The CLI owns conflict/canonicalization/$include/order.
+ * view and issuing `bind`/`unbind`. Every write through the final
+ * managed-set verification runs under one recovery path: on any failure the
+ * agent's routes are restored to the pre-change snapshot and the original reason
+ * is surfaced; if restoration cannot be confirmed the request fails with
+ * `500 agent_binding_rollback_failed` rather than report a clean result over
+ * mutated routing. The endpoint only returns success once the managed route set
+ * actually equals the requested channels. The CLI owns
+ * conflict/canonicalization/$include/order.
  */
 export async function updateAgentBindings(
   agentId: string,
@@ -134,7 +150,8 @@ export async function updateAgentBindings(
   options: AgentConfigOptions = {}
 ): Promise<{ snapshot: AgentConfigSnapshot; agent: AgentSummary }> {
   const normalized = requireAgentId(agentId);
-  const desired = [...new Set(body.channels.map(channel => channel.trim().toLowerCase()))];
+  const desiredSet = new Set(body.channels.map(channel => channel.trim().toLowerCase()));
+  const desired = [...desiredSet];
 
   return deps.serializeMutation(async () => {
     const snapshot = deps.readSnapshot(options);
@@ -152,36 +169,42 @@ export async function updateAgentBindings(
     }
 
     const before = await deps.listBindings(normalized);
-    const current = before
-      .filter(isManagedDefaultRoute)
-      .map(binding => toBindingSummary(binding).channel);
-    const currentSet = new Set(current);
-    const desiredSet = new Set(desired);
-    const toBind = desired.filter(channel => !currentSet.has(channel));
-    const toUnbind = current.filter(channel => !desiredSet.has(channel));
-
     const beforeKeys = new Set(before.map(routeKey));
+    const beforeManaged = managedChannelSet(before);
+    const toBind = desired.filter(channel => !beforeManaged.has(channel));
+    const toUnbind = [...beforeManaged].filter(channel => !desiredSet.has(channel));
 
-    // Undo exactly the routes a rejected/aborted bind produced, then CONFIRM the
-    // agent's routes match the pre-bind snapshot. We diff against `before` rather
-    // than unbinding `toBind` blindly: a bare unbind can resolve to an
-    // account-scoped route, so unbinding requested channels could delete a
-    // pre-existing route this request never created. If restoration can't be
-    // confirmed (CLI timeout, write conflict, …), surface a distinct
-    // state-uncertain error instead of reporting a clean rejection over mutated
-    // routing.
-    const restoreToBefore = async (created: CliBinding[]): Promise<void> => {
+    // Restore the agent's routes to `before` after a failed/aborted change, then
+    // CONFIRM it. We diff the live state against the snapshot rather than
+    // replaying `toBind`/`toUnbind`: a bare spec can resolve to an account-scoped
+    // route, so we undo exactly the routes that diverged (unbind what was added,
+    // re-bind what was removed) by their canonical specs. If the confirming read
+    // fails or still shows drift, the routing state is uncertain — surface that
+    // instead of a clean result.
+    const restoreToBefore = async (): Promise<void> => {
       try {
-        if (created.length > 0) {
-          await deps.unbind(normalized, created.map(routeToUnbindSpec));
-        }
+        const live = await deps.listBindings(normalized);
+        const liveKeys = new Set(live.map(routeKey));
+        const created = live.filter(binding => !beforeKeys.has(routeKey(binding)));
+        const removed = before.filter(binding => !liveKeys.has(routeKey(binding)));
+        if (created.length > 0) await deps.unbind(normalized, created.map(routeToSpec));
+        if (removed.length > 0) await deps.bind(normalized, removed.map(routeToSpec));
       } catch (rollbackError) {
         console.error(
-          '[controller] Agent binding rollback unbind failed:',
+          '[controller] Agent binding rollback failed:',
           rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
         );
       }
-      const afterRollback = await deps.listBindings(normalized);
+      let afterRollback: CliBinding[];
+      try {
+        afterRollback = await deps.listBindings(normalized);
+      } catch {
+        throw new AgentConfigError(
+          500,
+          'agent_binding_rollback_failed',
+          'Binding change failed and the rollback could not be confirmed; routing state is uncertain — re-read bindings before retrying'
+        );
+      }
       const afterKeys = new Set(afterRollback.map(routeKey));
       const drifted =
         afterRollback.some(binding => !beforeKeys.has(routeKey(binding))) ||
@@ -195,46 +218,52 @@ export async function updateAgentBindings(
       }
     };
 
-    // Bind first, before removing anything. OpenClaw applies every
-    // non-conflicting addition and THEN reports the conflict (exit 1), so we
-    // diff the agent's routes against the pre-bind snapshot to see exactly what
-    // this invocation produced, and roll those back on any rejection.
-    if (toBind.length > 0) {
-      const result = await deps.bind(normalized, toBind);
-      const created = (await deps.listBindings(normalized)).filter(
-        binding => !beforeKeys.has(routeKey(binding))
-      );
-
-      if (result.conflicts.length > 0) {
-        await restoreToBefore(created);
-        throw new AgentConfigError(
-          409,
-          'agent_binding_conflict',
-          `Channel already routed to another agent: ${result.conflicts.join(', ')}`
-        );
+    if (toBind.length > 0 || toUnbind.length > 0) {
+      // OpenClaw writes config before emitting its JSON result, so a bind/unbind
+      // timeout, malformed result, conflict, or a managed set that doesn't match
+      // the request can all leave routes changed. Funnel every such case through
+      // one recovery path: restore to `before`, then surface the reason.
+      let failure: unknown = null;
+      try {
+        if (toBind.length > 0) {
+          const result = await deps.bind(normalized, toBind);
+          if (result.conflicts.length > 0) {
+            failure = new AgentConfigError(
+              409,
+              'agent_binding_conflict',
+              `Channel already routed to another agent: ${result.conflicts.join(', ')}`
+            );
+          }
+        }
+        if (!failure && toUnbind.length > 0) {
+          await deps.unbind(normalized, toUnbind);
+        }
+        if (!failure) {
+          // Only report success if the managed route set is exactly the request.
+          // A bare bind can resolve to an existing account route (reported
+          // `skipped`) or a bare unbind to a different account scope (reported
+          // `missing`), either of which leaves the managed set wrong despite an
+          // ok-looking CLI result.
+          const finalManaged = managedChannelSet(await deps.listBindings(normalized));
+          const matches =
+            finalManaged.size === desiredSet.size &&
+            [...desiredSet].every(channel => finalManaged.has(channel));
+          if (!matches) {
+            failure = new AgentConfigError(
+              422,
+              'invalid_agent_config',
+              'Could not set the requested channel routes; OpenClaw resolved one or more channels outside the managed default-account scope'
+            );
+          }
+        }
+      } catch (writeError) {
+        failure = writeError;
       }
 
-      // Defense-in-depth: a channel's bare bind could (for some channel plugin)
-      // resolve into an account-scoped route this endpoint can't manage as a
-      // default route — a later `channels: []` clear would then silently leave
-      // it. Confirm every route this invocation produced is a channel-key-only
-      // default route; if not, roll back and fail closed. The cloud channels all
-      // bind cleanly, so this only guards a future auto-resolving channel.
-      const unmanageable = created.filter(binding => !isManagedDefaultRoute(binding));
-      if (unmanageable.length > 0) {
-        await restoreToBefore(created);
-        const channels = [
-          ...new Set(unmanageable.map(binding => toBindingSummary(binding).channel)),
-        ];
-        throw new AgentConfigError(
-          422,
-          'invalid_agent_config',
-          `OpenClaw resolved a bind to an account-scoped route this endpoint cannot manage as a default route: ${channels.join(', ')}`
-        );
+      if (failure) {
+        await restoreToBefore(); // throws 500 agent_binding_rollback_failed if unconfirmable
+        throw failure;
       }
-    }
-    if (toUnbind.length > 0) {
-      await deps.unbind(normalized, toUnbind);
     }
 
     const after = deps.readSummary(normalized, options);

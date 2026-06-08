@@ -141,7 +141,7 @@ function statefulDeps(
 
 describe('updateAgentBindings', () => {
   it('binds channels missing from the current set', async () => {
-    const deps = makeDeps({ listBindings: vi.fn(async () => [route('research', 'slack')]) });
+    const { deps } = statefulDeps([route('research', 'slack')]);
 
     await updateAgentBindings('research', { channels: ['slack', 'discord'] }, deps);
 
@@ -150,9 +150,7 @@ describe('updateAgentBindings', () => {
   });
 
   it('unbinds channels no longer desired', async () => {
-    const deps = makeDeps({
-      listBindings: vi.fn(async () => [route('research', 'slack'), route('research', 'discord')]),
-    });
+    const { deps } = statefulDeps([route('research', 'slack'), route('research', 'discord')]);
 
     await updateAgentBindings('research', { channels: ['slack'] }, deps);
 
@@ -161,18 +159,50 @@ describe('updateAgentBindings', () => {
   });
 
   it('only manages default-account routes (preserves account-scoped + advanced)', async () => {
-    const deps = makeDeps({
-      listBindings: vi.fn(async () => [
-        route('research', 'slack'),
-        route('research', 'discord', { accountId: 'team' }), // account-scoped
-        route('research', 'whatsapp', { peer: { kind: 'direct', id: '+1' } }), // advanced
-      ]),
-    });
+    const { deps, routes } = statefulDeps([
+      route('research', 'slack'),
+      route('research', 'discord', { accountId: 'team' }), // account-scoped
+      route('research', 'whatsapp', { peer: { kind: 'direct', id: '+1' } }), // advanced
+    ]);
 
     await updateAgentBindings('research', { channels: [] }, deps);
 
-    // Only the plain default-account slack route is removed.
+    // Only the plain default-account slack route is removed; the rest survive.
     expect(deps.unbind).toHaveBeenCalledWith('research', ['slack']);
+    expect(
+      routes()
+        .map(r => r.match.channel)
+        .sort()
+    ).toEqual(['discord', 'whatsapp']);
+  });
+
+  it('fails closed (422) when a requested channel resolves to an existing account route', async () => {
+    // whatsapp auto-resolves to :default and the agent already has whatsapp:default,
+    // so the bind is reported "skipped" and the managed (default) set still lacks
+    // whatsapp — the request was not actually satisfied, so we must not report ok.
+    const { deps, routes } = statefulDeps(
+      [route('research', 'whatsapp', { accountId: 'default' })],
+      {
+        accountResolve: ['whatsapp'],
+      }
+    );
+
+    await expect(
+      updateAgentBindings('research', { channels: ['whatsapp'] }, deps)
+    ).rejects.toMatchObject({ code: 'invalid_agent_config', status: 422 });
+
+    // Nothing was created, so there is nothing to roll back and the route stays.
+    expect(routes()).toHaveLength(1);
+  });
+
+  it('reports state-uncertain (500) when a post-write step fails and rollback cannot complete', async () => {
+    // kilo-chat is added and discord removed; unbind always fails, so the
+    // rollback of the added kilo-chat route cannot complete.
+    const { deps } = statefulDeps([route('research', 'discord')], { unbindThrows: true });
+
+    await expect(
+      updateAgentBindings('research', { channels: ['kilo-chat'] }, deps)
+    ).rejects.toMatchObject({ code: 'agent_binding_rollback_failed', status: 500 });
   });
 
   it('leaves an account-scoped route (incl. literal "default") intact on clear', async () => {

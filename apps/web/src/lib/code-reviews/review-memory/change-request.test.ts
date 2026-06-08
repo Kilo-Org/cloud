@@ -15,7 +15,7 @@ import {
   upsertScopeProposal,
   type ReviewMemoryOwner,
 } from './db';
-import { buildChangeRequestBody } from './change-request';
+import { buildChangeRequestBody, isStaleOpeningChangeRequest } from './change-request';
 
 describe('review memory change requests', () => {
   afterEach(async () => {
@@ -64,6 +64,14 @@ describe('review memory change requests', () => {
     const supersededProposal = await seedProposal(owner, 'acme/superseded');
     const superseded = await markProposalSuperseded({ proposalId: supersededProposal.id });
     expect(superseded?.status).toBe('superseded');
+  });
+
+  it('detects stale opening change-request states', () => {
+    const now = new Date('2026-06-01T12:00:00.000Z');
+
+    expect(isStaleOpeningChangeRequest('2026-06-01T11:31:00.000Z', now)).toBe(false);
+    expect(isStaleOpeningChangeRequest('2026-06-01T11:30:00.000Z', now)).toBe(true);
+    expect(isStaleOpeningChangeRequest('not-a-date', now)).toBe(false);
   });
 });
 

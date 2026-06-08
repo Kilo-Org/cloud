@@ -24,6 +24,7 @@ import { generateIntegratedReviewGuidanceWithGateway } from './review-md-integra
 const REVIEW_MEMORY_TARGET_FILE_PATH = 'REVIEW.md';
 const REVIEW_MEMORY_CHANGE_REQUEST_TITLE = 'docs(review): update REVIEW.md guidance';
 const REVIEW_MEMORY_CHANGE_REQUEST_MARKER = '<!-- kilo-review-memory-change-request -->';
+const OPENING_CHANGE_REQUEST_STALE_MS = 30 * 60 * 1000;
 const APPROVABLE_STATUSES: ReadonlySet<ReviewMemoryProposalStatus> = new Set([
   'open',
   'edited',
@@ -58,12 +59,22 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
   owner: ReviewMemoryOwner;
   proposalId: string;
 }): Promise<CodeReviewMemoryProposal> {
-  const proposal = await getProposal({ owner: input.owner, proposalId: input.proposalId });
+  let proposal = await getProposal({ owner: input.owner, proposalId: input.proposalId });
   if (!proposal) {
     throw new ReviewMemoryChangeRequestError('NOT_FOUND', 'Review memory proposal not found.');
   }
   if (proposal.status === 'change_request_opened' && proposal.change_request_url) {
     return proposal;
+  }
+  if (proposal.status === 'opening_change_request') {
+    const recovered = await recoverStaleOpeningChangeRequest(proposal);
+    if (!recovered) {
+      throw new ReviewMemoryChangeRequestError(
+        'CONFLICT',
+        'Review memory proposal is already being processed.'
+      );
+    }
+    proposal = recovered;
   }
   if (!APPROVABLE_STATUSES.has(proposal.status)) {
     throw new ReviewMemoryChangeRequestError(
@@ -164,6 +175,20 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
       redactSensitiveErrorMessage(error instanceof Error ? error.message : String(error))
     );
   }
+}
+
+export function isStaleOpeningChangeRequest(updatedAt: string, now = new Date()): boolean {
+  const updatedAtMs = new Date(updatedAt).getTime();
+  return (
+    Number.isFinite(updatedAtMs) && now.getTime() - updatedAtMs >= OPENING_CHANGE_REQUEST_STALE_MS
+  );
+}
+
+async function recoverStaleOpeningChangeRequest(
+  proposal: CodeReviewMemoryProposal
+): Promise<CodeReviewMemoryProposal | null> {
+  if (!isStaleOpeningChangeRequest(proposal.updated_at)) return null;
+  return await markProposalChangeRequestFailed({ proposalId: proposal.id });
 }
 
 async function findGitHubIntegrationForProposal(

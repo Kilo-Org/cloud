@@ -255,6 +255,156 @@ export const FileWriteResponseSchema = z.union([
 export type FileWriteResponse = z.infer<typeof FileWriteResponseSchema>;
 
 // ──────────────────────────────────────────────────────────────────────
+// Agent config CRUD responses
+// Mirror (controller side):
+//   - controller/src/openclaw-agent-config.ts → AgentSummary, AgentConfigSummary
+//   - controller/src/openclaw-agent-cli.ts     → CreateResultSchema, DeleteResultSchema
+// Response schemas are intentionally lenient (settings as nullable strings, not
+// enums) so a newer controller adding an enum value never fails cloud-side parsing.
+// ──────────────────────────────────────────────────────────────────────
+
+// Raw model value as authored in openclaw.json: a bare string or an object.
+const AgentRawModelSchema = z.union([
+  z.string(),
+  z
+    .object({
+      primary: z.string().optional(),
+      fallbacks: z.array(z.string()).optional(),
+    })
+    .passthrough(),
+]);
+
+const AgentModelSummarySchema = z.object({
+  primary: z.string().nullable(),
+  fallbacks: z.array(z.string()),
+});
+
+const AgentSettingsSummarySchema = z.object({
+  thinkingDefault: z.string().nullable(),
+  verboseDefault: z.string().nullable(),
+  reasoningDefault: z.string().nullable(),
+  fastModeDefault: z.boolean().nullable(),
+});
+
+export const AgentSummarySchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  configured: z.boolean(),
+  workspace: z.string().nullable(),
+  agentDir: z.string().nullable(),
+  model: AgentModelSummarySchema.extend({
+    source: z.enum(['agent', 'defaults']).nullable(),
+  }),
+  rawModel: AgentRawModelSchema.nullable(),
+  settings: AgentSettingsSummarySchema,
+});
+export type AgentSummary = z.infer<typeof AgentSummarySchema>;
+
+export const AgentDefaultsSummarySchema = z.object({
+  model: AgentModelSummarySchema.nullable(),
+  settings: AgentSettingsSummarySchema,
+});
+export type AgentDefaultsSummary = z.infer<typeof AgentDefaultsSummarySchema>;
+
+// GET /_kilo/config/agents → { etag, defaults, agents[] }
+export const AgentConfigListResponseSchema = z.object({
+  etag: z.string(),
+  defaults: AgentDefaultsSummarySchema,
+  agents: z.array(AgentSummarySchema),
+});
+export type AgentConfigListResponse = z.infer<typeof AgentConfigListResponseSchema>;
+
+// GET /_kilo/config/agents/:id → { etag, agent }
+export const AgentReadResponseSchema = z.object({
+  etag: z.string(),
+  agent: AgentSummarySchema,
+});
+export type AgentReadResponse = z.infer<typeof AgentReadResponseSchema>;
+
+// PATCH /_kilo/config/agents/:id → { ok, etag, agent }
+export const AgentMutationResponseSchema = z.object({
+  ok: z.boolean(),
+  etag: z.string(),
+  agent: AgentSummarySchema,
+});
+export type AgentMutationResponse = z.infer<typeof AgentMutationResponseSchema>;
+
+// PATCH /_kilo/config/agent-defaults → { ok, etag, defaults }
+export const AgentDefaultsMutationResponseSchema = z.object({
+  ok: z.boolean(),
+  etag: z.string(),
+  defaults: AgentDefaultsSummarySchema,
+});
+export type AgentDefaultsMutationResponse = z.infer<typeof AgentDefaultsMutationResponseSchema>;
+
+// CLI create result — mirror controller/src/openclaw-agent-cli.ts CreateResultSchema.
+const AgentCreateResultSchema = z.object({
+  agentId: z.string(),
+  name: z.string(),
+  workspace: z.string(),
+  agentDir: z.string(),
+  model: z.string().optional(),
+  bindings: z
+    .object({
+      added: z.array(z.string()),
+      updated: z.array(z.string()),
+      skipped: z.array(z.string()),
+      conflicts: z.array(z.string()),
+    })
+    .optional(),
+});
+
+// POST /_kilo/config/agents → { ok, etag, agent, created }
+export const AgentCreateResponseSchema = z.object({
+  ok: z.boolean(),
+  etag: z.string(),
+  agent: AgentSummarySchema,
+  created: AgentCreateResultSchema,
+});
+export type AgentCreateResponse = z.infer<typeof AgentCreateResponseSchema>;
+
+// DELETE /_kilo/config/agents/:id → { ok, filesystemDisposition, agentId, ... }
+// filesystemDisposition is always 'unverified' — the controller does not confirm
+// the workspace/state/session dirs were removed. The UI must surface this honestly.
+export const AgentDeleteResponseSchema = z.object({
+  ok: z.boolean(),
+  filesystemDisposition: z.literal('unverified'),
+  agentId: z.string(),
+  workspace: z.string(),
+  agentDir: z.string(),
+  sessionsDir: z.string(),
+  removedBindings: z.number().int(),
+  removedAllow: z.number().int(),
+});
+export type AgentDeleteResponse = z.infer<typeof AgentDeleteResponseSchema>;
+
+/**
+ * Error envelope RETURNED (never thrown) by the agent gateway/DO methods.
+ * Custom error properties (`.status`/`.code` on GatewayControllerError) are
+ * stripped crossing the DO RPC boundary — only `.message` survives — so a typed
+ * agent error must be returned as a serializable value and reconstructed into an
+ * HTTP response in the platform route. Same pattern as kilo-cli-run.ts /
+ * doctor-run.ts. `agentError` is a unique key not present on any success shape.
+ */
+export type AgentConfigErrorEnvelope = {
+  agentError: {
+    status: number;
+    code: string | null;
+    message: string;
+  };
+};
+
+export function isAgentConfigErrorEnvelope(value: unknown): value is AgentConfigErrorEnvelope {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'agentError' in value &&
+    typeof (value as { agentError: unknown }).agentError === 'object' &&
+    (value as { agentError: unknown }).agentError !== null
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Controller pairing responses
 //
 // These schemas describe the wire format returned by the controller's

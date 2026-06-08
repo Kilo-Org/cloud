@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
+import { transitionSecurityAgentCommand } from '@kilocode/db';
 import { security_audit_log } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import { z } from 'zod';
@@ -25,12 +26,13 @@ const ManualAnalysisOwnerSchema = z
     organizationId: z.string().uuid().optional(),
     userId: z.string().min(1).optional(),
   })
-  .refine(owner => Boolean(owner.organizationId || owner.userId), {
-    message: 'organizationId or userId is required',
+  .refine(owner => Boolean(owner.organizationId) !== Boolean(owner.userId), {
+    message: 'exactly one of organizationId or userId is required',
   });
 
 export const ManualAnalysisStartCommandSchema = z.object({
   schemaVersion: z.literal(1),
+  commandId: z.string().uuid(),
   findingId: z.string().uuid(),
   owner: ManualAnalysisOwnerSchema,
   actorUserId: z.string().min(1),
@@ -42,6 +44,10 @@ export const ManualAnalysisStartCommandSchema = z.object({
     })
     .optional(),
   retrySandboxOnly: z.boolean().optional(),
+});
+
+export const ManualAnalysisStartRequestSchema = ManualAnalysisStartCommandSchema.omit({
+  commandId: true,
 });
 
 export type ManualAnalysisStartCommand = z.infer<typeof ManualAnalysisStartCommandSchema>;
@@ -74,6 +80,7 @@ export async function processManualAnalysisStart(params: {
     | 'actor-missing'
     | 'token-missing'
     | 'failed';
+  resultCode?: string;
 }> {
   const owner = commandOwner(params.command);
   const finding = await getSecurityFindingById(params.db, params.command.findingId);
@@ -102,7 +109,7 @@ export async function processManualAnalysisStart(params: {
       claimToken,
       status: 'failed',
       failureCode: 'GITHUB_TOKEN_UNAVAILABLE',
-      errorMessage: tokenResult.reason,
+      errorMessage: 'GitHub token unavailable',
     });
     return { status: 'token-missing' };
   }
@@ -162,7 +169,7 @@ export async function processManualAnalysisStart(params: {
         nextRetryAt: null,
       },
     });
-    throw error;
+    return { status: 'failed', resultCode: 'INSUFFICIENT_CREDITS' };
   }
   if (!result.started) {
     if (result.failureNeedsLifecycleTransition) {
@@ -214,6 +221,35 @@ export async function processManualAnalysisStart(params: {
   return { status: 'started' };
 }
 
+function manualAnalysisCommandTerminalState(result: {
+  status:
+    | 'started'
+    | 'duplicate'
+    | 'owner-cap'
+    | 'finding-missing'
+    | 'actor-missing'
+    | 'token-missing'
+    | 'failed';
+  resultCode?: string;
+}): { status: 'succeeded' | 'failed' | 'no_op'; resultCode: string } {
+  switch (result.status) {
+    case 'started':
+      return { status: 'succeeded', resultCode: 'ANALYSIS_LAUNCH_STARTED' };
+    case 'duplicate':
+      return { status: 'no_op', resultCode: 'ALREADY_IN_PROGRESS' };
+    case 'owner-cap':
+      return { status: 'failed', resultCode: 'OWNER_CAP_REACHED' };
+    case 'finding-missing':
+      return { status: 'failed', resultCode: 'FINDING_UNAVAILABLE' };
+    case 'actor-missing':
+      return { status: 'failed', resultCode: 'ACTOR_RESOLUTION_FAILED' };
+    case 'token-missing':
+      return { status: 'failed', resultCode: 'GITHUB_TOKEN_UNAVAILABLE' };
+    case 'failed':
+      return { status: 'failed', resultCode: result.resultCode ?? 'ANALYSIS_LAUNCH_FAILED' };
+  }
+}
+
 export async function consumeManualAnalysisBatch(
   batch: MessageBatch<unknown>,
   env: CloudflareEnv
@@ -222,14 +258,36 @@ export async function consumeManualAnalysisBatch(
   for (const message of batch.messages) {
     const parsed = ManualAnalysisStartCommandSchema.safeParse(message.body);
     if (!parsed.success) {
+      console.error('Invalid manual security analysis command', { errors: parsed.error.issues });
       message.ack();
       continue;
     }
     try {
-      await processManualAnalysisStart({ db, env, command: parsed.data });
+      await transitionSecurityAgentCommand(db, {
+        commandId: parsed.data.commandId,
+        fromStatuses: ['accepted', 'running'],
+        status: 'running',
+      });
+      const result = await processManualAnalysisStart({ db, env, command: parsed.data });
+      const terminal = manualAnalysisCommandTerminalState(result);
+      await transitionSecurityAgentCommand(db, {
+        commandId: parsed.data.commandId,
+        fromStatuses: ['accepted', 'running'],
+        status: terminal.status,
+        resultCode: terminal.resultCode,
+      });
+      console.info('Manual security analysis command completed', {
+        command_id: parsed.data.commandId,
+        command_type: 'start_analysis',
+        owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+        result_code: terminal.resultCode,
+      });
       message.ack();
     } catch (error) {
       console.error('Manual security analysis start failed', {
+        command_id: parsed.data.commandId,
+        command_type: 'start_analysis',
+        owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
         findingId: parsed.data.findingId,
         error: error instanceof Error ? error.message : String(error),
       });

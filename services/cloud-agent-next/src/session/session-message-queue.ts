@@ -81,7 +81,16 @@ export type PendingFlushDelivered = {
   remainingCount: number;
 };
 
-export type PendingFlushResult = PendingFlushFailure | PendingFlushSkipped | PendingFlushDelivered;
+export type PendingFlushHeld = {
+  type: 'held';
+  remainingCount: number;
+};
+
+export type PendingFlushResult =
+  | PendingFlushFailure
+  | PendingFlushSkipped
+  | PendingFlushDelivered
+  | PendingFlushHeld;
 
 type PersistedQueuedMessageEvent = {
   sessionId: string;
@@ -127,6 +136,7 @@ export type SessionMessageQueueDependencies = {
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
   getDeliveryBlock: () => Promise<{ retryAt: number } | null>;
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
+  isDeliveryHeld?: () => Promise<boolean>;
   ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
   reportQueuedState?: (state: SessionMessageState) => void;
   ensureAcceptedMessageEffects: (messageId: string) => Promise<void>;
@@ -182,6 +192,7 @@ function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
       return { failureStage: 'pre_dispatch', failureCode: 'invalid_delivery_request' };
     case 'MODEL_MISSING':
       return { failureStage: 'pre_dispatch', failureCode: 'model_missing' };
+    case 'WRAPPER_FINALIZING':
     case 'INTERNAL':
     case 'UNKNOWN':
     case undefined:
@@ -274,6 +285,7 @@ export async function flushNextPendingSessionMessage(params: {
   getDeliveryBlock?: SessionMessageQueueDependencies['getDeliveryBlock'];
   validateModeAgainstRuntimeAgents: SessionMessageQueueDependencies['validateModeAgainstRuntimeAgents'];
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
+  isDeliveryHeld?: () => Promise<boolean>;
   repairQueuedMessageEffects?: (intent: SessionMessageIntent) => Promise<void>;
   prepareQueuedMessageDelivery?: (intent: SessionMessageIntent) => Promise<void>;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
@@ -296,6 +308,9 @@ export async function flushNextPendingSessionMessage(params: {
 
   if (!message) {
     return { type: 'skipped', remainingCount: 0 };
+  }
+  if (await params.isDeliveryHeld?.()) {
+    return { type: 'held', remainingCount: totalCount };
   }
 
   const existingState = await getSessionMessageState(params.storage, message.messageId);
@@ -394,6 +409,9 @@ export async function flushNextPendingSessionMessage(params: {
       params.validateModeAgainstRuntimeAgents
     );
     const startResult = await params.deliver(plan);
+    if (!startResult.success && startResult.code === 'WRAPPER_FINALIZING') {
+      return { type: 'held', remainingCount: totalCount };
+    }
     if (!startResult.success) {
       const failure = await recordPendingFlushFailure(
         params.storage,
@@ -477,6 +495,7 @@ export function createSessionMessageQueue(
     getDeliveryContext,
     getDeliveryBlock,
     deliver,
+    isDeliveryHeld,
     ensureQueuedMessageEvent,
     reportQueuedState,
     ensureAcceptedMessageEffects,
@@ -854,6 +873,7 @@ export function createSessionMessageQueue(
       getDeliveryBlock,
       validateModeAgainstRuntimeAgents,
       deliver,
+      isDeliveryHeld,
       repairQueuedMessageEffects: repairQueuedAdmissionEffects,
       prepareQueuedMessageDelivery,
       ensureAcceptedMessageEffects,
@@ -871,6 +891,10 @@ export function createSessionMessageQueue(
         retryAt: undefined,
         remainingPendingCount: flushResult.remainingCount,
       };
+    }
+
+    if (flushResult.type === 'held') {
+      return { remainingPendingCount: flushResult.remainingCount };
     }
 
     if (flushResult.type === 'delivered') {

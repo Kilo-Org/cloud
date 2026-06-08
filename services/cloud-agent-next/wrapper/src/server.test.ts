@@ -91,7 +91,6 @@ function createTestFetch(overrides?: {
       closeConnection: async () => {},
       setAborted: () => {},
       resetLifecycle: () => {},
-      setPerTurnConfig: () => {},
       updateRuntimeEnvironment: async env => {
         runtimeEnvironmentUpdates.push(env);
       },
@@ -215,7 +214,6 @@ describe('wrapper PTY routes', () => {
         closeConnection: async () => {},
         setAborted: () => {},
         resetLifecycle: () => {},
-        setPerTurnConfig: () => {},
       },
       () => {}
     );
@@ -329,6 +327,49 @@ describe('wrapper Kilo proxy route', () => {
 });
 
 describe('wrapper session binding', () => {
+  it('rejects even the current binding while the wrapper is finalizing', async () => {
+    const state = new WrapperState();
+    const sessionBinding = {
+      kiloSessionId: 'kilo_sess_test',
+      ingestUrl: 'ws://worker.test/ingest',
+      workerAuthToken: 'worker-token',
+      wrapperRunId: 'run_1',
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_1',
+      agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+    };
+    state.bindSession(sessionBinding);
+    state.blockAdmissions();
+
+    const response = await bindSessionContext(
+      sessionBinding,
+      {
+        port: 5000,
+        workspacePath: '/workspace/repo',
+        version: 'test',
+        sessionId: 'kilo_sess_test',
+        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+        userId: 'user_test',
+      },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        openConnection: async () => {},
+        closeConnection: async () => {},
+        setAborted: () => {},
+        resetLifecycle: () => {},
+      },
+      'close-until-runtime-ready'
+    );
+
+    if (!response) throw new Error('Expected finalizing binding rejection');
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: 'WRAPPER_FINALIZING',
+      wrapperRunId: 'run_1',
+    });
+  });
+
   it('keeps bootstrap rebindings close-only until runtime readiness is verified', async () => {
     const state = new WrapperState();
     state.bindSession({

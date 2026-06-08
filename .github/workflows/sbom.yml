@@ -1,0 +1,38 @@
+name: SBOM
+
+# Generates a repo-wide CycloneDX SBOM of the resolved pnpm dependency tree.
+# syft reads pnpm-lock.yaml directly, so no `pnpm install` is needed — a fresh
+# checkout has no node_modules and therefore no filesystem-duplicate noise.
+# The SBOM is uploaded as a retained workflow artifact (never committed).
+#
+# Container-image SBOMs are handled separately in deploy-kiloclaw.yml, where
+# they are attested against the image digest in GHCR.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly (Mondays 04:00 UTC) — regenerate against the unchanged lockfile.
+    # Sets up future vulnerability re-scans against newly disclosed CVEs.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-sbom:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    name: Source dependency SBOM
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Generate source SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: cloud-sbom.cyclonedx.json
+          upload-artifact: true
+          artifact-name: cloud-sbom-${{ github.sha }}

@@ -784,6 +784,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   {
     const errorResponse = await makeErrorReadable({
+      providerId: effectiveProviderContext.provider.id,
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,

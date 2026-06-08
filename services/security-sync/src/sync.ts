@@ -7,6 +7,12 @@
 
 import { z } from 'zod';
 import { eq, and, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import {
+  recordSecurityAgentRepositorySyncAttempt,
+  recordSecurityAgentRepositorySyncFailure,
+  recordSecurityAgentRepositorySyncSuccess,
+  type SecurityAgentCommandOwner,
+} from '@kilocode/db';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   agent_configs,
@@ -150,6 +156,8 @@ type SyncResult = {
   reauthRequired: boolean;
   /** Repos that returned 404 or are access-blocked (deleted/transferred/inaccessible) */
   staleRepos: string[];
+  /** Stable command-ledger result when an acknowledged sync resolves without normal success. */
+  commandResultCode?: string;
 };
 
 type FetchAlertsResult =
@@ -184,6 +192,12 @@ function isOrgOwner(
   owner: SecurityReviewOwner
 ): owner is { organizationId: string; userId?: never } {
   return 'organizationId' in owner && Boolean(owner.organizationId);
+}
+
+function toSecurityAgentCommandOwner(owner: SecurityReviewOwner): SecurityAgentCommandOwner {
+  return isOrgOwner(owner)
+    ? { type: 'org', id: owner.organizationId }
+    : { type: 'user', id: owner.userId };
 }
 
 function ownerFilter(owner: SecurityReviewOwner) {
@@ -1149,7 +1163,7 @@ export async function syncOwner(params: {
   const config = await getOwnerConfig(database, owner);
   if (!config) {
     console.info(`No enabled config for owner, skipping`, { runId, owner });
-    return createEmptySyncResult();
+    return { ...createEmptySyncResult(), commandResultCode: 'CONFIG_DISABLED' };
   }
 
   const repositories = selectRepositoriesForSync(config, repoFullName);
@@ -1159,7 +1173,12 @@ export async function syncOwner(params: {
       owner,
       repoFullName,
     });
-    return createEmptySyncResult();
+    await recordSecurityAgentRepositorySyncFailure(database, {
+      owner: toSecurityAgentCommandOwner(owner),
+      repoFullName,
+      failureCode: 'REPOSITORY_UNAVAILABLE',
+    });
+    return { ...createEmptySyncResult(), commandResultCode: 'REPOSITORY_UNAVAILABLE' };
   }
 
   if (isRecentTimestamp(config.authInvalidAt, AUTH_INVALID_SHORT_CIRCUIT_MS)) {
@@ -1202,6 +1221,11 @@ export async function syncOwner(params: {
       }
     } catch (error) {
       totalResult.errors++;
+      await recordSecurityAgentRepositorySyncFailure(database, {
+        owner: toSecurityAgentCommandOwner(owner),
+        repoFullName,
+        failureCode: 'SYNC_FAILED',
+      });
       console.error(`Failed to sync ${repoFullName}`, {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -1353,6 +1377,8 @@ async function syncRepo(params: {
     repoFullName,
     slaConfig,
   } = params;
+  const commandOwner = toSecurityAgentCommandOwner(owner);
+  await recordSecurityAgentRepositorySyncAttempt(database, { owner: commandOwner, repoFullName });
   const token = await gitTokenService.getToken(installationId);
   const result = createEmptySyncResult();
 
@@ -1370,24 +1396,40 @@ async function syncRepo(params: {
       repoFullName,
     });
     await markIntegrationAuthInvalid(database, platformIntegrationId);
+    await recordSecurityAgentRepositorySyncFailure(database, {
+      owner: commandOwner,
+      repoFullName,
+      failureCode: 'GITHUB_AUTH_INVALID',
+    });
     return createAuthInvalidSyncResult([repoFullName]);
   }
 
   if (fetchResult.status === 'repo_not_found') {
     console.warn(`Repository ${repoFullName} no longer exists, marking as stale`);
     result.staleRepos.push(repoFullName);
+    await recordSecurityAgentRepositorySyncFailure(database, {
+      owner: commandOwner,
+      repoFullName,
+      failureCode: 'REPOSITORY_UNAVAILABLE',
+    });
     return result;
   }
 
   if (fetchResult.status === 'alerts_disabled') {
     console.info(`Dependabot alerts disabled for ${repoFullName}, skipping`);
     result.skipped = 1;
+    await recordSecurityAgentRepositorySyncSuccess(database, { owner: commandOwner, repoFullName });
     return result;
   }
 
   if (fetchResult.status === 'access_blocked') {
     console.warn(`Repository ${repoFullName} access blocked, marking as stale`);
     result.staleRepos.push(repoFullName);
+    await recordSecurityAgentRepositorySyncFailure(database, {
+      owner: commandOwner,
+      repoFullName,
+      failureCode: 'REPOSITORY_UNAVAILABLE',
+    });
     return result;
   }
 
@@ -1445,5 +1487,14 @@ async function syncRepo(params: {
     }
   }
 
+  if (result.errors > 0) {
+    await recordSecurityAgentRepositorySyncFailure(database, {
+      owner: commandOwner,
+      repoFullName,
+      failureCode: 'SYNC_PARTIAL_FAILURE',
+    });
+  } else {
+    await recordSecurityAgentRepositorySyncSuccess(database, { owner: commandOwner, repoFullName });
+  }
   return result;
 }

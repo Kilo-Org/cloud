@@ -36,7 +36,6 @@ import {
 import {
   alibabaDirectModels,
   qwen36_plus_stealth_model,
-  qwen37_plus_free_model,
   qwen37_plus_model,
 } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
@@ -45,11 +44,11 @@ import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { deepseekDiscountedModels } from '@/lib/ai-gateway/providers/deepseek';
+import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
-  'nvidia/nemotron-3-ultra-550b-a55b:free',
   'poolside/laguna-m.1:free',
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
 ].filter(m => m !== null);
@@ -96,7 +95,6 @@ export const kiloExclusiveModels = [
   ...alibabaDirectModels,
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
-  qwen37_plus_free_model,
   claude_sonnet_clawsetup_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
@@ -116,6 +114,25 @@ export function isKiloExclusiveModelRequiringDataCollection(model: string): bool
 
 export function isKiloStealthModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));
+}
+
+export function shouldRedactModelNameInMicrodollarUsage(
+  provider: ProviderId,
+  model: string
+): boolean {
+  return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
+}
+
+export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
+  return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
+}
+
+export function shouldRedactModelNameInResponse(provider: ProviderId, model: string): boolean {
+  // custom is only used internally so we don't have to risk the perf or reliablity impact of rewriting the response
+  return (
+    provider !== 'martian' && // this is a stealth provider, but the models aren't stealth, so we can keep the model name in place
+    (provider === 'experiment' || isKiloStealthModel(model))
+  );
 }
 
 export function isOpenRouterStealthModel(model: string): boolean {

@@ -71,6 +71,7 @@ import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organiz
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import { successResult } from '@/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
+import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';
 
 type KiloClawChargeContext = {
   chargeId: string;
@@ -722,6 +723,7 @@ async function handlePaymentMethodEvent(
 }
 
 type AutoTopUpOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
+type DisputeChargeWithInvoice = Stripe.Charge & { invoice?: string | Stripe.Invoice | null };
 
 async function releaseAutoTopUpAttemptLock(owner: AutoTopUpOwner): Promise<void> {
   if (owner.type === 'user') {
@@ -751,6 +753,44 @@ async function markAutoTopUpCompleted(owner: AutoTopUpOwner): Promise<void> {
     .update(auto_top_up_configs)
     .set({ last_auto_top_up_at: sql`NOW()`, attempt_started_at: null })
     .where(eq(auto_top_up_configs.owned_by_organization_id, owner.id));
+}
+
+async function syncStripeDisputeCaseFromWebhook(params: {
+  eventId: string;
+  eventCreated: number;
+  dispute: Stripe.Dispute;
+}): Promise<{ chargeId: string | undefined; disputeCharge: DisputeChargeWithInvoice | null }> {
+  const chargeId = stripeReferenceId(params.dispute.charge);
+
+  if (!chargeId) {
+    await observeStripeDisputeCreated({
+      eventId: params.eventId,
+      eventCreated: params.eventCreated,
+      dispute: params.dispute,
+    });
+    return { chargeId, disputeCharge: null };
+  }
+
+  let disputeCharge: DisputeChargeWithInvoice;
+  try {
+    disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+  } catch (error) {
+    await observeStripeDisputeCreated({
+      eventId: params.eventId,
+      eventCreated: params.eventCreated,
+      dispute: params.dispute,
+    });
+    throw error;
+  }
+
+  await observeStripeDisputeCreated({
+    eventId: params.eventId,
+    eventCreated: params.eventCreated,
+    dispute: params.dispute,
+    preFetchedCharge: disputeCharge,
+  });
+
+  return { chargeId, disputeCharge };
 }
 
 export async function processStripePaymentEventHook(event: Stripe.Event) {
@@ -915,14 +955,11 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'charge.dispute.created': {
       const dispute = event.data.object;
-      const chargeId =
-        typeof dispute.charge === 'string' ? dispute.charge : (dispute.charge?.id ?? null);
-
-      let disputeCharge: (Stripe.Charge & { invoice?: string | Stripe.Invoice | null }) | null =
-        null;
-      if (chargeId) {
-        disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
-      }
+      const { chargeId, disputeCharge } = await syncStripeDisputeCaseFromWebhook({
+        eventId: event.id,
+        eventCreated: event.created,
+        dispute,
+      });
 
       void reportChargeBackedStripeAbuseEvent({
         abuseEventType: 'stripe.charge.dispute.created',
@@ -981,6 +1018,17 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
           occurredAt: new Date(dispute.created * 1000),
         });
       }
+      break;
+    }
+
+    case 'charge.dispute.updated':
+    case 'charge.dispute.closed': {
+      const dispute = event.data.object;
+      await syncStripeDisputeCaseFromWebhook({
+        eventId: event.id,
+        eventCreated: event.created,
+        dispute,
+      });
       break;
     }
 

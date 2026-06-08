@@ -41,6 +41,7 @@ const completeEventSchema = z.object({
   exitCode: z.number(),
   currentBranch: z.string().optional(),
   gateResult: z.enum(['pass', 'fail']).optional(),
+  messageIds: z.array(z.string()).optional(),
 });
 
 const kilocodeEventSchema = z
@@ -147,7 +148,7 @@ export type IngestDOContext = {
     | 'isCurrentConnection'
     | 'observePong'
     | 'observeMeaningfulOutput'
-    | 'observeRootIdle'
+    | 'observeFinalizing'
     | 'onTerminalEvent'
   >;
   keepContainerAlive?: () => void;
@@ -192,6 +193,7 @@ export function createIngestHandler(
     status: 'completed' | 'failed' | 'interrupted';
     error?: string;
     gateResult?: 'pass' | 'fail';
+    messageIds?: string[];
   }): Promise<void> {
     await doContext.wrapperSupervisor.onTerminalEvent(params);
   }
@@ -614,49 +616,31 @@ export function createIngestHandler(
           }
         }
 
-        if (isSessionIdle && wrapperGeneration !== undefined && wrapperConnectionId) {
-          await doContext.wrapperSupervisor.observeRootIdle(
-            wrapperGeneration,
-            wrapperConnectionId,
-            now
-          );
-        }
-
-        // Terminalize user messages from terminal assistant message.updated events only.
-        // Partial updates (no time.completed or error) must not terminalize.
+        // Assistant completion can be an intermediate tool-loop step. Record
+        // correlated activity here and let a turn-level lifecycle boundary settle success.
         if (eventType === 'kilocode') {
           const data = ingestEvent.data as Record<string, unknown>;
           const eventName = data.event;
           if (eventName === 'message.updated') {
             const properties = data.properties as Record<string, unknown> | undefined;
             const info = properties?.info as Record<string, unknown> | undefined;
-            const time = info?.time as Record<string, unknown> | undefined;
-            const isCompleted = Boolean(time?.completed);
             const assistantError = getAssistantErrorMessage(info?.error);
-            const hasError = assistantError !== undefined;
-            const isTerminal = isCompleted || hasError;
             const parentMessageId =
               info?.role === 'assistant' && typeof info.parentID === 'string'
                 ? info.parentID
                 : undefined;
             if (parentMessageId !== undefined) {
               await doContext.observeCorrelatedAgentActivity?.(parentMessageId);
-              if (isTerminal) {
+              if (assistantError !== undefined) {
                 await doContext.terminalizeSessionMessageOnce(
                   parentMessageId,
-                  hasError
-                    ? {
-                        kind: 'failed',
-                        assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
-                        reason: 'assistant_error',
-                        error: assistantError,
-                        completionSource: 'assistant_message_event',
-                      }
-                    : {
-                        kind: 'completed',
-                        assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
-                        completionSource: 'assistant_message_event',
-                      },
+                  {
+                    kind: 'failed',
+                    assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
+                    reason: 'assistant_error',
+                    error: assistantError,
+                    completionSource: 'assistant_message_event',
+                  },
                   wrapperRunId
                 );
               }
@@ -693,6 +677,10 @@ export function createIngestHandler(
           });
         }
 
+        if (eventType === 'wrapper_finalizing') {
+          await doContext.wrapperSupervisor.observeFinalizing(wrapperRunId);
+        }
+
         if (eventType === 'complete') {
           broadcastFn({
             id: 0 as EventId,
@@ -718,6 +706,7 @@ export function createIngestHandler(
             wrapperRunId,
             status: 'completed',
             gateResult: parsedComplete.data.gateResult,
+            messageIds: parsedComplete.data.messageIds,
           });
           logger
             .withFields({
@@ -726,6 +715,7 @@ export function createIngestHandler(
               wrapperGeneration,
               wrapperConnectionId,
               gateResult: parsedComplete.data.gateResult,
+              messageCount: parsedComplete.data.messageIds?.length,
             })
             .info('Wrapper complete event forwarded to session coordinator');
         }

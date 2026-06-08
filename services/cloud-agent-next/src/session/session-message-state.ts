@@ -5,8 +5,13 @@ import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js'
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { AttachmentsSchema } from '../persistence/schemas.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
+import {
+  getWrapperRuntimeState,
+  hasCompleteWrapperRunMessageIndex,
+} from './wrapper-runtime-state.js';
 
 const SESSION_MESSAGE_STATE_PREFIX = 'session_message:';
+const WRAPPER_RUN_MESSAGE_INDEX_PREFIX = 'session_message_wrapper_run:';
 
 export type SessionMessageStatus = 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted';
 
@@ -269,6 +274,14 @@ function sessionMessageStateKey(messageId: string): string {
   return `${SESSION_MESSAGE_STATE_PREFIX}${messageId}`;
 }
 
+function wrapperRunMessageIndexPrefix(wrapperRunId: string): string {
+  return `${WRAPPER_RUN_MESSAGE_INDEX_PREFIX}${encodeURIComponent(wrapperRunId)}:`;
+}
+
+function wrapperRunMessageIndexKey(wrapperRunId: string, messageId: string): string {
+  return `${wrapperRunMessageIndexPrefix(wrapperRunId)}${messageId}`;
+}
+
 function normalizeLegacyAdmissionConstraints(
   constraints: z.infer<typeof SessionMessageStateSchema>['legacyAdmissionConstraints']
 ): LegacyAdmissionConstraints | undefined {
@@ -404,10 +417,14 @@ export async function putSessionMessageState(
   storage: SessionMessageStorage,
   state: SessionMessageState
 ): Promise<void> {
-  await storage.put(
-    sessionMessageStateKey(state.messageId),
-    SessionMessageStateSchema.parse(state)
-  );
+  const parsedState = SessionMessageStateSchema.parse(state);
+  if (parsedState.wrapperRunId) {
+    await storage.put(
+      wrapperRunMessageIndexKey(parsedState.wrapperRunId, parsedState.messageId),
+      true
+    );
+  }
+  await storage.put(sessionMessageStateKey(parsedState.messageId), parsedState);
 }
 
 export function createQueuedSessionMessageState(
@@ -564,12 +581,40 @@ export async function listNonTerminalAcceptedMessages(
   storage: SessionMessageStorage,
   wrapperRunId?: string
 ): Promise<SessionMessageState[]> {
-  const entries = await listSessionMessageStates(storage);
-  return entries.filter(
-    state =>
-      state.status === 'accepted' &&
-      (wrapperRunId === undefined || state.wrapperRunId === wrapperRunId)
+  const entries =
+    wrapperRunId === undefined
+      ? await listSessionMessageStates(storage)
+      : await listMessagesForWrapperRun(storage, wrapperRunId);
+  return entries.filter(state => state.status === 'accepted');
+}
+
+async function listIndexedMessagesForWrapperRun(
+  storage: SessionMessageStorage,
+  wrapperRunId: string
+): Promise<SessionMessageState[]> {
+  const indexPrefix = wrapperRunMessageIndexPrefix(wrapperRunId);
+  const index = await storage.list<unknown>({ prefix: indexPrefix });
+  const messages = await Promise.all(
+    Array.from(index.keys()).map(async key => {
+      const messageId = key.slice(indexPrefix.length);
+      if (!messageId) return undefined;
+      const state = await getSessionMessageState(storage, messageId);
+      return state?.wrapperRunId === wrapperRunId ? state : undefined;
+    })
   );
+  return messages.filter(state => state !== undefined);
+}
+
+export async function listMessagesForWrapperRun(
+  storage: SessionMessageStorage,
+  wrapperRunId: string
+): Promise<SessionMessageState[]> {
+  if (hasCompleteWrapperRunMessageIndex(await getWrapperRuntimeState(storage), wrapperRunId)) {
+    return listIndexedMessagesForWrapperRun(storage, wrapperRunId);
+  }
+
+  const entries = await listSessionMessageStates(storage);
+  return entries.filter(state => state.wrapperRunId === wrapperRunId);
 }
 
 type NeverAcceptedTerminalQueuedMessageState = SessionMessageState & {

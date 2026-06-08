@@ -1,4 +1,5 @@
 import { db } from '@/lib/drizzle';
+import { getSecurityAgentRepositorySyncState } from '@kilocode/db';
 import { security_findings, agent_configs } from '@kilocode/db/schema';
 import { eq, and, desc, count, sql, max, or, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
@@ -811,10 +812,12 @@ export async function getLastSyncTime(params: {
       return await getOwnerLastSyncedAt(ownerConverted);
     }
 
-    // Repo-specific: read MAX(last_synced_at) from findings for this repo.
-    // Returns null for repos with zero findings — we lack per-repo sync metadata,
-    // so falling back to the owner-level timestamp would overstate freshness for
-    // repos added after the last full sync.
+    // Repo-specific: prefer explicit sync runtime state so clean repositories can
+    // show freshness without requiring a finding row. Fall back to finding timestamps
+    // while older deployments populate runtime state.
+    const syncState = await getSecurityAgentRepositorySyncState(db, ownerConverted, repoFullName);
+    if (syncState?.last_succeeded_at) return syncState.last_succeeded_at;
+
     const findingConditions: SQL[] = [];
     if (ownerConverted.type === 'org') {
       findingConditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));

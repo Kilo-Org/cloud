@@ -27,7 +27,7 @@ type OrphanedRepository = {
 
 type ClearFindingsCardProps = {
   orphanedRepositories: OrphanedRepository[];
-  onDeleteFindings: (repoFullName: string) => void;
+  onDeleteFindings: (repoFullName: string, onSuccess?: () => void) => void;
   isDeleting: boolean;
 };
 
@@ -54,9 +54,10 @@ export function ClearFindingsCard({
 
   const handleConfirmDelete = () => {
     if (selectedRepo) {
-      onDeleteFindings(selectedRepo);
-      setConfirmDialogOpen(false);
-      setSelectedRepo(null);
+      onDeleteFindings(selectedRepo, () => {
+        setConfirmDialogOpen(false);
+        setSelectedRepo(null);
+      });
     }
   };
 
@@ -64,9 +65,9 @@ export function ClearFindingsCard({
     <>
       <Card className="w-full border-yellow-500/50">
         <CardHeader className="pb-3">
-          <div className="flex items-center space-x-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-500/20">
-              <AlertTriangle className="h-5 w-5 text-yellow-400" />
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-yellow-500/20">
+              <AlertTriangle className="size-5 text-yellow-400" />
             </div>
             <div>
               <CardTitle className="text-lg font-bold">Clear Orphaned Findings</CardTitle>
@@ -86,9 +87,11 @@ export function ClearFindingsCard({
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-medium">Select repository to clear</label>
+            <label htmlFor="orphaned-repository" className="text-sm font-medium">
+              Select repository to clear
+            </label>
             <Select value={selectedRepo ?? ''} onValueChange={setSelectedRepo}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger id="orphaned-repository" className="w-full">
                 <SelectValue placeholder="Select a repository..." />
               </SelectTrigger>
               <SelectContent>
@@ -113,11 +116,11 @@ export function ClearFindingsCard({
               disabled={!selectedRepo || isDeleting}
             >
               {isDeleting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 size-4 animate-spin" />
               ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
+                <Trash2 className="mr-2 size-4" />
               )}
-              {isDeleting ? 'Deleting...' : 'Delete Findings'}
+              {isDeleting ? 'Deleting…' : 'Delete Findings'}
             </Button>
           </div>
         </CardContent>
@@ -128,7 +131,7 @@ export function ClearFindingsCard({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <AlertTriangle className="size-5 text-red-500" />
               Delete Security Findings?
             </DialogTitle>
             <DialogDescription>
@@ -160,8 +163,8 @@ export function ClearFindingsCard({
             <Button variant="destructive" onClick={handleConfirmDelete} disabled={isDeleting}>
               {isDeleting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Deleting…
                 </>
               ) : (
                 'Delete Findings'

@@ -340,10 +340,6 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
               AND json_extract(payload, '$.properties.info.role') = 'assistant'
               AND json_extract(payload, '$.properties.info.sessionID') = ?
               AND json_extract(payload, '$.properties.info.parentID') = ?
-              AND (
-                json_extract(payload, '$.properties.info.time.completed') IS NOT NULL
-                OR json_extract(payload, '$.properties.info.error') IS NOT NULL
-              )
             LIMIT 1
             `,
             sessionId,
@@ -378,10 +374,6 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
               AND json_extract(payload, '$.properties.info.role') = 'assistant'
               AND json_extract(payload, '$.properties.info.sessionID') = ?
               AND json_extract(payload, '$.properties.info.parentID') = ?
-              AND (
-                json_extract(payload, '$.properties.info.time.completed') IS NOT NULL
-                OR json_extract(payload, '$.properties.info.error') IS NOT NULL
-              )
             ORDER BY id DESC
             LIMIT 1
             `,

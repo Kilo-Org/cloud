@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentSandbox, WrapperInstanceLease } from '../agent-sandbox/protocol.js';
 import type { Env } from '../types.js';
+import { WrapperError } from '../kilo/wrapper-client.js';
 import type { ExecutionError } from './errors.js';
 import type { FencedWrapperDispatchRequest } from './types.js';
 import {
@@ -234,6 +235,30 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
       code: 'WRAPPER_START_FAILED',
       retryable: true,
     } satisfies Partial<ExecutionError>);
+  });
+
+  it('preserves a finalizing error from wrapper startup', async () => {
+    const { orchestrator, ensureWrapper } = createOrchestrator();
+    const finalizingError = new WrapperError(
+      'Wrapper batch is finalizing',
+      'WRAPPER_FINALIZING',
+      409
+    );
+    ensureWrapper.mockRejectedValueOnce(finalizingError);
+
+    await expect(orchestrator.execute(basePlan)).rejects.toBe(finalizingError);
+  });
+
+  it('preserves a finalizing error from wrapper dispatch', async () => {
+    const { orchestrator, prompt } = createOrchestrator();
+    const finalizingError = new WrapperError(
+      'Wrapper batch is finalizing',
+      'WRAPPER_FINALIZING',
+      409
+    );
+    prompt.mockRejectedValueOnce(finalizingError);
+
+    await expect(orchestrator.execute(basePlan)).rejects.toBe(finalizingError);
   });
 
   it('does not recover the shared sandbox for plain capacity admission rejection', async () => {

@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -28,15 +27,14 @@ import {
 } from 'lucide-react';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { useTRPC } from '@/lib/trpc/utils';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { toast } from 'sonner';
+import { useSecurityAgent } from './SecurityAgentContext';
 import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
 
-const ACCEPTED_QUEUE_POLL_INTERVAL_MS = 3000;
-const ACCEPTED_QUEUE_POLL_TIMEOUT_MS = 18_000;
+const ANALYSIS_POLL_INTERVAL_MS = 3000;
 
 function isSeverity(value: string): value is Severity {
   return ['critical', 'high', 'medium', 'low'].includes(value);
@@ -51,13 +49,13 @@ function AnalysisStatusIcon({
 }) {
   switch (status) {
     case 'completed':
-      return <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />;
+      return <CheckCircle2 className="size-3.5 text-green-400" />;
     case 'failed':
-      return <XCircle className="h-3.5 w-3.5 text-red-400" />;
+      return <XCircle className="size-3.5 text-red-400" />;
     case 'running':
-      return <Loader2 className="h-3.5 w-3.5 animate-spin text-yellow-400" />;
+      return <Loader2 className="size-3.5 animate-spin text-yellow-400" />;
     case 'pending':
-      return <Loader2 className="h-3.5 w-3.5 animate-spin text-yellow-400" />;
+      return <Loader2 className="size-3.5 animate-spin text-yellow-400" />;
     default:
       return <>{fallback}</>;
   }
@@ -81,17 +79,14 @@ export function FindingDetailDialog({
   organizationId,
 }: FindingDetailDialogProps) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const isOrg = !!organizationId;
-  const [queuedFindingId, setQueuedFindingId] = useState<string | null>(null);
-  const isAwaitingAnalysisStart = queuedFindingId === finding?.id;
+  const { handleStartAnalysis: triggerStartAnalysis, startingAnalysisIds } = useSecurityAgent();
+  const isAwaitingAnalysisStart = finding ? startingAnalysisIds.has(finding.id) : false;
 
-  // Poll while queued admission is crossing the Worker boundary or analysis is active.
-  // Two separate queries for org/personal to avoid type-union issues with useQuery.
   const pollWhileActive = (query: { state: { data?: { status?: string | null } } }) => {
     const status = query.state.data?.status;
     if (isAwaitingAnalysisStart || status === 'pending' || status === 'running') {
-      return ACCEPTED_QUEUE_POLL_INTERVAL_MS;
+      return ANALYSIS_POLL_INTERVAL_MS;
     }
     return false as const;
   };
@@ -112,50 +107,6 @@ export function FindingDetailDialog({
   });
   const analysisData = isOrg ? orgAnalysisQuery.data : personalAnalysisQuery.data;
 
-  useEffect(() => {
-    if (!queuedFindingId) return;
-    const intervalId = window.setInterval(() => {
-      void queryClient.invalidateQueries();
-    }, ACCEPTED_QUEUE_POLL_INTERVAL_MS);
-    const timeoutId = window.setTimeout(() => {
-      setQueuedFindingId(current => (current === queuedFindingId ? null : current));
-    }, ACCEPTED_QUEUE_POLL_TIMEOUT_MS);
-    return () => {
-      window.clearInterval(intervalId);
-      window.clearTimeout(timeoutId);
-    };
-  }, [queryClient, queuedFindingId]);
-
-  // Start analysis mutation (organization)
-  const startOrgAnalysisMutation = useMutation(
-    trpc.organizations.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async () => {
-        toast.success(manualAnalysisAdmissionCopy.successTitle);
-        await queryClient.invalidateQueries();
-      },
-      onError: (error, variables) => {
-        toast.error(manualAnalysisAdmissionCopy.failureTitle, { description: error.message });
-        setQueuedFindingId(current => (current === variables.findingId ? null : current));
-      },
-    })
-  );
-
-  // Start analysis mutation (user)
-  const startUserAnalysisMutation = useMutation(
-    trpc.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async () => {
-        toast.success(manualAnalysisAdmissionCopy.successTitle);
-        await queryClient.invalidateQueries();
-      },
-      onError: (error, variables) => {
-        toast.error(manualAnalysisAdmissionCopy.failureTitle, { description: error.message });
-        setQueuedFindingId(current => (current === variables.findingId ? null : current));
-      },
-    })
-  );
-
-  const startAnalysisMutation = isOrg ? startOrgAnalysisMutation : startUserAnalysisMutation;
-
   if (!finding) return null;
 
   // Use polled data if available, otherwise use finding data
@@ -165,23 +116,10 @@ export function FindingDetailDialog({
   const cliSessionId = analysisData?.cliSessionId ?? finding.cli_session_id;
 
   const isAnalyzing =
-    isAwaitingAnalysisStart ||
-    startAnalysisMutation.isPending ||
-    analysisStatus === 'pending' ||
-    analysisStatus === 'running';
+    isAwaitingAnalysisStart || analysisStatus === 'pending' || analysisStatus === 'running';
 
   const handleStartAnalysis = ({ retrySandboxOnly }: { retrySandboxOnly?: boolean } = {}) => {
-    setQueuedFindingId(finding.id);
-    if (isOrg) {
-      if (!organizationId) return;
-      startOrgAnalysisMutation.mutate({
-        organizationId,
-        findingId: finding.id,
-        retrySandboxOnly,
-      });
-    } else {
-      startUserAnalysisMutation.mutate({ findingId: finding.id, retrySandboxOnly });
-    }
+    triggerStartAnalysis(finding.id, { retrySandboxOnly });
   };
 
   const severity: Severity = isSeverity(finding.severity) ? finding.severity : 'medium';
@@ -219,9 +157,7 @@ export function FindingDetailDialog({
             {finding.status === 'open' && finding.sla_due_at && (
               <div className="text-right text-xs">
                 <div className="flex items-center justify-end gap-1.5">
-                  <Clock
-                    className={`h-3.5 w-3.5 ${isOverdue ? 'text-red-400' : 'text-yellow-400'}`}
-                  />
+                  <Clock className={`size-3.5 ${isOverdue ? 'text-red-400' : 'text-yellow-400'}`} />
                   <span className={isOverdue ? 'text-red-400' : 'text-yellow-400'}>
                     SLA{' '}
                     {isOverdue
@@ -237,7 +173,7 @@ export function FindingDetailDialog({
             {finding.status === 'fixed' && finding.fixed_at && (
               <div className="text-right text-xs">
                 <div className="flex items-center justify-end gap-1.5 text-green-400">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <CheckCircle2 className="size-3.5" />
                   Fixed {formatDistanceToNow(new Date(finding.fixed_at), { addSuffix: true })}
                 </div>
                 <div className="text-muted-foreground mt-0.5">
@@ -247,7 +183,7 @@ export function FindingDetailDialog({
             )}
             {finding.status === 'ignored' && finding.ignored_reason && (
               <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <XCircle className="h-3.5 w-3.5" />
+                <XCircle className="size-3.5" />
                 Dismissed: {finding.ignored_reason.replace(/_/g, ' ')}
               </div>
             )}
@@ -260,7 +196,7 @@ export function FindingDetailDialog({
             <TabsTrigger value="triage" className="flex items-center gap-1.5">
               <AnalysisStatusIcon
                 status={analysis?.triage ? 'completed' : analysisStatus}
-                fallback={<Zap className="h-3.5 w-3.5" />}
+                fallback={<Zap className="size-3.5" />}
               />
               Triage
             </TabsTrigger>
@@ -271,7 +207,7 @@ export function FindingDetailDialog({
                     ? 'completed'
                     : analysisStatus
                 }
-                fallback={<Brain className="h-3.5 w-3.5" />}
+                fallback={<Brain className="size-3.5" />}
               />
               Analysis
             </TabsTrigger>
@@ -279,7 +215,7 @@ export function FindingDetailDialog({
 
           <TabsContent value="details" className="space-y-6 pt-2">
             <div className="flex items-center gap-2 text-sm font-medium text-white">
-              <Package className="h-4 w-4" />
+              <Package className="size-4" />
               {finding.package_name} ({finding.package_ecosystem})
             </div>
 
@@ -319,7 +255,7 @@ export function FindingDetailDialog({
               {finding.dependabot_html_url && (
                 <Button variant="outline" size="sm" asChild className="mt-3">
                   <a href={finding.dependabot_html_url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
+                    <ExternalLink className="mr-2 size-4" />
                     View on GitHub
                   </a>
                 </Button>
@@ -336,7 +272,7 @@ export function FindingDetailDialog({
                       variant="outline"
                       className="border-green-500/50 bg-green-500/10 text-green-400"
                     >
-                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      <CheckCircle2 className="mr-1 size-3" />
                       Safe to Dismiss
                     </Badge>
                   )}
@@ -374,11 +310,11 @@ export function FindingDetailDialog({
               analysisStatus === 'pending' ? (
               <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
+                  <Loader2 className="size-4 animate-spin text-yellow-400" />
                   <p className="text-sm text-yellow-400">
                     {isAwaitingAnalysisStart || analysisStatus === 'pending'
-                      ? `${manualAnalysisAdmissionCopy.pendingLabel}...`
-                      : 'Triage in progress...'}
+                      ? `${manualAnalysisAdmissionCopy.pendingLabel}…`
+                      : 'Triage in progress…'}
                   </p>
                 </div>
               </div>
@@ -408,7 +344,7 @@ export function FindingDetailDialog({
                   onClick={() => handleStartAnalysis()}
                   disabled={isAnalyzing}
                 >
-                  <Zap className="mr-2 h-4 w-4" />
+                  <Zap className="mr-2 size-4" />
                   Start Triage
                 </Button>
               </div>
@@ -424,7 +360,7 @@ export function FindingDetailDialog({
                       variant="outline"
                       className="border-red-500/50 bg-red-500/10 text-red-400"
                     >
-                      <XCircle className="mr-1 h-3 w-3" />
+                      <XCircle className="mr-1 size-3" />
                       Exploitable
                     </Badge>
                   )}
@@ -433,7 +369,7 @@ export function FindingDetailDialog({
                       variant="outline"
                       className="border-green-500/50 bg-green-500/10 text-green-400"
                     >
-                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      <CheckCircle2 className="mr-1 size-3" />
                       Not Exploitable
                     </Badge>
                   )}
@@ -450,17 +386,16 @@ export function FindingDetailDialog({
                         Usage locations:
                       </span>
                       <ul className="text-muted-foreground mt-1 list-inside list-disc text-xs">
-                        {/* usageLocations may contain duplicates, so index is needed for uniqueness */}
-                        {analysis.sandboxAnalysis.usageLocations
+                        {[...new Set(analysis.sandboxAnalysis.usageLocations)]
                           .slice(0, 5)
-                          .map((loc: string, i: number) => (
-                            <li key={`${loc}-${i}`} className="truncate">
+                          .map((loc: string) => (
+                            <li key={loc} className="truncate">
                               {loc}
                             </li>
                           ))}
                         {analysis.sandboxAnalysis.usageLocations.length > 5 && (
                           <li className="text-muted-foreground/70">
-                            ...and {analysis.sandboxAnalysis.usageLocations.length - 5} more
+                            …and {analysis.sandboxAnalysis.usageLocations.length - 5} more
                           </li>
                         )}
                       </ul>
@@ -491,7 +426,7 @@ export function FindingDetailDialog({
                     }
                     className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
                   >
-                    <ExternalLink className="h-4 w-4" />
+                    <ExternalLink className="size-4" />
                     Continue conversation in Cloud Agent
                   </Link>
                 )}
@@ -506,11 +441,11 @@ export function FindingDetailDialog({
               analysisStatus === 'pending' ? (
               <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
+                  <Loader2 className="size-4 animate-spin text-yellow-400" />
                   <p className="text-sm text-yellow-400">
                     {isAwaitingAnalysisStart || analysisStatus === 'pending'
-                      ? `${manualAnalysisAdmissionCopy.pendingLabel}...`
-                      : 'Codebase analysis in progress...'}
+                      ? `${manualAnalysisAdmissionCopy.pendingLabel}…`
+                      : 'Codebase analysis in progress…'}
                   </p>
                 </div>
                 <p className="text-muted-foreground mt-1 text-xs">
@@ -526,7 +461,7 @@ export function FindingDetailDialog({
                       }
                       className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
                     >
-                      <ExternalLink className="h-3 w-3" />
+                      <ExternalLink className="size-3" />
                       Watch analysis in Cloud Agent
                     </Link>
                   </div>
@@ -564,7 +499,7 @@ export function FindingDetailDialog({
                   onClick={() => handleStartAnalysis()}
                   disabled={isAnalyzing}
                 >
-                  <Brain className="mr-2 h-4 w-4" />
+                  <Brain className="mr-2 size-4" />
                   Start Analysis
                 </Button>
               </div>
@@ -582,7 +517,7 @@ export function FindingDetailDialog({
             <div className="flex items-stretch gap-2">
               {canDismiss && finding.status === 'open' && (
                 <Button variant="destructive" size="sm" onClick={onDismiss}>
-                  <XCircle className="mr-2 h-4 w-4" />
+                  <XCircle className="mr-2 size-4" />
                   Dismiss
                 </Button>
               )}

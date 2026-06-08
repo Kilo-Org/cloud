@@ -92,14 +92,40 @@ export function buildStartCommand(serviceName: string): string {
   // would try to descend into <dir>/<dir> which doesn't exist.
   if (svc.dir !== '.' && svc.command[0] === 'pnpm') {
     const [, ...rest] = svc.command;
-    return `pnpm --filter {./${svc.dir}} ${rest.join(' ')}`;
+    return `${getCommandEnvironmentPrefix()}${getPnpmCommand()} --filter {./${svc.dir}} ${rest.join(' ')}`;
   }
 
   const parts: string[] = [];
   if (svc.dir !== '.') parts.push(`cd ${shellQuote(path.join(findRepoRoot(), svc.dir))}`);
-  parts.push(svc.command.join(' '));
+  parts.push(`${getCommandEnvironmentPrefix()}${svc.command.join(' ')}`);
 
   return parts.join(' && ');
+}
+
+function getCommandEnvironmentPrefix(): string {
+  const env = ['PATH', 'PNPM_HOME', 'COREPACK_HOME', 'npm_execpath']
+    .map(key => {
+      const value = process.env[key];
+      return value === undefined || value === '' ? undefined : `${key}=${shellQuote(value)}`;
+    })
+    .filter(value => value !== undefined);
+
+  return env.length === 0 ? '' : `${env.join(' ')} `;
+}
+
+function getPnpmCommand(): string {
+  const pnpmHome = process.env.PNPM_HOME;
+  if (pnpmHome) {
+    const pnpmPath = path.join(pnpmHome, 'pnpm');
+    if (fs.existsSync(pnpmPath)) return shellQuote(pnpmPath);
+  }
+
+  const npmExecPath = process.env.npm_execpath;
+  if (npmExecPath && npmExecPath.includes('pnpm')) {
+    return `node ${shellQuote(npmExecPath)}`;
+  }
+
+  return 'pnpm';
 }
 
 // ---------------------------------------------------------------------------

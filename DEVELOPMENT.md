@@ -132,15 +132,21 @@ Both are already present in Vercel and pulled by `vercel env pull`. If either is
 
 #### b. Set up manually
 
-If you do not have Vercel access (typical for non-Kilo-employees), you will need to set up the `.env.local` file manually.
+If you do not have Vercel access (typical for non-Kilo-employees), run the interactive setup CLI to bootstrap `.env.local`:
 
-Copy `.env.local.example` to `.env.local`, then update the following variables in `.env.local`:
+```bash
+pnpm dev:setup-env
+```
 
-- `NEXTAUTH_SECRET`: Generate a random secret with `openssl rand -base64 32`
-- `INTERNAL_API_SECRET`: Generate a random secret with `openssl rand -base64 32`
-- `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: These must be set to create a fake account. You can use an existing Stripe account or create a new one, and use the keys from Sandbox Mode (formerly Test Mode) here.
+This prompts for the 8 required env vars only, generates secrets automatically, and writes `.env.local`. It warns if `.env.local` already exists before making changes.
 
-Then run `pnpm dev:env`. It derives `apps/web/.env.development.local` and Worker `.dev.vars` files from `.env.local` plus each `.example` template. Re-run it after pulling changes that add local service URLs or Worker env vars.
+After it completes, run:
+
+```bash
+pnpm dev:env
+```
+
+The setup covers: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `POSTGRES_URL`, `CALLBACK_TOKEN_SECRET`, `BYOK_ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, `STRIPE_SECRET_KEY`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
 
 These changes will allow you to do local testing with a fake account.
 

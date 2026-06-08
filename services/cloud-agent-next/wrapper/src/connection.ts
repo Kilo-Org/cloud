@@ -81,12 +81,9 @@ function isRootSessionActivity(
   properties: Record<string, unknown>,
   rootSessionID: string | undefined
 ): boolean {
-  if (!rootSessionID || eventType === 'session.idle') return false;
-  if (eventType === 'session.status' && statusTypeFromProperties(properties) === 'idle') {
-    return false;
-  }
-
-  return getActivitySessionID(eventType, properties) === rootSessionID;
+  if (!rootSessionID || getActivitySessionID(eventType, properties) !== rootSessionID) return false;
+  if (eventType === 'session.turn.open') return true;
+  return eventType === 'session.status' && statusTypeFromProperties(properties) === 'busy';
 }
 
 export const CODE_REVIEW_PERMISSION_REJECTION_MESSAGE =
@@ -151,36 +148,10 @@ export function isSessionIdleEvent(
   return isRecord(props) && typeof props.sessionID === 'string';
 }
 
-/**
- * Type guard for message.updated events where the assistant message is
- * terminal (has time.completed or an error) and has a resolvable parentID.
- * Used by the wrapper to detect per-message completion in the new-path
- * keep-warm model.
- */
-export function isAssistantMessageCompleted(data: unknown): data is {
-  event: 'message.updated';
-  properties: { info: { role: string; parentID: string; time?: { completed?: number } } };
-} {
-  if (!isRecord(data)) return false;
-  if (data.event !== 'message.updated') return false;
-  const info = isRecord(data.properties) ? data.properties.info : undefined;
-  if (!isRecord(info)) return false;
-  if (info.role !== 'assistant') return false;
-  if (typeof info.parentID !== 'string') return false;
+function isAssistantCompletionSignal(info: unknown): boolean {
+  if (!isRecord(info) || info.role !== 'assistant') return false;
   const time = isRecord(info.time) ? info.time : undefined;
-  const isCompleted = time !== undefined && typeof time.completed === 'number';
-  const hasError = info.error !== undefined && info.error !== null;
-  return isCompleted || hasError;
-}
-
-/**
- * Extracts the parentID of a completed assistant message from a
- * message.updated event. Returns undefined if the event is not a
- * terminal assistant message update.
- */
-export function getCompletedAssistantParentID(data: unknown): string | undefined {
-  if (!isAssistantMessageCompleted(data)) return undefined;
-  return (data.properties.info as { parentID: string }).parentID;
+  return typeof time?.completed === 'number' || (info.error !== undefined && info.error !== null);
 }
 
 // ---------------------------------------------------------------------------
@@ -192,8 +163,6 @@ export type ConnectionConfig = {
 };
 
 export type ConnectionCallbacks = {
-  /** Called when a completion event is detected for a message */
-  onMessageComplete: (messageId: string) => void;
   /** Called when a terminal error is detected */
   onTerminalError: (reason: string) => void;
   /** Called when a command is received from DO */
@@ -1025,13 +994,7 @@ export function createConnectionManager(
                 state.setLastAssistantMessageId(messageInfo.id);
               }
             }
-
-            // Detect terminal assistant messages for per-message completion in
-            // the new-path keep-warm model.
-            const data = { event: eventType as 'message.updated', properties };
-            const parentID = getCompletedAssistantParentID(data);
-            if (parentID) {
-              callbacks.onMessageComplete(parentID);
+            if (isAssistantCompletionSignal(messageInfo)) {
               callbacks.onCompletionSignal();
             }
           }

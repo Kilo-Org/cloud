@@ -474,10 +474,10 @@ export function useKiloClawLatestVersion() {
   );
 }
 
-export function useFileTree(enabled: boolean) {
+export function useFileTree(enabled: boolean, path?: string) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.kiloclaw.fileTree.queryOptions(undefined, {
+    trpc.kiloclaw.fileTree.queryOptions(path === undefined ? undefined : { path }, {
       enabled,
       refetchOnWindowFocus: false,
     })

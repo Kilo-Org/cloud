@@ -9,6 +9,7 @@ import {
   createMessageSettlementOutbox,
   type MessageSettlementOutboxStorage,
 } from './message-settlement-outbox.js';
+import { createPendingSessionMessage, storePendingSessionMessage } from './pending-messages.js';
 import {
   getSessionMessageState,
   putSessionMessageState,
@@ -498,6 +499,83 @@ describe('MessageSettlementOutbox', () => {
       status: 'failed',
       errorMessage: 'provider failed',
     });
+  });
+
+  it('finalizes a terminal wrapper-run callback while the next run remains pending', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/sealed-batch' })
+    );
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: secondMessageId,
+        role: 'user',
+        content: 'next prompt',
+        createdAt: 3_000,
+      })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'idle_reconciliation',
+    });
+    expect(harness.callbackJobs).toHaveLength(0);
+
+    await harness.outbox.finalizeTerminalWrapperRunCallbackIfReady('wr_outbox');
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload.messageId).toBe(firstMessageId);
+  });
+
+  it('keeps a wrapper-run callback blocked while that run has a nonterminal accepted message', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/sealed-batch' })
+    );
+    await putSessionMessageState(harness.storage, acceptedMessageState(secondMessageId));
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'idle_reconciliation',
+    });
+    await harness.outbox.finalizeTerminalWrapperRunCallbackIfReady('wr_outbox');
+
+    expect(harness.callbackJobs).toHaveLength(0);
+  });
+
+  it('preserves gate-result waits when finalizing a terminal wrapper-run callback', async () => {
+    const harness = createHarness({
+      metadata: { ...metadata, finalization: { gateThreshold: 'warning' } },
+    });
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/sealed-batch-gate' })
+    );
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: secondMessageId,
+        role: 'user',
+        content: 'next prompt',
+        createdAt: 3_000,
+      })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'idle_reconciliation',
+    });
+    await harness.outbox.finalizeTerminalWrapperRunCallbackIfReady('wr_outbox');
+    expect(harness.callbackJobs).toHaveLength(0);
+
+    await harness.outbox.observeWrapperTerminalForIdleBatch('pass');
+    await harness.outbox.finalizeTerminalWrapperRunCallbackIfReady('wr_outbox');
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload.gateResult).toBe('pass');
   });
 
   it('includes a persisted completed message gate result in callback jobs', async () => {

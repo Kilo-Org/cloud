@@ -77,6 +77,7 @@ export type MessageSettlementOutbox = {
   releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId: string): Promise<boolean>;
   isWaitingForWrapperTerminalGateResult(): Promise<boolean>;
   finalizeIdleBatchCallbackIfReady(options?: FinalizeIdleBatchCallbackOptions): Promise<void>;
+  finalizeTerminalWrapperRunCallbackIfReady(wrapperRunId: string): Promise<void>;
   repairTerminalEffects(): Promise<boolean>;
   retryPendingCallbacks(now: number): Promise<void>;
   nextCallbackDeadline(): Promise<number | undefined>;
@@ -547,6 +548,33 @@ export function createMessageSettlementOutbox(
     return gateThreshold !== undefined && gateThreshold !== 'off';
   }
 
+  async function finalizeIdleBatchCallbackState(
+    batch: IdleBatchCallbackState,
+    allowWithoutObservedIdle: boolean
+  ): Promise<void> {
+    const now = Date.now();
+    const finalized: IdleBatchCallbackState = {
+      ...batch,
+      finalizedAt: now,
+      updatedAt: now,
+    };
+    await storage.put(idleBatchCallbackKey(finalized.batchId), finalized);
+    await storage.delete(CURRENT_IDLE_BATCH_CALLBACK_KEY);
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        batchId: finalized.batchId,
+        representativeMessageId: finalized.representativeMessageId,
+        allowWithoutObservedIdle,
+      })
+      .info('Finalized idle-batch callback state');
+
+    if (!finalized.representativeMessageId) return;
+    const representative = await getSessionMessageState(storage, finalized.representativeMessageId);
+    if (!representative?.callbackRequired || representative.callbackEnqueuedAt) return;
+    await enqueueMessageCallbackNotification(representative);
+  }
+
   async function finalizeIdleBatchCallbackIfReady(
     options?: FinalizeIdleBatchCallbackOptions
   ): Promise<void> {
@@ -559,7 +587,8 @@ export function createMessageSettlementOutbox(
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage);
     if (acceptedMessages.length > 0) return;
 
-    if (!options?.allowWithoutObservedIdle && !(await hasObservedWrapperIdle())) {
+    const allowWithoutObservedIdle = options?.allowWithoutObservedIdle ?? false;
+    if (!allowWithoutObservedIdle && !(await hasObservedWrapperIdle())) {
       return;
     }
 
@@ -567,26 +596,24 @@ export function createMessageSettlementOutbox(
       return;
     }
 
-    const finalized: IdleBatchCallbackState = {
-      ...batch,
-      finalizedAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    await storage.put(idleBatchCallbackKey(finalized.batchId), finalized);
-    await storage.delete(CURRENT_IDLE_BATCH_CALLBACK_KEY);
-    logger
-      .withFields({
-        sessionId: getSessionIdForLogs(),
-        batchId: finalized.batchId,
-        representativeMessageId: finalized.representativeMessageId,
-        allowWithoutObservedIdle: options?.allowWithoutObservedIdle ?? false,
-      })
-      .info('Finalized idle-batch callback state');
+    await finalizeIdleBatchCallbackState(batch, allowWithoutObservedIdle);
+  }
 
-    if (!finalized.representativeMessageId) return;
-    const representative = await getSessionMessageState(storage, finalized.representativeMessageId);
-    if (!representative?.callbackRequired || representative.callbackEnqueuedAt) return;
-    await enqueueMessageCallbackNotification(representative);
+  async function finalizeTerminalWrapperRunCallbackIfReady(wrapperRunId: string): Promise<void> {
+    const batch = await getCurrentIdleBatchCallbackState();
+    if (!batch?.representativeMessageId) return;
+
+    const representative = await getSessionMessageState(storage, batch.representativeMessageId);
+    if (representative?.wrapperRunId !== wrapperRunId) return;
+
+    const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
+    if (acceptedMessages.length > 0) return;
+
+    if (await shouldWaitForWrapperGateResult(batch)) {
+      return;
+    }
+
+    await finalizeIdleBatchCallbackState(batch, true);
   }
 
   async function listPendingIdleBatchCallbacks(): Promise<SessionMessageState[]> {
@@ -770,6 +797,7 @@ export function createMessageSettlementOutbox(
     releaseWrapperTerminalWaitForIdleBatchForWrapperRun,
     isWaitingForWrapperTerminalGateResult,
     finalizeIdleBatchCallbackIfReady,
+    finalizeTerminalWrapperRunCallbackIfReady,
     repairTerminalEffects,
     retryPendingCallbacks,
     nextCallbackDeadline,

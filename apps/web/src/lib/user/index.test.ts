@@ -38,6 +38,8 @@ import {
   security_findings,
   security_analysis_queue,
   security_analysis_owner_state,
+  security_agent_commands,
+  security_agent_repository_sync_state,
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_email_log,
@@ -67,6 +69,8 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  code_review_feedback_events,
+  code_review_memory_proposals,
   user_github_app_tokens,
   model_eval_ingestions,
   microdollar_usage,
@@ -174,6 +178,8 @@ describe('User', () => {
     await db.delete(kiloclaw_google_oauth_connections);
     await db.delete(kiloclaw_inbound_email_aliases);
     await db.delete(security_analysis_queue);
+    await db.delete(security_agent_commands);
+    await db.delete(security_agent_repository_sync_state);
     await db.delete(security_findings);
     await db.delete(security_analysis_owner_state);
     await db.delete(organization_invitations);
@@ -217,6 +223,8 @@ describe('User', () => {
     await db.delete(mcp_gateway_connect_resources);
     await db.delete(mcp_gateway_configs);
     await db.delete(github_branch_pull_requests);
+    await db.delete(code_review_memory_proposals);
+    await db.delete(code_review_feedback_events);
     await db.delete(user_github_app_tokens);
     await db.delete(organizations);
     await db.delete(kilocode_users);
@@ -643,6 +651,68 @@ describe('User', () => {
       expect(softDeleted!.is_admin).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
+    });
+
+    it('deletes user-owned review memory and retains org-owned proposals', async () => {
+      const user = await insertTestUser({ google_user_email: 'review-memory-delete@example.com' });
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Review memory org' })
+        .returning({ id: organizations.id });
+      if (!organization) throw new Error('Failed to create review memory test organization');
+
+      await db.insert(code_review_feedback_events).values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        repo_full_name: 'acme/widgets',
+        pr_number: 12,
+        kilo_comment_id: '1001',
+        reply_excerpt: 'This comment is a false positive for our generated fixtures.',
+        kilo_comment_excerpt: 'Generated fixtures should be simplified.',
+        dedupe_hash: `review-memory-delete-${user.id}`,
+      });
+      await db.insert(code_review_memory_proposals).values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        repo_full_name: 'acme/widgets',
+        title: 'Generated fixtures',
+        rationale: 'Maintainers corrected repeated generated fixture comments.',
+        proposed_markdown:
+          '## Generated fixtures\n\nDo not flag generated fixtures unless behavior changes.',
+        evidence: [{ excerpt: 'False positive for generated fixtures.', prNumber: 12 }],
+      });
+      const [orgProposal] = await db
+        .insert(code_review_memory_proposals)
+        .values({
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+          title: 'Org-owned guidance',
+          rationale: 'Org-owned proposals are not owned by the deleted user.',
+          proposed_markdown: '## Org guidance\n\nKeep this org-owned guidance.',
+          evidence: [{ excerpt: 'Org evidence excerpt.', prNumber: 14 }],
+        })
+        .returning({ id: code_review_memory_proposals.id });
+      if (!orgProposal) throw new Error('Failed to create org-owned review memory proposal');
+
+      await softDeleteUser(user.id);
+
+      const [userFeedbackCount] = await db
+        .select({ value: count() })
+        .from(code_review_feedback_events)
+        .where(eq(code_review_feedback_events.owned_by_user_id, user.id));
+      const [userProposalCount] = await db
+        .select({ value: count() })
+        .from(code_review_memory_proposals)
+        .where(eq(code_review_memory_proposals.owned_by_user_id, user.id));
+      const [orgProposalCount] = await db
+        .select({ value: count() })
+        .from(code_review_memory_proposals)
+        .where(eq(code_review_memory_proposals.id, orgProposal.id));
+
+      expect(userFeedbackCount?.value).toBe(0);
+      expect(userProposalCount?.value).toBe(0);
+      expect(orgProposalCount?.value).toBe(1);
     });
 
     it('should rotate and scrub App Store account-linked Kilo Pass data', async () => {
@@ -1719,6 +1789,59 @@ describe('User', () => {
           .select({ count: count() })
           .from(security_analysis_owner_state)
           .where(eq(security_analysis_owner_state.owned_by_user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete personal Security Agent command and repository sync rows', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(security_agent_commands).values([
+        { command_type: 'sync', origin: 'manual', owned_by_user_id: user1.id },
+        { command_type: 'sync', origin: 'manual', owned_by_user_id: user2.id },
+      ]);
+      await db.insert(security_agent_repository_sync_state).values([
+        {
+          owned_by_user_id: user1.id,
+          repo_full_name: 'kilo-org/cloud-user-1',
+          last_attempted_at: new Date().toISOString(),
+        },
+        {
+          owned_by_user_id: user2.id,
+          repo_full_name: 'kilo-org/cloud-user-2',
+          last_attempted_at: new Date().toISOString(),
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_agent_commands)
+          .where(eq(security_agent_commands.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_agent_repository_sync_state)
+          .where(eq(security_agent_repository_sync_state.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_agent_commands)
+          .where(eq(security_agent_commands.owned_by_user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_agent_repository_sync_state)
+          .where(eq(security_agent_repository_sync_state.owned_by_user_id, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

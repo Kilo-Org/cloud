@@ -1,5 +1,5 @@
 {
-  "id": "6eeddfda-ec23-48be-b704-1936dd0ed7f7",
+  "id": "c750b1b2-c7f8-4596-ad86-ca8be9a3148f",
   "prevId": "e600f125-9593-4920-bd40-d8d07bbb9a55",
   "version": "7",
   "dialect": "postgresql",
@@ -17742,25 +17742,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "provider_scopes": {
-          "name": "provider_scopes",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_scope_source": {
-          "name": "provider_scope_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "provider_resource": {
-          "name": "provider_resource",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "enabled": {
           "name": "enabled",
           "type": "boolean",
@@ -17924,10 +17905,6 @@
         "mcp_gateway_configs_sharing_mode": {
           "name": "mcp_gateway_configs_sharing_mode",
           "value": "\"mcp_gateway_configs\".\"sharing_mode\" IN ('single_user', 'multi_user')"
-        },
-        "mcp_gateway_configs_provider_scope_source": {
-          "name": "mcp_gateway_configs_provider_scope_source",
-          "value": "\"mcp_gateway_configs\".\"provider_scope_source\" IN ('none', 'discovered', 'override')"
         }
       },
       "isRLSEnabled": false
@@ -20463,6 +20440,12 @@
         "description": {
           "name": "description",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

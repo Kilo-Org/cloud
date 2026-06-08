@@ -40,19 +40,19 @@ describe('wrapper lifecycle drain races', () => {
       autoCommit: false,
       condenseOnComplete: false,
     });
-    lifecycle.setAborted();
     state.clearAllMessages();
+    lifecycle.setAborted();
     lifecycle.triggerDrainAndClose();
 
+    lifecycle.reset();
     state.acceptMessage('message-2', {
       autoCommit: false,
       condenseOnComplete: false,
     });
     await wait(300);
 
-    lifecycle.onMessageComplete('message-2');
     lifecycle.onSessionIdle();
-    await wait(50);
+    await wait(3_050);
 
     expect(events.map(event => event.streamEventType)).toContain('complete');
   });

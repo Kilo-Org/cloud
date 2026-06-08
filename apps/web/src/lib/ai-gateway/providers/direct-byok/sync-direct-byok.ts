@@ -4,6 +4,7 @@ import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
+const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
 
 const ModalitySchema = z
@@ -14,6 +15,7 @@ const OpenAICompatibleModelsResponseSchema = z.object({
   data: z.array(
     z.object({
       id: z.string(),
+      name: z.string().optional(),
       context_length: z.number().optional(),
       max_model_len: z.number().optional(),
       max_output_length: z.number().optional(),
@@ -64,6 +66,14 @@ type ProviderFetcher = {
   fetch(ctx: SyncContext): Promise<RawModel[]>;
 };
 
+function shortenDisplayName(id: string): string;
+function shortenDisplayName(id: string | undefined): string | undefined;
+function shortenDisplayName(id: string | undefined) {
+  if (!id) return undefined;
+  const slash = Math.max(id.lastIndexOf(':'), id.lastIndexOf('/'));
+  return slash >= 0 ? id.slice(slash + 1).trim() : id;
+}
+
 function openAICompatibleFetcher(options: {
   providerId: DirectUserByokInferenceProviderId;
   label: string;
@@ -81,6 +91,7 @@ function openAICompatibleFetcher(options: {
       const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
       return parsed.data.map(model => ({
         id: model.id,
+        name: shortenDisplayName(model.name),
         context_length: model.context_length ?? model.max_model_len,
         max_completion_tokens: model.max_output_length,
         input_modalities: model.input_modalities,
@@ -104,7 +115,7 @@ function modelsDevFetcher(
       const provider = ModelsDevProviderSchema.parse(entry);
       return Object.values(provider.models).map(model => ({
         id: model.id,
-        name: model.name,
+        name: shortenDisplayName(model.name),
         context_length: model.limit?.context,
         max_completion_tokens: model.limit?.output,
         input_modalities: model.modalities?.input,
@@ -134,24 +145,44 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Chutes',
     url: 'https://llm.chutes.ai/v1/models',
   }),
+  openAICompatibleFetcher({
+    providerId: 'crofai',
+    label: 'CrofAI',
+    url: 'https://crof.ai/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'orcarouter',
+    label: 'OrcaRouter',
+    url: 'https://api.orcarouter.ai/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'inceptron-byok',
+    label: 'Inceptron BYOK',
+    url: 'https://api.inceptron.io/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'martian',
+    label: 'Martian',
+    url: 'https://api.withmartian.com/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'synthetic',
+    label: 'Synthetic',
+    url: 'https://api.synthetic.new/v1/models',
+  }),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
   modelsDevFetcher('xiaomi-token-plan-ams', 'xiaomi-token-plan-ams'),
   modelsDevFetcher('xiaomi-token-plan-sgp', 'xiaomi-token-plan-sgp'),
 ];
 
-function modelIdToDisplayName(id: string) {
-  const slash = id.lastIndexOf('/');
-  return slash >= 0 ? id.slice(slash + 1) : id;
-}
-
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
   const fetched = await fetcher.fetch(ctx);
   const models: DirectByokModel[] = [];
 
   for (const raw of fetched) {
-    const name = raw.name ?? modelIdToDisplayName(raw.id);
-    const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
+    const name = raw.name ?? shortenDisplayName(raw.id);
+    const context_length = raw.context_length ?? DEFAULT_CONTENT_LENGTH;
     const max_completion_tokens = Math.min(
       raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
       context_length

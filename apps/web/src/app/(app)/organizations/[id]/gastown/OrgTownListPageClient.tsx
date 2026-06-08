@@ -44,48 +44,35 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
   return (
     <PageContainer>
       <GastownBackdrop contentClassName="p-5 md:p-7">
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <SetPageTitle title="Gas Town" />
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="max-w-2xl text-sm leading-relaxed text-white/60">
-                A chat-first orchestration console for towns, rigs, beads, and agents. Built for
-                radical transparency: every object is clickable; every outcome is attributable.
-              </p>
-            </div>
+          <p className="max-w-2xl text-sm leading-relaxed text-white/60">
+            A chat-first orchestration console for towns, rigs, beads, and agents. Built for radical
+            transparency: every object is clickable; every outcome is attributable.
+          </p>
 
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => router.push(onboardingUrl)}
-              className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-            >
-              <Plus className="size-5" />
-              New Town
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[120px] rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
               <div className="text-[11px] tracking-wider text-white/40 uppercase">Towns</div>
-              <div className="mt-0.5 text-lg font-semibold text-white/85">
-                {townsQuery.isLoading ? '…' : (townsQuery.data ?? []).length}
+              <div className="mt-1 text-2xl font-semibold text-white/90">
+                {townsQuery.isLoading ? (
+                  <Skeleton className="h-8 w-6 bg-white/20" />
+                ) : (
+                  (townsQuery.data ?? []).length
+                )}
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-              <div className="text-[11px] tracking-wider text-white/40 uppercase">Mode</div>
-              <div className="mt-1 inline-flex items-center gap-2 text-sm text-white/70">
-                <span className="size-2 rounded-full bg-emerald-400" />
-                Live
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-              <div className="text-[11px] tracking-wider text-white/40 uppercase">Core</div>
-              <div className="mt-1 text-sm text-white/70">MEOW · GUPP · NDI</div>
-            </div>
-            <div className="hidden rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 sm:block">
-              <div className="text-[11px] tracking-wider text-white/40 uppercase">Promise</div>
-              <div className="mt-1 text-sm text-white/70">Discover, don't track</div>
+
+            <div className="ml-auto">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => router.push(onboardingUrl)}
+                className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+              >
+                <Plus className="size-5" />
+                New Town
+              </Button>
             </div>
           </div>
         </div>

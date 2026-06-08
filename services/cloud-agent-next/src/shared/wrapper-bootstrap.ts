@@ -148,9 +148,14 @@ export type WrapperSessionReadySuccessResponse = {
 export type WrapperSessionReadyErrorResponse = {
   status: 'error';
   error: {
-    code: 'INVALID_REQUEST' | 'WORKSPACE_SETUP_FAILED' | 'KILO_SERVER_FAILED';
+    code:
+      | 'INVALID_REQUEST'
+      | 'WRAPPER_FINALIZING'
+      | 'WORKSPACE_SETUP_FAILED'
+      | 'KILO_SERVER_FAILED';
     message: string;
     retryable?: boolean;
+    wrapperRunId?: string;
   };
 };
 

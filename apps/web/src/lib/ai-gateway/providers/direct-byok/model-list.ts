@@ -11,13 +11,11 @@ import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 type CachedEnhancedModelListOptions = {
   providerId: DirectUserByokInferenceProviderId;
   recommendedModels: ReadonlyArray<DirectByokModel>;
-  variants?: Record<string, OpenCodeVariant>;
 };
 
 export function cachedEnhancedDirectByokModelList({
   providerId,
   recommendedModels,
-  variants,
 }: CachedEnhancedModelListOptions) {
   return createCachedFetch<ReadonlyArray<DirectByokModel>>(
     async () =>
@@ -26,7 +24,6 @@ export function cachedEnhancedDirectByokModelList({
         remainingModels: DirectByokModelArraySchema.parse(
           JSON.parse((await redisClient.get<string>(directByokModelsRedisKey(providerId))) ?? '[]')
         ),
-        variants,
       }),
     600_000,
     recommendedModels
@@ -36,7 +33,6 @@ export function cachedEnhancedDirectByokModelList({
 function enhanceDirectByokModelList({
   recommendedModels,
   remainingModels,
-  variants,
 }: {
   recommendedModels: ReadonlyArray<DirectByokModel>;
   remainingModels: ReadonlyArray<DirectByokModel>;
@@ -51,7 +47,6 @@ function enhanceDirectByokModelList({
       return {
         ...model,
         flags: flags.size > 0 ? [...flags] : undefined,
-        variants: model.variants ?? variants,
       };
     });
 }

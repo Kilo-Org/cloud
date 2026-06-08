@@ -60,6 +60,7 @@ function createMessage(): SecurityDismissMessage {
   return {
     schemaVersion: 1,
     kind: 'dismiss',
+    commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     messageId: 'dismiss-message-123',
     dispatchedAt: '2026-05-18T08:30:00.000Z',
@@ -87,7 +88,12 @@ describe('processSecurityFindingDismissal', () => {
         gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
         message: createMessage(),
       })
-    ).resolves.toEqual({ dismissed: true, findingSource: 'dependabot' });
+    ).resolves.toEqual({
+      dismissed: true,
+      findingSource: 'dependabot',
+      commandStatus: 'succeeded',
+      resultCode: 'FINDING_DISMISSED',
+    });
 
     expect(updates[0]).toMatchObject({
       status: 'ignored',
@@ -146,7 +152,12 @@ describe('processSecurityFindingDismissal', () => {
         gitTokenService: { getToken } as unknown as GitTokenService,
         message: createMessage(),
       })
-    ).resolves.toEqual({ dismissed: false, findingSource: 'dependabot' });
+    ).resolves.toEqual({
+      dismissed: false,
+      findingSource: 'dependabot',
+      commandStatus: 'failed',
+      resultCode: 'INVALID_DISMISS_TARGET',
+    });
 
     expect(getToken).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -166,7 +177,12 @@ describe('processSecurityFindingDismissal', () => {
         gitTokenService: { getToken } as unknown as GitTokenService,
         message: createMessage(),
       })
-    ).resolves.toEqual({ dismissed: true, findingSource: 'pnpm_audit' });
+    ).resolves.toEqual({
+      dismissed: true,
+      findingSource: 'pnpm_audit',
+      commandStatus: 'succeeded',
+      resultCode: 'FINDING_DISMISSED',
+    });
 
     expect(getToken).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -193,7 +209,12 @@ describe('processSecurityFindingDismissal', () => {
         gitTokenService: { getToken } as unknown as GitTokenService,
         message: createMessage(),
       })
-    ).resolves.toEqual({ dismissed: false, findingSource: 'dependabot' });
+    ).resolves.toEqual({
+      dismissed: false,
+      findingSource: 'dependabot',
+      commandStatus: 'no_op',
+      resultCode: 'ALREADY_IGNORED',
+    });
 
     expect(getToken).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -216,7 +237,12 @@ describe('processSecurityFindingDismissal', () => {
         gitTokenService: { getToken } as unknown as GitTokenService,
         message: createMessage(),
       })
-    ).resolves.toEqual({ dismissed: false, findingSource: null });
+    ).resolves.toEqual({
+      dismissed: false,
+      findingSource: null,
+      commandStatus: 'failed',
+      resultCode: 'FINDING_UNAVAILABLE',
+    });
 
     expect(getToken).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();

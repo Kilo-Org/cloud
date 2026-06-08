@@ -948,6 +948,22 @@ export type PlatformRepository = {
   private: boolean;
 };
 
+export const REVIEW_MEMORY_PLATFORMS = ['github'] as const;
+export type ReviewMemoryPlatform = (typeof REVIEW_MEMORY_PLATFORMS)[number];
+
+export const REVIEW_MEMORY_PROPOSAL_STATUSES = [
+  'open',
+  'edited',
+  'rejected',
+  'opening_change_request',
+  'change_request_opened',
+  'change_request_failed',
+  'superseded',
+] as const;
+export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES)[number];
+
+export type ReviewMemoryEvidenceItem = { excerpt: string; prNumber: number | null };
+
 // --- Deployment types ---
 
 export const providerSchema = z.enum(['github', 'git', 'app-builder']);
@@ -1001,6 +1017,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   //   'warning'  — gate fails on warnings and above
   //   'critical' — gate fails only on critical issues
   gate_threshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  review_memory_enabled: z.boolean().optional(),
 });
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;
@@ -1286,24 +1303,31 @@ export const CustomLlmPricingSchema = z.object({
 
 export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
 
-export const CustomLlmDefinitionSchema = z.object({
-  internal_id: z.string(),
-  display_name: z.string(),
+export const CustomLlmMetadataSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  base_url: z.url(),
-  api_key: z.string(),
-  organization_ids: z.array(z.string()),
   supports_image_input: z.boolean().optional(),
-  add_cache_breakpoints: z.boolean().optional(),
-  remove_cache_breakpoints: z.boolean().optional(),
-  inject_reasoning_into_content: z.boolean().optional(),
-  extra_headers: CustomLlmExtraHeadersSchema.optional(),
-  extra_body: CustomLlmExtraBodySchema.optional(),
-  remove_from_body: z.array(z.string()).optional(),
   opencode_settings: OpenCodeSettingsSchema.optional(),
-  pricing: CustomLlmPricingSchema.optional(),
 });
+
+export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
+
+export const CustomLlmDefinitionSchema = z
+  .object({
+    internal_id: z.string(),
+    display_name: z.string(),
+    base_url: z.url(),
+    api_key: z.string(),
+    organization_ids: z.array(z.string()),
+    add_cache_breakpoints: z.boolean().optional(),
+    remove_cache_breakpoints: z.boolean().optional(),
+    inject_reasoning_into_content: z.boolean().optional(),
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+    extra_body: CustomLlmExtraBodySchema.optional(),
+    remove_from_body: z.array(z.string()).optional(),
+    pricing: CustomLlmPricingSchema.optional(),
+  })
+  .and(CustomLlmMetadataSchema);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

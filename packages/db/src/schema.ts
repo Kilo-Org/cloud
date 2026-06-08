@@ -103,6 +103,7 @@ import type {
   KiloClawScheduledActionNotificationStatus,
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
+  CustomLlmMetadata,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -119,6 +120,9 @@ import type {
   BuildStatus,
   Provider,
   CodeReviewAgentConfig,
+  ReviewMemoryEvidenceItem,
+  ReviewMemoryPlatform,
+  ReviewMemoryProposalStatus,
   DependabotAlertRaw,
   SecurityFindingAnalysis,
   NormalizedOpenRouterResponse,
@@ -3937,6 +3941,102 @@ export const cloud_agent_code_reviews = pgTable(
 
 export type CloudAgentCodeReview = typeof cloud_agent_code_reviews.$inferSelect;
 
+export const code_review_feedback_events = pgTable(
+  'code_review_feedback_events',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    repo_full_name: text().notNull(),
+    pr_number: integer(),
+    kilo_comment_id: text().notNull(),
+    reply_excerpt: text().notNull(),
+    kilo_comment_excerpt: text(),
+    dedupe_hash: text().notNull(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_code_review_feedback_events_dedupe_hash').on(table.dedupe_hash),
+    index('idx_code_review_feedback_events_owned_by_org_id').on(table.owned_by_organization_id),
+    index('idx_code_review_feedback_events_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_feedback_events_platform_repo').on(table.platform, table.repo_full_name),
+    index('idx_code_review_feedback_events_created_at').on(table.created_at),
+    check(
+      'code_review_feedback_events_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewFeedbackEvent = typeof code_review_feedback_events.$inferSelect;
+
+export const code_review_memory_proposals = pgTable(
+  'code_review_memory_proposals',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    repo_full_name: text().notNull(),
+    status: text().$type<ReviewMemoryProposalStatus>().notNull().default('open'),
+    title: text().notNull(),
+    rationale: text().notNull(),
+    proposed_markdown: text().notNull(),
+    evidence: jsonb().$type<ReviewMemoryEvidenceItem[]>().default([]).notNull(),
+    positive_count: integer().notNull().default(0),
+    negative_count: integer().notNull().default(0),
+    neutral_count: integer().notNull().default(0),
+    change_request_url: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('idx_code_review_memory_proposals_owned_by_org_id').on(table.owned_by_organization_id),
+    index('idx_code_review_memory_proposals_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_memory_proposals_platform_repo_status').on(
+      table.platform,
+      table.repo_full_name,
+      table.status
+    ),
+    index('idx_code_review_memory_proposals_updated_at').on(table.updated_at),
+    uniqueIndex('UQ_code_review_memory_proposals_org_active_scope')
+      .on(table.owned_by_organization_id, table.platform, table.repo_full_name)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+      ),
+    uniqueIndex('UQ_code_review_memory_proposals_user_active_scope')
+      .on(table.owned_by_user_id, table.platform, table.repo_full_name)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+      ),
+    check(
+      'code_review_memory_proposals_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewMemoryProposal = typeof code_review_memory_proposals.$inferSelect;
+
 export const cloud_agent_code_review_attempts = pgTable(
   'cloud_agent_code_review_attempts',
   {
@@ -4829,6 +4929,117 @@ export const security_analysis_owner_state = pgTable(
 );
 
 export type SecurityAnalysisOwnerState = typeof security_analysis_owner_state.$inferSelect;
+
+export type SecurityAgentCommandType = 'sync' | 'dismiss_finding' | 'start_analysis';
+export type SecurityAgentCommandOrigin = 'manual' | 'dashboard_refresh' | 'enable_initial_sync';
+export type SecurityAgentCommandStatus = 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
+
+export const security_agent_commands = pgTable(
+  'security_agent_commands',
+  {
+    id: idPrimaryKeyColumn,
+    command_type: text().$type<SecurityAgentCommandType>().notNull(),
+    origin: text().$type<SecurityAgentCommandOrigin>().notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    finding_id: uuid().references(() => security_findings.id, { onDelete: 'set null' }),
+    repo_full_name: text(),
+    status: text().$type<SecurityAgentCommandStatus>().notNull().default('accepted'),
+    result_code: text(),
+    last_error_redacted: text(),
+    accepted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_agent_commands_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'security_agent_commands_type_check',
+      sql`${table.command_type} IN ('sync', 'dismiss_finding', 'start_analysis')`
+    ),
+    check(
+      'security_agent_commands_origin_check',
+      sql`${table.origin} IN ('manual', 'dashboard_refresh', 'enable_initial_sync')`
+    ),
+    check(
+      'security_agent_commands_status_check',
+      sql`${table.status} IN ('accepted', 'running', 'succeeded', 'failed', 'no_op')`
+    ),
+    index('idx_security_agent_commands_org_created').on(
+      table.owned_by_organization_id,
+      table.created_at.desc()
+    ),
+    index('idx_security_agent_commands_user_created').on(
+      table.owned_by_user_id,
+      table.created_at.desc()
+    ),
+    index('idx_security_agent_commands_status_updated').on(table.status, table.updated_at),
+    index('idx_security_agent_commands_finding_created').on(
+      table.finding_id,
+      table.created_at.desc()
+    ),
+  ]
+);
+
+export type SecurityAgentCommand = typeof security_agent_commands.$inferSelect;
+export type NewSecurityAgentCommand = typeof security_agent_commands.$inferInsert;
+
+export const security_agent_repository_sync_state = pgTable(
+  'security_agent_repository_sync_state',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    repo_full_name: text().notNull(),
+    last_attempted_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_succeeded_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_failure_code: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_agent_repository_sync_state_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    uniqueIndex('UQ_security_agent_repository_sync_state_org_repo')
+      .on(table.owned_by_organization_id, table.repo_full_name)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_security_agent_repository_sync_state_user_repo')
+      .on(table.owned_by_user_id, table.repo_full_name)
+      .where(isNotNull(table.owned_by_user_id)),
+  ]
+);
+
+export type SecurityAgentRepositorySyncState =
+  typeof security_agent_repository_sync_state.$inferSelect;
+export type NewSecurityAgentRepositorySyncState =
+  typeof security_agent_repository_sync_state.$inferInsert;
 
 // Security Audit Log — SOC2-compliant audit trail for security agent actions
 export const security_audit_log = pgTable(
@@ -7176,6 +7387,7 @@ export const model_experiment = pgTable(
     public_model_id: text().notNull(),
     name: text().notNull(),
     description: text(),
+    metadata: jsonb().$type<CustomLlmMetadata>(),
     // status: draft | active | paused | completed
     status: text().notNull().default('draft'),
     is_archived: boolean().notNull().default(false),

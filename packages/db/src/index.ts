@@ -32,6 +32,24 @@ export {
 } from './kiloclaw-orphan-volume';
 export { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
 export {
+  createSecurityAgentCommand,
+  deleteRetainedSecurityAgentCommands,
+  getSecurityAgentCommandForOwner,
+  listActiveSecurityAgentCommandsForOwner,
+  markSecurityAgentCommandQueueAdmissionFailed,
+  reconcileStaleSecurityAgentCommands,
+  transitionSecurityAgentCommand,
+  type CreateSecurityAgentCommandInput,
+  type SecurityAgentCommandOwner,
+  type TransitionSecurityAgentCommandInput,
+} from './security-agent-command-repository';
+export {
+  getSecurityAgentRepositorySyncState,
+  recordSecurityAgentRepositorySyncAttempt,
+  recordSecurityAgentRepositorySyncFailure,
+  recordSecurityAgentRepositorySyncSuccess,
+} from './security-agent-repository-sync-state';
+export {
   countUnresolvedTerminalRenewalFailures,
   findUnresolvedTerminalRenewalFailure,
   listUnresolvedTerminalRenewalFailures,

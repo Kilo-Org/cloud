@@ -35,6 +35,7 @@ import {
   clearCodeReviewActionRequiredState,
   getCodeReviewActionRequiredState,
 } from '@/lib/code-reviews/action-required';
+import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -185,6 +186,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           disableReviewMd: true,
+          reviewMemoryEnabled: false,
           actionRequired: null,
         };
       }
@@ -202,6 +204,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         selectedRepositoryIds: cfg.selected_repository_ids || [],
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
         disableReviewMd: cfg.disable_review_md ?? true,
+        reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
         actionRequired: getCodeReviewActionRequiredState(config),
       };
     }),
@@ -221,6 +224,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         const previousRepoIds =
           (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
           [];
+        const reviewMemoryEnabled = getReviewMemoryEnabledFromConfig(previousConfig?.config);
 
         // Save the agent config
         await upsertAgentConfig({
@@ -238,6 +242,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
             disable_review_md: input.disableReviewMd ?? true,
+            review_memory_enabled: reviewMemoryEnabled,
           },
           createdBy: ctx.user.id,
         });

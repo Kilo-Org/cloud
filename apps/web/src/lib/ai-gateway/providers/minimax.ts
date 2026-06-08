@@ -13,7 +13,7 @@ export const minimax_m3_discounted_model: KiloExclusiveModel = {
 Trained as a native multimodal model on interleaved data and tuned for multi-turn, production-like collaboration via an interactive user-simulator framework, the model is oriented toward sustained, multi-step tasks rather than single-turn execution.`,
   context_length: 524288,
   max_completion_tokens: 512000,
-  status: 'public',
+  status: 'disabled',
   flags: ['reasoning', 'vercel-routing', 'vision'],
   gateway: 'openrouter',
   internal_id: MINIMAX_CURRENT_MODEL_ID,

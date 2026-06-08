@@ -141,6 +141,7 @@ export class ExecutionOrchestrator {
       });
     } catch (error) {
       if (error instanceof ExecutionError) throw error;
+      if (error instanceof WrapperError && error.code === 'WRAPPER_FINALIZING') throw error;
       throw ExecutionError.wrapperStartFailed(
         `Failed to start wrapper: ${error instanceof Error ? error.message : String(error)}`,
         error
@@ -209,6 +210,9 @@ export class ExecutionOrchestrator {
         }
         if (error.code === 'KILO_SERVER_FAILED') {
           throw ExecutionError.kiloServerFailed(error.message, error);
+        }
+        if (error.code === 'WRAPPER_FINALIZING') {
+          throw error;
         }
       }
       if (error instanceof ExecutionError) throw error;

@@ -932,6 +932,65 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
+    it('retries a wrapper version mismatch infra failure without marking parent terminal', async () => {
+      const errorMessage = 'Wrapper version mismatch after startup: expected 2.0.0, got 1.9.9';
+
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-wrapper-mismatch-old' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000203',
+          status: 'failed',
+          session_id: 'agent-wrapper-mismatch-old',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000203',
+          status: 'failed',
+          session_id: 'agent-wrapper-mismatch-old',
+        })
+      );
+      mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
+        outcome: 'created',
+        attempt: makeAttempt({
+          id: '00000000-0000-0000-0000-000000000204',
+          attempt_number: 2,
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000203',
+          status: 'pending',
+        }),
+      });
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-wrapper-mismatch-old',
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith(
+        expect.objectContaining({
+          codeReviewId: REVIEW_ID,
+          retryOfAttemptId: '00000000-0000-0000-0000-000000000203',
+        })
+      );
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: 'agent-wrapper-mismatch-old',
+        reason: errorMessage,
+        failedAttemptId: '00000000-0000-0000-0000-000000000203',
+        retryAttemptId: '00000000-0000-0000-0000-000000000204',
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
     it('does not retry when the parent review is already superseded', async () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ status: 'cancelled', terminal_reason: 'superseded' })

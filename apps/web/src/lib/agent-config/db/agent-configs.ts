@@ -2,10 +2,11 @@ import { db } from '@/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import type { Owner } from '@/lib/code-reviews/core';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
+
+type AgentConfigOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
 
 /**
  * Gets agent configuration for an organization
@@ -126,7 +127,11 @@ export async function deleteAgentConfig(
  * Gets agent configuration for an owner (organization or personal user)
  * Supports both organization and personal user ownership
  */
-export async function getAgentConfigForOwner(owner: Owner, agentType: string, platform: string) {
+export async function getAgentConfigForOwner(
+  owner: AgentConfigOwner,
+  agentType: string,
+  platform: string
+) {
   const conditions = [
     eq(agent_configs.agent_type, agentType),
     eq(agent_configs.platform, platform),
@@ -153,7 +158,7 @@ export async function getAgentConfigForOwner(owner: Owner, agentType: string, pl
  * Supports both organization and personal user ownership
  */
 export async function upsertAgentConfigForOwner(data: {
-  owner: Owner;
+  owner: AgentConfigOwner;
   agentType: string;
   platform: string;
   config: CodeReviewAgentConfig | Record<string, unknown>;
@@ -219,7 +224,7 @@ export async function upsertAgentConfigForOwner(data: {
  * Supports both organization and personal user ownership
  */
 export async function setAgentEnabledForOwner(
-  owner: Owner,
+  owner: AgentConfigOwner,
   agentType: string,
   platform: string,
   isEnabled: boolean
@@ -251,15 +256,10 @@ export async function setAgentEnabledForOwner(
  * to clear stale repository selections from the previous instance.
  */
 export async function resetCodeReviewConfigForOwner(
-  owner: Pick<Owner, 'type' | 'id'>,
+  owner: AgentConfigOwner,
   platform: string
 ): Promise<boolean> {
-  const ownerForQuery = {
-    ...owner,
-    userId: owner.type === 'user' ? owner.id : 'system',
-  };
-
-  const config = await getAgentConfigForOwner(ownerForQuery, 'code_review', platform);
+  const config = await getAgentConfigForOwner(owner, 'code_review', platform);
   if (!config) {
     return false;
   }
@@ -267,7 +267,7 @@ export async function resetCodeReviewConfigForOwner(
   const existingConfig = config.config as CodeReviewAgentConfig;
 
   await upsertAgentConfigForOwner({
-    owner: ownerForQuery,
+    owner,
     agentType: 'code_review',
     platform,
     config: {

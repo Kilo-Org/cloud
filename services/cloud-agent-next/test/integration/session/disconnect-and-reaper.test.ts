@@ -117,6 +117,7 @@ describe('Disconnect handling and compatibility execution RPCs', () => {
       await instance.handleWrapperTerminalEvent({
         wrapperRunId: 'wr_idle_warm_reuse',
         status: 'completed',
+        messageIds: [],
       });
       await instance.alarm();
 

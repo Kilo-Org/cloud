@@ -8,6 +8,8 @@ import type { SecurityDismissMessage } from './index.js';
 type FindingDismissalResult = {
   dismissed: boolean;
   findingSource: string | null;
+  commandStatus: 'succeeded' | 'failed' | 'no_op';
+  resultCode: string;
 };
 
 type FindingOwner = {
@@ -50,11 +52,21 @@ export async function processSecurityFindingDismissal(params: {
       runId: params.message.runId,
       findingId: params.message.findingId,
     });
-    return { dismissed: false, findingSource: null };
+    return {
+      dismissed: false,
+      findingSource: null,
+      commandStatus: 'failed',
+      resultCode: 'FINDING_UNAVAILABLE',
+    };
   }
 
   if (finding.status === 'ignored') {
-    return { dismissed: false, findingSource: finding.source };
+    return {
+      dismissed: false,
+      findingSource: finding.source,
+      commandStatus: 'no_op',
+      resultCode: 'ALREADY_IGNORED',
+    };
   }
 
   if (finding.source === 'dependabot') {
@@ -68,7 +80,12 @@ export async function processSecurityFindingDismissal(params: {
         runId: params.message.runId,
         findingId: params.message.findingId,
       });
-      return { dismissed: false, findingSource: finding.source };
+      return {
+        dismissed: false,
+        findingSource: finding.source,
+        commandStatus: 'failed',
+        resultCode: 'INVALID_DISMISS_TARGET',
+      };
     }
 
     const token = await params.gitTokenService.getToken(params.message.installationId);
@@ -130,5 +147,10 @@ export async function processSecurityFindingDismissal(params: {
     });
   });
 
-  return { dismissed: true, findingSource: finding.source };
+  return {
+    dismissed: true,
+    findingSource: finding.source,
+    commandStatus: 'succeeded',
+    resultCode: 'FINDING_DISMISSED',
+  };
 }

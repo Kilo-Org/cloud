@@ -229,6 +229,8 @@ function getActionRequiredTerminalReason(
   return classifyCodeReviewActionRequiredFailure(errorMessage);
 }
 
+const RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE = 'Wrapper version mismatch'.toLowerCase();
+
 function isRetryableInfraFailure(
   status: 'running' | 'completed' | 'failed' | 'cancelled',
   terminalReason?: CodeReviewTerminalReason,
@@ -250,6 +252,7 @@ function isRetryableInfraFailure(
   if (message.includes('user interrupted')) return false;
 
   return (
+    message.includes(RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE) ||
     message.includes('container shutdown: sigterm') ||
     message.includes('execution timeout - no heartbeat received') ||
     ((message.includes('sandbox') ||

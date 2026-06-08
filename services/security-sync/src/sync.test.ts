@@ -56,7 +56,11 @@ function createFakeDb(options: FakeDbOptions = {}) {
         return { where: async () => undefined };
       },
     }),
-    insert: () => ({ values: async () => undefined }),
+    insert: () => ({
+      values: () => ({
+        onConflictDoUpdate: async () => undefined,
+      }),
+    }),
     execute: async () => ({ rows: [] }),
   };
 

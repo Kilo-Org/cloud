@@ -13,6 +13,7 @@ import type {
   WorkspaceReady,
 } from '../execution/types.js';
 import { logger } from '../logger.js';
+import { WrapperFinalizingError } from '../kilo/wrapper-client.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { WrapperCommand } from '../shared/protocol.js';
 import type { Env as WorkerEnv } from '../types.js';
@@ -20,13 +21,17 @@ import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
 import {
   allocateWrapperRuntimeState,
   clearAllocatedWrapperRuntimeState,
+  clearWrapperDispatchingMessage,
   clearWrapperRuntimeIdentity,
   getWrapperLease,
   getWrapperRuntimeState,
+  isWrapperRunFinalizing,
+  markWrapperFinalizing,
   nextWrapperCleanupDeadline,
   putWrapperLease,
   READY_ONLY_IDLE_MS,
   recordWrapperAcceptedMessage,
+  recordWrapperDispatchingMessage,
   recordWrapperReadyLease,
   reduceWrapperLease,
   type WrapperLease,
@@ -268,6 +273,14 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
   ): Promise<MessageDeliveryResult> {
     const { sessionId } = plan.scope;
     const { turn, agent } = plan;
+    const currentRuntimeState = await getWrapperRuntimeState(storage);
+    if (isWrapperRunFinalizing(currentRuntimeState)) {
+      return {
+        success: false,
+        code: 'WRAPPER_FINALIZING',
+        error: 'Wrapper batch is finalizing',
+      };
+    }
     const { leasedInstance, allocatedPhysicalInstance, requiresFreshRunFence } =
       await authorizePhysicalWrapper(plan);
     const previousRuntimeState = await getWrapperRuntimeState(storage);
@@ -336,6 +349,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
             })
             .info('AgentRuntime wrapper workspace reported ready');
           await hooks.onWorkspaceReady?.(ready);
+          await recordWrapperDispatchingMessage(storage, wrapperRuntimeState, turn.messageId);
         },
       });
 
@@ -350,6 +364,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         acceptedAt,
         wrapperRunId: wrapperRuntimeState.wrapperRunId,
       });
+      await clearWrapperDispatchingMessage(storage, wrapperRuntimeState, turn.messageId);
       try {
         const acceptedLease = await getWrapperLease(storage);
         await putWrapperLease(
@@ -381,6 +396,20 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         .info('AgentRuntime wrapper accepted pending session message');
       return buildRuntimeAcceptanceResult(turn.messageId, wrapperRuntimeState.wrapperRunId);
     } catch (error) {
+      await clearWrapperDispatchingMessage(storage, wrapperRuntimeState, turn.messageId);
+      if (error instanceof WrapperFinalizingError) {
+        if (
+          error.wrapperRunId === undefined ||
+          error.wrapperRunId === wrapperRuntimeState.wrapperRunId
+        ) {
+          await markWrapperFinalizing(storage, wrapperRuntimeState.wrapperRunId);
+        }
+        return {
+          success: false,
+          code: 'WRAPPER_FINALIZING',
+          error: error.message,
+        };
+      }
       logger
         .withFields({
           sessionId,

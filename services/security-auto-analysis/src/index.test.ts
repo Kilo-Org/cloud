@@ -1,6 +1,25 @@
+import {
+  createSecurityAgentCommand,
+  markSecurityAgentCommandQueueAdmissionFailed,
+} from '@kilocode/db';
+import { getWorkerDb } from '@kilocode/db/client';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
+
+vi.mock('@kilocode/db', () => ({
+  createSecurityAgentCommand: vi.fn(),
+  markSecurityAgentCommandQueueAdmissionFailed: vi.fn(),
+}));
+vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(getWorkerDb).mockReturnValue({} as never);
+  vi.mocked(createSecurityAgentCommand).mockResolvedValue({
+    id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  } as never);
+});
 
 const CALLBACK_SECRET = 'callback-token-secret';
 const FINDING_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -144,6 +163,40 @@ describe('security analysis callback ingress', () => {
     expect(response.status).toBe(503);
   });
 
+  it('compensates the accepted command when manual analysis queue admission fails', async () => {
+    await expect(
+      worker.fetch(
+        new Request('https://security-auto-analysis/internal/manual-analysis-start', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-internal-api-key': 'worker-secret',
+          },
+          body: JSON.stringify({
+            schemaVersion: 1,
+            findingId: FINDING_ID,
+            owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+            actorUserId: 'user-123',
+          }),
+        }),
+        {
+          INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+          HYPERDRIVE: { connectionString: 'postgres://worker' },
+          MANUAL_ANALYSIS_QUEUE: {
+            sendBatch: async () => {
+              throw new Error('queue unavailable');
+            },
+          },
+        } as unknown as CloudflareEnv
+      )
+    ).rejects.toThrow('queue unavailable');
+    expect(markSecurityAgentCommandQueueAdmissionFailed).toHaveBeenCalledWith(
+      {},
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      'Queue admission failed'
+    );
+  });
+
   it('accepts manual analysis commands by enqueuing Worker-owned orchestration', async () => {
     const queued: MessageSendRequest<unknown>[][] = [];
     const response = await worker.fetch(
@@ -164,6 +217,7 @@ describe('security analysis callback ingress', () => {
       }),
       {
         INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
         MANUAL_ANALYSIS_QUEUE: {
           sendBatch: async batch => {
             queued.push(batch);
@@ -173,7 +227,13 @@ describe('security analysis callback ingress', () => {
     );
 
     expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      accepted: true,
+      commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    });
     expect(queued[0]?.[0]?.body).toMatchObject({
+      commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
       findingId: FINDING_ID,
       actorUserId: 'user-123',
       retrySandboxOnly: true,

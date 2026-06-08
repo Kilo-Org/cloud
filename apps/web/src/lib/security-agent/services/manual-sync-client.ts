@@ -15,10 +15,12 @@ type SubmitManualSecuritySyncParams = {
   owner: ManualSecuritySyncOwner;
   actor: ManualSecuritySyncActor;
   repoFullName?: string;
+  origin?: 'manual' | 'dashboard_refresh' | 'enable_initial_sync';
 };
 
 type AcceptedManualSecuritySync = {
   accepted: true;
+  commandId: string;
   runId: string;
   messageId: string;
 };
@@ -26,6 +28,7 @@ type AcceptedManualSecuritySync = {
 type ManualSecuritySyncWorkerResponse = {
   success?: boolean;
   accepted?: boolean;
+  commandId?: string;
   runId?: string;
   messageId?: string;
   error?: string;
@@ -52,6 +55,7 @@ export async function submitManualSecuritySync(
       schemaVersion: 1,
       owner: params.owner,
       actor: params.actor,
+      origin: params.origin,
       repoFullName: params.repoFullName,
     }),
   });
@@ -64,6 +68,7 @@ export async function submitManualSecuritySync(
   if (
     body.success !== true ||
     body.accepted !== true ||
+    typeof body.commandId !== 'string' ||
     typeof body.runId !== 'string' ||
     typeof body.messageId !== 'string'
   ) {
@@ -72,6 +77,7 @@ export async function submitManualSecuritySync(
 
   return {
     accepted: true,
+    commandId: body.commandId,
     runId: body.runId,
     messageId: body.messageId,
   };

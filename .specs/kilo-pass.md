@@ -2,10 +2,10 @@
 
 ## Role of This Document
 
-This spec records the Kilo Pass behavior implemented in the current codebase: valid states, provider support, credit
-amounts, eligibility rules, lifecycle behavior, and known limits. It is intended to become the source of truth for
-future work. While this draft is being aligned retrospectively, code remains authoritative when this document and the
-implementation disagree.
+This spec records Kilo Pass business rules: valid states, provider support, credit amounts, eligibility rules,
+lifecycle behavior, and known limits. Most sections describe current behavior. A section marked as approved target
+behavior is authoritative before implementation and records the behavior that implementation work MUST satisfy. For
+all other disagreements while this draft is being aligned retrospectively, code remains authoritative.
 
 Billing-platform behavior shared with other products (Stripe webhook processing, fraud warnings, the Subscription Center
 surface, affiliate/referral attribution) is governed by the adjacent specs listed in the Changelog and is summarized
@@ -13,7 +13,8 @@ here only where Kilo Pass adds product-specific behavior.
 
 ## Status
 
-Draft -- current-code alignment revision created 2026-06-01.
+Draft -- current-code alignment revision created 2026-06-01. The first-fingerprint-claim cooldown in Duplicate-Card
+Rules 51-55 were implemented on 2026-06-05.
 
 ## Conventions
 
@@ -61,8 +62,20 @@ rounding to whole cents uses round-half-up (ties round toward positive infinity)
 - **Initial welcome-promo reason**: The nullable reason stored on the earliest issuance for a Stripe monthly
   subscription. Values are `first_payment_fingerprint_claim`, `fingerprint_previously_claimed`, `missing_fingerprint`,
   `no_supported_fingerprint`, `no_positive_settlement`, and `settlement_unresolved`.
-- **Welcome-promo fingerprint claim**: An atomic Stripe claim keyed by payment-method type plus fingerprint. Supported
-  reusable types are `card`, `sepa_debit`, `us_bank_account`, `bacs_debit`, and `au_becs_debit`.
+- **Welcome-promo fingerprint claim**: A permanent atomic Stripe claim keyed by payment-method type plus fingerprint. It
+  stores the first source Stripe invoice and database claim timestamp and is never refreshed. Supported reusable types
+  are `card`, `sepa_debit`, `us_bank_account`, `bacs_debit`, and `au_becs_debit`.
+- **Paid settlement**: One successful Stripe invoice payment resolved to the payment instrument that settled it and, when
+  available, its refundable PaymentIntent or Charge identifier.
+- **Eligible duplicate-card purchase**: A first paid monthly or yearly Stripe subscription purchase settled by card.
+  Renewals, zero-value starts, later payments for the same subscription, non-card payments, and store-provider purchases
+  are not subject to duplicate-card blocking.
+- **First fingerprint claimant**: The Kilo user attributed to a card's permanent welcome-promo fingerprint claim by
+  joining its source Stripe invoice to an issuance and that issuance to its subscription. Missing attribution is not a
+  match and fails open.
+- **First-fingerprint-claim cooldown**: The period while a card's permanent first claim is strictly less than 24 hours old
+  at database transaction time. Exactly 24 hours is outside the cooldown. Allowed later purchases never refresh or
+  replace the first claim, so this is intentionally not a rolling purchase-to-purchase window.
 - **Issuance**: A persisted record for one subscription and one **issue month** (a calendar-month anchor such as
   `2026-03-01`).
 - **Issuance item**: One credit grant within an issuance, of kind `base`, `bonus`, `promo_first_month_50pct`, or
@@ -160,8 +173,9 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
     method and record `first_payment_fingerprint_claim`, `fingerprint_previously_claimed`, `missing_fingerprint`,
     `no_supported_fingerprint`, or `settlement_unresolved`.
 21. When the earliest handled monthly invoice has no positive settlement, the system MUST record
-    `no_positive_settlement`. Under current behavior that reason is final: a later paid invoice MAY claim a fingerprint
-    but MUST NOT replace the earliest issuance reason.
+    `no_positive_settlement`. That reason is final. A later positive monthly invoice with a resolvable supported reusable
+    fingerprint MUST attempt the permanent fingerprint claim used by welcome-promo, referral, and duplicate-card rules,
+    but MUST NOT replace the earliest issuance reason or run duplicate-card cancellation enforcement.
 22. A stored `settlement_unresolved` reason MAY be replaced only when the earliest issuance itself is processed again
     with resolvable payment details. A later-period invoice MUST NOT replace the earliest issuance reason.
 23. Non-null reasons other than `settlement_unresolved` MUST remain unchanged.
@@ -239,19 +253,37 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 
 ### Duplicate-Card Gate
 
-51. Duplicate-card gate MUST run for every handled Stripe `invoice.paid` event before credit issuance, not only for an
-    explicitly identified first invoice.
-52. Gate MUST inspect card fingerprint only. It MUST first attempt to resolve fingerprint from invoice payment intent
-    and MAY fall back to one locally stored payment-method fingerprint for the charged user.
-53. Gate MUST block when a different user has the same locally stored card fingerprint and any non-ended Kilo Pass row
-    with a null ended marker. It does not prove that the other user's Kilo Pass row was paid with the matching card.
-    Same-user subscriptions MUST NOT trigger the gate.
-54. Blocking MUST suppress credit issuance and affiliate sale processing, persist the newly handled subscription row as
-    canceled, set the duplicate-card blocked reason when the user is not already blocked, and attempt to send the
-    duplicate-card cancellation email.
-55. Stripe cancellation and refund attempts MUST be best effort. Their failures are captured operationally but do not
-    prevent the database block and do not create persisted reconciliation state. The gate does not provide an atomic
-    exactly-one-winner guarantee across concurrent new subscriptions.
+Rules 51-55 protect against rapid cross-account reuse of a recently first-used card. Allowed purchases do not restart the
+24-hour restriction.
+
+51. A first paid monthly or yearly Stripe subscription purchase MUST be checked after payment and before the purchaser
+    receives Kilo Pass credits or other purchase benefits. Renewals, zero-value starts, later payments for the same
+    subscription, non-card payments, and store-provider purchases MUST NOT be blocked. A later positive monthly payment
+    remains subject to Rule 21 and MAY make its payment instrument count as previously used in future monthly
+    welcome-promo and referral eligibility decisions.
+52. Duplicate-card and monthly welcome-promo or referral decisions for the same purchase MUST be based on the same paid
+    card settlement. The purchase MUST be allowed when that settlement does not identify exactly one paid card. A provider
+    lookup failure MUST produce `settlement_unresolved` when a monthly welcome-promo decision is required. Unexpected
+    evidence or attribution failures MUST be reported.
+53. The first eligible purchase made with a card MUST establish that purchaser as the first claimant and MUST be allowed.
+    A different user MUST be blocked only when the first use was less than 24 hours earlier. The first claimant and first-use
+    time MUST NOT change. Same-user purchases and different-user purchases at or after 24 hours MUST be allowed, regardless
+    of subscription status, cancellation, card attachment, or later allowed purchases. A card first used for a yearly
+    purchase MUST count as previously used in later monthly welcome-promo and referral decisions, while the yearly
+    purchase itself remains ineligible for those benefits. If the first claimant cannot be determined reliably, the
+    purchase MUST be allowed and the failure MUST be reported.
+54. Concurrent eligible purchases using the same card MUST produce one first claimant. Retried processing MUST preserve the
+    original blocked or allowed outcome, including after the 24-hour restriction expires or card evidence becomes
+    unavailable. A blocked outcome MUST take precedence over an allowed outcome. If no prior outcome can be established,
+    the purchase MUST receive the standard duplicate-card decision. Conflicting purchaser, subscription, or payment
+    identity MUST abort processing rather than trigger a new decision.
+55. A blocked purchase or retry MUST create no Kilo Pass issuance, credits, referral conversion, referral reward, or
+    affiliate sale. The Kilo Pass subscription MUST remain canceled, and the purchaser MUST receive the permanent
+    `kilo_pass_duplicate_card` block unless another block reason already exists. The system MUST attempt to cancel the
+    Stripe subscription, refund the settled payment, and send a cancellation email that reveals neither the 24-hour
+    restriction nor the matched claimant. Missing refund evidence or provider failure MUST be reported but MUST NOT
+    reverse the block or grant benefits. Duplicate-card audit evidence, errors, logs, email, and operational context MUST
+    NOT contain the raw card fingerprint.
 
 ### Scheduled Changes (Stripe)
 
@@ -303,8 +335,9 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
     append a failed audit entry and rethrow.
 74. Store-expiry reconciliation MUST append success audit after persisted cancellation. App Store expiry notifications
     also append success audit after persisting ended state.
-75. Duplicate-card cancellation or refund failures MUST remain operational error reports only. The duplicate-card audit
-    MAY still record a successful database-side block.
+75. Duplicate-card cancellation or refund failures MUST remain operational error reports only. A successful
+    duplicate-card audit MUST remain authoritative blocked-replay evidence even when provider enforcement fails. It MUST
+    identify the matched first fingerprint claim and fingerprint digest without recording the raw fingerprint.
 76. Repeated base or bonus issuance handled by normal issuance helpers MUST append skipped-idempotent audit entries.
     Store-transaction replay and usage-triggered prechecks that find an existing bonus-like item return without an
     equivalent skipped-idempotent audit entry.
@@ -323,30 +356,37 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
    transaction, rollback MUST leave threshold available for retry.
 4. Threshold-trigger handling MUST clear threshold and return without issuing when selected subscription is absent or
    non-active, current issuance is absent, base item is absent, or bonus-like item already exists.
-5. Duplicate-card provider cancellation and refund failures MUST NOT abort the database-side block and MUST NOT permit
-   credits. Such failures do not create persisted reconciliation records.
-6. Tracked scheduled-change release failure MUST restore active row, append failed audit, and throw. Missing-row cleanup
+5. Duplicate-card provider cancellation and refund failures, and a missing refundable settlement identifier, MUST NOT
+   abort the database-side block and MUST NOT permit credits. Such failures MUST be reported operationally and do not
+   create persisted reconciliation records.
+6. Missing or unsupported duplicate-card evidence and missing first-claimant attribution MUST fail open as described in
+   Rules 52-54. Provider lookup failures, multiple paid settlements, and missing first-claimant attribution MUST be
+   reported operationally but MUST NOT abort normal invoice processing. Matching blocked-audit or committed-issuance
+   attribution conflicts MUST throw and roll back invoice handling. Replay authority MUST NOT be overridden by a later
+   fail-open condition.
+7. Tracked scheduled-change release failure MUST restore active row, append failed audit, and throw. Missing-row cleanup
    release failure MAY throw without audit and MAY mask originating schedule-creation error.
-7. Audit logging MUST NOT be treated as universally independent of business transaction rollback.
+8. Audit logging MUST NOT be treated as universally independent of business transaction rollback.
 
 ## Not Yet Implemented
 
-The following stronger guarantees are not implemented by current code:
+The following behavior or stronger guarantees are not implemented by current code:
 
 1. Deterministic identifier tiebreak for equal-recency subscription rows.
 2. Effective-subscription reselection after late-derived pause or store expiration.
 3. Exposed verified Google Play purchase completion and provider notification handling.
 4. Mobile-store yearly products and store-yearly monthly issuance lifecycle.
-5. Atomic duplicate-card arbitration across concurrent Stripe subscriptions.
-6. Persisted reconciliation state for duplicate-card cancellation or refund partial failures.
-7. One canonical projection path that matches issuance eligibility, existing bonus-like item checks, scheduled-change
+5. Persisted reconciliation state for duplicate-card cancellation or refund partial failures.
+6. One canonical projection path that matches issuance eligibility, existing bonus-like item checks, scheduled-change
    target behavior, and stored Stripe promo reason across every consumer.
-8. Unbounded or explicitly durable streak accounting beyond the 36-month scan cap.
-9. Explicit ended-state streak reset for reactivated store subscriptions.
-10. Guaranteed expiry for every granted bonus credit.
-11. Independent durable audit recording for every failed provider or issuance operation.
-12. Retirement of the grandfathered streak-month-2 promo branch after no eligible pre-cutoff subscriptions remain.
-13. Store-provider welcome-promo anti-abuse signals equivalent to Stripe fingerprint claims.
+7. Unbounded or explicitly durable streak accounting beyond the 36-month scan cap.
+8. Explicit ended-state streak reset for reactivated store subscriptions.
+9. Guaranteed expiry for every granted bonus credit.
+10. Independent durable audit recording for every failed provider or issuance operation.
+11. Retirement of the grandfathered streak-month-2 promo branch after no eligible pre-cutoff subscriptions remain.
+12. Store-provider welcome-promo anti-abuse signals equivalent to Stripe fingerprint claims.
+13. Atomic prevention of concurrent or repeated active Kilo Pass purchases by the same user. Duplicate-card Rules 51-55
+    intentionally exclude same-user purchases.
 
 ## Adjacent Spec Compatibility
 
@@ -354,7 +394,28 @@ The Kilo Pass implementation treats `unpaid` as an ended provider status. The Su
 Pass `unpaid` as a visible non-terminal warning state. This produces different profile and Subscription Center
 presentation behavior and should be resolved before the adjacent specs are treated as one unified lifecycle contract.
 
+The first-fingerprint-claim cooldown reuses the permanent welcome-promo claim governed by `.specs/impact-referrals.md`.
+Passing the cancellation cooldown after 24 hours does not make a previously claimed fingerprint eligible for a welcome
+promo or Kilo Pass referral conversion.
+
 ## Changelog
+
+### 2026-06-08 -- Yearly duplicate-card enforcement
+
+- First paid yearly purchases are now subject to the same 24-hour cross-account card-reuse restriction as first paid
+  monthly purchases.
+- A payment instrument used for a first paid yearly purchase counts as previously used in future monthly welcome-promo and
+  referral decisions, while yearly purchases remain ineligible for those benefits.
+
+### 2026-06-05 -- First-fingerprint-claim cooldown implementation
+
+- Replaced the rolling accepted-purchase window with a 24-hour cooldown anchored to the permanent first exact
+  card fingerprint claim.
+- Limited cancellation enforcement to rapid cross-user reuse on positive initial Stripe monthly invoices. Allowed later
+  purchases do not refresh the first claim, and previously claimed fingerprints remain ineligible for welcome promos and
+  Kilo Pass referral conversions.
+- Defined blocked-audit and committed-issuance replay authority while preserving exact-settlement resolution,
+  fail-open evidence handling, and the existing duplicate cancellation outcome.
 
 ### 2026-06-01 -- Initial spec
 

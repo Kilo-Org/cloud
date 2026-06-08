@@ -46,9 +46,14 @@ function row(overrides: Partial<Parameters<typeof summarizeTerminalBench>[0][num
 describe('summarizeTerminalBench', () => {
   it('publishes only eligible non-internal summaries', () => {
     const stealth = { ...row({ openrouterId: 'stealth/model' }), isStealth: true };
+    const nullable = {
+      ...benchmarks(),
+      artificialAnalysis: { liveCodeBench: null },
+    };
     const summaries = summarizeTerminalBench([
       row(),
       stealth,
+      row({ openrouterId: 'nullable/model', benchmarks: nullable }),
       row({ openrouterId: 'kilo-internal/custom', benchmarks: benchmarks() }),
       row({ isActive: false }),
       row({ benchmarks: benchmarks({ nAttempts: 4 }) }),
@@ -61,6 +66,7 @@ describe('summarizeTerminalBench', () => {
       new Map([
         ['openai/model', summary],
         ['stealth/model', summary],
+        ['nullable/model', summary],
       ])
     );
   });

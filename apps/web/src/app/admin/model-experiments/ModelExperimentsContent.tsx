@@ -49,6 +49,7 @@ import { deepStrict } from '@/lib/zod/deep-strict';
 import { toast } from 'sonner';
 import { Plus, ChevronLeft, KeyRound, RefreshCw, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+import * as z from 'zod';
 
 const StrictCustomLlmMetadataSchema = deepStrict(CustomLlmMetadataSchema);
 
@@ -971,11 +972,7 @@ function SwapVersionDialog({
     }
     const result = ExperimentUpstreamSchema.safeParse(parsed);
     if (!result.success) {
-      setError(
-        result.error.issues
-          .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-          .join('\n')
-      );
+      setError(z.prettifyError(result.error));
       return;
     }
     const trimmedKey = apiKey.trim();

@@ -495,15 +495,8 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     const updateFilter =
       input.metadata === undefined
         ? eq(model_experiment.id, input.id)
-        : and(
-            eq(model_experiment.id, input.id),
-            ne(model_experiment.status, 'completed')
-          );
-    const [updated] = await db
-      .update(model_experiment)
-      .set(next)
-      .where(updateFilter)
-      .returning();
+        : and(eq(model_experiment.id, input.id), ne(model_experiment.status, 'completed'));
+    const [updated] = await db.update(model_experiment).set(next).where(updateFilter).returning();
     if (!updated) {
       if (input.metadata !== undefined) {
         badRequest('Changing metadata is not allowed on completed experiments');

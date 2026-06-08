@@ -1,15 +1,21 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type {
   AgentDefaultsSummary,
   AgentSettingsSummary,
   AgentSummary,
 } from '@/lib/kiloclaw/types';
 
-import { useClawAgents } from '../hooks/useClawHooks';
+import { useClawAgentMutations, useClawAgents } from '../hooks/useClawHooks';
+import { AgentCreateDialog } from './AgentCreateDialog';
+import { AgentEditDialog } from './AgentEditDialog';
+import { ConfirmActionDialog } from './ConfirmActionDialog';
 
 // Compact, human-readable list of the per-agent behavioral settings that are
 // actually set (null = inherits the default, so we omit it).
@@ -24,19 +30,53 @@ function settingChips(settings: AgentSettingsSummary): string[] {
   return chips;
 }
 
-function AgentRow({ agent }: { agent: AgentSummary }) {
+function AgentRow({
+  agent,
+  onEdit,
+  onDelete,
+}: {
+  agent: AgentSummary;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const settings = settingChips(agent.settings);
+  // `main` is reserved and cannot be deleted (controller rejects it).
+  const canDelete = agent.id !== 'main';
 
   return (
     <div className="px-4 py-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium">{agent.name ?? agent.id}</span>
-        {agent.name && <span className="text-muted-foreground text-xs">{agent.id}</span>}
-        {!agent.configured && (
-          <Badge variant="secondary" className="px-1.5 py-0 text-[10px] leading-4">
-            Default
-          </Badge>
-        )}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="text-sm font-medium">{agent.name ?? agent.id}</span>
+          {agent.name && <span className="text-muted-foreground text-xs">{agent.id}</span>}
+          {!agent.configured && (
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px] leading-4">
+              Default
+            </Badge>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            onClick={onEdit}
+            aria-label="Edit agent"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive h-7 px-2"
+              onClick={onDelete}
+              aria-label="Delete agent"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="text-muted-foreground mt-1 text-xs">
@@ -95,15 +135,42 @@ function DefaultsRow({ defaults }: { defaults: AgentDefaultsSummary }) {
 }
 
 /**
- * Read-only view of the agents running on the user's machine and the channels
- * routed to each. Gated by the controller's `config.agents.read` capability at
- * the call site (SettingsTab).
+ * Agents view: lists the fleet running on the user's machine and the channels
+ * routed to each, with create / edit / delete. Gated by the controller's
+ * `config.agents.read` capability and admin status at the call site.
  */
 export function AgentsSection({ enabled }: { enabled: boolean }) {
   const { data, isLoading, error } = useClawAgents(enabled);
+  const { deleteAgent } = useClawAgentMutations();
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<AgentSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AgentSummary | null>(null);
+
+  const onConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteAgent.mutateAsync(deleteTarget.id);
+      toast.success(`Deleted ${deleteTarget.name ?? deleteTarget.id}`);
+      setDeleteTarget(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete agent', {
+        duration: 10000,
+      });
+    }
+  };
 
   return (
     <div>
+      {enabled && data && (
+        <div className="mb-3 flex justify-end">
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            New agent
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border">
         {!enabled ? (
           <div className="text-muted-foreground px-4 py-3 text-xs">
@@ -121,15 +188,48 @@ export function AgentsSection({ enabled }: { enabled: boolean }) {
         ) : (
           <div className="[&>*+*]:border-t">
             {data.agents.map(agent => (
-              <AgentRow key={agent.id} agent={agent} />
+              <AgentRow
+                key={agent.id}
+                agent={agent}
+                onEdit={() => setEditTarget(agent)}
+                onDelete={() => setDeleteTarget(agent)}
+              />
             ))}
             <DefaultsRow defaults={data.defaults} />
           </div>
         )}
       </div>
+
       <p className="text-muted-foreground mt-2 text-xs">
         The agents running on your machine and the channels routed to each.
       </p>
+
+      <AgentCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      {data && editTarget && (
+        <AgentEditDialog
+          open
+          onOpenChange={open => {
+            if (!open) setEditTarget(null);
+          }}
+          agent={editTarget}
+          etag={data.etag}
+        />
+      )}
+
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        onOpenChange={open => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete agent"
+        description={`Delete "${deleteTarget?.name ?? deleteTarget?.id ?? ''}"? This removes the agent and its channel routing. Workspace files on the machine may remain.`}
+        confirmLabel="Delete"
+        isPending={deleteAgent.isPending}
+        pendingLabel="Deleting"
+        onConfirm={onConfirmDelete}
+        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+      />
     </div>
   );
 }

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Sandbox } from '@cloudflare/sandbox';
-import { generateSandboxId, getOutboundContainerId, getSandboxNamespace } from './sandbox-id.js';
+import {
+  generateSandboxId,
+  getOutboundContainerId,
+  getSandboxNamespace,
+  isManagedScmContainmentCanary,
+} from './sandbox-id.js';
 import type { Env } from './types.js';
 
 describe('generateSandboxId', () => {
@@ -198,6 +203,36 @@ describe('generateSandboxId', () => {
     });
   });
 
+  describe('forced per-session sandbox', () => {
+    it('uses SandboxSmall for a containment canary session', async () => {
+      const id = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        'agent_canary',
+        undefined,
+        false,
+        true
+      );
+
+      expect(id).toMatch(/^ses-[0-9a-f]{48}$/);
+    });
+
+    it('keeps devcontainer routing ahead of containment isolation', async () => {
+      const id = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        'agent_canary',
+        undefined,
+        true,
+        true
+      );
+
+      expect(id).toMatch(/^dind-[0-9a-f]{48}$/);
+    });
+  });
+
   describe('devcontainer sandbox', () => {
     it('should produce a dind- prefixed ID when devcontainer is true', async () => {
       const id = await generateSandboxId(
@@ -250,6 +285,61 @@ describe('generateSandboxId', () => {
       const id = await generateSandboxId(undefined, 'org-id', 'user-id', 'session');
       expect(id).toMatch(/^org-/);
     });
+  });
+});
+
+describe('isManagedScmContainmentCanary', () => {
+  it('matches an exact GitHub repository without affecting neighboring repositories', () => {
+    const allowlist = 'Kilo-Org/containment-canary, Kilo-Org/another-repo';
+
+    expect(
+      isManagedScmContainmentCanary(allowlist, {
+        type: 'github',
+        repo: 'Kilo-Org/containment-canary',
+      })
+    ).toBe(true);
+    expect(
+      isManagedScmContainmentCanary(allowlist, {
+        type: 'github',
+        repo: 'Kilo-Org/containment-canary-extra',
+      })
+    ).toBe(false);
+  });
+
+  it('matches GitHub repository names case-insensitively', () => {
+    expect(
+      isManagedScmContainmentCanary('kilo-org/containment-canary', {
+        type: 'github',
+        repo: 'Kilo-Org/Containment-Canary',
+      })
+    ).toBe(true);
+  });
+
+  it('matches an exact managed GitLab repository URL', () => {
+    expect(
+      isManagedScmContainmentCanary('https://gitlab.example.com/acme/repo.git', {
+        type: 'gitlab',
+        url: 'https://gitlab.example.com/acme/repo.git',
+      })
+    ).toBe(true);
+    expect(
+      isManagedScmContainmentCanary('https://gitlab.example.com/acme/repo.git', {
+        type: 'gitlab',
+        url: 'https://gitlab.example.com/acme/repo',
+      })
+    ).toBe(false);
+  });
+
+  it('is disabled for blank configuration and generic Git repositories', () => {
+    expect(isManagedScmContainmentCanary('  ', { type: 'github', repo: 'Kilo-Org/repo' })).toBe(
+      false
+    );
+    expect(
+      isManagedScmContainmentCanary('https://github.com/Kilo-Org/repo.git', {
+        type: 'git',
+        url: 'https://github.com/Kilo-Org/repo.git',
+      })
+    ).toBe(false);
   });
 });
 

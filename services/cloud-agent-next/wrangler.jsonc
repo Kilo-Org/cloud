@@ -54,6 +54,7 @@
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
+    "SCM_CONTAINMENT_CANARY_REPOSITORIES": "na2-org/hi-how-are-you",
   },
   "placement": { "mode": "smart" },
   /**
@@ -290,6 +291,7 @@
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
+        "SCM_CONTAINMENT_CANARY_REPOSITORIES": "",
       },
       "services": [
         {

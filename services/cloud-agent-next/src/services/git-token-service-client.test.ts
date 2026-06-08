@@ -52,6 +52,7 @@ describe('resolveManagedGitLabToken', () => {
     ).resolves.toEqual({
       success: true,
       token: 'project-access-token',
+      instanceUrl: 'https://gitlab.com',
       glabIsOAuth2: false,
     });
     expect(service.getGitLabToken).toHaveBeenCalledWith(reviewParams);
@@ -68,7 +69,12 @@ describe('resolveManagedGitLabToken', () => {
 
     await expect(
       resolveManagedGitLabToken({ GIT_TOKEN_SERVICE: service }, { userId: 'user_123' })
-    ).resolves.toEqual({ success: true, token: 'integration-token', glabIsOAuth2: true });
+    ).resolves.toEqual({
+      success: true,
+      token: 'integration-token',
+      instanceUrl: 'https://gitlab.com',
+      glabIsOAuth2: true,
+    });
   });
 
   it('returns a safe generic failure without a local fallback path', async () => {

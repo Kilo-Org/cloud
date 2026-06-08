@@ -163,6 +163,8 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Exact GitHub repositories or GitLab URLs enabled for managed SCM containment canaries */
+  SCM_CONTAINMENT_CANARY_REPOSITORIES?: string;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE?: GitTokenService;
   /** Service binding for dispatching push notifications */

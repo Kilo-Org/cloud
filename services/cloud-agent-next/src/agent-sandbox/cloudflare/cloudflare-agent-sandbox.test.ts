@@ -12,14 +12,18 @@ import {
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 
-function metadata(options?: { devcontainer?: boolean }): SessionMetadata {
+function metadata(options?: { devcontainer?: boolean; githubRepo?: string }): SessionMetadata {
   return {
     metadataSchemaVersion: 2,
     identity: { sessionId: 'agent_cloudflare', userId: 'user_cloudflare', orgId: 'org_cloudflare' },
     auth: {},
     workspace: {
       sandboxId: options?.devcontainer ? 'dind-abcdef' : 'ses-abcdef',
+      ...(options?.githubRepo ? { managedScmContainment: true } : {}),
     },
+    ...(options?.githubRepo
+      ? { repository: { type: 'github' as const, repo: options.githubRepo } }
+      : {}),
     ...(options?.devcontainer
       ? {
           devcontainer: {
@@ -102,6 +106,30 @@ describe('CloudflareAgentSandbox', () => {
       agentSessionId: 'agent_cloudflare',
       userId: 'user_cloudflare',
     });
+    ensureBootstrapWrapper.mockRestore();
+  });
+
+  it('activates containment before probing a canary sandbox', async () => {
+    const bootstrapSession = {};
+    const setOutboundHandler = vi.fn().mockResolvedValue(undefined);
+    const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' });
+    const createSession = vi.fn().mockResolvedValue(bootstrapSession);
+    const ensureBootstrapWrapper = vi
+      .spyOn(WrapperClient, 'ensureBootstrapWrapper')
+      .mockResolvedValueOnce({ client: {} as WrapperClient });
+    const sessionMetadata = metadata({ githubRepo: 'Kilo-Org/containment-canary' });
+    const env = {} as Env;
+    const sandbox = new CloudflareAgentSandbox(env, sessionMetadata, {
+      resolveSandbox: () =>
+        ({ setOutboundHandler, exec, createSession }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.ensureWrapper(ensureRequest());
+
+    expect(setOutboundHandler).toHaveBeenCalledWith('managedScm');
+    expect(setOutboundHandler.mock.invocationCallOrder[0]).toBeLessThan(
+      exec.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
     ensureBootstrapWrapper.mockRestore();
   });
 

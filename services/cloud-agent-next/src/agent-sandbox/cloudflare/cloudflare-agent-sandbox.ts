@@ -17,8 +17,13 @@ import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import type { SandboxDeleteReason, WrapperStopReason } from '../protocol.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
-import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
+import {
+  generateSandboxId,
+  getSandboxNamespace,
+  MANAGED_SCM_OUTBOUND_HANDLER,
+} from '../../sandbox-id.js';
 import { SessionService } from '../../session-service.js';
+import { logger } from '../../logger.js';
 import { WrapperClient, WrapperContainerClient } from '../../kilo/wrapper-client.js';
 import {
   discoverSessionWrappers,
@@ -180,6 +185,15 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.sandboxIdPromise = Promise.resolve(plan.workspace.sandboxId as SandboxId);
     const sandboxId = await this.resolveSandboxId();
     const sandbox = await this.getSandbox({ sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS });
+    if (this.metadata.workspace?.managedScmContainment === true) {
+      if (!sandboxId.startsWith('ses-')) {
+        throw ExecutionError.invalidRequest(
+          'Managed SCM containment requires a per-session sandbox'
+        );
+      }
+      await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
+      logger.withFields({ sandboxId, sessionId }).info('Activated managed SCM containment canary');
+    }
 
     if (this.requiresPreparedDevcontainerRuntime(request)) {
       const preparedWorkspace = await withWorkspacePreparationTimeout(

@@ -13,6 +13,8 @@ import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
+  resolveCloudAgentGitHubAuthForRepo,
+  resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
 import { ExecutionError } from './execution/errors.js';
 import {
@@ -1299,9 +1301,12 @@ export class SessionService {
     metadata: CloudAgentSessionState,
     sandboxId: SandboxId
   ): Promise<ResolvedWorkspaceTokens> {
-    const outboundContainerId = getOutboundContainerId(env, sandboxId);
     const github = githubRepository(metadata);
     const git = gitRepository(metadata);
+    const useManagedScmContainment = metadata.workspace?.managedScmContainment === true;
+    if (useManagedScmContainment && !sandboxId.startsWith('ses-')) {
+      throw ExecutionError.invalidRequest('Managed SCM containment requires a per-session sandbox');
+    }
     let githubToken: string | undefined;
     let githubInstallationId = github?.githubInstallationId;
     let githubAppType = github?.githubAppType;
@@ -1314,27 +1319,31 @@ export class SessionService {
       const authParams = {
         githubRepo: github.repo,
         userId: metadata.identity.userId,
-        outboundContainerId,
         orgId: metadata.identity.orgId,
         allowUserAuthorization:
           metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
           metadata.identity.createdOnPlatform === 'slack',
       };
-      const result = await issueCloudAgentGitHubSessionCapability(env, authParams);
-      if (result.success) {
-        githubToken = result.value.capability;
-        githubInstallationId = result.value.installationId;
-        githubAppType = result.value.appType;
-        githubSource = result.value.source;
-        githubGitAuthor =
-          result.value.gitAuthor ?? installationGitAuthorFromEnv(env, result.value.appType);
-        githubCommitCoAuthor = result.value.commitCoAuthor;
-        githubFallbackReason = result.value.fallbackReason;
-      } else {
+      const result = useManagedScmContainment
+        ? await issueCloudAgentGitHubSessionCapability(env, {
+            ...authParams,
+            outboundContainerId: getOutboundContainerId(env, sandboxId),
+          })
+        : await resolveCloudAgentGitHubAuthForRepo(env, authParams);
+      if (!result.success) {
         throw ExecutionError.invalidRequest(
           `GitHub token or active app installation required for this repository (${result.error.reason})`
         );
       }
+      githubToken =
+        'capability' in result.value ? result.value.capability : result.value.githubToken;
+      githubInstallationId = result.value.installationId;
+      githubAppType = result.value.appType;
+      githubSource = result.value.source;
+      githubGitAuthor =
+        result.value.gitAuthor ?? installationGitAuthorFromEnv(env, result.value.appType);
+      githubCommitCoAuthor = result.value.commitCoAuthor;
+      githubFallbackReason = result.value.fallbackReason;
     }
 
     if (github && !githubToken) {
@@ -1350,21 +1359,36 @@ export class SessionService {
       if (!env.GIT_TOKEN_SERVICE) {
         throw ExecutionError.invalidRequest('Git token service is not configured');
       }
-      const result = await issueCloudAgentGitLabSessionCapability(env, {
-        gitUrl: git.url,
-        userId: metadata.identity.userId,
-        outboundContainerId,
-        orgId: metadata.identity.orgId,
-        createdOnPlatform: metadata.identity.createdOnPlatform,
-      });
-      if (result.success) {
+      if (useManagedScmContainment) {
+        const result = await issueCloudAgentGitLabSessionCapability(env, {
+          gitUrl: git.url,
+          userId: metadata.identity.userId,
+          outboundContainerId: getOutboundContainerId(env, sandboxId),
+          orgId: metadata.identity.orgId,
+          createdOnPlatform: metadata.identity.createdOnPlatform,
+        });
+        if (!result.success) {
+          throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
+        }
         gitToken = result.value.capability;
         gitlabCapabilityGitUrl = result.value.gitUrl;
         gitlabTokenManaged = true;
         gitlabInstanceUrl = result.value.instanceOrigin;
         glabIsOAuth2 = result.value.glabIsOAuth2;
       } else {
-        throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
+        const result = await resolveManagedGitLabToken(env, {
+          userId: metadata.identity.userId,
+          orgId: metadata.identity.orgId,
+          repositoryUrl: git.url,
+          createdOnPlatform: metadata.identity.createdOnPlatform,
+        });
+        if (!result.success) {
+          throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
+        }
+        gitToken = result.token;
+        gitlabTokenManaged = true;
+        gitlabInstanceUrl = result.instanceUrl;
+        glabIsOAuth2 = result.glabIsOAuth2;
       }
     }
 

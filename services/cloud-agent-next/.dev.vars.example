@@ -44,6 +44,10 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
+# Managed SCM containment canaries (optional)
+# Exact GitHub owner/repo values or GitLab repository URLs, comma-separated
+SCM_CONTAINMENT_CANARY_REPOSITORIES=
+
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App
 # Format for git config:

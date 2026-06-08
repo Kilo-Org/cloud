@@ -360,6 +360,8 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Exact GitHub repositories or GitLab URLs enabled for managed SCM containment canaries */
+  SCM_CONTAINMENT_CANARY_REPOSITORIES?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

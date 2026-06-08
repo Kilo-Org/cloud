@@ -1,7 +1,10 @@
 import { Buffer } from 'node:buffer';
 import { ContainerProxy, Sandbox as StockSandbox } from '@cloudflare/sandbox';
 import { logger } from './logger.js';
+import { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 import type { GitTokenService } from './types.js';
+
+export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 
 const GITHUB_CAPABILITY_PREFIXES = ['kgh1.', 'kgh2.'];
 const GITLAB_CAPABILITY_PREFIXES = ['kgl1.', 'kgl2.'];
@@ -395,23 +398,19 @@ export function handleManagedScmOutbound(
 
 export class Sandbox extends StockSandbox<Cloudflare.Env> {
   enableInternet = true;
-  interceptHttps = true;
 }
-
-Sandbox.outbound = handleManagedScmOutbound;
 
 export class SandboxSmall extends StockSandbox<Cloudflare.Env> {
   enableInternet = true;
   interceptHttps = true;
 }
 
-SandboxSmall.outbound = handleManagedScmOutbound;
+SandboxSmall.outboundHandlers = {
+  [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
+};
 
 export class SandboxDIND extends StockSandbox<Cloudflare.Env> {
   enableInternet = true;
-  interceptHttps = true;
 }
-
-SandboxDIND.outbound = handleManagedScmOutbound;
 
 export { ContainerProxy };

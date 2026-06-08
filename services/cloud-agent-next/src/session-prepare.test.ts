@@ -6,6 +6,7 @@ import * as schemas from './router/schemas.js';
 const {
   generateSessionIdMock,
   generateSandboxIdMock,
+  isManagedScmContainmentCanaryMock,
   createCliSessionMock,
   deleteCliSessionMock,
   createSessionReportMock,
@@ -21,6 +22,7 @@ const {
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   generateSandboxIdMock: vi.fn().mockResolvedValue('sb-test-123'),
+  isManagedScmContainmentCanaryMock: vi.fn(() => false),
   createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
   deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
   createSessionReportMock: vi.fn().mockResolvedValue(undefined),
@@ -61,6 +63,7 @@ vi.mock('./utils/kilo-session-id.js', () => ({
 vi.mock('./sandbox-id.js', () => ({
   generateSandboxId: generateSandboxIdMock,
   getSandboxNamespace: vi.fn(),
+  isManagedScmContainmentCanary: isManagedScmContainmentCanaryMock,
 }));
 
 vi.mock('./telemetry/session-reports.js', () => ({
@@ -230,6 +233,7 @@ describe('prepareSession endpoint', () => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxIdMock.mockResolvedValue('sb-test-123');
+    isManagedScmContainmentCanaryMock.mockReturnValue(false);
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
     createSessionReportMock.mockResolvedValue(undefined);
@@ -458,6 +462,7 @@ describe('prepareSession endpoint', () => {
         workspace: {
           sandboxId: 'sb-test-123',
           shallow: true,
+          managedScmContainment: false,
         },
       })
     );
@@ -619,18 +624,54 @@ describe('prepareSession endpoint', () => {
       'test-user-123',
       'agent_12345678-1234-1234-1234-123456789abc',
       undefined,
-      true
+      true,
+      false
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: {
           sandboxId: 'dind-abcdef',
           shallow: false,
+          managedScmContainment: false,
           devcontainerRequested: true,
         },
       })
     );
     expect(doStub.registerSession).not.toHaveBeenCalled();
+  });
+
+  it('forces an allowlisted repository onto a per-session sandbox', async () => {
+    isManagedScmContainmentCanaryMock.mockReturnValueOnce(true);
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test containment',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'Kilo-Org/containment-canary',
+      autoInitiate: true,
+    });
+
+    expect(isManagedScmContainmentCanaryMock).toHaveBeenCalledWith(undefined, {
+      type: 'github',
+      repo: 'Kilo-Org/containment-canary',
+      branch: undefined,
+    });
+    expect(generateSandboxIdMock).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      'test-user-123',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      undefined,
+      undefined,
+      true
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ managedScmContainment: true }),
+      })
+    );
   });
 
   it('rejects devcontainer preparation without auto-initiation', async () => {
@@ -888,6 +929,7 @@ describe('start endpoint', () => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxIdMock.mockResolvedValue('sb-test-123');
+    isManagedScmContainmentCanaryMock.mockReturnValue(false);
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
     createSessionReportMock.mockResolvedValue(undefined);
@@ -944,6 +986,33 @@ describe('start endpoint', () => {
 
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('persists containment intent for an allowlisted grouped start', async () => {
+    isManagedScmContainmentCanaryMock.mockReturnValueOnce(true);
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.start({
+      message: { prompt: 'Test containment' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'Kilo-Org/containment-canary' },
+    });
+
+    expect(generateSandboxIdMock).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      'test-user-123',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      undefined,
+      undefined,
+      true
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ managedScmContainment: true }),
+      })
+    );
   });
 
   it('resolves web defaults for grouped start without an explicit profile', async () => {

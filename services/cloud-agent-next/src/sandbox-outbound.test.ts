@@ -28,6 +28,7 @@ import {
   Sandbox,
   SandboxDIND,
   SandboxSmall,
+  MANAGED_SCM_OUTBOUND_HANDLER,
   handleManagedScmOutbound,
 } from './sandbox-outbound.js';
 
@@ -66,35 +67,31 @@ function serializedLogCalls(): string {
 }
 
 describe('managed GitHub sandbox outbound configuration', () => {
-  it('enables catch-all outbound HTTPS interception on production sandboxes', () => {
-    expect(new Sandbox({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
+  it('registers an inactive named handler only on per-session sandboxes', () => {
+    expect(new Sandbox({} as never, {} as never)).toMatchObject({ enableInternet: true });
     expect(new SandboxSmall({} as never, {} as never)).toMatchObject({
       enableInternet: true,
       interceptHttps: true,
     });
-    expect(new SandboxDIND({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
+    expect(new SandboxDIND({} as never, {} as never)).toMatchObject({ enableInternet: true });
     expect(ContainerProxy).toBe(sdk.ContainerProxy);
-    expect(Sandbox.outbound).toBe(handleManagedScmOutbound);
-    expect(SandboxSmall.outbound).toBe(handleManagedScmOutbound);
-    expect(SandboxDIND.outbound).toBe(handleManagedScmOutbound);
-    expect(Sandbox.outboundByHost).toBeUndefined();
-    expect(SandboxSmall.outboundByHost).toBeUndefined();
-    expect(SandboxDIND.outboundByHost).toBeUndefined();
+    expect(Sandbox.outbound).toBeUndefined();
+    expect(SandboxSmall.outbound).toBeUndefined();
+    expect(SandboxDIND.outbound).toBeUndefined();
+    expect(Sandbox.outboundHandlers).toBeUndefined();
+    expect(SandboxSmall.outboundHandlers).toEqual({
+      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
+    });
+    expect(SandboxDIND.outboundHandlers).toBeUndefined();
   });
 
-  it('wires the catch-all handler to Git and API redemption behavior', async () => {
+  it('wires the named handler to Git and API redemption behavior', async () => {
     const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: false,
       reason: 'invalid_capability',
     });
     const env = createEnv(redeemGitHubSessionCapability);
-    const handler = Sandbox.outbound;
+    const handler = SandboxSmall.outboundHandlers?.[MANAGED_SCM_OUTBOUND_HANDLER];
     if (!handler) throw new Error('Expected configured outbound handler');
 
     await handler(

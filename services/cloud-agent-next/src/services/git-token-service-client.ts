@@ -266,7 +266,7 @@ export type ResolvedCloudAgentGitLabCapability = {
 };
 
 export type ResolveManagedGitLabTokenResult =
-  | { success: true; token: string; glabIsOAuth2: boolean }
+  | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
   | { success: false; reason: string };
 
 export async function issueCloudAgentGitLabSessionCapability(
@@ -334,7 +334,12 @@ export async function resolveManagedGitLabToken(
     const result = await env.GIT_TOKEN_SERVICE.getGitLabToken(params);
     if (result.success) {
       logger.info('Resolved GitLab token via git-token-service');
-      return { success: true, token: result.token, glabIsOAuth2: result.glabIsOAuth2 };
+      return {
+        success: true,
+        token: result.token,
+        instanceUrl: result.instanceUrl,
+        glabIsOAuth2: result.glabIsOAuth2,
+      };
     }
     logger.withFields({ reason: result.reason }).info('GitLab token lookup failed');
     return { success: false, reason: result.reason };

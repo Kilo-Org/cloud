@@ -8,6 +8,8 @@ import type { OrganizationWithMembers } from '@/lib/organizations/organization-t
 import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
 import { Button } from '@/components/ui/button';
 import { ConnectionStatusBadge } from './ConnectionStatusBadge';
+import { ConnectToKiloDialog } from './ConnectToKiloDialog';
+import { CopyButton } from './CopyButton';
 import { OrgMemberPicker } from './OrgMemberPicker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,7 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, CheckCircle2, Copy, RotateCw, ShieldAlert, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Cable, RotateCw, ShieldAlert, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -33,6 +35,13 @@ type McpGatewayDetailContentProps = {
   configId: string;
   organizationId?: string;
 };
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
 function requiresProviderSignIn(authMode: string) {
   return authMode === 'oauth_dynamic' || authMode === 'oauth_static';
@@ -89,6 +98,7 @@ export function McpGatewayDetailContent({
   const [rotateDialogOpen, setRotateDialogOpen] = useState(false);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const detailQuery = useQuery(
     organizationId
       ? trpc.mcpGateway.getOrganization.queryOptions({ organizationId, configId })
@@ -220,15 +230,6 @@ export function McpGatewayDetailContent({
     })
   );
 
-  async function copyConnectUrl(url: string) {
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success('Connect URL copied');
-    } catch {
-      toast.error('Could not copy the connect URL');
-    }
-  }
-
   if (detailQuery.isLoading) {
     return (
       <div className="space-y-6">
@@ -268,6 +269,7 @@ export function McpGatewayDetailContent({
     connection.authMode === 'static_headers' || connection.authMode === 'oauth_static';
   const missingStaticCredentials =
     connection.authMode === 'oauth_static' && !connection.hasStaticProviderCredentials;
+  const suggestedName = slugify(connection.name) || 'kilo-gateway';
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
@@ -603,51 +605,60 @@ export function McpGatewayDetailContent({
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="text-base">Connect URL</CardTitle>
-          <CardDescription>
-            Point Kilo Code at this URL. Rotating it invalidates the old URL immediately.
-          </CardDescription>
+          <CardDescription>Point Kilo Code at this URL.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <code className="bg-muted/70 min-w-0 flex-1 rounded-md px-3 py-2 text-xs break-all">
+        <CardContent className="space-y-4">
+          <div className="bg-muted/70 flex min-w-0 items-center gap-2 rounded-md px-3 py-2">
+            <code className="min-w-0 flex-1 truncate text-xs" title={connection.canonicalUrl}>
               {connection.canonicalUrl}
             </code>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => copyConnectUrl(connection.canonicalUrl)}>
-                <Copy className="size-4" />
-                Copy
-              </Button>
-              <AlertDialog open={rotateDialogOpen} onOpenChange={setRotateDialogOpen}>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" disabled={rotateMutation.isPending}>
-                    <RotateCw className="size-4" />
-                    Rotate URL
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Rotate this connect URL?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      The current URL and any gateway tokens bound to it stop working immediately.
-                      Provider sign-in grants remain available on the new URL.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={rotateMutation.isPending}>
-                      Keep current URL
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      variant="destructive"
-                      onClick={() => rotateMutation.mutate(managedConfigInput)}
-                      disabled={rotateMutation.isPending}
-                    >
-                      Rotate URL
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+            <CopyButton
+              value={connection.canonicalUrl}
+              ariaLabel="Copy connect URL"
+              toastLabel="Connect URL copied"
+            />
           </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Button onClick={() => setConnectDialogOpen(true)}>
+              <Cable className="size-4" />
+              Connect to Kilo
+            </Button>
+            <AlertDialog open={rotateDialogOpen} onOpenChange={setRotateDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" disabled={rotateMutation.isPending}>
+                  <RotateCw className="size-4" />
+                  Rotate URL
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Rotate this connect URL?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    The current URL and any gateway tokens bound to it stop working immediately.
+                    Provider sign-in grants remain available on the new URL.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={rotateMutation.isPending}>
+                    Keep current URL
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => rotateMutation.mutate(managedConfigInput)}
+                    disabled={rotateMutation.isPending}
+                  >
+                    Rotate URL
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+          <ConnectToKiloDialog
+            open={connectDialogOpen}
+            onOpenChange={setConnectDialogOpen}
+            connectUrl={connection.canonicalUrl}
+            suggestedName={suggestedName}
+          />
         </CardContent>
       </Card>
 

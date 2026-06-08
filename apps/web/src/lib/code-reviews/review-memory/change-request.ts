@@ -1,4 +1,4 @@
-import type { CodeReviewMemoryProposal, PlatformIntegration, User } from '@kilocode/db/schema';
+import type { CodeReviewMemoryProposal, PlatformIntegration } from '@kilocode/db/schema';
 import type { ReviewMemoryProposalStatus } from '@kilocode/db/schema-types';
 
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
@@ -57,13 +57,6 @@ Kilo analyzed maintainer replies to recent review comments and found repeated fe
 export async function approveAndOpenReviewMemoryChangeRequest(input: {
   owner: ReviewMemoryOwner;
   proposalId: string;
-  approvedByUser:
-    | Pick<User, 'id' | 'google_user_email' | 'google_user_name'>
-    | {
-        id: string;
-        email: string | null;
-        name: string | null;
-      };
 }): Promise<CodeReviewMemoryProposal> {
   const proposal = await getProposal({ owner: input.owner, proposalId: input.proposalId });
   if (!proposal) {

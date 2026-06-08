@@ -151,11 +151,6 @@ export const reviewMemoryRouter = createTRPCRouter({
         return await approveAndOpenReviewMemoryChangeRequest({
           owner,
           proposalId: input.proposalId,
-          approvedByUser: {
-            id: ctx.user.id,
-            email: ctx.user.google_user_email,
-            name: ctx.user.google_user_name,
-          },
         });
       } catch (error) {
         if (error instanceof ReviewMemoryChangeRequestError) {

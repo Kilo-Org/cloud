@@ -443,15 +443,9 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
       );
     } catch (error) {
       if (mayIndicateAlreadyCanceledStripeSubscriptionError(error)) {
+        let subscription: Stripe.Subscription;
         try {
-          const subscription = await params.stripe.subscriptions.retrieve(
-            params.stripeSubscriptionId
-          );
-          if (isStripeSubscriptionEnded(subscription.status)) {
-            canceledSubscription = { id: subscription.id };
-          } else {
-            throw error;
-          }
+          subscription = await params.stripe.subscriptions.retrieve(params.stripeSubscriptionId);
         } catch (confirmationError) {
           captureException(confirmationError, {
             tags: {
@@ -460,6 +454,11 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
             },
             extra: operationalContext,
           });
+          throw error;
+        }
+        if (isStripeSubscriptionEnded(subscription.status)) {
+          canceledSubscription = { id: subscription.id };
+        } else {
           throw error;
         }
       } else {

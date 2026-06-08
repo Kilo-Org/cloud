@@ -1,9 +1,6 @@
 name: Setup Smoke
 
 on:
-  pull_request:
-    branches:
-      - main
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:

@@ -23,7 +23,7 @@ import {
 } from '@/lib/ai-gateway/model-utils';
 import { redisClient } from '@/lib/redis';
 import { TRPCError } from '@trpc/server';
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 type TrpcErrorCode = ConstructorParameters<typeof TRPCError>[0]['code'];
@@ -258,7 +258,7 @@ const CreateExperimentSchema = z.object({
   public_model_id: publicModelIdSchema,
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
-  metadata: StrictCustomLlmMetadataSchema.optional(),
+  metadata: StrictCustomLlmMetadataSchema.nullable().optional(),
 });
 
 const UpdateExperimentSchema = idSchema.extend({
@@ -483,17 +483,33 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     const next: Partial<typeof model_experiment.$inferInsert> = {};
     if (input.name !== undefined) next.name = input.name;
     if (input.description !== undefined) next.description = input.description;
-    if (input.metadata !== undefined) next.metadata = input.metadata;
+    if (input.metadata !== undefined) {
+      assertNonTerminal(existing.status as Status, 'Changing metadata');
+      next.metadata = input.metadata;
+    }
     if (input.public_model_id !== undefined) {
       assertDraft(existing.status as Status, 'Changing public_model_id');
       next.public_model_id = input.public_model_id;
     }
     if (Object.keys(next).length === 0) return existing;
+    const updateFilter =
+      input.metadata === undefined
+        ? eq(model_experiment.id, input.id)
+        : and(
+            eq(model_experiment.id, input.id),
+            ne(model_experiment.status, 'completed')
+          );
     const [updated] = await db
       .update(model_experiment)
       .set(next)
-      .where(eq(model_experiment.id, input.id))
+      .where(updateFilter)
       .returning();
+    if (!updated) {
+      if (input.metadata !== undefined) {
+        badRequest('Changing metadata is not allowed on completed experiments');
+      }
+      notFound('Experiment');
+    }
     // Only routing-relevant edits touch the experimented-public-id cache;
     // cosmetic name/description-only changes don't refresh it.
     if (existing.public_model_id !== updated.public_model_id) {

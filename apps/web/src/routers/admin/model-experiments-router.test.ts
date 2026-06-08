@@ -75,6 +75,7 @@ describe('admin.modelExperiments — basic CRUD', () => {
     expect(created.status).toBe('draft');
     expect(created.public_model_id).toBe('partner/preview-foo');
     expect(created.created_by_user_id).toBe(admin.id);
+    expect(created.metadata).toBeNull();
   });
 
   it('creates and updates experiment metadata', async () => {
@@ -105,6 +106,12 @@ describe('admin.modelExperiments — basic CRUD', () => {
       context_length: 200_000,
       max_completion_tokens: 32_000,
     });
+
+    const cleared = await caller.admin.modelExperiments.update({
+      id: created.id,
+      metadata: null,
+    });
+    expect(cleared.metadata).toBeNull();
   });
 
   it('rejects invalid experiment metadata', async () => {
@@ -484,6 +491,20 @@ describe('admin.modelExperiments — state machine', () => {
     await caller.admin.modelExperiments.complete({ id: experimentId });
     await expect(
       caller.admin.modelExperiments.activate({ id: experimentId })
+    ).rejects.toMatchObject({ message: expect.stringContaining('completed') });
+  });
+
+  it('rejects metadata updates on completed experiments', async () => {
+    const { caller, experimentId } = await makeDraftWithTwoVariants(
+      'partner/preview-metadata-done'
+    );
+    await caller.admin.modelExperiments.activate({ id: experimentId });
+    await caller.admin.modelExperiments.complete({ id: experimentId });
+    await expect(
+      caller.admin.modelExperiments.update({
+        id: experimentId,
+        metadata: null,
+      })
     ).rejects.toMatchObject({ message: expect.stringContaining('completed') });
   });
 });

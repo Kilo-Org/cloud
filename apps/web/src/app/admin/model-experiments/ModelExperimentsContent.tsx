@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,11 +52,6 @@ import Editor from '@monaco-editor/react';
 
 const StrictCustomLlmMetadataSchema = deepStrict(CustomLlmMetadataSchema);
 
-const INITIAL_METADATA: CustomLlmMetadata = {
-  context_length: 200_000,
-  max_completion_tokens: 32_000,
-};
-
 const INITIAL_UPSTREAM: ExperimentUpstream = {
   internal_id: '',
   base_url: '',
@@ -64,12 +59,20 @@ const INITIAL_UPSTREAM: ExperimentUpstream = {
 
 function parseMetadataJson(
   value: string
-): { success: true; data: CustomLlmMetadata } | { success: false; error: string } {
+): { success: true; data: CustomLlmMetadata | null } | { success: false; error: string } {
+  if (!value.trim()) {
+    return { success: true, data: null };
+  }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(value);
   } catch {
     return { success: false, error: 'Invalid JSON syntax' };
+  }
+
+  if (parsed === null) {
+    return { success: true, data: null };
   }
 
   const result = StrictCustomLlmMetadataSchema.safeParse(parsed);
@@ -282,7 +285,7 @@ function CreateExperimentDialog({
   const [name, setName] = useState('');
   const [publicModelId, setPublicModelId] = useState('');
   const [description, setDescription] = useState('');
-  const [metadataJson, setMetadataJson] = useState(() => JSON.stringify(INITIAL_METADATA, null, 2));
+  const [metadataJson, setMetadataJson] = useState('');
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const create = useCreateExperiment();
 
@@ -290,7 +293,7 @@ function CreateExperimentDialog({
     setName('');
     setPublicModelId('');
     setDescription('');
-    setMetadataJson(JSON.stringify(INITIAL_METADATA, null, 2));
+    setMetadataJson('');
     setMetadataError(null);
   }, []);
 
@@ -418,8 +421,8 @@ function MetadataJsonEditor({
         />
       </div>
       <p className="text-muted-foreground mt-1 text-xs">
-        Sets context length, completion limit, image support, and optional OpenCode settings.
-        Validated against <code>CustomLlmMetadataSchema</code>.
+        Sets context length, completion limit, image support, and optional OpenCode settings. Leave
+        blank to keep metadata null. Validated against <code>CustomLlmMetadataSchema</code>.
       </p>
       {error && (
         <pre
@@ -444,18 +447,26 @@ function EditMetadataDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const initialMetadata = useMemo(() => {
+  const initialMetadataJson = useMemo(() => {
+    if (metadata === null) return '';
     const result = StrictCustomLlmMetadataSchema.safeParse(metadata);
-    return result.success ? result.data : INITIAL_METADATA;
+    return result.success ? JSON.stringify(result.data, null, 2) : '';
   }, [metadata]);
-  const [metadataJson, setMetadataJson] = useState(() => JSON.stringify(initialMetadata, null, 2));
+  const [metadataJson, setMetadataJson] = useState(initialMetadataJson);
   const [error, setError] = useState<string | null>(null);
+  const preserveMetadataOnClose = useRef(false);
   const update = useUpdateExperiment();
 
-  const reset = useCallback(() => {
-    setMetadataJson(JSON.stringify(initialMetadata, null, 2));
-    setError(null);
-  }, [initialMetadata]);
+  useEffect(() => {
+    if (!open) {
+      if (preserveMetadataOnClose.current) {
+        preserveMetadataOnClose.current = false;
+      } else {
+        setMetadataJson(initialMetadataJson);
+      }
+      setError(null);
+    }
+  }, [initialMetadataJson, open]);
 
   const handleSave = useCallback(async () => {
     const result = parseMetadataJson(metadataJson);
@@ -466,6 +477,7 @@ function EditMetadataDialog({
 
     try {
       await update.mutateAsync({ id: experimentId, metadata: result.data });
+      preserveMetadataOnClose.current = true;
       toast.success('Experiment metadata updated');
       onOpenChange(false);
     } catch (saveError) {
@@ -474,13 +486,7 @@ function EditMetadataDialog({
   }, [experimentId, metadataJson, onOpenChange, update]);
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={nextOpen => {
-        if (!nextOpen) reset();
-        onOpenChange(nextOpen);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Edit experiment metadata</DialogTitle>

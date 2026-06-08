@@ -97,11 +97,16 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: CreditCard,
       url: '/claw/subscription',
     },
-    {
-      title: 'Agents',
-      icon: Bot,
-      url: '/claw/agents',
-    },
+    // Agent management is admin-only for now.
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'Agents',
+            icon: Bot,
+            url: '/claw/agents',
+          },
+        ]
+      : []),
     {
       title: 'Settings',
       icon: Settings,

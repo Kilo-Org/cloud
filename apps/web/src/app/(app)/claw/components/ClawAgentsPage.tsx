@@ -8,6 +8,7 @@ import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
+import { useUser } from '@/hooks/useUser';
 
 import { AgentsSection } from './AgentsSection';
 import { BillingWrapper } from './billing/BillingWrapper';
@@ -24,6 +25,19 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
   const orgStatus = useOrgKiloClawStatus(organizationId);
   const { data: status, isLoading, error } = organizationId ? orgStatus : personalStatus;
 
+  // Agent management is admin-only. Hide from non-admins and bounce direct hits
+  // back to settings. (The nav item is also gated on is_admin.)
+  const { data: user, isLoading: userLoading } = useUser();
+  const notAdmin = !userLoading && !!user && user.is_admin !== true;
+  const settingsUrl = organizationId
+    ? `/organizations/${organizationId}/claw/settings`
+    : '/claw/settings';
+  useEffect(() => {
+    if (notAdmin) {
+      router.replace(settingsUrl);
+    }
+  }, [notAdmin, settingsUrl, router]);
+
   const clawUrl = organizationId ? `/organizations/${organizationId}/claw/new` : '/claw/new';
   const shouldRedirect = !isLoading && !error && (!status || status.status === null);
   useEffect(() => {
@@ -32,7 +46,7 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
     }
   }, [shouldRedirect, clawUrl, router]);
 
-  if (isLoading || shouldRedirect) {
+  if (userLoading || notAdmin || isLoading || shouldRedirect) {
     return (
       <Card>
         <CardContent className="py-12 text-center">

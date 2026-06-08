@@ -1839,7 +1839,7 @@ async function getPersonalBillingStatus(user: {
   total_microdollars_acquired: number;
   microdollars_used: number;
   kilo_pass_threshold: number | null;
-}) {
+}): Promise<ClawBillingStatus> {
   const now = new Date();
   const { currentPersonalInstance, subscription: sub } =
     await getDisplayedPersonalKiloclawSubscription({

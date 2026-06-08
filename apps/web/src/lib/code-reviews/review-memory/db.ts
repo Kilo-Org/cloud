@@ -24,12 +24,6 @@ const ACTIVE_PROPOSAL_STATUSES = [
   'opening_change_request',
   'change_request_failed',
 ] as const;
-const DASHBOARD_ACTIVE_PROPOSAL_STATUSES = [
-  'open',
-  'edited',
-  'opening_change_request',
-  'change_request_failed',
-] as const;
 const EDITABLE_PROPOSAL_STATUSES = ['open', 'edited', 'change_request_failed'] as const;
 const TERMINAL_PRUNABLE_PROPOSAL_STATUSES = [
   'rejected',
@@ -372,7 +366,7 @@ export async function countActiveProposals(input: {
   const conditions: SQL[] = [
     ...proposalOwnerConditions(input.owner),
     eq(code_review_memory_proposals.platform, input.platform),
-    inArray(code_review_memory_proposals.status, [...DASHBOARD_ACTIVE_PROPOSAL_STATUSES]),
+    inArray(code_review_memory_proposals.status, [...ACTIVE_PROPOSAL_STATUSES]),
   ];
   if (input.repoFullName) {
     conditions.push(eq(code_review_memory_proposals.repo_full_name, input.repoFullName));

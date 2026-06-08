@@ -584,20 +584,41 @@ describe('duplicate-card provider enforcement and email', () => {
     );
   });
 
-  test('provider failures and missing refund target do not throw', async () => {
+  test('cancellation failure throws before refund so webhook delivery can retry', async () => {
     const providerError = new Error('provider unavailable');
+    const createRefund = jest.fn();
     await expect(
       attemptDuplicateCardProviderEnforcement({
         stripe: {
           subscriptions: { cancel: jest.fn(async () => Promise.reject(providerError)) },
-          refunds: { create: jest.fn(async () => Promise.reject(providerError)) },
+          refunds: { create: createRefund },
         } as unknown as Stripe,
         stripeInvoiceId: 'in_provider_failure',
         stripeSubscriptionId: 'sub_provider_failure',
         kiloUserId: 'user_provider_failure',
         gateResult: { ...gateResult, refundableTarget: null },
       })
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('provider unavailable');
+    expect(createRefund).not.toHaveBeenCalled();
+  });
+
+  test('refund failure is returned separately after successful cancellation', async () => {
+    const providerError = new Error('refund unavailable');
+    const result = await attemptDuplicateCardProviderEnforcement({
+      stripe: {
+        subscriptions: { cancel: jest.fn(async () => ({ id: 'sub_refund_failure' })) },
+        refunds: { create: jest.fn(async () => Promise.reject(providerError)) },
+      } as unknown as Stripe,
+      stripeInvoiceId: 'in_refund_failure',
+      stripeSubscriptionId: 'sub_refund_failure',
+      kiloUserId: 'user_refund_failure',
+      gateResult,
+    });
+
+    expect(result).toEqual({
+      cancellation: { subscriptionId: 'sub_refund_failure' },
+      refund: { status: 'failed', error: providerError },
+    });
   });
 
   test('clears email marker when provider is unavailable so replay can retry', async () => {

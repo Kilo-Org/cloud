@@ -227,7 +227,16 @@ export async function loadDuplicateCardReplayAuthority(params: {
     .where(
       and(
         eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled),
-        eq(kilo_pass_audit_log.result, KiloPassAuditLogResult.Success),
+        or(
+          and(
+            eq(kilo_pass_audit_log.result, KiloPassAuditLogResult.SkippedIdempotent),
+            sql`${kilo_pass_audit_log.payload_json}->>'outcome' = 'duplicate_card_blocked'`
+          ),
+          and(
+            eq(kilo_pass_audit_log.result, KiloPassAuditLogResult.Success),
+            sql`${kilo_pass_audit_log.payload_json}->>'outcome' IS NULL`
+          )
+        ),
         or(
           eq(kilo_pass_audit_log.stripe_invoice_id, params.stripeInvoiceId),
           eq(kilo_pass_audit_log.stripe_subscription_id, params.stripeSubscriptionId)
@@ -265,7 +274,7 @@ export async function loadDuplicateCardReplayAuthority(params: {
   }
 
   const blockAudit = blockAudits[0];
-  const blockedAuthority: DuplicateCardReplayAuthority | null = blockAudit
+  const existingBlockedAuthority: DuplicateCardReplayAuthority | null = blockAudit
     ? {
         kind: 'blocked',
         gateResult: {
@@ -287,7 +296,7 @@ export async function loadDuplicateCardReplayAuthority(params: {
     : null;
   const issuanceRecord = issuanceRecords[0];
   if (issuanceRecord) {
-    return blockedAuthority ?? { kind: 'allowed', issuanceId: issuanceRecord.issuanceId };
+    return existingBlockedAuthority ?? { kind: 'allowed', issuanceId: issuanceRecord.issuanceId };
   }
 
   const conflictingSubscriptionIssuance = (
@@ -319,7 +328,7 @@ export async function loadDuplicateCardReplayAuthority(params: {
     });
   }
 
-  return blockedAuthority ?? { kind: 'none' };
+  return existingBlockedAuthority ?? { kind: 'none' };
 }
 
 export async function checkDuplicateCardFingerprintGate(params: {
@@ -383,13 +392,21 @@ export async function checkDuplicateCardFingerprintGate(params: {
   };
 }
 
+export type DuplicateCardProviderEnforcementResult = {
+  cancellation: { subscriptionId: string };
+  refund:
+    | { status: 'succeeded'; refundId: string }
+    | { status: 'failed'; error: unknown }
+    | { status: 'skipped'; reason: 'missing_refund_target' };
+};
+
 export async function attemptDuplicateCardProviderEnforcement(params: {
   stripe: Stripe;
   stripeInvoiceId: string;
   stripeSubscriptionId: string;
   kiloUserId: string;
   gateResult: Extract<DuplicateCardGateResult, { blocked: true }>;
-}): Promise<void> {
+}): Promise<DuplicateCardProviderEnforcementResult> {
   const operationalContext = {
     stripeInvoiceId: params.stripeInvoiceId,
     stripeSubscriptionId: params.stripeSubscriptionId,
@@ -401,8 +418,9 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
     matchedKiloUserId: params.gateResult.matchedKiloUserId,
   };
 
+  let canceledSubscription: Stripe.Subscription;
   try {
-    await params.stripe.subscriptions.cancel(
+    canceledSubscription = await params.stripe.subscriptions.cancel(
       params.stripeSubscriptionId,
       { invoice_now: false, prorate: false },
       { idempotencyKey: `kilo-pass-duplicate-card-cancel:${params.stripeInvoiceId}` }
@@ -412,6 +430,7 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
       tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'subscription_cancel' },
       extra: operationalContext,
     });
+    throw error;
   }
 
   const refundableTarget = params.gateResult.refundableTarget;
@@ -423,11 +442,14 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
         extra: operationalContext,
       }
     );
-    return;
+    return {
+      cancellation: { subscriptionId: canceledSubscription.id },
+      refund: { status: 'skipped', reason: 'missing_refund_target' },
+    };
   }
 
   try {
-    await params.stripe.refunds.create(
+    const refund = await params.stripe.refunds.create(
       {
         ...(refundableTarget.kind === 'payment_intent'
           ? { payment_intent: refundableTarget.id }
@@ -441,6 +463,10 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
       },
       { idempotencyKey: `kilo-pass-duplicate-card-refund:${params.stripeInvoiceId}` }
     );
+    return {
+      cancellation: { subscriptionId: canceledSubscription.id },
+      refund: { status: 'succeeded', refundId: refund.id },
+    };
   } catch (error) {
     captureException(error, {
       tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'refund' },
@@ -450,6 +476,10 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
         refundableTargetId: refundableTarget.id,
       },
     });
+    return {
+      cancellation: { subscriptionId: canceledSubscription.id },
+      refund: { status: 'failed', error },
+    };
   }
 }
 

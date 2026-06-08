@@ -1,9 +1,7 @@
 import {
-  KiloClawCommitRetirementQualificationSource,
   KiloClawPlan,
   KiloClawScheduledBy,
   KiloClawScheduledPlan,
-  type KiloClawCommitRetirementQualificationSource as KiloClawCommitRetirementQualificationSourceType,
   type KiloClawPlan as KiloClawPlanType,
   type KiloClawScheduledBy as KiloClawScheduledByType,
   type KiloClawScheduledPlan as KiloClawScheduledPlanType,
@@ -11,6 +9,27 @@ import {
 
 export const KILOCLAW_COMMIT_SALES_CUTOFF = '2026-06-06T00:00:00.000Z';
 export const KILOCLAW_COMMIT_STRIPE_GUARD_LEAD_DAYS = 30;
+
+export const KiloClawCommitRetirementQualificationSource = {
+  ActiveAtCutoff: 'active_at_cutoff',
+  CheckoutConfirmedBeforeCutoff: 'checkout_confirmed_before_cutoff',
+  SwitchRequestedBeforeCutoff: 'switch_requested_before_cutoff',
+  RenewalDueBeforeCutoff: 'renewal_due_before_cutoff',
+} as const;
+
+export type KiloClawCommitRetirementQualificationSource =
+  (typeof KiloClawCommitRetirementQualificationSource)[keyof typeof KiloClawCommitRetirementQualificationSource];
+
+export const KiloClawCommitRetirementState = {
+  PendingFinalTerm: 'pending_final_term',
+  FinalTerm: 'final_term',
+  StandardScheduled: 'standard_scheduled',
+  Completed: 'completed',
+  ManualReview: 'manual_review',
+} as const;
+
+export type KiloClawCommitRetirementState =
+  (typeof KiloClawCommitRetirementState)[keyof typeof KiloClawCommitRetirementState];
 
 const STRIPE_GUARD_LEAD_MS = KILOCLAW_COMMIT_STRIPE_GUARD_LEAD_DAYS * 24 * 60 * 60 * 1000;
 
@@ -24,8 +43,7 @@ export type KiloClawCommitRetirementEvidence = {
   currentPeriodEnd?: Timestamp | null;
   commitEndsAt?: Timestamp | null;
   qualifiedAt?: Timestamp | null;
-  qualificationSource?: KiloClawCommitRetirementQualificationSourceType | null;
-  hasOpenReview?: boolean;
+  qualificationSource?: KiloClawCommitRetirementQualificationSource | null;
   hasStandardConsent?: boolean;
 };
 
@@ -64,8 +82,6 @@ export function isBeforeKiloClawCommitSalesCutoff(timestamp: Timestamp): boolean
 export function classifyKiloClawCommitTerm(
   evidence: KiloClawCommitRetirementEvidence
 ): KiloClawCommitTermClassification {
-  if (evidence.hasOpenReview) return 'ambiguous';
-
   if (evidence.plan === KiloClawPlan.Commit) {
     if (!evidence.currentPeriodStart || !evidence.currentPeriodEnd || !evidence.commitEndsAt) {
       return 'ambiguous';
@@ -115,7 +131,7 @@ export function classifyKiloClawCommitInvoice(input: {
   invoicePeriodEnd: Timestamp;
   commitEndsAt?: Timestamp | null;
   qualifiedAt?: Timestamp | null;
-  qualificationSource?: KiloClawCommitRetirementQualificationSourceType | null;
+  qualificationSource?: KiloClawCommitRetirementQualificationSource | null;
 }): KiloClawCommitInvoiceAuthorization {
   const periodStart = timestampMillis(input.invoicePeriodStart);
   const periodEnd = timestampMillis(input.invoicePeriodEnd);

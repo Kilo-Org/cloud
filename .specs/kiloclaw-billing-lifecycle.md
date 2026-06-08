@@ -75,9 +75,6 @@ capitals, as shown here.
 - **Final Commit boundary cancellation**: Expected pure-credit outcome where
   a final Commit term reaches its authorized boundary without explicit
   Standard continuation and cancels without deduction or period advancement.
-- **Commit retirement review**: An open review case for missing, conflicting,
-  ambiguous, or forbidden Commit evidence. The case is the sole containment
-  marker and reason authority.
 - **Stripe retirement guard sweep**: Lifecycle activity that makes an eligible
   Stripe-funded final Commit term non-renewing beginning 30 days before its
   verified final boundary.
@@ -145,11 +142,7 @@ downstream enforcement can proceed.
 3. If the subscription's current credit-renewal boundary no longer
    matches the item boundary, the item MUST be treated as stale or
    superseded and MUST NOT apply another deduction for that boundary.
-4. Before any renewal mutation, processing MUST skip a subscription with an
-   open Commit retirement review case and preserve current access for operator
-   resolution. If
-   the subscription is otherwise no longer a current eligible pure-credit row,
-   the item MUST be skipped without billing mutation.
+4. Before any renewal mutation, processing MUST recompute Commit eligibility from existing subscription fields and change-log evidence. An anomaly MUST fail closed, prevent another Commit deduction, report through logs and Sentry, and remain retryable. If the subscription is otherwise no longer a current eligible pure-credit row, the item MUST be skipped without billing mutation.
 5. If the associated instance or ownership context makes the row
    ineligible for personal credit renewal, the item MUST be skipped
    without billing mutation. Instance destruction alone MUST NOT make a
@@ -245,9 +238,7 @@ downstream enforcement can proceed.
 2. Each guard item MUST re-read local and live provider state, reconcile
    hidden or conflicting schedules, and idempotently set provider and local
    cancellation at period end without creating another Commit phase.
-3. A guard retry MUST remain safe after timeout or duplicate delivery. An
-   unknown provider outcome, conflicting schedule, or unverified boundary MUST
-   enter Commit retirement review rather than infer success.
+3. A guard retry MUST remain safe after timeout or duplicate delivery. An unknown provider outcome, conflicting schedule, or unverified boundary MUST fail closed, attempt provider non-renewal when possible, report through logs and Sentry, and retry or recompute rather than infer success.
 4. Guard processing failures MUST retry and alert operators before the final
    boundary. A failure for one subscription MUST NOT prevent other guard items
    from processing.
@@ -274,10 +265,7 @@ downstream enforcement can proceed.
 6. If credit-renewal backlog or retry age creates credible risk of
    false suspension or destruction, the system SHOULD add a stronger
    protection mechanism before continuing rollout.
-7. Downstream enforcement MUST skip every subscription with an open Commit
-   retirement review case, including suspension, stop, warning, and destruction
-   actions, until the case is resolved. This protection is independent of
-   terminal renewal failure protection and MUST NOT block unrelated subscriptions.
+7. Commit retirement MUST NOT add a durable review lifecycle or operator-resolution barrier. Each renewal and enforcement attempt MUST recompute from existing subscription and change-log state; ambiguous Commit renewal fails closed and is retried after logging and Sentry reporting.
 
 ### Observability and Operator Control
 
@@ -349,7 +337,7 @@ The following SHOULD-level operational improvements remain future work:
 ### 2026-06-05 -- Commit retirement lifecycle safety
 
 - Added final Commit cancellation as an expected pure-credit outcome.
-- Added idempotent Stripe retirement guard requirements and manual-review enforcement protection while preserving invoice-settlement ownership.
+- Added idempotent Stripe retirement guard requirements and fail-closed anomaly handling while preserving invoice-settlement ownership.
 
 ### 2026-05-13 -- Initial spec
 

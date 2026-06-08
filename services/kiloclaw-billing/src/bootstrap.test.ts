@@ -2,12 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from '@kilocode/db';
 
 const {
-  mockCreateCommitRetirementReviewCase,
   mockFindLatestPreCutoffUserCommitSwitchQualification,
   mockGetWorkerDb,
   mockInsertKiloClawSubscriptionChangeLog,
 } = vi.hoisted(() => ({
-  mockCreateCommitRetirementReviewCase: vi.fn(async () => ({ id: 'review-case' })),
   mockFindLatestPreCutoffUserCommitSwitchQualification: vi.fn<
     () => Promise<{
       qualifiedAt: string;
@@ -27,7 +25,6 @@ vi.mock('@kilocode/db', async importOriginal => {
     ...actual,
     CURRENT_KILOCLAW_PRICE_VERSION: currentPriceVersion,
     LEGACY_KILOCLAW_PRICE_VERSION: legacyPriceVersion,
-    createCommitRetirementReviewCase: mockCreateCommitRetirementReviewCase,
     findLatestPreCutoffUserCommitSwitchQualification:
       mockFindLatestPreCutoffUserCommitSwitchQualification,
     getKiloClawPricingCatalogEntry: vi.fn((priceVersion: string) => {
@@ -50,7 +47,6 @@ vi.mock('@kilocode/db', async importOriginal => {
     getWorkerDb: mockGetWorkerDb,
     KILOCLAW_COMMIT_SALES_CUTOFF: '2026-06-06T00:00:00.000Z',
     insertKiloClawSubscriptionChangeLog: mockInsertKiloClawSubscriptionChangeLog,
-    kiloclaw_commit_retirement_review_cases: {},
     kiloclaw_earlybird_purchases: {},
     kiloclaw_instances: {},
     kiloclaw_subscriptions: {},
@@ -200,7 +196,6 @@ function createTransferSource(overrides: Record<string, unknown> = {}) {
 
 describe('bootstrapProvisionSubscription successor transfer', () => {
   beforeEach(() => {
-    mockCreateCommitRetirementReviewCase.mockClear();
     mockFindLatestPreCutoffUserCommitSwitchQualification.mockReset();
     mockFindLatestPreCutoffUserCommitSwitchQualification.mockResolvedValue(null);
     mockGetWorkerDb.mockReset();
@@ -283,7 +278,6 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
         stripe_schedule_id: 'schedule-live',
       })
     );
-    expect(mockCreateCommitRetirementReviewCase).not.toHaveBeenCalled();
   });
 
   it('preserves a pending Commit switch with pre-cutoff change-log qualification', async () => {
@@ -337,7 +331,6 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
     expect(insertValues[0]).toEqual(
       expect.objectContaining({ scheduled_plan: 'commit', scheduled_by: 'user' })
     );
-    expect(mockCreateCommitRetirementReviewCase).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -356,21 +349,7 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
       }),
       reason: 'boundary_mismatch',
     },
-  ])('contains unsafe transfer with $name', async ({ source, reason }) => {
-    const insertedSuccessor = {
-      ...source,
-      id: 'sub-successor',
-      instance_id: 'instance-new',
-      stripe_subscription_id: null,
-      stripe_schedule_id: null,
-    };
-    const containedSuccessor = {
-      ...insertedSuccessor,
-      scheduled_plan: null,
-      scheduled_by: null,
-      cancel_at_period_end: true,
-      stripe_subscription_id: source.stripe_subscription_id,
-    };
+  ])('aborts unsafe transfer with $name before successor mutation', async ({ source, reason }) => {
     const { db, insertValues, updateSets } = createMockDb({
       selectRows: [
         [],
@@ -381,85 +360,22 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
         ],
         [],
       ],
-      txSelectRows: [[source], [{ id: 'instance-new' }], [], []],
-      insertReturningRows: [[insertedSuccessor]],
-      updateReturningRows: [[{ ...source, status: 'canceled' }], [containedSuccessor]],
+      txSelectRows: [[source], [{ id: 'instance-new' }], []],
+      insertReturningRows: [],
+      updateReturningRows: [],
     });
     mockGetWorkerDb.mockReturnValue(db);
 
-    const result = await bootstrapProvisionSubscription(createEnv(), {
-      userId: source.user_id,
-      instanceId: 'instance-new',
-      orgId: null,
-    });
-
-    expect(insertValues[0]).toEqual(
-      expect.objectContaining({
-        scheduled_plan: null,
-        scheduled_by: null,
-        cancel_at_period_end: true,
-        commit_ends_at: source.commit_ends_at,
+    await expect(
+      bootstrapProvisionSubscription(createEnv(), {
+        userId: source.user_id,
+        instanceId: 'instance-new',
+        orgId: null,
       })
-    );
-    expect(updateSets[1]).toEqual(
-      expect.objectContaining({ stripe_subscription_id: 'stripe-live', stripe_schedule_id: null })
-    );
-    expect(result).toEqual(containedSuccessor);
-    expect(mockCreateCommitRetirementReviewCase).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ subscriptionId: 'sub-successor', reasonCode: reason })
-    );
-  });
+    ).rejects.toThrow(`Unsafe personal subscription transfer: ${reason}`);
 
-  it('retargets existing open review case without replacing its reason authority', async () => {
-    const source = createTransferSource({ scheduled_plan: 'commit', scheduled_by: 'user' });
-    const openReviewCase = {
-      id: 'review-existing',
-      reason_code: 'provider_state_mismatch',
-      summary: 'Existing provider mismatch',
-    };
-    const insertedSuccessor = {
-      ...source,
-      id: 'sub-successor',
-      instance_id: 'instance-new',
-      stripe_subscription_id: null,
-      stripe_schedule_id: null,
-    };
-    const containedSuccessor = {
-      ...insertedSuccessor,
-      scheduled_plan: null,
-      scheduled_by: null,
-      cancel_at_period_end: true,
-      stripe_subscription_id: source.stripe_subscription_id,
-    };
-    const { db, updateSets } = createMockDb({
-      selectRows: [
-        [],
-        [source],
-        [
-          { id: 'instance-old', destroyedAt: '2026-06-07T00:00:00.000Z', organizationId: null },
-          { id: 'instance-new', destroyedAt: null, organizationId: null },
-        ],
-        [],
-      ],
-      txSelectRows: [[source], [{ id: 'instance-new' }], [], [openReviewCase]],
-      insertReturningRows: [[insertedSuccessor]],
-      updateReturningRows: [
-        [{ ...source, status: 'canceled' }],
-        [containedSuccessor],
-        [{ ...openReviewCase, subscription_id: 'sub-successor' }],
-      ],
-    });
-    mockGetWorkerDb.mockReturnValue(db);
-
-    await bootstrapProvisionSubscription(createEnv(), {
-      userId: source.user_id,
-      instanceId: 'instance-new',
-      orgId: null,
-    });
-
-    expect(updateSets[2]).toEqual({ subscription_id: 'sub-successor' });
-    expect(mockCreateCommitRetirementReviewCase).not.toHaveBeenCalled();
+    expect(insertValues).toEqual([]);
+    expect(updateSets).toEqual([]);
   });
 
   it('clears predecessor Stripe ownership before restoring it on successor row', async () => {

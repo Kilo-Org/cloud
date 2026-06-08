@@ -8,7 +8,6 @@ import {
   CURRENT_KILOCLAW_PRICE_VERSION,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
-  findOpenCommitRetirementReviewCase,
   insertKiloClawSubscriptionChangeLog,
   type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeAction,
@@ -53,11 +52,10 @@ import {
 } from '@/lib/kiloclaw/current-personal-subscription';
 import {
   assertKiloClawCommitAdmission,
-  findKiloClawProviderRetirementDisposition,
   findPendingCommitSwitchQualification,
   getStripeFundedRetirementSettlementDecision,
   makeKiloClawStripeSubscriptionNonRenewing,
-  putKiloClawCommitRetirementInReview,
+  reportKiloClawCommitRetirementAnomaly,
   type KiloClawCommitEnrollmentQualification,
 } from '@/lib/kiloclaw/commit-retirement';
 
@@ -430,19 +428,24 @@ export async function getEffectiveCreditBalancePreview(params: {
  * stripe_subscription_id preserved), and advances the billing period from
  * invoice-derived boundaries.
  */
-export async function applyStripeFundedKiloClawPeriod(params: {
-  userId: string;
-  metadataInstanceId?: string;
-  stripeSubscriptionId: string;
-  stripePaymentId: string;
-  plan: 'commit' | 'standard';
-  priceVersion: KiloClawPriceVersion;
-  amountMicrodollars: number;
-  periodStart: string;
-  periodEnd: string;
-  stripeEventId?: string;
-  checkoutConfirmedAt?: string;
-}): Promise<boolean> {
+export async function applyStripeFundedKiloClawPeriod(
+  params: {
+    userId: string;
+    metadataInstanceId?: string;
+    stripeSubscriptionId: string;
+    stripePaymentId: string;
+    plan: 'commit' | 'standard';
+    priceVersion: KiloClawPriceVersion;
+    amountMicrodollars: number;
+    periodStart: string;
+    periodEnd: string;
+    stripeEventId?: string;
+    checkoutConfirmedAt?: string;
+  },
+  dependencies: {
+    makeStripeSubscriptionNonRenewing?: (stripeSubscriptionId: string) => Promise<void>;
+  } = {}
+): Promise<boolean> {
   const {
     userId,
     metadataInstanceId,
@@ -458,41 +461,6 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   const amountCents = Math.round(amountMicrodollars / 10_000);
   const periodStartDate = periodStart.slice(0, 10); // YYYY-MM-DD
 
-  const providerDisposition = await findKiloClawProviderRetirementDisposition({
-    stripeSubscriptionId,
-    stripeEventId: params.stripeEventId,
-  });
-  const recognizeRowlessPaidFinal =
-    providerDisposition?.status === 'resolved' &&
-    providerDisposition.resolution_disposition === 'recognize_paid_period_as_final';
-  if (providerDisposition && !recognizeRowlessPaidFinal) {
-    if (plan === 'commit') {
-      try {
-        await makeKiloClawStripeSubscriptionNonRenewing(stripeSubscriptionId);
-      } catch (error) {
-        logError('Blocked provider disposition could not confirm non-renewal', {
-          stripe_subscription_id: stripeSubscriptionId,
-          stripe_event_id: params.stripeEventId ?? null,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-    logWarning('Stripe-funded settlement blocked by provider retirement disposition', {
-      stripe_subscription_id: stripeSubscriptionId,
-      stripe_event_id: params.stripeEventId ?? null,
-      provider_disposition:
-        providerDisposition.resolution_disposition ?? providerDisposition.status,
-    });
-    return false;
-  }
-  if (recognizeRowlessPaidFinal && plan !== 'commit') {
-    logWarning('Stripe-funded non-Commit settlement blocked by paid-final disposition', {
-      stripe_subscription_id: stripeSubscriptionId,
-      stripe_event_id: params.stripeEventId ?? null,
-    });
-    return false;
-  }
-
   let wasSuspended = false;
   let resolvedInstanceId: string | undefined;
   let resolvedSubscriptionId: string | undefined;
@@ -503,7 +471,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   // not send the "subscription started" email. See
   // shouldSendSubscriptionStartedEmailForActivation.
   let shouldSendSubscriptionStartedEmailForNewSettlement = false;
-  let requiresProviderNonRenewal = recognizeRowlessPaidFinal;
+  let requiresProviderNonRenewal = false;
   // Set when the primary settlement insert was a duplicate (processTopUp
   // returned false). In that case the downstream email side effect may not
   // have run yet and we attempt best-effort recovery after commit.
@@ -611,45 +579,26 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     resolvedInstanceId = targetRow.instance_id ?? undefined;
     resolvedSubscriptionId = targetRow.id;
 
-    if (recognizeRowlessPaidFinal && targetRow.commit_ends_at !== null) {
-      logWarning('Later settlement blocked after recognized rowless paid final ingestion', {
-        user_id: userId,
-        stripe_subscription_id: stripeSubscriptionId,
-        subscription_id: targetRow.id,
-        stripe_event_id: params.stripeEventId ?? null,
-      });
-      return;
-    }
-
-    const ingestRecognizedRowlessPaidFinal = recognizeRowlessPaidFinal;
     const switchQualification =
       plan === 'commit' ? await findPendingCommitSwitchQualification(targetRow.id, tx) : null;
-    const openReviewCase = await findOpenCommitRetirementReviewCase(tx, targetRow.id);
-    const retirementDecision = ingestRecognizedRowlessPaidFinal
-      ? {
-          authorization: 'authorized_final_term' as const,
-          reviewReason: null,
-          subscriptionUpdate: { cancel_at_period_end: true, commit_ends_at: periodEnd },
-        }
-      : getStripeFundedRetirementSettlementDecision({
-          subscription: targetRow,
-          plan,
-          periodStart,
-          periodEnd,
-          checkoutConfirmedAt: params.checkoutConfirmedAt,
-          switchQualification: switchQualification ?? undefined,
-          openReviewCase,
-        });
-    requiresProviderNonRenewal ||= retirementDecision.reviewReason !== null;
-    if (retirementDecision.reviewReason) {
-      await putKiloClawCommitRetirementInReview({
-        tx,
-        subscription: targetRow,
-        reason: retirementDecision.reviewReason,
+    const retirementDecision = getStripeFundedRetirementSettlementDecision({
+      subscription: targetRow,
+      plan,
+      periodStart,
+      periodEnd,
+      checkoutConfirmedAt: params.checkoutConfirmedAt,
+      switchQualification: switchQualification ?? undefined,
+    });
+    requiresProviderNonRenewal ||= retirementDecision.anomalyReason !== null;
+    if (retirementDecision.anomalyReason) {
+      reportKiloClawCommitRetirementAnomaly({
+        reason: retirementDecision.anomalyReason,
+        subscriptionId: targetRow.id,
+        stripeSubscriptionId,
         stripeEventId: params.stripeEventId,
         summary:
           plan === 'commit'
-            ? 'Paid Commit invoice requires retirement review; paid access is preserved.'
+            ? 'Paid Commit invoice is ambiguous; paid access is preserved and renewal is blocked.'
             : 'Standard invoice lacks verified explicit retirement continuation consent.',
       });
     }
@@ -765,20 +714,6 @@ export async function applyStripeFundedKiloClawPeriod(params: {
         before,
         after,
       });
-      if (
-        before.commit_ends_at !== after.commit_ends_at ||
-        before.scheduled_plan !== after.scheduled_plan ||
-        before.scheduled_by !== after.scheduled_by
-      ) {
-        await insertKiloClawSubscriptionChangeLog(tx, {
-          subscriptionId: after.id,
-          actor: CREDIT_BILLING_ACTOR,
-          action: 'commit_retirement_changed',
-          reason: 'stripe_invoice_settlement_retirement',
-          before,
-          after,
-        });
-      }
     }
 
     applied = true;
@@ -790,31 +725,44 @@ export async function applyStripeFundedKiloClawPeriod(params: {
 
   if (requiresProviderNonRenewal) {
     try {
-      await makeKiloClawStripeSubscriptionNonRenewing(stripeSubscriptionId);
-    } catch (error) {
+      await (
+        dependencies.makeStripeSubscriptionNonRenewing ?? makeKiloClawStripeSubscriptionNonRenewing
+      )(stripeSubscriptionId);
       if (resolvedSubscriptionId) {
-        const [current] = await db
-          .select()
-          .from(kiloclaw_subscriptions)
-          .where(eq(kiloclaw_subscriptions.id, resolvedSubscriptionId))
-          .limit(1);
-        if (current) {
-          await db.transaction(async tx => {
-            await putKiloClawCommitRetirementInReview({
-              tx,
-              subscription: current,
-              reason: 'provider_outcome_unknown',
-              stripeEventId: params.stripeEventId,
-              summary: 'Paid retirement settlement could not confirm provider non-renewal.',
-            });
+        const subscriptionId = resolvedSubscriptionId;
+        await db.transaction(async tx => {
+          const [before] = await tx
+            .select()
+            .from(kiloclaw_subscriptions)
+            .where(eq(kiloclaw_subscriptions.id, subscriptionId))
+            .for('update')
+            .limit(1);
+          if (!before || before.stripe_subscription_id !== stripeSubscriptionId) return;
+          const [after] = await tx
+            .update(kiloclaw_subscriptions)
+            .set({ cancel_at_period_end: true })
+            .where(eq(kiloclaw_subscriptions.id, subscriptionId))
+            .returning();
+          if (!after || before.cancel_at_period_end === after.cancel_at_period_end) return;
+          await insertKiloClawSubscriptionChangeLog(tx, {
+            subscriptionId: after.id,
+            actor: CREDIT_BILLING_ACTOR,
+            action: 'schedule_changed',
+            reason: 'stripe_invoice_settlement_nonrenewal_confirmed',
+            before,
+            after,
           });
-        }
+        });
       }
-      logError('Paid retirement settlement could not confirm provider non-renewal', {
-        stripe_subscription_id: stripeSubscriptionId,
-        stripe_event_id: params.stripeEventId ?? null,
-        error: error instanceof Error ? error.message : String(error),
+    } catch (error) {
+      reportKiloClawCommitRetirementAnomaly({
+        reason: 'provider_outcome_unknown',
+        summary: 'Paid retirement settlement could not confirm provider non-renewal.',
+        subscriptionId: resolvedSubscriptionId,
+        stripeSubscriptionId,
+        stripeEventId: params.stripeEventId,
       });
+      throw error;
     }
   }
 
@@ -1473,16 +1421,6 @@ export async function enrollWithCredits(params: {
         before: currentSubscription ?? null,
         after: mutatedSubscription,
       });
-      if (plan === 'commit') {
-        await insertKiloClawSubscriptionChangeLog(tx, {
-          subscriptionId: mutatedSubscription.id,
-          actor: params.actor ?? CREDIT_BILLING_ACTOR,
-          action: 'commit_retirement_changed',
-          reason: 'credit_enrollment_final_commit',
-          before: currentSubscription ?? null,
-          after: mutatedSubscription,
-        });
-      }
     }
   });
 

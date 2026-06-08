@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   KILOCLAW_COMMIT_SALES_CUTOFF,
+  KiloClawCommitRetirementQualificationSource,
   classifyKiloClawCommitInvoice,
   classifyKiloClawCommitTerm,
   deriveKiloClawCommitFinalBoundary,
@@ -10,12 +11,7 @@ import {
   isKiloClawCommitStripeGuardDue,
   maySelectKiloClawCommit,
 } from './kiloclaw-commit-retirement';
-import {
-  KiloClawCommitRetirementQualificationSource,
-  KiloClawPlan,
-  KiloClawScheduledBy,
-  KiloClawScheduledPlan,
-} from './schema-types';
+import { KiloClawPlan, KiloClawScheduledBy, KiloClawScheduledPlan } from './schema-types';
 
 const finalCommit = {
   plan: KiloClawPlan.Commit,
@@ -44,8 +40,7 @@ describe('KiloClaw Commit retirement policy', () => {
     ).toBe('pending_final_term');
   });
 
-  it('fails closed for review cases and missing or mismatched boundaries', () => {
-    expect(classifyKiloClawCommitTerm({ ...finalCommit, hasOpenReview: true })).toBe('ambiguous');
+  it('fails closed for missing or mismatched boundaries', () => {
     expect(classifyKiloClawCommitTerm({ ...finalCommit, commitEndsAt: null })).toBe('ambiguous');
     expect(
       classifyKiloClawCommitTerm({

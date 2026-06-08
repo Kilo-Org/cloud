@@ -38,7 +38,6 @@ import {
   findLatestPreCutoffUserCommitSwitchQualification,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
-  hasOpenCommitRetirementReviewCase,
   insertKiloClawSubscriptionChangeLog,
   maySelectKiloClawCommit,
   PersonalSubscriptionCollapseUQConflictError,
@@ -125,7 +124,7 @@ import {
 } from '@/lib/kiloclaw/access-state';
 import {
   continueKiloClawCommitAsStandard,
-  putKiloClawCommitRetirementInReview,
+  reportKiloClawCommitRetirementAnomaly,
   undoKiloClawCommitStandardContinuation,
 } from '@/lib/kiloclaw/commit-retirement';
 import {
@@ -180,8 +179,7 @@ async function insertUserSubscriptionChangeLog(
       | 'canceled'
       | 'reactivated'
       | 'schedule_changed'
-      | 'payment_source_changed'
-      | 'commit_retirement_changed';
+      | 'payment_source_changed';
     reason: string;
     before: typeof kiloclaw_subscriptions.$inferSelect;
     after: typeof kiloclaw_subscriptions.$inferSelect;
@@ -1663,10 +1661,6 @@ function getFinalCommitBoundary(
 async function getCommitRetirementDisplayState(
   subscription: typeof kiloclaw_subscriptions.$inferSelect
 ) {
-  if (await hasOpenCommitRetirementReviewCase(db, subscription.id)) {
-    return 'manual_review' as const;
-  }
-
   const evidence = await getCommitRetirementEvidence(subscription);
   const classification = classifyKiloClawCommitTerm(evidence);
   if (classification === 'ambiguous') return 'manual_review' as const;
@@ -2508,7 +2502,21 @@ async function acceptKiloclawConversionForRow(params: {
     });
   }
 
-  const liveSub = await stripe.subscriptions.retrieve(subscription.stripe_subscription_id);
+  let liveSub: Awaited<ReturnType<typeof stripe.subscriptions.retrieve>>;
+  try {
+    liveSub = await stripe.subscriptions.retrieve(subscription.stripe_subscription_id);
+  } catch (error) {
+    reportCommitRetirementMutationAnomaly({
+      subscription,
+      reason: 'provider_outcome_unknown',
+      summary: 'Credit conversion could not read provider state.',
+    });
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Unable to confirm Stripe state. Please try again.',
+      cause: error,
+    });
+  }
   const scheduleIdToRelease =
     subscription.stripe_schedule_id ?? resolveScheduleId(liveSub.schedule);
 
@@ -2593,6 +2601,11 @@ async function acceptKiloclawConversionForRow(params: {
           error: stripeError instanceof Error ? stripeError.message : String(stripeError),
         }
       );
+      reportCommitRetirementMutationAnomaly({
+        subscription,
+        reason: 'provider_outcome_unknown',
+        summary: 'Credit conversion could not confirm provider non-renewal.',
+      });
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -2635,8 +2648,7 @@ async function reactivateKiloclawSubscriptionForRow(params: {
   const commitClassification = classifyKiloClawCommitTerm(
     await getCommitRetirementEvidence(subscription)
   );
-  const hasOpenReview = await hasOpenCommitRetirementReviewCase(db, subscription.id);
-  if (commitClassification === 'ambiguous' || hasOpenReview) {
+  if (commitClassification === 'ambiguous') {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Commit retirement state requires support review.',
@@ -2984,9 +2996,8 @@ async function continueFinalCommitAsStandardForRow(params: {
         ? new Date(providerPeriodEnd * 1000).toISOString()
         : null;
     } catch (error) {
-      await putCommitRetirementMutationInReview({
-        subscriptionId: params.subscription.id,
-        userId: params.userId,
+      reportCommitRetirementMutationAnomaly({
+        subscription: params.subscription,
         reason: 'provider_outcome_unknown',
         summary: 'Standard continuation could not read provider state.',
       });
@@ -3001,9 +3012,8 @@ async function continueFinalCommitAsStandardForRow(params: {
     allowLocalOnly: !params.subscription.stripe_subscription_id,
   });
   if (boundary.kind !== 'verified') {
-    await putCommitRetirementMutationInReview({
-      subscriptionId: params.subscription.id,
-      userId: params.userId,
+    reportCommitRetirementMutationAnomaly({
+      subscription: params.subscription,
       reason:
         boundary.kind === 'conflicting' ? 'boundary_mismatch' : 'missing_qualification_evidence',
       summary: 'Standard continuation could not verify the final Commit boundary.',
@@ -3030,9 +3040,8 @@ async function continueFinalCommitAsStandardForRow(params: {
       message.includes('already credit-funded') ||
       message.includes('requires support review');
     if (!isExpectedRejection) {
-      await putCommitRetirementMutationInReview({
-        subscriptionId: params.subscription.id,
-        userId: params.userId,
+      reportCommitRetirementMutationAnomaly({
+        subscription: params.subscription,
         reason: boundaryChanged ? 'boundary_mismatch' : 'provider_outcome_unknown',
         summary: boundaryChanged
           ? 'Standard continuation could not confirm the expected final Commit boundary.'
@@ -3043,30 +3052,16 @@ async function continueFinalCommitAsStandardForRow(params: {
   }
 }
 
-async function putCommitRetirementMutationInReview(params: {
-  subscriptionId: string;
-  userId: string;
+function reportCommitRetirementMutationAnomaly(params: {
+  subscription: typeof kiloclaw_subscriptions.$inferSelect;
   reason: 'boundary_mismatch' | 'missing_qualification_evidence' | 'provider_outcome_unknown';
   summary: string;
 }) {
-  await db.transaction(async tx => {
-    const [current] = await tx
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.id, params.subscriptionId),
-          eq(kiloclaw_subscriptions.user_id, params.userId)
-        )
-      )
-      .limit(1);
-    if (!current || (await hasOpenCommitRetirementReviewCase(tx, current.id))) return;
-    await putKiloClawCommitRetirementInReview({
-      tx,
-      subscription: current,
-      reason: params.reason,
-      summary: params.summary,
-    });
+  reportKiloClawCommitRetirementAnomaly({
+    reason: params.reason,
+    summary: params.summary,
+    subscriptionId: params.subscription.id,
+    stripeSubscriptionId: params.subscription.stripe_subscription_id,
   });
 }
 
@@ -3114,9 +3109,8 @@ async function cancelKiloclawPlanSwitchForRow(params: {
         message.includes('final boundary has passed') ||
         message.includes('requires support review');
       if (!isExpectedRejection) {
-        await putCommitRetirementMutationInReview({
-          subscriptionId: subscription.id,
-          userId,
+        reportCommitRetirementMutationAnomaly({
+          subscription,
           reason: 'provider_outcome_unknown',
           summary: 'Standard continuation undo could not confirm provider and local state.',
         });

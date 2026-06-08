@@ -258,10 +258,7 @@ to the subscription, including subscriptions enrolled under earlier pricing.
 Scheduled or requested plan changes MUST display pricing that will apply if
 the change completes. Every final Commit summary card and detail view MUST
 state that hosting ends on the final date unless the customer continues
-month-to-month, and MUST expose the continuation action directly. A
-support-review state MUST preserve current-access messaging, direct the
-customer to support, and hide unsafe billing actions without exposing internal
-reason codes.
+month-to-month, and MUST expose the continuation action directly. When retirement state cannot be derived safely, the surface MUST hide unsafe billing actions, preserve only access supported by canonical state, and show a generic temporary billing-state error without exposing internal reason codes.
 
 When the user has no non-terminal KiloClaw subscription, the enrollment
 view MUST display Standard as the only currently available offer after the
@@ -469,7 +466,7 @@ not yet enforced in the current codebase:
 ### 2026-06-05 -- KiloClaw final Commit continuation
 
 - Replaced two-way post-cutoff plan switching with explicit final Commit continuation into lineage-priced Standard.
-- Required final date, funding, default cancellation, continuation/undo actions, support-review presentation, and historical Commit display.
+- Required final date, funding, default cancellation, continuation/undo actions, fail-closed ambiguous-state presentation, and historical Commit display.
 
 ### 2026-05-28 -- Personal product navigation and return context
 

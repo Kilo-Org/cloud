@@ -1355,7 +1355,6 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
 
   const hasOrgSubs = organizationChains.length > 0;
   const cancelingSubscription = subscriptions.find(s => s.id === cancelSubscriptionId) ?? null;
-  const openRetirementReviewCases = data.openRetirementReviewCases;
 
   return (
     <>
@@ -1395,30 +1394,6 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           ) : null}
 
           {subscriptions.length > 0 ? <SummaryStrip state={data} effective={effective} /> : null}
-
-          {openRetirementReviewCases.length > 0 ? (
-            <div className="rounded-lg border bg-yellow-500/10 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h4 className="text-sm font-medium text-yellow-300">
-                    {openRetirementReviewCases.length} open Commit retirement review case
-                    {openRetirementReviewCases.length === 1 ? '' : 's'}
-                  </h4>
-                  <div className="mt-2 space-y-1 text-xs text-yellow-100/80">
-                    {openRetirementReviewCases.map(reviewCase => (
-                      <p key={reviewCase.id}>
-                        <span className="font-mono">{reviewCase.reason_code}</span>:{' '}
-                        {reviewCase.summary}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/admin/kiloclaw-retirement-reviews">Open retirement reviews</Link>
-                </Button>
-              </div>
-            </div>
-          ) : null}
 
           <EarlyAccessRow userId={userId} initialValue={data.kiloclawEarlyAccess} />
 

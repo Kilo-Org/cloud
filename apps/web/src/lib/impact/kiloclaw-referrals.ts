@@ -41,7 +41,6 @@ import {
   impact_referral_reward_decisions,
   impact_referral_rewards,
   impact_referrals,
-  kiloclaw_commit_retirement_review_cases,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
@@ -62,7 +61,6 @@ import {
   KiloClawReferralDecisionOutcome,
   KiloClawReferralRewardStatus,
   KiloClawReferralWinningTouchType,
-  type KiloClawCommitRetirementReviewReason,
 } from '@kilocode/db/schema-types';
 
 type DatabaseClient = typeof db | DrizzleTransaction;
@@ -798,23 +796,6 @@ function buildExtendedRetirementSchedulePhases(params: {
   ];
 }
 
-async function createReferralRetirementScheduleReviewCase(params: {
-  subscriptionId: string;
-  stripeSubscriptionId: string;
-  reason: KiloClawCommitRetirementReviewReason;
-}): Promise<void> {
-  await db
-    .insert(kiloclaw_commit_retirement_review_cases)
-    .values({
-      dedupe_key: `commit-retirement:${params.reason}:${params.subscriptionId}`,
-      subscription_id: params.subscriptionId,
-      stripe_subscription_id: params.stripeSubscriptionId,
-      reason_code: params.reason,
-      summary: 'Referral reward could not safely move scheduled Standard transition',
-    })
-    .onConflictDoNothing();
-}
-
 async function applyReferralRewardById(
   rewardId: string,
   options?: { stripeAlreadyApplied?: boolean }
@@ -1080,12 +1061,32 @@ async function applyReferralRewardById(
       throw new Error('Ambiguous retirement schedule phases');
     }
     await stripe.subscriptionSchedules.update(result.scheduleId, { phases });
-  } catch {
-    await createReferralRetirementScheduleReviewCase({
-      subscriptionId: result.subscriptionId,
-      stripeSubscriptionId: result.stripeSubscriptionId,
-      reason: 'referral_reward_ambiguous_standard_schedule',
-    });
+  } catch (error) {
+    console.error(
+      '[kiloclaw-referrals] reward application requires review due to ambiguous retirement schedule',
+      {
+        rewardId,
+        subscriptionId: result.subscriptionId,
+        stripeSubscriptionId: result.stripeSubscriptionId,
+        scheduleId: result.scheduleId,
+        error,
+      }
+    );
+    await db
+      .update(impact_referral_rewards)
+      .set({
+        status: KiloClawReferralRewardStatus.ReviewRequired,
+        review_reason: getRewardApplicationReason('ambiguous_standard_schedule'),
+      })
+      .where(
+        and(
+          eq(impact_referral_rewards.id, rewardId),
+          or(
+            eq(impact_referral_rewards.status, KiloClawReferralRewardStatus.Earned),
+            eq(impact_referral_rewards.status, KiloClawReferralRewardStatus.Pending)
+          )
+        )
+      );
     return 'pending';
   }
 

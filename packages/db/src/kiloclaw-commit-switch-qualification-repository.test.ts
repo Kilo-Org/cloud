@@ -3,14 +3,13 @@ import { eq } from 'drizzle-orm';
 
 import { createDrizzleClient } from './client';
 import { computeDatabaseUrl } from './database-url';
-import { KILOCLAW_COMMIT_SALES_CUTOFF } from './kiloclaw-commit-retirement';
+import {
+  KILOCLAW_COMMIT_SALES_CUTOFF,
+  KiloClawCommitRetirementQualificationSource,
+} from './kiloclaw-commit-retirement';
 import { findLatestPreCutoffUserCommitSwitchQualification } from './kiloclaw-commit-switch-qualification-repository';
 import { kiloclaw_subscription_change_log, kiloclaw_subscriptions, kilocode_users } from './schema';
-import {
-  KiloClawCommitRetirementQualificationSource,
-  KiloClawPlan,
-  KiloClawSubscriptionStatus,
-} from './schema-types';
+import { KiloClawPlan, KiloClawSubscriptionStatus } from './schema-types';
 
 const testDatabase = createDrizzleClient({
   connectionString: computeDatabaseUrl(),

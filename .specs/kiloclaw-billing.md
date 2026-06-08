@@ -108,10 +108,9 @@ capitals, as shown here.
   final Commit term through current schedule and cancellation state. It differs
   from ordinary user cancellation because source evidence shows why it was
   applied and an approved referral reward may extend its final boundary.
-- **Manual-review containment**: An open Commit retirement review case that
-  preserves current paid access while blocking renewal and destructive
-  enforcement until an operator resolves missing, conflicting, or forbidden
-  Commit evidence. The case is the sole containment marker and reason authority.
+- **Commit anomaly**: Missing, conflicting, or forbidden Commit evidence. The
+  system fails closed, attempts provider non-renewal when possible, reports the
+  anomaly through logs and Sentry, and retries or recomputes from canonical state.
 
 ## Overview
 
@@ -342,20 +341,9 @@ lapses, with email notifications at each stage.
     checkout, a qualified pending switch, or recovery for a pre-cutoff renewal
     boundary. Standard settlement after a final Commit boundary MUST require
     explicit Standard consent recorded in current schedule state.
-11. A paid post-cutoff Commit term that lacks authorization MUST preserve the
-    paid access already granted, block future renewal, and enter manual-review
-    containment. Missing, conflicting, or misaligned qualification, boundary,
-    schedule, provider, or timeout-after-commit evidence MUST also enter
-    manual-review containment rather than guessing.
-12. An open Commit retirement review case is the sole containment marker and
-    reason authority. It MUST block renewal and downstream suspension or
-    destruction enforcement until resolved. Resolution MAY correct, cancel,
-    refund, or recognize an already-paid period as final, but MUST NOT create
-    another Commit term.
-13. Runtime enforcement MUST NOT bulk-change active Commit subscriptions or
-    provider schedules at the cutoff. Qualification MUST be reconstructed and
-    validated from its source-specific canonical authority; no qualification
-    capture, retirement-column backfill, or dual-write agreement is required.
+11. A paid post-cutoff Commit term that lacks authorization MUST preserve only paid access supported by canonical state and block future renewal. Missing, conflicting, or misaligned qualification, boundary, schedule, provider, or timeout-after-commit evidence MUST fail closed. Runtime MUST attempt provider non-renewal when possible, report non-sensitive context through logs and Sentry, and retry or recompute from existing subscription fields and change-log history rather than guessing.
+12. Commit retirement MUST add no review table, retirement field, status, action, index, or migration. It MUST NOT depend on durable review lifecycle or operator resolution. Existing subscription fields and append-only change log remain canonical.
+13. Runtime enforcement MUST NOT bulk-change active Commit subscriptions or provider schedules at the cutoff. Qualification MUST be reconstructed and validated from its source-specific canonical authority; no qualification capture, retirement-column backfill, or dual-write agreement is required.
 14. Every KiloClaw billing surface MUST communicate final-term state and offer
     a direct `Continue month-to-month` action. The system MUST NOT add
     retirement-specific transactional emails; customer outreach is a separate
@@ -447,8 +435,7 @@ rules resolve conflicts.
 7. For non-hybrid rows (legacy Stripe or pure credit), their existing
    ownership model remains unchanged, subject to Commit Retirement. The
    ownership rules in this section apply ONLY to hybrid rows; retirement
-   admission, final-boundary, and manual-review rules apply to every funding
-   source.
+   admission, final-boundary, and fail-closed anomaly rules apply to every funding source.
 
 ### Trial Eligibility and Creation
 
@@ -482,10 +469,7 @@ rules resolve conflicts.
 
 1. In personal context, the current subscription row is the personal
    subscription row whose `transferred_to_subscription_id` is null.
-2. Live personal runtime MUST have at most one current subscription
-   row per user personal context. If more than one exists, runtime
-   MUST fail closed and quarantine/manual-review the user rather than
-   choose heuristically.
+2. Live personal runtime MUST have at most one current subscription row per user personal context. If more than one exists, runtime MUST fail closed and abort reprovision transfer rather than choose heuristically. It MUST log and report the anomaly to Sentry for retry or canonical-state repair.
 3. Transferred-out predecessor rows MUST NOT participate in live
    access checks, checkout duplicate guards, credit enrollment,
    Stripe webhook mutation, invoice settlement, renewal, dunning,
@@ -577,7 +561,7 @@ rules resolve conflicts.
 11. Commit checkout admission and late activation MUST follow Commit
     Retirement rules 1-3 and 10. A Commit subscription created before the
     cutoff MAY activate after cutoff as its final term; one created at or
-    after cutoff MUST enter manual-review containment.
+    after cutoff MUST enter fail-closed anomaly handling.
 
 ### Credit Enrollment
 
@@ -818,7 +802,7 @@ rows renew.
    date to the invoice's period end without advancing the durable authorized
    final boundary beyond permitted evidence. For Standard, clear the active
    commitment end date. A forbidden or ambiguous Commit invoice follows
-   Commit Retirement manual-review containment instead.
+   Commit Retirement fail-closed anomaly handling instead.
    e. Clear past-due state and any auto-top-up marker for the
    prior period.
 7. If a scheduled plan change matches the settled invoice's plan,
@@ -826,10 +810,7 @@ rows renew.
    with settlement. If the invoice plan differs from the current
    plan and there is no matching scheduled change, the system MUST
    treat the settled invoice as authoritative only when Commit Retirement
-   permits that plan and period. An unauthorized or ambiguous Commit invoice
-   MUST preserve paid access, block renewal, and enter manual-review
-   containment rather than silently normalizing the plan. Schedule lifecycle
-   events MUST NOT erase canonical Commit evidence or durable Standard consent.
+   permits that plan and period. An unauthorized or ambiguous Commit invoice MUST preserve only canonically supported paid access, block renewal, attempt provider non-renewal when possible, report through logs and Sentry, and retry or recompute rather than silently normalize the plan. Schedule lifecycle events MUST NOT erase canonical Commit evidence or durable Standard consent.
 8. If the subscription was past-due or suspended before settlement,
    the system MUST trigger the auto-resume procedure after the
    settlement transaction commits (see Auto-Resume on Payment
@@ -913,7 +894,7 @@ rows renew.
    Settlement rule 7). Intentional releases (cancellation or cancel-plan-
    switch) clear the local schedule reference before the event fires, so the
    schedule event MUST NOT match those rows. An unauthorized or ambiguous
-   Commit transition MUST enter manual-review containment.
+   Commit transition MUST enter fail-closed anomaly handling.
 7. When a qualified pre-cutoff Standard-to-Commit switch takes effect,
    the system MUST set the resulting final Commit boundary to six calendar
    months from the transition date and MUST arm final-boundary cancellation
@@ -1451,10 +1432,7 @@ rows renew.
    has a Kilo Pass subscription, the billing status MUST include an
    indicator signaling that the standalone-to-credit conversion
    prompt should be shown (see Standalone-to-Credit Conversion).
-8. For retirement-involved Commit subscriptions, billing status MUST include
-   server-derived final-term state, final boundary, lineage-priced Standard
-   continuation price, current and future funding source, whether explicit
-   Standard continuation is scheduled, and whether support review is needed.
+8. For retirement-involved Commit subscriptions, billing status MUST include server-derived final-term state, final boundary, lineage-priced Standard continuation price, current and future funding source, whether explicit Standard continuation is scheduled, and whether canonical state is temporarily ambiguous. Ambiguity MUST hide unsafe actions and trigger retry/recomputation; it is not a durable review state.
 9. The billing status MUST include earlybird data (expiry date, days
    remaining) only when a canonical earlybird subscription row exists.
 10. The billing status MUST include instance data (whether an
@@ -1498,7 +1476,7 @@ rows renew.
 #### 2026-06-05 -- Retire new and renewing Commit subscriptions
 
 - Made Standard the only newly selectable post-cutoff plan while preserving Commit history and one qualified final term.
-- Defined explicit lineage-priced Standard continuation, undo, default final-boundary cancellation, Stripe guard, pure-credit cancellation, and manual-review containment.
+- Defined explicit lineage-priced Standard continuation, undo, default final-boundary cancellation, Stripe guard, pure-credit cancellation, and fail-closed anomaly handling.
 - Closed post-cutoff Commit entry points and defined verified Kilo Pass hosting intent, late settlement, conversion, referral-extension, display, and email behavior.
 
 #### 2026-05-28 -- Personal Stripe EFW fraud-enforcement exception

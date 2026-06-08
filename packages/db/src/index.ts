@@ -8,20 +8,6 @@ export {
   type KiloClawCommitSwitchQualification,
 } from './kiloclaw-commit-switch-qualification-repository';
 export {
-  containKnownSubscriptionCommitRetirementReview,
-  createCommitRetirementReviewCase,
-  findOpenCommitRetirementReviewCase,
-  findProviderCommitRetirementDisposition,
-  hasOpenCommitRetirementReviewCase,
-  resolveCommitRetirementReviewCase,
-  type CommitRetirementReviewCaseRepository,
-  type ContainKnownSubscriptionCommitRetirementReviewInput,
-  type CreateCommitRetirementReviewCaseInput,
-  type ProviderCommitRetirementDispositionKey,
-  type ResolveCommitRetirementReviewCaseInput,
-  type TransactionalCommitRetirementReviewCaseRepository,
-} from './kiloclaw-commit-retirement-review-case-repository';
-export {
   createDrizzleClient,
   type CreateDrizzleClientOptions,
   getWorkerDb,

@@ -1,15 +1,11 @@
 import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import {
   CURRENT_KILOCLAW_PRICE_VERSION,
-  KiloClawCommitRetirementReviewReason,
   LEGACY_KILOCLAW_PRICE_VERSION,
   classifyKiloClawCommitTerm,
-  createCommitRetirementReviewCase,
   findLatestPreCutoffUserCommitSwitchQualification,
-  findOpenCommitRetirementReviewCase,
   getKiloClawPricingCatalogEntry,
   insertKiloClawSubscriptionChangeLog,
-  kiloclaw_commit_retirement_review_cases,
   kiloclaw_earlybird_purchases,
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -532,54 +528,28 @@ type PersonalTransferSafety =
   | { safe: true }
   | {
       safe: false;
-      reason: (typeof KiloClawCommitRetirementReviewReason)[keyof typeof KiloClawCommitRetirementReviewReason];
-      summary: string;
+      reason:
+        | 'provider_state_mismatch'
+        | 'missing_qualification_evidence'
+        | 'boundary_mismatch'
+        | 'conflicting_qualification_evidence';
     };
 
 async function assessPersonalTransferSafety(
   tx: Pick<WorkerDb, 'execute' | 'insert' | 'select' | 'update'>,
   subscription: KiloClawSubscription
-): Promise<{
-  safety: PersonalTransferSafety;
-  openReviewCase: Awaited<ReturnType<typeof findOpenCommitRetirementReviewCase>>;
-}> {
-  const openReviewCase = await findOpenCommitRetirementReviewCase(tx, subscription.id);
-  if (openReviewCase) {
-    return {
-      safety: {
-        safe: false,
-        reason: openReviewCase.reason_code,
-        summary: openReviewCase.summary,
-      },
-      openReviewCase,
-    };
-  }
-
+): Promise<PersonalTransferSafety> {
   const providerOwnershipConsistent =
     (subscription.payment_source !== 'stripe' || subscription.stripe_subscription_id !== null) &&
     (subscription.stripe_schedule_id === null || subscription.stripe_subscription_id !== null) &&
     (subscription.payment_source !== null ||
       (subscription.stripe_subscription_id === null && subscription.stripe_schedule_id === null));
   if (!providerOwnershipConsistent) {
-    return {
-      safety: {
-        safe: false,
-        reason: KiloClawCommitRetirementReviewReason.ProviderStateMismatch,
-        summary: 'Subscription transfer has inconsistent provider ownership state',
-      },
-      openReviewCase: null,
-    };
+    return { safe: false, reason: 'provider_state_mismatch' };
   }
 
   if (subscription.scheduled_plan === 'standard' && subscription.scheduled_by !== 'user') {
-    return {
-      safety: {
-        safe: false,
-        reason: KiloClawCommitRetirementReviewReason.ProviderStateMismatch,
-        summary: 'Scheduled Standard continuation lacks explicit user consent',
-      },
-      openReviewCase: null,
-    };
+    return { safe: false, reason: 'provider_state_mismatch' };
   }
 
   const switchQualification =
@@ -612,24 +582,16 @@ async function assessPersonalTransferSafety(
       parseSubscriptionTimestamp(subscription.commit_ends_at) !==
         parseSubscriptionTimestamp(subscription.current_period_end);
     return {
-      safety: {
-        safe: false,
-        reason: missingSwitchQualification
-          ? KiloClawCommitRetirementReviewReason.MissingQualificationEvidence
-          : boundaryMismatch
-            ? KiloClawCommitRetirementReviewReason.BoundaryMismatch
-            : KiloClawCommitRetirementReviewReason.ConflictingQualificationEvidence,
-        summary: missingSwitchQualification
-          ? 'Pending Commit transfer lacks pre-cutoff user change-log qualification'
-          : boundaryMismatch
-            ? 'Commit transfer final boundary does not match current period end'
-            : 'Commit transfer evidence is incomplete or ambiguous',
-      },
-      openReviewCase: null,
+      safe: false,
+      reason: missingSwitchQualification
+        ? 'missing_qualification_evidence'
+        : boundaryMismatch
+          ? 'boundary_mismatch'
+          : 'conflicting_qualification_evidence',
     };
   }
 
-  return { safety: { safe: true }, openReviewCase: null };
+  return { safe: true };
 }
 
 async function createSuccessorPersonalSubscription(
@@ -683,8 +645,15 @@ async function createSuccessorPersonalSubscription(
       throw new Error('Target instance already has a subscription row');
     }
 
-    const { safety, openReviewCase } = await assessPersonalTransferSafety(tx, before);
-    const preserveOperationalState = safety.safe;
+    const safety = await assessPersonalTransferSafety(tx, before);
+    if (!safety.safe) {
+      console.error('[kiloclaw-billing/bootstrap] Aborting unsafe personal subscription transfer', {
+        subscriptionId: before.id,
+        targetInstanceId: input.instanceId,
+        reason: safety.reason,
+      });
+      throw new Error(`Unsafe personal subscription transfer: ${safety.reason}`);
+    }
 
     const [insertedSuccessor] = await tx
       .insert(kiloclaw_subscriptions)
@@ -697,10 +666,10 @@ async function createSuccessorPersonalSubscription(
         payment_source: before.payment_source,
         kiloclaw_price_version: before.kiloclaw_price_version,
         plan: before.plan,
-        scheduled_plan: preserveOperationalState ? before.scheduled_plan : null,
-        scheduled_by: preserveOperationalState ? before.scheduled_by : null,
+        scheduled_plan: before.scheduled_plan,
+        scheduled_by: before.scheduled_by,
         status: before.status,
-        cancel_at_period_end: preserveOperationalState ? before.cancel_at_period_end : true,
+        cancel_at_period_end: before.cancel_at_period_end,
         pending_conversion: before.pending_conversion,
         trial_started_at: before.trial_started_at,
         trial_ends_at: before.trial_ends_at,
@@ -753,7 +722,7 @@ async function createSuccessorPersonalSubscription(
           .update(kiloclaw_subscriptions)
           .set({
             stripe_subscription_id: before.stripe_subscription_id,
-            stripe_schedule_id: preserveOperationalState ? before.stripe_schedule_id : null,
+            stripe_schedule_id: before.stripe_schedule_id,
           })
           .where(eq(kiloclaw_subscriptions.id, insertedSuccessor.id))
           .returning()
@@ -762,27 +731,6 @@ async function createSuccessorPersonalSubscription(
 
     if (!successor) {
       throw new Error('Failed to restore successor Stripe ownership');
-    }
-
-    if (openReviewCase) {
-      await tx
-        .update(kiloclaw_commit_retirement_review_cases)
-        .set({ subscription_id: successor.id })
-        .where(
-          and(
-            eq(kiloclaw_commit_retirement_review_cases.subscription_id, before.id),
-            eq(kiloclaw_commit_retirement_review_cases.status, 'open')
-          )
-        )
-        .returning();
-    } else if (!safety.safe) {
-      await createCommitRetirementReviewCase(tx, {
-        dedupeKey: `commit-retirement:transfer:${successor.id}:${safety.reason}`,
-        subscriptionId: successor.id,
-        stripeSubscriptionId: successor.stripe_subscription_id,
-        reasonCode: safety.reason,
-        summary: safety.summary,
-      });
     }
 
     await insertKiloClawSubscriptionChangeLog(tx, {

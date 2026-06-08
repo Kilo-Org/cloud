@@ -229,27 +229,6 @@ describe('database schema', () => {
       KiloClawSubscriptionStatus: ['trialing', 'active', 'past_due', 'canceled', 'unpaid'],
       KiloClawSubscriptionAccessOrigin: ['earlybird'],
       KiloClawSubscriptionChangeActorType: ['user', 'system'],
-      KiloClawCommitRetirementReviewReason: [
-        'unqualified_post_cutoff_commit',
-        'missing_qualification_evidence',
-        'conflicting_qualification_evidence',
-        'boundary_mismatch',
-        'provider_state_mismatch',
-        'provider_outcome_unknown',
-        'forbidden_commit_invoice',
-        'ambiguous_subscription_lineage',
-        'referral_reward_ambiguous_standard_schedule',
-      ],
-      KiloClawCommitRetirementReviewCaseStatus: ['open', 'resolved', 'dismissed'],
-      KiloClawCommitRetirementResolutionDisposition: [
-        'deny_future_commit',
-        'recognize_paid_period_as_final',
-        'correct_state',
-        'cancel_subscription',
-        'refund_and_cancel',
-        'dismiss_no_issue',
-      ],
-      KiloClawCommitRetirementResolutionActorType: ['operator', 'system'],
       KiloClawSubscriptionChangeAction: [
         'created',
         'status_changed',
@@ -264,7 +243,6 @@ describe('database schema', () => {
         'payment_source_changed',
         'schedule_changed',
         'admin_override',
-        'commit_retirement_changed',
       ],
       KiloClawTerminalRenewalFailureStatus: ['unresolved', 'resolved', 'waived', 'superseded'],
       KiloClawTerminalRenewalFailureCode: [
@@ -311,26 +289,6 @@ describe('database schema', () => {
         'review_required',
         'dismissed',
       ],
-      StripeDisputeOwnerClassification: ['personal', 'organization', 'ambiguous', 'unmatched'],
-      StripeDisputeCaseStatus: [
-        'needs_action',
-        'processing',
-        'accepted',
-        'acceptance_failed',
-        'enforcement_failed',
-        'review_required',
-        'closed',
-      ],
-      StripeDisputeActionType: [
-        'stripe_acceptance',
-        'user_block',
-        'auto_top_up_disable',
-        'credit_balance_reset',
-        'subscription_cancellation',
-        'access_termination',
-        'kiloclaw_suspension',
-      ],
-      StripeDisputeActionStatus: ['queued', 'processing', 'completed', 'failed', 'skipped'],
       AffiliateProvider: ['impact'],
       AffiliateEventType: ['signup', 'trial_start', 'trial_end', 'sale', 'sale_reversal'],
       AffiliateEventDeliveryState: ['queued', 'blocked', 'sending', 'delivered', 'failed'],
@@ -356,31 +314,6 @@ describe('database schema', () => {
       ImpactReferralPaymentProvider: ['stripe', 'credits', 'app_store', 'google_play'],
       ImpactConversionReportState: ['queued', 'retrying', 'delivered', 'failed'],
       ImpactAdvocateRewardRedemptionState: ['queued', 'retrying', 'redeemed', 'failed'],
-      BYOKManagementSource: ['user', 'coding_plan'],
-      CodingPlanCredentialStatus: [
-        'available',
-        'assigned',
-        'revocation_pending',
-        'revoked',
-        'revocation_failed',
-      ],
-      CodingPlanSubscriptionStatus: ['active', 'past_due', 'canceled'],
-      CodingPlanTermKind: ['activation', 'extension', 'renewal'],
-      MCPGatewayOwnerScope: ['personal', 'organization'],
-      MCPGatewayAuthMode: ['none', 'static_headers', 'oauth_dynamic', 'oauth_static'],
-      MCPGatewaySharingMode: ['single_user', 'multi_user'],
-      MCPGatewayRouteStatus: ['active', 'rotated', 'revoked'],
-      MCPGatewayInstanceStatus: ['active', 'needs_reauth', 'revoked', 'removed'],
-      MCPGatewayProviderGrantStatus: ['active', 'revoked'],
-      MCPGatewaySecretKind: [
-        'static_provider_credentials',
-        'dynamic_registration',
-        'static_headers',
-      ],
-      MCPGatewayOAuthClientAuthMethod: ['none', 'client_secret_post', 'client_secret_basic'],
-      MCPGatewayAuthorizationRequestStatus: ['pending', 'completed', 'error'],
-      MCPGatewayPendingProviderAuthorizationStatus: ['pending', 'completed', 'error'],
-      MCPGatewayAuditOutcome: ['success', 'failure', 'blocked'],
     };
 
     const actualEnumValues: Record<string, string[]> = {};
@@ -427,33 +360,6 @@ describe('database schema', () => {
         );
       }
     }
-  });
-
-  it('defines the active Stripe Commit boundary keyset index', () => {
-    const currentSchema = generateDrizzleJson(schema, crypto.randomUUID());
-    const subscriptionTable = currentSchema.tables['public.kiloclaw_subscriptions'];
-    const boundaryIndex = subscriptionTable?.indexes[
-      'IDX_kiloclaw_subscriptions_active_stripe_commit_boundary'
-    ] as
-      | {
-          columns: { expression: string; isExpression: boolean }[];
-          where?: string;
-        }
-      | undefined;
-
-    expect(boundaryIndex?.columns).toMatchObject([
-      { expression: 'commit_ends_at', isExpression: false },
-      { expression: 'current_period_end', isExpression: false },
-      { expression: 'id', isExpression: false },
-    ]);
-    expect(boundaryIndex?.where).toContain('"kiloclaw_subscriptions"."plan" = \'commit\'');
-    expect(boundaryIndex?.where).toContain('"kiloclaw_subscriptions"."status" = \'active\'');
-    expect(boundaryIndex?.where).toContain(
-      '"kiloclaw_subscriptions"."transferred_to_subscription_id" IS NULL'
-    );
-    expect(boundaryIndex?.where).toContain(
-      '"kiloclaw_subscriptions"."cancel_at_period_end" = false'
-    );
   });
 
   it('exposes provider-aware Kilo Pass store tables', () => {

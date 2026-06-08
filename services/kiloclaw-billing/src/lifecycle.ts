@@ -4,7 +4,6 @@ import { addMonths, format } from 'date-fns';
 import type { WorkerDb } from '@kilocode/db';
 import {
   countUnresolvedTerminalRenewalFailures,
-  createCommitRetirementReviewCase,
   findLatestPreCutoffUserCommitSwitchQualification,
   findUnresolvedTerminalRenewalFailure,
   getKiloClawPlanCostMicrodollars,
@@ -43,7 +42,6 @@ import {
   credit_transactions,
   kilo_pass_pause_events,
   kilo_pass_subscriptions,
-  kiloclaw_commit_retirement_review_cases,
   kiloclaw_email_log,
   kiloclaw_instances,
   kiloclaw_subscription_change_log,
@@ -53,10 +51,7 @@ import {
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
-import {
-  KiloClawCommitRetirementReviewReason,
-  KiloClawTerminalRenewalFailureCode,
-} from '@kilocode/db/schema-types';
+import { KiloClawTerminalRenewalFailureCode } from '@kilocode/db/schema-types';
 import type {
   KiloClawPlan,
   KiloClawSubscriptionChangeAction,
@@ -203,7 +198,6 @@ type CreditRenewalRow = {
   auto_resume_attempt_count: number;
   auto_top_up_triggered_for_period: string | null;
   scheduled_by: KiloClawSubscription['scheduled_by'];
-  has_open_commit_review: boolean;
   total_microdollars_acquired: number;
   microdollars_used: number;
   auto_top_up_enabled: boolean;
@@ -647,12 +641,19 @@ function currentSubscriptionRowFilter() {
   return isNull(kiloclaw_subscriptions.transferred_to_subscription_id);
 }
 
-function commitRetirementEnforcementProtectionFilter() {
-  return sql`NOT EXISTS (
-    SELECT 1 FROM ${kiloclaw_commit_retirement_review_cases}
-    WHERE ${kiloclaw_commit_retirement_review_cases.subscription_id} = ${kiloclaw_subscriptions.id}
-      AND ${kiloclaw_commit_retirement_review_cases.status} = 'open'
-  )`;
+function unambiguousCommitEnforcementFilter() {
+  return or(
+    and(
+      sql`${kiloclaw_subscriptions.plan} IS DISTINCT FROM 'commit'`,
+      sql`${kiloclaw_subscriptions.scheduled_plan} IS DISTINCT FROM 'commit'`
+    ),
+    and(
+      eq(kiloclaw_subscriptions.plan, 'commit'),
+      isNotNull(kiloclaw_subscriptions.commit_ends_at),
+      eq(kiloclaw_subscriptions.commit_ends_at, kiloclaw_subscriptions.current_period_end),
+      sql`(${kiloclaw_subscriptions.scheduled_plan} IS NULL OR (${kiloclaw_subscriptions.scheduled_plan} = 'standard' AND ${kiloclaw_subscriptions.scheduled_by} = 'user'))`
+    )
+  );
 }
 
 function legacyInstanceReadyEmailType(sandboxId: string) {
@@ -1674,7 +1675,6 @@ async function fetchLockedCreditRenewalItemRow(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         isNull(kiloclaw_subscriptions.stripe_subscription_id),
         currentSubscriptionRowFilter(),
-        commitRetirementEnforcementProtectionFilter(),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due'])
       )
     )
@@ -1690,8 +1690,7 @@ type CommitRetirementRenewalDecision =
       kind: 'allow_final_commit';
       qualificationSource: 'renewal_due_before_cutoff' | 'switch_requested_before_cutoff';
     }
-  | { kind: 'skip_manual_review' }
-  | { kind: 'open_manual_review' }
+  | { kind: 'ambiguous' }
   | { kind: 'ordinary' };
 
 function isBeforeCommitSalesCutoff(timestamp: string | null): boolean {
@@ -1708,25 +1707,22 @@ export function decideCommitRetirementCreditRenewal(
     | 'current_period_start'
     | 'current_period_end'
     | 'commit_ends_at'
-    | 'has_open_commit_review'
   >,
   pendingSwitchQualified = false
 ): CommitRetirementRenewalDecision {
-  if (current.has_open_commit_review) return { kind: 'skip_manual_review' };
-
   if (current.scheduled_plan === 'standard' && current.scheduled_by === 'user') {
     return current.plan === 'commit' &&
       current.credit_renewal_at !== null &&
       current.commit_ends_at !== null &&
       Date.parse(current.credit_renewal_at) === Date.parse(current.commit_ends_at)
       ? { kind: 'continue_standard' }
-      : { kind: 'open_manual_review' };
+      : { kind: 'ambiguous' };
   }
 
   if (current.scheduled_plan === 'commit') {
     return current.plan === 'standard' && pendingSwitchQualified
       ? { kind: 'allow_final_commit', qualificationSource: 'switch_requested_before_cutoff' }
-      : { kind: 'open_manual_review' };
+      : { kind: 'ambiguous' };
   }
 
   if (current.plan !== 'commit') return { kind: 'ordinary' };
@@ -1734,21 +1730,21 @@ export function decideCommitRetirementCreditRenewal(
     return { kind: 'allow_final_commit', qualificationSource: 'renewal_due_before_cutoff' };
   }
   if (!current.credit_renewal_at || !current.commit_ends_at || !current.current_period_end) {
-    return { kind: 'open_manual_review' };
+    return { kind: 'ambiguous' };
   }
 
   const renewalBoundary = Date.parse(current.credit_renewal_at);
   const commitBoundary = Date.parse(current.commit_ends_at);
   const currentPeriodEnd = Date.parse(current.current_period_end);
   if (![renewalBoundary, commitBoundary, currentPeriodEnd].every(Number.isFinite)) {
-    return { kind: 'open_manual_review' };
+    return { kind: 'ambiguous' };
   }
-  if (commitBoundary !== currentPeriodEnd) return { kind: 'open_manual_review' };
+  if (commitBoundary !== currentPeriodEnd) return { kind: 'ambiguous' };
   if (renewalBoundary >= commitBoundary) return { kind: 'cancel_final_commit' };
 
   return isBeforeCommitSalesCutoff(current.credit_renewal_at)
     ? { kind: 'allow_final_commit', qualificationSource: 'renewal_due_before_cutoff' }
-    : { kind: 'open_manual_review' };
+    : { kind: 'ambiguous' };
 }
 
 function buildCreditRenewalAdvanceUpdateSet(params: {
@@ -1871,34 +1867,19 @@ async function processCreditRenewalRow(
       current,
       pendingSwitchQualification !== null
     );
-    if (retirementDecision.kind === 'skip_manual_review') {
-      logSkippedSubscriptionRow(
-        'Skipping credit renewal during Commit retirement manual review',
-        current,
-        {
-          reason: 'commit_retirement_manual_review',
-        }
-      );
-      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
-    }
-
-    if (retirementDecision.kind === 'open_manual_review') {
-      const reviewReason =
-        current.scheduled_plan === 'standard'
-          ? KiloClawCommitRetirementReviewReason.BoundaryMismatch
-          : current.scheduled_plan === 'commit'
-            ? KiloClawCommitRetirementReviewReason.UnqualifiedPostCutoffCommit
-            : KiloClawCommitRetirementReviewReason.MissingQualificationEvidence;
-      await createCommitRetirementReviewCase(tx, {
-        dedupeKey: `commit-retirement:credit-renewal:${current.id}:${Date.parse(renewalAt)}`,
+    if (retirementDecision.kind === 'ambiguous') {
+      log('error', 'Skipping ambiguous Commit credit renewal', {
+        event: 'commit_credit_renewal_ambiguous',
+        outcome: 'skipped',
         subscriptionId: current.id,
-        reasonCode: reviewReason,
-        summary:
-          current.scheduled_plan === 'standard'
-            ? 'Standard continuation boundary does not match authorized final Commit boundary'
-            : current.scheduled_plan === 'commit'
-              ? 'Commit credit-renewal switch lacks unused pre-cutoff qualification'
-              : 'Commit credit-renewal boundary lacks verified retirement qualification',
+        userId: current.user_id,
+        instanceId: current.instance_id,
+        renewalBoundary: renewalAt,
+        plan: current.plan,
+        scheduledPlan: current.scheduled_plan,
+        scheduledBy: current.scheduled_by,
+        currentPeriodEnd: current.current_period_end,
+        commitEndsAt: current.commit_ends_at,
       });
       return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
     }
@@ -2347,11 +2328,6 @@ export async function runCreditRenewalSweep(
       suspended_at: kiloclaw_subscriptions.suspended_at,
       auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
       auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
-      has_open_commit_review: sql<boolean>`EXISTS (
-        SELECT 1 FROM ${kiloclaw_commit_retirement_review_cases}
-        WHERE ${kiloclaw_commit_retirement_review_cases.subscription_id} = ${kiloclaw_subscriptions.id}
-          AND ${kiloclaw_commit_retirement_review_cases.status} = 'open'
-      )`,
       total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
       microdollars_used: kilocode_users.microdollars_used,
       auto_top_up_enabled: kilocode_users.auto_top_up_enabled,
@@ -2367,7 +2343,6 @@ export async function runCreditRenewalSweep(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         isNull(kiloclaw_subscriptions.stripe_subscription_id),
         currentSubscriptionRowFilter(),
-        commitRetirementEnforcementProtectionFilter(),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
         lte(kiloclaw_subscriptions.credit_renewal_at, now)
       )
@@ -2405,7 +2380,6 @@ function creditRenewalEligibilityFilter(nowIso: string) {
     eq(kiloclaw_subscriptions.payment_source, 'credits'),
     isNull(kiloclaw_subscriptions.stripe_subscription_id),
     currentSubscriptionRowFilter(),
-    commitRetirementEnforcementProtectionFilter(),
     inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
     lte(kiloclaw_subscriptions.credit_renewal_at, nowIso)
   );
@@ -2452,11 +2426,6 @@ function selectCreditRenewalRowFields() {
     suspended_at: kiloclaw_subscriptions.suspended_at,
     auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
     auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
-    has_open_commit_review: sql<boolean>`EXISTS (
-      SELECT 1 FROM ${kiloclaw_commit_retirement_review_cases}
-      WHERE ${kiloclaw_commit_retirement_review_cases.subscription_id} = ${kiloclaw_subscriptions.id}
-        AND ${kiloclaw_commit_retirement_review_cases.status} = 'open'
-    )`,
     total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
     microdollars_used: kilocode_users.microdollars_used,
     auto_top_up_enabled: kilocode_users.auto_top_up_enabled,
@@ -2503,7 +2472,7 @@ async function fetchCreditRenewalItemRow(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         isNull(kiloclaw_subscriptions.stripe_subscription_id),
         currentSubscriptionRowFilter(),
-        commitRetirementEnforcementProtectionFilter(),
+
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due'])
       )
     )
@@ -2799,7 +2768,7 @@ export async function runCommitRetirementGuardSweep(
         isNotNull(kiloclaw_subscriptions.commit_ends_at),
         eq(kiloclaw_subscriptions.commit_ends_at, kiloclaw_subscriptions.current_period_end),
         lte(finalBoundary, guardCutoff),
-        commitRetirementEnforcementProtectionFilter(),
+
         sql`(${kiloclaw_subscriptions.scheduled_plan} IS DISTINCT FROM 'standard' OR ${kiloclaw_subscriptions.scheduled_by} IS DISTINCT FROM 'user')`,
         eq(kiloclaw_subscriptions.cancel_at_period_end, false),
         commitRetirementGuardCursorFilter(message)
@@ -3389,6 +3358,7 @@ async function loadCurrentOrganizationDestructionRow(
         eq(kiloclaw_subscriptions.id, subscriptionId),
         lt(kiloclaw_subscriptions.destruction_deadline, now),
         currentSubscriptionRowFilter(),
+        unambiguousCommitEnforcementFilter(),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         inArray(kiloclaw_subscriptions.status, ['canceled', 'past_due', 'unpaid']),
         isNotNull(kiloclaw_subscriptions.instance_id),
@@ -3945,7 +3915,7 @@ async function runSubscriptionExpirySweep(
       and(
         eq(kiloclaw_subscriptions.status, 'canceled'),
         currentSubscriptionRowFilter(),
-        commitRetirementEnforcementProtectionFilter(),
+        unambiguousCommitEnforcementFilter(),
         lt(kiloclaw_subscriptions.current_period_end, now),
         isNull(kiloclaw_subscriptions.suspended_at),
         isNull(kiloclaw_instances.destroyed_at)
@@ -4088,7 +4058,7 @@ async function runInstanceDestructionSweep(
       and(
         lt(kiloclaw_subscriptions.destruction_deadline, now),
         currentSubscriptionRowFilter(),
-        commitRetirementEnforcementProtectionFilter(),
+        unambiguousCommitEnforcementFilter(),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         inArray(kiloclaw_subscriptions.status, ['canceled', 'past_due', 'unpaid'])
       )
@@ -4404,7 +4374,7 @@ async function runPastDueCleanupSweep(
       and(
         eq(kiloclaw_subscriptions.status, 'past_due'),
         currentSubscriptionRowFilter(),
-        commitRetirementEnforcementProtectionFilter(),
+        unambiguousCommitEnforcementFilter(),
         lt(kiloclaw_subscriptions.past_due_since, fourteenDaysAgo),
         isNull(kiloclaw_subscriptions.suspended_at)
       )
@@ -4580,7 +4550,7 @@ async function runDestructionWarningSweep(
         gte(kiloclaw_subscriptions.destruction_deadline, advisoryNow),
         lte(kiloclaw_subscriptions.destruction_deadline, twoDaysFromNow),
         currentSubscriptionRowFilter(),
-        commitRetirementEnforcementProtectionFilter(),
+        unambiguousCommitEnforcementFilter(),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         isNull(kiloclaw_instances.destroyed_at)
       )

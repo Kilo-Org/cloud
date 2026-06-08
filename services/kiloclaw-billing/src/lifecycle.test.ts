@@ -326,7 +326,6 @@ function creditRenewalRow(overrides: Partial<Record<string, unknown>> = {}) {
     scheduled_plan: null,
     scheduled_by: null,
     commit_ends_at: null,
-    has_open_commit_review: false,
     past_due_since: null,
     suspended_at: null,
     auto_resume_attempt_count: 0,
@@ -495,7 +494,7 @@ describe('Commit retirement credit renewal decisions', () => {
     ).toEqual({ kind: 'continue_standard' });
   });
 
-  it('opens review when Standard continuation renewal boundary mismatches final boundary', () => {
+  it('fails closed when Standard continuation renewal boundary mismatches final boundary', () => {
     expect(
       decideCommitRetirementCreditRenewal(
         creditRenewalRow({
@@ -506,7 +505,7 @@ describe('Commit retirement credit renewal decisions', () => {
           commit_ends_at: '2026-06-01T00:00:00.000Z',
         }) as never
       )
-    ).toEqual({ kind: 'open_manual_review' });
+    ).toEqual({ kind: 'ambiguous' });
   });
 
   it('honors canonical pending Standard-to-Commit switch qualification once', () => {
@@ -525,7 +524,7 @@ describe('Commit retirement credit renewal decisions', () => {
     });
   });
 
-  it('sends every unqualified scheduled Commit switch to manual review', () => {
+  it('fails closed for every unqualified scheduled Commit switch', () => {
     for (const creditRenewalAt of ['2026-06-05T23:59:59.999Z', '2026-07-01T00:00:00.000Z']) {
       expect(
         decideCommitRetirementCreditRenewal(
@@ -535,7 +534,7 @@ describe('Commit retirement credit renewal decisions', () => {
             credit_renewal_at: creditRenewalAt,
           }) as never
         )
-      ).toEqual({ kind: 'open_manual_review' });
+      ).toEqual({ kind: 'ambiguous' });
     }
   });
 
@@ -548,7 +547,7 @@ describe('Commit retirement credit renewal decisions', () => {
           commit_ends_at: '2026-12-05T23:59:59.999Z',
         }) as never
       )
-    ).toEqual({ kind: 'open_manual_review' });
+    ).toEqual({ kind: 'ambiguous' });
   });
 
   it('authorizes pre-cutoff recovery only when no exhaustion state exists', () => {
@@ -565,7 +564,7 @@ describe('Commit retirement credit renewal decisions', () => {
     });
   });
 
-  it('opens review instead of canceling before a proven final boundary', () => {
+  it('fails closed instead of canceling before a proven final boundary', () => {
     expect(
       decideCommitRetirementCreditRenewal(
         creditRenewalRow({
@@ -573,7 +572,7 @@ describe('Commit retirement credit renewal decisions', () => {
           credit_renewal_at: '2026-06-06T00:00:00.000Z',
         }) as never
       )
-    ).toEqual({ kind: 'open_manual_review' });
+    ).toEqual({ kind: 'ambiguous' });
   });
 
   it('does not authorize a qualified pending switch after final-term exhaustion', () => {
@@ -585,18 +584,7 @@ describe('Commit retirement credit renewal decisions', () => {
           credit_renewal_at: '2026-07-01T00:00:00.000Z',
         }) as never
       )
-    ).toEqual({ kind: 'open_manual_review' });
-  });
-
-  it('skips manual-review retirement rows', () => {
-    expect(
-      decideCommitRetirementCreditRenewal(
-        creditRenewalRow({
-          plan: 'commit',
-          has_open_commit_review: true,
-        }) as never
-      )
-    ).toEqual({ kind: 'skip_manual_review' });
+    ).toEqual({ kind: 'ambiguous' });
   });
 });
 
@@ -1210,33 +1198,6 @@ describe('credit renewal fanout queue processing', () => {
         cancel_at_period_end: false,
       })
     );
-  });
-
-  it('skips queued work when an open retirement review exists after discovery', async () => {
-    const row = creditRenewalRow();
-    const { db, txInserts, txUpdates, updates, selectBuilders } = createMockDb([[row], []]);
-    mockGetWorkerDb.mockReturnValue(db);
-    const { env } = createEnvWithQueueMocks(vi.fn());
-
-    const summary = await processCreditRenewalItem(
-      env,
-      {
-        kind: 'credit_renewal_item',
-        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        sweep: 'credit_renewal_item',
-        subscriptionId: row.id,
-        userId: row.user_id,
-        renewalBoundary: '2026-06-01T00:00:00.000Z',
-      },
-      1
-    );
-
-    expect(summary.credit_renewals).toBe(0);
-    expect(summary.credit_renewals_past_due).toBe(0);
-    expect(txInserts).toHaveLength(0);
-    expect(txUpdates).toHaveLength(0);
-    expect(updates).toHaveLength(0);
-    expect(selectBuilders).toHaveLength(2);
   });
 
   it('skips stale, transferred, or hybrid item messages once no current pure-credit boundary matches', async () => {
@@ -4748,7 +4709,6 @@ describe('credit renewal sweep affiliate tracking', () => {
             scheduled_plan: null,
             scheduled_by: null,
             commit_ends_at: renewalAt,
-            has_open_commit_review: false,
             past_due_since: null,
             suspended_at: null,
             auto_resume_attempt_count: 0,
@@ -4934,7 +4894,6 @@ describe('credit renewal sweep affiliate tracking', () => {
             cancel_at_period_end: false,
             scheduled_plan: 'commit',
             scheduled_by: 'user',
-            has_open_commit_review: false,
             commit_ends_at: null,
             past_due_since: null,
             suspended_at: null,
@@ -4964,7 +4923,6 @@ describe('credit renewal sweep affiliate tracking', () => {
             scheduled_plan: 'standard',
             scheduled_by: 'user',
             commit_ends_at: renewalAt,
-            has_open_commit_review: false,
             past_due_since: null,
             suspended_at: null,
             auto_resume_attempt_count: 0,

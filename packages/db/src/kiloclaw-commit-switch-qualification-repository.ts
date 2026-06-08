@@ -1,10 +1,12 @@
 import { sql } from 'drizzle-orm';
 
 import type { WorkerDb } from './client';
-import { KILOCLAW_COMMIT_SALES_CUTOFF } from './kiloclaw-commit-retirement';
+import {
+  KILOCLAW_COMMIT_SALES_CUTOFF,
+  KiloClawCommitRetirementQualificationSource,
+} from './kiloclaw-commit-retirement';
 import { kiloclaw_subscription_change_log, kiloclaw_subscriptions } from './schema';
 import {
-  KiloClawCommitRetirementQualificationSource,
   KiloClawSubscriptionChangeAction,
   KiloClawSubscriptionChangeActorType,
 } from './schema-types';

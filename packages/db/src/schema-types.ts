@@ -212,71 +212,6 @@ export const KiloClawSubscriptionChangeActorType = {
 export type KiloClawSubscriptionChangeActorType =
   (typeof KiloClawSubscriptionChangeActorType)[keyof typeof KiloClawSubscriptionChangeActorType];
 
-export const KiloClawCommitRetirementState = {
-  PendingFinalTerm: 'pending_final_term',
-  FinalTerm: 'final_term',
-  StandardScheduled: 'standard_scheduled',
-  Completed: 'completed',
-  ManualReview: 'manual_review',
-} as const;
-
-export type KiloClawCommitRetirementState =
-  (typeof KiloClawCommitRetirementState)[keyof typeof KiloClawCommitRetirementState];
-
-export const KiloClawCommitRetirementQualificationSource = {
-  ActiveAtCutoff: 'active_at_cutoff',
-  CheckoutConfirmedBeforeCutoff: 'checkout_confirmed_before_cutoff',
-  SwitchRequestedBeforeCutoff: 'switch_requested_before_cutoff',
-  RenewalDueBeforeCutoff: 'renewal_due_before_cutoff',
-} as const;
-
-export type KiloClawCommitRetirementQualificationSource =
-  (typeof KiloClawCommitRetirementQualificationSource)[keyof typeof KiloClawCommitRetirementQualificationSource];
-
-export const KiloClawCommitRetirementReviewReason = {
-  UnqualifiedPostCutoffCommit: 'unqualified_post_cutoff_commit',
-  MissingQualificationEvidence: 'missing_qualification_evidence',
-  ConflictingQualificationEvidence: 'conflicting_qualification_evidence',
-  BoundaryMismatch: 'boundary_mismatch',
-  ProviderStateMismatch: 'provider_state_mismatch',
-  ProviderOutcomeUnknown: 'provider_outcome_unknown',
-  ForbiddenCommitInvoice: 'forbidden_commit_invoice',
-  AmbiguousSubscriptionLineage: 'ambiguous_subscription_lineage',
-  ReferralRewardAmbiguousStandardSchedule: 'referral_reward_ambiguous_standard_schedule',
-} as const;
-
-export type KiloClawCommitRetirementReviewReason =
-  (typeof KiloClawCommitRetirementReviewReason)[keyof typeof KiloClawCommitRetirementReviewReason];
-
-export const KiloClawCommitRetirementReviewCaseStatus = {
-  Open: 'open',
-  Resolved: 'resolved',
-  Dismissed: 'dismissed',
-} as const;
-
-export type KiloClawCommitRetirementReviewCaseStatus =
-  (typeof KiloClawCommitRetirementReviewCaseStatus)[keyof typeof KiloClawCommitRetirementReviewCaseStatus];
-
-export const KiloClawCommitRetirementResolutionDisposition = {
-  DenyFutureCommit: 'deny_future_commit',
-  RecognizePaidPeriodAsFinal: 'recognize_paid_period_as_final',
-  CorrectState: 'correct_state',
-  CancelSubscription: 'cancel_subscription',
-  RefundAndCancel: 'refund_and_cancel',
-  DismissNoIssue: 'dismiss_no_issue',
-} as const;
-
-export type KiloClawCommitRetirementResolutionDisposition =
-  (typeof KiloClawCommitRetirementResolutionDisposition)[keyof typeof KiloClawCommitRetirementResolutionDisposition];
-
-export const KiloClawCommitRetirementResolutionActorType = {
-  Operator: 'operator',
-  System: 'system',
-} as const;
-
-export type KiloClawCommitRetirementResolutionActorType =
-  (typeof KiloClawCommitRetirementResolutionActorType)[keyof typeof KiloClawCommitRetirementResolutionActorType];
-
 export const KiloClawTerminalRenewalFailureStatus = {
   Unresolved: 'unresolved',
   Resolved: 'resolved',
@@ -326,7 +261,6 @@ export const KiloClawSubscriptionChangeAction = {
   PaymentSourceChanged: 'payment_source_changed',
   ScheduleChanged: 'schedule_changed',
   AdminOverride: 'admin_override',
-  CommitRetirementChanged: 'commit_retirement_changed',
 } as const;
 
 export type KiloClawSubscriptionChangeAction =

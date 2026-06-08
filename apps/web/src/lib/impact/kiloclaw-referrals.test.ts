@@ -68,7 +68,6 @@ import {
   impact_referral_reward_applications,
   impact_referral_reward_decisions,
   impact_referral_rewards,
-  kiloclaw_commit_retirement_review_cases,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
@@ -311,7 +310,6 @@ describe('kiloclaw referrals', () => {
     await db.delete(impact_attribution_touches).where(sql`true`);
     await db.delete(credit_transactions).where(sql`true`);
     await db.delete(kiloclaw_subscription_change_log).where(sql`true`);
-    await db.delete(kiloclaw_commit_retirement_review_cases).where(sql`true`);
     await db.delete(kiloclaw_subscriptions).where(sql`true`);
     await db.delete(kiloclaw_instances).where(sql`true`);
     await db.delete(impact_advocate_participants).where(sql`true`);
@@ -592,16 +590,24 @@ describe('kiloclaw referrals', () => {
         .select()
         .from(impact_referral_rewards)
         .where(eq(impact_referral_rewards.beneficiary_user_id, user.id));
-      expect(reward.status).toBe('earned');
-      const [reviewCase] = await db.select().from(kiloclaw_commit_retirement_review_cases);
-      expect(reviewCase).toEqual(
+      expect(reward).toEqual(
         expect.objectContaining({
-          subscription_id: subscription.id,
-          stripe_subscription_id: 'sub_ambiguous_final_commit',
-          reason_code: 'referral_reward_ambiguous_standard_schedule',
-          status: 'open',
+          status: 'review_required',
+          review_reason: 'referral_reward_ambiguous_standard_schedule',
+          applies_to_subscription_id: null,
+          applied_at: null,
         })
       );
+      const applications = await db
+        .select()
+        .from(impact_referral_reward_applications)
+        .where(eq(impact_referral_reward_applications.reward_id, reward.id));
+      expect(applications).toHaveLength(0);
+      const redemptions = await db
+        .select()
+        .from(impact_advocate_reward_redemptions)
+        .where(eq(impact_advocate_reward_redemptions.reward_id, reward.id));
+      expect(redemptions).toHaveLength(0);
     });
   });
 

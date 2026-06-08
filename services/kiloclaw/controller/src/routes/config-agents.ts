@@ -1,6 +1,5 @@
 import type { Context, Hono } from 'hono';
 import {
-  AgentBindingsPutBodySchema,
   AgentConfigError,
   AgentDefaultsPatchBodySchema,
   AgentSettingsPatchBodySchema,
@@ -8,7 +7,6 @@ import {
   readAgentSummary,
   serializeAgentConfigMutation,
   summarizeAgentConfig,
-  updateAgentBindings,
   updateAgentDefaults,
   updateAgentSettings,
 } from '../openclaw-agent-config';
@@ -18,6 +16,11 @@ import {
   createAgentViaCli,
   deleteAgentViaCli,
 } from '../openclaw-agent-cli';
+import {
+  AgentBindingsPutBodySchema,
+  listAgentBindingSummaries,
+  updateAgentBindings,
+} from '../openclaw-agent-bindings';
 
 export type AgentRouteDeps = {
   readSnapshot: typeof readAgentConfigSnapshot;
@@ -29,6 +32,7 @@ export type AgentRouteDeps = {
   createViaCli: typeof createAgentViaCli;
   deleteViaCli: typeof deleteAgentViaCli;
   setBindings: typeof updateAgentBindings;
+  listBindingSummaries: typeof listAgentBindingSummaries;
 };
 
 const defaultDeps: AgentRouteDeps = {
@@ -41,6 +45,7 @@ const defaultDeps: AgentRouteDeps = {
   createViaCli: createAgentViaCli,
   deleteViaCli: deleteAgentViaCli,
   setBindings: updateAgentBindings,
+  listBindingSummaries: listAgentBindingSummaries,
 };
 
 function errorStatus(status: number): 400 | 404 | 409 | 422 | 500 | 502 | 504 {
@@ -79,19 +84,30 @@ async function readJsonBody(c: Context): Promise<unknown> {
 }
 
 export function registerAgentConfigRoutes(app: Hono, deps: AgentRouteDeps = defaultDeps): void {
-  app.get('/_kilo/config/agents', c => {
+  app.get('/_kilo/config/agents', async c => {
     try {
       const snapshot = deps.readSnapshot();
-      return c.json({ etag: snapshot.etag, ...deps.summarize(snapshot.config) });
+      const summary = deps.summarize(snapshot.config);
+      // Bindings are sourced from the OpenClaw CLI (the routing source of truth).
+      const bindingsByAgent = await deps.listBindingSummaries(undefined);
+      const agents = summary.agents.map(agent => ({
+        ...agent,
+        bindings: bindingsByAgent.get(agent.id) ?? [],
+      }));
+      return c.json({ etag: snapshot.etag, defaults: summary.defaults, agents });
     } catch (error) {
       return respondError(c, error);
     }
   });
 
-  app.get('/_kilo/config/agents/:agentId', c => {
+  app.get('/_kilo/config/agents/:agentId', async c => {
     try {
       const { snapshot, agent } = deps.readSummary(c.req.param('agentId'));
-      return c.json({ etag: snapshot.etag, agent });
+      const bindingsByAgent = await deps.listBindingSummaries(agent.id);
+      return c.json({
+        etag: snapshot.etag,
+        agent: { ...agent, bindings: bindingsByAgent.get(agent.id) ?? [] },
+      });
     } catch (error) {
       return respondError(c, error);
     }

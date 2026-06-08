@@ -137,30 +137,8 @@ export const AgentDefaultsPatchBodySchema = z
     message: 'Patch must set or unset at least one field',
   });
 
-// Declarative channel-route set: this agent's channel-level default-account
-// routes should become exactly `channels`. Advanced and account-scoped bindings
-// are preserved.
-export const AgentBindingsPutBodySchema = z
-  .object({
-    etag: z.string().min(1).optional(),
-    channels: z
-      .array(
-        z
-          .string()
-          .trim()
-          .min(1)
-          .max(64)
-          .refine(value => !value.startsWith('-'), {
-            message: 'Channel must not begin with a dash',
-          })
-      )
-      .max(50),
-  })
-  .strict();
-
 export type AgentSettingsPatchBody = z.infer<typeof AgentSettingsPatchBodySchema>;
 export type AgentDefaultsPatchBody = z.infer<typeof AgentDefaultsPatchBodySchema>;
-export type AgentBindingsPutBody = z.infer<typeof AgentBindingsPutBodySchema>;
 type OpenClawAgentConfig = z.infer<typeof OpenClawAgentConfigSchema>;
 type AgentEntry = z.infer<typeof AgentEntrySchema>;
 type AgentDefaults = z.infer<typeof AgentDefaultsSchema>;
@@ -309,147 +287,6 @@ function findConfiguredEntry(config: OpenClawAgentConfig, agentId: string): Agen
   return config.agents?.list?.find(entry => normalizeAgentId(entry.id) === agentId);
 }
 
-// The top-level `bindings` array is not modeled by OpenClawAgentConfigSchema
-// (it round-trips via .passthrough()), so read it leniently at runtime — a
-// malformed binding entry is skipped, never fatal to a read.
-// `accountId` is validated (string) so a malformed value (e.g. a number) fails
-// parsing and the entry is treated as unmanaged: skipped on read, preserved on
-// write, never mistaken for a default-account route. Other match keys
-// (peer/guild/team/roles) pass through and are detected by presence.
-// `agentId`/`channel` are trimmed and required so whitespace-only values (which
-// would otherwise normalize to `main`/empty) fail parsing and stay unmanaged.
-const BindingMatchSchema = z
-  .object({ channel: z.string().trim().min(1), accountId: z.string().optional() })
-  .passthrough();
-const ConfigBindingSchema = z
-  .object({
-    type: z.string().optional(),
-    agentId: z.string().trim().min(1),
-    match: BindingMatchSchema,
-  })
-  .passthrough();
-
-// Binding-level keys (alongside match keys) that take a binding off the simple
-// channel-route surface and MUST be preserved. `session` carries DM-scope /
-// isolation overrides; `acp` is for persistent ACP bindings.
-const ADVANCED_BINDING_KEYS = ['session', 'acp'];
-// Match keys that make a binding more specific than a channel(/account) route.
-const ADVANCED_MATCH_KEYS = ['peer', 'parentPeer', 'guildId', 'teamId', 'roles'];
-
-function normalizeChannel(channel: string): string {
-  return channel.trim().toLowerCase();
-}
-
-// Resolve an accountId to the OpenClaw routing bucket: absent, blank, or the
-// literal "default" all map to the default account (null). Everything else
-// (including "*") is an explicit account scope.
-function normalizeAccountId(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (trimmed === '' || trimmed.toLowerCase() === 'default') {
-    return null;
-  }
-  return trimmed;
-}
-
-// OpenClaw treats empty/whitespace strings, empty arrays, and empty objects as
-// "no constraint" — so a key only counts when it is effectively set.
-function isEffectivelyPresent(value: unknown): boolean {
-  if (value === undefined || value === null) {
-    return false;
-  }
-  if (typeof value === 'string') {
-    return value.trim().length > 0;
-  }
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  if (typeof value === 'object') {
-    return Object.keys(value).length > 0;
-  }
-  return true;
-}
-
-type ClassifiedBinding = {
-  agentId: string;
-  channel: string;
-  // null = the OpenClaw default account (absent, blank, or "default").
-  accountId: string | null;
-  isRoute: boolean;
-  // A match constraint that narrows which messages the binding captures.
-  hasAdvancedMatch: boolean;
-  // A behavior override (session/dmScope, acp) that does NOT narrow the match.
-  hasBehaviorOverride: boolean;
-};
-
-// Single source of truth for classifying a raw binding entry, used by both the
-// read summary and the declarative-set diff so they never disagree. Returns null
-// for entries that fail parsing (skipped on read, preserved on write).
-function classifyBinding(item: unknown): ClassifiedBinding | null {
-  const parsed = ConfigBindingSchema.safeParse(item);
-  if (!parsed.success) {
-    return null;
-  }
-  const binding = parsed.data;
-  const bindingRecord = binding as Record<string, unknown>;
-  const match = binding.match as Record<string, unknown>;
-  return {
-    agentId: normalizeAgentId(binding.agentId),
-    channel: normalizeChannel(binding.match.channel),
-    accountId: normalizeAccountId(match.accountId),
-    isRoute: binding.type === undefined || binding.type === 'route',
-    hasAdvancedMatch: ADVANCED_MATCH_KEYS.some(key => isEffectivelyPresent(match[key])),
-    hasBehaviorOverride: ADVANCED_BINDING_KEYS.some(key =>
-      isEffectivelyPresent(bindingRecord[key])
-    ),
-  };
-}
-
-// Surfaced `advanced` flag: anything beyond a plain channel(/account) route.
-function isAdvancedBinding(binding: ClassifiedBinding): boolean {
-  return !binding.isRoute || binding.hasAdvancedMatch || binding.hasBehaviorOverride;
-}
-
-// Occupies the default-account channel route slot — what conflict detection keys
-// on. A route with a session/acp override still matches the same default-account
-// traffic, so it conflicts even though it is NOT removable.
-function occupiesDefaultChannelRoute(binding: ClassifiedBinding): boolean {
-  return binding.isRoute && binding.accountId === null && !binding.hasAdvancedMatch;
-}
-
-// A binding the declarative set may add/remove: a fully-simple default-account
-// route with no behavior overrides.
-function isManagedDefaultRoute(binding: ClassifiedBinding): boolean {
-  return occupiesDefaultChannelRoute(binding) && !binding.hasBehaviorOverride;
-}
-
-// Parse the top-level bindings array once and group summaries by normalized
-// agent id, so summarizing the fleet stays O(agents + bindings) rather than
-// re-scanning every binding per agent.
-function summarizeBindingsByAgent(config: OpenClawAgentConfig): Map<string, AgentBindingSummary[]> {
-  const byAgent = new Map<string, AgentBindingSummary[]>();
-  const raw = (config as { bindings?: unknown }).bindings;
-  if (!Array.isArray(raw)) {
-    return byAgent;
-  }
-  for (const item of raw) {
-    const classified = classifyBinding(item);
-    if (!classified) {
-      continue;
-    }
-    const summaries = byAgent.get(classified.agentId) ?? [];
-    summaries.push({
-      channel: classified.channel,
-      accountId: classified.accountId,
-      advanced: isAdvancedBinding(classified),
-    });
-    byAgent.set(classified.agentId, summaries);
-  }
-  return byAgent;
-}
-
 function assertUniqueAgentIds(config: OpenClawAgentConfig): void {
   const seen = new Set<string>();
   for (const entry of config.agents?.list ?? []) {
@@ -493,7 +330,6 @@ export function summarizeAgentConfig(config: OpenClawAgentConfig): AgentConfigSu
   const defaults = config.agents?.defaults;
   const defaultsModel = normalizeModel(defaults?.model);
   const entries = config.agents?.list?.length ? config.agents.list : [{ id: DEFAULT_AGENT_ID }];
-  const bindingsByAgent = summarizeBindingsByAgent(config);
   return {
     defaults: {
       model: defaultsModel,
@@ -515,7 +351,7 @@ export function summarizeAgentConfig(config: OpenClawAgentConfig): AgentConfigSu
         },
         rawModel: entry.model ?? null,
         settings: settingsOf(entry),
-        bindings: bindingsByAgent.get(id) ?? [],
+        bindings: [],
       };
     }),
   };
@@ -726,107 +562,4 @@ export async function updateAgentDefaults(
     options
   );
   return { snapshot, defaults: summarizeAgentConfig(snapshot.config).defaults };
-}
-
-/**
- * Declaratively set an agent's channel-level (default-account) routes via a
- * single guarded, atomic config write. Surgically replaces only this agent's
- * managed channel routes; advanced bindings (peer/guild/team/roles, non-route
- * types), account-scoped routes, and other agents' bindings are preserved
- * untouched. Fails closed (422) if the bindings array is an unexpected shape,
- * and rejects (409 agent_binding_conflict) a channel already routed to another
- * agent — all before any write.
- */
-export async function updateAgentBindings(
-  agentId: string,
-  body: AgentBindingsPutBody,
-  options: AgentConfigOptions = {}
-): Promise<{ snapshot: AgentConfigSnapshot; agent: AgentSummary }> {
-  const normalized = requireAgentId(agentId);
-  const desired = [...new Set(body.channels.map(normalizeChannel))];
-
-  const { snapshot } = await mutateAgentConfig(
-    body.etag,
-    config => {
-      if (findConfiguredEntry(config, normalized) === undefined) {
-        if (normalized !== DEFAULT_AGENT_ID) {
-          throw new AgentConfigError(404, 'agent_not_found', `Agent "${normalized}" not found`);
-        }
-        // Materialize implicit main: a binding targeting an agent not in
-        // agents.list resolves to the default/first agent at runtime, so main
-        // must be a real entry for its route to actually reach main.
-        config.agents ??= {};
-        config.agents.list ??= [];
-        config.agents.list.push({ id: DEFAULT_AGENT_ID });
-      }
-
-      const rawBindings = (config as { bindings?: unknown }).bindings;
-      if (rawBindings !== undefined && !Array.isArray(rawBindings)) {
-        throw new AgentConfigError(
-          422,
-          'invalid_agent_config',
-          'Unexpected bindings shape in config'
-        );
-      }
-      const existing: unknown[] = Array.isArray(rawBindings) ? rawBindings : [];
-
-      // Reject any requested channel whose default-account route slot another
-      // agent already occupies — including routes with behavior overrides
-      // (session/acp) that we preserve but must not double-bind.
-      for (const channel of desired) {
-        const conflicted = existing.some(item => {
-          const route = classifyBinding(item);
-          return (
-            route !== null &&
-            occupiesDefaultChannelRoute(route) &&
-            route.channel === channel &&
-            route.agentId !== normalized
-          );
-        });
-        if (conflicted) {
-          throw new AgentConfigError(
-            409,
-            'agent_binding_conflict',
-            `Channel "${channel}" is already routed to another agent`
-          );
-        }
-      }
-
-      // Drop only this agent's managed channel routes; keep everything else.
-      const preserved = existing.filter(item => {
-        const route = classifyBinding(item);
-        return !(route !== null && isManagedDefaultRoute(route) && route.agentId === normalized);
-      });
-      const added = desired.map(channel => ({
-        type: 'route',
-        agentId: normalized,
-        match: { channel },
-      }));
-      const next = [...preserved, ...added];
-
-      if (next.length > 0 || Array.isArray(rawBindings)) {
-        (config as { bindings?: unknown }).bindings = next;
-      }
-    },
-    options
-  );
-
-  // Summarize via the implicit-main fallback (same as readAgentSummary): binding
-  // `main` does not materialize an agents.list entry, and summarizeAgentConfig
-  // only synthesizes implicit main when the list is empty — so look it up against
-  // a single synthetic entry rather than the full list.
-  const entry = findConfiguredEntry(snapshot.config, normalized);
-  const summarizedEntry = entry ?? { id: DEFAULT_AGENT_ID };
-  const agent = summarizeAgentConfig({
-    ...snapshot.config,
-    agents: { ...snapshot.config.agents, list: [summarizedEntry] },
-  }).agents[0];
-  if (!agent) {
-    throw new AgentConfigError(
-      500,
-      'agent_config_read_failed',
-      'Unable to summarize agent after binding update'
-    );
-  }
-  return { snapshot, agent: { ...agent, configured: entry !== undefined } };
 }

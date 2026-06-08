@@ -681,11 +681,11 @@ Other values MUST return 400.
 14. Controller-originated agent create, update, defaults-update, and delete mutations MUST be serialized per config path so a lifecycle CLI mutation cannot be overwritten by a concurrent native controller update.
 15. CLI lifecycle operations MUST report known reserved/not-found/conflict validation failures using stable HTTP error codes, and MUST report timeout or malformed/process failures without exposing secret environment values.
 16. Controller server errors from agent-config reads MUST NOT expose filesystem error details in HTTP responses.
-17. Agent read summaries MUST include the agent's channel route bindings (channel and, when present, account id), and MUST flag bindings that are more specific than a channel(/account) route (peer/guild/team/roles match, or a non-`route` binding type) so consumers can distinguish them. Malformed binding entries MUST be skipped rather than failing the read.
-18. `PUT /_kilo/config/agents/:agentId/bindings` MUST declaratively set the agent's channel-level default-account route bindings to exactly the requested channel set, using guarded read-modify-write behavior (one atomic config write; stale etags reported as `409 config_etag_conflict`). It MUST be serialized per config path with the other agent mutations.
-19. The binding set MUST preserve bindings it does not manage — advanced bindings (peer/guild/team/roles or non-`route` type), account-scoped routes, and other agents' bindings MUST be left intact.
-20. The binding set MUST reject a requested channel already routed (default account) to another agent with `409 agent_binding_conflict`, before writing any change.
-21. The binding set MUST fail closed (`422 invalid_agent_config`) when the configuration's `bindings` value is present but not an array, rather than overwriting an unexpected structure.
+17. Agent read summaries MUST include the agent's channel route bindings, sourced from non-interactive OpenClaw CLI binding behavior (the routing source of truth), surfacing channel, account id (default account as null), and a flag for bindings more specific than a channel(/account) route (peer/guild/team/roles or non-`route` type).
+18. `PUT /_kilo/config/agents/:agentId/bindings` MUST declaratively set the agent's channel-level default-account routes to exactly the requested channel set by delegating to non-interactive OpenClaw CLI binding behavior (diffing the CLI's current view and issuing bind/unbind). It MUST be serialized per config path with the other agent mutations, and MUST report a stale request etag as `409 config_etag_conflict` before issuing CLI writes.
+19. The binding set MUST manage only channel-level default-account routes; account-scoped routes, advanced bindings (peer/guild/team/roles or non-`route` type), and other agents' bindings MUST be left intact.
+20. The binding set MUST report a requested channel that the CLI rejects as already routed to another agent as `409 agent_binding_conflict`, and MUST add bindings before removing any so a conflict leaves existing routes intact.
+21. Binding edits MUST target an agent present in `agents.list`; a request for an absent agent (including unconfigured implicit `main`) MUST return `404 agent_not_found` rather than misrouting to the default agent.
 
 #### Environment (bearer token)
 

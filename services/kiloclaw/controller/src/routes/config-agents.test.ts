@@ -68,6 +68,9 @@ function createDeps(overrides: Partial<AgentRouteDeps> = {}): AgentRouteDeps {
       removedAllow: 0,
     })),
     setBindings: vi.fn(async () => ({ snapshot, agent })),
+    listBindingSummaries: vi.fn(
+      async () => new Map([['research', [{ channel: 'slack', accountId: null, advanced: false }]]])
+    ),
     ...overrides,
   };
 }
@@ -86,11 +89,15 @@ describe('agent config read routes', () => {
     expect(await response.json()).toMatchObject({ etag: 'etag-1', agents: [{ id: 'research' }] });
   });
 
-  it('returns only one normalized agent summary and its etag', async () => {
+  it('returns one normalized agent summary with CLI-sourced bindings attached', async () => {
     const response = await makeApp(createDeps()).request('/_kilo/config/agents/research');
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ etag: 'etag-1', agent });
+    expect(await response.json()).toEqual({
+      etag: 'etag-1',
+      // bindings come from listBindingSummaries (the CLI), not the config summary.
+      agent: { ...agent, bindings: [{ channel: 'slack', accountId: null, advanced: false }] },
+    });
   });
 });
 

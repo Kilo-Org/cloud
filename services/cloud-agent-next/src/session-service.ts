@@ -66,6 +66,7 @@ import {
   type WrapperSessionReadyRequest,
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
+import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
 import type {
   FencedLegacyExecutionRequest,
   FencedWrapperDispatchRequest,
@@ -584,21 +585,7 @@ export async function writeGlobalRules(
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  const content = [
-    '# Cloud Agent Environment',
-    '',
-    "You are running inside a sandboxed cloud container, not on the user's local machine.",
-    'The filesystem is ephemeral and will not persist after the session ends.',
-    "Do not assume access to the user's local files, browsers, or desktop environment.",
-    '',
-    '## Temporary Files',
-    '',
-    `When you need to create temporary or scratch files, use \`/tmp/${sessionId}/\` as your scratch directory.`,
-    'This path is pre-approved for file access and will not trigger permission prompts.',
-    '',
-  ].join('\n');
-
-  await sandbox.writeFile(rulesPath, content);
+  await sandbox.writeFile(rulesPath, buildCloudAgentRules(sessionId));
 }
 
 /**

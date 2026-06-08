@@ -15,6 +15,7 @@ const OpenAICompatibleModelsResponseSchema = z.object({
   data: z.array(
     z.object({
       id: z.string(),
+      name: z.string().optional(),
       context_length: z.number().optional(),
       max_model_len: z.number().optional(),
       max_output_length: z.number().optional(),
@@ -65,6 +66,12 @@ type ProviderFetcher = {
   fetch(ctx: SyncContext): Promise<RawModel[]>;
 };
 
+function shortenDisplayName(id: string | undefined) {
+  if (!id) return undefined;
+  const slash = id.lastIndexOf(':');
+  return slash >= 0 ? id.slice(slash + 1).trim() : id;
+}
+
 function openAICompatibleFetcher(options: {
   providerId: DirectUserByokInferenceProviderId;
   label: string;
@@ -82,6 +89,7 @@ function openAICompatibleFetcher(options: {
       const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
       return parsed.data.map(model => ({
         id: model.id,
+        name: shortenDisplayName(model.name),
         context_length: model.context_length ?? model.max_model_len,
         max_completion_tokens: model.max_output_length,
         input_modalities: model.input_modalities,
@@ -105,7 +113,7 @@ function modelsDevFetcher(
       const provider = ModelsDevProviderSchema.parse(entry);
       return Object.values(provider.models).map(model => ({
         id: model.id,
-        name: model.name,
+        name: shortenDisplayName(model.name),
         context_length: model.limit?.context,
         max_completion_tokens: model.limit?.output,
         input_modalities: model.modalities?.input,

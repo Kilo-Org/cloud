@@ -206,8 +206,18 @@ export async function upsertScopeProposal(input: {
       negative_count: input.negativeCount,
       neutral_count: input.neutralCount,
     })
+    .onConflictDoNothing()
     .returning();
-  if (!inserted) throw new Error('Review Memory proposal insert failed');
+  if (!inserted) {
+    const conflicted = await getActiveProposalForScope({
+      owner: input.owner,
+      platform: input.platform,
+      repoFullName: input.repoFullName,
+      database,
+    });
+    if (conflicted) return conflicted;
+    throw new Error('Review Memory active proposal conflict lookup failed');
+  }
   return inserted;
 }
 

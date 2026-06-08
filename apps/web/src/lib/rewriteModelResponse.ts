@@ -28,22 +28,40 @@ function createRewrittenSseStream<T>(
   const reader = body?.getReader() ?? null;
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
-  let outputController: ReadableStreamDefaultController<Uint8Array> | null = null;
+  const queuedOutput: Uint8Array[] = [];
+  let decodedInput = '';
   let doneReceived = false;
+  let doneOutputQueued = false;
+  let upstreamDone = false;
   let cancelled = false;
   let finished = false;
   let released = false;
-  let enqueueCount = 0;
 
   const release = () => {
     if (!reader || released) return;
     released = true;
     reader.releaseLock();
   };
-  const enqueue = (value: string) => {
-    if (cancelled || !outputController) return;
-    outputController.enqueue(encoder.encode(value));
-    enqueueCount++;
+  const queueOutput = (value: string) => {
+    if (!cancelled) queuedOutput.push(encoder.encode(value));
+  };
+  const takeNextInputLine = (): string | null => {
+    for (let index = 0; index < decodedInput.length; index++) {
+      const character = decodedInput[index];
+      if (character === '\n') {
+        const line = decodedInput.slice(0, index + 1);
+        decodedInput = decodedInput.slice(index + 1);
+        return line;
+      }
+      if (character !== '\r') continue;
+      if (index + 1 === decodedInput.length && !upstreamDone) return null;
+
+      const lineEnd = decodedInput[index + 1] === '\n' ? index + 2 : index + 1;
+      const line = decodedInput.slice(0, lineEnd);
+      decodedInput = decodedInput.slice(lineEnd);
+      return line;
+    }
+    return null;
   };
   const parser = createParser({
     onEvent(event: EventSourceMessage) {
@@ -56,16 +74,15 @@ function createRewrittenSseStream<T>(
       rewriteJson(json);
       const idLine = event.id === undefined ? '' : `id: ${event.id}\n`;
       const eventLine = event.event ? `event: ${event.event}\n` : '';
-      enqueue(`${idLine}${eventLine}data: ${JSON.stringify(json)}\n\n`);
+      queueOutput(`${idLine}${eventLine}data: ${JSON.stringify(json)}\n\n`);
     },
     onComment() {
-      enqueue(': KILO PROCESSING\n\n');
+      queueOutput(': KILO PROCESSING\n\n');
     },
   });
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
-      outputController = controller;
       if (!reader) {
         finished = true;
         controller.close();
@@ -75,27 +92,46 @@ function createRewrittenSseStream<T>(
       if (!reader || finished || cancelled) return;
 
       try {
-        const enqueueCountBeforePull = enqueueCount;
-        while (!finished && !cancelled && enqueueCount === enqueueCountBeforePull) {
-          const { done, value } = await reader.read();
-          if (cancelled) return;
-          if (!done) {
-            parser.feed(decoder.decode(value, { stream: true }));
+        while (queuedOutput.length === 0 && !finished && !cancelled) {
+          const nextLine = takeNextInputLine();
+          if (nextLine !== null) {
+            parser.feed(nextLine);
+            continue;
+          }
+
+          if (!upstreamDone) {
+            const { done, value } = await reader.read();
+            if (cancelled) return;
+            if (!done) {
+              decodedInput += decoder.decode(value, { stream: true });
+              continue;
+            }
+
+            upstreamDone = true;
+            decodedInput += decoder.decode();
+            // Be permissive at EOF and dispatch a complete final data line even
+            // when the upstream omitted its trailing blank SSE delimiter.
+            decodedInput += '\n\n';
+            release();
+            continue;
+          }
+
+          if (doneReceived && !doneOutputQueued) {
+            doneOutputQueued = true;
+            queueOutput('data: [DONE]\n\n');
             continue;
           }
 
           finished = true;
-          const finalText = decoder.decode();
-          if (finalText) parser.feed(finalText);
-          // Be permissive at EOF and dispatch a complete final data line even
-          // when the upstream omitted its trailing blank SSE delimiter.
-          parser.feed('\n\n');
-          if (doneReceived) enqueue('data: [DONE]\n\n');
-          release();
           controller.close();
         }
+
+        const nextOutput = queuedOutput.shift();
+        if (nextOutput) controller.enqueue(nextOutput);
       } catch (error) {
         finished = true;
+        queuedOutput.length = 0;
+        decodedInput = '';
         release();
         if (!cancelled) controller.error(error);
       }
@@ -103,6 +139,8 @@ function createRewrittenSseStream<T>(
     cancel(reason) {
       cancelled = true;
       finished = true;
+      queuedOutput.length = 0;
+      decodedInput = '';
       if (reader) {
         void reader
           .cancel(reason)

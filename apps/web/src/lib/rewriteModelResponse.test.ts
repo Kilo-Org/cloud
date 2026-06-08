@@ -333,6 +333,26 @@ describe('rewriteFreeModelResponse_Responses', () => {
     expect(result.headers.get('cache-control')).toBe('no-cache, no-transform');
   });
 
+  test('stops parsing a multi-event chunk when downstream backpressure applies', async () => {
+    const upstream = sseResponse(
+      'event: response.in_progress\n' +
+        'data: {"type":"response.in_progress","sequence_number":0}\n\n' +
+        'event: response.completed\n' +
+        'data: not-json\n\n'
+    );
+
+    const result = await rewriteFreeModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const reader = result.body?.getReader();
+    if (!reader) throw new Error('Expected a response body');
+
+    const firstRead = await reader.read();
+    expect(firstRead.done).toBe(false);
+    expect(dataObjects(new TextDecoder().decode(firstRead.value))).toEqual([
+      { type: 'response.in_progress', sequence_number: 0 },
+    ]);
+    await expect(reader.read()).rejects.toBeInstanceOf(SyntaxError);
+  });
+
   test('preserves contiguous events across one-byte chunks and split UTF-8 code points', async () => {
     const events = Array.from({ length: 58 }, (_, sequenceNumber) => {
       const type = sequenceNumber === 57 ? 'response.completed' : 'response.output_text.delta';

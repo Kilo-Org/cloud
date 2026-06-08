@@ -66,9 +66,11 @@ type ProviderFetcher = {
   fetch(ctx: SyncContext): Promise<RawModel[]>;
 };
 
+function shortenDisplayName(id: string): string;
+function shortenDisplayName(id: string | undefined): string | undefined;
 function shortenDisplayName(id: string | undefined) {
   if (!id) return undefined;
-  const slash = id.lastIndexOf(':');
+  const slash = Math.max(id.lastIndexOf(':'), id.lastIndexOf('/'));
   return slash >= 0 ? id.slice(slash + 1).trim() : id;
 }
 
@@ -174,17 +176,12 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   modelsDevFetcher('xiaomi-token-plan-sgp', 'xiaomi-token-plan-sgp'),
 ];
 
-function modelIdToDisplayName(id: string) {
-  const slash = id.lastIndexOf('/');
-  return slash >= 0 ? id.slice(slash + 1) : id;
-}
-
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
   const fetched = await fetcher.fetch(ctx);
   const models: DirectByokModel[] = [];
 
   for (const raw of fetched) {
-    const name = raw.name ?? modelIdToDisplayName(raw.id);
+    const name = raw.name ?? shortenDisplayName(raw.id);
     const context_length = raw.context_length ?? DEFAULT_CONTENT_LENGTH;
     const max_completion_tokens = Math.min(
       raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,

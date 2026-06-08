@@ -17,7 +17,7 @@ export default {
     providerId: 'synthetic',
     recommendedModels: [
       {
-        id: 'moonshotai/Kimi-K2.6',
+        id: 'hf:moonshotai/Kimi-K2.6',
         name: 'Kimi-K2.6',
         flags: ['vision'],
         context_length: 262144,

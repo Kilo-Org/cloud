@@ -146,7 +146,7 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum['orcarouter']]: 'google/gemini-3.5-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['crofai']]: 'deepseek-v4-flash',
-  [DirectUserByokInferenceProviderIdSchema.enum['synthetic']]: 'zai-org/GLM-5.1',
+  [DirectUserByokInferenceProviderIdSchema.enum['synthetic']]: 'hf:zai-org/GLM-5.1',
   [DirectUserByokInferenceProviderIdSchema.enum['ollama-cloud']]: 'kimi-k2.6:cloud',
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-ams']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-sgp']]: 'mimo-v2-flash',

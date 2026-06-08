@@ -388,6 +388,7 @@ async function insertPersonalSubscriptionFixture(params: PersonalSubscriptionFix
   });
 }
 
+const PRE_COMMIT_CUTOFF_TIME = '2026-06-05T12:00:00.000Z';
 const FINAL_COMMIT_START = '2026-05-01T00:00:00.000Z';
 const FINAL_COMMIT_END = '2026-11-01T00:00:00.000Z';
 
@@ -2052,6 +2053,7 @@ describe('subscription center procedures', () => {
   });
 
   it('writes changelog when switching targeted instance plan', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     stripeMock.subscriptions.retrieve.mockResolvedValue({
       schedule: null,
       items: { data: [{ price: { id: 'price_standard' } }] },
@@ -2138,6 +2140,7 @@ describe('subscription center procedures', () => {
   });
 
   it('writes stale-clear and new-schedule changelogs for targeted switch', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     stripeMock.subscriptions.retrieve.mockResolvedValue({
       schedule: null,
       items: { data: [{ price: { id: 'price_standard_intro' } }] },
@@ -2610,6 +2613,7 @@ describe('createSubscriptionCheckout', () => {
   });
 
   it('allows promotion codes for commit plan', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -2736,6 +2740,7 @@ describe('createKiloPassUpsellCheckout', () => {
   });
 
   it('rejects commit hosting for monthly tier 19', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createKiloclawInstance(user.id);
     const caller = await createCallerForUser(user.id);
 
@@ -2754,6 +2759,7 @@ describe('createKiloPassUpsellCheckout', () => {
   });
 
   it('rejects commit hosting for yearly tier 19 when monthly effective credits cannot cover the charge', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createKiloclawInstance(user.id);
     const caller = await createCallerForUser(user.id);
 
@@ -2918,6 +2924,7 @@ describe('createKiloPassUpsellCheckout', () => {
   });
 
   it('allows legacy Commit hosting for monthly tier 49', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -2946,6 +2953,7 @@ describe('createKiloPassUpsellCheckout', () => {
   });
 
   it('allows current Commit hosting only when balance plus selected tier projection covers the six-month charge', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createKiloclawInstance(user.id);
     await db
       .update(kilocode_users)
@@ -2981,6 +2989,7 @@ describe('handleKiloClawSubscriptionUpdated', () => {
   });
 
   it('maps Stripe trialing status with commit plan to local active', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
       stripe_subscription_id: 'sub_commit_trial',
@@ -3893,6 +3902,7 @@ describe('handleKiloClawSubscriptionCreated', () => {
   });
 
   it('sets commit_ends_at for a new commit subscription', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createWebhookAnchor();
     const subscription = makeStripeSubscription({
       id: 'sub_commit_new',
@@ -5195,6 +5205,10 @@ describe('reactivateSubscription', () => {
 });
 
 describe('switchPlan', () => {
+  beforeEach(() => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
+  });
+
   it('creates a fresh schedule when switching standard to commit with no existing schedule', async () => {
     await insertPersonalSubscriptionFixture({
       stripe_subscription_id: 'sub_switch',
@@ -6004,6 +6018,7 @@ describe('personal billing mutations do not affect org subscriptions', () => {
   });
 
   it('switchPlan targets the personal subscription, not the org one', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const { orgSub, personalSub } = await createPersonalAndOrgSubscriptions();
 
     stripeMock.subscriptions.retrieve.mockResolvedValue({
@@ -6135,6 +6150,7 @@ describe('switchPlan', () => {
   });
 
   it('rejects when subscription is not active', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     await insertPersonalSubscriptionFixture({
       stripe_subscription_id: 'sub_canceled',
       plan: 'standard',
@@ -7110,6 +7126,7 @@ describe('enrollWithCredits', () => {
   });
 
   it('enrolls with credits for commit plan when balance sufficient', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     await createCreditEnrollmentAnchor(user.id);
     await giveUserCredits(user.id, 50_000_000); // $50
 
@@ -7135,6 +7152,7 @@ describe('enrollWithCredits', () => {
   });
 
   it('charges current commit pricing for current trial enrollment', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 310_000_000);
 
@@ -7170,6 +7188,7 @@ describe('enrollWithCredits', () => {
   });
 
   it('rejects enrollment when balance is insufficient', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     await createCreditEnrollmentAnchor(user.id);
     await giveUserCredits(user.id, 5_000_000); // $5 — not enough for commit ($48)
 
@@ -7374,6 +7393,7 @@ describe('enrollWithCredits', () => {
   });
 
   it('enqueues only sale affiliate events for attributed direct credit enrollment', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 310_000_000);
     await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
@@ -8119,6 +8139,7 @@ describe('pure credit cancel/reactivate', () => {
   });
 
   it('switches plan for pure credit subscription locally', async () => {
+    setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     await createPureCreditSubscription(user.id, 'standard');
 
     const caller = await createCallerForUser(user.id);

@@ -146,6 +146,11 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     url: 'https://api.orcarouter.ai/v1/models',
   }),
   openAICompatibleFetcher({
+    providerId: 'inceptron-byok',
+    label: 'Inceptron BYOK',
+    url: 'https://api.inceptron.io/v1/models',
+  }),
+  openAICompatibleFetcher({
     providerId: 'martian',
     label: 'Martian',
     url: 'https://api.withmartian.com/v1/models',

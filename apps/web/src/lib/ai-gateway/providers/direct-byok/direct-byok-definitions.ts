@@ -3,6 +3,7 @@ import byteplusCoding from './byteplus-coding';
 import chutesByok from './chutes-byok';
 import crofai from './crofai';
 import kimiCoding from './kimi-coding';
+import inceptronByok from './inceptron-byok';
 import martian from './martian';
 import neuralwatt from './neurowatt';
 import ollamaCloud from './ollama-cloud';
@@ -17,6 +18,7 @@ export default [
   chutesByok,
   crofai,
   kimiCoding,
+  inceptronByok,
   martian,
   neuralwatt,
   ollamaCloud,

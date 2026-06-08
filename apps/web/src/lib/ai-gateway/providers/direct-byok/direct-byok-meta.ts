@@ -6,6 +6,7 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   'chutes-byok': 'Chutes BYOK',
   crofai: 'CrofAI',
   'kimi-coding': 'Kimi Code',
+  'inceptron-byok': 'Inceptron BYOK',
   martian: 'Martian',
   neuralwatt: 'Neuralwatt',
   'ollama-cloud': 'Ollama Cloud',

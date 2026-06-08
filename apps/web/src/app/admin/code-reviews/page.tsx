@@ -39,7 +39,7 @@ const breadcrumbs = (
   </BreadcrumbItem>
 );
 
-type PresetRangeType = '30m' | '2h' | '7d';
+type PresetRangeType = '30m' | '1h' | '2h' | '7d';
 type RangeType = PresetRangeType | 'interval';
 type OwnershipType = 'all' | 'personal' | 'organization';
 type RetryAccountingModeType = 'final_outcome' | 'all_attempts';
@@ -78,6 +78,7 @@ type DateIntervalValidation = {
 
 const dateRangeOptions = [
   { value: '30m', label: 'Last 30 min' },
+  { value: '1h', label: 'Last 1h' },
   { value: '2h', label: 'Last 2h' },
   { value: '7d', label: 'Last 7 days' },
   { value: 'interval', label: 'Date interval' },
@@ -85,6 +86,7 @@ const dateRangeOptions = [
 
 const presetRangeDurations = {
   '30m': 30 * 60 * 1000,
+  '1h': 60 * 60 * 1000,
   '2h': 2 * 60 * 60 * 1000,
   '7d': 7 * 24 * 60 * 60 * 1000,
 } satisfies Record<PresetRangeType, number>;

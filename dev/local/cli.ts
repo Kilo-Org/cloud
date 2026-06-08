@@ -78,7 +78,10 @@ const CAPTURE_TIMEOUT_MS = 30_000;
 // Commands
 // ---------------------------------------------------------------------------
 
-async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
+async function cmdUp(args: string[], repoRoot: string): Promise<void> {
+  const noAttach = args.includes('--no-attach');
+  const targets = args.filter(arg => arg !== '--no-attach');
+
   // --- Preflight checks ---
   if (!isTmuxAvailable()) {
     console.error('tmux is not installed. Install it with: brew install tmux');
@@ -126,8 +129,12 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   // --- Check for existing session ---
   const sessionName = getSessionName();
   if (sessionExists(sessionName)) {
-    console.log(`Session ${sessionName} already running — attaching.`);
-    attachSession(sessionName);
+    console.log(
+      noAttach
+        ? `Session ${sessionName} already running.`
+        : `Session ${sessionName} already running — attaching.`
+    );
+    if (!noAttach) attachSession(sessionName);
     return;
   }
 
@@ -194,10 +201,26 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   const wranglerRegistryPath = getWranglerRegistryPath(repoRoot);
   const sessionEnv: Record<string, string> = {
     KILO_PORT_OFFSET: String(portOffset),
+    PATH: process.env.PATH ?? '',
     WRANGLER_REGISTRY_PATH: wranglerRegistryPath,
   };
+  if (process.env.PNPM_HOME !== undefined && process.env.PNPM_HOME !== '') {
+    sessionEnv.PNPM_HOME = process.env.PNPM_HOME;
+  }
   if (process.env.PORT !== undefined && process.env.PORT !== '') {
     sessionEnv.PORT = String(getService('nextjs').port);
+  }
+  if (process.env.DEBUG_SHOW_DEV_UI !== undefined && process.env.DEBUG_SHOW_DEV_UI !== '') {
+    sessionEnv.DEBUG_SHOW_DEV_UI = process.env.DEBUG_SHOW_DEV_UI;
+  }
+  if (process.env.SKIP_STRIPE_API !== undefined && process.env.SKIP_STRIPE_API !== '') {
+    sessionEnv.SKIP_STRIPE_API = process.env.SKIP_STRIPE_API;
+  }
+  if (
+    process.env.NEXT_PUBLIC_POSTHOG_KEY !== undefined &&
+    process.env.NEXT_PUBLIC_POSTHOG_KEY !== ''
+  ) {
+    sessionEnv.NEXT_PUBLIC_POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   }
   createSession(sessionName, sessionEnv);
 
@@ -401,7 +424,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   console.log(
     `${GREEN}Started ${startedServices.length} services in session ${sessionName}${RESET}`
   );
-  attachSession(sessionName);
+  if (!noAttach) attachSession(sessionName);
 }
 
 type ServiceStatus = 'up' | 'down';
@@ -583,7 +606,8 @@ async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
 function printUsage(): void {
   console.log(`
 Usage:
-  dev:start [targets...]  Start services (default: core)
+  dev:start [--no-attach] [targets...]
+                          Start services (default: core)
   dev:stop [--force]      Stop all services (skips shared Docker infra if
                           other kilo-dev sessions are running; --force overrides)
   dev:status [--json]     Show running services and their ports

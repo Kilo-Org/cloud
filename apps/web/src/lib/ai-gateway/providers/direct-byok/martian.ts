@@ -11,7 +11,7 @@ export default {
     providerId: 'martian',
     recommendedModels: [
       {
-        id: 'moonshotai/Kimi-K2.6',
+        id: 'moonshotai/kimi-k2.6',
         name: 'kimi-k2.6',
         flags: ['vision'],
         context_length: 262144,

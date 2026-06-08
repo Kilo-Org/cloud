@@ -23,19 +23,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { AgentUpdateInput } from '@/lib/kiloclaw/agent-schemas';
+import {
+  REASONING_OPTIONS,
+  THINKING_OPTIONS,
+  VERBOSE_OPTIONS,
+  type AgentUpdateInput,
+} from '@/lib/kiloclaw/agent-schemas';
 import type { AgentSummary } from '@/lib/kiloclaw/types';
 import { useClawAgentMutations } from '../hooks/useClawHooks';
 import { useClawModelOptions } from '../hooks/useClawModelOptions';
 
 const INHERIT = 'inherit';
-const THINKING = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'adaptive', 'max'] as const;
-const VERBOSE = ['off', 'on', 'full'] as const;
-const REASONING = ['on', 'off', 'stream'] as const;
 
-type ThinkingOpt = typeof INHERIT | (typeof THINKING)[number];
-type VerboseOpt = typeof INHERIT | (typeof VERBOSE)[number];
-type ReasoningOpt = typeof INHERIT | (typeof REASONING)[number];
+type ThinkingOpt = typeof INHERIT | (typeof THINKING_OPTIONS)[number];
+type VerboseOpt = typeof INHERIT | (typeof VERBOSE_OPTIONS)[number];
+type ReasoningOpt = typeof INHERIT | (typeof REASONING_OPTIONS)[number];
 type FastModeOpt = typeof INHERIT | 'on' | 'off';
 
 // The agent's OWN model (not the inherited/effective one): primary + fallbacks.
@@ -91,7 +93,7 @@ export function AgentEditDialog({
   etag: string;
 }) {
   const { updateAgent } = useClawAgentMutations();
-  const { modelOptions, isLoading: isLoadingModels } = useClawModelOptions();
+  const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
 
   const initial = useMemo(() => ownModel(agent), [agent]);
   // An agent owns a model when rawModel is set — including a fallback-only model
@@ -228,6 +230,7 @@ export function AgentEditDialog({
                   value={primary}
                   onValueChange={setPrimary}
                   isLoading={isLoadingModels}
+                  error={modelError}
                   placeholder="Select a model"
                   modal
                   className="w-full"
@@ -249,14 +252,19 @@ export function AgentEditDialog({
           <LabeledSelect
             label="Thinking"
             value={thinking}
-            options={THINKING}
+            options={THINKING_OPTIONS}
             onChange={setThinking}
           />
-          <LabeledSelect label="Verbose" value={verbose} options={VERBOSE} onChange={setVerbose} />
+          <LabeledSelect
+            label="Verbose"
+            value={verbose}
+            options={VERBOSE_OPTIONS}
+            onChange={setVerbose}
+          />
           <LabeledSelect
             label="Reasoning"
             value={reasoning}
-            options={REASONING}
+            options={REASONING_OPTIONS}
             onChange={setReasoning}
           />
           <LabeledSelect

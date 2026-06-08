@@ -137,11 +137,17 @@ function AgentRow({
 
 function DefaultsRow({ defaults }: { defaults: AgentDefaultsSummary }) {
   const settings = settingChips(defaults.settings);
+  // Defaults can be fallback-only (primary null, fallbacks set) — don't show "none".
+  const modelLabel = defaults.model
+    ? defaults.model.primary ||
+      (defaults.model.fallbacks.length > 0
+        ? `fallbacks: ${defaults.model.fallbacks.join(', ')}`
+        : 'none')
+    : 'none';
 
   return (
     <div className="text-muted-foreground bg-muted/30 px-4 py-3 text-xs">
-      <span className="font-medium">Inherited defaults</span> · Model:{' '}
-      {defaults.model?.primary ?? 'none'}
+      <span className="font-medium">Inherited defaults</span> · Model: {modelLabel}
       {settings.length > 0 && ` · ${settings.join(' · ')}`}
     </div>
   );
@@ -232,7 +238,9 @@ export function AgentsSection({
         The agents running on your machine and the channels routed to each.
       </p>
 
-      <AgentCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
+      {/* Mounted only while open so its model-catalog/version queries don't run
+          on every page visit (incl. read-only and stopped-machine states). */}
+      {createOpen && <AgentCreateDialog open onOpenChange={setCreateOpen} />}
 
       {editTarget && (
         <AgentEditDialog

@@ -26,19 +26,24 @@ const EMPTY_STATUS = {
 export function useClawModelOptions(): {
   modelOptions: ModelOption[];
   isLoading: boolean;
-  error: boolean;
+  error: string | undefined;
 } {
   const { organizationId } = useClawContext();
   const personalStatus = useKiloClawStatus({ enabled: !organizationId });
   const orgStatus = useOrgKiloClawStatus(organizationId);
   const status = (organizationId ? orgStatus.data : personalStatus.data) ?? EMPTY_STATUS;
 
-  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
+  const {
+    data: modelsData,
+    isLoading: isLoadingModels,
+    error: modelsError,
+  } = useModelSelectorList(organizationId);
+  const isModelsError = modelsError != null;
   const isRunning = status.status === 'running';
   const { trackedVersion, runningVersion, isLoadingControllerVersion, isControllerVersionError } =
     useClawUpdateAvailable(status);
 
-  const hasError = isRunning && isControllerVersionError;
+  const versionError = isRunning && isControllerVersionError;
   const modelOptions = useMemo<ModelOption[]>(
     () =>
       getSettingsModelOptions({
@@ -51,14 +56,24 @@ export function useClawModelOptions(): {
         runningOpenClawVersion: runningVersion,
         isRunning,
         isLoadingRunningVersion: isLoadingControllerVersion,
-        hasRunningVersionError: hasError,
+        hasRunningVersionError: versionError,
       }),
-    [modelsData, trackedVersion, runningVersion, isRunning, isLoadingControllerVersion, hasError]
+    [
+      modelsData,
+      trackedVersion,
+      runningVersion,
+      isRunning,
+      isLoadingControllerVersion,
+      versionError,
+    ]
   );
 
+  // Surface either failure so the combobox shows it instead of a bare "no
+  // models" that hides a transient model-catalog or controller-version error.
+  const hasError = isModelsError || versionError;
   return {
     modelOptions,
     isLoading: isLoadingModels || (isRunning && isLoadingControllerVersion),
-    error: hasError,
+    error: hasError ? 'Could not load models. Try again in a moment.' : undefined,
   };
 }

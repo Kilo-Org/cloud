@@ -52,7 +52,7 @@ export function AgentCreateDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { createAgent } = useClawAgentMutations();
-  const { modelOptions, isLoading: isLoadingModels } = useClawModelOptions();
+  const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
   const [name, setName] = useState('');
   const [model, setModel] = useState('');
 
@@ -125,6 +125,7 @@ export function AgentCreateDialog({
               value={model}
               onValueChange={setModel}
               isLoading={isLoadingModels}
+              error={modelError}
               placeholder="Use the default model"
               modal
               className="w-full"

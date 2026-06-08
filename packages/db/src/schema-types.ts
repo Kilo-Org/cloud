@@ -948,6 +948,22 @@ export type PlatformRepository = {
   private: boolean;
 };
 
+export const REVIEW_MEMORY_PLATFORMS = ['github'] as const;
+export type ReviewMemoryPlatform = (typeof REVIEW_MEMORY_PLATFORMS)[number];
+
+export const REVIEW_MEMORY_PROPOSAL_STATUSES = [
+  'open',
+  'edited',
+  'rejected',
+  'opening_change_request',
+  'change_request_opened',
+  'change_request_failed',
+  'superseded',
+] as const;
+export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES)[number];
+
+export type ReviewMemoryEvidenceItem = { excerpt: string; prNumber: number | null };
+
 // --- Deployment types ---
 
 export const providerSchema = z.enum(['github', 'git', 'app-builder']);
@@ -1001,6 +1017,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   //   'warning'  — gate fails on warnings and above
   //   'critical' — gate fails only on critical issues
   gate_threshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  review_memory_enabled: z.boolean().optional(),
 });
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;

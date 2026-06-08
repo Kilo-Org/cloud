@@ -19,6 +19,7 @@ import { linearRouter } from '@/routers/linear-router';
 import { dolthubRouter } from '@/routers/dolthub-router';
 import { discordRouter } from '@/routers/discord-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
+import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
 import { appBuilderRouter } from '@/routers/app-builder-router';
@@ -62,6 +63,7 @@ export const rootRouter = createTRPCRouter({
   cloudAgent: cloudAgentRouter,
   cloudAgentNext: cloudAgentNextRouter,
   codeReviews: codeReviewRouter,
+  reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,
   byok: byokRouter,
   appBuilder: appBuilderRouter,

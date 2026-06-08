@@ -1100,6 +1100,13 @@
       "when": 1780670410645,
       "tag": "0156_living_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "7",
+      "when": 1780914642420,
+      "tag": "0157_fresh_elektra",
+      "breakpoints": true
     }
   ]
 }

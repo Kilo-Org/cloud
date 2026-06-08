@@ -54,7 +54,7 @@ jobs:
 
       - name: Expose pnpm to tmux shells
         run: |
-          printf '#!/usr/bin/env bash\nexec "%s/pnpm" "$@"\n' "$PNPM_HOME" | sudo tee /usr/local/bin/pnpm >/dev/null
+          printf '#!/usr/bin/env bash\nexport PATH="%s"\nexec "%s/pnpm" "$@"\n' "$PATH" "$PNPM_HOME" | sudo tee /usr/local/bin/pnpm >/dev/null
           sudo chmod +x /usr/local/bin/pnpm
 
       - name: Install tmux

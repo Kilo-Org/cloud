@@ -12,7 +12,7 @@ export default {
     recommendedModels: [
       {
         id: 'moonshotai/Kimi-K2.6',
-        name: 'Kimi-K2.6',
+        name: 'kimi-k2.6',
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 65535,

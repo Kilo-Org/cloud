@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -108,3 +109,21 @@ jobs:
             apps/web/test-results
             dev/logs
           retention-days: 7
+
+      - name: Notify setup smoke failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: '3791'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          cat > /tmp/setup-smoke-failure.md <<EOF
+          @RSO Setup Smoke failed.
+
+          Run: ${RUN_URL}
+          Ref: ${GITHUB_REF_NAME}
+          SHA: ${GITHUB_SHA}
+          Trigger: ${GITHUB_EVENT_NAME}
+          EOF
+
+          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/setup-smoke-failure.md

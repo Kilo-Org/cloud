@@ -6,7 +6,13 @@ export default {
   base_url: 'https://api.inceptron.io/v1',
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
-  transformRequest() {},
+  transformRequest(context) {
+    const { request } = context;
+    if (request.kind !== 'chat_completions') {
+      return;
+    }
+    request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
+  },
   models: cachedEnhancedDirectByokModelList({
     providerId: 'inceptron-byok',
     recommendedModels: [

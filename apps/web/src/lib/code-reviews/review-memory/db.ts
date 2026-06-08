@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { and, count, desc, eq, gte, inArray, lt, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, lt, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import {
@@ -30,6 +30,7 @@ const TERMINAL_PRUNABLE_PROPOSAL_STATUSES = [
   'change_request_opened',
   'superseded',
 ] as const;
+const REVIEW_MEMORY_PRUNE_BATCH_SIZE = 1_000;
 
 export function createReviewMemoryDedupeHash(parts: readonly unknown[]): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
@@ -396,23 +397,42 @@ export async function pruneExpiredReviewMemoryData(input?: {
   const database = input?.database ?? db;
   const cutoff = reviewMemoryRetentionCutoff(input?.now);
   const feedbackEvents = await database
-    .delete(code_review_feedback_events)
+    .select({ id: code_review_feedback_events.id })
+    .from(code_review_feedback_events)
     .where(lt(code_review_feedback_events.created_at, cutoff))
-    .returning({ id: code_review_feedback_events.id });
+    .orderBy(asc(code_review_feedback_events.created_at))
+    .limit(REVIEW_MEMORY_PRUNE_BATCH_SIZE);
+  const feedbackEventIds = feedbackEvents.map(event => event.id);
+  const feedbackResult =
+    feedbackEventIds.length > 0
+      ? await database
+          .delete(code_review_feedback_events)
+          .where(inArray(code_review_feedback_events.id, feedbackEventIds))
+      : null;
+
   const proposals = await database
-    .delete(code_review_memory_proposals)
+    .select({ id: code_review_memory_proposals.id })
+    .from(code_review_memory_proposals)
     .where(
       and(
         lt(code_review_memory_proposals.updated_at, cutoff),
         inArray(code_review_memory_proposals.status, [...TERMINAL_PRUNABLE_PROPOSAL_STATUSES])
       )
     )
-    .returning({ id: code_review_memory_proposals.id });
+    .orderBy(asc(code_review_memory_proposals.updated_at))
+    .limit(REVIEW_MEMORY_PRUNE_BATCH_SIZE);
+  const proposalIds = proposals.map(proposal => proposal.id);
+  const proposalResult =
+    proposalIds.length > 0
+      ? await database
+          .delete(code_review_memory_proposals)
+          .where(inArray(code_review_memory_proposals.id, proposalIds))
+      : null;
 
   return {
     cutoff,
-    feedbackEventsDeleted: feedbackEvents.length,
-    proposalsDeleted: proposals.length,
+    feedbackEventsDeleted: feedbackResult?.rowCount ?? 0,
+    proposalsDeleted: proposalResult?.rowCount ?? 0,
   };
 }
 

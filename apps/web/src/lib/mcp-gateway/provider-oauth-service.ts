@@ -27,7 +27,6 @@ import type { GatewayAppConfig } from './config';
 import type { GatewayRepository, ResolvedGatewayRoute } from './repository';
 import type { GatewayRouteService } from './route-service';
 import type { GatewayGrantService } from './grant-service';
-import type { GatewayDiscoveryService } from './discovery-service';
 import { configSecretAad, expiresAtIso, hashToken, pkceChallenge, randomToken } from './crypto';
 import { validatePublicHttpsDestination } from './discovery-service';
 import { createAuditService } from './audit-service';
@@ -135,7 +134,6 @@ export function createProviderOAuthService(params: {
   repository: GatewayRepository;
   routeService: GatewayRouteService;
   grantService: GatewayGrantService;
-  discoveryService: GatewayDiscoveryService;
   config: GatewayAppConfig;
   fetchImpl?: typeof fetch;
 }) {
@@ -281,21 +279,10 @@ export function createProviderOAuthService(params: {
       credentials.metadata.authorization_endpoint
     );
     const tokenEndpoint = await validatePublicHttpsDestination(credentials.metadata.token_endpoint);
-    let providerScopes = resolved.config.provider_scopes;
-    let providerResource = resolved.config.provider_resource
+    const providerScopes = resolved.config.provider_scopes;
+    const providerResource = resolved.config.provider_resource
       ? await validatePublicHttpsDestination(resolved.config.provider_resource)
       : null;
-    if (providerScopes === null || providerResource === null) {
-      const discovery = await params.discoveryService.discoverRemoteProvider(
-        resolved.config.remote_url
-      );
-      if (providerScopes === null) {
-        providerScopes = discovery.providerScopes;
-      }
-      if (providerResource === null && discovery.providerResource) {
-        providerResource = await validatePublicHttpsDestination(discovery.providerResource);
-      }
-    }
     return {
       authorizationEndpoint,
       tokenEndpoint,

@@ -31,7 +31,28 @@ const blockedExactHeaders = new Set([
   'x-api-key',
 ]);
 
-const transportIdentityHeaders = new Set(['host', 'forwarded']);
+const transportIdentityHeaders = new Set([
+  'host',
+  'forwarded',
+  'cf-connecting-ip',
+  'cf-connecting-o2o',
+  'cf-device-type',
+  'cf-ipcity',
+  'cf-ipcontinent',
+  'cf-ipcountry',
+  'cf-iplatitude',
+  'cf-iplongitude',
+  'cf-metro-code',
+  'cf-postal-code',
+  'cf-ray',
+  'cf-region',
+  'cf-region-code',
+  'cf-timezone',
+  'cf-visitor',
+  'cf-worker',
+  'cf-ew-via',
+  'cf-pseudo-ipv4',
+]);
 
 export function isAllowedTransientHeader(name: string): boolean {
   const normalized = name.toLowerCase();
@@ -49,11 +70,7 @@ export function isCredentialLikeHeader(name: string): boolean {
 
 function isTransportIdentityHeader(name: string): boolean {
   const normalized = name.toLowerCase();
-  return (
-    transportIdentityHeaders.has(normalized) ||
-    normalized.startsWith('x-forwarded-') ||
-    normalized.startsWith('cf-')
-  );
+  return transportIdentityHeaders.has(normalized) || normalized.startsWith('x-forwarded-');
 }
 
 const headerValueSchema = z

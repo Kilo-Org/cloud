@@ -30,6 +30,12 @@ import { createAuditService } from './audit-service';
 
 const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
 
+function normalizeProviderScopes(scopes: string[] | null | undefined): string[] | null {
+  if (!scopes) return null;
+  const normalized = [...new Set(scopes.map(scope => scope.trim()).filter(Boolean))].sort();
+  return normalized.length > 0 ? normalized : null;
+}
+
 export function createConfigService(params: {
   repository: GatewayRepository;
   config: GatewayAppConfig;
@@ -62,14 +68,16 @@ export function createConfigService(params: {
         400
       );
     }
-    const providerScopeSource: MCPGatewayProviderScopeSource = input.providerScopes
+    const overrideScopes = normalizeProviderScopes(input.providerScopes);
+    const providerScopes = overrideScopes ?? normalizeProviderScopes(discovery.providerScopes);
+    const providerScopeSource: MCPGatewayProviderScopeSource = overrideScopes
       ? 'override'
-      : discovery.providerScopeSource === 'discovered'
+      : providerScopes && discovery.providerScopeSource === 'discovered'
         ? 'discovered'
         : 'none';
     return {
       metadata: provider,
-      providerScopes: input.providerScopes ?? discovery.providerScopes,
+      providerScopes,
       providerScopeSource,
       providerResource: discovery.providerResource,
     };
@@ -476,19 +484,20 @@ export function createConfigService(params: {
           400
         );
       }
-      const currentScopes = config.provider_scopes ?? null;
+      const currentScopes = normalizeProviderScopes(config.provider_scopes);
+      const nextScopes = normalizeProviderScopes(input.providerScopes);
       const sameScopes =
-        currentScopes === null && input.providerScopes === null
+        currentScopes === null && nextScopes === null
           ? true
-          : currentScopes?.length === input.providerScopes?.length &&
-            currentScopes?.every((scope, index) => scope === input.providerScopes?.[index]);
-      const nextSource: MCPGatewayProviderScopeSource = input.providerScopes ? 'override' : 'none';
+          : currentScopes?.length === nextScopes?.length &&
+            currentScopes?.every((scope, index) => scope === nextScopes?.[index]);
+      const nextSource: MCPGatewayProviderScopeSource = nextScopes ? 'override' : 'none';
       if (sameScopes && config.provider_scope_source === nextSource) return config;
       await revokeConfigGrants(tx, input.configId);
       const [updated] = await tx
         .update(mcp_gateway_configs)
         .set({
-          provider_scopes: input.providerScopes,
+          provider_scopes: nextScopes,
           provider_scope_source: nextSource,
           config_version: sql`${mcp_gateway_configs.config_version} + 1`,
         })
@@ -500,7 +509,7 @@ export function createConfigService(params: {
         configId: updated.config_id,
         eventType: 'config_updated',
         outcome: 'success',
-        metadata: { providerScopes: input.providerScopes, providerScopeSource: nextSource },
+        metadata: { providerScopes: nextScopes, providerScopeSource: nextSource },
       });
       return updated;
     });
@@ -615,7 +624,11 @@ export function createConfigService(params: {
     return assignment;
   }
 
-  async function revokeAssignment(input: { configId: string; userId: string }) {
+  async function revokeAssignment(input: {
+    configId: string;
+    userId: string;
+    actorUserId: string;
+  }) {
     return await params.repository.database.transaction(async tx => {
       const assignment = await removeAssignmentState(tx, input.configId, input.userId);
       if (!assignment) return null;
@@ -629,7 +642,7 @@ export function createConfigService(params: {
           ownerScope: config.owner_scope,
           ownerId: config.owner_id,
           configId: config.config_id,
-          actorUserId: assignment.assigned_by_kilo_user_id,
+          actorUserId: input.actorUserId,
           eventType: 'assignment_removed',
           outcome: 'success',
         });

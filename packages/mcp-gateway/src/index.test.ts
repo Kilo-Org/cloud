@@ -83,6 +83,15 @@ describe('static headers', () => {
     expect(() => parseStaticHeaders({ 'CF-Connecting-IP': '203.0.113.1' })).toThrow(
       'Static header cannot be transport identity metadata'
     );
+    expect(
+      parseStaticHeaders({
+        'CF-Access-Client-Id': 'client-id',
+        'CF-Access-Client-Secret': 'client-secret',
+      })
+    ).toEqual({
+      'CF-Access-Client-Id': 'client-id',
+      'CF-Access-Client-Secret': 'client-secret',
+    });
   });
 });
 

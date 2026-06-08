@@ -474,7 +474,7 @@ describe('MCP gateway app OAuth flow', () => {
       authorization_endpoint: 'https://example.com/authorize',
       token_endpoint: 'https://example.com/token',
     });
-    expect(created.config.provider_scopes).toEqual(['openid', 'email']);
+    expect(created.config.provider_scopes).toEqual(['email', 'openid']);
     expect(created.config.provider_scope_source).toBe('discovered');
     expect(created.config.provider_resource).toBe('https://example.com/mcp');
   });
@@ -517,13 +517,18 @@ describe('MCP gateway app OAuth flow', () => {
 
     const updated = await services.configService.updateProviderScopes({
       configId: created.config.config_id,
-      providerScopes: ['repo'],
+      providerScopes: ['repo', 'read'],
+    });
+    const reordered = await services.configService.updateProviderScopes({
+      configId: created.config.config_id,
+      providerScopes: ['read', 'repo'],
     });
     const grant = await services.repository.findActiveGrant(instance.instance_id);
 
-    expect(updated.provider_scopes).toEqual(['repo']);
+    expect(updated.provider_scopes).toEqual(['read', 'repo']);
     expect(updated.provider_scope_source).toBe('override');
     expect(updated.config_version).toBe(2);
+    expect(reordered.config_version).toBe(2);
     expect(grant).toBeNull();
   });
 
@@ -657,7 +662,7 @@ describe('MCP gateway app OAuth flow', () => {
     expect(authorization.kind).toBe('provider_redirect');
     if (authorization.kind !== 'provider_redirect') return;
     const providerAuthorizationUrl = new URL(authorization.authorizationUrl);
-    expect(providerAuthorizationUrl.searchParams.get('scope')).toBe('openid email');
+    expect(providerAuthorizationUrl.searchParams.get('scope')).toBe('email openid');
     expect(providerAuthorizationUrl.searchParams.get('resource')).toBe('https://example.com/mcp');
     expect(registrationBody).toMatchObject({
       client_name: 'Kilo MCP Gateway',
@@ -699,7 +704,7 @@ describe('MCP gateway app OAuth flow', () => {
       executionContext: { type: 'personal' },
     });
     const providerAuthorizationUrl = new URL(authorization.authorizationUrl);
-    expect(providerAuthorizationUrl.searchParams.get('scope')).toBe('openid email');
+    expect(providerAuthorizationUrl.searchParams.get('scope')).toBe('email openid');
     expect(providerAuthorizationUrl.searchParams.get('resource')).toBe('https://example.com/mcp');
   });
 
@@ -968,7 +973,7 @@ describe('MCP gateway app OAuth flow', () => {
         callback.grant.encrypted_grant,
         callback.instance.instance_id
       ).scope
-    ).toBe('openid email');
+    ).toBe('email openid');
     const grants = await db
       .select()
       .from(mcp_gateway_provider_grants)

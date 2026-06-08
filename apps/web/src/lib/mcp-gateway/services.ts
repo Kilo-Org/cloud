@@ -31,7 +31,6 @@ export function createGatewayServices(
     repository,
     routeService,
     grantService,
-    discoveryService,
     config,
     fetchImpl: params.fetchImpl,
   });

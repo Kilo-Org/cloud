@@ -377,20 +377,40 @@ export function McpGatewayDetailContent({
                               {member?.name ? member.email : assignment.userId}
                             </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-foreground sm:-mr-2"
-                            onClick={() =>
-                              revokeAssignmentMutation.mutate({
-                                ...managedConfigInput,
-                                userId: assignment.userId,
-                              })
-                            }
-                            disabled={revokeAssignmentMutation.isPending}
-                          >
-                            Revoke access
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-foreground sm:-mr-2"
+                                disabled={revokeAssignmentMutation.isPending}
+                              >
+                                Revoke access
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Revoke member access?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This removes the member's assignment, active instance, and
+                                  provider grant for this connection.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() =>
+                                    revokeAssignmentMutation.mutate({
+                                      ...managedConfigInput,
+                                      userId: assignment.userId,
+                                    })
+                                  }
+                                >
+                                  Revoke access
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       );
                     })}

@@ -708,6 +708,7 @@ export const mcpGatewayRouter = createTRPCRouter({
         const assignment = await services.configService.revokeAssignment({
           configId: input.configId,
           userId: input.userId,
+          actorUserId: ctx.user.id,
         });
         if (!assignment)
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Assignment not found' });

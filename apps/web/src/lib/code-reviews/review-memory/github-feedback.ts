@@ -19,6 +19,7 @@ export const KILO_GITHUB_BOT_LOGINS: ReadonlySet<string> = new Set([
 ]);
 
 const MAINTAINER_AUTHOR_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+export const REVIEW_MEMORY_FEEDBACK_EXCERPT_MAX_LENGTH = 2_000;
 
 export function isLikelyKiloBotActor(login: string | undefined): boolean {
   return KILO_GITHUB_BOT_LOGINS.has(login?.toLowerCase() ?? '');
@@ -83,8 +84,8 @@ export async function handleGitHubReviewCommentReply(input: {
     repoFullName: input.payload.repository.full_name,
     prNumber: input.payload.pull_request.number,
     kiloCommentId: String(parentCommentId),
-    replyExcerpt: input.payload.comment.body,
-    kiloCommentExcerpt: parent.body,
+    replyExcerpt: truncateReviewMemoryFeedbackExcerpt(input.payload.comment.body),
+    kiloCommentExcerpt: truncateReviewMemoryFeedbackExcerpt(parent.body),
     occurredAt: input.payload.comment.created_at ?? new Date().toISOString(),
   });
 
@@ -99,6 +100,10 @@ function ownerFromIntegration(integration: PlatformIntegration): ReviewMemoryOwn
     return { type: 'user', id: integration.owned_by_user_id };
   }
   return null;
+}
+
+function truncateReviewMemoryFeedbackExcerpt(value: string): string {
+  return value.slice(0, REVIEW_MEMORY_FEEDBACK_EXCERPT_MAX_LENGTH);
 }
 
 const defaultFetchParentComment: FetchParentReviewComment = async input => {

@@ -159,6 +159,11 @@ describe('AgentBindingsInputSchema', () => {
     expect(AgentBindingsInputSchema.safeParse({ channels: ['  '] }).success).toBe(false);
   });
 
+  it('rejects channels with controller-guarded formats (dash prefix, account specifier)', () => {
+    expect(AgentBindingsInputSchema.safeParse({ channels: ['-foo'] }).success).toBe(false);
+    expect(AgentBindingsInputSchema.safeParse({ channels: ['slack:team'] }).success).toBe(false);
+  });
+
   it('rejects unknown keys (strict)', () => {
     expect(AgentBindingsInputSchema.safeParse({ channels: ['slack'], nope: true }).success).toBe(
       false

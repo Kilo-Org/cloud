@@ -327,20 +327,42 @@ describe('kiloclaw referrals', () => {
         google_user_email: 'user-canceled-commit@example.com',
         normalized_email: 'user-canceled-commit@example.com',
       });
-      await insertActivePersonalSubscription(guardedUser.id, {
-        plan: 'commit',
-        cancel_at_period_end: true,
-        current_period_end: '2026-12-01T12:00:00.000Z',
-        credit_renewal_at: '2026-12-01T12:00:00.000Z',
-        commit_ends_at: '2026-12-01T12:00:00.000Z',
-      });
-      await insertActivePersonalSubscription(userCanceledUser.id, {
-        plan: 'commit',
-        cancel_at_period_end: true,
-        current_period_end: '2026-12-01T12:00:00.000Z',
-        credit_renewal_at: '2026-12-01T12:00:00.000Z',
-        commit_ends_at: '2027-01-01T12:00:00.000Z',
-      });
+      const { subscriptionId: guardedSubscriptionId } = await insertActivePersonalSubscription(
+        guardedUser.id,
+        {
+          plan: 'commit',
+          cancel_at_period_end: true,
+          current_period_end: '2026-12-01T12:00:00.000Z',
+          credit_renewal_at: '2026-12-01T12:00:00.000Z',
+          commit_ends_at: '2026-12-01T12:00:00.000Z',
+        }
+      );
+      const { subscriptionId: userCanceledSubscriptionId } = await insertActivePersonalSubscription(
+        userCanceledUser.id,
+        {
+          plan: 'commit',
+          cancel_at_period_end: true,
+          current_period_end: '2026-12-01T12:00:00.000Z',
+          credit_renewal_at: '2026-12-01T12:00:00.000Z',
+          commit_ends_at: '2026-12-01T12:00:00.000Z',
+        }
+      );
+      await db.insert(kiloclaw_subscription_change_log).values([
+        {
+          subscription_id: guardedSubscriptionId,
+          actor_type: 'system',
+          actor_id: 'commit-retirement',
+          action: 'schedule_changed',
+          reason: 'commit_retirement_guarded',
+        },
+        {
+          subscription_id: userCanceledSubscriptionId,
+          actor_type: 'user',
+          actor_id: userCanceledUser.id,
+          action: 'canceled',
+          reason: 'user_requested_cancellation',
+        },
+      ]);
       await insertEarnedReferralRewardForUser(guardedUser.id);
       await insertEarnedReferralRewardForUser(userCanceledUser.id);
 
@@ -479,6 +501,57 @@ describe('kiloclaw referrals', () => {
         ],
       });
       expect(mockStripeSubscriptionUpdate).not.toHaveBeenCalled();
+      const [subscription] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, user.id));
+      expect(subscription).toEqual(
+        expect.objectContaining({
+          current_period_end: '2027-01-01 12:00:00+00',
+          commit_ends_at: '2027-01-01 12:00:00+00',
+        })
+      );
+    });
+
+    it('completes local reward application when the Stripe schedule was already extended', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'already-extended-final-commit@example.com',
+        normalized_email: 'already-extended-final-commit@example.com',
+      });
+      await insertActivePersonalSubscription(user.id, {
+        payment_source: 'stripe',
+        stripe_subscription_id: 'sub_already_extended_final_commit',
+        stripe_schedule_id: 'sched_already_extended_final_commit',
+        plan: 'commit',
+        scheduled_plan: 'standard',
+        scheduled_by: 'user',
+        current_period_end: '2026-12-01T12:00:00.000Z',
+        credit_renewal_at: null,
+        commit_ends_at: '2026-12-01T12:00:00.000Z',
+      });
+      await insertEarnedReferralRewardForUser(user.id);
+      const previousBoundary = Math.floor(new Date('2026-12-01T12:00:00.000Z').getTime() / 1000);
+      const newBoundary = Math.floor(new Date('2027-01-01T12:00:00.000Z').getTime() / 1000);
+      mockStripeScheduleRetrieve.mockResolvedValueOnce({
+        id: 'sched_already_extended_final_commit',
+        status: 'active',
+        phases: [
+          {
+            start_date: previousBoundary - 15_552_000,
+            end_date: newBoundary,
+            items: [{ price: 'price_commit' }],
+          },
+          {
+            start_date: newBoundary,
+            items: [{ price: 'price_standard' }],
+          },
+        ],
+      } as never);
+
+      const summary = await processQueuedKiloClawReferralRewards({ beneficiaryUserIds: [user.id] });
+
+      expect(summary).toEqual({ claimed: 1, applied: 1, expired: 0, pending: 0, failed: 0 });
+      expect(mockStripeScheduleUpdate).not.toHaveBeenCalled();
       const [subscription] = await db
         .select()
         .from(kiloclaw_subscriptions)

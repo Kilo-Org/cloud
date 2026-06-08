@@ -19,7 +19,10 @@ import { logImpactReferralDebug } from '@/lib/impact/debug';
 import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { projectPendingKiloPassBonusMicrodollars } from '@/lib/kiloclaw/credit-billing';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { enforceKiloClawCommitRetirementGuard } from '@/lib/kiloclaw/commit-retirement';
+import {
+  enforceKiloClawCommitRetirementGuard,
+  reportKiloClawCommitRetirementAnomaly,
+} from '@/lib/kiloclaw/commit-retirement';
 
 const personalBillingTemplateNames = [
   'clawSuspendedTrial',
@@ -341,6 +344,14 @@ const BodySchema = z.discriminatedUnion('action', [
     }),
   }),
   z.object({
+    action: z.literal('report_commit_retirement_anomaly'),
+    input: z.object({
+      reason: z.literal('boundary_mismatch'),
+      summary: z.string().min(1),
+      subscriptionId: z.uuid(),
+    }),
+  }),
+  z.object({
     action: z.literal('process_paid_conversion'),
     input: z.object({
       userId: z.string().min(1),
@@ -396,6 +407,7 @@ function getActionLogFields(body: z.infer<typeof BodySchema>): {
     case 'enqueue_affiliate_event':
       return { userId: body.input.userId };
     case 'commit_retirement_guard':
+    case 'report_commit_retirement_anomaly':
       return {};
     case 'process_paid_conversion':
       return { userId: body.input.userId };
@@ -487,6 +499,11 @@ export async function POST(request: NextRequest) {
 
       case 'commit_retirement_guard':
         payload = await enforceKiloClawCommitRetirementGuard(parsed.data.input);
+        break;
+
+      case 'report_commit_retirement_anomaly':
+        reportKiloClawCommitRetirementAnomaly(parsed.data.input);
+        payload = { ok: true };
         break;
 
       case 'enqueue_affiliate_event':

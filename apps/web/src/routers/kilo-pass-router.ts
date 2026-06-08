@@ -758,7 +758,7 @@ async function buildEndedKiloPassSubscriptionState(params: {
 const GetCheckoutReturnStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateBaseSchema.nullable(),
   creditsAwarded: z.boolean(),
-  hostingIntent: z.enum(['none', 'standard', 'commit']),
+  hostingIntent: z.enum(['none', 'expired_commit', 'standard', 'commit']),
   welcomePromoIneligibleDueToReusedFingerprint: z.boolean(),
 });
 
@@ -1086,7 +1086,7 @@ export const kiloPassRouter = createTRPCRouter({
 
       const checkoutSession = await stripe.checkout.sessions.retrieve(input.sessionId);
       const checkoutHostingIntent = checkoutSession.metadata?.kiloclawHostingPlan;
-      let hostingIntent: 'none' | 'standard' | 'commit' =
+      let hostingIntent: 'none' | 'expired_commit' | 'standard' | 'commit' =
         checkoutHostingIntent === 'standard' || checkoutHostingIntent === 'commit'
           ? checkoutHostingIntent
           : 'none';
@@ -1099,7 +1099,7 @@ export const kiloPassRouter = createTRPCRouter({
         if (checkoutSubscriptionId) {
           const verifiedSubscription = await stripe.subscriptions.retrieve(checkoutSubscriptionId);
           if (!isBeforeKiloClawCommitSalesCutoff(new Date(verifiedSubscription.created * 1000))) {
-            hostingIntent = 'none';
+            hostingIntent = 'expired_commit';
           }
         }
       }
@@ -1249,11 +1249,23 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
+      const [priorPaidSubscription] = await db
+        .select({ id: kiloclaw_subscriptions.id })
+        .from(kiloclaw_subscriptions)
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, ctx.user.id),
+            eq(kiloclaw_subscriptions.status, 'canceled'),
+            ne(kiloclaw_subscriptions.plan, 'trial')
+          )
+        )
+        .limit(1);
+
       await enrollWithCredits({
         userId: ctx.user.id,
         instanceId: instance.id,
         plan: hostingPlan,
-        hadPaidSubscription: false,
+        hadPaidSubscription: Boolean(priorPaidSubscription),
         actor: { actorType: 'user', actorId: ctx.user.id },
         commitQualification:
           hostingPlan === 'commit'

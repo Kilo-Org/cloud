@@ -338,6 +338,14 @@ type SideEffectRequest =
       input: { subscriptionId: string; expectedFinalBoundary: string };
     }
   | {
+      action: 'report_commit_retirement_anomaly';
+      input: {
+        reason: 'boundary_mismatch';
+        summary: string;
+        subscriptionId: string;
+      };
+    }
+  | {
       action: 'process_paid_conversion';
       input: {
         userId: string;
@@ -366,14 +374,16 @@ type SideEffectResponse<T extends SideEffectRequest> = T['action'] extends 'send
         ? { enqueued: boolean }
         : T['action'] extends 'commit_retirement_guard'
           ? { guarded: boolean }
-          : T['action'] extends 'process_paid_conversion'
-            ? {
-                affiliateSaleEnqueued: boolean;
-                winningTouchType: 'referral' | 'affiliate' | 'none';
-                conversionId: string | null;
-                disqualificationReason: string | null;
-              }
-            : { ok: true };
+          : T['action'] extends 'report_commit_retirement_anomaly'
+            ? { ok: true }
+            : T['action'] extends 'process_paid_conversion'
+              ? {
+                  affiliateSaleEnqueued: boolean;
+                  winningTouchType: 'referral' | 'affiliate' | 'none';
+                  conversionId: string | null;
+                  disqualificationReason: string | null;
+                }
+              : { ok: true };
 
 export class KiloClawApiError extends Error {
   readonly statusCode: number;
@@ -1629,6 +1639,7 @@ async function autoResumeIfSuspended(
 
 type CreditRenewalTransactionOutcome =
   | { kind: 'skipped' }
+  | { kind: 'ambiguous_commit'; subscriptionId: string; userId: string; instanceId: string }
   | { kind: 'canceled'; row: CreditRenewalRow; renewalAt: string }
   | {
       kind: 'duplicate';
@@ -1881,7 +1892,12 @@ async function processCreditRenewalRow(
         currentPeriodEnd: current.current_period_end,
         commitEndsAt: current.commit_ends_at,
       });
-      return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
+      return {
+        kind: 'ambiguous_commit',
+        subscriptionId: current.id,
+        userId: current.user_id,
+        instanceId: current.instance_id,
+      } satisfies CreditRenewalTransactionOutcome;
     }
 
     const cancelAtFinalCommitBoundary = retirementDecision.kind === 'cancel_final_commit';
@@ -2087,6 +2103,26 @@ async function processCreditRenewalRow(
 
     return { kind: 'past_due', row: current } satisfies CreditRenewalTransactionOutcome;
   });
+
+  if (outcome.kind === 'ambiguous_commit') {
+    await callBillingSideEffect(
+      env,
+      context,
+      {
+        action: 'report_commit_retirement_anomaly',
+        input: {
+          reason: 'boundary_mismatch',
+          summary: 'Credit renewal skipped because final Commit evidence is ambiguous.',
+          subscriptionId: outcome.subscriptionId,
+        },
+      },
+      {
+        userId: outcome.userId,
+        instanceId: outcome.instanceId,
+      }
+    );
+    return;
+  }
 
   if (outcome.kind === 'canceled') {
     if (shouldResolveTerminalFailure) {

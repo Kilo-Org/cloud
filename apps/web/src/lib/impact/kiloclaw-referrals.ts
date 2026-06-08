@@ -377,23 +377,61 @@ function hasUserScheduledStandardContinuation(subscription: KiloClawSubscription
   return subscription.scheduled_plan === 'standard' && subscription.scheduled_by === 'user';
 }
 
-function isEligibleFinalCommitCancellation(subscription: KiloClawSubscription): boolean {
-  return (
-    subscription.plan === 'commit' &&
-    subscription.commit_ends_at !== null &&
-    subscription.current_period_end === subscription.commit_ends_at &&
-    subscription.cancel_at_period_end &&
-    (hasUserScheduledStandardContinuation(subscription) || subscription.scheduled_plan === null)
-  );
+async function isEligibleFinalCommitCancellation(
+  subscription: KiloClawSubscription,
+  database: DatabaseClient
+): Promise<boolean> {
+  if (
+    subscription.plan !== 'commit' ||
+    subscription.commit_ends_at === null ||
+    subscription.current_period_end !== subscription.commit_ends_at ||
+    !subscription.cancel_at_period_end ||
+    (!hasUserScheduledStandardContinuation(subscription) && subscription.scheduled_plan !== null)
+  ) {
+    return false;
+  }
+
+  if (hasUserScheduledStandardContinuation(subscription)) {
+    return true;
+  }
+
+  const [latestCancellationChange] = await database
+    .select({ reason: kiloclaw_subscription_change_log.reason })
+    .from(kiloclaw_subscription_change_log)
+    .where(
+      and(
+        eq(kiloclaw_subscription_change_log.subscription_id, subscription.id),
+        inArray(kiloclaw_subscription_change_log.reason, [
+          'commit_retirement_guarded',
+          'user_requested_cancellation',
+        ])
+      )
+    )
+    .orderBy(
+      sql`${kiloclaw_subscription_change_log.created_at} DESC`,
+      sql`${kiloclaw_subscription_change_log.id} DESC`
+    )
+    .limit(1);
+
+  return latestCancellationChange?.reason === 'commit_retirement_guarded';
 }
 
-function hasActiveEligibleSubscriptionRow(subscription: KiloClawSubscription): boolean {
+async function hasActiveEligibleSubscriptionRow(
+  subscription: KiloClawSubscription,
+  database: DatabaseClient
+): Promise<boolean> {
+  if (
+    subscription.plan === 'trial' ||
+    subscription.status !== 'active' ||
+    subscription.suspended_at !== null ||
+    subscription.past_due_since !== null
+  ) {
+    return false;
+  }
+
   return (
-    subscription.plan !== 'trial' &&
-    subscription.status === 'active' &&
-    (!subscription.cancel_at_period_end || isEligibleFinalCommitCancellation(subscription)) &&
-    subscription.suspended_at === null &&
-    subscription.past_due_since === null
+    !subscription.cancel_at_period_end ||
+    (await isEligibleFinalCommitCancellation(subscription, database))
   );
 }
 
@@ -402,7 +440,7 @@ async function hasActiveEligiblePersonalSubscription(
   database: DatabaseClient
 ): Promise<boolean> {
   const row = await resolveCurrentPersonalSubscriptionRow({ userId, dbOrTx: database });
-  return row ? hasActiveEligibleSubscriptionRow(row.subscription) : false;
+  return row ? hasActiveEligibleSubscriptionRow(row.subscription, database) : false;
 }
 
 async function markAffiliateTouchSaleAttributed(params: {
@@ -736,6 +774,37 @@ function resolveSchedulePhasePrice(phase: Stripe.SubscriptionSchedule.Phase): st
   return typeof price === 'string' ? price : (price.id ?? null);
 }
 
+function isExtendedRetirementScheduleAlreadyApplied(params: {
+  schedule: Stripe.SubscriptionSchedule;
+  newBoundary: string;
+}): boolean {
+  const newBoundary = toStripeTimestamp(params.newBoundary);
+  if (!Number.isFinite(newBoundary)) return false;
+
+  const commitPhaseIndex = params.schedule.phases.findIndex(
+    phase =>
+      phase.end_date === newBoundary && phase.start_date < newBoundary && phase.items.length === 1
+  );
+  const commitPhase = params.schedule.phases[commitPhaseIndex];
+  const standardPhase = params.schedule.phases[commitPhaseIndex + 1];
+  const commitPrice = commitPhase ? resolveSchedulePhasePrice(commitPhase) : null;
+  const standardPrice = standardPhase ? resolveSchedulePhasePrice(standardPhase) : null;
+
+  return (
+    (params.schedule.status === 'active' || params.schedule.status === 'not_started') &&
+    commitPhaseIndex >= 0 &&
+    Boolean(commitPhase) &&
+    Boolean(standardPhase) &&
+    params.schedule.phases.length === commitPhaseIndex + 2 &&
+    standardPhase?.start_date === newBoundary &&
+    standardPhase.items.length === 1 &&
+    commitPrice !== null &&
+    standardPrice !== null &&
+    getClawPlanForStripePriceId(commitPrice) === 'commit' &&
+    getClawPlanForStripePriceId(standardPrice) === 'standard'
+  );
+}
+
 function buildExtendedRetirementSchedulePhases(params: {
   schedule: Stripe.SubscriptionSchedule;
   previousBoundary: string;
@@ -864,7 +933,7 @@ async function applyReferralRewardById(
     });
     const subscription = currentSubscription?.subscription ?? null;
 
-    if (!subscription || !hasActiveEligibleSubscriptionRow(subscription)) {
+    if (!subscription || !(await hasActiveEligibleSubscriptionRow(subscription, tx))) {
       if (reward.status === KiloClawReferralRewardStatus.Earned) {
         // Mirror the conversion-time invariant: a Referrer reward that lands
         // in Pending because the referrer is no longer on an eligible paid
@@ -1062,10 +1131,16 @@ async function applyReferralRewardById(
       previousBoundary: result.previousBoundary,
       newBoundary: result.newBoundary,
     });
-    if (!phases) {
+    if (phases) {
+      await stripe.subscriptionSchedules.update(result.scheduleId, { phases });
+    } else if (
+      !isExtendedRetirementScheduleAlreadyApplied({
+        schedule,
+        newBoundary: result.newBoundary,
+      })
+    ) {
       throw new Error('Ambiguous retirement schedule phases');
     }
-    await stripe.subscriptionSchedules.update(result.scheduleId, { phases });
   } catch (error) {
     console.error(
       '[kiloclaw-referrals] reward application requires review due to ambiguous retirement schedule',

@@ -221,7 +221,10 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
   ) {
     reportKiloClawCommitRetirementAnomaly({
       reason: 'boundary_mismatch',
-      summary: 'Retirement guard boundary could not be verified; provider non-renewal forced.',
+      summary:
+        boundary.kind === 'verified'
+          ? 'Verified retirement boundary no longer matches the expected boundary; provider non-renewal forced.'
+          : 'Retirement guard boundary could not be verified; provider non-renewal forced.',
       subscriptionId: subscription.id,
       stripeSubscriptionId: subscription.stripe_subscription_id,
     });
@@ -244,6 +247,7 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
       before.plan !== 'commit' ||
       before.status !== 'active' ||
       before.stripe_subscription_id !== subscription.stripe_subscription_id ||
+      !timestampsEqual(before.commit_ends_at, params.expectedFinalBoundary) ||
       !timestampsEqual(before.current_period_end, subscription.current_period_end)
     ) {
       reportKiloClawCommitRetirementAnomaly({

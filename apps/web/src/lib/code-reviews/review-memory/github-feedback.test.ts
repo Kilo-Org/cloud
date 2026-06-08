@@ -79,6 +79,46 @@ describe('GitHub review memory feedback', () => {
     expect(events[0].reply_excerpt).toBe('First reply');
   });
 
+  it('does not dedupe replies for different owners', async () => {
+    const firstUser = await insertTestUser();
+    const secondUser = await insertTestUser();
+    const firstOwner = { type: 'user' as const, id: firstUser.id };
+    const secondOwner = { type: 'user' as const, id: secondUser.id };
+    await setReviewMemoryEnabled({
+      owner: firstOwner,
+      platform: 'github',
+      enabled: true,
+      createdBy: firstUser.id,
+    });
+    await setReviewMemoryEnabled({
+      owner: secondOwner,
+      platform: 'github',
+      enabled: true,
+      createdBy: secondUser.id,
+    });
+
+    const first = await handleGitHubReviewCommentReply({
+      payload: buildPayload({ parentCommentId: 252, body: 'First owner reply' }),
+      integration: buildIntegration(firstUser.id),
+      deliveryId: 'delivery-3a',
+      fetchParentComment: parentFetcher({ userLogin: 'kilo-code[bot]' }),
+    });
+    const second = await handleGitHubReviewCommentReply({
+      payload: buildPayload({ parentCommentId: 252, body: 'Second owner reply' }),
+      integration: buildIntegration(secondUser.id),
+      deliveryId: 'delivery-3b',
+      fetchParentComment: parentFetcher({ userLogin: 'kilo-code[bot]' }),
+    });
+
+    expect(first.recorded).toBe(true);
+    expect(second.recorded).toBe(true);
+    const events = await db
+      .select()
+      .from(code_review_feedback_events)
+      .where(eq(code_review_feedback_events.kilo_comment_id, '252'));
+    expect(events).toHaveLength(2);
+  });
+
   it('skips replies when the parent is not authored by a Kilo bot', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };

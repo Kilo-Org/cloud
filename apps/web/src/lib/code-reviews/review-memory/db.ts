@@ -53,7 +53,12 @@ export async function recordReplyFeedbackEvent(input: {
   database?: ReviewMemoryDatabase;
 }): Promise<{ event: CodeReviewFeedbackEvent; created: boolean }> {
   const database = input.database ?? db;
-  const dedupeHash = createReviewMemoryDedupeHash(['github', input.kiloCommentId]);
+  const dedupeHash = createReviewMemoryDedupeHash([
+    input.platform,
+    input.owner.type,
+    input.owner.id,
+    input.kiloCommentId,
+  ]);
   const [inserted] = await database
     .insert(code_review_feedback_events)
     .values({

@@ -3,11 +3,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 
-export function useKiloClawStatus() {
+export function useKiloClawStatus(options?: { enabled?: boolean }) {
   const trpc = useTRPC();
+  const enabled = options?.enabled ?? true;
   return useQuery(
     trpc.kiloclaw.getStatus.queryOptions(undefined, {
-      refetchInterval: 10_000,
+      enabled,
+      refetchInterval: enabled ? 10_000 : false,
     })
   );
 }

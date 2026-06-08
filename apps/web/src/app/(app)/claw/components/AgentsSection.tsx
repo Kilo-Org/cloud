@@ -65,7 +65,10 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
               className="px-1.5 py-0 text-[10px] leading-4"
             >
               {binding.channel}
-              {binding.accountId ? ` (${binding.accountId})` : ''}
+              {/* accountId is verbatim; null = default-account route. An empty
+                  string is still an account-scoped route, so test against null. */}
+              {binding.accountId !== null &&
+                ` (${binding.accountId === '' ? 'blank account' : binding.accountId})`}
               {binding.advanced ? ' · advanced' : ''}
             </Badge>
           ))

@@ -229,40 +229,94 @@ function getActionRequiredTerminalReason(
   return classifyCodeReviewActionRequiredFailure(errorMessage);
 }
 
-const RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE = 'Wrapper version mismatch'.toLowerCase();
+const MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY = 100_000;
 
-function isRetryableInfraFailure(
-  status: 'running' | 'completed' | 'failed' | 'cancelled',
-  terminalReason?: CodeReviewTerminalReason,
-  errorMessage?: string
-): boolean {
-  if (status !== 'failed') return false;
-  if (terminalReason === 'billing') return false;
-  if (isCodeReviewActionRequiredReason(terminalReason)) return false;
-  if (classifyCodeReviewActionRequiredFailure(errorMessage)) return false;
-  if (isBillingCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
-  if (isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)) return false;
+function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalReason): boolean {
+  return (
+    terminalReason === 'billing' ||
+    terminalReason === 'model_not_found' ||
+    terminalReason === 'user_cancelled' ||
+    terminalReason === 'superseded' ||
+    terminalReason === 'interrupted' ||
+    isCodeReviewActionRequiredReason(terminalReason)
+  );
+}
 
+function hasKnownUnretryableFailureMessage(errorMessage?: string | null): boolean {
   const message = errorMessage?.toLowerCase();
   if (!message) return false;
 
-  if (message.includes('execution exceeded maximum runtime')) return false;
-  if (message.includes('cancelled') || message.includes('canceled')) return false;
-  if (message.includes('superseded')) return false;
-  if (message.includes('user interrupted')) return false;
-
   return (
-    message.includes(RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE) ||
-    message.includes('container shutdown: sigterm') ||
-    message.includes('execution timeout - no heartbeat received') ||
-    ((message.includes('sandbox') ||
-      message.includes('container') ||
-      message.includes('cloudflare')) &&
-      (message.includes('http 500') ||
-        message.includes('status: 500') ||
-        message.includes('internal server error') ||
-        message.includes('internal_server_error')))
+    message.includes('maximum runtime') ||
+    /\b(cancelled|canceled)\b/i.test(message) ||
+    message.includes('superseded') ||
+    message.includes('user interrupted')
   );
+}
+
+function isKnownUnretryableCodeReviewFailure(
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string | null
+): boolean {
+  return (
+    hasKnownUnretryableTerminalReason(terminalReason) ||
+    classifyCodeReviewActionRequiredFailure(errorMessage) !== null ||
+    isBillingCodeReviewTerminalReason(terminalReason, errorMessage) ||
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage) ||
+    hasKnownUnretryableFailureMessage(errorMessage)
+  );
+}
+
+function shouldAutoRetryCodeReviewFailure(
+  status: 'running' | 'completed' | 'failed' | 'cancelled',
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string | null
+): boolean {
+  if (status !== 'failed') return false;
+  return !isKnownUnretryableCodeReviewFailure(terminalReason, errorMessage);
+}
+
+async function shouldSkipAutoRetryForFailedSessionTokenUsage(params: {
+  reviewId: string;
+  failedAttemptId: string;
+  failedCliSessionId?: string | null;
+  reviewCreatedAt: string;
+}): Promise<boolean> {
+  if (!params.failedCliSessionId) {
+    logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
+      reviewId: params.reviewId,
+      failedAttemptId: params.failedAttemptId,
+      reason: 'missing_cli_session_id',
+    });
+    return false;
+  }
+
+  const usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
+  if (!usage) {
+    logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
+      reviewId: params.reviewId,
+      failedAttemptId: params.failedAttemptId,
+      cliSessionId: params.failedCliSessionId,
+      reason: 'usage_unavailable',
+    });
+    return false;
+  }
+
+  const failedSessionTokens = usage.totalTokensIn + usage.totalTokensOut;
+  if (failedSessionTokens <= MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY) {
+    return false;
+  }
+
+  logExceptInTest('[code-review-status] Skipping infra retry after expensive failed session', {
+    reviewId: params.reviewId,
+    failedAttemptId: params.failedAttemptId,
+    cliSessionId: params.failedCliSessionId,
+    totalTokensIn: usage.totalTokensIn,
+    totalTokensOut: usage.totalTokensOut,
+    failedSessionTokens,
+    maxFailedSessionTokensForAutoRetry: MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY,
+  });
+  return true;
 }
 
 function isSupersededReview(review: CloudAgentCodeReview): boolean {
@@ -869,7 +923,7 @@ export async function POST(
       return terminalOwnerResolution;
     };
 
-    if (isRetryableInfraFailure(status, terminalReason, errorMessage)) {
+    if (shouldAutoRetryCodeReviewFailure(status, terminalReason, errorMessage)) {
       const retryableReview = await getCodeReviewById(reviewId);
       if (!retryableReview || isSupersededReview(retryableReview)) {
         logExceptInTest('[code-review-status] Skipping infra retry for superseded review', {
@@ -880,91 +934,101 @@ export async function POST(
         return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
       }
 
-      const retryAttemptResult = await createInfraRetryAttemptIfMissing({
-        codeReviewId: reviewId,
-        retryOfAttemptId: attempt.id,
+      const failedCliSessionId = attempt.cli_session_id ?? cliSessionId ?? review.cli_session_id;
+      const skipRetryForTokenUsage = await shouldSkipAutoRetryForFailedSessionTokenUsage({
+        reviewId,
+        failedAttemptId: attempt.id,
+        failedCliSessionId,
+        reviewCreatedAt: review.created_at,
       });
 
-      if (retryAttemptResult.outcome === 'created') {
-        const retryAttempt = retryAttemptResult.attempt;
+      if (!skipRetryForTokenUsage) {
+        const retryAttemptResult = await createInfraRetryAttemptIfMissing({
+          codeReviewId: reviewId,
+          retryOfAttemptId: attempt.id,
+        });
 
-        try {
-          const latestReview = await getCodeReviewById(reviewId);
-          if (!latestReview || isSupersededReview(latestReview)) {
+        if (retryAttemptResult.outcome === 'created') {
+          const retryAttempt = retryAttemptResult.attempt;
+
+          try {
+            const latestReview = await getCodeReviewById(reviewId);
+            if (!latestReview || isSupersededReview(latestReview)) {
+              await updateCodeReviewAttemptForCallback({
+                codeReviewId: reviewId,
+                attemptId: retryAttempt.id,
+                status: 'cancelled',
+                errorMessage: 'Superseded by new push',
+                terminalReason: 'superseded',
+                completedAt: new Date(),
+              });
+              logExceptInTest('[code-review-status] Skipping fresh retry for superseded review', {
+                reviewId,
+                retryAttemptId: retryAttempt.id,
+                status: latestReview?.status,
+                terminalReason: latestReview?.terminal_reason,
+              });
+              return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
+            }
+
+            const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
+              sessionId,
+              reason: errorMessage ?? terminalReason ?? 'retryable infra failure',
+              failedAttemptId: attempt.id,
+              retryAttemptId: retryAttempt.id,
+            });
+
+            if (retryResult.success) {
+              logExceptInTest('[code-review-status] Started fresh retry after infra failure', {
+                reviewId,
+                failedAttemptId: attempt.id,
+                retryAttemptId: retryAttempt.id,
+                sessionId,
+              });
+              return NextResponse.json({ success: true, retried: true });
+            }
+
             await updateCodeReviewAttemptForCallback({
               codeReviewId: reviewId,
               attemptId: retryAttempt.id,
-              status: 'cancelled',
-              errorMessage: 'Superseded by new push',
-              terminalReason: 'superseded',
+              status: 'failed',
+              errorMessage: 'Worker declined fresh retry after infra failure',
+              terminalReason: 'sandbox_error',
               completedAt: new Date(),
             });
-            logExceptInTest('[code-review-status] Skipping fresh retry for superseded review', {
-              reviewId,
-              retryAttemptId: retryAttempt.id,
-              status: latestReview?.status,
-              terminalReason: latestReview?.terminal_reason,
+          } catch (retryError) {
+            await updateCodeReviewAttemptForCallback({
+              codeReviewId: reviewId,
+              attemptId: retryAttempt.id,
+              status: 'failed',
+              errorMessage: retryError instanceof Error ? retryError.message : String(retryError),
+              terminalReason: 'sandbox_error',
+              completedAt: new Date(),
             });
-            return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
-          }
-
-          const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
-            sessionId,
-            reason: errorMessage ?? terminalReason ?? 'retryable infra failure',
-            failedAttemptId: attempt.id,
-            retryAttemptId: retryAttempt.id,
-          });
-
-          if (retryResult.success) {
-            logExceptInTest('[code-review-status] Started fresh retry after infra failure', {
+            logExceptInTest('[code-review-status] Fresh retry startup failed, falling through', {
               reviewId,
               failedAttemptId: attempt.id,
               retryAttemptId: retryAttempt.id,
-              sessionId,
+              error: retryError instanceof Error ? retryError.message : String(retryError),
             });
-            return NextResponse.json({ success: true, retried: true });
           }
-
-          await updateCodeReviewAttemptForCallback({
-            codeReviewId: reviewId,
-            attemptId: retryAttempt.id,
-            status: 'failed',
-            errorMessage: 'Worker declined fresh retry after infra failure',
-            terminalReason: 'sandbox_error',
-            completedAt: new Date(),
-          });
-        } catch (retryError) {
-          await updateCodeReviewAttemptForCallback({
-            codeReviewId: reviewId,
-            attemptId: retryAttempt.id,
-            status: 'failed',
-            errorMessage: retryError instanceof Error ? retryError.message : String(retryError),
-            terminalReason: 'sandbox_error',
-            completedAt: new Date(),
-          });
-          logExceptInTest('[code-review-status] Fresh retry startup failed, falling through', {
+        } else if (retryAttemptResult.outcome === 'existing-for-attempt') {
+          logExceptInTest('[code-review-status] Fresh retry already queued for failed attempt', {
             reviewId,
             failedAttemptId: attempt.id,
-            retryAttemptId: retryAttempt.id,
-            error: retryError instanceof Error ? retryError.message : String(retryError),
+            retryAttemptId: retryAttemptResult.attempt.id,
+            sessionId,
           });
+          return NextResponse.json({ success: true, retried: true });
+        } else if (retryAttemptResult.outcome === 'skipped-inactive') {
+          logExceptInTest('[code-review-status] Skipping infra retry for inactive review', {
+            reviewId,
+            failedAttemptId: attempt.id,
+            reviewStatus: retryAttemptResult.reviewStatus,
+            terminalReason: retryAttemptResult.terminalReason,
+          });
+          return NextResponse.json({ success: true, retried: false, skipped: 'inactive' });
         }
-      } else if (retryAttemptResult.outcome === 'existing-for-attempt') {
-        logExceptInTest('[code-review-status] Fresh retry already queued for failed attempt', {
-          reviewId,
-          failedAttemptId: attempt.id,
-          retryAttemptId: retryAttemptResult.attempt.id,
-          sessionId,
-        });
-        return NextResponse.json({ success: true, retried: true });
-      } else if (retryAttemptResult.outcome === 'skipped-inactive') {
-        logExceptInTest('[code-review-status] Skipping infra retry for inactive review', {
-          reviewId,
-          failedAttemptId: attempt.id,
-          reviewStatus: retryAttemptResult.reviewStatus,
-          terminalReason: retryAttemptResult.terminalReason,
-        });
-        return NextResponse.json({ success: true, retried: false, skipped: 'inactive' });
       }
     }
 

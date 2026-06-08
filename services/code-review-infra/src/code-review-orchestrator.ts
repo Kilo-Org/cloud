@@ -142,13 +142,14 @@ type CloudAgentNextFreshRetryFailureCategory =
   | 'not_cloud_agent_next_error'
   | 'non_5xx'
   | 'cancelled'
+  | 'deterministic_action_required_failure'
   | 'sandbox_api_or_storage_failure'
   | 'wrapper_version_mismatch'
   | 'wrapper_wait_for_port_timeout'
   | 'wrapper_kilo_server_start_timeout'
   | 'configured_session_lookup_failure'
   | 'repo_clone_or_checkout_failure'
-  | 'other_5xx';
+  | 'unclassified_5xx';
 
 type CloudAgentNextFreshRetryClassification = {
   retryable: boolean;
@@ -187,30 +188,60 @@ function classifyCloudAgentNextFreshSessionRetry(
     return cloudAgentNextFreshRetryClassification(error, false, 'billing', 'billing_protected');
   }
 
-  if (!(error instanceof CloudAgentNextError)) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const normalizedErrorMessage = errorMessage.toLowerCase();
+  const cloudAgentNextError = error instanceof CloudAgentNextError ? error : undefined;
+
+  if (/\b(cancelled|canceled)\b/i.test(errorMessage)) {
     return cloudAgentNextFreshRetryClassification(
-      undefined,
+      cloudAgentNextError,
       false,
-      'not_cloud_agent_next_error',
-      'not_cloud_agent_next_error'
+      'cancelled',
+      'cancelled_protected'
     );
   }
 
-  if (error.status < 500 || error.status >= 600) {
-    return cloudAgentNextFreshRetryClassification(error, false, 'non_5xx', 'non_5xx');
+  if (
+    normalizedErrorMessage.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
+    normalizedErrorMessage.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)
+  ) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      false,
+      'deterministic_action_required_failure',
+      'deterministic_action_required_failure_not_retryable'
+    );
   }
 
-  if (/\b(cancelled|canceled)\b/i.test(error.body)) {
-    return cloudAgentNextFreshRetryClassification(error, false, 'cancelled', 'cancelled_protected');
+  if (!cloudAgentNextError) {
+    return cloudAgentNextFreshRetryClassification(
+      undefined,
+      true,
+      'not_cloud_agent_next_error',
+      'unexpected_non_billing_error_retryable_by_default'
+    );
   }
 
-  const body = error.body.toLowerCase();
+  if (cloudAgentNextError.status < 500 || cloudAgentNextError.status >= 600) {
+    return cloudAgentNextFreshRetryClassification(cloudAgentNextError, false, 'non_5xx', 'non_5xx');
+  }
+
+  if (/\b(cancelled|canceled)\b/i.test(cloudAgentNextError.body)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      false,
+      'cancelled',
+      'cancelled_protected'
+    );
+  }
+
+  const body = cloudAgentNextError.body.toLowerCase();
   if (
     body.includes('configured session') &&
     body.includes('not found: session get returned no data')
   ) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       false,
       'configured_session_lookup_failure',
       'configured_session_lookup_not_retryable'
@@ -224,26 +255,38 @@ function classifyCloudAgentNextFreshSessionRetry(
     body.includes('object does not exist on the server')
   ) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       false,
       'repo_clone_or_checkout_failure',
       'repo_clone_or_checkout_not_retryable'
     );
   }
 
+  if (
+    body.includes('internal error in durable object storage') ||
+    body.includes('durable object storage operation exceeded timeout')
+  ) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      false,
+      'sandbox_api_or_storage_failure',
+      'storage_failure_not_retryable_by_code_review_classifier'
+    );
+  }
+
   if (body.includes(RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE)) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       true,
       'wrapper_version_mismatch',
       'wrapper_version_mismatch'
     );
   }
 
-  const parsedBody = parseJsonBody(error.body);
+  const parsedBody = parseJsonBody(cloudAgentNextError.body);
   if (hasRetryableSandboxMarker(parsedBody)) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       true,
       'sandbox_api_or_storage_failure',
       'sandbox_retryable_marker'
@@ -252,7 +295,7 @@ function classifyCloudAgentNextFreshSessionRetry(
 
   if (body.includes('failed to start kilo server: timeout waiting for server to start')) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       true,
       'wrapper_kilo_server_start_timeout',
       'wrapper_kilo_server_start_timeout'
@@ -264,7 +307,7 @@ function classifyCloudAgentNextFreshSessionRetry(
     body.includes('waitforport timed out')
   ) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       true,
       'wrapper_wait_for_port_timeout',
       'wrapper_wait_for_port_timeout'
@@ -279,33 +322,26 @@ function classifyCloudAgentNextFreshSessionRetry(
   const hasInternalServerSignal =
     body.includes('internal server error') ||
     body.includes('internal_server_error') ||
-    /http\s+error!\s+status:\s*500\b/i.test(error.body) ||
-    /\bstatus:\s*500\b/i.test(error.body) ||
-    /\bhttp\s*500\b/i.test(error.body) ||
-    /\b500\b/.test(error.body);
+    /http\s+error!\s+status:\s*500\b/i.test(cloudAgentNextError.body) ||
+    /\bstatus:\s*500\b/i.test(cloudAgentNextError.body) ||
+    /\bhttp\s*500\b/i.test(cloudAgentNextError.body) ||
+    /\b500\b/.test(cloudAgentNextError.body);
 
   if (hasSandboxSignal && hasInternalServerSignal) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       true,
       'sandbox_api_or_storage_failure',
       'sandbox_5xx_body_signal'
     );
   }
 
-  if (
-    body.includes('internal error in durable object storage') ||
-    body.includes('durable object storage operation exceeded timeout')
-  ) {
-    return cloudAgentNextFreshRetryClassification(
-      error,
-      false,
-      'sandbox_api_or_storage_failure',
-      'storage_failure_not_retryable_by_code_review_classifier'
-    );
-  }
-
-  return cloudAgentNextFreshRetryClassification(error, false, 'other_5xx', 'unclassified_5xx');
+  return cloudAgentNextFreshRetryClassification(
+    cloudAgentNextError,
+    true,
+    'unclassified_5xx',
+    'retryable_by_default_unclassified_5xx'
+  );
 }
 
 /**

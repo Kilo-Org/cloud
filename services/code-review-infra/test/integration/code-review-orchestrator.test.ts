@@ -658,18 +658,29 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(failedStatusUpdates).toHaveLength(0);
   });
 
-  it('does not retry workspace mkdir prose without a structured retry marker', async () => {
+  it('retries workspace mkdir prose once by default', async () => {
     const stub = getReviewStub();
+    let prepareCalls = 0;
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
       const url = String(request);
       if (url.includes('/api/internal/code-review-status/')) {
         return Response.json({ success: true });
       }
       if (url.includes('/trpc/prepareSession')) {
-        return trpcError(
-          500,
-          'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN'
-        );
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(
+            500,
+            'Failed to create workspace directory: FileSystemError: mkdir operation failed with exit code NaN'
+          );
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-workspace-prose-retry',
+          kiloSessionId: 'ses_workspace_prose_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-workspace-prose-retry', status: 'running' });
       }
       return new Response('unexpected fetch', { status: 500 });
     });
@@ -684,15 +695,18 @@ describe('CodeReviewOrchestrator recovery', () => {
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
-      status: 'failed',
+      status: 'running',
+      sessionId: 'agent-workspace-prose-retry',
+      cliSessionId: 'ses_workspace_prose_retry',
     });
-    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
-    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
     await expect(storedReview(stub)).resolves.toMatchObject({
-      status: 'failed',
+      sandboxRetryAttempted: true,
+      status: 'running',
+      sessionId: 'agent-workspace-prose-retry',
+      cliSessionId: 'ses_workspace_prose_retry',
     });
-    const stored = await storedReview(stub);
-    expect(stored?.sandboxRetryAttempted).toBeUndefined();
   });
 
   it('retries prepareSession once after wrapper waitForPort readiness timeout', async () => {

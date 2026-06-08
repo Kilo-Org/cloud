@@ -292,6 +292,41 @@ function makeIntegration(overrides: Partial<PlatformIntegration> = {}): Platform
   };
 }
 
+function mockCreatedInfraRetryFlow(
+  overrides: {
+    failedAttemptId?: string;
+    retryAttemptId?: string;
+    sessionId?: string;
+    cliSessionId?: string | null;
+  } = {}
+) {
+  const failedAttemptId = overrides.failedAttemptId ?? '00000000-0000-0000-0000-000000000601';
+  const retryAttemptId = overrides.retryAttemptId ?? '00000000-0000-0000-0000-000000000602';
+  const sessionId = overrides.sessionId ?? 'agent-old';
+  const cliSessionId = overrides.cliSessionId ?? null;
+  const failedAttempt = makeAttempt({
+    id: failedAttemptId,
+    status: 'failed',
+    session_id: sessionId,
+    cli_session_id: cliSessionId,
+  });
+
+  mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(failedAttempt);
+  mockGetLatestCodeReviewAttempt.mockResolvedValue(failedAttempt);
+  mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
+    outcome: 'created',
+    attempt: makeAttempt({
+      id: retryAttemptId,
+      attempt_number: 2,
+      retry_reason: 'infra_failure',
+      retry_of_attempt_id: failedAttemptId,
+      status: 'pending',
+    }),
+  });
+
+  return { failedAttemptId, retryAttemptId, sessionId, cliSessionId };
+}
+
 // --- Tests ---
 
 import type { POST as POSTType } from './route';
@@ -989,6 +1024,134 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('retries an unclassified failed callback without marking parent terminal', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000205',
+        retryAttemptId: '00000000-0000-0000-0000-000000000206',
+        sessionId: 'agent-unclassified-old',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage: 'Unexpected backend failure while publishing results',
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: 'Unexpected backend failure while publishing results',
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('skips infra retry when the failed session used more than 100k tokens', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000207',
+        retryAttemptId: '00000000-0000-0000-0000-000000000208',
+        sessionId: 'agent-expensive-old',
+        cliSessionId: 'ses_expensive_failed',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue({
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 100_001,
+        totalTokensOut: 0,
+        totalCostMusd: 123,
+      });
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage: 'Unexpected backend failure after a long run',
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_expensive_failed',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'upstream_error' })
+      );
+    });
+
+    it.each([
+      {
+        name: 'at the token threshold',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 60_000,
+          totalTokensOut: 40_000,
+          totalCostMusd: 123,
+        },
+      },
+      { name: 'unavailable', usage: null },
+    ])('allows infra retry when failed session usage is $name', async ({ usage }) => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000209',
+        retryAttemptId: '00000000-0000-0000-0000-000000000210',
+        sessionId: 'agent-allowed-old',
+        cliSessionId: 'ses_allowed_failed',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(usage);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage: 'Unexpected backend failure after a bounded run',
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_allowed_failed',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: 'Unexpected backend failure after a bounded run',
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
 
     it('does not retry when the parent review is already superseded', async () => {

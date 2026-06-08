@@ -30,6 +30,23 @@ function settingChips(settings: AgentSettingsSummary): string[] {
   return chips;
 }
 
+// Render an agent's effective model. A fallback-only agent model (no primary)
+// still has source 'agent', so we must not collapse a null primary to "uses
+// default" — show the fallbacks instead. Only source === null truly inherits.
+function AgentModelLabel({ model }: { model: AgentSummary['model'] }) {
+  const label =
+    model.primary || (model.fallbacks.length > 0 ? `fallbacks: ${model.fallbacks.join(', ')}` : '');
+  if (model.source === null || label === '') {
+    return <>uses default</>;
+  }
+  return (
+    <span className="text-foreground">
+      {label}
+      {model.source === 'defaults' && <span className="text-muted-foreground"> (inherited)</span>}
+    </span>
+  );
+}
+
 function AgentRow({
   agent,
   canUpdate,
@@ -88,17 +105,7 @@ function AgentRow({
       </div>
 
       <div className="text-muted-foreground mt-1 text-xs">
-        Model:{' '}
-        {agent.model.primary ? (
-          <span className="text-foreground">
-            {agent.model.primary}
-            {agent.model.source === 'defaults' && (
-              <span className="text-muted-foreground"> (inherited)</span>
-            )}
-          </span>
-        ) : (
-          'uses default'
-        )}
+        Model: <AgentModelLabel model={agent.model} />
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -106,12 +113,10 @@ function AgentRow({
         {agent.bindings.length === 0 ? (
           <span className="text-muted-foreground text-xs">none</span>
         ) : (
-          agent.bindings.map(binding => (
-            <Badge
-              key={`${binding.channel}:${binding.accountId ?? ''}`}
-              variant="outline"
-              className="px-1.5 py-0 text-[10px] leading-4"
-            >
+          // accountId null vs '' are distinct routes and advanced bindings can
+          // repeat channel+account, so the array index is the stable key here.
+          agent.bindings.map((binding, index) => (
+            <Badge key={index} variant="outline" className="px-1.5 py-0 text-[10px] leading-4">
               {binding.channel}
               {/* accountId is verbatim; null = default-account route. An empty
                   string is still an account-scoped route, so test against null. */}

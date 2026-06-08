@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot } from 'lucide-react';
+import { AlertTriangle, Bot } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 
@@ -130,8 +130,24 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
     );
   }
 
+  const body = (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-amber-400">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          Internal — work in progress
+        </p>
+        <p className="text-muted-foreground mt-1 text-xs">
+          Agent management is admin-only and shipped to production for limited testing. Expect rough
+          edges, and behavior may change.
+        </p>
+      </div>
+      {content}
+    </div>
+  );
+
   // Personal context uses BillingWrapper for access-lock dialogs/banners.
-  return organizationId ? content : <BillingWrapper>{content}</BillingWrapper>;
+  return organizationId ? body : <BillingWrapper>{body}</BillingWrapper>;
 }
 
 export function ClawAgentsPage({ organizationId }: { organizationId?: string }) {

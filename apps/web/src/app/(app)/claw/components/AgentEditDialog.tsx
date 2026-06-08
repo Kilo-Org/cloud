@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { AnimatedDots } from './AnimatedDots';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -91,6 +92,10 @@ export function AgentEditDialog({
   const { updateAgent } = useClawAgentMutations();
 
   const initial = useMemo(() => ownModel(agent), [agent]);
+  // An agent owns a model when rawModel is set — including a fallback-only model
+  // (no primary). The inherit toggle is the only way to clear such a model.
+  const hadOwnModel = agent.rawModel != null;
+  const [inheritModel, setInheritModel] = useState(!hadOwnModel);
   const [primary, setPrimary] = useState(initial.primary);
   const [thinking, setThinking] = useState<ThinkingOpt>(
     (agent.settings.thinkingDefault as ThinkingOpt | null) ?? INHERIT
@@ -114,14 +119,18 @@ export function AgentEditDialog({
     const set: AgentUpdateInput['set'] = {};
     const unset: AgentUpdateInput['unset'] = [];
 
-    const newPrimary = primary.trim();
-    if (newPrimary !== initial.primary) {
-      if (newPrimary === '') {
-        unset.push('model'); // clearing primary clears the whole model entry
-      } else {
+    if (inheritModel) {
+      // Clear the agent's own model (primary-only OR fallback-only) so it falls
+      // back to the fleet default.
+      if (hadOwnModel) unset.push('model');
+    } else {
+      const newPrimary = primary.trim();
+      const fallbacks = initial.fallbacks; // preserved; not edited here
+      const changed = !hadOwnModel || newPrimary !== initial.primary;
+      if (changed && (newPrimary !== '' || fallbacks.length > 0)) {
         set.model = {
-          primary: newPrimary,
-          ...(initial.fallbacks.length > 0 ? { fallbacks: initial.fallbacks } : {}),
+          ...(newPrimary !== '' ? { primary: newPrimary } : {}),
+          ...(fallbacks.length > 0 ? { fallbacks } : {}),
         };
       }
     }
@@ -152,10 +161,22 @@ export function AgentEditDialog({
     }
 
     return { set, unset };
-  }, [primary, thinking, verbose, reasoning, fastMode, initial, agent.settings]);
+  }, [
+    inheritModel,
+    hadOwnModel,
+    primary,
+    thinking,
+    verbose,
+    reasoning,
+    fastMode,
+    initial,
+    agent.settings,
+  ]);
 
+  // Not inheriting but no primary and no fallbacks = no model to write.
+  const modelInvalid = !inheritModel && primary.trim() === '' && initial.fallbacks.length === 0;
   const hasChanges = Object.keys(patch.set).length > 0 || patch.unset.length > 0;
-  const canSubmit = hasChanges && !updateAgent.isPending;
+  const canSubmit = hasChanges && !modelInvalid && !updateAgent.isPending;
 
   const onSubmit = async () => {
     if (!canSubmit) return;
@@ -182,19 +203,41 @@ export function AgentEditDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="agent-edit-model">Model</Label>
-            <Input
-              id="agent-edit-model"
-              value={primary}
-              maxLength={256}
-              placeholder="Blank to inherit the default model"
-              onChange={e => setPrimary(e.target.value)}
-            />
-            {initial.fallbacks.length > 0 && (
-              <p className="text-muted-foreground text-xs">
-                Fallbacks preserved: {initial.fallbacks.join(', ')}
-              </p>
+          <div className="flex flex-col gap-2">
+            <Label>Model</Label>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="agent-edit-inherit-model"
+                checked={inheritModel}
+                onCheckedChange={checked => setInheritModel(checked === true)}
+              />
+              <Label
+                htmlFor="agent-edit-inherit-model"
+                className="text-muted-foreground font-normal"
+              >
+                Use the default model
+              </Label>
+            </div>
+            {!inheritModel && (
+              <>
+                <Input
+                  id="agent-edit-model"
+                  value={primary}
+                  maxLength={256}
+                  placeholder="Model id (e.g. kilocode/kilo-auto/balanced)"
+                  onChange={e => setPrimary(e.target.value)}
+                />
+                {initial.fallbacks.length > 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    Fallbacks preserved: {initial.fallbacks.join(', ')}
+                  </p>
+                )}
+                {modelInvalid && (
+                  <p className="text-destructive text-xs">
+                    Enter a model id, or use the default model.
+                  </p>
+                )}
+              </>
             )}
           </div>
 

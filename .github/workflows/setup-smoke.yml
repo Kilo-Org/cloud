@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
+    inputs:
+      force_failure:
+        description: 'Force a failure to verify notifications'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -94,6 +100,12 @@ jobs:
 
       - name: Run setup smoke tests
         run: pnpm test:setup-smoke
+
+      - name: Force notification test failure
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_failure == 'true' }}
+        run: |
+          echo "Force failure requested for setup smoke notification verification"
+          exit 1
 
       - name: Stop dev stack
         if: always()

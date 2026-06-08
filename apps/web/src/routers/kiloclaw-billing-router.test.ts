@@ -37,11 +37,7 @@ import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
 import { KiloPassTier, KiloPassCadence, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { differenceInCalendarMonths } from 'date-fns';
-import {
-  classifyKiloClawCommitTerm,
-  CURRENT_KILOCLAW_PRICE_VERSION,
-  LEGACY_KILOCLAW_PRICE_VERSION,
-} from '@kilocode/db';
+import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 
 (kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
   LEGACY_KILOCLAW_PRICE_VERSION;
@@ -428,8 +424,6 @@ async function insertFinalCommitFixture(params?: {
       credit_renewal_at: params?.stripeSubscriptionId ? null : FINAL_COMMIT_END,
       commit_ends_at: FINAL_COMMIT_END,
       commit_retirement_state: 'final_term',
-      commit_retirement_qualified_at: FINAL_COMMIT_START,
-      commit_retirement_qualification_source: 'active_at_cutoff',
       commit_retirement_final_ends_at: FINAL_COMMIT_END,
     })
     .returning();
@@ -1565,7 +1559,6 @@ describe('subscription center procedures', () => {
       expect.objectContaining({
         cancel_at_period_end: true,
         commit_retirement_state: 'final_term',
-        commit_retirement_qualification_source: 'active_at_cutoff',
         commit_retirement_final_ends_at: '2026-11-01 00:00:00+00',
       })
     );
@@ -2260,9 +2253,6 @@ describe('subscription center procedures', () => {
           commit_retirement_standard_opted_in_at: null,
         })
       );
-      expect(new Date(row.commit_retirement_qualified_at ?? '').toISOString()).toBe(
-        FINAL_COMMIT_START
-      );
       expect(new Date(row.commit_retirement_final_ends_at ?? '').toISOString()).toBe(
         FINAL_COMMIT_END
       );
@@ -2283,8 +2273,6 @@ describe('subscription center procedures', () => {
       current_period_end: '2026-06-01T00:00:00.000Z',
       credit_renewal_at: '2026-06-01T00:00:00.000Z',
       commit_retirement_state: 'pending_final_term',
-      commit_retirement_qualified_at: '2026-06-05T12:00:00.000Z',
-      commit_retirement_qualification_source: 'switch_requested_before_cutoff',
     });
 
     const caller = await createCallerForUser(user.id);
@@ -2299,8 +2287,6 @@ describe('subscription center procedures', () => {
         plan: 'standard',
         scheduled_plan: null,
         commit_retirement_state: null,
-        commit_retirement_qualified_at: null,
-        commit_retirement_qualification_source: null,
         commit_retirement_final_ends_at: null,
       })
     );
@@ -4292,8 +4278,6 @@ describe('handleKiloClawScheduleEvent', () => {
       current_period_start: '2026-05-01T00:00:00.000Z',
       current_period_end: '2026-06-10T00:00:00.000Z',
       commit_retirement_state: 'pending_final_term',
-      commit_retirement_qualified_at: '2026-06-05T12:00:00.000Z',
-      commit_retirement_qualification_source: 'switch_requested_before_cutoff',
     });
     const { handleKiloClawScheduleEvent } = await import('@/lib/kiloclaw/stripe-handlers');
 
@@ -4316,19 +4300,9 @@ describe('handleKiloClawScheduleEvent', () => {
         scheduled_plan: null,
         stripe_schedule_id: null,
         commit_retirement_state: 'pending_final_term',
-        commit_retirement_qualified_at: '2026-06-05 12:00:00+00',
-        commit_retirement_qualification_source: 'switch_requested_before_cutoff',
       })
     );
-    expect(
-      classifyKiloClawCommitTerm({
-        plan: row.plan,
-        scheduledPlan: row.scheduled_plan,
-        retirementState: row.commit_retirement_state,
-        qualifiedAt: row.commit_retirement_qualified_at,
-        qualificationSource: row.commit_retirement_qualification_source,
-      })
-    ).toBe('pending_final_term');
+    expect(row.commit_retirement_state).toBe('pending_final_term');
   });
 });
 

@@ -267,12 +267,22 @@ export function CommitRetirementReviewsContent() {
                   <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                     <Field title="Created" value={timestamp(reviewCase.created_at)} />
                     <Field
-                      title="Qualification evidence"
-                      value={label(subscription?.commit_retirement_qualification_source)}
+                      title="Qualification authority"
+                      value={
+                        subscription?.commit_retirement_state === 'pending_final_term'
+                          ? 'Subscription change log'
+                          : subscription?.plan === 'commit'
+                            ? 'Current period'
+                            : '—'
+                      }
                     />
                     <Field
-                      title="Qualified at"
-                      value={timestamp(subscription?.commit_retirement_qualified_at)}
+                      title="Qualification time"
+                      value={
+                        subscription?.commit_retirement_state === 'pending_final_term'
+                          ? 'See subscription audit history'
+                          : timestamp(subscription?.current_period_start)
+                      }
                     />
                     <Field
                       title="Final boundary"

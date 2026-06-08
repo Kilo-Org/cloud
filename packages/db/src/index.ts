@@ -3,6 +3,11 @@ export * from './schema-types';
 export * from './kiloclaw-pricing-catalog';
 export * from './kiloclaw-commit-retirement';
 export {
+  findLatestPreCutoffUserCommitSwitchQualification,
+  type CommitSwitchQualificationRepository,
+  type KiloClawCommitSwitchQualification,
+} from './kiloclaw-commit-switch-qualification-repository';
+export {
   containKnownSubscriptionCommitRetirementReview,
   createCommitRetirementReviewCase,
   findOpenCommitRetirementReviewCase,

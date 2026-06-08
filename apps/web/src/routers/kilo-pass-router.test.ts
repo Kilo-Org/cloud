@@ -2119,8 +2119,6 @@ describe('kiloPassRouter', () => {
       expect(hosting).toMatchObject({
         plan: 'commit',
         commit_retirement_state: 'final_term',
-        commit_retirement_qualified_at: '2026-06-05 23:59:59+00',
-        commit_retirement_qualification_source: 'checkout_confirmed_before_cutoff',
       });
     });
 

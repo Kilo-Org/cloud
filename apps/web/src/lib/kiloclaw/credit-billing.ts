@@ -53,6 +53,7 @@ import {
 import {
   assertKiloClawCommitAdmission,
   findKiloClawProviderRetirementDisposition,
+  findPendingCommitSwitchQualification,
   getStripeFundedRetirementSettlementDecision,
   makeKiloClawStripeSubscriptionNonRenewing,
   putKiloClawCommitRetirementInReview,
@@ -623,6 +624,8 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     }
 
     const ingestRecognizedRowlessPaidFinal = recognizeRowlessPaidFinal;
+    const switchQualification =
+      plan === 'commit' ? await findPendingCommitSwitchQualification(targetRow.id, tx) : null;
     const retirementDecision = ingestRecognizedRowlessPaidFinal
       ? {
           authorization: 'authorized_final_term' as const,
@@ -641,6 +644,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
           periodStart,
           periodEnd,
           checkoutConfirmedAt: params.checkoutConfirmedAt,
+          switchQualification: switchQualification ?? undefined,
         });
     requiresProviderNonRenewal ||= retirementDecision.reviewReason !== null;
     if (retirementDecision.reviewReason) {
@@ -1424,10 +1428,6 @@ export async function enrollWithCredits(params: {
       plan === 'commit'
         ? {
             commit_retirement_state: 'final_term' as const,
-            commit_retirement_qualified_at:
-              params.commitQualification?.qualifiedAt ?? periodStartIso,
-            commit_retirement_qualification_source:
-              params.commitQualification?.source ?? ('active_at_cutoff' as const),
             commit_retirement_final_ends_at: periodEndIso,
           }
         : {};

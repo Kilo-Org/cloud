@@ -159,16 +159,6 @@ async function insertActivePersonalSubscription(
     })
     .returning({ id: kiloclaw_instances.id });
 
-  const qualifiedRetirementState =
-    overrides?.commit_retirement_state === 'pending_final_term' ||
-    overrides?.commit_retirement_state === 'final_term' ||
-    overrides?.commit_retirement_state === 'standard_scheduled'
-      ? {
-          commit_retirement_qualified_at: '2026-04-01T00:00:00.000Z',
-          commit_retirement_qualification_source: 'active_at_cutoff' as const,
-        }
-      : {};
-
   const [subscription] = await db
     .insert(kiloclaw_subscriptions)
     .values({
@@ -181,7 +171,6 @@ async function insertActivePersonalSubscription(
       current_period_end: '2026-05-01T12:00:00.000Z',
       credit_renewal_at: '2026-05-01T12:00:00.000Z',
       cancel_at_period_end: false,
-      ...qualifiedRetirementState,
       ...overrides,
     })
     .returning({ id: kiloclaw_subscriptions.id });

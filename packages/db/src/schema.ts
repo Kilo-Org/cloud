@@ -50,7 +50,6 @@ import {
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
   KiloClawCommitRetirementState,
-  KiloClawCommitRetirementQualificationSource,
   KiloClawCommitRetirementReviewReason,
   KiloClawCommitRetirementReviewCaseStatus,
   KiloClawCommitRetirementResolutionDisposition,
@@ -184,7 +183,6 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionChangeAction,
   KiloClawCommitRetirementState,
-  KiloClawCommitRetirementQualificationSource,
   KiloClawCommitRetirementReviewReason,
   KiloClawCommitRetirementReviewCaseStatus,
   KiloClawCommitRetirementResolutionDisposition,
@@ -6489,9 +6487,6 @@ export const kiloclaw_subscriptions = pgTable(
     credit_renewal_at: timestamp({ withTimezone: true, mode: 'string' }),
     commit_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
     commit_retirement_state: text().$type<KiloClawCommitRetirementState>(),
-    commit_retirement_qualified_at: timestamp({ withTimezone: true, mode: 'string' }),
-    commit_retirement_qualification_source:
-      text().$type<KiloClawCommitRetirementQualificationSource>(),
     commit_retirement_final_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
     commit_retirement_standard_opted_in_at: timestamp({ withTimezone: true, mode: 'string' }),
     commit_retirement_guarded_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -6546,18 +6541,9 @@ export const kiloclaw_subscriptions = pgTable(
       KiloClawCommitRetirementState
     ),
     enumCheck(
-      'kiloclaw_subscriptions_commit_retirement_qualification_source_check',
-      table.commit_retirement_qualification_source,
-      KiloClawCommitRetirementQualificationSource
-    ),
-    enumCheck(
       'kiloclaw_subscriptions_commit_retirement_review_reason_check',
       table.commit_retirement_review_reason,
       KiloClawCommitRetirementReviewReason
-    ),
-    check(
-      'kiloclaw_subscriptions_commit_retirement_qualification_check',
-      sql`(${table.commit_retirement_qualified_at} IS NULL) = (${table.commit_retirement_qualification_source} IS NULL)`
     ),
     check(
       'kiloclaw_subscriptions_commit_retirement_standard_consent_check',

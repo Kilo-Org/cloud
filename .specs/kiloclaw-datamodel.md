@@ -195,18 +195,19 @@ to describe payment and access lifecycle.
    | Field | Meaning |
    |---|---|
    | `commit_retirement_state` | Current retirement classification |
-   | `commit_retirement_qualified_at` | Authoritative grandfathering timestamp |
-   | `commit_retirement_qualification_source` | Evidence source authorizing final term |
    | `commit_retirement_final_ends_at` | Authorized final Commit boundary, including approved reward extensions |
    | `commit_retirement_standard_opted_in_at` | Current explicit Standard continuation consent |
    | `commit_retirement_guarded_at` | Time retirement guard made subscription non-renewing |
    | `commit_retirement_review_reason` | Non-sensitive reason for manual review |
 
-2. A qualified final Commit obligation MUST record authoritative qualification
-   time and source. Allowed sources are `active_at_cutoff`,
-   `checkout_confirmed_before_cutoff`, `switch_requested_before_cutoff`, and
-   `renewal_due_before_cutoff`. A final term starting after cutoff without
-   verified qualification MUST enter manual review.
+2. Qualification MUST be derived from the canonical authority for each source:
+   the subscription change log entry for a pending Standard-to-Commit switch;
+   the current billing period for a Commit term active at cutoff; the Stripe
+   subscription creation timestamp for completed checkout; or the invoice or
+   renewal boundary for payment recovery. Qualification timestamps and source
+   labels MUST NOT be copied into duplicate subscription columns. A final term
+   starting after cutoff without verified canonical evidence MUST enter manual
+   review.
 3. Retirement state MUST record the authorized final Commit boundary,
    including approved referral extensions; current explicit Standard consent;
    time the retirement guard made the subscription non-renewing; and a
@@ -219,14 +220,15 @@ to describe payment and access lifecycle.
 6. Missing, conflicting, or misaligned qualification, boundary, provider, or
    schedule evidence MUST set `manual_review`. That state MUST block renewal
    and destructive enforcement until operator resolution.
-7. Runtime MUST NOT bulk-populate active Commit behavior state at the cutoff.
-   Before cutoff, the system MAY capture qualification metadata for already-
-   pending obligations that cannot be reconstructed later, but MUST NOT change
-   plan, period, cancellation, or provider schedule state during capture.
+7. Runtime MUST NOT bulk-populate active Commit behavior state at the cutoff or
+   run a qualification backfill. It MUST validate qualification directly from
+   the source-specific canonical evidence without changing plan, period,
+   cancellation, or provider schedule state.
 8. Retirement state MUST follow the current live personal subscription lineage
    during reprovision transfer only when billing period and provider ownership
-   remain consistent. The successor MUST preserve qualification, final
-   boundary, consent, guard state, and review state. A mismatch MUST enter
+   remain consistent. The successor MUST preserve final boundary, consent,
+   guard state, and review state; source-specific qualification remains with its
+   canonical authority. A mismatch MUST enter
    manual review rather than grant a fresh Commit term.
 9. Canceled and transferred-out predecessor rows MUST retain retirement state
    as history but MUST NOT authorize or seed another Commit term.
@@ -477,7 +479,7 @@ not yet enforced in the current codebase:
 
 ### 2026-06-05 -- Commit retirement state and review cases
 
-- Defined additive lineage-scoped retirement state, qualification evidence, final boundary, explicit Standard consent, guard state, and audit action.
+- Defined additive lineage-scoped retirement state, source-specific canonical qualification evidence, final boundary, explicit Standard consent, guard state, and audit action.
 - Defined durable known-row and provider-only review cases, successor transfer, historical-row restrictions, and GDPR-safe review data.
 
 ### 2026-05-28 -- Fraud-enforcement subscription mutations

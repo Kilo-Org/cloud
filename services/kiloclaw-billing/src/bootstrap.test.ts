@@ -21,6 +21,7 @@ vi.mock('@kilocode/db', async importOriginal => {
     CURRENT_KILOCLAW_PRICE_VERSION: currentPriceVersion,
     LEGACY_KILOCLAW_PRICE_VERSION: legacyPriceVersion,
     createCommitRetirementReviewCase: mockCreateCommitRetirementReviewCase,
+    findLatestPreCutoffUserCommitSwitchQualification: vi.fn(async () => null),
     getKiloClawPricingCatalogEntry: vi.fn((priceVersion: string) => {
       if (priceVersion === legacyPriceVersion) {
         return {
@@ -158,8 +159,6 @@ describe('Commit retirement successor transfer', () => {
     expect(
       retirementTransferValues({
         commit_retirement_state: 'standard_scheduled',
-        commit_retirement_qualified_at: '2026-06-05T00:00:00.000Z',
-        commit_retirement_qualification_source: 'active_at_cutoff',
         commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
         commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
         commit_retirement_guarded_at: null,
@@ -180,8 +179,6 @@ describe('Commit retirement successor transfer', () => {
     expect(
       retirementTransferValues({
         commit_retirement_state: 'standard_scheduled',
-        commit_retirement_qualified_at: '2026-06-05T00:00:00.000Z',
-        commit_retirement_qualification_source: 'active_at_cutoff',
         commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
         commit_retirement_standard_opted_in_at: null,
         commit_retirement_guarded_at: null,
@@ -199,25 +196,28 @@ describe('Commit retirement successor transfer', () => {
     });
   });
 
-  it('preserves valid pending final-term switch evidence', () => {
+  it('preserves canonically qualified pending final-term switch evidence', () => {
     expect(
-      retirementTransferValues({
-        commit_retirement_state: 'pending_final_term',
-        commit_retirement_qualified_at: '2026-06-05T23:59:59.999Z',
-        commit_retirement_qualification_source: 'switch_requested_before_cutoff',
-        commit_retirement_final_ends_at: null,
-        commit_retirement_standard_opted_in_at: null,
-        commit_retirement_guarded_at: null,
-        commit_retirement_review_reason: null,
-        plan: 'standard',
-        scheduled_plan: 'commit',
-        current_period_end: '2026-07-01T00:00:00.000Z',
-        payment_source: 'credits',
-        stripe_subscription_id: null,
-      } as never)
+      retirementTransferValues(
+        {
+          commit_retirement_state: 'pending_final_term',
+          commit_retirement_final_ends_at: null,
+          commit_retirement_standard_opted_in_at: null,
+          commit_retirement_guarded_at: null,
+          commit_retirement_review_reason: null,
+          plan: 'standard',
+          scheduled_plan: 'commit',
+          current_period_end: '2026-07-01T00:00:00.000Z',
+          payment_source: 'credits',
+          stripe_subscription_id: null,
+        } as never,
+        {
+          qualifiedAt: '2026-06-05T23:59:59.999Z',
+          qualificationSource: 'switch_requested_before_cutoff',
+        }
+      )
     ).toMatchObject({
       commit_retirement_state: 'pending_final_term',
-      commit_retirement_qualification_source: 'switch_requested_before_cutoff',
       commit_retirement_review_reason: null,
     });
   });
@@ -226,8 +226,6 @@ describe('Commit retirement successor transfer', () => {
     expect(
       retirementTransferValues({
         commit_retirement_state: 'pending_final_term',
-        commit_retirement_qualified_at: '2026-06-06T00:00:00.000Z',
-        commit_retirement_qualification_source: 'switch_requested_before_cutoff',
         commit_retirement_final_ends_at: null,
         commit_retirement_standard_opted_in_at: null,
         commit_retirement_guarded_at: null,
@@ -248,8 +246,6 @@ describe('Commit retirement successor transfer', () => {
     expect(
       retirementTransferValues({
         commit_retirement_state: 'manual_review',
-        commit_retirement_qualified_at: null,
-        commit_retirement_qualification_source: null,
         commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
         commit_retirement_standard_opted_in_at: null,
         commit_retirement_guarded_at: null,
@@ -268,8 +264,6 @@ describe('Commit retirement successor transfer', () => {
     expect(
       retirementTransferValues({
         commit_retirement_state: 'standard_scheduled',
-        commit_retirement_qualified_at: '2026-06-05T00:00:00.000Z',
-        commit_retirement_qualification_source: 'active_at_cutoff',
         commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
         commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
         commit_retirement_guarded_at: '2026-11-01T00:00:00.000Z',
@@ -283,20 +277,16 @@ describe('Commit retirement successor transfer', () => {
       } as never)
     ).toMatchObject({
       commit_retirement_state: 'standard_scheduled',
-      commit_retirement_qualified_at: '2026-06-05T00:00:00.000Z',
-      commit_retirement_qualification_source: 'active_at_cutoff',
       commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
       commit_retirement_guarded_at: '2026-11-01T00:00:00.000Z',
       commit_retirement_review_reason: null,
     });
   });
 
-  it('preserves completed qualification fields as historical audit evidence', () => {
+  it('preserves completed retirement boundary without retired qualification fields', () => {
     expect(
       retirementTransferValues({
         commit_retirement_state: 'completed',
-        commit_retirement_qualified_at: '2026-06-05T00:00:00.000Z',
-        commit_retirement_qualification_source: 'switch_requested_before_cutoff',
         commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
         commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
         commit_retirement_guarded_at: null,
@@ -308,8 +298,6 @@ describe('Commit retirement successor transfer', () => {
       } as never)
     ).toMatchObject({
       commit_retirement_state: 'completed',
-      commit_retirement_qualified_at: '2026-06-05T00:00:00.000Z',
-      commit_retirement_qualification_source: 'switch_requested_before_cutoff',
       commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
     });
   });
@@ -318,8 +306,6 @@ describe('Commit retirement successor transfer', () => {
     expect(
       retirementTransferValues({
         commit_retirement_state: 'final_term',
-        commit_retirement_qualified_at: '2026-06-05T00:00:00.000Z',
-        commit_retirement_qualification_source: 'active_at_cutoff',
         commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
         commit_retirement_standard_opted_in_at: null,
         commit_retirement_guarded_at: null,
@@ -341,8 +327,6 @@ describe('Commit retirement successor transfer', () => {
     expect(
       retirementTransferValues({
         commit_retirement_state: 'standard_scheduled',
-        commit_retirement_qualified_at: '2026-06-05T00:00:00.000Z',
-        commit_retirement_qualification_source: 'active_at_cutoff',
         commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
         commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
         commit_retirement_guarded_at: null,
@@ -391,8 +375,6 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
       credit_renewal_at: '2026-12-01T00:00:00.000Z',
       commit_ends_at: '2026-12-01T00:00:00.000Z',
       commit_retirement_state: 'standard_scheduled',
-      commit_retirement_qualified_at: '2026-06-05T00:00:00.000Z',
-      commit_retirement_qualification_source: 'active_at_cutoff',
       commit_retirement_final_ends_at: '2026-12-01T00:00:00.000Z',
       commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
       commit_retirement_guarded_at: null,

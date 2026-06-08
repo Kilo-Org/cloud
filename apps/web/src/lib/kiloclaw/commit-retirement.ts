@@ -10,6 +10,7 @@ import {
   classifyKiloClawCommitTerm,
   createCommitRetirementReviewCase,
   deriveKiloClawCommitFinalBoundary,
+  findLatestPreCutoffUserCommitSwitchQualification,
   findOpenCommitRetirementReviewCase,
   findProviderCommitRetirementDisposition,
   getKiloClawPlanCostMicrodollars,
@@ -34,7 +35,10 @@ export const KILOCLAW_COMMIT_RETIRED_MESSAGE =
   'KiloClaw Commit is no longer available. Choose month-to-month Standard instead.';
 
 export type KiloClawCommitEnrollmentQualification = {
-  source: 'active_at_cutoff' | 'checkout_confirmed_before_cutoff';
+  source:
+    | 'active_at_cutoff'
+    | 'checkout_confirmed_before_cutoff'
+    | 'switch_requested_before_cutoff';
   qualifiedAt: string;
 };
 
@@ -66,10 +70,34 @@ export async function findKiloClawProviderRetirementDisposition(params: {
   return disposition?.subscription_id === null ? disposition : null;
 }
 
+export async function findPendingCommitSwitchQualification(
+  subscriptionId: string,
+  dbOrTx: typeof db | DbTransaction = db
+): Promise<KiloClawCommitEnrollmentQualification | null> {
+  const qualification = await findLatestPreCutoffUserCommitSwitchQualification(
+    dbOrTx,
+    subscriptionId
+  );
+  if (!qualification) return null;
+  return {
+    source: qualification.qualificationSource,
+    qualifiedAt: qualification.qualifiedAt,
+  };
+}
+
 export type StripeFundedRetirementSettlementDecision = {
   authorization: KiloClawCommitInvoiceAuthorization | 'standard_authorized' | 'not_involved';
   reviewReason: KiloClawCommitRetirementReviewReason | null;
   retirementUpdate: Partial<typeof kiloclaw_subscriptions.$inferInsert>;
+};
+
+type CommitQualificationEvidence = {
+  qualifiedAt: string;
+  source:
+    | 'active_at_cutoff'
+    | 'checkout_confirmed_before_cutoff'
+    | 'switch_requested_before_cutoff'
+    | 'renewal_due_before_cutoff';
 };
 
 export function isQualifiedKiloClawCommitPreCutoffRecovery(params: {
@@ -94,6 +122,7 @@ export function getStripeFundedRetirementSettlementDecision(params: {
   periodStart: string;
   periodEnd: string;
   checkoutConfirmedAt?: string;
+  switchQualification?: KiloClawCommitEnrollmentQualification;
 }): StripeFundedRetirementSettlementDecision {
   const { subscription, plan, periodStart, periodEnd } = params;
 
@@ -164,26 +193,21 @@ export function getStripeFundedRetirementSettlementDecision(params: {
     };
   }
 
-  const verifiedCheckoutConfirmedAt =
-    subscription.plan !== 'commit' &&
-    !subscription.commit_retirement_qualified_at &&
-    !subscription.commit_retirement_qualification_source &&
-    params.checkoutConfirmedAt &&
-    isBeforeKiloClawCommitSalesCutoff(params.checkoutConfirmedAt)
-      ? params.checkoutConfirmedAt
-      : null;
-  const qualifiedAt = subscription.commit_retirement_qualified_at ?? verifiedCheckoutConfirmedAt;
-  const qualificationSource =
-    subscription.commit_retirement_qualification_source ??
-    (verifiedCheckoutConfirmedAt ? 'checkout_confirmed_before_cutoff' : null);
+  const qualification = getCommitSettlementQualification({
+    subscription,
+    periodStart,
+    checkoutConfirmedAt: params.checkoutConfirmedAt,
+    switchQualification: params.switchQualification,
+    qualifiedPreCutoffRecovery,
+  });
   const authorization = qualifiedPreCutoffRecovery
     ? 'pre_cutoff_recovery'
     : classifyKiloClawCommitInvoice({
         invoicePeriodStart: periodStart,
         invoicePeriodEnd: periodEnd,
         finalEndsAt: classificationFinalBoundary,
-        qualifiedAt,
-        qualificationSource,
+        qualifiedAt: qualification?.qualifiedAt,
+        qualificationSource: qualification?.source,
       });
 
   if (authorization === 'forbidden_renewal') {
@@ -201,12 +225,7 @@ export function getStripeFundedRetirementSettlementDecision(params: {
     };
   }
 
-  const settlementQualifiedAt =
-    qualifiedAt ?? (isBeforeKiloClawCommitSalesCutoff(periodStart) ? periodStart : null);
-  const settlementQualificationSource =
-    qualificationSource ?? (settlementQualifiedAt ? 'renewal_due_before_cutoff' : null);
-
-  if (!settlementQualifiedAt || !settlementQualificationSource) {
+  if (!qualification) {
     return {
       authorization: 'ambiguous',
       reviewReason: 'missing_qualification_evidence',
@@ -219,8 +238,6 @@ export function getStripeFundedRetirementSettlementDecision(params: {
     reviewReason: null,
     retirementUpdate: {
       commit_retirement_state: 'final_term',
-      commit_retirement_qualified_at: settlementQualifiedAt,
-      commit_retirement_qualification_source: settlementQualificationSource,
       commit_retirement_final_ends_at: periodEnd,
       commit_retirement_review_reason: null,
       cancel_at_period_end: false,
@@ -400,13 +417,13 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
       return;
     }
 
-    const qualifiedAt = before.commit_retirement_qualified_at ?? before.current_period_start;
-    if (!qualifiedAt || !isBeforeKiloClawCommitSalesCutoff(qualifiedAt)) {
+    const activeTermStartedAt = before.current_period_start;
+    if (!activeTermStartedAt || !isBeforeKiloClawCommitSalesCutoff(activeTermStartedAt)) {
       await putKiloClawCommitRetirementInReview({
         tx,
         subscription: before,
         reason: 'missing_qualification_evidence',
-        summary: 'Retirement guard found a final Commit term without pre-cutoff qualification.',
+        summary: 'Retirement guard found a final Commit term without a pre-cutoff period start.',
       });
       return;
     }
@@ -416,9 +433,6 @@ export async function enforceKiloClawCommitRetirementGuard(params: {
       .set({
         cancel_at_period_end: true,
         commit_retirement_state: 'final_term',
-        commit_retirement_qualified_at: qualifiedAt,
-        commit_retirement_qualification_source:
-          before.commit_retirement_qualification_source ?? 'active_at_cutoff',
         commit_retirement_final_ends_at: params.expectedFinalBoundary,
         commit_retirement_guarded_at: guardedAt,
         commit_retirement_review_reason: null,
@@ -821,17 +835,65 @@ function requireLiveFinalCommitBoundary(subscription: KiloClawSubscription): str
 }
 
 function toRetirementEvidence(subscription: KiloClawSubscription) {
+  const qualification = getDirectCommitQualification(subscription);
   return {
     plan: subscription.plan,
     scheduledPlan: subscription.scheduled_plan,
     currentPeriodStart: subscription.current_period_start,
     currentPeriodEnd: subscription.current_period_end,
     retirementState: subscription.commit_retirement_state,
-    qualifiedAt: subscription.commit_retirement_qualified_at,
-    qualificationSource: subscription.commit_retirement_qualification_source,
+    qualifiedAt: qualification?.qualifiedAt,
+    qualificationSource: qualification?.source,
     finalEndsAt: subscription.commit_retirement_final_ends_at,
     standardOptedInAt: subscription.commit_retirement_standard_opted_in_at,
   };
+}
+
+function getDirectCommitQualification(
+  subscription: KiloClawSubscription
+): CommitQualificationEvidence | null {
+  if (
+    subscription.plan === 'commit' &&
+    subscription.current_period_start &&
+    isBeforeKiloClawCommitSalesCutoff(subscription.current_period_start)
+  ) {
+    return { qualifiedAt: subscription.current_period_start, source: 'active_at_cutoff' };
+  }
+  return null;
+}
+
+function getCommitSettlementQualification(params: {
+  subscription: KiloClawSubscription;
+  periodStart: string;
+  checkoutConfirmedAt?: string;
+  switchQualification?: KiloClawCommitEnrollmentQualification;
+  qualifiedPreCutoffRecovery: boolean;
+}): CommitQualificationEvidence | null {
+  const activeTerm = getDirectCommitQualification(params.subscription);
+  if (activeTerm) return activeTerm;
+  if (
+    params.switchQualification?.source === 'switch_requested_before_cutoff' &&
+    isBeforeKiloClawCommitSalesCutoff(params.switchQualification.qualifiedAt)
+  ) {
+    return params.switchQualification;
+  }
+  if (params.qualifiedPreCutoffRecovery) {
+    return { qualifiedAt: params.periodStart, source: 'renewal_due_before_cutoff' };
+  }
+  if (
+    params.subscription.plan !== 'commit' &&
+    params.checkoutConfirmedAt &&
+    isBeforeKiloClawCommitSalesCutoff(params.checkoutConfirmedAt)
+  ) {
+    return {
+      qualifiedAt: params.checkoutConfirmedAt,
+      source: 'checkout_confirmed_before_cutoff',
+    };
+  }
+  if (isBeforeKiloClawCommitSalesCutoff(params.periodStart)) {
+    return { qualifiedAt: params.periodStart, source: 'renewal_due_before_cutoff' };
+  }
+  return null;
 }
 
 function getStripeSubscriptionPeriodEnd(subscription: Stripe.Subscription): string | null {

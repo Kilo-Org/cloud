@@ -1,17 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from '@kilocode/db';
 
-const { mockGetWorkerDb, mockGetMissingSnowflakeConfig, mockQueryKiloclawActiveUserIds } =
-  vi.hoisted(() => ({
-    mockGetWorkerDb: vi.fn(),
-    mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
-    mockQueryKiloclawActiveUserIds: vi.fn(),
-  }));
+const {
+  mockFindLatestPreCutoffUserCommitSwitchQualification,
+  mockGetWorkerDb,
+  mockGetMissingSnowflakeConfig,
+  mockQueryKiloclawActiveUserIds,
+} = vi.hoisted(() => ({
+  mockFindLatestPreCutoffUserCommitSwitchQualification: vi.fn<
+    () => Promise<DbModule.KiloClawCommitSwitchQualification | null>
+  >(async () => null),
+  mockGetWorkerDb: vi.fn(),
+  mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
+  mockQueryKiloclawActiveUserIds: vi.fn(),
+}));
 
 vi.mock('@kilocode/db', async importOriginal => {
   const actual: Record<string, unknown> = await importOriginal();
   return {
     ...actual,
+    findLatestPreCutoffUserCommitSwitchQualification:
+      mockFindLatestPreCutoffUserCommitSwitchQualification,
     getWorkerDb: mockGetWorkerDb,
   };
 });
@@ -321,8 +330,6 @@ function creditRenewalRow(overrides: Partial<Record<string, unknown>> = {}) {
     auto_resume_attempt_count: 0,
     auto_top_up_triggered_for_period: null,
     commit_retirement_state: null,
-    commit_retirement_qualified_at: null,
-    commit_retirement_qualification_source: null,
     commit_retirement_final_ends_at: null,
     commit_retirement_standard_opted_in_at: null,
     commit_retirement_guarded_at: null,
@@ -507,7 +514,7 @@ describe('Commit retirement credit renewal decisions', () => {
     ).toEqual({ kind: 'open_manual_review' });
   });
 
-  it('honors qualified pending Standard-to-Commit switch once', () => {
+  it('honors canonical pending Standard-to-Commit switch qualification once', () => {
     expect(
       decideCommitRetirementCreditRenewal(
         creditRenewalRow({
@@ -515,9 +522,8 @@ describe('Commit retirement credit renewal decisions', () => {
           scheduled_plan: 'commit',
           credit_renewal_at: '2026-07-01T00:00:00.000Z',
           commit_retirement_state: 'pending_final_term',
-          commit_retirement_qualified_at: '2026-06-05T23:59:59.999Z',
-          commit_retirement_qualification_source: 'switch_requested_before_cutoff',
-        }) as never
+        }) as never,
+        true
       )
     ).toEqual({
       kind: 'allow_final_commit',
@@ -589,8 +595,6 @@ describe('Commit retirement credit renewal decisions', () => {
           scheduled_plan: 'commit',
           credit_renewal_at: '2026-07-01T00:00:00.000Z',
           commit_retirement_state: 'completed',
-          commit_retirement_qualified_at: '2026-06-05T23:59:59.999Z',
-          commit_retirement_qualification_source: 'switch_requested_before_cutoff',
           commit_retirement_final_ends_at: '2026-06-01T00:00:00.000Z',
         }) as never
       )
@@ -4931,7 +4935,11 @@ describe('credit renewal sweep affiliate tracking', () => {
     expect(txUpdates).toHaveLength(0);
   });
 
-  it('applies scheduled pure-credit plan switches atomically at the versioned renewal cost', async () => {
+  it('applies canonically qualified pure-credit plan switches atomically at the versioned renewal cost', async () => {
+    mockFindLatestPreCutoffUserCommitSwitchQualification.mockResolvedValueOnce({
+      qualifiedAt: '2026-04-08T10:00:00.000Z',
+      qualificationSource: 'switch_requested_before_cutoff',
+    });
     const renewalAt = '2026-04-09T10:00:00.000Z';
     const { db, updates, txInserts, txUpdates } = createMockDb(
       [
@@ -4952,8 +4960,6 @@ describe('credit renewal sweep affiliate tracking', () => {
             cancel_at_period_end: false,
             scheduled_plan: 'commit',
             commit_retirement_state: 'pending_final_term',
-            commit_retirement_qualified_at: '2026-04-08T10:00:00.000Z',
-            commit_retirement_qualification_source: 'switch_requested_before_cutoff',
             commit_retirement_final_ends_at: null,
             commit_ends_at: null,
             past_due_since: null,

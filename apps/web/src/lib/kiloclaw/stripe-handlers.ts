@@ -1166,8 +1166,6 @@ export async function handleKiloClawSubscriptionCreated(params: {
         ...(plan === 'commit'
           ? {
               commit_retirement_state: 'final_term' as const,
-              commit_retirement_qualified_at: new Date(subscription.created * 1000).toISOString(),
-              commit_retirement_qualification_source: 'checkout_confirmed_before_cutoff' as const,
               commit_retirement_final_ends_at: commitEndsAt,
               commit_retirement_review_reason: null,
             }
@@ -1343,8 +1341,13 @@ export async function handleKiloClawSubscriptionUpdated(params: {
         currentPeriodStart: currentRow.current_period_start,
         currentPeriodEnd: currentRow.current_period_end,
         retirementState: currentRow.commit_retirement_state,
-        qualifiedAt: currentRow.commit_retirement_qualified_at,
-        qualificationSource: currentRow.commit_retirement_qualification_source,
+        qualifiedAt: currentRow.current_period_start,
+        qualificationSource:
+          currentRow.plan === 'commit' &&
+          currentRow.current_period_start &&
+          isBeforeKiloClawCommitSalesCutoff(currentRow.current_period_start)
+            ? 'active_at_cutoff'
+            : null,
         finalEndsAt: currentRow.commit_retirement_final_ends_at,
         standardOptedInAt: currentRow.commit_retirement_standard_opted_in_at,
       })
@@ -1786,45 +1789,49 @@ export async function handleKiloClawScheduleEvent(params: {
     scheduleStatus === 'canceled' ||
     scheduleStatus === 'completed'
   ) {
-    const [before] = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.stripe_schedule_id, scheduleId))
-      .limit(1);
-    const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
-      stripe_schedule_id: null,
-      scheduled_plan: null,
-      scheduled_by: null,
-    };
+    await db.transaction(async tx => {
+      const [before] = await tx
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.stripe_schedule_id, scheduleId))
+        .for('update')
+        .limit(1);
+      if (!before) return;
 
-    // Schedule lifecycle never owns Commit retirement plan or boundary
-    // mutation. Invoice settlement remains authoritative for every hybrid
-    // success and every retirement-involved plan transition.
-    if (
-      scheduleStatus === 'completed' &&
-      row.scheduled_plan &&
-      row.payment_source !== 'credits' &&
-      row.plan !== 'commit' &&
-      row.scheduled_plan !== 'commit'
-    ) {
-      updateSet.plan = row.scheduled_plan;
-      updateSet.commit_ends_at = null;
-    }
+      const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
+        stripe_schedule_id: null,
+        scheduled_plan: null,
+        scheduled_by: null,
+      };
 
-    const [after] = await db
-      .update(kiloclaw_subscriptions)
-      .set(updateSet)
-      .where(eq(kiloclaw_subscriptions.stripe_schedule_id, scheduleId))
-      .returning();
+      // Schedule lifecycle never owns Commit retirement plan or boundary
+      // mutation. Invoice settlement remains authoritative for every hybrid
+      // success and every retirement-involved plan transition.
+      if (
+        scheduleStatus === 'completed' &&
+        before.scheduled_plan &&
+        before.payment_source !== 'credits' &&
+        before.plan !== 'commit' &&
+        before.scheduled_plan !== 'commit'
+      ) {
+        updateSet.plan = before.scheduled_plan;
+        updateSet.commit_ends_at = null;
+      }
 
-    await insertStripeSubscriptionChangeLog(db, {
-      subscriptionId: after?.id ?? before?.id,
-      action:
-        scheduleStatus === 'completed' && !!updateSet.plan ? 'plan_switched' : 'schedule_changed',
-      reason: `stripe_schedule_${scheduleStatus}`,
-      before: before ?? null,
-      after: after ?? null,
-      bestEffort: true,
+      const [after] = await tx
+        .update(kiloclaw_subscriptions)
+        .set(updateSet)
+        .where(eq(kiloclaw_subscriptions.id, before.id))
+        .returning();
+
+      await insertStripeSubscriptionChangeLog(tx, {
+        subscriptionId: after?.id ?? before.id,
+        action:
+          scheduleStatus === 'completed' && !!updateSet.plan ? 'plan_switched' : 'schedule_changed',
+        reason: `stripe_schedule_${scheduleStatus}`,
+        before,
+        after: after ?? null,
+      });
     });
   }
 

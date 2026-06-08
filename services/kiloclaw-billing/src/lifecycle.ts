@@ -6,6 +6,7 @@ import {
   classifyKiloClawCommitTerm,
   countUnresolvedTerminalRenewalFailures,
   createCommitRetirementReviewCase,
+  findLatestPreCutoffUserCommitSwitchQualification,
   findUnresolvedTerminalRenewalFailure,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
@@ -203,8 +204,6 @@ type CreditRenewalRow = {
   auto_resume_attempt_count: number;
   auto_top_up_triggered_for_period: string | null;
   commit_retirement_state: KiloClawSubscription['commit_retirement_state'];
-  commit_retirement_qualified_at: string | null;
-  commit_retirement_qualification_source: KiloClawSubscription['commit_retirement_qualification_source'];
   commit_retirement_final_ends_at: string | null;
   commit_retirement_standard_opted_in_at: string | null;
   total_microdollars_acquired: number;
@@ -1713,11 +1712,10 @@ export function decideCommitRetirementCreditRenewal(
     | 'current_period_start'
     | 'current_period_end'
     | 'commit_retirement_state'
-    | 'commit_retirement_qualified_at'
-    | 'commit_retirement_qualification_source'
     | 'commit_retirement_final_ends_at'
     | 'commit_retirement_standard_opted_in_at'
-  >
+  >,
+  pendingSwitchQualified = false
 ): CommitRetirementRenewalDecision {
   if (current.commit_retirement_state === 'manual_review') {
     return { kind: 'skip_manual_review' };
@@ -1747,8 +1745,7 @@ export function decideCommitRetirementCreditRenewal(
       current.plan === 'standard' &&
       !finalTermAlreadyExhausted &&
       current.commit_retirement_state === 'pending_final_term' &&
-      current.commit_retirement_qualification_source === 'switch_requested_before_cutoff' &&
-      isBeforeCommitSalesCutoff(current.commit_retirement_qualified_at)
+      pendingSwitchQualified
     ) {
       return { kind: 'allow_final_commit', qualificationSource: 'switch_requested_before_cutoff' };
     }
@@ -1785,8 +1782,6 @@ export function decideCommitRetirementCreditRenewal(
       currentPeriodStart: current.current_period_start,
       currentPeriodEnd: current.current_period_end,
       retirementState: current.commit_retirement_state,
-      qualifiedAt: current.commit_retirement_qualified_at,
-      qualificationSource: current.commit_retirement_qualification_source,
       finalEndsAt: current.commit_retirement_final_ends_at,
       standardOptedInAt: current.commit_retirement_standard_opted_in_at,
     });
@@ -1826,10 +1821,6 @@ function buildCreditRenewalAdvanceUpdateSet(params: {
 
   if (params.retirementDecision.kind === 'allow_final_commit') {
     updateSet.commit_retirement_state = 'final_term';
-    updateSet.commit_retirement_qualified_at =
-      params.current.commit_retirement_qualified_at ?? params.newPeriodStart;
-    updateSet.commit_retirement_qualification_source =
-      params.retirementDecision.qualificationSource;
     updateSet.commit_retirement_final_ends_at = params.newPeriodEnd;
     updateSet.commit_retirement_guarded_at = new Date().toISOString();
     updateSet.cancel_at_period_end = true;
@@ -1926,7 +1917,14 @@ async function processCreditRenewalRow(
     }
 
     const userId = current.user_id;
-    const retirementDecision = decideCommitRetirementCreditRenewal(current);
+    const pendingSwitchQualification =
+      current.plan === 'standard' && current.scheduled_plan === 'commit'
+        ? await findLatestPreCutoffUserCommitSwitchQualification(tx, current.id)
+        : null;
+    const retirementDecision = decideCommitRetirementCreditRenewal(
+      current,
+      pendingSwitchQualification !== null
+    );
     if (retirementDecision.kind === 'skip_manual_review') {
       logSkippedSubscriptionRow(
         'Skipping credit renewal during Commit retirement manual review',
@@ -2428,9 +2426,6 @@ export async function runCreditRenewalSweep(
       auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
       auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
       commit_retirement_state: kiloclaw_subscriptions.commit_retirement_state,
-      commit_retirement_qualified_at: kiloclaw_subscriptions.commit_retirement_qualified_at,
-      commit_retirement_qualification_source:
-        kiloclaw_subscriptions.commit_retirement_qualification_source,
       commit_retirement_final_ends_at: kiloclaw_subscriptions.commit_retirement_final_ends_at,
       commit_retirement_standard_opted_in_at:
         kiloclaw_subscriptions.commit_retirement_standard_opted_in_at,
@@ -2534,9 +2529,6 @@ function selectCreditRenewalRowFields() {
     auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
     auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
     commit_retirement_state: kiloclaw_subscriptions.commit_retirement_state,
-    commit_retirement_qualified_at: kiloclaw_subscriptions.commit_retirement_qualified_at,
-    commit_retirement_qualification_source:
-      kiloclaw_subscriptions.commit_retirement_qualification_source,
     commit_retirement_final_ends_at: kiloclaw_subscriptions.commit_retirement_final_ends_at,
     commit_retirement_standard_opted_in_at:
       kiloclaw_subscriptions.commit_retirement_standard_opted_in_at,

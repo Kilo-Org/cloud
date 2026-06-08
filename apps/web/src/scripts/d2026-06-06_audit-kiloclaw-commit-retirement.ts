@@ -13,6 +13,7 @@ import {
 import {
   kiloclaw_commit_retirement_review_cases,
   kiloclaw_instances,
+  kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
@@ -27,6 +28,7 @@ type ScheduleEvidence = {
   issue: string | null;
 };
 type CheckoutCounts = { directCommit: number; kiloPassCommitIntents: number };
+type PendingSwitchEvidence = { requestedAt: string | null; issue: string | null };
 
 function stripeSubscriptionPeriodEnd(subscription: Stripe.Subscription): string | null {
   const periodEnd = subscription.items.data[0]?.current_period_end;
@@ -89,6 +91,29 @@ async function inspectProviderEvidence(
       issue: error instanceof Error ? error.name : 'UnknownError',
     };
   }
+}
+
+async function getPendingSwitchEvidence(subscriptionId: string): Promise<PendingSwitchEvidence> {
+  const { rows } = await db.execute<{ requested_at: string }>(sql`
+    SELECT created_at AS requested_at
+    FROM ${kiloclaw_subscription_change_log}
+    WHERE subscription_id = ${subscriptionId}
+      AND action = 'schedule_changed'
+      AND after_state->>'scheduled_plan' = 'commit'
+      AND COALESCE(before_state->>'scheduled_plan', '') <> 'commit'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `);
+  const requestedAt = rows[0]?.requested_at;
+  if (!requestedAt) return { requestedAt: null, issue: 'missing_switch_request_change_log' };
+
+  const normalizedRequestedAt = new Date(requestedAt).toISOString();
+  return {
+    requestedAt: normalizedRequestedAt,
+    issue: isBeforeKiloClawCommitSalesCutoff(normalizedRequestedAt)
+      ? null
+      : 'switch_request_not_before_cutoff',
+  };
 }
 
 async function countOpenCommitCheckouts(): Promise<CheckoutCounts> {
@@ -176,17 +201,20 @@ async function main() {
 
   let ambiguousEvidence = 0;
   for (const subscription of [...commitSubscriptions, ...pendingCommitSwitches]) {
-    const classification = classifyKiloClawCommitTerm({
-      plan: subscription.plan,
-      scheduledPlan: subscription.scheduled_plan,
-      currentPeriodStart: subscription.current_period_start,
-      currentPeriodEnd: subscription.current_period_end,
-      retirementState: subscription.commit_retirement_state,
-      qualifiedAt: subscription.commit_retirement_qualified_at,
-      qualificationSource: subscription.commit_retirement_qualification_source,
-      finalEndsAt: subscription.commit_retirement_final_ends_at,
-      standardOptedInAt: subscription.commit_retirement_standard_opted_in_at,
-    });
+    const pendingSwitchEvidence =
+      subscription.plan === 'standard' ? await getPendingSwitchEvidence(subscription.id) : null;
+    const classification =
+      pendingSwitchEvidence?.issue === null
+        ? 'pending_final_term'
+        : classifyKiloClawCommitTerm({
+            plan: subscription.plan,
+            scheduledPlan: subscription.scheduled_plan,
+            currentPeriodStart: subscription.current_period_start,
+            currentPeriodEnd: subscription.current_period_end,
+            retirementState: subscription.commit_retirement_state,
+            finalEndsAt: subscription.commit_retirement_final_ends_at,
+            standardOptedInAt: subscription.commit_retirement_standard_opted_in_at,
+          });
     const provider = await inspectProviderEvidence(subscription);
     const boundary = deriveKiloClawCommitFinalBoundary({
       durableFinalEndsAt: subscription.commit_retirement_final_ends_at,
@@ -198,6 +226,7 @@ async function main() {
       boundary.kind === 'missing' ? 'missing_period_boundary_evidence' : null,
       boundary.kind === 'conflicting' ? 'conflicting_period_boundary_evidence' : null,
       provider.issue,
+      pendingSwitchEvidence?.issue ?? null,
     ].filter((issue): issue is string => issue !== null);
 
     if (issues.length > 0) ambiguousEvidence++;
@@ -213,6 +242,9 @@ async function main() {
         classification,
         currentPeriodStart: subscription.current_period_start,
         currentPeriodEnd: subscription.current_period_end,
+        switchRequestedAt: pendingSwitchEvidence?.requestedAt ?? null,
+        qualificationAuthority:
+          subscription.plan === 'standard' ? 'subscription_change_log' : 'current_period',
         finalBoundary: boundary.kind === 'verified' ? boundary.finalEndsAt : null,
         boundaryEvidence: boundary.kind,
         providerStatus: provider.status,

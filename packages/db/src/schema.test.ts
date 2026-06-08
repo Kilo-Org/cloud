@@ -236,12 +236,6 @@ describe('database schema', () => {
         'completed',
         'manual_review',
       ],
-      KiloClawCommitRetirementQualificationSource: [
-        'active_at_cutoff',
-        'checkout_confirmed_before_cutoff',
-        'switch_requested_before_cutoff',
-        'renewal_due_before_cutoff',
-      ],
       KiloClawCommitRetirementReviewReason: [
         'unqualified_post_cutoff_commit',
         'missing_qualification_evidence',

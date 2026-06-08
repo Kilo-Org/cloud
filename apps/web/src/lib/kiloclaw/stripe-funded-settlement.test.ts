@@ -313,8 +313,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
       commit_retirement_state: 'final_term',
-      commit_retirement_qualified_at: '2026-01-01T00:00:00.000Z',
-      commit_retirement_qualification_source: 'active_at_cutoff',
       commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
     });
     const firstDedupeKey = `commit-retirement:forbidden_commit_invoice:${subscriptionId}:episode:1`;
@@ -401,8 +399,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
       commit_retirement_state: 'final_term',
-      commit_retirement_qualified_at: '2026-01-01T00:00:00.000Z',
-      commit_retirement_qualification_source: 'active_at_cutoff',
       commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
     });
 
@@ -456,8 +452,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
       commit_retirement_state: 'final_term',
-      commit_retirement_qualified_at: '2026-01-01T00:00:00.000Z',
-      commit_retirement_qualification_source: 'active_at_cutoff',
       commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
     });
 
@@ -506,8 +500,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
       commit_retirement_state: 'standard_scheduled',
-      commit_retirement_qualified_at: '2026-01-01T00:00:00.000Z',
-      commit_retirement_qualification_source: 'active_at_cutoff',
       commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
       commit_retirement_standard_opted_in_at: '2026-06-10T00:00:00.000Z',
     });
@@ -568,8 +560,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
     await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
       plan: 'commit',
       commit_retirement_state: 'final_term',
-      commit_retirement_qualified_at: '2026-06-05 23:59:59+00',
-      commit_retirement_qualification_source: 'checkout_confirmed_before_cutoff',
       commit_retirement_final_ends_at: '2026-12-10 00:00:00+00',
     });
   });
@@ -610,7 +600,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       cancel_at_period_end: true,
       commit_retirement_state: 'manual_review',
       commit_retirement_review_reason: 'forbidden_commit_invoice',
-      commit_retirement_qualification_source: null,
     });
   });
 
@@ -634,8 +623,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       credit_renewal_at: '2026-07-01T00:00:00.000Z',
       commit_ends_at: '2026-07-01T00:00:00.000Z',
       commit_retirement_state: 'final_term',
-      commit_retirement_qualified_at: '2026-01-01T00:00:00.000Z',
-      commit_retirement_qualification_source: 'active_at_cutoff',
       commit_retirement_final_ends_at: '2026-07-01T00:00:00.000Z',
     });
 
@@ -757,8 +744,6 @@ describe('Stripe-funded KiloClaw settlement', () => {
       current_period_start: '2026-04-01T00:00:00.000Z',
       current_period_end: '2026-05-01T00:00:00.000Z',
       commit_retirement_state: 'pending_final_term',
-      commit_retirement_qualified_at: '2026-06-05T12:00:00.000Z',
-      commit_retirement_qualification_source: 'switch_requested_before_cutoff',
     });
 
     const applied = await applyStripeFundedKiloClawPeriod({

@@ -610,21 +610,20 @@ function getRelevantFields(
       value: formatRetirementLabel(sub.commit_retirement_state),
     });
     fields.push({
-      label: 'Qualification evidence',
-      value: sub.commit_retirement_qualification_source ? (
-        <span>
-          {formatRetirementLabel(sub.commit_retirement_qualification_source)}{' '}
-          <span className="text-muted-foreground text-xs">
-            (
-            {sub.commit_retirement_qualified_at
-              ? formatDate(sub.commit_retirement_qualified_at)
-              : 'time missing'}
-            )
+      label: 'Qualification authority',
+      value:
+        sub.commit_retirement_state === 'pending_final_term' ? (
+          'Subscription change log'
+        ) : sub.plan === 'commit' && sub.current_period_start ? (
+          <span>
+            Current period{' '}
+            <span className="text-muted-foreground text-xs">
+              ({formatDate(sub.current_period_start)})
+            </span>
           </span>
-        </span>
-      ) : (
-        '—'
-      ),
+        ) : (
+          '—'
+        ),
     });
     fields.push({
       label: 'Authorized final boundary',

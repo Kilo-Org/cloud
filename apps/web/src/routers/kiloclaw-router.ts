@@ -1624,25 +1624,23 @@ function assertKiloClawCommitAdmission(
   }
 }
 
-function getCommitSwitchQualificationUpdate(toPlan: 'commit' | 'standard', qualifiedAt: string) {
-  return toPlan === 'commit'
-    ? {
-        commit_retirement_state: 'pending_final_term' as const,
-        commit_retirement_qualified_at: qualifiedAt,
-        commit_retirement_qualification_source: 'switch_requested_before_cutoff' as const,
-      }
-    : {};
+function getCommitSwitchRetirementUpdate(toPlan: 'commit' | 'standard') {
+  return toPlan === 'commit' ? { commit_retirement_state: 'pending_final_term' as const } : {};
 }
 
 function getCommitRetirementEvidence(subscription: typeof kiloclaw_subscriptions.$inferSelect) {
+  const activeTermQualified =
+    subscription.plan === 'commit' &&
+    subscription.current_period_start &&
+    maySelectKiloClawCommit(subscription.current_period_start);
   return {
     plan: subscription.plan,
     scheduledPlan: subscription.scheduled_plan,
     currentPeriodStart: subscription.current_period_start,
     currentPeriodEnd: subscription.current_period_end,
     retirementState: subscription.commit_retirement_state,
-    qualifiedAt: subscription.commit_retirement_qualified_at,
-    qualificationSource: subscription.commit_retirement_qualification_source,
+    qualifiedAt: activeTermQualified ? subscription.current_period_start : null,
+    qualificationSource: activeTermQualified ? ('active_at_cutoff' as const) : null,
     finalEndsAt: subscription.commit_retirement_final_ends_at,
     standardOptedInAt: subscription.commit_retirement_standard_opted_in_at,
   };
@@ -2705,10 +2703,7 @@ async function switchKiloclawPlanForRow(params: {
   const { subscription, toPlan, userId } = params;
   const requestedAt = new Date();
   assertKiloClawCommitAdmission(toPlan, 'switch_plan_for_row', requestedAt);
-  const commitSwitchQualification = getCommitSwitchQualificationUpdate(
-    toPlan,
-    requestedAt.toISOString()
-  );
+  const commitSwitchRetirementUpdate = getCommitSwitchRetirementUpdate(toPlan);
 
   if (subscription.status !== 'active') {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to switch.' });
@@ -2793,7 +2788,7 @@ async function switchKiloclawPlanForRow(params: {
                 stripe_schedule_id: effectiveScheduleId,
                 scheduled_plan: toPlan,
                 scheduled_by: 'user',
-                ...commitSwitchQualification,
+                ...commitSwitchRetirementUpdate,
               })
               .where(eq(kiloclaw_subscriptions.id, subscription.id))
               .returning();
@@ -2886,7 +2881,7 @@ async function switchKiloclawPlanForRow(params: {
               stripe_schedule_id: schedule.id,
               scheduled_plan: toPlan,
               scheduled_by: 'user',
-              ...commitSwitchQualification,
+              ...commitSwitchRetirementUpdate,
             })
             .where(
               and(
@@ -2941,7 +2936,7 @@ async function switchKiloclawPlanForRow(params: {
           .set({
             scheduled_plan: toPlan,
             scheduled_by: 'user',
-            ...commitSwitchQualification,
+            ...commitSwitchRetirementUpdate,
           })
           .where(eq(kiloclaw_subscriptions.id, subscription.id))
           .returning();
@@ -3130,8 +3125,6 @@ async function cancelKiloclawPlanSwitchForRow(params: {
     cancelsPendingFinalTerm && subscription.commit_retirement_state === 'pending_final_term'
       ? {
           commit_retirement_state: null,
-          commit_retirement_qualified_at: null,
-          commit_retirement_qualification_source: null,
           commit_retirement_final_ends_at: null,
           commit_retirement_standard_opted_in_at: null,
           commit_retirement_guarded_at: null,
@@ -5483,10 +5476,7 @@ export const kiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const requestedAt = new Date();
       assertKiloClawCommitAdmission(input.toPlan, 'legacy_switch_plan', requestedAt);
-      const commitSwitchQualification = getCommitSwitchQualificationUpdate(
-        input.toPlan,
-        requestedAt.toISOString()
-      );
+      const commitSwitchRetirementUpdate = getCommitSwitchRetirementUpdate(input.toPlan);
       const { subscription: sub } = await getDisplayedPersonalKiloclawSubscription({
         userId: ctx.user.id,
       });
@@ -5570,42 +5560,26 @@ export const kiloclawRouter = createTRPCRouter({
               ],
             });
 
-            const scheduleLog = await db.transaction(async tx => {
-              const [before] = await tx
-                .select()
-                .from(kiloclaw_subscriptions)
-                .where(eq(kiloclaw_subscriptions.id, sub.id))
-                .limit(1);
+            await mutateUserSubscriptionWithChangeLog({
+              subscriptionId: sub.id,
+              userId: ctx.user.id,
+              action: 'schedule_changed',
+              reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
+              mutate: async tx => {
+                const [after] = await tx
+                  .update(kiloclaw_subscriptions)
+                  .set({
+                    stripe_schedule_id: effectiveScheduleId,
+                    scheduled_plan: input.toPlan,
+                    scheduled_by: 'user',
+                    ...commitSwitchRetirementUpdate,
+                  })
+                  .where(eq(kiloclaw_subscriptions.id, sub.id))
+                  .returning();
 
-              const [after] = await tx
-                .update(kiloclaw_subscriptions)
-                .set({
-                  stripe_schedule_id: effectiveScheduleId,
-                  scheduled_plan: input.toPlan,
-                  scheduled_by: 'user',
-                  ...commitSwitchQualification,
-                })
-                .where(eq(kiloclaw_subscriptions.id, sub.id))
-                .returning();
-
-              return before && after
-                ? {
-                    before,
-                    after,
-                  }
-                : null;
+                return after ?? null;
+              },
             });
-
-            if (scheduleLog) {
-              await insertUserSubscriptionChangeLogBestEffort({
-                subscriptionId: sub.id,
-                userId: ctx.user.id,
-                action: 'schedule_changed',
-                reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
-                before: scheduleLog.before,
-                after: scheduleLog.after,
-              });
-            }
 
             return { success: true };
           } catch (err) {
@@ -5660,35 +5634,30 @@ export const kiloclawRouter = createTRPCRouter({
           });
 
           // Optimistic concurrency: only write if no other request wrote a schedule first.
-          const scheduleLog = await db.transaction(async tx => {
-            const [before] = await tx
-              .select()
-              .from(kiloclaw_subscriptions)
-              .where(eq(kiloclaw_subscriptions.id, sub.id))
-              .limit(1);
-
-            const [after] = await tx
-              .update(kiloclaw_subscriptions)
-              .set({
-                stripe_schedule_id: schedule.id,
-                scheduled_plan: input.toPlan,
-                scheduled_by: 'user',
-                ...commitSwitchQualification,
-              })
-              .where(
-                and(
-                  eq(kiloclaw_subscriptions.id, sub.id),
-                  isNull(kiloclaw_subscriptions.stripe_schedule_id)
+          const scheduleLog = await mutateUserSubscriptionWithChangeLog({
+            subscriptionId: sub.id,
+            userId: ctx.user.id,
+            action: 'schedule_changed',
+            reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
+            mutate: async tx => {
+              const [after] = await tx
+                .update(kiloclaw_subscriptions)
+                .set({
+                  stripe_schedule_id: schedule.id,
+                  scheduled_plan: input.toPlan,
+                  scheduled_by: 'user',
+                  ...commitSwitchRetirementUpdate,
+                })
+                .where(
+                  and(
+                    eq(kiloclaw_subscriptions.id, sub.id),
+                    isNull(kiloclaw_subscriptions.stripe_schedule_id)
+                  )
                 )
-              )
-              .returning();
+                .returning();
 
-            return before && after
-              ? {
-                  before,
-                  after,
-                }
-              : null;
+              return after ?? null;
+            },
           });
 
           if (!scheduleLog) {
@@ -5700,15 +5669,6 @@ export const kiloclawRouter = createTRPCRouter({
               message: 'A plan switch is already pending. Cancel it before requesting a new one.',
             });
           }
-
-          await insertUserSubscriptionChangeLogBestEffort({
-            subscriptionId: sub.id,
-            userId: ctx.user.id,
-            action: 'schedule_changed',
-            reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
-            before: scheduleLog.before,
-            after: scheduleLog.after,
-          });
 
           return { success: true };
         } catch (error) {
@@ -5746,7 +5706,7 @@ export const kiloclawRouter = createTRPCRouter({
             .set({
               scheduled_plan: input.toPlan,
               scheduled_by: 'user',
-              ...commitSwitchQualification,
+              ...commitSwitchRetirementUpdate,
             })
             .where(eq(kiloclaw_subscriptions.id, sub.id))
             .returning();

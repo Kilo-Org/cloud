@@ -297,10 +297,15 @@ lapses, with email notifications at each stage.
    the cutoff; and a Commit renewal boundary due before the cutoff whose
    payment or processing later recovers. Open unconfirmed Commit checkout
    sessions and pending Kilo Pass Commit intents expire at the cutoff.
-3. Checkout confirmation MUST be proven from authoritative server/provider
-   evidence. For Stripe checkout, the completed subscription creation
-   timestamp is authoritative; checkout-session creation time, webhook arrival
-   time, browser time, and query-string values are not confirmation evidence.
+3. Qualification authority is source-specific. The subscription change log
+   entry is authoritative for a pending Standard-to-Commit request; the current
+   billing period is authoritative for a Commit term active at cutoff; the
+   Stripe subscription creation timestamp is authoritative for completed
+   checkout; and the invoice or renewal boundary is authoritative for payment
+   recovery. Checkout-session creation time, webhook arrival time, browser time,
+   and query-string values are not confirmation evidence. Qualification MUST be
+   evaluated from these canonical sources rather than duplicate qualification
+   fields on the subscription row.
 4. Each qualified obligation MUST receive at most one final Commit term. A
    final Commit term MUST NOT renew into another Commit term. Its final
    boundary MAY move later only when an approved KiloClaw free-month reward
@@ -343,9 +348,9 @@ lapses, with email notifications at each stage.
     refund, or recognize an already-paid period as final, but MUST NOT create
     another Commit term.
 13. Runtime enforcement MUST NOT bulk-change active Commit subscriptions or
-    provider schedules at the cutoff. Qualification evidence for already-
-    pending pre-cutoff obligations MAY be captured before cutoff without
-    changing plan, period, cancellation, or provider schedule state.
+    provider schedules at the cutoff. Qualification MUST be reconstructed and
+    validated from its source-specific canonical authority; no qualification
+    capture or backfill is required.
 14. Every KiloClaw billing surface MUST communicate final-term state and offer
     a direct `Continue month-to-month` action. The system MUST NOT add
     retirement-specific transactional emails; customer outreach is a separate
@@ -819,7 +824,7 @@ rows renew.
    permits that plan and period. An unauthorized or ambiguous Commit invoice
    MUST preserve paid access, block renewal, and enter manual-review
    containment rather than silently normalizing the plan. Schedule lifecycle
-   events MUST NOT erase durable Commit qualification or Standard consent.
+   events MUST NOT erase canonical Commit evidence or durable Standard consent.
 8. If the subscription was past-due or suspended before settlement,
    the system MUST trigger the auto-resume procedure after the
    settlement transaction commits (see Auto-Resume on Payment

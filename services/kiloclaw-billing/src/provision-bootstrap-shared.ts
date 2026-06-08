@@ -4,6 +4,7 @@ import {
   LEGACY_KILOCLAW_PRICE_VERSION,
   classifyKiloClawCommitTerm,
   createCommitRetirementReviewCase,
+  findLatestPreCutoffUserCommitSwitchQualification,
   getKiloClawPricingCatalogEntry,
   insertKiloClawSubscriptionChangeLog,
   kiloclaw_commit_retirement_review_cases,
@@ -12,6 +13,7 @@ import {
   kiloclaw_subscriptions,
   organization_seats_purchases,
   organizations,
+  type KiloClawCommitSwitchQualification,
   type KiloClawPriceVersion,
   type KiloClawPricingCatalogEntry,
   type KiloClawSubscription,
@@ -520,8 +522,6 @@ type RetirementTransferResult = {
   values: Pick<
     KiloClawSubscription,
     | 'commit_retirement_state'
-    | 'commit_retirement_qualified_at'
-    | 'commit_retirement_qualification_source'
     | 'commit_retirement_final_ends_at'
     | 'commit_retirement_standard_opted_in_at'
     | 'commit_retirement_guarded_at'
@@ -532,7 +532,8 @@ type RetirementTransferResult = {
 };
 
 function retirementTransferReviewReason(
-  subscription: KiloClawSubscription
+  subscription: KiloClawSubscription,
+  pendingSwitchQualification: KiloClawCommitSwitchQualification | null
 ): KiloClawSubscription['commit_retirement_review_reason'] {
   if (subscription.commit_retirement_state === 'manual_review') {
     return (
@@ -557,8 +558,8 @@ function retirementTransferReviewReason(
     currentPeriodStart: subscription.current_period_start,
     currentPeriodEnd: subscription.current_period_end,
     retirementState: subscription.commit_retirement_state,
-    qualifiedAt: subscription.commit_retirement_qualified_at,
-    qualificationSource: subscription.commit_retirement_qualification_source,
+    qualifiedAt: pendingSwitchQualification?.qualifiedAt,
+    qualificationSource: pendingSwitchQualification?.qualificationSource,
     finalEndsAt: subscription.commit_retirement_final_ends_at,
     standardOptedInAt: subscription.commit_retirement_standard_opted_in_at,
   });
@@ -594,17 +595,17 @@ function retirementTransferReviewReason(
     : KiloClawCommitRetirementReviewReason.BoundaryMismatch;
 }
 
-function retirementTransferResult(source: KiloClawSubscription): RetirementTransferResult {
-  const reviewReason = retirementTransferReviewReason(source);
+function retirementTransferResult(
+  source: KiloClawSubscription,
+  pendingSwitchQualification: KiloClawCommitSwitchQualification | null = null
+): RetirementTransferResult {
+  const reviewReason = retirementTransferReviewReason(source, pendingSwitchQualification);
   if (!reviewReason) {
     return {
       reviewReason: null,
       unsafe: false,
       values: {
         commit_retirement_state: source.commit_retirement_state ?? null,
-        commit_retirement_qualified_at: source.commit_retirement_qualified_at ?? null,
-        commit_retirement_qualification_source:
-          source.commit_retirement_qualification_source ?? null,
         commit_retirement_final_ends_at: source.commit_retirement_final_ends_at ?? null,
         commit_retirement_standard_opted_in_at:
           source.commit_retirement_standard_opted_in_at ?? null,
@@ -619,8 +620,6 @@ function retirementTransferResult(source: KiloClawSubscription): RetirementTrans
     unsafe: true,
     values: {
       commit_retirement_state: 'manual_review',
-      commit_retirement_qualified_at: source.commit_retirement_qualified_at ?? null,
-      commit_retirement_qualification_source: source.commit_retirement_qualification_source ?? null,
       commit_retirement_final_ends_at: source.commit_retirement_final_ends_at ?? null,
       commit_retirement_standard_opted_in_at: null,
       commit_retirement_guarded_at: source.commit_retirement_guarded_at ?? null,
@@ -629,8 +628,11 @@ function retirementTransferResult(source: KiloClawSubscription): RetirementTrans
   };
 }
 
-export function retirementTransferValues(source: KiloClawSubscription) {
-  return retirementTransferResult(source).values;
+export function retirementTransferValues(
+  source: KiloClawSubscription,
+  pendingSwitchQualification: KiloClawCommitSwitchQualification | null = null
+) {
+  return retirementTransferResult(source, pendingSwitchQualification).values;
 }
 
 function currentSubscriptionRecency(subscription: KiloClawSubscription): number {
@@ -694,7 +696,11 @@ async function createSuccessorPersonalSubscription(
       throw new Error('Target instance already has a subscription row');
     }
 
-    const retirementTransfer = retirementTransferResult(before);
+    const pendingSwitchQualification =
+      before.plan === 'standard' && before.scheduled_plan === 'commit'
+        ? await findLatestPreCutoffUserCommitSwitchQualification(tx, before.id)
+        : null;
+    const retirementTransfer = retirementTransferResult(before, pendingSwitchQualification);
     const [insertedSuccessor] = await tx
       .insert(kiloclaw_subscriptions)
       .values({

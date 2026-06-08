@@ -561,8 +561,6 @@ describe('admin.users.getKiloClawState', () => {
         payment_source: 'credits',
         current_period_end: '2026-12-06T00:00:00.000Z',
         commit_retirement_state: 'manual_review',
-        commit_retirement_qualified_at: '2026-06-05T12:00:00.000Z',
-        commit_retirement_qualification_source: 'active_at_cutoff',
         commit_retirement_final_ends_at: '2026-12-06T00:00:00.000Z',
         commit_retirement_review_reason: 'boundary_mismatch',
       })
@@ -580,7 +578,6 @@ describe('admin.users.getKiloClawState', () => {
     expect(result.subscriptions[0]).toEqual(
       expect.objectContaining({
         commit_retirement_state: 'manual_review',
-        commit_retirement_qualification_source: 'active_at_cutoff',
         commit_retirement_final_ends_at: expect.any(String),
         commit_retirement_review_reason: 'boundary_mismatch',
       })
@@ -925,8 +922,6 @@ describe('admin.commitRetirementReviews', () => {
         current_period_end: finalBoundary,
         credit_renewal_at: finalBoundary,
         commit_retirement_state: 'manual_review',
-        commit_retirement_qualified_at: '2026-05-06T00:00:00.000Z',
-        commit_retirement_qualification_source: 'active_at_cutoff',
         commit_retirement_final_ends_at: finalBoundary,
         commit_retirement_review_reason: 'boundary_mismatch',
       })

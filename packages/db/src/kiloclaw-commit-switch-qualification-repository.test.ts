@@ -66,6 +66,7 @@ async function insertScheduleChange(input: {
 async function insertLifecycleState(input: {
   subscriptionId: string;
   createdAt: string;
+  actorType?: 'user' | 'system';
   actorId?: string;
   reason?: string;
   beforeScheduledPlan?: string | null;
@@ -76,7 +77,7 @@ async function insertLifecycleState(input: {
   await testDatabase.db.insert(kiloclaw_subscription_change_log).values({
     subscription_id: input.subscriptionId,
     created_at: input.createdAt,
-    actor_type: 'system',
+    actor_type: input.actorType ?? 'system',
     actor_id: input.actorId ?? 'billing-lifecycle-job',
     action: 'status_changed',
     reason: input.reason ?? 'credit_renewal_insufficient_credits',
@@ -96,6 +97,7 @@ async function insertAlignmentBaseline(input: {
   createdAt: string;
   reason?: string;
   actorId?: string;
+  beforeState?: Record<string, unknown> | null;
   scheduledPlan?: string | null;
   scheduledBy?: string | null;
 }): Promise<void> {
@@ -106,7 +108,7 @@ async function insertAlignmentBaseline(input: {
     actor_id: input.actorId ?? 'kiloclaw-subscription-alignment',
     action: 'backfilled',
     reason: input.reason ?? 'baseline_subscription_snapshot',
-    before_state: null,
+    before_state: input.beforeState ?? null,
     after_state: {
       scheduled_plan: input.scheduledPlan ?? 'commit',
       scheduled_by: input.scheduledBy ?? 'user',
@@ -222,13 +224,14 @@ describe('Commit switch qualification repository', () => {
   });
 
   it.each([
-    { actorId: 'another-system' },
-    { reason: 'another_reason' },
-    { beforeScheduledPlan: 'standard' },
-    { afterScheduledPlan: 'standard' },
-    { beforeScheduledBy: 'system' },
-    { afterScheduledBy: 'system' },
-  ])('excludes non-canonical lifecycle evidence: $actorId$reason', async evidence => {
+    { description: 'wrong actor type', actorType: 'user' as const },
+    { description: 'wrong actor ID', actorId: 'another-system' },
+    { description: 'wrong reason', reason: 'another_reason' },
+    { description: 'wrong previous plan', beforeScheduledPlan: 'standard' },
+    { description: 'wrong resulting plan', afterScheduledPlan: 'standard' },
+    { description: 'wrong previous scheduler', beforeScheduledBy: 'system' },
+    { description: 'wrong resulting scheduler', afterScheduledBy: 'system' },
+  ])('excludes non-canonical lifecycle evidence: $description', async evidence => {
     const { subscriptionId } = await createSubscription();
     await insertLifecycleState({
       subscriptionId,
@@ -266,9 +269,21 @@ describe('Commit switch qualification repository', () => {
   });
 
   it.each([
-    { actorId: 'another-system', reason: 'baseline_subscription_snapshot' },
-    { actorId: 'kiloclaw-subscription-alignment', reason: 'another_reason' },
-  ])('excludes non-canonical alignment evidence: $reason', async evidence => {
+    {
+      description: 'wrong actor ID',
+      actorId: 'another-system',
+      reason: 'baseline_subscription_snapshot',
+    },
+    {
+      description: 'wrong reason',
+      actorId: 'kiloclaw-subscription-alignment',
+      reason: 'another_reason',
+    },
+    {
+      description: 'non-null before state',
+      beforeState: { scheduled_plan: 'standard' },
+    },
+  ])('excludes non-canonical alignment evidence: $description', async evidence => {
     const { subscriptionId } = await createSubscription();
     await insertAlignmentBaseline({
       subscriptionId,

@@ -199,9 +199,17 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   // Pass critical runtime env into the session so panes see this worktree's
   // values even when an existing tmux server is shared with sibling worktrees.
   const wranglerRegistryPath = getWranglerRegistryPath(repoRoot);
+  const pnpmHome = process.env.PNPM_HOME;
+  const processPath = process.env.PATH ?? '';
+  const sessionPath =
+    pnpmHome !== undefined &&
+    pnpmHome !== '' &&
+    !processPath.split(path.delimiter).includes(pnpmHome)
+      ? `${pnpmHome}${path.delimiter}${processPath}`
+      : processPath;
   const sessionEnv: Record<string, string> = {
     KILO_PORT_OFFSET: String(portOffset),
-    PATH: process.env.PATH ?? '',
+    PATH: sessionPath,
     WRANGLER_REGISTRY_PATH: wranglerRegistryPath,
   };
   for (const key of ['PNPM_HOME', 'COREPACK_HOME', 'npm_execpath']) {

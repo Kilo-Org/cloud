@@ -584,6 +584,45 @@ describe('handleKiloPassSubscriptionEvent', () => {
     expect(row?.status).toBe('canceled');
   });
 
+  test('Stripe resource_missing preserves existing ended_at when event has no terminal timestamp', async () => {
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
+    const user = await insertTestUser();
+    const stripeSubId = `sub_missing_preserve_${Math.random()}`;
+    const endedAt = '2026-01-02T03:04:05.000Z';
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
+      stripe_subscription_id: stripeSubId,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'canceled',
+      ended_at: endedAt,
+    });
+    mockStripeSubscriptionsRetrieve.mockRejectedValue({ code: 'resource_missing' });
+
+    await handleKiloPassSubscriptionEvent({
+      eventId: 'evt_resource_missing_preserve',
+      eventType: 'customer.subscription.updated',
+      subscription: makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_767_225_600,
+        status: 'active',
+        metadata: kiloPassMetadata({
+          kiloUserId: user.id,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+        }),
+      }),
+    });
+
+    const row = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+    });
+    expect(row?.status).toBe('canceled');
+    expect(toIso(row?.ended_at)).toBe(endedAt);
+  });
+
   test('closes pause event when pause_collection is cleared', async () => {
     const { handleKiloPassSubscriptionEvent } =
       await import('@/lib/kilo-pass/stripe-handlers-subscription-events');

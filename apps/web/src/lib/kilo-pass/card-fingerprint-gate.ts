@@ -30,6 +30,16 @@ import { createHash } from 'node:crypto';
 
 const KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE = 'kilo_pass_duplicate_card_canceled';
 
+function isAlreadyCanceledStripeSubscriptionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalizedMessage = message.toLowerCase();
+  return (
+    (normalizedMessage.includes('already') && normalizedMessage.includes('cancel')) ||
+    normalizedMessage.includes('has been canceled') ||
+    normalizedMessage.includes('is canceled')
+  );
+}
+
 export type PaymentFingerprintClaimResult = {
   welcomePromoReason: KiloPassWelcomePromoEligibilityReason;
   cardClaim: {
@@ -418,7 +428,7 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
     matchedKiloUserId: params.gateResult.matchedKiloUserId,
   };
 
-  let canceledSubscription: Stripe.Subscription;
+  let canceledSubscription: { id: string };
   try {
     canceledSubscription = await params.stripe.subscriptions.cancel(
       params.stripeSubscriptionId,
@@ -426,11 +436,15 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
       { idempotencyKey: `kilo-pass-duplicate-card-cancel:${params.stripeInvoiceId}` }
     );
   } catch (error) {
-    captureException(error, {
-      tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'subscription_cancel' },
-      extra: operationalContext,
-    });
-    throw error;
+    if (isAlreadyCanceledStripeSubscriptionError(error)) {
+      canceledSubscription = { id: params.stripeSubscriptionId };
+    } else {
+      captureException(error, {
+        tags: { source: 'kilo_pass_duplicate_card_gate', stage: 'subscription_cancel' },
+        extra: operationalContext,
+      });
+      throw error;
+    }
   }
 
   const refundableTarget = params.gateResult.refundableTarget;

@@ -93,7 +93,15 @@ export async function handleKiloPassSubscriptionEvent(params: {
       const isNowEnded =
         isStripeSubscriptionEnded(stripeStatus) || currentSubscription.ended_at != null;
       const transitionedToEnded = !wasEnded && isNowEnded;
-      const endedAt = isNowEnded ? getStripeEndedAtIso(currentSubscription) : null;
+      const hasProviderEndedAt =
+        currentSubscription.ended_at != null || currentSubscription.canceled_at != null;
+      let endedAt: string | null = null;
+      if (isNowEnded) {
+        endedAt =
+          resourceMissing && !hasProviderEndedAt && existing?.ended_at
+            ? existing.ended_at
+            : getStripeEndedAtIso(currentSubscription);
+      }
       const baseValues = {
         kilo_user_id: kiloUserId,
         tier,

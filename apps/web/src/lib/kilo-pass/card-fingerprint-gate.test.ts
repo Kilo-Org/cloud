@@ -602,6 +602,36 @@ describe('duplicate-card provider enforcement and email', () => {
     expect(createRefund).not.toHaveBeenCalled();
   });
 
+  test('already canceled subscription still proceeds to refund on replay', async () => {
+    const createRefund = jest.fn(async (...args: unknown[]) => {
+      void args;
+      return { id: 're_replay' };
+    });
+    const result = await attemptDuplicateCardProviderEnforcement({
+      stripe: {
+        subscriptions: {
+          cancel: jest.fn(async () =>
+            Promise.reject(new Error('Subscription sub_replay is already canceled'))
+          ),
+        },
+        refunds: { create: createRefund },
+      } as unknown as Stripe,
+      stripeInvoiceId: 'in_replay',
+      stripeSubscriptionId: 'sub_replay',
+      kiloUserId: 'user_replay',
+      gateResult,
+    });
+
+    expect(result).toEqual({
+      cancellation: { subscriptionId: 'sub_replay' },
+      refund: { status: 'succeeded', refundId: 're_replay' },
+    });
+    expect(createRefund).toHaveBeenCalledWith(
+      expect.objectContaining({ charge: 'ch_exact', reason: 'duplicate' }),
+      { idempotencyKey: 'kilo-pass-duplicate-card-refund:in_replay' }
+    );
+  });
+
   test('refund failure is returned separately after successful cancellation', async () => {
     const providerError = new Error('refund unavailable');
     const result = await attemptDuplicateCardProviderEnforcement({

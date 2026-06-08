@@ -33,7 +33,6 @@ type SecretStoreBinding = {
   binding: string;
   store_id: string;
   secret_name: string;
-  devGeneratedBase64Bytes?: number;
 };
 
 type SecretStoreWarning = {

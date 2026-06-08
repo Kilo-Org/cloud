@@ -50,11 +50,11 @@ import {
   acquireDuplicateCardSubscriptionLock,
   attemptDuplicateCardProviderEnforcement,
   checkDuplicateCardFingerprintGate,
-  claimMonthlyPaymentFingerprint,
+  claimPaymentFingerprint,
   loadDuplicateCardReplayAuthority,
   maybeSendDuplicateCardCanceledEmail,
   type DuplicateCardGateResult,
-  type MonthlyPaymentFingerprintClaimResult,
+  type PaymentFingerprintClaimResult,
 } from '@/lib/kilo-pass/card-fingerprint-gate';
 import { processTopUp } from '@/lib/credits';
 import { randomUUID } from 'node:crypto';
@@ -363,9 +363,7 @@ export async function handleKiloPassInvoicePaid(params: {
       });
 
       const isEligibleDuplicateCardAttempt =
-        cadence === KiloPassCadence.Monthly &&
-        invoice.amount_paid > 0 &&
-        invoice.billing_reason === 'subscription_create';
+        invoice.amount_paid > 0 && invoice.billing_reason === 'subscription_create';
       if (isEligibleDuplicateCardAttempt) {
         await acquireDuplicateCardSubscriptionLock(tx, subscription.id);
       }
@@ -460,7 +458,7 @@ export async function handleKiloPassInvoicePaid(params: {
             kiloUserId,
           })
         : { kind: 'none' as const };
-      let paymentFingerprintClaimResult: MonthlyPaymentFingerprintClaimResult | null = null;
+      let paymentFingerprintClaimResult: PaymentFingerprintClaimResult | null = null;
       let gateResult: DuplicateCardGateResult = { blocked: false };
       if (isEligibleDuplicateCardAttempt && replayAuthority.kind === 'blocked') {
         const settlement = await getSettledPaymentResolution();
@@ -469,7 +467,7 @@ export async function handleKiloPassInvoicePaid(params: {
           refundableTarget: settlement.kind === 'settled' ? settlement.refundableTarget : null,
         };
       } else if (isEligibleDuplicateCardAttempt && replayAuthority.kind === 'none') {
-        paymentFingerprintClaimResult = await claimMonthlyPaymentFingerprint({
+        paymentFingerprintClaimResult = await claimPaymentFingerprint({
           tx,
           stripeInvoiceId: invoice.id,
           settlement: await getSettledPaymentResolution(),
@@ -561,13 +559,16 @@ export async function handleKiloPassInvoicePaid(params: {
         hasPositiveSettlement &&
         paymentFingerprintClaimResult === null
       ) {
-        paymentFingerprintClaimResult = await claimMonthlyPaymentFingerprint({
+        paymentFingerprintClaimResult = await claimPaymentFingerprint({
           tx,
           stripeInvoiceId: invoice.id,
           settlement: await getSettledPaymentResolution(),
         });
       }
-      const positiveSettlementReason = paymentFingerprintClaimResult?.welcomePromoReason ?? null;
+      const positiveSettlementReason =
+        cadence === KiloPassCadence.Monthly
+          ? (paymentFingerprintClaimResult?.welcomePromoReason ?? null)
+          : null;
       referralConversionState.welcomePromoEligibilityReason = positiveSettlementReason;
       const initialWelcomePromoEligibilityReason =
         cadence === KiloPassCadence.Monthly

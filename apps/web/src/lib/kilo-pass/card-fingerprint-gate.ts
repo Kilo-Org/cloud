@@ -30,7 +30,7 @@ import { createHash } from 'node:crypto';
 
 const KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE = 'kilo_pass_duplicate_card_canceled';
 
-export type MonthlyPaymentFingerprintClaimResult = {
+export type PaymentFingerprintClaimResult = {
   welcomePromoReason: KiloPassWelcomePromoEligibilityReason;
   cardClaim: {
     ownership: 'current_invoice' | 'other_invoice';
@@ -119,11 +119,11 @@ export async function acquireDuplicateCardSubscriptionLock(
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
 }
 
-export async function claimMonthlyPaymentFingerprint(params: {
+export async function claimPaymentFingerprint(params: {
   tx: DrizzleTransaction;
   stripeInvoiceId: string;
   settlement: SettledInvoicePaymentResolution;
-}): Promise<MonthlyPaymentFingerprintClaimResult> {
+}): Promise<PaymentFingerprintClaimResult> {
   if (params.settlement.kind !== 'settled') {
     return {
       welcomePromoReason: KiloPassWelcomePromoEligibilityReason.SettlementUnresolved,
@@ -299,7 +299,7 @@ export async function loadDuplicateCardReplayAuthority(params: {
 export async function checkDuplicateCardFingerprintGate(params: {
   tx: DrizzleTransaction;
   kiloUserId: string;
-  claimResult: MonthlyPaymentFingerprintClaimResult;
+  claimResult: PaymentFingerprintClaimResult;
 }): Promise<DuplicateCardGateResult> {
   const cardClaim = params.claimResult.cardClaim;
   if (cardClaim === null || cardClaim.ownership === 'current_invoice') return { blocked: false };

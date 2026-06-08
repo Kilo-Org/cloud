@@ -67,10 +67,9 @@ rounding to whole cents uses round-half-up (ties round toward positive infinity)
   are `card`, `sepa_debit`, `us_bank_account`, `bacs_debit`, and `au_becs_debit`.
 - **Paid settlement**: One successful Stripe invoice payment resolved to the payment instrument that settled it and, when
   available, its refundable PaymentIntent or Charge identifier.
-- **Eligible duplicate-card claim attempt**: A positive-amount Stripe monthly initial-subscription invoice
-  (`billing_reason = 'subscription_create'`) with exactly one paid settlement and an exact settled-card fingerprint.
-  Yearly purchases, renewals, zero-dollar initial invoices, later invoices after a zero-dollar start, non-card methods,
-  and store-provider purchases are not eligible.
+- **Eligible duplicate-card purchase**: A first paid monthly or yearly Stripe subscription purchase settled by card.
+  Renewals, zero-value starts, later payments for the same subscription, non-card payments, and store-provider purchases
+  are not subject to duplicate-card blocking.
 - **First fingerprint claimant**: The Kilo user attributed to a card's permanent welcome-promo fingerprint claim by
   joining its source Stripe invoice to an issuance and that issuance to its subscription. Missing attribution is not a
   match and fails open.
@@ -257,22 +256,22 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 Rules 51-58 intentionally protect against rapid cross-account reuse of a recently first-claimed card; they do not define
 a rolling cooldown refreshed by every allowed purchase.
 
-51. Stripe Checkout creation MUST NOT inspect saved cards or run an approximate duplicate-card precheck. The gate MUST run
-    after payment, after the local subscription upsert, and before every credit-producing branch for an eligible
-    duplicate-card claim attempt. Yearly and non-initial invoices MUST skip the gate. A zero-dollar initial invoice and
-    every later invoice for that subscription remain ungated. A later positive monthly settlement MUST still follow Rule
-    21 claim behavior and MAY establish the permanent first claim used by future eligible attempts.
+51. A first paid monthly or yearly Stripe subscription purchase MUST be checked for recent cross-account card reuse after
+    payment is confirmed and before the purchaser receives Kilo Pass credits or other purchase benefits. Renewals,
+    zero-value starts, later payments for the same subscription, non-card payments, and store-provider purchases MUST NOT
+    be blocked under this rule. A later positive monthly payment remains subject to Rule 21 and MAY make its payment
+    instrument count as previously used in future monthly welcome-promo and referral eligibility decisions.
 52. Within one invoice-handling attempt, duplicate-card and welcome-promo decisions MUST share one settled-payment
     resolution. Duplicate-card enforcement MUST use only the exact card fingerprint from exactly one paid settlement and
     MUST NOT fall back to an attached, default, or locally stored card. Missing fingerprints, non-card settlements, no
     settlement, and unresolved settlements MUST fail open. Expected missing or unsupported evidence MAY skip silently.
     Provider lookup failures and multiple paid settlements MUST fail open and be reported operationally. A provider
     lookup failure MUST produce `settlement_unresolved` when the same attempt needs a welcome-promo settlement decision.
-53. An eligible attempt MUST atomically claim the exact settled card through the existing welcome-promo fingerprint-claim
-    mechanism. If the current invoice creates the permanent first claim, the attempt MUST be allowed. If the claim already
-    exists, the system MUST resolve the first claimant from the claim's source Stripe invoice through its matching
-    issuance and subscription. Missing or unresolvable first-claimant attribution MUST fail open and be reported
-    operationally.
+53. The first eligible purchase made with a card MUST establish that purchaser as the card's first claimant and MUST be
+    allowed. A card first used for a yearly purchase MUST count as previously used in later monthly welcome-promo and
+    referral decisions, while the yearly purchase itself remains ineligible for those benefits. If the card was already
+    used, the existing first claimant MUST remain authoritative. If the first claimant cannot be determined reliably, the
+    purchase MUST be allowed and the failure MUST be reported operationally.
 54. An existing claim MUST block only when its resolved first claimant is a different Kilo user and its immutable
     `claimed_at` is strictly greater than database transaction time minus 24 hours. Same-user attempts and attempts at
     exactly 24 hours or later MUST be allowed. Claim source, claimant, and `claimed_at` MUST NOT be refreshed or replaced
@@ -420,6 +419,13 @@ Passing the cancellation cooldown after 24 hours does not make a previously clai
 promo or Kilo Pass referral conversion.
 
 ## Changelog
+
+### 2026-06-08 -- Yearly duplicate-card enforcement
+
+- First paid yearly purchases are now subject to the same 24-hour cross-account card-reuse restriction as first paid
+  monthly purchases.
+- A payment instrument used for a first paid yearly purchase counts as previously used in future monthly welcome-promo and
+  referral decisions, while yearly purchases remain ineligible for those benefits.
 
 ### 2026-06-05 -- First-fingerprint-claim cooldown implementation
 

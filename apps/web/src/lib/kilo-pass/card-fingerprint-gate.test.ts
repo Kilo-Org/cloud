@@ -26,7 +26,7 @@ import {
   acquireDuplicateCardSubscriptionLock,
   attemptDuplicateCardProviderEnforcement,
   checkDuplicateCardFingerprintGate,
-  claimMonthlyPaymentFingerprint,
+  claimPaymentFingerprint,
   digestCardFingerprint,
   loadDuplicateCardReplayAuthority,
   maybeSendDuplicateCardCanceledEmail,
@@ -51,6 +51,7 @@ async function insertSubscriptionAttribution(params: {
   kiloUserId: string;
   stripeSubscriptionId: string;
   stripeInvoiceId: string;
+  cadence?: KiloPassCadence;
 }): Promise<void> {
   const [subscription] = await db
     .insert(kilo_pass_subscriptions)
@@ -60,7 +61,7 @@ async function insertSubscriptionAttribution(params: {
       provider_subscription_id: params.stripeSubscriptionId,
       stripe_subscription_id: params.stripeSubscriptionId,
       tier: KiloPassTier.Tier19,
-      cadence: KiloPassCadence.Monthly,
+      cadence: params.cadence ?? KiloPassCadence.Monthly,
       status: 'active',
     })
     .returning({ id: kilo_pass_subscriptions.id });
@@ -77,6 +78,7 @@ async function insertFirstClaim(params: {
   kiloUserId: string;
   stripeSubscriptionId: string;
   stripeInvoiceId: string;
+  cadence?: KiloPassCadence;
 }): Promise<void> {
   await insertSubscriptionAttribution(params);
   await db.insert(kilo_pass_welcome_promo_payment_fingerprint_claims).values({
@@ -92,7 +94,7 @@ async function evaluateExistingClaim(params: {
   candidateStripeInvoiceId: string;
 }): Promise<DuplicateCardGateResult> {
   return await db.transaction(async tx => {
-    const claimResult = await claimMonthlyPaymentFingerprint({
+    const claimResult = await claimPaymentFingerprint({
       tx,
       stripeInvoiceId: params.candidateStripeInvoiceId,
       settlement: cardSettlement(params.fingerprint),
@@ -113,7 +115,7 @@ describe('first-fingerprint-claim cooldown', () => {
   test('first exact-card claim is allowed and supplies welcome-promo decision', async () => {
     const fingerprint = 'fp_first_claim';
     const result = await db.transaction(async tx => {
-      const claimResult = await claimMonthlyPaymentFingerprint({
+      const claimResult = await claimPaymentFingerprint({
         tx,
         stripeInvoiceId: 'in_first_claim',
         settlement: cardSettlement(fingerprint),
@@ -199,6 +201,31 @@ describe('first-fingerprint-claim cooldown', () => {
     });
   });
 
+  test('uses a yearly issuance to attribute the first claimant', async () => {
+    const firstUser = await insertTestUser();
+    const candidateUser = await insertTestUser();
+    await insertFirstClaim({
+      fingerprint: 'fp_yearly_first_claim',
+      kiloUserId: firstUser.id,
+      stripeSubscriptionId: 'sub_yearly_first_claim',
+      stripeInvoiceId: 'in_yearly_first_claim',
+      cadence: KiloPassCadence.Yearly,
+    });
+
+    const result = await evaluateExistingClaim({
+      fingerprint: 'fp_yearly_first_claim',
+      candidateKiloUserId: candidateUser.id,
+      candidateStripeInvoiceId: 'in_monthly_candidate',
+    });
+
+    expect(result).toMatchObject({
+      blocked: true,
+      firstClaimSourceStripeInvoiceId: 'in_yearly_first_claim',
+      matchedKiloUserId: firstUser.id,
+      matchedStripeSubscriptionId: 'sub_yearly_first_claim',
+    });
+  });
+
   test.each([
     ['exactly 24 hours', sql`transaction_timestamp() - interval '24 hours'`],
     ['more than 24 hours', sql`transaction_timestamp() - interval '25 hours'`],
@@ -219,7 +246,7 @@ describe('first-fingerprint-claim cooldown', () => {
         .where(
           eq(kilo_pass_welcome_promo_payment_fingerprint_claims.stripe_fingerprint, 'fp_elapsed')
         );
-      const claimResult = await claimMonthlyPaymentFingerprint({
+      const claimResult = await claimPaymentFingerprint({
         tx,
         stripeInvoiceId: 'in_elapsed_candidate',
         settlement: cardSettlement('fp_elapsed'),
@@ -263,7 +290,7 @@ describe('first-fingerprint-claim cooldown', () => {
 
   test('non-card claims retain welcome-promo behavior without cancellation enforcement', async () => {
     const result = await db.transaction(async tx => {
-      const claimResult = await claimMonthlyPaymentFingerprint({
+      const claimResult = await claimPaymentFingerprint({
         tx,
         stripeInvoiceId: 'in_bank',
         settlement: {
@@ -342,7 +369,7 @@ describe('first-fingerprint-claim cooldown', () => {
         async candidate =>
           await db.transaction(async tx => {
             await acquireDuplicateCardSubscriptionLock(tx, candidate.stripeSubscriptionId);
-            const claimResult = await claimMonthlyPaymentFingerprint({
+            const claimResult = await claimPaymentFingerprint({
               tx,
               stripeInvoiceId: candidate.stripeInvoiceId,
               settlement: cardSettlement('fp_concurrent'),

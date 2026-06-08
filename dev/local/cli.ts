@@ -261,7 +261,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     }
 
     for (const name of captureServices) {
-      startServiceInTmux(sessionName, name);
+      startServiceInTmux(sessionName, name, sessionEnv);
       startedServices.push(name);
       await sleep(300);
     }
@@ -369,7 +369,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
       continue;
     }
 
-    startServiceInTmux(sessionName, name);
+    startServiceInTmux(sessionName, name, sessionEnv);
     startedServices.push(name);
     await sleep(300);
   }

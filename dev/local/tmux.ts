@@ -124,10 +124,16 @@ function attachSession(sessionName: string): void {
 // Window management
 // ---------------------------------------------------------------------------
 
-function createWindow(sessionName: string, windowName: string, startupCommand?: string): number {
+function createWindow(
+  sessionName: string,
+  windowName: string,
+  env?: Record<string, string>,
+  startupCommand?: string
+): number {
   const args = [
     'new-window',
     '-d',
+    ...Object.entries(env ?? {}).flatMap(([key, value]) => ['-e', `${key}=${value}`]),
     '-t',
     sessionName,
     '-n',

@@ -106,11 +106,15 @@ export function buildStartCommand(serviceName: string): string {
 // Tmux service lifecycle
 // ---------------------------------------------------------------------------
 
-export function startServiceInTmux(sessionName: string, serviceName: string): void {
+export function startServiceInTmux(
+  sessionName: string,
+  serviceName: string,
+  env?: Record<string, string>
+): void {
   const svc = getService(serviceName);
   const startupCommand =
     svc.type === 'infra' ? buildInfraLogCommand(serviceName) : buildStartCommand(serviceName);
-  const winIndex = createWindow(sessionName, serviceName, startupCommand);
+  const winIndex = createWindow(sessionName, serviceName, env, startupCommand);
   const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
   pipePane(sessionName, winIndex, 0, buildLogPipeCommand(logPath));
 }

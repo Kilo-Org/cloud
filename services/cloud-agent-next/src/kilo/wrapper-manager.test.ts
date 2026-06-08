@@ -1,4 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const { mockTimeoutWithFields, mockWarn, mockLogger } = vi.hoisted(() => {
+  const debug = vi.fn();
+  const warn = vi.fn();
+  const timeoutWithFields = vi.fn(() => ({ warn }));
+  return {
+    mockTimeoutWithFields: timeoutWithFields,
+    mockWarn: warn,
+    mockLogger: {
+      withFields: vi.fn(() => ({ debug })),
+      withTags: vi.fn(() => ({ withFields: timeoutWithFields })),
+    },
+  };
+});
+
+vi.mock('../logger.js', () => ({ logger: mockLogger }));
+
+import { FAST_SANDBOX_COMMAND_TIMEOUT_MS } from '../sandbox-timeout-logging.js';
 import {
   discoverSessionWrappers,
   extractPublishedWrapperPort,
@@ -140,6 +158,43 @@ describe('listWrapperContainers', () => {
 });
 
 describe('discoverSessionWrappers', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('returns inspection failure when direct process discovery times out', async () => {
+    vi.useFakeTimers();
+    const sandbox = {
+      listProcesses: vi.fn(() => new Promise<never>(() => undefined)),
+      exec: vi.fn(),
+    };
+
+    const discovery = discoverSessionWrappers(sandbox as never, 'agent_xyz');
+    let settled = false;
+    const observedResult = discovery.then(result => {
+      settled = true;
+      return result;
+    });
+
+    await vi.advanceTimersByTimeAsync(FAST_SANDBOX_COMMAND_TIMEOUT_MS);
+
+    expect(settled).toBe(true);
+    await expect(observedResult).resolves.toEqual({
+      status: 'inspection-failed',
+      error: `Wrapper process discovery timed out after ${FAST_SANDBOX_COMMAND_TIMEOUT_MS}ms`,
+    });
+    expect(mockLogger.withTags).toHaveBeenCalledWith({ logTag: 'sandbox-operation-timeout' });
+    expect(mockTimeoutWithFields).toHaveBeenCalledWith({
+      operation: 'wrapper.discovery.listProcesses',
+      timeoutMs: FAST_SANDBOX_COMMAND_TIMEOUT_MS,
+      timeoutLayer: 'outer',
+    });
+    expect(mockWarn).toHaveBeenCalledOnce();
+    expect(mockWarn).toHaveBeenCalledWith('Sandbox operation timed out');
+    expect(sandbox.exec).not.toHaveBeenCalled();
+  });
+
   it('returns every direct and devcontainer wrapper process tagged for the session', async () => {
     const sandbox = {
       listProcesses: vi.fn().mockResolvedValue([

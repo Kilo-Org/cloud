@@ -1,8 +1,5 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import {
-  isReasoningExplicitlyDisabled,
-  scrubOpenCodeSpecificProperties,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
 
@@ -54,9 +51,6 @@ export default {
     supportedChatApis: ['chat_completions', 'responses', 'messages'],
     transformRequest(context) {
       delete context.request.body.provider;
-      if (context.request.kind === 'chat_completions') {
-        scrubOpenCodeSpecificProperties(context.request.body);
-      }
     },
   },
   MISTRAL: {

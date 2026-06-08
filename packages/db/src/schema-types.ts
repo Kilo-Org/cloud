@@ -1303,24 +1303,31 @@ export const CustomLlmPricingSchema = z.object({
 
 export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
 
-export const CustomLlmDefinitionSchema = z.object({
-  internal_id: z.string(),
-  display_name: z.string(),
+export const CustomLlmMetadataSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  base_url: z.url(),
-  api_key: z.string(),
-  organization_ids: z.array(z.string()),
   supports_image_input: z.boolean().optional(),
-  add_cache_breakpoints: z.boolean().optional(),
-  remove_cache_breakpoints: z.boolean().optional(),
-  inject_reasoning_into_content: z.boolean().optional(),
-  extra_headers: CustomLlmExtraHeadersSchema.optional(),
-  extra_body: CustomLlmExtraBodySchema.optional(),
-  remove_from_body: z.array(z.string()).optional(),
   opencode_settings: OpenCodeSettingsSchema.optional(),
-  pricing: CustomLlmPricingSchema.optional(),
 });
+
+export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
+
+export const CustomLlmDefinitionSchema = z
+  .object({
+    internal_id: z.string(),
+    display_name: z.string(),
+    base_url: z.url(),
+    api_key: z.string(),
+    organization_ids: z.array(z.string()),
+    add_cache_breakpoints: z.boolean().optional(),
+    remove_cache_breakpoints: z.boolean().optional(),
+    inject_reasoning_into_content: z.boolean().optional(),
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+    extra_body: CustomLlmExtraBodySchema.optional(),
+    remove_from_body: z.array(z.string()).optional(),
+    pricing: CustomLlmPricingSchema.optional(),
+  })
+  .and(CustomLlmMetadataSchema);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

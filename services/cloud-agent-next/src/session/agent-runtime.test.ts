@@ -693,6 +693,7 @@ describe('AgentRuntime', () => {
     async ({ observation, reason }) => {
       const storage = createMemoryStorage();
       const execute = vi.fn();
+      const requestAlarmAtOrBefore = vi.fn();
       const sandbox = {
         discoverSessionWrappers: vi.fn().mockResolvedValue(observation),
       } as unknown as AgentSandbox;
@@ -704,10 +705,19 @@ describe('AgentRuntime', () => {
         getSessionIdForLogs: () => 'agent_runtime',
         sendToWrapper: () => false,
         createAgentSandbox: () => sandbox,
+        requestAlarmAtOrBefore,
       });
 
-      await expect(runtime.send(createPlan())).rejects.toThrow(/cleanup is required/i);
+      const now = 10_000;
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+      try {
+        await expect(runtime.send(createPlan())).rejects.toThrow(/cleanup is required/i);
+      } finally {
+        clock.mockRestore();
+      }
       expect(execute).not.toHaveBeenCalled();
+      expect(requestAlarmAtOrBefore).toHaveBeenCalledOnce();
+      expect(requestAlarmAtOrBefore).toHaveBeenCalledWith(now);
       await expect(getWrapperLease(storage)).resolves.toMatchObject({
         state: 'stop_needed',
         target: { kind: 'session' },

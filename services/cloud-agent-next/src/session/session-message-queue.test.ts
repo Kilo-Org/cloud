@@ -29,6 +29,7 @@ import {
   putSessionMessageState,
   type TerminalizeParams,
 } from './session-message-state.js';
+import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
 
 type QueueEvent = {
   sessionId: string;
@@ -577,6 +578,27 @@ describe('SessionMessageQueue', () => {
     expect(drain).toEqual({ retryAt, remainingPendingCount: 1 });
     expect(harness.events).toHaveLength(1);
     expect(harness.deliver).not.toHaveBeenCalled();
+    expect(pending?.flushAttempts).toBeUndefined();
+    expect(pending?.lastFlushError).toBeUndefined();
+  });
+
+  it('retains a queued message without consuming an attempt while wrapper cleanup blocks delivery', async () => {
+    const retryAt = 50_000;
+    const harness = createQueueHarness({
+      deliver: async () => {
+        throw new WrapperCleanupBlockedError(retryAt);
+      },
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'wait for wrapper cleanup' },
+    });
+
+    const drain = await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+
+    expect(drain).toEqual({ retryAt, remainingPendingCount: 1 });
+    expect(pending?.messageId).toBe(FIRST_MESSAGE_ID);
     expect(pending?.flushAttempts).toBeUndefined();
     expect(pending?.lastFlushError).toBeUndefined();
   });

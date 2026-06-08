@@ -8,9 +8,14 @@
  * This is similar to server-manager.ts but for the wrapper process.
  */
 
+import { withTimeout } from '@kilocode/worker-utils';
 import type { SandboxInstance } from '../types.js';
 import type { ObservedWrapper, WrapperObservation } from '../agent-sandbox/protocol.js';
 import { logger } from '../logger.js';
+import {
+  FAST_SANDBOX_COMMAND_TIMEOUT_MS,
+  logSandboxOperationTimeout,
+} from '../sandbox-timeout-logging.js';
 import { KILO_AGENT_SESSION_LABEL, KILO_WRAPPER_PORT_LABEL } from './devcontainer.js';
 import { dockerSocketEnv, resolveDockerSocketPath } from './sandbox-runtime.js';
 import { shellQuote } from './utils.js';
@@ -291,7 +296,18 @@ export async function discoverSessionWrappers(
 ): Promise<WrapperObservation> {
   let processes: Process[];
   try {
-    processes = await sandbox.listProcesses();
+    const timeoutMs = FAST_SANDBOX_COMMAND_TIMEOUT_MS;
+    processes = await withTimeout(
+      sandbox.listProcesses(),
+      timeoutMs,
+      `Wrapper process discovery timed out after ${timeoutMs}ms`,
+      () =>
+        logSandboxOperationTimeout({
+          operation: 'wrapper.discovery.listProcesses',
+          timeoutMs,
+          timeoutLayer: 'outer',
+        })
+    );
   } catch (error) {
     return {
       status: 'inspection-failed',

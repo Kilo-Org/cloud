@@ -170,6 +170,10 @@ function issueCommentPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+async function waitForAfterTask() {
+  await new Promise(resolve => setTimeout(resolve, 0));
+}
+
 describe('handleGitHubWebhook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -304,6 +308,7 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
+    await waitForAfterTask();
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
     expect(mockHandlePRReviewComment).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'created' }),
@@ -324,6 +329,7 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
+    await waitForAfterTask();
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({

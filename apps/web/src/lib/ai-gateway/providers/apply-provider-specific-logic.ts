@@ -24,6 +24,7 @@ import {
   addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
+  scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 
@@ -100,6 +101,8 @@ export function applyProviderSpecificLogic(
   sanitizeBinaryToolResults(requestToMutate);
 
   if (requestToMutate.kind === 'chat_completions') {
+    scrubOpenCodeSpecificProperties(requestToMutate.body);
+
     // Mostly a workaround for bugs in the old extension.
     repairTools(requestToMutate.body);
 

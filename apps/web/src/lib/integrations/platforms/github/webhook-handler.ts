@@ -649,15 +649,16 @@ export async function handleGitHubWebhook(
 
       // Process asynchronously to return 200 within GitHub's timeout
       after(async () => {
-        const handlersTriggered = ['pr_review_comment_fix', 'review_memory_feedback'];
+        const handlersTriggered = ['pr_review_comment_fix'];
         try {
           await handlePRReviewComment(parseResult.data, integration);
           try {
-            await handleGitHubReviewCommentReply({
+            const reviewMemoryResult = await handleGitHubReviewCommentReply({
               payload: parseResult.data,
               integration,
               deliveryId: eventSignature,
             });
+            if (reviewMemoryResult.recorded) handlersTriggered.push('review_memory_feedback');
           } catch (error) {
             logExceptInTest(`Error handling review memory feedback${logSuffix}:`, error);
             captureException(error, {

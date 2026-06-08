@@ -8,6 +8,7 @@ const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
 const mockHandlePRReviewComment = jest.fn();
+const mockHandleGitHubReviewCommentReply = jest.fn();
 const mockHandleInstallationTargetRenamed = jest.fn();
 const mockRevokeStoredGitHubUserAuthorization = jest.fn();
 
@@ -48,6 +49,10 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handlePushEvent: jest.fn(),
   upsertCliSessionPullRequestsFromWebhook: jest.fn(),
   upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
+}));
+
+jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
+  handleGitHubReviewCommentReply: (input: unknown) => mockHandleGitHubReviewCommentReply(input),
 }));
 
 jest.mock('next/server', () => {
@@ -174,6 +179,10 @@ describe('handleGitHubWebhook', () => {
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
     mockHandlePRReviewComment.mockResolvedValue(undefined);
+    mockHandleGitHubReviewCommentReply.mockResolvedValue({
+      recorded: false,
+      reason: 'not-review-comment-reply',
+    });
     mockHandleInstallationTargetRenamed.mockResolvedValue(
       Response.json({ message: 'Installation target updated' })
     );
@@ -303,6 +312,23 @@ describe('handleGitHubWebhook', () => {
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({ handlers_triggered: ['pr_review_comment_fix'] })
+    );
+  });
+
+  it('logs review memory feedback only when it records feedback', async () => {
+    mockHandleGitHubReviewCommentReply.mockResolvedValueOnce({ recorded: true, eventId: 'evt_1' });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
+      'we_1',
+      expect.objectContaining({
+        handlers_triggered: ['pr_review_comment_fix', 'review_memory_feedback'],
+      })
     );
   });
 

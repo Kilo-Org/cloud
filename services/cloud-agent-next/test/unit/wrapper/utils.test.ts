@@ -23,6 +23,32 @@ describe('runProcess', () => {
 
     expect(result).toEqual({ stdout: 'hello\n', stderr: '', exitCode: 0 });
   });
+
+  it('rejects invalid bounded output limits before spawning', async () => {
+    await expect(
+      runProcess('missing-command', [], { maxCapturedOutputBytes: Number.NaN })
+    ).rejects.toThrow('maxCapturedOutputBytes must be a non-negative safe integer');
+    await expect(
+      runProcess('missing-command', [], {
+        maxCapturedOutputBytes: 1,
+        maxObservedOutputBytes: -1,
+      })
+    ).rejects.toThrow('maxObservedOutputBytes must be a non-negative safe integer');
+  });
+
+  it('accepts a zero-byte capture limit', async () => {
+    const result = await runProcess(process.execPath, ['-e', 'process.stdout.write("x")'], {
+      maxCapturedOutputBytes: 0,
+    });
+
+    expect(result.stdout).toBe('');
+    expect(result.boundedOutput.stdout).toEqual({
+      preview: '',
+      totalBytes: 1,
+      retainedBytes: 0,
+      truncated: true,
+    });
+  });
 });
 
 describe('git', () => {

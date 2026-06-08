@@ -8,7 +8,7 @@ export type BoundedProcessOutput = {
   truncated: boolean;
 };
 
-type BoundedProcessResult = {
+export type BoundedProcessResult = {
   stdout: BoundedProcessOutput;
   stderr: BoundedProcessOutput;
 };
@@ -26,16 +26,20 @@ export type ProcessOptions = {
   timeoutMs?: number;
   signal?: AbortSignal;
   terminationGraceMs?: number;
-  maxCapturedOutputBytes?: number;
+};
+
+export type BoundedProcessOptions = ProcessOptions & {
+  maxCapturedOutputBytes: number;
   maxObservedOutputBytes?: number;
 };
 
-type BoundedProcessOptions = ProcessOptions & {
-  maxCapturedOutputBytes: number;
+export type BoundedExecResult = ExecResult & {
+  boundedOutput: BoundedProcessResult;
 };
 
-type BoundedExecResult = ExecResult & {
-  boundedOutput: BoundedProcessResult;
+type RunProcessOptions = ProcessOptions & {
+  maxCapturedOutputBytes?: number;
+  maxObservedOutputBytes?: number;
 };
 
 export type GitOptions = ProcessOptions;
@@ -58,6 +62,12 @@ export type TerminationReason = 'timeout' | 'abort' | 'excessive-output';
 
 function withStderrSuffix(stderr: string, suffix: string): string {
   return `${stderr}${stderr.endsWith('\n') || stderr.length === 0 ? '' : '\n'}${suffix}`;
+}
+
+function validateOutputLimit(name: string, value: number | undefined): void {
+  if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+    throw new RangeError(`${name} must be a non-negative safe integer`);
+  }
 }
 
 function createBoundedOutputCollector(maxBytes: number): {
@@ -98,11 +108,17 @@ export function runProcess(
   args: string[],
   opts?: ProcessOptions
 ): Promise<ExecResult>;
-export function runProcess(
+export async function runProcess(
   command: string,
   args: string[],
-  opts?: ProcessOptions
+  opts?: RunProcessOptions
 ): Promise<ExecResult> {
+  validateOutputLimit('maxCapturedOutputBytes', opts?.maxCapturedOutputBytes);
+  validateOutputLimit('maxObservedOutputBytes', opts?.maxObservedOutputBytes);
+  if (opts?.maxObservedOutputBytes !== undefined && opts.maxCapturedOutputBytes === undefined) {
+    throw new RangeError('maxObservedOutputBytes requires maxCapturedOutputBytes');
+  }
+
   const stdoutCollector =
     opts?.maxCapturedOutputBytes === undefined
       ? undefined

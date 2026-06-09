@@ -34,7 +34,7 @@ export async function classifyNormalizedInput(
   env: ClassifierEnv,
   input: NormalizedClassifierInput
 ): Promise<ClassifierOutput> {
-  return classifyWithOpenRouter(createOpenRouterClient(env), input);
+  return classifyWithOpenRouter(await createOpenRouterClient(env), input);
 }
 
 export async function classifyWithOpenRouter(

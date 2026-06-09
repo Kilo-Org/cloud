@@ -7,7 +7,7 @@ import {
 
 type OpenRouterClientOptions = {
   _options: {
-    apiKey: () => Promise<string>;
+    apiKey: string;
     httpReferer: string;
     appTitle: string;
   };
@@ -15,7 +15,7 @@ type OpenRouterClientOptions = {
 
 describe('createOpenRouterClient', () => {
   it('creates an OpenRouter SDK client that matches the Next.js OpenRouter attribution', async () => {
-    const client = createOpenRouterClient({
+    const client = await createOpenRouterClient({
       OPENROUTER_API_KEY: {
         get: async () => 'sk-or-test',
       },
@@ -24,7 +24,7 @@ describe('createOpenRouterClient', () => {
     expect(client).toHaveProperty('chat');
 
     const options = (client as OpenRouterClientOptions)._options;
-    await expect(options.apiKey()).resolves.toBe('sk-or-test');
+    expect(options.apiKey).toBe('sk-or-test');
     expect(options.httpReferer).toBe(OPENROUTER_HTTP_REFERER);
     expect(options.appTitle).toBe(OPENROUTER_APP_TITLE);
   });

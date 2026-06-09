@@ -71,6 +71,7 @@ import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason,
 } from '@kilocode/db/schema-types';
+import { isCloudAgentNextBillingErrorBody } from '@kilocode/worker-utils/cloud-agent-next-client';
 import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
@@ -201,20 +202,11 @@ function isBillingCodeReviewTerminalReason(
     return true;
   }
 
-  const message = errorMessage?.toLowerCase();
-  if (!message) {
+  if (!errorMessage) {
     return false;
   }
 
-  return [
-    'insufficient credits',
-    'paid model',
-    'add credits',
-    'credits required',
-    'credit balance is too low',
-    'insufficient funds',
-    'payment required',
-  ].some(pattern => message.includes(pattern));
+  return isCloudAgentNextBillingErrorBody(errorMessage);
 }
 
 function isModelNotFoundCodeReviewTerminalReason(

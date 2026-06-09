@@ -25,7 +25,11 @@ export { createNotFoundHandler } from './not-found-handler.js';
 
 export type { Owner, MCPServerConfig } from './types.js';
 
-export { createCloudAgentNextFetchClient } from './cloud-agent-next-client.js';
+export {
+  CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS,
+  createCloudAgentNextFetchClient,
+  isCloudAgentNextBillingErrorBody,
+} from './cloud-agent-next-client.js';
 export type {
   CloudAgentNextFetchClient,
   CallbackTarget,

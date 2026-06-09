@@ -2,7 +2,6 @@ import 'server-only';
 
 import type Stripe from 'stripe';
 import { eq, and, isNull, sql } from 'drizzle-orm';
-import { addMonths } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
 import {
@@ -44,6 +43,12 @@ import {
   CurrentPersonalSubscriptionResolutionError,
   resolveCurrentPersonalSubscriptionRow,
 } from '@/lib/kiloclaw/current-personal-subscription';
+import {
+  isQualifiedKiloClawCommitPreCutoffRecovery,
+  makeKiloClawStripeSubscriptionNonRenewing,
+  reportKiloClawCommitRetirementAnomaly,
+} from '@/lib/kiloclaw/commit-retirement';
+import { isBeforeKiloClawCommitSalesCutoff } from '@kilocode/db';
 
 const logInfo = sentryLogger('kiloclaw-stripe', 'info');
 const logWarning = sentryLogger('kiloclaw-stripe', 'warning');
@@ -52,6 +57,31 @@ const STRIPE_WEBHOOK_ACTOR = {
   actorType: 'system',
   actorId: 'stripe-webhook',
 } as const;
+
+function reportProviderOnlyCommitRetirementAnomaly(params: {
+  stripeSubscriptionId: string;
+  stripeEventId: string;
+  reason: string;
+  summary: string;
+}): void {
+  reportKiloClawCommitRetirementAnomaly(params);
+}
+
+function reportKnownCommitRetirementAnomaly(params: {
+  subscription: KiloClawSubscription;
+  reason: string;
+  summary: string;
+  stripeEventId?: string;
+}): void {
+  reportKiloClawCommitRetirementAnomaly({
+    reason: params.reason,
+    summary: params.summary,
+    subscriptionId: params.subscription.id,
+    stripeSubscriptionId: params.subscription.stripe_subscription_id,
+    stripeEventId: params.stripeEventId,
+  });
+}
+
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type SubscriptionLogWriter = DbTransaction | typeof db;
 
@@ -99,6 +129,32 @@ function logQuarantinedStripeEvent(
     reason,
     ...fields,
   });
+}
+
+async function containProviderNonRenewal(params: {
+  stripeSubscriptionId: string;
+  stripeEventId: string;
+  reason?: string;
+  summary?: string;
+  logMessage?: string;
+}): Promise<void> {
+  reportKiloClawCommitRetirementAnomaly({
+    reason: params.reason ?? 'provider_nonrenewal_required',
+    summary: params.summary ?? params.logMessage ?? 'Provider subscription must not renew.',
+    stripeSubscriptionId: params.stripeSubscriptionId,
+    stripeEventId: params.stripeEventId,
+  });
+  await makeKiloClawStripeSubscriptionNonRenewing(params.stripeSubscriptionId);
+}
+
+async function containUnresolvedCommitCreation(params: {
+  stripeSubscriptionId: string;
+  stripeEventId: string;
+  reason: string;
+  summary: string;
+  logMessage: string;
+}): Promise<void> {
+  await containProviderNonRenewal(params);
 }
 
 async function insertStripeSubscriptionChangeLog(
@@ -374,6 +430,14 @@ async function runAfterResponse(work: () => Promise<void>) {
   }
 
   after(work);
+}
+
+function timestampsEqual(
+  left: string | Date | null | undefined,
+  right: string | Date | null | undefined
+): boolean {
+  if (!left || !right) return false;
+  return new Date(left).getTime() === new Date(right).getTime();
 }
 
 function getSubscriptionPeriods(subscription: Stripe.Subscription, kiloUserId?: string) {
@@ -753,6 +817,16 @@ export async function handleKiloClawSubscriptionCreated(params: {
   const metadata = getKiloClawMetadata(subscription.metadata);
 
   if (!metadata) {
+    const priceId = subscription.items.data[0]?.price?.id;
+    if (priceId && getClawPlanForStripePriceId(priceId) === 'commit') {
+      await containUnresolvedCommitCreation({
+        stripeSubscriptionId: subscription.id,
+        stripeEventId: eventId,
+        reason: 'ambiguous_subscription_lineage',
+        summary: 'Stripe Commit subscription creation lacked required KiloClaw metadata.',
+        logMessage: 'Failed to contain Commit subscription creation without metadata',
+      });
+    }
     logWarning('KiloClaw subscription.created missing metadata', {
       stripe_event_id: eventId,
       stripe_subscription_id: subscription.id,
@@ -775,12 +849,24 @@ export async function handleKiloClawSubscriptionCreated(params: {
   let convertedFromTrial = false;
   let beforeSubscriptionForMarkerClear: KiloClawSubscription | null = null;
   let afterSubscriptionForMarkerClear: KiloClawSubscription | null = null;
+  let unresolvedCommitCreation: { logMessage: string } | undefined;
   const trialEndEventDate =
     typeof subscription.created === 'number' ? new Date(subscription.created * 1000) : new Date();
 
   await db.transaction(async tx => {
     const stripeRows = await selectPersonalSubscriptionsByStripeId(tx, subscription.id);
     if (stripeRows.length > 1) {
+      if (plan === 'commit') {
+        reportProviderOnlyCommitRetirementAnomaly({
+          stripeSubscriptionId: subscription.id,
+          stripeEventId: eventId,
+          reason: 'ambiguous_subscription_lineage',
+          summary: 'Stripe Commit subscription creation matched multiple local subscription rows.',
+        });
+        unresolvedCommitCreation = {
+          logMessage: 'Failed to contain duplicate-owner Commit subscription creation',
+        };
+      }
       logQuarantinedStripeEvent('duplicate_stripe_subscription_id', {
         stripe_event_id: eventId,
         stripe_subscription_id: subscription.id,
@@ -825,6 +911,17 @@ export async function handleKiloClawSubscriptionCreated(params: {
       }
     } catch (error) {
       if (error instanceof PersonalStripeResolutionError) {
+        if (plan === 'commit') {
+          reportProviderOnlyCommitRetirementAnomaly({
+            stripeSubscriptionId: subscription.id,
+            stripeEventId: eventId,
+            reason: 'ambiguous_subscription_lineage',
+            summary: 'Stripe Commit subscription creation could not resolve a canonical lineage.',
+          });
+          unresolvedCommitCreation = {
+            logMessage: 'Failed to contain lineage-unresolved Commit subscription creation',
+          };
+        }
         logQuarantinedStripeEvent(error.reason, {
           stripe_event_id: eventId,
           stripe_subscription_id: subscription.id,
@@ -838,6 +935,26 @@ export async function handleKiloClawSubscriptionCreated(params: {
     }
 
     if (!resolvedTarget || !resolvedTarget.subscription.instance_id) {
+      if (plan === 'commit') {
+        const createdBeforeCutoff = isBeforeKiloClawCommitSalesCutoff(
+          new Date(subscription.created * 1000)
+        );
+        const reason = createdBeforeCutoff
+          ? 'ambiguous_subscription_lineage'
+          : 'unqualified_post_cutoff_commit';
+        const summary = createdBeforeCutoff
+          ? 'Pre-cutoff confirmed Stripe Commit subscription creation lacked a canonical billing target.'
+          : 'Stripe created a rowless Commit subscription at or after the sales cutoff.';
+        reportProviderOnlyCommitRetirementAnomaly({
+          stripeSubscriptionId: subscription.id,
+          stripeEventId: eventId,
+          reason,
+          summary,
+        });
+        unresolvedCommitCreation = {
+          logMessage: 'Failed to contain unresolved Commit subscription creation',
+        };
+      }
       logQuarantinedStripeEvent('missing_personal_instance_target', {
         stripe_event_id: eventId,
         stripe_subscription_id: subscription.id,
@@ -857,7 +974,50 @@ export async function handleKiloClawSubscriptionCreated(params: {
 
     const existingRow = resolvedTarget.subscription;
 
+    const existingCommitPeriodRenewed =
+      plan === 'commit' &&
+      existingRow.plan === 'commit' &&
+      existingRow.current_period_end !== null &&
+      (periods.current_period_start === null ||
+        new Date(periods.current_period_start).getTime() >=
+          new Date(existingRow.current_period_end).getTime() ||
+        (periods.current_period_end !== null &&
+          new Date(periods.current_period_end).getTime() >
+            new Date(existingRow.current_period_end).getTime()));
+    if (
+      plan === 'commit' &&
+      (!isBeforeKiloClawCommitSalesCutoff(new Date(subscription.created * 1000)) ||
+        existingCommitPeriodRenewed)
+    ) {
+      reportKnownCommitRetirementAnomaly({
+        subscription: existingRow,
+        reason: existingCommitPeriodRenewed
+          ? 'forbidden_commit_invoice'
+          : 'unqualified_post_cutoff_commit',
+        summary: existingCommitPeriodRenewed
+          ? 'Stripe subscription.created reported a later Commit period for an existing Commit row.'
+          : 'Stripe created a Commit subscription at or after the sales cutoff.',
+        stripeEventId: eventId,
+      });
+      unresolvedCommitCreation = {
+        logMessage: 'Failed to contain unqualified Commit subscription creation',
+      };
+      return;
+    }
+
     if (existingRow.status === 'canceled') {
+      if (plan === 'commit') {
+        reportProviderOnlyCommitRetirementAnomaly({
+          stripeSubscriptionId: subscription.id,
+          stripeEventId: eventId,
+          reason: 'ambiguous_subscription_lineage',
+          summary:
+            'Stripe Commit subscription creation resolved only to a canceled lineage target.',
+        });
+        unresolvedCommitCreation = {
+          logMessage: 'Failed to contain Commit creation targeting a canceled lineage',
+        };
+      }
       logQuarantinedStripeEvent('subscription_created_canceled_lineage_target', {
         stripe_event_id: eventId,
         stripe_subscription_id: subscription.id,
@@ -875,6 +1035,18 @@ export async function handleKiloClawSubscriptionCreated(params: {
       existingRow.stripe_subscription_id !== null &&
       existingRow.stripe_subscription_id !== subscription.id
     ) {
+      if (plan === 'commit') {
+        reportProviderOnlyCommitRetirementAnomaly({
+          stripeSubscriptionId: subscription.id,
+          stripeEventId: eventId,
+          reason: 'ambiguous_subscription_lineage',
+          summary:
+            'Stripe Commit subscription creation conflicted with existing provider ownership.',
+        });
+        unresolvedCommitCreation = {
+          logMessage: 'Failed to contain Commit creation with conflicting provider ownership',
+        };
+      }
       logWarning(
         'Ignoring stale subscription.created — instance already has a different subscription',
         {
@@ -895,6 +1067,17 @@ export async function handleKiloClawSubscriptionCreated(params: {
       stripePriceVersion &&
       stripePriceVersion !== existingRow.kiloclaw_price_version
     ) {
+      if (plan === 'commit') {
+        reportProviderOnlyCommitRetirementAnomaly({
+          stripeSubscriptionId: subscription.id,
+          stripeEventId: eventId,
+          reason: 'ambiguous_subscription_lineage',
+          summary: 'Stripe Commit subscription creation conflicted with lineage price version.',
+        });
+        unresolvedCommitCreation = {
+          logMessage: 'Failed to contain Commit creation with conflicting price version',
+        };
+      }
       logQuarantinedStripeEvent('subscription_created_price_version_mismatch', {
         stripe_event_id: eventId,
         stripe_subscription_id: subscription.id,
@@ -919,20 +1102,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
       .where(eq(kiloclaw_subscriptions.id, existingRow.id))
       .limit(1);
 
-    // For commit plans, derive commit_ends_at. Pre-launch subscriptions
-    // had a delayed-billing trial_end — the 6-month commit term starts
-    // after the trial boundary, not at subscription creation time.
-    const commitEndsAt =
-      plan === 'commit'
-        ? addMonths(
-            subscription.trial_end
-              ? new Date(subscription.trial_end * 1000)
-              : periods.current_period_start
-                ? new Date(periods.current_period_start)
-                : new Date(),
-            6
-          ).toISOString()
-        : null;
+    const commitEndsAt = plan === 'commit' ? periods.current_period_end : null;
 
     const [afterSubscription] = await tx
       .update(kiloclaw_subscriptions)
@@ -966,6 +1136,15 @@ export async function handleKiloClawSubscriptionCreated(params: {
     afterSubscriptionForMarkerClear = afterSubscription ?? null;
     didProcess = true;
   });
+
+  if (unresolvedCommitCreation) {
+    await containProviderNonRenewal({
+      stripeSubscriptionId: subscription.id,
+      stripeEventId: eventId,
+      logMessage: unresolvedCommitCreation.logMessage,
+    });
+    return;
+  }
 
   await clearTrialInactivityStopAfterStripeTrialTransition({
     userId: kiloUserId,
@@ -1060,6 +1239,84 @@ export async function handleKiloClawSubscriptionUpdated(params: {
   }
 
   const isHybrid = preRead.payment_source === 'credits' && preRead.stripe_subscription_id !== null;
+  const [currentRow] = await db
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(eq(kiloclaw_subscriptions.id, preRead.id))
+    .limit(1);
+
+  const incomingCommitStartsPostCutoff =
+    !periods.current_period_start ||
+    !isBeforeKiloClawCommitSalesCutoff(periods.current_period_start);
+  const currentCommitIsAmbiguous =
+    currentRow?.plan === 'commit' &&
+    (!currentRow.current_period_start ||
+      !currentRow.current_period_end ||
+      !currentRow.commit_ends_at ||
+      !timestampsEqual(currentRow.commit_ends_at, currentRow.current_period_end));
+  const incomingExtendsVerifiedFinalBoundary =
+    currentRow?.commit_ends_at && periods.current_period_end
+      ? new Date(periods.current_period_end).getTime() >
+        new Date(currentRow.commit_ends_at).getTime()
+      : false;
+  const incomingStartsAtOrAfterExistingBoundary =
+    currentRow?.plan === 'commit' &&
+    currentRow.current_period_end !== null &&
+    periods.current_period_start !== null &&
+    new Date(periods.current_period_start).getTime() >=
+      new Date(currentRow.current_period_end).getTime();
+  const qualifiedPreCutoffRecovery = currentRow
+    ? isQualifiedKiloClawCommitPreCutoffRecovery({
+        subscription: currentRow,
+        incomingPeriodStart: periods.current_period_start,
+      })
+    : false;
+  const unqualifiedCommitUpdate =
+    plan === 'commit' &&
+    currentRow &&
+    !qualifiedPreCutoffRecovery &&
+    ((incomingCommitStartsPostCutoff && currentCommitIsAmbiguous) ||
+      incomingExtendsVerifiedFinalBoundary ||
+      incomingStartsAtOrAfterExistingBoundary);
+  if (unqualifiedCommitUpdate && currentRow) {
+    reportKnownCommitRetirementAnomaly({
+      subscription: currentRow,
+      reason: 'unqualified_post_cutoff_commit',
+      summary: 'Stripe subscription update reported Commit without verified qualification.',
+      stripeEventId: eventId,
+    });
+    await containProviderNonRenewal({
+      stripeSubscriptionId: subscription.id,
+      stripeEventId: eventId,
+      logMessage: 'Failed to make unqualified Commit update non-renewing',
+    });
+    return;
+  }
+
+  const retirementInvolvedStandardWithoutConsent =
+    plan === 'standard' &&
+    currentRow !== undefined &&
+    (currentRow.plan === 'commit' || currentRow.commit_ends_at !== null) &&
+    !(
+      currentRow.scheduled_plan === 'standard' &&
+      currentRow.scheduled_by === 'user' &&
+      periods.current_period_start &&
+      timestampsEqual(currentRow.commit_ends_at, periods.current_period_start)
+    );
+  if (retirementInvolvedStandardWithoutConsent && currentRow) {
+    reportKnownCommitRetirementAnomaly({
+      subscription: currentRow,
+      reason: 'provider_state_mismatch',
+      summary: 'Stripe subscription update reported Standard without durable explicit consent.',
+      stripeEventId: eventId,
+    });
+    await containProviderNonRenewal({
+      stripeSubscriptionId: subscription.id,
+      stripeEventId: eventId,
+      logMessage: 'Failed to contain unconsented Standard subscription update',
+    });
+    return;
+  }
 
   if (isHybrid) {
     // Hybrid guard: only propagate cancel intent and dunning states.
@@ -1126,30 +1383,9 @@ export async function handleKiloClawSubscriptionUpdated(params: {
         cancel_at_period_end: subscription.cancel_at_period_end,
         current_period_start: periods.current_period_start,
         current_period_end: periods.current_period_end,
-        // Commit plan auto-renewal: when the existing commit_ends_at boundary
-        // has passed, advance it forward in 6-month increments until it is in
-        // the future. This fires naturally on renewal webhooks
-        // (subscription.updated events), keeping the subscription on the
-        // commit price indefinitely in 6-month windows.
-        // If commit_ends_at is null (e.g. update webhook arrived before the
-        // creation handler persisted it), fall back to current_period_start
-        // + 6 months to approximate the correct 6-month commit boundary.
-        // When leaving commit, clear it.
-        ...(plan !== 'commit'
-          ? { commit_ends_at: null }
-          : {
-              commit_ends_at: sql`CASE
-                WHEN ${kiloclaw_subscriptions.commit_ends_at} IS NOT NULL
-                     AND ${kiloclaw_subscriptions.commit_ends_at} < now()
-                THEN ${kiloclaw_subscriptions.commit_ends_at} + interval '6 months'
-                     * CEIL(EXTRACT(EPOCH FROM (now() - ${kiloclaw_subscriptions.commit_ends_at}))
-                            / EXTRACT(EPOCH FROM interval '6 months'))
-                ELSE COALESCE(
-                  ${kiloclaw_subscriptions.commit_ends_at},
-                  ${periods.current_period_start}::timestamptz + interval '6 months'
-                )
-              END`,
-            }),
+        // Subscription updates never authorize or extend Commit. Invoice
+        // settlement owns any qualified final-period boundary mutation.
+        ...(plan !== 'commit' ? { commit_ends_at: null } : {}),
         // Record when the subscription first entered past_due; clear when recovered.
         // past_due_since drives the 14-day grace period in the billing lifecycle cron
         // (updated_at would be unreliable because $onUpdateFn refreshes it on every write).
@@ -1274,6 +1510,18 @@ export async function handleKiloClawSubscriptionDeleted(params: {
     // that Stripe auto-cancels, and restoring active status there would grant a
     // free grace window. See Standalone-to-Credit Conversion rule 4.
     if (targetRow.pending_conversion) {
+      if (
+        targetRow.plan === 'commit' &&
+        (targetRow.scheduled_plan !== 'standard' || targetRow.scheduled_by !== 'user')
+      ) {
+        reportKnownCommitRetirementAnomaly({
+          subscription: targetRow,
+          reason: 'provider_state_mismatch',
+          summary: 'Final Commit Stripe conversion lacked explicit Standard continuation consent.',
+          stripeEventId: eventId,
+        });
+        return;
+      }
       // Conversion path: clear Stripe subscription ID, set payment_source to
       // credits, and set credit_renewal_at to the existing period end so the
       // credit renewal sweep picks up the next renewal.
@@ -1293,8 +1541,11 @@ export async function handleKiloClawSubscriptionDeleted(params: {
           credit_renewal_at: targetRow.current_period_end,
           cancel_at_period_end: false,
           pending_conversion: false,
-          scheduled_plan: null,
-          scheduled_by: null,
+          scheduled_plan: targetRow.scheduled_plan === 'standard' ? 'standard' : null,
+          scheduled_by:
+            targetRow.scheduled_plan === 'standard' && targetRow.scheduled_by === 'user'
+              ? 'user'
+              : null,
           stripe_schedule_id: null,
         })
         .where(eq(kiloclaw_subscriptions.id, targetRow.id))
@@ -1385,6 +1636,7 @@ export async function handleKiloClawScheduleEvent(params: {
   const [row] = await db
     .select({
       user_id: kiloclaw_subscriptions.user_id,
+      stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
       plan: kiloclaw_subscriptions.plan,
       scheduled_plan: kiloclaw_subscriptions.scheduled_plan,
       payment_source: kiloclaw_subscriptions.payment_source,
@@ -1403,55 +1655,49 @@ export async function handleKiloClawScheduleEvent(params: {
     scheduleStatus === 'canceled' ||
     scheduleStatus === 'completed'
   ) {
-    const [before] = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.stripe_schedule_id, scheduleId))
-      .limit(1);
-    const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
-      stripe_schedule_id: null,
-      scheduled_plan: null,
-      scheduled_by: null,
-    };
+    await db.transaction(async tx => {
+      const [before] = await tx
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.stripe_schedule_id, scheduleId))
+        .for('update')
+        .limit(1);
+      if (!before) return;
 
-    // Apply the scheduled plan only on 'completed' for non-hybrid rows.
-    // Hybrid rows: plan mutation is owned by invoice settlement (Hybrid
-    // Subscription Ownership rule 4). Only clear schedule tracking fields.
-    // Our schedules use end_behavior: 'release', so natural transitions
-    // fire as 'released' — but so do intentional cancels (cancelSubscription,
-    // cancelPlanSwitch). Since subscription.updated already picks up the new
-    // price via detectPlanFromSubscription, we don't need to apply the plan
-    // here for 'released'. Restricting to 'completed' eliminates the race
-    // where a cancel-release webhook arrives before the local DB clears the
-    // schedule.
-    if (scheduleStatus === 'completed' && row.scheduled_plan && row.payment_source !== 'credits') {
-      updateSet.plan = row.scheduled_plan;
-      if (row.scheduled_plan === 'standard') {
+      const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
+        stripe_schedule_id: null,
+        scheduled_plan: null,
+        scheduled_by: null,
+      };
+
+      // Schedule lifecycle never owns Commit retirement plan or boundary
+      // mutation. Invoice settlement remains authoritative for every hybrid
+      // success and every retirement-involved plan transition.
+      if (
+        scheduleStatus === 'completed' &&
+        before.scheduled_plan &&
+        before.payment_source !== 'credits' &&
+        before.plan !== 'commit' &&
+        before.scheduled_plan !== 'commit'
+      ) {
+        updateSet.plan = before.scheduled_plan;
         updateSet.commit_ends_at = null;
-      } else if (row.scheduled_plan === 'commit') {
-        // Standard → Commit switch released. Derive the first commit
-        // boundary from the Stripe-resolved last phase start_date (the
-        // exact transition moment) + 6 calendar months.
-        const lastPhase = schedule.phases[schedule.phases.length - 1];
-        const transitionDate = lastPhase ? new Date(lastPhase.start_date * 1000) : new Date();
-        updateSet.commit_ends_at = addMonths(transitionDate, 6).toISOString();
       }
-    }
 
-    const [after] = await db
-      .update(kiloclaw_subscriptions)
-      .set(updateSet)
-      .where(eq(kiloclaw_subscriptions.stripe_schedule_id, scheduleId))
-      .returning();
+      const [after] = await tx
+        .update(kiloclaw_subscriptions)
+        .set(updateSet)
+        .where(eq(kiloclaw_subscriptions.id, before.id))
+        .returning();
 
-    await insertStripeSubscriptionChangeLog(db, {
-      subscriptionId: after?.id ?? before?.id,
-      action:
-        scheduleStatus === 'completed' && !!updateSet.plan ? 'plan_switched' : 'schedule_changed',
-      reason: `stripe_schedule_${scheduleStatus}`,
-      before: before ?? null,
-      after: after ?? null,
-      bestEffort: true,
+      await insertStripeSubscriptionChangeLog(tx, {
+        subscriptionId: after?.id ?? before.id,
+        action:
+          scheduleStatus === 'completed' && !!updateSet.plan ? 'plan_switched' : 'schedule_changed',
+        reason: `stripe_schedule_${scheduleStatus}`,
+        before,
+        after: after ?? null,
+      });
     });
   }
 
@@ -1573,9 +1819,22 @@ export async function handleKiloClawInvoicePaid(params: {
     amountMicrodollars,
     periodStart,
     periodEnd,
+    stripeEventId: eventId,
+    checkoutConfirmedAt:
+      typeof stripeSubscription.created === 'number'
+        ? new Date(stripeSubscription.created * 1000).toISOString()
+        : undefined,
   });
 
   if (!applied) {
+    if (plan === 'commit') {
+      await containProviderNonRenewal({
+        stripeSubscriptionId,
+        stripeEventId: eventId,
+        reason: 'ambiguous_subscription_lineage',
+        summary: 'Paid Commit invoice could not be resolved to a canonical subscription target.',
+      });
+    }
     logQuarantinedStripeEvent('invoice_paid_unresolved_target', {
       stripe_event_id: eventId,
       stripe_invoice_id: invoice.id,

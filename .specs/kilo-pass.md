@@ -14,7 +14,7 @@ here only where Kilo Pass adds product-specific behavior.
 ## Status
 
 Draft -- current-code alignment revision created 2026-06-01. The first-fingerprint-claim cooldown in Duplicate-Card
-Rules 51-55 were implemented on 2026-06-05.
+Rules 51-55 and verified KiloClaw hosting intent at Kilo Pass checkout were implemented on 2026-06-05.
 
 ## Conventions
 
@@ -216,6 +216,29 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 37. The KiloClaw pending-balance projection and scheduled-change renewal UI use narrower direct-multiplication
     calculations. They MUST NOT be treated as canonical bonus computations.
 
+### KiloClaw Hosting Intent
+
+1. A Kilo Pass checkout MAY carry an intent to activate KiloClaw hosting after
+   purchase, but the Kilo Pass purchase and the hosting activation are
+   independent decisions. Failure or expiry of hosting intent MUST NOT
+   invalidate an otherwise valid Kilo Pass purchase.
+2. Hosting intent MUST be stored in payment-provider checkout metadata and
+   MUST include the selected KiloClaw plan, target instance, and intended
+   KiloClaw price version. Callback and query-string values MAY support display
+   or navigation but MUST NOT authorize hosting activation.
+3. Before auto-activation, the server MUST retrieve and validate the completed
+   Kilo Pass checkout, its verified hosting metadata, and the Stripe
+   subscription creation timestamp. The browser MUST NOT be authoritative for
+   plan, instance, price version, or confirmation time.
+4. A pending Commit hosting intent is valid only when the Kilo Pass checkout
+   completed before the KiloClaw Commit sales cutoff defined by
+   `.specs/kiloclaw-billing.md`. A Kilo Pass purchase completed at or after the
+   cutoff remains valid, but its Commit hosting intent MUST expire and the
+   customer MUST be directed to activate Standard.
+5. Standard hosting intent remains eligible after the Commit cutoff, subject
+   to KiloClaw credit enrollment, balance sufficiency, and instance ownership
+   rules.
+
 ### Projections and UI
 
 38. The Kilo Pass state read path MUST compute current-period and next-period UI bonus projections from tier, cadence,
@@ -335,9 +358,10 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
     append a failed audit entry and rethrow.
 74. Store-expiry reconciliation MUST append success audit after persisted cancellation. App Store expiry notifications
     also append success audit after persisting ended state.
-75. Duplicate-card cancellation or refund failures MUST remain operational error reports only. A successful
-    duplicate-card audit MUST remain authoritative blocked-replay evidence even when provider enforcement fails. It MUST
-    identify the matched first fingerprint claim and fingerprint digest without recording the raw fingerprint.
+75. Duplicate-card blocking MUST commit before provider enforcement and remain authoritative replay evidence. The block
+    audit MUST identify the matched first fingerprint claim and fingerprint digest without recording the raw fingerprint.
+    Cancellation and refund outcomes MUST be recorded separately in audit payloads. Cancellation failure MUST throw for
+    webhook retry; refund failure MUST remain observable without reversing the block or granting credits.
 76. Repeated base or bonus issuance handled by normal issuance helpers MUST append skipped-idempotent audit entries.
     Store-transaction replay and usage-triggered prechecks that find an existing bonus-like item return without an
     equivalent skipped-idempotent audit entry.
@@ -357,8 +381,8 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
 4. Threshold-trigger handling MUST clear threshold and return without issuing when selected subscription is absent or
    non-active, current issuance is absent, base item is absent, or bonus-like item already exists.
 5. Duplicate-card provider cancellation and refund failures, and a missing refundable settlement identifier, MUST NOT
-   abort the database-side block and MUST NOT permit credits. Such failures MUST be reported operationally and do not
-   create persisted reconciliation records.
+   reverse the database-side block or permit credits. Cancellation failure MUST abort webhook acknowledgement so Stripe
+   retries. Cancellation and refund outcomes MUST be persisted in existing audit records; refund failure remains nonfatal.
 6. Missing or unsupported duplicate-card evidence and missing first-claimant attribution MUST fail open as described in
    Rules 52-54. Provider lookup failures, multiple paid settlements, and missing first-claimant attribution MUST be
    reported operationally but MUST NOT abort normal invoice processing. Matching blocked-audit or committed-issuance
@@ -376,7 +400,8 @@ The following behavior or stronger guarantees are not implemented by current cod
 2. Effective-subscription reselection after late-derived pause or store expiration.
 3. Exposed verified Google Play purchase completion and provider notification handling.
 4. Mobile-store yearly products and store-yearly monthly issuance lifecycle.
-5. Persisted reconciliation state for duplicate-card cancellation or refund partial failures.
+5. Dedicated durable workflow state for duplicate-card cancellation or refund partial failures beyond existing audits and
+   Stripe idempotency keys.
 6. One canonical projection path that matches issuance eligibility, existing bonus-like item checks, scheduled-change
    target behavior, and stored Stripe promo reason across every consumer.
 7. Unbounded or explicitly durable streak accounting beyond the 36-month scan cap.
@@ -416,6 +441,11 @@ promo or Kilo Pass referral conversion.
   Kilo Pass referral conversions.
 - Defined blocked-audit and committed-issuance replay authority while preserving exact-settlement resolution,
   fail-open evidence handling, and the existing duplicate cancellation outcome.
+
+### 2026-06-05 -- Verified KiloClaw hosting intent
+
+- Defined server-verified checkout metadata and completion time as KiloClaw hosting activation authority.
+- Kept completed Kilo Pass purchases valid when post-cutoff Commit hosting intent expires.
 
 ### 2026-06-01 -- Initial spec
 

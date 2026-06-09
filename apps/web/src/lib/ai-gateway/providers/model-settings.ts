@@ -14,6 +14,7 @@ import type {
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
+import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
@@ -95,6 +96,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     return REASONING_VARIANTS_BINARY;
   }
   if (
+    isMinimaxModel(model) ||
     isKimiModel(model) ||
     isGlmModel(model) ||
     isGrokToggleableReasoningModel(model) ||

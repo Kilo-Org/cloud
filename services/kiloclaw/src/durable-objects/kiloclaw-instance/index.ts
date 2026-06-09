@@ -218,6 +218,30 @@ const PENDING_REGISTRY_CLEANUP_KEY = 'pendingRegistryCleanup';
 const SKIP_PROVISION_RESERVATION_RELEASE_KEY = 'skipProvisionReservationRelease';
 const REGISTRY_CLEANUP_RETRY_MS = 60_000;
 
+const JSON_LOG_STRING_ESCAPES: Record<string, string> = {
+  '\b': '\\b',
+  '\f': '\\f',
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+  '"': '\\"',
+  '\\': '\\\\',
+};
+
+function formatJsonLogString(value: string): string {
+  let result = '"';
+  for (const char of value) {
+    const escaped = JSON_LOG_STRING_ESCAPES[char];
+    if (escaped) {
+      result += escaped;
+      continue;
+    }
+    const code = char.charCodeAt(0);
+    result += code < 0x20 ? `\\u${code.toString(16).padStart(4, '0')}` : char;
+  }
+  return `${result}"`;
+}
+
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
   private startInProgress = false;
@@ -3487,7 +3511,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           previousOverride ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB` : 'none'
         } ` +
         `new=${input.size.cpus}/${input.size.memory_mb}MB cpu_kind=${input.size.cpu_kind ?? 'shared'} ` +
-        `reason="${input.reason.replace(/"/g, '\\"')}"`
+        `reason=${formatJsonLogString(input.reason)}`
     );
 
     return { previousOverride, newOverride: input.size };
@@ -3527,7 +3551,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
       console.log(
         `[admin-size-override] clear (no-op) userId=${this.s.userId} actor=${input.actorEmail} ` +
-          `reason="${input.reason.replace(/"/g, '\\"')}"`
+          `reason=${JSON.stringify(input.reason)}`
       );
       return { previousOverride: null };
     }
@@ -3558,10 +3582,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const previousLabel = previousOverride
       ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB`
       : 'metadata-only (skewed state)';
-    console.log(
-      `[admin-size-override] clear userId=${this.s.userId} actor=${input.actorEmail} ` +
-        `previous=${previousLabel} reason="${input.reason.replace(/"/g, '\\"')}"`
-    );
+    console.log('[admin-size-override] clear', {
+      userId: this.s.userId,
+      actor: input.actorEmail,
+      previous: previousLabel,
+      reason: input.reason,
+    });
 
     return { previousOverride };
   }
@@ -3945,6 +3971,20 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async deleteAgent(agentId: string): Promise<AgentDeleteResponse | AgentConfigErrorEnvelope> {
     await this.loadState();
     return gateway.deleteAgent(this.s, this.env, agentId);
+  }
+
+  /**
+   * Declaratively set an agent's channel-level routes ({ etag?, channels[] }).
+   * Returns an error envelope for stale etag (`config_etag_conflict`), unknown
+   * agent (`agent_not_found`), channel conflict (`agent_binding_conflict`), or
+   * missing capability (`capability_unavailable`).
+   */
+  async updateAgentBindings(
+    agentId: string,
+    body: Record<string, unknown>
+  ): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.updateAgentBindings(this.s, this.env, agentId, body);
   }
 
   async getFileTree(filePath?: string) {

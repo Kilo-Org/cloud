@@ -1,14 +1,40 @@
 import 'server-only';
+import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
-import type { JsonWebKey } from 'node:crypto';
 import { z } from 'zod';
+
+type GatewayPublicJwk = Pick<
+  JsonWebKey,
+  | 'alg'
+  | 'crv'
+  | 'd'
+  | 'dp'
+  | 'dq'
+  | 'e'
+  | 'ext'
+  | 'k'
+  | 'key_ops'
+  | 'kty'
+  | 'n'
+  | 'oth'
+  | 'p'
+  | 'q'
+  | 'qi'
+  | 'use'
+  | 'x'
+  | 'y'
+>;
+
+const PublicJwkSchema = z
+  .object({
+    kty: z.string().min(1),
+  })
+  .passthrough();
 
 const JWTKeySchema = z.object({
   keyId: z.string().min(1),
-  publicJwk: z.custom<JsonWebKey>(
-    value => value !== null && typeof value === 'object',
-    'publicJwk must be an object'
-  ),
+  publicJwk: PublicJwkSchema,
+  publicKeyPem: z.string().min(1).optional(),
   privateKeyPem: z.string().min(1).optional(),
 });
 
@@ -35,7 +61,8 @@ const CredentialKeysetSchema = z.object({
 
 export type GatewayJWTKey = {
   keyId: string;
-  publicJwk: JsonWebKey;
+  publicJwk: GatewayPublicJwk;
+  publicKeyPem?: string;
   privateKeyPem?: string;
 };
 
@@ -96,7 +123,7 @@ export function getGatewayAppConfig(): GatewayAppConfig {
   }
 
   return {
-    appBaseUrl: getEnvVariable('MCP_GATEWAY_APP_BASE_URL') || 'https://app.kilo.ai',
+    appBaseUrl: getEnvVariable('MCP_GATEWAY_APP_BASE_URL') || APP_URL,
     gatewayBaseUrl: getEnvVariable('MCP_GATEWAY_BASE_URL') || 'https://mcp.kilosessions.ai',
     issuer: jwtKeyset.issuer,
     accessTokenTtlSeconds: Number(getEnvVariable('MCP_GATEWAY_ACCESS_TOKEN_TTL_SECONDS') || '900'),

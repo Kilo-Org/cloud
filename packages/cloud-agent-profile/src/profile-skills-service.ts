@@ -115,6 +115,39 @@ export const skillUpdateInputSchema = z.object({
 export type SkillCustomInput = z.infer<typeof skillCustomInputSchema>;
 export type SkillUpdateInput = z.infer<typeof skillUpdateInputSchema>;
 
+function getFrontmatterValue(frontmatter: string, key: string): string | null {
+  for (const rawLine of frontmatter.split('\n')) {
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+    if (!line.startsWith(key)) {
+      continue;
+    }
+
+    let index = key.length;
+    while (line[index] === ' ' || line[index] === '\t') {
+      index += 1;
+    }
+    if (line[index] !== ':') {
+      continue;
+    }
+
+    index += 1;
+    const valueStart = index;
+    while (line[index] === ' ' || line[index] === '\t') {
+      index += 1;
+    }
+    if (index >= line.length) {
+      if (valueStart < line.length) {
+        return '';
+      }
+      continue;
+    }
+
+    return line.slice(index);
+  }
+
+  return null;
+}
+
 /**
  * Extract YAML frontmatter `name` and `description` from SKILL.md.
  * Supports both --- and +++ delimiters. Returns `null` if no frontmatter.
@@ -128,8 +161,8 @@ export function parseSkillFrontmatter(rawMarkdown: string): {
     return { name: null, description: null };
   }
   const frontmatter = match[1];
-  const nameMatch = frontmatter.match(/^name\s*:\s*(.+)$/m);
-  const descMatch = frontmatter.match(/^description\s*:\s*(.+)$/m);
+  const name = getFrontmatterValue(frontmatter, 'name');
+  const description = getFrontmatterValue(frontmatter, 'description');
   const stripQuotes = (v: string): string => {
     const trimmed = v.trim();
     if (
@@ -141,8 +174,8 @@ export function parseSkillFrontmatter(rawMarkdown: string): {
     return trimmed;
   };
   return {
-    name: nameMatch ? stripQuotes(nameMatch[1]) : null,
-    description: descMatch ? stripQuotes(descMatch[1]) : null,
+    name: name === null ? null : stripQuotes(name),
+    description: description === null ? null : stripQuotes(description),
   };
 }
 

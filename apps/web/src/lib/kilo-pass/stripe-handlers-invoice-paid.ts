@@ -2,6 +2,7 @@ import 'server-only';
 
 import {
   credit_transactions,
+  kilo_pass_audit_log,
   kilo_pass_issuances,
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
@@ -10,7 +11,7 @@ import {
 
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
@@ -69,6 +70,124 @@ import {
   type KiloPassAffiliateSaleContext,
 } from '@/lib/kilo-pass/affiliate-sale';
 import { processPersonalKiloPassStripePaidConversion } from '@/lib/impact/kilo-pass-referrals';
+type DuplicateCardEnforcement = {
+  kiloUserId: string;
+  stripeInvoiceId: string;
+  stripeSubscriptionId: string;
+  kiloPassSubscriptionId: string;
+  gateResult: Extract<DuplicateCardGateResult, { blocked: true }>;
+};
+
+function getRefundAuditResult(
+  status: Awaited<ReturnType<typeof attemptDuplicateCardProviderEnforcement>>['refund']['status']
+): KiloPassAuditLogResult {
+  switch (status) {
+    case 'succeeded':
+      return KiloPassAuditLogResult.Success;
+    case 'failed':
+      return KiloPassAuditLogResult.Failed;
+    case 'skipped':
+      return KiloPassAuditLogResult.SkippedIdempotent;
+  }
+}
+
+async function enforceDuplicateCardBlock(params: {
+  enforcement: DuplicateCardEnforcement;
+  eventId: string;
+  stripe: Stripe;
+}): Promise<void> {
+  const { enforcement, eventId, stripe } = params;
+  const existingCancellationSuccess = await db.query.kilo_pass_audit_log.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled),
+      eq(kilo_pass_audit_log.result, KiloPassAuditLogResult.Success),
+      eq(kilo_pass_audit_log.stripe_invoice_id, enforcement.stripeInvoiceId),
+      sql`${kilo_pass_audit_log.payload_json}->>'outcome' = 'subscription_cancellation'`
+    ),
+  });
+  const existingRefundOutcome = await db.query.kilo_pass_audit_log.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled),
+      eq(kilo_pass_audit_log.stripe_invoice_id, enforcement.stripeInvoiceId),
+      sql`${kilo_pass_audit_log.payload_json}->>'outcome' = 'refund'`
+    ),
+  });
+  if (existingCancellationSuccess && existingRefundOutcome) return;
+
+  let enforcementResult: Awaited<ReturnType<typeof attemptDuplicateCardProviderEnforcement>>;
+  try {
+    enforcementResult = await attemptDuplicateCardProviderEnforcement({
+      stripe,
+      stripeInvoiceId: enforcement.stripeInvoiceId,
+      stripeSubscriptionId: enforcement.stripeSubscriptionId,
+      kiloUserId: enforcement.kiloUserId,
+      gateResult: enforcement.gateResult,
+      skipSubscriptionCancellation: existingCancellationSuccess !== undefined,
+      skipRefund: existingRefundOutcome !== undefined,
+    });
+  } catch (error) {
+    if (!existingCancellationSuccess) {
+      await appendKiloPassAuditLog(db, {
+        action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
+        result: KiloPassAuditLogResult.Failed,
+        kiloUserId: enforcement.kiloUserId,
+        kiloPassSubscriptionId: enforcement.kiloPassSubscriptionId,
+        stripeEventId: eventId,
+        stripeInvoiceId: enforcement.stripeInvoiceId,
+        stripeSubscriptionId: enforcement.stripeSubscriptionId,
+        payload: {
+          outcome: 'subscription_cancellation',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+    throw error;
+  }
+
+  if (!existingCancellationSuccess) {
+    await appendKiloPassAuditLog(db, {
+      action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
+      result: KiloPassAuditLogResult.Success,
+      kiloUserId: enforcement.kiloUserId,
+      kiloPassSubscriptionId: enforcement.kiloPassSubscriptionId,
+      stripeEventId: eventId,
+      stripeInvoiceId: enforcement.stripeInvoiceId,
+      stripeSubscriptionId: enforcement.stripeSubscriptionId,
+      payload: {
+        outcome: 'subscription_cancellation',
+        canceledStripeSubscriptionId: enforcementResult.cancellation.subscriptionId,
+      },
+    });
+  }
+  if (!existingRefundOutcome) {
+    await appendKiloPassAuditLog(db, {
+      action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
+      result: getRefundAuditResult(enforcementResult.refund.status),
+      kiloUserId: enforcement.kiloUserId,
+      kiloPassSubscriptionId: enforcement.kiloPassSubscriptionId,
+      stripeEventId: eventId,
+      stripeInvoiceId: enforcement.stripeInvoiceId,
+      stripeSubscriptionId: enforcement.stripeSubscriptionId,
+      payload: {
+        outcome: 'refund',
+        refundStatus: enforcementResult.refund.status,
+        ...(enforcementResult.refund.status === 'succeeded'
+          ? { stripeRefundId: enforcementResult.refund.refundId }
+          : enforcementResult.refund.status === 'skipped'
+            ? { reason: enforcementResult.refund.reason }
+            : {
+                error:
+                  enforcementResult.refund.error instanceof Error
+                    ? enforcementResult.refund.error.message
+                    : String(enforcementResult.refund.error),
+              }),
+      },
+    });
+  }
+}
+
 async function getOrCreateInitialMonthlyWelcomePromoReason(params: {
   tx: DrizzleTransaction;
   subscriptionId: string;
@@ -315,10 +434,10 @@ export async function handleKiloPassInvoicePaid(params: {
   let kiloUserIdForAudit: string | null = null;
   let stripeSubscriptionIdForAudit: string | null = null;
 
-  let blockedEmailParams: { kiloUserId: string; stripeInvoiceId: string } | null = null;
+  let duplicateCardEnforcement: DuplicateCardEnforcement | null = null;
 
   try {
-    blockedEmailParams = await db.transaction(async tx => {
+    duplicateCardEnforcement = await db.transaction(async tx => {
       const subscription = await getInvoiceSubscription({ invoice, stripe });
       if (!subscription) {
         throw new KiloPassError('Kilo Pass invoice has no subscription reference', {
@@ -482,13 +601,14 @@ export async function handleKiloPassInvoicePaid(params: {
       if (gateResult.blocked) {
         await appendKiloPassAuditLog(tx, {
           action: KiloPassAuditLogAction.DuplicateCardSubscriptionCanceled,
-          result: KiloPassAuditLogResult.Success,
+          result: KiloPassAuditLogResult.SkippedIdempotent,
           kiloUserId,
           kiloPassSubscriptionId,
           stripeEventId: eventId,
           stripeInvoiceId: invoice.id,
           stripeSubscriptionId: subscription.id,
           payload: {
+            outcome: 'duplicate_card_blocked',
             fingerprintDigest: gateResult.fingerprintDigest,
             firstClaimSourceStripeInvoiceId: gateResult.firstClaimSourceStripeInvoiceId,
             firstClaimedAt: gateResult.firstClaimedAt,
@@ -510,17 +630,15 @@ export async function handleKiloPassInvoicePaid(params: {
           })
           .where(and(eq(kilocode_users.id, kiloUserId), isNull(kilocode_users.blocked_reason)));
 
-        await attemptDuplicateCardProviderEnforcement({
-          stripe,
-          stripeInvoiceId: invoice.id,
-          stripeSubscriptionId: subscription.id,
-          kiloUserId,
-          gateResult,
-        });
-
         affiliateSaleState.context = null;
         kiloUserIdForCache = null;
-        return { kiloUserId, stripeInvoiceId: invoice.id };
+        return {
+          kiloUserId,
+          stripeInvoiceId: invoice.id,
+          stripeSubscriptionId: subscription.id,
+          kiloPassSubscriptionId,
+          gateResult,
+        };
       }
 
       if (metadata.kiloPassScheduledChangeId) {
@@ -709,6 +827,14 @@ export async function handleKiloPassInvoicePaid(params: {
     throw error;
   }
 
+  if (duplicateCardEnforcement) {
+    await enforceDuplicateCardBlock({
+      enforcement: duplicateCardEnforcement,
+      eventId,
+      stripe,
+    });
+  }
+
   if (
     affiliateSaleState.context &&
     referralConversionState.kiloPassSubscriptionId &&
@@ -754,10 +880,10 @@ export async function handleKiloPassInvoicePaid(params: {
     });
   }
 
-  if (blockedEmailParams) {
+  if (duplicateCardEnforcement) {
     await maybeSendDuplicateCardCanceledEmail({
-      kiloUserId: blockedEmailParams.kiloUserId,
-      stripeInvoiceId: blockedEmailParams.stripeInvoiceId,
+      kiloUserId: duplicateCardEnforcement.kiloUserId,
+      stripeInvoiceId: duplicateCardEnforcement.stripeInvoiceId,
     });
   }
 

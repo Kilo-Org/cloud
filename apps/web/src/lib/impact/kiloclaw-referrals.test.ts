@@ -30,10 +30,28 @@ jest.mock('@/lib/impact/advocate', () => {
   };
 });
 
+jest.mock('@/lib/kiloclaw/stripe-price-ids.server', () => ({
+  getClawPlanForStripePriceId: jest.fn((priceId: string | null | undefined) => {
+    if (priceId === 'price_commit') return 'commit';
+    if (priceId === 'price_standard') return 'standard';
+    return null;
+  }),
+}));
+
 jest.mock('@/lib/stripe-client', () => ({
   client: {
     subscriptions: {
+      retrieve: jest.fn(async (id: string) => ({
+        id,
+        schedule: null,
+        cancel_at_period_end: true,
+      })),
       update: jest.fn(async () => ({})),
+    },
+    subscriptionSchedules: {
+      retrieve: jest.fn(async () => ({})),
+      update: jest.fn(async () => ({})),
+      release: jest.fn(async () => ({})),
     },
   },
 }));
@@ -84,7 +102,11 @@ const mockSendImpactAdvocateRewardRedemptionPayload = jest.mocked(
   sendImpactAdvocateRewardRedemptionPayload
 );
 const mockReverseImpactAction = jest.mocked(reverseImpactAction);
+const mockStripeSubscriptionRetrieve = jest.mocked(stripeClient.subscriptions.retrieve);
 const mockStripeSubscriptionUpdate = jest.mocked(stripeClient.subscriptions.update);
+const mockStripeScheduleRetrieve = jest.mocked(stripeClient.subscriptionSchedules.retrieve);
+const mockStripeScheduleUpdate = jest.mocked(stripeClient.subscriptionSchedules.update);
+const mockStripeScheduleRelease = jest.mocked(stripeClient.subscriptionSchedules.release);
 
 function makeTouch(
   overrides: Partial<ImpactAttributionTouch> & Pick<ImpactAttributionTouch, 'touch_type'>
@@ -172,6 +194,49 @@ async function insertImpactAdvocateParticipant(userId: string, opaqueReferralIde
   return identifier;
 }
 
+async function insertEarnedReferralRewardForUser(userId: string): Promise<string> {
+  const [conversion] = await db
+    .insert(impact_referral_conversions)
+    .values({
+      referee_user_id: userId,
+      referrer_user_id: null,
+      winning_touch_type: 'none',
+      source_payment_id: `reward-application-test:${randomUUID()}`,
+      qualified: true,
+      converted_at: '2026-04-10T00:00:00.000Z',
+    })
+    .returning({ id: impact_referral_conversions.id });
+  if (!conversion) throw new Error('Failed to insert referral conversion');
+
+  const [decision] = await db
+    .insert(impact_referral_reward_decisions)
+    .values({
+      conversion_id: conversion.id,
+      beneficiary_user_id: userId,
+      beneficiary_role: 'referee',
+      outcome: 'granted',
+      months_granted: 1,
+    })
+    .returning({ id: impact_referral_reward_decisions.id });
+  if (!decision) throw new Error('Failed to insert referral reward decision');
+
+  const [reward] = await db
+    .insert(impact_referral_rewards)
+    .values({
+      conversion_id: conversion.id,
+      decision_id: decision.id,
+      beneficiary_user_id: userId,
+      beneficiary_role: 'referee',
+      months_granted: 1,
+      status: 'earned',
+      earned_at: '2026-04-10T00:00:00.000Z',
+    })
+    .returning({ id: impact_referral_rewards.id });
+  if (!reward) throw new Error('Failed to insert referral reward');
+
+  return reward.id;
+}
+
 async function insertAppliedReferralRewardForUser(userId: string): Promise<string> {
   const [conversion] = await db
     .insert(impact_referral_conversions)
@@ -250,6 +315,373 @@ describe('kiloclaw referrals', () => {
     await db.delete(impact_advocate_participants).where(sql`true`);
     await db.delete(referral_codes).where(sql`true`);
     await db.delete(kilocode_users).where(sql`true`);
+  });
+
+  describe('processQueuedKiloClawReferralRewards retirement behavior', () => {
+    it('extends a retirement-guarded final Commit term and keeps ordinary user cancellation pending', async () => {
+      const guardedUser = await insertTestUser({
+        google_user_email: 'guarded-final-commit@example.com',
+        normalized_email: 'guarded-final-commit@example.com',
+      });
+      const userCanceledUser = await insertTestUser({
+        google_user_email: 'user-canceled-commit@example.com',
+        normalized_email: 'user-canceled-commit@example.com',
+      });
+      const { subscriptionId: guardedSubscriptionId } = await insertActivePersonalSubscription(
+        guardedUser.id,
+        {
+          plan: 'commit',
+          cancel_at_period_end: true,
+          current_period_end: '2026-12-01T12:00:00.000Z',
+          credit_renewal_at: '2026-12-01T12:00:00.000Z',
+          commit_ends_at: '2026-12-01T12:00:00.000Z',
+        }
+      );
+      const { subscriptionId: userCanceledSubscriptionId } = await insertActivePersonalSubscription(
+        userCanceledUser.id,
+        {
+          plan: 'commit',
+          cancel_at_period_end: true,
+          current_period_end: '2026-12-01T12:00:00.000Z',
+          credit_renewal_at: '2026-12-01T12:00:00.000Z',
+          commit_ends_at: '2026-12-01T12:00:00.000Z',
+        }
+      );
+      await db.insert(kiloclaw_subscription_change_log).values([
+        {
+          subscription_id: guardedSubscriptionId,
+          actor_type: 'system',
+          actor_id: 'commit-retirement',
+          action: 'schedule_changed',
+          reason: 'commit_retirement_guarded',
+        },
+        {
+          subscription_id: userCanceledSubscriptionId,
+          actor_type: 'user',
+          actor_id: userCanceledUser.id,
+          action: 'canceled',
+          reason: 'user_requested_cancellation',
+        },
+      ]);
+      await insertEarnedReferralRewardForUser(guardedUser.id);
+      await insertEarnedReferralRewardForUser(userCanceledUser.id);
+
+      const summary = await processQueuedKiloClawReferralRewards({
+        beneficiaryUserIds: [guardedUser.id, userCanceledUser.id],
+      });
+
+      expect(summary).toEqual({ claimed: 2, applied: 1, expired: 0, pending: 1, failed: 0 });
+      const subscriptions = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.plan, 'commit'));
+      expect(subscriptions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            user_id: guardedUser.id,
+            current_period_end: '2027-01-01 12:00:00+00',
+            credit_renewal_at: '2027-01-01 12:00:00+00',
+            commit_ends_at: '2027-01-01 12:00:00+00',
+            cancel_at_period_end: true,
+          }),
+          expect.objectContaining({
+            user_id: userCanceledUser.id,
+            current_period_end: '2026-12-01 12:00:00+00',
+          }),
+        ])
+      );
+    });
+
+    it('extends a pending Stripe-to-credits final Commit conversion without reopening Commit renewal', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'pending-conversion-final-commit@example.com',
+        normalized_email: 'pending-conversion-final-commit@example.com',
+      });
+      await insertActivePersonalSubscription(user.id, {
+        payment_source: 'credits',
+        stripe_subscription_id: 'sub_pending_conversion_final_commit',
+        stripe_schedule_id: null,
+        plan: 'commit',
+        scheduled_plan: 'standard',
+        scheduled_by: 'user',
+        pending_conversion: true,
+        cancel_at_period_end: true,
+        current_period_end: '2026-12-01T12:00:00.000Z',
+        credit_renewal_at: '2026-12-01T12:00:00.000Z',
+        commit_ends_at: '2026-12-01T12:00:00.000Z',
+      });
+      await insertEarnedReferralRewardForUser(user.id);
+      const newBoundary = Math.floor(new Date('2027-01-01T12:00:00.000Z').getTime() / 1000);
+
+      const summary = await processQueuedKiloClawReferralRewards({ beneficiaryUserIds: [user.id] });
+
+      expect(summary).toEqual({ claimed: 1, applied: 1, expired: 0, pending: 0, failed: 0 });
+      expect(mockStripeSubscriptionUpdate).toHaveBeenCalledWith(
+        'sub_pending_conversion_final_commit',
+        {
+          trial_end: newBoundary,
+          proration_behavior: 'none',
+        },
+        { idempotencyKey: expect.any(String) }
+      );
+      expect(mockStripeScheduleRetrieve).not.toHaveBeenCalled();
+      expect(mockStripeScheduleUpdate).not.toHaveBeenCalled();
+      const [subscription] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, user.id));
+      expect(subscription).toEqual(
+        expect.objectContaining({
+          plan: 'commit',
+          scheduled_plan: 'standard',
+          scheduled_by: 'user',
+          stripe_schedule_id: null,
+          pending_conversion: true,
+          cancel_at_period_end: true,
+          current_period_end: '2027-01-01 12:00:00+00',
+          credit_renewal_at: '2027-01-01 12:00:00+00',
+          commit_ends_at: '2027-01-01 12:00:00+00',
+        })
+      );
+    });
+
+    it('moves a scheduled Standard transition when extending a Stripe final term', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'scheduled-standard-final-commit@example.com',
+        normalized_email: 'scheduled-standard-final-commit@example.com',
+      });
+      await insertActivePersonalSubscription(user.id, {
+        payment_source: 'stripe',
+        stripe_subscription_id: 'sub_final_commit',
+        stripe_schedule_id: 'sched_final_commit',
+        plan: 'commit',
+        scheduled_plan: 'standard',
+        scheduled_by: 'user',
+        current_period_end: '2026-12-01T12:00:00.000Z',
+        credit_renewal_at: null,
+        commit_ends_at: '2026-12-01T12:00:00.000Z',
+      });
+      await insertEarnedReferralRewardForUser(user.id);
+      const previousBoundary = Math.floor(new Date('2026-12-01T12:00:00.000Z').getTime() / 1000);
+      const newBoundary = Math.floor(new Date('2027-01-01T12:00:00.000Z').getTime() / 1000);
+      const boundaryExtension = newBoundary - previousBoundary;
+      const previousStandardEnd = previousBoundary + 2_592_000;
+      mockStripeScheduleRetrieve.mockResolvedValueOnce({
+        id: 'sched_final_commit',
+        status: 'active',
+        phases: [
+          {
+            start_date: previousBoundary - 15_552_000,
+            end_date: previousBoundary,
+            items: [{ price: 'price_commit' }],
+          },
+          {
+            start_date: previousBoundary,
+            end_date: previousStandardEnd,
+            items: [{ price: 'price_standard' }],
+          },
+        ],
+      } as never);
+
+      const summary = await processQueuedKiloClawReferralRewards({ beneficiaryUserIds: [user.id] });
+
+      expect(summary).toEqual({ claimed: 1, applied: 1, expired: 0, pending: 0, failed: 0 });
+      expect(mockStripeScheduleUpdate).toHaveBeenCalledWith('sched_final_commit', {
+        phases: [
+          {
+            items: [{ price: 'price_commit' }],
+            start_date: previousBoundary - 15_552_000,
+            end_date: newBoundary,
+          },
+          {
+            items: [{ price: 'price_standard' }],
+            start_date: newBoundary,
+            end_date: previousStandardEnd + boundaryExtension,
+          },
+        ],
+      });
+      expect(mockStripeSubscriptionUpdate).not.toHaveBeenCalled();
+      const [subscription] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, user.id));
+      expect(subscription).toEqual(
+        expect.objectContaining({
+          current_period_end: '2027-01-01 12:00:00+00',
+          commit_ends_at: '2027-01-01 12:00:00+00',
+        })
+      );
+    });
+
+    it('completes local reward application when the Stripe schedule was already extended', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'already-extended-final-commit@example.com',
+        normalized_email: 'already-extended-final-commit@example.com',
+      });
+      await insertActivePersonalSubscription(user.id, {
+        payment_source: 'stripe',
+        stripe_subscription_id: 'sub_already_extended_final_commit',
+        stripe_schedule_id: 'sched_already_extended_final_commit',
+        plan: 'commit',
+        scheduled_plan: 'standard',
+        scheduled_by: 'user',
+        current_period_end: '2026-12-01T12:00:00.000Z',
+        credit_renewal_at: null,
+        commit_ends_at: '2026-12-01T12:00:00.000Z',
+      });
+      await insertEarnedReferralRewardForUser(user.id);
+      const previousBoundary = Math.floor(new Date('2026-12-01T12:00:00.000Z').getTime() / 1000);
+      const newBoundary = Math.floor(new Date('2027-01-01T12:00:00.000Z').getTime() / 1000);
+      mockStripeScheduleRetrieve.mockResolvedValueOnce({
+        id: 'sched_already_extended_final_commit',
+        status: 'active',
+        phases: [
+          {
+            start_date: previousBoundary - 15_552_000,
+            end_date: newBoundary,
+            items: [{ price: 'price_commit' }],
+          },
+          {
+            start_date: newBoundary,
+            items: [{ price: 'price_standard' }],
+          },
+        ],
+      } as never);
+
+      const summary = await processQueuedKiloClawReferralRewards({ beneficiaryUserIds: [user.id] });
+
+      expect(summary).toEqual({ claimed: 1, applied: 1, expired: 0, pending: 0, failed: 0 });
+      expect(mockStripeScheduleUpdate).not.toHaveBeenCalled();
+      const [subscription] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, user.id));
+      expect(subscription).toEqual(
+        expect.objectContaining({
+          current_period_end: '2027-01-01 12:00:00+00',
+          commit_ends_at: '2027-01-01 12:00:00+00',
+        })
+      );
+    });
+
+    it('preserves an indefinite Standard phase when moving its retirement transition', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'indefinite-standard-final-commit@example.com',
+        normalized_email: 'indefinite-standard-final-commit@example.com',
+      });
+      await insertActivePersonalSubscription(user.id, {
+        payment_source: 'stripe',
+        stripe_subscription_id: 'sub_indefinite_final_commit',
+        stripe_schedule_id: 'sched_indefinite_final_commit',
+        plan: 'commit',
+        scheduled_plan: 'standard',
+        scheduled_by: 'user',
+        current_period_end: '2026-12-01T12:00:00.000Z',
+        credit_renewal_at: null,
+        commit_ends_at: '2026-12-01T12:00:00.000Z',
+      });
+      await insertEarnedReferralRewardForUser(user.id);
+      const previousBoundary = Math.floor(new Date('2026-12-01T12:00:00.000Z').getTime() / 1000);
+      const newBoundary = Math.floor(new Date('2027-01-01T12:00:00.000Z').getTime() / 1000);
+      mockStripeScheduleRetrieve.mockResolvedValueOnce({
+        id: 'sched_indefinite_final_commit',
+        status: 'active',
+        phases: [
+          {
+            start_date: previousBoundary - 15_552_000,
+            end_date: previousBoundary,
+            items: [{ price: 'price_commit' }],
+          },
+          {
+            start_date: previousBoundary,
+            items: [{ price: 'price_standard' }],
+          },
+        ],
+      } as never);
+
+      const summary = await processQueuedKiloClawReferralRewards({ beneficiaryUserIds: [user.id] });
+
+      expect(summary).toEqual({ claimed: 1, applied: 1, expired: 0, pending: 0, failed: 0 });
+      expect(mockStripeScheduleUpdate).toHaveBeenCalledWith('sched_indefinite_final_commit', {
+        phases: [
+          {
+            items: [{ price: 'price_commit' }],
+            start_date: previousBoundary - 15_552_000,
+            end_date: newBoundary,
+          },
+          {
+            items: [{ price: 'price_standard' }],
+            start_date: newBoundary,
+          },
+        ],
+      });
+    });
+
+    it('contains ambiguous retirement schedules without reopening Commit or applying reward', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'ambiguous-scheduled-standard@example.com',
+        normalized_email: 'ambiguous-scheduled-standard@example.com',
+      });
+      await insertActivePersonalSubscription(user.id, {
+        payment_source: 'stripe',
+        stripe_subscription_id: 'sub_ambiguous_final_commit',
+        stripe_schedule_id: 'sched_ambiguous_final_commit',
+        plan: 'commit',
+        scheduled_plan: 'standard',
+        scheduled_by: 'user',
+        current_period_end: '2026-12-01T12:00:00.000Z',
+        credit_renewal_at: null,
+        commit_ends_at: '2026-12-01T12:00:00.000Z',
+      });
+      await insertEarnedReferralRewardForUser(user.id);
+      mockStripeScheduleRetrieve.mockResolvedValueOnce({
+        id: 'sched_ambiguous_final_commit',
+        status: 'active',
+        phases: [],
+      } as never);
+
+      const summary = await processQueuedKiloClawReferralRewards({ beneficiaryUserIds: [user.id] });
+
+      expect(summary).toEqual({ claimed: 1, applied: 0, expired: 0, pending: 1, failed: 0 });
+      expect(mockStripeScheduleUpdate).not.toHaveBeenCalled();
+      expect(mockStripeSubscriptionRetrieve).not.toHaveBeenCalled();
+      expect(mockStripeScheduleRelease).not.toHaveBeenCalled();
+      expect(mockStripeSubscriptionUpdate).not.toHaveBeenCalled();
+      const [subscription] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, user.id));
+      expect(subscription).toEqual(
+        expect.objectContaining({
+          current_period_end: '2026-12-01 12:00:00+00',
+          commit_ends_at: '2026-12-01 12:00:00+00',
+          scheduled_plan: 'standard',
+          plan: 'commit',
+        })
+      );
+      const [reward] = await db
+        .select()
+        .from(impact_referral_rewards)
+        .where(eq(impact_referral_rewards.beneficiary_user_id, user.id));
+      expect(reward).toEqual(
+        expect.objectContaining({
+          status: 'review_required',
+          review_reason: 'referral_reward_ambiguous_standard_schedule',
+          applies_to_subscription_id: null,
+          applied_at: null,
+        })
+      );
+      const applications = await db
+        .select()
+        .from(impact_referral_reward_applications)
+        .where(eq(impact_referral_reward_applications.reward_id, reward.id));
+      expect(applications).toHaveLength(0);
+      const redemptions = await db
+        .select()
+        .from(impact_advocate_reward_redemptions)
+        .where(eq(impact_advocate_reward_redemptions.reward_id, reward.id));
+      expect(redemptions).toHaveLength(0);
+    });
   });
 
   describe('dispatchQueuedImpactAdvocateRewardRedemptions', () => {

@@ -25,17 +25,40 @@ export type Pricing = {
   completion_per_million: number;
   input_cache_read_per_million: number | null;
   input_cache_write_per_million: number | null;
-  calculate_mUsd(usage: Usage, basePricing: Pricing): number;
 };
 
-export function calculateSimpleCost_mUsd(usage: Usage, basePricing: Pricing) {
+export type PricingTier = {
+  start_context_length: number;
+  pricing: Pricing;
+};
+
+export type PricingTiers = readonly [PricingTier, ...PricingTier[]];
+
+export function calculateCost_mUsd(usage: Usage, pricingTiers: PricingTiers): number {
+  if (pricingTiers[0].start_context_length !== 0) {
+    throw new Error('The first pricing tier must start at context length 0');
+  }
+
+  const totalInputTokens =
+    usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
+  let selectedTier = pricingTiers[0];
+  let previousTier = pricingTiers[0];
+  for (const tier of pricingTiers.slice(1)) {
+    if (tier.start_context_length <= previousTier.start_context_length) {
+      throw new Error('Pricing tiers must be ordered by ascending start context length');
+    }
+    if (tier.start_context_length <= totalInputTokens) {
+      selectedTier = tier;
+    }
+    previousTier = tier;
+  }
+
+  const pricing = selectedTier.pricing;
   return (
-    usage.uncachedInputTokens * basePricing.prompt_per_million +
-    usage.cacheWriteTokens *
-      (basePricing.input_cache_write_per_million ?? basePricing.prompt_per_million) +
-    usage.cacheHitTokens *
-      (basePricing.input_cache_read_per_million ?? basePricing.prompt_per_million) +
-    usage.totalOutputTokens * basePricing.completion_per_million
+    usage.uncachedInputTokens * pricing.prompt_per_million +
+    usage.cacheWriteTokens * (pricing.input_cache_write_per_million ?? pricing.prompt_per_million) +
+    usage.cacheHitTokens * (pricing.input_cache_read_per_million ?? pricing.prompt_per_million) +
+    usage.totalOutputTokens * pricing.completion_per_million
   );
 }
 
@@ -49,7 +72,7 @@ export type KiloExclusiveModel = {
   flags: KiloExclusiveModelFlag[];
   gateway: ProviderId;
   internal_id: string;
-  pricing: Pricing | null;
+  pricing: PricingTiers | null;
   /** Features allowed to use this model. Empty array means no restriction. */
   exclusive_to: ReadonlyArray<FeatureValue>;
   /**
@@ -168,6 +191,7 @@ function formatPricePerMillionAsPerToken(price: number | null | undefined): stri
 }
 
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
+  const cheapestPricing = model.pricing?.[0].pricing;
   return {
     id: model.public_id,
     canonical_slug: model.public_id,
@@ -184,17 +208,17 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       instruct_type: null,
     },
     pricing: {
-      prompt: formatPricePerMillionAsPerToken(model.pricing?.prompt_per_million ?? 0),
-      completion: formatPricePerMillionAsPerToken(model.pricing?.completion_per_million ?? 0),
+      prompt: formatPricePerMillionAsPerToken(cheapestPricing?.prompt_per_million ?? 0),
+      completion: formatPricePerMillionAsPerToken(cheapestPricing?.completion_per_million ?? 0),
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
       input_cache_read: formatPricePerMillionAsPerToken(
-        model.pricing?.input_cache_read_per_million ?? model.pricing?.prompt_per_million ?? 0
+        cheapestPricing?.input_cache_read_per_million ?? cheapestPricing?.prompt_per_million ?? 0
       ),
       input_cache_write: formatPricePerMillionAsPerToken(
-        model.pricing?.input_cache_write_per_million
+        cheapestPricing?.input_cache_write_per_million
       ),
     },
     top_provider: {

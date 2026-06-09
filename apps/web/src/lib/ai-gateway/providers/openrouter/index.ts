@@ -24,6 +24,7 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 // Re-export from shared module for backwards compatibility
@@ -119,6 +120,7 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadata();
+  const summaries = await getTerminalBenchSummaries();
   const enhancedModels = await Promise.all(
     models
       .filter(
@@ -139,7 +141,12 @@ async function enhancedModelList(models: OpenRouterModel[]) {
                 normalizeInferenceProviderId(preferredProvider)
             )?.pricing);
         const pricing = rawPricing ? undoPricingDiscount(rawPricing) : rawPricing;
-        return pricing ? { ...model, pricing } : model;
+        const terminalBench = terminalBenchFor(summaries, model.id);
+        return {
+          ...model,
+          ...(pricing && { pricing }),
+          ...(terminalBench && { terminalBench }),
+        };
       })
       .concat(
         kiloExclusiveModels

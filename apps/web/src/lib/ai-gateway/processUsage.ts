@@ -64,7 +64,10 @@ import {
   drainSseStream,
   extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  calculateCost_mUsd,
+  type KiloExclusiveModel,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const posthogClient = PostHogClient();
 
@@ -948,7 +951,7 @@ export function calculateKiloExclusiveCost_mUsd(
     });
   }
   return Math.round(
-    pricing.calculate_mUsd(
+    calculateCost_mUsd(
       {
         uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
         totalOutputTokens: usage.outputTokens,
@@ -1052,17 +1055,28 @@ async function useGenerationLookup(
   const isGatewayProvider =
     usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
+  if (!isGatewayProvider || !isSuccessStatusCode) {
+    return false;
+  }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
     (await isFreeModel(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);
-  return (
-    isGatewayProvider &&
-    isSuccessStatusCode &&
-    (!hasOutputTokens || !hasCostWhenPaid || !hasInferenceProvider)
-  );
+  if (!hasOutputTokens) {
+    console.debug('[useGenerationLookup] token stats are missing');
+    return true;
+  }
+  if (!hasCostWhenPaid) {
+    console.debug('[useGenerationLookup] cost is missing');
+    return true;
+  }
+  if (!hasInferenceProvider) {
+    console.debug('[useGenerationLookup] inference provider is missing');
+    return true;
+  }
+  return false;
 }
 
 export const mapToUsageStats = (

@@ -42,6 +42,9 @@ const DetailInputSchema = z.object({
   offset: z.number().min(0).default(0),
 });
 
+const escapeHogQLStringLiteral = (value: string) =>
+  value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
 export const adminFeatureInterestRouter = createTRPCRouter({
   // Feature Interest Leaderboard
   list: adminProcedure.query(async () => {
@@ -158,9 +161,8 @@ export const adminFeatureInterestRouter = createTRPCRouter({
     // When only slug is provided (from Signups by Feature Page), search by feature_slug property
     const featureName = nameParam ?? slug;
 
-    // Escape single quotes in the feature name for the SQL query
-    const escapedValue = featureName.replace(/'/g, "\\'");
-    const escapedSlug = slug.replace(/'/g, "\\'");
+    const escapedValue = escapeHogQLStringLiteral(featureName);
+    const escapedSlug = escapeHogQLStringLiteral(slug);
 
     // Build the WHERE condition based on search type
     // Use LIKE for partial matching to capture all variations of feature names

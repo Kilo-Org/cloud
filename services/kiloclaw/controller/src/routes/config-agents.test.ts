@@ -25,6 +25,7 @@ const agent: AgentSummary = {
     reasoningDefault: null,
     fastModeDefault: null,
   },
+  bindings: [],
 };
 
 function createDeps(overrides: Partial<AgentRouteDeps> = {}): AgentRouteDeps {
@@ -66,6 +67,10 @@ function createDeps(overrides: Partial<AgentRouteDeps> = {}): AgentRouteDeps {
       removedBindings: 1,
       removedAllow: 0,
     })),
+    setBindings: vi.fn(async () => ({ snapshot, agent })),
+    listBindingSummaries: vi.fn(
+      async () => new Map([['research', [{ channel: 'slack', accountId: null, advanced: false }]]])
+    ),
     ...overrides,
   };
 }
@@ -84,11 +89,15 @@ describe('agent config read routes', () => {
     expect(await response.json()).toMatchObject({ etag: 'etag-1', agents: [{ id: 'research' }] });
   });
 
-  it('returns only one normalized agent summary and its etag', async () => {
+  it('returns one normalized agent summary with CLI-sourced bindings attached', async () => {
     const response = await makeApp(createDeps()).request('/_kilo/config/agents/research');
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ etag: 'etag-1', agent });
+    expect(await response.json()).toEqual({
+      etag: 'etag-1',
+      // bindings come from listBindingSummaries (the CLI), not the config summary.
+      agent: { ...agent, bindings: [{ channel: 'slack', accountId: null, advanced: false }] },
+    });
   });
 });
 
@@ -116,11 +125,12 @@ describe('agent config mutation routes', () => {
     expect(await response.json()).toMatchObject({
       ok: true,
       etag: 'etag-1',
-      agent: { id: 'research' },
+      // CLI-sourced bindings are attached so a create with --bind isn't reported empty.
+      agent: { id: 'research', bindings: [{ channel: 'slack', accountId: null, advanced: false }] },
     });
   });
 
-  it('updates allowed per-agent settings', async () => {
+  it('updates allowed per-agent settings and returns CLI-sourced bindings', async () => {
     const deps = createDeps();
     const response = await makeApp(deps).request('/_kilo/config/agents/research', {
       method: 'PATCH',
@@ -133,6 +143,10 @@ describe('agent config mutation routes', () => {
       'research',
       expect.objectContaining({ set: { verboseDefault: 'off' } })
     );
+    // The settings-update response must not falsely report an empty binding set.
+    expect(await response.json()).toMatchObject({
+      agent: { bindings: [{ channel: 'slack', accountId: null, advanced: false }] },
+    });
   });
 
   it('updates agent defaults on the unambiguous defaults route', async () => {
@@ -178,6 +192,52 @@ describe('agent config mutation routes', () => {
       agentId: 'research',
       filesystemDisposition: 'unverified',
     });
+  });
+
+  it('sets agent bindings declaratively and returns the normalized summary', async () => {
+    const deps = createDeps();
+    const response = await makeApp(deps).request('/_kilo/config/agents/research/bindings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channels: ['slack', 'discord'] }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(deps.setBindings).toHaveBeenCalledWith('research', { channels: ['slack', 'discord'] });
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      etag: 'etag-1',
+      agent: { id: 'research' },
+    });
+  });
+
+  it('rejects an invalid bindings body', async () => {
+    const deps = createDeps();
+    const response = await makeApp(deps).request('/_kilo/config/agents/research/bindings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channels: 'slack' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid_agent_request' });
+    expect(deps.setBindings).not.toHaveBeenCalled();
+  });
+
+  it('maps a binding conflict to 409', async () => {
+    const deps = createDeps({
+      setBindings: vi.fn(async () => {
+        throw new AgentConfigError(409, 'agent_binding_conflict', 'Channel routed elsewhere');
+      }),
+    });
+    const response = await makeApp(deps).request('/_kilo/config/agents/research/bindings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channels: ['slack'] }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'agent_binding_conflict' });
   });
 
   it('rejects unsupported settings fields and removed target expectation guards', async () => {

@@ -6,6 +6,7 @@ import {
   buildScopedConnectRootPath,
   buildUpstreamHeaders,
   parseScopedConnectPath,
+  parseStaticHeaders,
   isPublicIp,
   ProviderGrantBundleSchema,
   OAuthClientMetadataSchema,
@@ -65,6 +66,32 @@ describe('provider grant schema', () => {
         expiresAt: null,
       })
     ).toThrow();
+  });
+});
+
+describe('static headers', () => {
+  test('allows authorization but rejects transport identity headers', () => {
+    expect(parseStaticHeaders({ Authorization: 'Bearer test' })).toEqual({
+      Authorization: 'Bearer test',
+    });
+    expect(() => parseStaticHeaders({ Host: 'example.com' })).toThrow(
+      'Static header cannot be transport identity metadata'
+    );
+    expect(() => parseStaticHeaders({ 'X-Forwarded-Host': 'example.com' })).toThrow(
+      'Static header cannot be transport identity metadata'
+    );
+    expect(() => parseStaticHeaders({ 'CF-Connecting-IP': '203.0.113.1' })).toThrow(
+      'Static header cannot be transport identity metadata'
+    );
+    expect(
+      parseStaticHeaders({
+        'CF-Access-Client-Id': 'client-id',
+        'CF-Access-Client-Secret': 'client-secret',
+      })
+    ).toEqual({
+      'CF-Access-Client-Id': 'client-id',
+      'CF-Access-Client-Secret': 'client-secret',
+    });
   });
 });
 

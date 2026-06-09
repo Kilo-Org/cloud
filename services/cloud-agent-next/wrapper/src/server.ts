@@ -168,6 +168,10 @@ function wrapperFinalizingResponse(state: WrapperState): Response {
   );
 }
 
+function snapshotInitializationForPlatform(platform?: string): 'wait' | undefined {
+  return platform === 'cloud-agent-web' ? 'wait' : undefined;
+}
+
 async function applyCommitAttribution(
   workspacePath: string,
   commitCoAuthor: WrapperCommitCoAuthor | undefined,
@@ -478,6 +482,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
     });
 
     try {
+      const snapshotInitialization = snapshotInitializationForPlatform(session.platform);
       await kiloClient.sendPromptAsync({
         sessionId: session.kiloSessionId,
         messageId,
@@ -488,6 +493,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
         model: prompt.agent?.model,
         system: prompt.agent?.system,
         tools: prompt.agent?.tools,
+        ...(snapshotInitialization ? { snapshotInitialization } : {}),
       });
       logToFile(`job/prompt: sent messageId=${messageId}`);
       acknowledgeDelivery('async-prompt');
@@ -593,11 +599,13 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
           });
         }
       } else {
+        const snapshotInitialization = snapshotInitializationForPlatform(session.platform);
         result = await kiloClient.sendCommand({
           sessionId: session.kiloSessionId,
           command: body.command,
           args: body.args,
           messageId,
+          ...(snapshotInitialization ? { snapshotInitialization } : {}),
         });
       }
       state.updateActivity();

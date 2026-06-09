@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { z } from 'zod';
 import {
   buildMCPID,
   buildScopedConnectCanonicalUrl,
@@ -99,9 +100,29 @@ function logUpstreamServerError(params: {
   );
 }
 
-function requestRoute(c: Context<MCPGatewayEnv>): ScopedConnectRoute {
+function requestRoute(
+  c: Context<MCPGatewayEnv>,
+  params: UserConnectRouteParams | OrgConnectRouteParams
+): ScopedConnectRoute {
   const route = parseScopedConnectPath(c.req.path);
   if (!route) {
+    throw createGatewayError(GatewayErrorCode.InvalidRequest, 'Invalid scoped route', 400);
+  }
+  const expectedRoute =
+    'userId' in params
+      ? parseScopedConnectPath(
+          `/mcp-connect/user/${params.userId}/${params.configId}/${params.routeKey}`
+        )
+      : parseScopedConnectPath(
+          `/mcp-connect/org/${params.orgId}/${params.configId}/${params.routeKey}`
+        );
+  if (
+    !expectedRoute ||
+    route.ownerScope !== expectedRoute.ownerScope ||
+    route.ownerId !== expectedRoute.ownerId ||
+    route.configId !== expectedRoute.configId ||
+    route.routeKey !== expectedRoute.routeKey
+  ) {
     throw createGatewayError(GatewayErrorCode.InvalidRequest, 'Invalid scoped route', 400);
   }
   return route;
@@ -109,14 +130,14 @@ function requestRoute(c: Context<MCPGatewayEnv>): ScopedConnectRoute {
 
 async function handleConnect(
   c: Context<MCPGatewayEnv>,
-  _params: UserConnectRouteParams | OrgConnectRouteParams
+  params: UserConnectRouteParams | OrgConnectRouteParams
 ) {
   let phase: RuntimePhase = 'parse_route';
   let loggedRoute: ScopedConnectRoute | null = null;
   let hasBearerToken = false;
   let authMode: GatewayAuthMode | undefined;
   try {
-    const route = requestRoute(c);
+    const route = requestRoute(c, params);
     loggedRoute = route;
     const canonicalUrl = buildScopedConnectCanonicalUrl(c.env.MCP_GATEWAY_BASE_URL, {
       ownerScope: route.ownerScope,
@@ -297,6 +318,7 @@ export async function handleUserConnect(c: Context<MCPGatewayEnv>, params: UserC
     return await handleConnect(c, validatedParams);
   } catch (error) {
     if (error instanceof GatewayError) return gatewayHandlerError(c, error);
+    if (error instanceof z.ZodError) return c.json({ error: 'not_found' }, 404);
     return c.json({ error: 'server_error' }, 500);
   }
 }
@@ -307,6 +329,7 @@ export async function handleOrgConnect(c: Context<MCPGatewayEnv>, params: OrgCon
     return await handleConnect(c, validatedParams);
   } catch (error) {
     if (error instanceof GatewayError) return gatewayHandlerError(c, error);
+    if (error instanceof z.ZodError) return c.json({ error: 'not_found' }, 404);
     return c.json({ error: 'server_error' }, 500);
   }
 }

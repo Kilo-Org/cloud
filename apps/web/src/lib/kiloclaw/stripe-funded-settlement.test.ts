@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
@@ -11,6 +11,10 @@ import {
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+
+const makeStripeSubscriptionNonRenewing =
+  jest.fn<(stripeSubscriptionId: string) => Promise<void>>();
+const settlementDependencies = { makeStripeSubscriptionNonRenewing };
 
 async function insertPersonalInstance(params: { id: string; userId: string }) {
   await db.insert(kiloclaw_instances).values({
@@ -37,6 +41,8 @@ async function readUser(id: string) {
 describe('Stripe-funded KiloClaw settlement', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
+    makeStripeSubscriptionNonRenewing.mockReset();
+    makeStripeSubscriptionNonRenewing.mockResolvedValue();
   });
 
   it('fails closed without mutating a current-price row when the invoice carries a legacy price version', async () => {
@@ -199,6 +205,325 @@ describe('Stripe-funded KiloClaw settlement', () => {
     });
   });
 
+  it('allows exactly one Commit recovery at a pre-cutoff local renewal boundary', async () => {
+    const user = await insertTestUser({ id: 'settlement-pre-cutoff-recovery-user' });
+    const instanceId = 'bcbcbcbc-bcbc-4bcb-8bcb-bcbcbcbcbcbc';
+    const subscriptionId = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+    const stripeSubscriptionId = 'sub_pre_cutoff_recovery';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: stripeSubscriptionId,
+      payment_source: 'stripe',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'commit',
+      status: 'past_due',
+      current_period_start: '2025-12-05T00:00:00.000Z',
+      current_period_end: '2026-06-05T00:00:00.000Z',
+      commit_ends_at: '2026-06-05T00:00:00.000Z',
+    });
+
+    const recovered = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instanceId,
+      stripeSubscriptionId,
+      stripePaymentId: 'in_pre_cutoff_recovery',
+      plan: 'commit',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+      amountMicrodollars: 306_000_000,
+      periodStart: '2026-06-05T00:00:00.000Z',
+      periodEnd: '2026-12-05T00:00:00.000Z',
+    });
+    const later = await applyStripeFundedKiloClawPeriod(
+      {
+        userId: user.id,
+        metadataInstanceId: instanceId,
+        stripeSubscriptionId,
+        stripePaymentId: 'in_pre_cutoff_recovery_later',
+        plan: 'commit',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        amountMicrodollars: 306_000_000,
+        periodStart: '2026-12-05T00:00:00.000Z',
+        periodEnd: '2027-06-05T00:00:00.000Z',
+      },
+      settlementDependencies
+    );
+
+    expect(recovered).toBe(true);
+    expect(later).toBe(true);
+    expect(makeStripeSubscriptionNonRenewing).toHaveBeenCalledWith(stripeSubscriptionId);
+    await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
+      current_period_end: '2027-06-05 00:00:00+00',
+      commit_ends_at: '2026-12-05 00:00:00+00',
+      cancel_at_period_end: true,
+    });
+  });
+
+  it('preserves paid access but contains a forbidden post-cutoff Commit renewal for review', async () => {
+    const user = await insertTestUser({ id: 'settlement-forbidden-commit-user' });
+    const instanceId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const subscriptionId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: 'sub_forbidden_commit',
+      payment_source: 'credits',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'commit',
+      status: 'active',
+      current_period_start: '2026-01-01T00:00:00.000Z',
+      current_period_end: '2026-07-01T00:00:00.000Z',
+      credit_renewal_at: '2026-07-01T00:00:00.000Z',
+      commit_ends_at: '2026-07-01T00:00:00.000Z',
+    });
+
+    const providerError = new Error('provider outcome unknown');
+    makeStripeSubscriptionNonRenewing.mockRejectedValueOnce(providerError);
+    const settlement = applyStripeFundedKiloClawPeriod(
+      {
+        userId: user.id,
+        metadataInstanceId: instanceId,
+        stripeSubscriptionId: 'sub_forbidden_commit',
+        stripePaymentId: 'in_forbidden_commit',
+        plan: 'commit',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        amountMicrodollars: 306_000_000,
+        periodStart: '2026-07-01T00:00:00.000Z',
+        periodEnd: '2027-01-01T00:00:00.000Z',
+      },
+      settlementDependencies
+    );
+
+    await expect(settlement).rejects.toBe(providerError);
+    await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
+      status: 'active',
+      plan: 'commit',
+      current_period_end: '2027-01-01 00:00:00+00',
+      cancel_at_period_end: false,
+      commit_ends_at: '2026-07-01 00:00:00+00',
+    });
+    expect(makeStripeSubscriptionNonRenewing).toHaveBeenCalledWith('sub_forbidden_commit');
+  });
+
+  it('requires durable explicit consent before settling Standard after final Commit', async () => {
+    const user = await insertTestUser({ id: 'settlement-standard-consent-user' });
+    const instanceId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    const subscriptionId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: 'sub_standard_without_consent',
+      payment_source: 'credits',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'commit',
+      status: 'active',
+      current_period_start: '2026-01-01T00:00:00.000Z',
+      current_period_end: '2026-07-01T00:00:00.000Z',
+      credit_renewal_at: '2026-07-01T00:00:00.000Z',
+      commit_ends_at: '2026-07-01T00:00:00.000Z',
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod(
+      {
+        userId: user.id,
+        metadataInstanceId: instanceId,
+        stripeSubscriptionId: 'sub_standard_without_consent',
+        stripePaymentId: 'in_standard_without_consent',
+        plan: 'standard',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        amountMicrodollars: 55_000_000,
+        periodStart: '2026-07-01T00:00:00.000Z',
+        periodEnd: '2026-08-01T00:00:00.000Z',
+      },
+      settlementDependencies
+    );
+
+    expect(applied).toBe(true);
+    expect(makeStripeSubscriptionNonRenewing).toHaveBeenCalledWith('sub_standard_without_consent');
+    await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
+      status: 'active',
+      plan: 'standard',
+      current_period_end: '2026-08-01 00:00:00+00',
+      cancel_at_period_end: true,
+    });
+  });
+
+  it('settles explicitly consented Standard continuation and completes retirement', async () => {
+    const user = await insertTestUser({ id: 'settlement-standard-consented-user' });
+    const instanceId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    const subscriptionId = 'abababab-abab-4aba-8aba-abababababab';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: 'sub_standard_consented',
+      payment_source: 'credits',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'commit',
+      scheduled_plan: 'standard',
+      scheduled_by: 'user',
+      status: 'active',
+      current_period_start: '2026-01-01T00:00:00.000Z',
+      current_period_end: '2026-07-01T00:00:00.000Z',
+      credit_renewal_at: '2026-07-01T00:00:00.000Z',
+      commit_ends_at: '2026-07-01T00:00:00.000Z',
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instanceId,
+      stripeSubscriptionId: 'sub_standard_consented',
+      stripePaymentId: 'in_standard_consented',
+      plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+      amountMicrodollars: 55_000_000,
+      periodStart: '2026-07-01T00:00:00.000Z',
+      periodEnd: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(applied).toBe(true);
+    await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
+      plan: 'standard',
+      scheduled_plan: null,
+      commit_ends_at: null,
+    });
+  });
+
+  it('authorizes a post-cutoff first Commit settlement from verified pre-cutoff checkout evidence', async () => {
+    const user = await insertTestUser({ id: 'settlement-pre-cutoff-checkout-user' });
+    const instanceId = '12121212-1212-4212-8212-121212121212';
+    const subscriptionId = '34343434-3434-4434-8434-343434343434';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: 'sub_pre_cutoff_checkout',
+      payment_source: 'stripe',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'trial',
+      status: 'trialing',
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instanceId,
+      stripeSubscriptionId: 'sub_pre_cutoff_checkout',
+      stripePaymentId: 'in_pre_cutoff_checkout',
+      plan: 'commit',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+      amountMicrodollars: 306_000_000,
+      periodStart: '2026-06-10T00:00:00.000Z',
+      periodEnd: '2026-12-10T00:00:00.000Z',
+      checkoutConfirmedAt: '2026-06-05T23:59:59.000Z',
+    });
+
+    expect(applied).toBe(true);
+    await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
+      plan: 'commit',
+      commit_ends_at: '2026-12-10 00:00:00+00',
+    });
+  });
+
+  it('does not infer checkout qualification when verified checkout occurred at cutoff', async () => {
+    const user = await insertTestUser({ id: 'settlement-cutoff-checkout-user' });
+    const instanceId = '56565656-5656-4656-8656-565656565656';
+    const subscriptionId = '78787878-7878-4878-8878-787878787878';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: 'sub_cutoff_checkout',
+      payment_source: 'stripe',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'trial',
+      status: 'trialing',
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod(
+      {
+        userId: user.id,
+        metadataInstanceId: instanceId,
+        stripeSubscriptionId: 'sub_cutoff_checkout',
+        stripePaymentId: 'in_cutoff_checkout',
+        plan: 'commit',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        amountMicrodollars: 306_000_000,
+        periodStart: '2026-06-10T00:00:00.000Z',
+        periodEnd: '2026-12-10T00:00:00.000Z',
+        checkoutConfirmedAt: '2026-06-06T00:00:00.000Z',
+      },
+      settlementDependencies
+    );
+
+    expect(applied).toBe(true);
+    expect(makeStripeSubscriptionNonRenewing).toHaveBeenCalledWith('sub_cutoff_checkout');
+    await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
+      plan: 'commit',
+      cancel_at_period_end: true,
+    });
+  });
+
+  it('does not let pre-cutoff subscription creation authorize an existing Commit renewal', async () => {
+    const user = await insertTestUser({ id: 'settlement-created-renewal-user' });
+    const instanceId = '91919191-9191-4191-8191-919191919191';
+    const subscriptionId = '92929292-9292-4292-8292-929292929292';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: 'sub_created_renewal',
+      payment_source: 'credits',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'commit',
+      status: 'active',
+      current_period_start: '2026-01-01T00:00:00.000Z',
+      current_period_end: '2026-07-01T00:00:00.000Z',
+      credit_renewal_at: '2026-07-01T00:00:00.000Z',
+      commit_ends_at: '2026-07-01T00:00:00.000Z',
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod(
+      {
+        userId: user.id,
+        metadataInstanceId: instanceId,
+        stripeSubscriptionId: 'sub_created_renewal',
+        stripePaymentId: 'in_created_renewal',
+        plan: 'commit',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        amountMicrodollars: 306_000_000,
+        periodStart: '2026-07-01T00:00:00.000Z',
+        periodEnd: '2027-01-01T00:00:00.000Z',
+        checkoutConfirmedAt: '2026-06-05T00:00:00.000Z',
+      },
+      settlementDependencies
+    );
+
+    expect(applied).toBe(true);
+    expect(makeStripeSubscriptionNonRenewing).toHaveBeenCalledWith('sub_created_renewal');
+    await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
+      current_period_end: '2027-01-01 00:00:00+00',
+      commit_ends_at: '2026-07-01 00:00:00+00',
+      cancel_at_period_end: true,
+    });
+  });
+
   it('settles the actual invoice amount balance-neutrally and advances to invoice period boundaries', async () => {
     const user = await insertTestUser({ id: 'settlement-actual-amount-user' });
     const instanceId = '33333333-3333-4333-8333-333333333333';
@@ -226,6 +551,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
       plan: 'commit',
       priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
       amountMicrodollars: 12_340_000,
+      checkoutConfirmedAt: '2026-06-05T12:00:00.000Z',
       periodStart: '2026-06-10T12:00:00.000Z',
       periodEnd: '2026-12-10T12:00:00.000Z',
     });

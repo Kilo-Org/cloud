@@ -62,13 +62,13 @@ describe('calculateKiloExclusiveCost_mUsd with qwen3.7-plus', () => {
     expect(result).toBe(Math.round(300_000 * 0.96 + 10_000 * 3.84));
   });
 
-  test('moves to the long-context tier above the 256k boundary', () => {
+  test('moves to the long-context tier at the 256k boundary', () => {
+    expect(
+      calculateKiloExclusiveCost_mUsd(qwen37_plus_model, makeUsage({ inputTokens: 262_143 }))
+    ).toBe(Math.round(262_143 * 0.32));
     expect(
       calculateKiloExclusiveCost_mUsd(qwen37_plus_model, makeUsage({ inputTokens: 262_144 }))
-    ).toBe(Math.round(262_144 * 0.32));
-    expect(
-      calculateKiloExclusiveCost_mUsd(qwen37_plus_model, makeUsage({ inputTokens: 262_145 }))
-    ).toBe(Math.round(262_145 * 0.96));
+    ).toBe(Math.round(262_144 * 0.96));
   });
 });
 

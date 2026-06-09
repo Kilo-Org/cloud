@@ -149,6 +149,15 @@ type NormalizedModel = {
   fallbacks: string[];
 };
 
+export type AgentBindingSummary = {
+  channel: string;
+  accountId: string | null;
+  // True when the binding is more specific than a channel(/account) route
+  // (peer/guild/team/roles match, or a non-route binding type). The simple
+  // channel-level editor surfaces these but must not clobber them.
+  advanced: boolean;
+};
+
 export type AgentSummary = {
   id: string;
   name: string | null;
@@ -163,6 +172,7 @@ export type AgentSummary = {
     reasoningDefault: string | null;
     fastModeDefault: boolean | null;
   };
+  bindings: AgentBindingSummary[];
 };
 
 export type AgentConfigSummary = {
@@ -341,6 +351,11 @@ export function summarizeAgentConfig(config: OpenClawAgentConfig): AgentConfigSu
         },
         rawModel: entry.model ?? null,
         settings: settingsOf(entry),
+        // Bindings come from the OpenClaw CLI, not the config summary. Routes
+        // attach the CLI's view to every response that returns AgentSummary
+        // (list, read, create, settings-update, bindings-update); this empty
+        // placeholder must never reach a caller.
+        bindings: [],
       };
     }),
   };

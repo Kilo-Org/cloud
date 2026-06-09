@@ -1,5 +1,5 @@
 import { cpus } from 'os';
-import { randomUUID } from 'crypto';
+import { randomInt as secureRandomInt, randomUUID } from 'crypto';
 import { Worker } from 'worker_threads';
 import path from 'path';
 import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
@@ -142,7 +142,7 @@ function generateRandomRecord(
       metaStats.vercel_ip_latitude_null_pct
     ),
     http_x_vercel_ip_longitude: maybeNull(
-      Math.random() * 360 - 180,
+      secureRandomInt(0, 360_000_000) / 1_000_000 - 180,
       metaStats.vercel_ip_longitude_null_pct
     ),
     http_x_vercel_ja4_digest: maybeNull(
@@ -192,7 +192,7 @@ function generateRandomRecord(
       pickRandom(['vscode-extension', 'cloud-agent', 'autocomplete', 'cli'], Math.random()),
       50
     ),
-    session_id: maybeNull(`session-${Math.random().toString(36).substring(2, 10)}`, 60),
+    session_id: maybeNull(`session-${randomUUID().slice(0, 8)}`, 60),
     mode: maybeNull(
       pickRandom(['code', 'build', 'architect', 'ask', 'debug', 'plan', 'general'], Math.random()),
       50

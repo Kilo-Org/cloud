@@ -1,6 +1,8 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@/lib/drizzle';
+import { enrollWithCredits } from '@/lib/kiloclaw/credit-billing';
+import { CURRENT_KILOCLAW_PRICE_VERSION, isBeforeKiloClawCommitSalesCutoff } from '@kilocode/db';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { client as stripe } from '@/lib/stripe-client';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
@@ -17,6 +19,8 @@ import {
   kilo_pass_scheduled_changes,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
+  kiloclaw_instances,
+  kiloclaw_subscriptions,
   microdollar_usage,
   microdollar_usage_daily,
 } from '@kilocode/db/schema';
@@ -754,7 +758,13 @@ async function buildEndedKiloPassSubscriptionState(params: {
 const GetCheckoutReturnStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateBaseSchema.nullable(),
   creditsAwarded: z.boolean(),
+  hostingIntent: z.enum(['none', 'expired_commit', 'standard', 'commit']),
   welcomePromoIneligibleDueToReusedFingerprint: z.boolean(),
+});
+
+const ActivateCheckoutHostingOutputSchema = z.object({
+  activated: z.boolean(),
+  hostingIntent: z.enum(['none', 'expired_commit', 'standard', 'commit']),
 });
 
 const CreateCheckoutSessionInputSchema = z.object({
@@ -1069,11 +1079,30 @@ export const kiloPassRouter = createTRPCRouter({
         return {
           subscription: null,
           creditsAwarded: false,
+          hostingIntent: 'none',
           welcomePromoIneligibleDueToReusedFingerprint: false,
         };
       }
 
       const checkoutSession = await stripe.checkout.sessions.retrieve(input.sessionId);
+      const checkoutHostingIntent = checkoutSession.metadata?.kiloclawHostingPlan;
+      let hostingIntent: 'none' | 'expired_commit' | 'standard' | 'commit' =
+        checkoutHostingIntent === 'standard' || checkoutHostingIntent === 'commit'
+          ? checkoutHostingIntent
+          : 'none';
+      if (hostingIntent === 'commit') {
+        const checkoutSubscription = checkoutSession.subscription;
+        const checkoutSubscriptionId =
+          typeof checkoutSubscription === 'string'
+            ? checkoutSubscription
+            : checkoutSubscription?.id;
+        if (checkoutSubscriptionId) {
+          const verifiedSubscription = await stripe.subscriptions.retrieve(checkoutSubscriptionId);
+          if (!isBeforeKiloClawCommitSalesCutoff(new Date(verifiedSubscription.created * 1000))) {
+            hostingIntent = 'expired_commit';
+          }
+        }
+      }
       const stripeSubscription = checkoutSession.subscription;
       const stripeSubscriptionId =
         typeof stripeSubscription === 'string' ? stripeSubscription : stripeSubscription?.id;
@@ -1081,6 +1110,7 @@ export const kiloPassRouter = createTRPCRouter({
         return {
           subscription: null,
           creditsAwarded: false,
+          hostingIntent,
           welcomePromoIneligibleDueToReusedFingerprint: false,
         };
       }
@@ -1096,6 +1126,7 @@ export const kiloPassRouter = createTRPCRouter({
         return {
           subscription: null,
           creditsAwarded: false,
+          hostingIntent,
           welcomePromoIneligibleDueToReusedFingerprint: false,
         };
       }
@@ -1123,10 +1154,125 @@ export const kiloPassRouter = createTRPCRouter({
       return {
         subscription,
         creditsAwarded: issuedBaseCredits.length > 0,
+        hostingIntent,
         welcomePromoIneligibleDueToReusedFingerprint:
           issuedBaseCredits[0]?.welcomePromoEligibilityReason ===
           KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
       };
+    }),
+
+  activateCheckoutHosting: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }))
+    .output(ActivateCheckoutHostingOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const checkoutSession = await stripe.checkout.sessions.retrieve(input.sessionId);
+      const metadata = checkoutSession.metadata ?? {};
+      if (
+        checkoutSession.status !== 'complete' ||
+        metadata.type !== 'kilo-pass' ||
+        metadata.kiloUserId !== ctx.user.id
+      ) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Checkout session does not belong to user.',
+        });
+      }
+
+      const hostingPlan = metadata.kiloclawHostingPlan;
+      if (hostingPlan !== 'standard' && hostingPlan !== 'commit') {
+        return { activated: false, hostingIntent: 'none' };
+      }
+
+      const stripeSubscription = checkoutSession.subscription;
+      const stripeSubscriptionId =
+        typeof stripeSubscription === 'string' ? stripeSubscription : stripeSubscription?.id;
+      if (!stripeSubscriptionId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Kilo Pass checkout is not complete.',
+        });
+      }
+      const verifiedSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+      const checkoutConfirmedAt = new Date(verifiedSubscription.created * 1000).toISOString();
+      if (hostingPlan === 'commit' && !isBeforeKiloClawCommitSalesCutoff(checkoutConfirmedAt)) {
+        return { activated: false, hostingIntent: 'expired_commit' };
+      }
+
+      const instanceId = metadata.kiloclawInstanceId;
+      const priceVersion = metadata.kiloclawPriceVersion;
+      if (!instanceId || !priceVersion) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Checkout is missing hosting intent metadata.',
+        });
+      }
+      const [instance] = await db
+        .select({ id: kiloclaw_instances.id })
+        .from(kiloclaw_instances)
+        .where(
+          and(eq(kiloclaw_instances.id, instanceId), eq(kiloclaw_instances.user_id, ctx.user.id))
+        )
+        .limit(1);
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Hosting instance not found.' });
+      }
+      const [existingSubscription] = await db
+        .select({ priceVersion: kiloclaw_subscriptions.kiloclaw_price_version })
+        .from(kiloclaw_subscriptions)
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.instance_id, instance.id),
+            eq(kiloclaw_subscriptions.user_id, ctx.user.id)
+          )
+        )
+        .limit(1);
+      const expectedPriceVersion =
+        existingSubscription?.priceVersion ?? CURRENT_KILOCLAW_PRICE_VERSION;
+      if (priceVersion !== expectedPriceVersion) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Checkout hosting price version no longer matches instance.',
+        });
+      }
+
+      const settledSubscription = await db.query.kilo_pass_subscriptions.findFirst({
+        columns: { id: true, started_at: true },
+        where: and(
+          eq(kilo_pass_subscriptions.kilo_user_id, ctx.user.id),
+          eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId)
+        ),
+      });
+      if (!settledSubscription) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Kilo Pass credits are still processing.',
+        });
+      }
+
+      const [priorPaidSubscription] = await db
+        .select({ id: kiloclaw_subscriptions.id })
+        .from(kiloclaw_subscriptions)
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, ctx.user.id),
+            eq(kiloclaw_subscriptions.status, 'canceled'),
+            ne(kiloclaw_subscriptions.plan, 'trial')
+          )
+        )
+        .limit(1);
+
+      await enrollWithCredits({
+        userId: ctx.user.id,
+        instanceId: instance.id,
+        plan: hostingPlan,
+        hadPaidSubscription: Boolean(priorPaidSubscription),
+        actor: { actorType: 'user', actorId: ctx.user.id },
+        commitQualification:
+          hostingPlan === 'commit'
+            ? { source: 'checkout_confirmed_before_cutoff', qualifiedAt: checkoutConfirmedAt }
+            : undefined,
+      });
+      return { activated: true, hostingIntent: hostingPlan };
     }),
 
   getCustomerPortalUrl: baseProcedure

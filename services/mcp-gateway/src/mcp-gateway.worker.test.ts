@@ -169,6 +169,25 @@ describe('MCP gateway route surface', () => {
     expect(response.status).toBe(404);
   });
 
+  it('fails closed for malformed scoped route params', async () => {
+    const responses = await Promise.all([
+      request('/mcp-connect/user/user-123/not-a-uuid/abcdefghijklmnopqrstuvwxyzABCDEF'),
+      request(
+        '/mcp-connect/org/not-a-uuid/33333333-3333-4333-8333-333333333333/abcdefghijklmnopqrstuvwxyzABCDEF'
+      ),
+      request(
+        '/.well-known/oauth-protected-resource/mcp-connect/user/user-123/not-a-uuid/abcdefghijklmnopqrstuvwxyzABCDEF'
+      ),
+      request(
+        '/.well-known/oauth-protected-resource/mcp-connect/org/not-a-uuid/33333333-3333-4333-8333-333333333333/abcdefghijklmnopqrstuvwxyzABCDEF'
+      ),
+    ]);
+
+    for (const response of responses) {
+      expect(response.status).toBe(404);
+    }
+  });
+
   it('does not expose legacy opaque connect routes', async () => {
     const response = await request('/mcp-connect/opaque-connect-id');
 

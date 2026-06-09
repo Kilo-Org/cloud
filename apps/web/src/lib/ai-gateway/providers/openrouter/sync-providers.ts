@@ -122,12 +122,18 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
     fmt: 'cards',
   });
 
-  console.log('GET', `https://openrouter.ai/api/frontend/models/find?${searchParams.toString()}`);
+  console.log(
+    'GET',
+    `https://openrouter.ai/api/frontend/v1/models/find?${searchParams.toString()}`
+  );
 
-  const response = await fetch(`https://openrouter.ai/api/frontend/models/find?${searchParams}`, {
-    method: 'GET',
-    headers: ATTRIBUTION_HEADERS,
-  });
+  const response = await fetch(
+    `https://openrouter.ai/api/frontend/v1/models/find?${searchParams}`,
+    {
+      method: 'GET',
+      headers: ATTRIBUTION_HEADERS,
+    }
+  );
 
   if (!response.ok) {
     throw new Error(

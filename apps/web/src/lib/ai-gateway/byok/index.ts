@@ -31,7 +31,7 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
     console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
     return [];
   }
-  console.debug(`[getModelUserByokProviders] found user byok providers for ${modelId}`, providers);
+  console.debug('[getModelUserByokProviders] found user byok providers for %s', modelId, providers);
   return providers;
 }
 

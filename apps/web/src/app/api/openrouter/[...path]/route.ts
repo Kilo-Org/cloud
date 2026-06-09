@@ -236,7 +236,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
 
   const logClientDisconnect = () => {
-    console.log('AI gateway client disconnected', {
+    console.log('AI gateway client disconnected, requested model: %s', requestedModelLowerCased, {
       path,
       elapsed_ms: Math.round(performance.now() - requestStartedAt),
       client_request_id: clientRequestId,

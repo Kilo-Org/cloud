@@ -111,12 +111,8 @@ export type OperationResult<T = void> = {
 };
 
 export type PersistenceEnv = {
-  /** Durable Object namespace for shared Sandbox instances */
+  /** Durable Object namespace for Sandbox instances */
   Sandbox: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session Sandbox instances */
-  SandboxSmall: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for Docker-in-Docker Sandbox instances */
-  SandboxDIND: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Service binding for the session ingest worker */
@@ -163,8 +159,6 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-  /** Exact GitHub repositories or GitLab URLs enabled for managed SCM containment canaries */
-  SCM_CONTAINMENT_CANARY_REPOSITORIES?: string;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE?: GitTokenService;
   /** Service binding for dispatching push notifications */

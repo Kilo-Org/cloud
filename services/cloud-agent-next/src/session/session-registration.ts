@@ -26,7 +26,7 @@ import {
   recordCloudAgentSandboxIdentity,
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
-import { generateSandboxId, isManagedScmContainmentCanary } from '../sandbox-id.js';
+import { generateSandboxId } from '../sandbox-id.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { createMessageId } from './message-id.js';
 import type {
@@ -105,7 +105,6 @@ type SessionEstablishmentFailure =
   | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
 
 type NewSessionAllocation = SessionRegistrationResult & {
-  managedScmContainment: boolean;
   sessionService: SessionService;
   rollbackCliSession: () => Promise<void>;
 };
@@ -145,9 +144,6 @@ async function allocateNewSession(
     ctx.env
   );
 
-  const useManagedScmContainment =
-    input.runtime?.devcontainer !== true &&
-    isManagedScmContainmentCanary(ctx.env.SCM_CONTAINMENT_CANARY_REPOSITORIES, input.repository);
   let sandboxId: Awaited<ReturnType<typeof generateSandboxId>>;
   try {
     sandboxId = await generateSandboxId(
@@ -156,8 +152,7 @@ async function allocateNewSession(
       ctx.userId,
       cloudAgentSessionId,
       ctx.botId,
-      input.runtime?.devcontainer,
-      useManagedScmContainment
+      input.runtime?.devcontainer
     );
   } catch (error) {
     await recordCloudAgentSessionFailure(
@@ -208,7 +203,6 @@ async function allocateNewSession(
     kiloSessionId,
     sandboxId,
     initialTurn,
-    managedScmContainment: useManagedScmContainment,
     sessionService,
     rollbackCliSession: async () => {
       try {
@@ -229,7 +223,7 @@ async function allocateNewSession(
 function buildSessionRegistrationCommand(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
-  allocation: NewSessionAllocation
+  allocation: SessionRegistrationResult
 ) {
   return {
     identity: {
@@ -258,7 +252,6 @@ function buildSessionRegistrationCommand(
     workspace: {
       sandboxId: allocation.sandboxId,
       shallow: input.options?.shallow,
-      managedScmContainment: allocation.managedScmContainment,
       ...(input.runtime?.devcontainer ? { devcontainerRequested: true } : {}),
     },
   };

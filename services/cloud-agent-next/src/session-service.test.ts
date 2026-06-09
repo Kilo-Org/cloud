@@ -40,8 +40,6 @@ vi.mock('./workspace.js', () => ({
 }));
 
 const tokenMocks = vi.hoisted(() => ({
-  issueCloudAgentGitHubSessionCapability: vi.fn(),
-  issueCloudAgentGitLabSessionCapability: vi.fn(),
   resolveCloudAgentGitHubAuthForRepo: vi.fn(),
   resolveManagedGitLabToken: vi.fn(),
 }));
@@ -189,16 +187,7 @@ function createSandbox(
 
 function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
   return {
-    Sandbox: {
-      idFromName: vi.fn(() => 'sandbox-do-id' as unknown as DurableObjectId),
-    } as unknown as PersistenceEnv['Sandbox'],
-    SandboxSmall: {
-      idFromName: vi.fn(() => 'small-sandbox-do-id' as unknown as DurableObjectId),
-    } as unknown as PersistenceEnv['SandboxSmall'],
-    SandboxDIND: {
-      idFromName: vi.fn(() => 'dind-sandbox-do-id' as unknown as DurableObjectId),
-    } as unknown as PersistenceEnv['SandboxDIND'],
-    SCM_CONTAINMENT_CANARY_REPOSITORIES: 'acme/repo,https://gitlab.com/acme/repo.git',
+    Sandbox: {} as PersistenceEnv['Sandbox'],
     CLOUD_AGENT_SESSION: {
       idFromName: vi.fn(() => 'do-id' as unknown as DurableObjectId),
       get: vi.fn(() => ({
@@ -233,31 +222,19 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         source: 'installation',
         gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
       }),
-      issueGitHubSessionCapability: vi.fn().mockResolvedValue({
-        success: true,
-        capability: 'kgh2.default',
-        installationId: '123',
-        accountLogin: 'acme',
-        appType: 'standard',
-        source: 'installation',
-        gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
-      }),
-      redeemGitHubSessionCapability: vi.fn(),
       getGitLabToken: vi.fn().mockResolvedValue({
         success: true,
         token: 'resolved-gitlab-token',
         instanceUrl: 'https://gitlab.com',
         glabIsOAuth2: true,
       }),
-      issueGitLabSessionCapability: vi.fn(),
-      redeemGitLabSessionCapability: vi.fn(),
     },
     NOTIFICATIONS: {} as unknown as PersistenceEnv['NOTIFICATIONS'],
   } satisfies PersistenceEnv;
 }
 
 function createMetadata(overrides: Record<string, unknown> = {}): CloudAgentSessionState {
-  const metadata = parseSessionMetadata({
+  return parseSessionMetadata({
     version: 1,
     sessionId: 'agent_test',
     userId: 'user_test',
@@ -270,13 +247,6 @@ function createMetadata(overrides: Record<string, unknown> = {}): CloudAgentSess
     platform: 'gitlab',
     ...overrides,
   });
-  const managedScmContainment =
-    overrides.managedScmContainment !== false &&
-    !(typeof overrides.sandboxId === 'string' && overrides.sandboxId.startsWith('dind-'));
-  return {
-    ...metadata,
-    workspace: { ...metadata.workspace, managedScmContainment },
-  };
 }
 
 function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
@@ -297,7 +267,6 @@ function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
       platform: 'gitlab',
     },
     agent: { mode: 'code', model: 'kilo/test-model' },
-    workspace: { managedScmContainment: true },
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
@@ -341,34 +310,9 @@ describe('SessionService.prepareWorkspace', () => {
         gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
       },
     });
-    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValue({
-      success: true,
-      value: {
-        capability: 'kgh2.default',
-        installationId: '123',
-        accountLogin: 'acme',
-        appType: 'standard',
-        source: 'installation',
-        gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
-      },
-    });
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValue({
-      success: true,
-      value: {
-        capability: 'kgl2.default',
-        instanceOrigin: 'https://gitlab.com',
-        instanceHost: 'gitlab.com',
-        projectPath: 'acme/repo',
-        integrationId: 'integration_1',
-        authType: 'oauth',
-        identity: { accountId: '42', accountLogin: 'octocat' },
-        glabIsOAuth2: true,
-      },
-    });
     tokenMocks.resolveManagedGitLabToken.mockResolvedValue({
       success: true,
       token: 'resolved-gitlab-token',
-      instanceUrl: 'https://gitlab.com',
       glabIsOAuth2: true,
     });
     devcontainerMocks.detectDevContainer.mockResolvedValue(null);
@@ -384,7 +328,7 @@ describe('SessionService.prepareWorkspace', () => {
 
     const result = await new SessionService().prepareWorkspace({
       sandbox,
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       userId: 'user_test',
       sessionId: 'agent_test' as SessionId,
       env: createEnv(),
@@ -404,12 +348,10 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://gitlab.com/acme/repo.git',
-      'kgl2.default',
+      'resolved-gitlab-token',
       undefined,
       { platform: 'gitlab' }
     );
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(workspaceMocks.manageBranch).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
@@ -420,11 +362,11 @@ describe('SessionService.prepareWorkspace', () => {
     expect(progress).toHaveBeenCalledWith('setup_commands', 'Running setup commands…');
     expect(result.ready).toMatchObject({
       workspacePath: '/workspace/user/sessions/agent_test',
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       sessionHome: '/home/agent_test',
       branchName: 'main',
       kiloSessionId: 'kilo-session',
-      gitToken: 'kgl2.default',
+      gitToken: 'resolved-gitlab-token',
       gitlabTokenManaged: true,
     });
   });
@@ -509,7 +451,7 @@ describe('SessionService.prepareWorkspace', () => {
     const metadata = {
       ...createMetadata(),
       workspace: {
-        sandboxId: 'ses-abcdef' as const,
+        sandboxId: 'usr-abcdef' as const,
         devcontainerRequested: true,
       },
     } satisfies CloudAgentSessionState;
@@ -524,7 +466,7 @@ describe('SessionService.prepareWorkspace', () => {
     await expect(
       new SessionService().prepareWorkspace({
         sandbox,
-        sandboxId: 'ses-abcdef',
+        sandboxId: 'usr-abcdef',
         userId: 'user_test',
         sessionId: 'agent_test' as SessionId,
         env: createEnv(),
@@ -629,7 +571,7 @@ describe('SessionService.prepareWorkspace', () => {
     await expect(
       new SessionService().prepareWorkspace({
         sandbox,
-        sandboxId: 'ses-abcdef',
+        sandboxId: 'usr-abcdef',
         userId: 'user_test',
         sessionId: 'agent_test' as SessionId,
         env: createEnv(),
@@ -690,7 +632,7 @@ describe('SessionService.prepareWorkspace', () => {
     expect(restoreCommand).not.toContain('KILOCODE_TOKEN=');
   });
 
-  it('refreshes prepared GitHub workspace metadata with a managed capability', async () => {
+  it('refreshes the warm fast path GitHub remote with repo lookup token when legacy metadata stored a token', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);
     const metadata = createMetadata({
@@ -702,12 +644,12 @@ describe('SessionService.prepareWorkspace', () => {
       workspacePath: '/workspace/user/sessions/agent_test',
       sessionHome: '/home/agent_test',
       branchName: 'session/agent_test',
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
     });
 
     await new SessionService().prepareWorkspace({
       sandbox,
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       userId: 'user_test',
       sessionId: 'agent_test' as SessionId,
       env: createEnv(),
@@ -716,24 +658,22 @@ describe('SessionService.prepareWorkspace', () => {
     });
 
     expect(workspaceMocks.cloneGitHubRepo).not.toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalledWith(
       expect.objectContaining({
         GIT_TOKEN_SERVICE: expect.any(Object),
       }),
       {
         githubRepo: 'acme/repo',
         userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: false,
       }
     );
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
     expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
       'https://github.com/acme/repo.git',
-      'kgh2.default'
+      'resolved-gh-token'
     );
   });
 
@@ -749,7 +689,7 @@ describe('SessionService.prepareWorkspace', () => {
 
     await new SessionService().prepareWorkspace({
       sandbox,
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       userId: 'user_test',
       sessionId: 'agent_test' as SessionId,
       env: createEnv(),
@@ -874,7 +814,7 @@ describe('SessionService.prepareWorkspace', () => {
     });
   });
 
-  it('refreshes a prepared warm GitHub remote with a managed capability', async () => {
+  it('refreshes the warm fast path git remote with a fresh GitHub installation token', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);
     const getTokenMock = vi.fn().mockResolvedValue('legacy-installation-token');
@@ -883,6 +823,17 @@ describe('SessionService.prepareWorkspace', () => {
       ...env.GIT_TOKEN_SERVICE,
       getToken: getTokenMock,
     } as PersistenceEnv['GIT_TOKEN_SERVICE'];
+    tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValueOnce({
+      success: true,
+      value: {
+        githubToken: 'installation-token',
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+        source: 'installation',
+        gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+      },
+    });
     const metadata = createMetadata({
       githubRepo: 'acme/repo',
       githubToken: 'stale-installation-token',
@@ -894,12 +845,12 @@ describe('SessionService.prepareWorkspace', () => {
       workspacePath: '/workspace/user/sessions/agent_test',
       sessionHome: '/home/agent_test',
       branchName: 'session/agent_test',
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
     });
 
     await new SessionService().prepareWorkspace({
       sandbox,
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       userId: 'user_test',
       sessionId: 'agent_test' as SessionId,
       env,
@@ -909,17 +860,16 @@ describe('SessionService.prepareWorkspace', () => {
 
     expect(workspaceMocks.cloneGitHubRepo).not.toHaveBeenCalled();
     expect(getTokenMock).not.toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalled();
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalled();
     expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
       'https://github.com/acme/repo.git',
-      'kgh2.default'
+      'installation-token'
     );
   });
 
-  it('refreshes the warm fast path GitLab remote with a capability even when legacy metadata opted out', async () => {
+  it('refreshes the warm fast path git remote with a fresh managed GitLab token even when legacy metadata opted out', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);
     const metadata = createMetadata({
@@ -930,12 +880,12 @@ describe('SessionService.prepareWorkspace', () => {
       workspacePath: '/workspace/user/sessions/agent_test',
       sessionHome: '/home/agent_test',
       branchName: 'session/agent_test',
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
     });
 
     await new SessionService().prepareWorkspace({
       sandbox,
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       userId: 'user_test',
       sessionId: 'agent_test' as SessionId,
       env: createEnv(),
@@ -944,38 +894,28 @@ describe('SessionService.prepareWorkspace', () => {
     });
 
     expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
     expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
       'https://gitlab.com/acme/repo.git',
-      'kgl2.default',
+      'resolved-gitlab-token',
       'gitlab'
     );
   });
 
-  it('refreshes a warm GitLab code-review remote with a contained project capability', async () => {
+  it('refreshes a warm GitLab code-review remote with the generically resolved project token', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
+    tokenMocks.resolveManagedGitLabToken.mockResolvedValueOnce({
       success: true,
-      value: {
-        capability: 'kgl2.project',
-        gitUrl: 'https://gitlab.com/acme/repo.git',
-        instanceOrigin: 'https://gitlab.com',
-        instanceHost: 'gitlab.com',
-        projectPath: 'acme/repo',
-        integrationId: 'project_token_1',
-        authType: 'pat',
-        identity: { accountId: null, accountLogin: null },
-        glabIsOAuth2: false,
-      },
+      token: 'resolved-project-token',
+      glabIsOAuth2: false,
     });
 
     await new SessionService().prepareWorkspace({
       sandbox,
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       userId: 'user_test',
       sessionId: 'agent_test' as SessionId,
       env: createEnv(),
@@ -983,27 +923,22 @@ describe('SessionService.prepareWorkspace', () => {
       kilocodeModel: 'test-model',
     });
 
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
-      expect.any(Object),
-      {
-        gitUrl: 'https://gitlab.com/acme/repo.git',
-        userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
-        orgId: undefined,
-        createdOnPlatform: 'code-review',
-      }
-    );
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalledWith(expect.any(Object), {
+      userId: 'user_test',
+      orgId: undefined,
+      repositoryUrl: 'https://gitlab.com/acme/repo.git',
+      createdOnPlatform: 'code-review',
+    });
     expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
       'https://gitlab.com/acme/repo.git',
-      'kgl2.project',
+      'resolved-project-token',
       'gitlab'
     );
   });
 
-  it('refreshes a prepared warm GitHub remote through managed capability authentication', async () => {
+  it('refreshes the warm fast path GitHub remote when repo lookup resolves a managed token', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);
     const metadata = createMetadata({
@@ -1016,12 +951,12 @@ describe('SessionService.prepareWorkspace', () => {
       workspacePath: '/workspace/user/sessions/agent_test',
       sessionHome: '/home/agent_test',
       branchName: 'session/agent_test',
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
     });
 
     await new SessionService().prepareWorkspace({
       sandbox,
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       userId: 'user_test',
       sessionId: 'agent_test' as SessionId,
       env: createEnv(),
@@ -1029,108 +964,12 @@ describe('SessionService.prepareWorkspace', () => {
       kilocodeModel: 'test-model',
     });
 
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalled();
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
     expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
       session,
       '/workspace/user/sessions/agent_test',
       'https://github.com/acme/repo.git',
-      'kgh2.default'
+      'resolved-gh-token'
     );
-  });
-
-  it('uses direct GitHub authentication for requested devcontainer preparation', async () => {
-    const session = createSession(false);
-    const sandbox = createSandbox(session);
-    const metadata = {
-      ...createMetadata({
-        githubRepo: 'acme/repo',
-        gitUrl: undefined,
-        gitToken: undefined,
-        platform: 'github',
-      }),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-    devcontainerMocks.detectDevContainer.mockResolvedValue({
-      configPath: '.devcontainer/devcontainer.json',
-    });
-    devcontainerMocks.bringUpDevContainer.mockResolvedValue({
-      containerId: 'container-dev',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/user/sessions/agent_test',
-      agentSessionId: 'agent_test',
-      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
-      teardown: vi.fn().mockResolvedValue(undefined),
-    });
-
-    await new SessionService().prepareWorkspace({
-      sandbox,
-      sandboxId: 'dind-abcdef',
-      userId: 'user_test',
-      sessionId: 'agent_test' as SessionId,
-      env: createEnv(),
-      metadata,
-      kilocodeModel: 'test-model',
-    });
-
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).not.toHaveBeenCalled();
-    expect(workspaceMocks.cloneGitHubRepo).toHaveBeenCalledWith(
-      session,
-      '/workspace/user/sessions/agent_test',
-      'acme/repo',
-      'resolved-gh-token',
-      { name: 'kiloconnect[bot]', email: 'bot@example.com' },
-      undefined
-    );
-  });
-
-  it('fails closed without a raw GitLab token fallback when prepared workspace capability issuance fails', async () => {
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
-      success: false,
-      reason: 'rpc_error',
-    });
-
-    await expect(
-      new SessionService().prepareWorkspace({
-        sandbox: createSandbox(createSession()),
-        sandboxId: 'ses-abcdef',
-        userId: 'user_test',
-        sessionId: 'agent_test' as SessionId,
-        env: createEnv(),
-        metadata: createMetadata(),
-      })
-    ).rejects.toThrow('GitLab token lookup failed (rpc_error)');
-
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
-  });
-
-  it('fails closed without raw GitHub auth fallback when prepared workspace capability issuance fails', async () => {
-    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
-      success: false,
-      error: { reason: 'rpc_error', message: 'RPC unavailable' },
-    });
-
-    await expect(
-      new SessionService().prepareWorkspace({
-        sandbox: createSandbox(createSession()),
-        sandboxId: 'ses-abcdef',
-        userId: 'user_test',
-        sessionId: 'agent_test' as SessionId,
-        env: createEnv(),
-        metadata: createMetadata({
-          githubRepo: 'acme/repo',
-          gitUrl: undefined,
-          gitToken: undefined,
-          platform: 'github',
-        }),
-      })
-    ).rejects.toThrow('GitHub token or active app installation required');
-
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
   });
 
   it('throws when required metadata is missing', async () => {
@@ -1139,7 +978,7 @@ describe('SessionService.prepareWorkspace', () => {
     await expect(
       new SessionService().prepareWorkspace({
         sandbox: createSandbox(createSession()),
-        sandboxId: 'ses-abcdef',
+        sandboxId: 'usr-abcdef',
         userId: 'user_test',
         sessionId: 'agent_test' as SessionId,
         env: createEnv(),
@@ -1163,34 +1002,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
       },
     });
-    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValue({
-      success: true,
-      value: {
-        capability: 'kgh2.default',
-        installationId: '123',
-        accountLogin: 'acme',
-        appType: 'standard',
-        source: 'installation',
-        gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
-      },
-    });
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValue({
-      success: true,
-      value: {
-        capability: 'kgl2.default',
-        instanceOrigin: 'https://gitlab.com',
-        instanceHost: 'gitlab.com',
-        projectPath: 'acme/repo',
-        integrationId: 'integration_1',
-        authType: 'oauth',
-        identity: { accountId: '42', accountLogin: 'octocat' },
-        glabIsOAuth2: true,
-      },
-    });
     tokenMocks.resolveManagedGitLabToken.mockResolvedValue({
       success: true,
       token: 'resolved-gitlab-token',
-      instanceUrl: 'https://gitlab.com',
       glabIsOAuth2: true,
     });
     devcontainerMocks.detectDevContainer.mockResolvedValue(null);
@@ -1206,12 +1020,6 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     const service = new SessionService();
     const env = createEnv();
     env.WORKER_URL = 'https://cloud-agent.example.com';
-    const repository = metadata.repository;
-    if (repository?.type === 'github') {
-      env.SCM_CONTAINMENT_CANARY_REPOSITORIES = repository.repo;
-    } else if (repository?.type === 'gitlab') {
-      env.SCM_CONTAINMENT_CANARY_REPOSITORIES = repository.url;
-    }
     configureEnv?.(env);
 
     return service.buildWrapperSessionReadyAndPromptRequests({
@@ -1231,7 +1039,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           model: 'test-model',
         },
         workspace: {
-          sandboxId: metadata.workspace?.sandboxId ?? 'ses-abcdef',
+          sandboxId: 'usr-abcdef',
           metadata,
         },
         wrapper: {
@@ -1244,73 +1052,6 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       } satisfies FencedWrapperDispatchRequest,
     });
   }
-
-  it('keeps direct GitLab credentials for a non-canary sandbox', async () => {
-    const result = await buildPromptWrapperRequests(
-      {
-        ...createMetadata(),
-        workspace: { sandboxId: 'ses-abcdef' },
-      } satisfies CloudAgentSessionState,
-      env => {
-        env.SCM_CONTAINMENT_CANARY_REPOSITORIES = 'Kilo-Org/other-repo';
-      }
-    );
-
-    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalledWith(expect.any(Object), {
-      userId: 'user_test',
-      orgId: undefined,
-      repositoryUrl: 'https://gitlab.com/acme/repo.git',
-      createdOnPlatform: undefined,
-    });
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({ token: 'resolved-gitlab-token' });
-  });
-
-  it('preserves a self-managed GitLab instance subpath for direct credentials', async () => {
-    tokenMocks.resolveManagedGitLabToken.mockResolvedValueOnce({
-      success: true,
-      token: 'resolved-gitlab-token',
-      instanceUrl: 'https://gitlab.example.com:8443/gitlab',
-      glabIsOAuth2: true,
-    });
-
-    const result = await buildPromptWrapperRequests(
-      createMetadata({
-        gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/repo.git',
-        managedScmContainment: false,
-      })
-    );
-
-    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.example.com:8443');
-    expect(result.readyRequest.materialized.env.GITLAB_SUBFOLDER).toBe('gitlab');
-  });
-
-  it('keeps direct GitHub credentials for a non-canary sandbox', async () => {
-    const result = await buildPromptWrapperRequests(
-      {
-        ...createMetadata({
-          githubRepo: 'acme/repo',
-          gitUrl: undefined,
-          gitToken: undefined,
-          platform: 'github',
-          createdOnPlatform: 'cloud-agent-web',
-        }),
-        workspace: { sandboxId: 'ses-abcdef' },
-      } satisfies CloudAgentSessionState,
-      env => {
-        env.SCM_CONTAINMENT_CANARY_REPOSITORIES = 'acme/other-repo';
-      }
-    );
-
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalledWith(expect.any(Object), {
-      githubRepo: 'acme/repo',
-      userId: 'user_test',
-      orgId: undefined,
-      allowUserAuthorization: true,
-    });
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({ token: 'resolved-gh-token' });
-  });
 
   it('passes persisted devcontainer intent to the active wrapper readiness request', async () => {
     const service = new SessionService();
@@ -1341,7 +1082,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           model: 'test-model',
         },
         workspace: {
-          sandboxId: metadata.workspace?.sandboxId ?? 'ses-abcdef',
+          sandboxId: 'dind-abcdef',
           metadata,
         },
         wrapper: {
@@ -1356,164 +1097,6 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
     expect(result.readyRequest.devcontainer).toEqual({ requested: true });
     expect(result.ready.devcontainer).toBeUndefined();
-  });
-
-  it('uses direct GitLab authentication for a DIND sandbox', async () => {
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata(),
-      workspace: { sandboxId: 'dind-abcdef' },
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({ token: 'resolved-gitlab-token' });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
-  });
-
-  it('derives a canary capability from the SandboxSmall container ID', async () => {
-    await buildPromptWrapperRequests({
-      ...createMetadata(),
-      workspace: { sandboxId: 'ses-abcdef', managedScmContainment: true },
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.objectContaining({ outboundContainerId: 'small-sandbox-do-id' })
-    );
-  });
-
-  it('uses direct GitLab authentication in DIND devcontainer wrapper readiness', async () => {
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata(),
-      workspace: {
-        sandboxId: 'dind-abcdef',
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({
-      kind: 'git',
-      token: 'resolved-gitlab-token',
-      platform: 'gitlab',
-    });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
-  });
-
-  it('fails closed without raw GitLab fallback when canary capability issuance fails', async () => {
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
-      success: false,
-      reason: 'rpc_error',
-    });
-
-    await expect(buildPromptWrapperRequests(createMetadata())).rejects.toThrow(
-      'GitLab token lookup failed (rpc_error)'
-    );
-
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
-  });
-
-  it('fails closed without raw GitHub fallback when canary capability issuance fails', async () => {
-    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
-      success: false,
-      error: { reason: 'rpc_error', message: 'RPC unavailable' },
-    });
-
-    await expect(
-      buildPromptWrapperRequests(
-        createMetadata({
-          githubRepo: 'acme/repo',
-          gitUrl: undefined,
-          gitToken: undefined,
-          platform: 'github',
-        })
-      )
-    ).rejects.toThrow('GitHub token or active app installation required');
-
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
-  });
-
-  it('uses a managed GitLab capability for a prepared standard wrapper workspace', async () => {
-    const result = await buildPromptWrapperRequests(createMetadata({ preparedAt: 1 }));
-
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({
-      token: 'kgl2.default',
-    });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
-    expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gitlab-token');
-  });
-
-  it('uses direct GitLab authentication for a resumed DIND session', async () => {
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata({ preparedAt: 1 }),
-      workspace: { sandboxId: 'dind-abcdef' },
-      devcontainer: {
-        workspacePath: '/workspace/user/sessions/agent_test',
-        innerWorkspaceFolder: '/workspaces/repo',
-        wrapperPort: 4173,
-        configPath: '.devcontainer/devcontainer.json',
-      },
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({ token: 'resolved-gitlab-token' });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
-  });
-
-  it('uses direct GitHub authentication in DIND devcontainer wrapper readiness', async () => {
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata({
-        githubRepo: 'acme/repo',
-        gitUrl: undefined,
-        gitToken: undefined,
-        platform: 'github',
-      }),
-      workspace: {
-        sandboxId: 'dind-abcdef',
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({
-      kind: 'github',
-      token: 'resolved-gh-token',
-    });
-    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('resolved-gh-token');
-  });
-
-  it('uses direct GitHub authentication for a resumed DIND session with resolved devcontainer metadata', async () => {
-    const devcontainer = {
-      workspacePath: '/workspace/user/sessions/agent_test',
-      innerWorkspaceFolder: '/workspaces/repo',
-      wrapperPort: 4173,
-      configPath: '.devcontainer/devcontainer.json',
-    };
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata({
-        preparedAt: 1,
-        githubRepo: 'acme/repo',
-        gitUrl: undefined,
-        gitToken: undefined,
-        platform: 'github',
-      }),
-      workspace: { sandboxId: 'dind-abcdef' },
-      devcontainer,
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({
-      kind: 'github',
-      token: 'resolved-gh-token',
-    });
-    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('resolved-gh-token');
-    expect(result.readyRequest.devcontainer).toEqual({ requested: true, resolved: devcontainer });
   });
 
   it('materializes workspace setup and prompt delivery without using provider token overrides for ingest auth', async () => {
@@ -1549,7 +1132,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           condenseOnComplete: false,
         },
         workspace: {
-          sandboxId: 'ses-abcdef',
+          sandboxId: 'usr-abcdef',
           metadata,
         },
         wrapper: {
@@ -1566,27 +1149,17 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
     expect(result.ready).toMatchObject({
       workspacePath: '/workspace/user/sessions/agent_test',
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       sessionHome: '/home/agent_test',
       branchName: 'main',
       kiloSessionId: 'kilo-session',
-      gitToken: 'kgl2.default',
+      gitToken: 'resolved-gitlab-token',
       gitlabTokenManaged: true,
     });
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
-      expect.any(Object),
-      {
-        gitUrl: 'https://gitlab.com/acme/repo.git',
-        userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
-        orgId: undefined,
-      }
-    );
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(result.readyRequest).toMatchObject({
       agentSessionId: 'agent_test',
       userId: 'user_test',
-      sandboxId: 'ses-abcdef',
+      sandboxId: 'usr-abcdef',
       kiloSessionId: 'kilo-session',
       workspace: {
         workspacePath: '/workspace/user/sessions/agent_test',
@@ -1597,7 +1170,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       repo: {
         kind: 'git',
         url: 'https://gitlab.com/acme/repo.git',
-        token: 'kgl2.default',
+        token: 'resolved-gitlab-token',
         platform: 'gitlab',
       },
       materialized: {
@@ -1614,8 +1187,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(JSON.parse(result.readyRequest.materialized.env.KILO_AUTH_CONTENT)).toEqual({
       kilo: { type: 'api', key: 'kilo-token' },
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
-    expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gitlab-token');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
     expect(result.readyRequest.session.workerAuthToken).toBe('kilo-token');
@@ -1708,7 +1280,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           attachments,
         },
         agent: { mode: 'code', model: 'test-model' },
-        workspace: { sandboxId: 'ses-abcdef', metadata: createMetadata() },
+        workspace: { sandboxId: 'usr-abcdef', metadata: createMetadata() },
         wrapper: {
           fence: {
             wrapperRunId: 'wr_attachment',
@@ -1727,45 +1299,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest.message.attachments).toEqual(signedAttachments);
   });
 
-  it('fails closed without a raw managed GitLab token fallback when wrapper capability issuance fails', async () => {
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
-      success: false,
-      reason: 'rpc_error',
-    });
-
-    await expect(buildPromptWrapperRequests(createMetadata())).rejects.toThrow(
-      'GitLab token lookup failed (rpc_error)'
-    );
-
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
-  });
-
-  it('fails closed without a raw managed token fallback when wrapper capability issuance fails', async () => {
-    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
-      success: false,
-      error: { reason: 'rpc_error', message: 'RPC unavailable' },
-    });
-    const metadata = createMetadata({
-      githubRepo: 'acme/repo',
-      gitUrl: undefined,
-      gitToken: undefined,
-      platform: 'github',
-    });
-
-    await expect(buildPromptWrapperRequests(metadata)).rejects.toThrow(
-      'GitHub token or active app installation required'
-    );
-
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalled();
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
-  });
-
-  it('uses a capability for covered selected-user GitHub remote and managed GH_TOKEN', async () => {
-    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
+  it('uses selected user GitHub auth for the remote, author, and managed GH_TOKEN', async () => {
+    tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgh2.selected-user',
+        githubToken: 'selected-user-token',
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -1783,24 +1321,18 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
     const result = await buildPromptWrapperRequests(metadata);
 
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
-      expect.any(Object),
-      {
-        githubRepo: 'acme/repo',
-        userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
-        orgId: undefined,
-        allowUserAuthorization: true,
-      }
-    );
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalledWith(expect.any(Object), {
+      githubRepo: 'acme/repo',
+      userId: 'user_test',
+      orgId: undefined,
+      allowUserAuthorization: true,
+    });
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'github',
-      token: 'kgh2.selected-user',
+      token: 'selected-user-token',
       gitAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
     });
-    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('kgh2.selected-user');
-    expect(JSON.stringify(result.readyRequest)).not.toContain('selected-user-token');
+    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('selected-user-token');
     if (result.type !== 'prompt') throw new Error('Expected prompt delivery request');
     expect(result.promptRequest.finalization?.commitCoAuthor).toEqual({
       name: 'kiloconnect[bot]',
@@ -1818,20 +1350,16 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
     await buildPromptWrapperRequests(metadata);
 
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
-      expect.any(Object),
-      {
-        githubRepo: 'acme/repo',
-        userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
-        orgId: undefined,
-        allowUserAuthorization: true,
-      }
-    );
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalledWith(expect.any(Object), {
+      githubRepo: 'acme/repo',
+      userId: 'user_test',
+      orgId: undefined,
+      allowUserAuthorization: true,
+    });
   });
 
   it.each([undefined, 'code-review', 'discord', 'github'])(
-    'requests installation-only GitHub capability for %s-origin sessions',
+    'requests installation-only GitHub auth for %s-origin sessions',
     async createdOnPlatform => {
       await buildPromptWrapperRequests(
         createMetadata({
@@ -1843,12 +1371,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         })
       );
 
-      expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
+      expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalledWith(
         expect.any(Object),
         {
           githubRepo: 'acme/repo',
           userId: 'user_test',
-          outboundContainerId: 'small-sandbox-do-id',
           orgId: undefined,
           allowUserAuthorization: false,
         }
@@ -1856,19 +1383,15 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     }
   );
 
-  it('preserves installation author identity supplied with capability metadata', async () => {
-    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
+  it('reconstructs installation author identity during legacy token-service fallback', async () => {
+    tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgh2.installation',
+        githubToken: 'legacy-installation-token',
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
-        gitAuthor: {
-          name: 'kiloconnect-development[bot]',
-          email: '242397087+kiloconnect-development[bot]@users.noreply.github.com',
-        },
       },
     });
     const result = await buildPromptWrapperRequests(
@@ -1877,12 +1400,16 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         gitUrl: undefined,
         gitToken: undefined,
         platform: 'github',
-      })
+      }),
+      env => {
+        env.GITHUB_APP_SLUG = 'kiloconnect-development';
+        env.GITHUB_APP_BOT_USER_ID = '242397087';
+      }
     );
 
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'github',
-      token: 'kgh2.installation',
+      token: 'legacy-installation-token',
       gitAuthor: {
         name: 'kiloconnect-development[bot]',
         email: '242397087+kiloconnect-development[bot]@users.noreply.github.com',
@@ -1890,11 +1417,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   });
 
-  it('preserves an explicit profile GH_TOKEN over a managed capability', async () => {
-    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
+  it('preserves an explicit profile GH_TOKEN over selected user authorization', async () => {
+    tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValueOnce({
       success: true,
       value: {
-        capability: 'kgh2.selected-user',
+        githubToken: 'selected-user-token',
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -1917,71 +1444,27 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('explicit-profile-token');
   });
 
-  it('materializes a canonical capability URL with a nested namespace and self-managed base URL', async () => {
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
-      success: true,
-      value: {
-        capability: 'kgl2.self-managed',
-        gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/platform/repo.git',
-        instanceOrigin: 'https://gitlab.example.com:8443/gitlab',
-        instanceHost: 'gitlab.example.com:8443',
-        projectPath: 'acme/platform/repo',
-        integrationId: 'integration_1',
-        authType: 'oauth',
-        identity: { accountId: '42', accountLogin: 'octocat' },
-        glabIsOAuth2: true,
-      },
-    });
+  it('materializes OAuth bearer mode with a self-managed GitLab host', async () => {
     const result = await buildPromptWrapperRequests(
       createMetadata({
-        gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/platform/repo',
+        gitUrl: 'https://gitlab.example.com:8443/acme/repo.git',
         platform: 'gitlab',
       })
     );
 
     expect(result.ready).toMatchObject({
-      gitToken: 'kgl2.self-managed',
+      gitToken: 'resolved-gitlab-token',
       gitlabTokenManaged: true,
     });
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
-      expect.any(Object),
-      {
-        gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/platform/repo',
-        userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
-        orgId: undefined,
-      }
-    );
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'git',
-      url: 'https://gitlab.example.com:8443/gitlab/acme/platform/repo.git',
-      token: 'kgl2.self-managed',
+      url: 'https://gitlab.example.com:8443/acme/repo.git',
+      token: 'resolved-gitlab-token',
       platform: 'gitlab',
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.self-managed');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.example.com:8443');
-    expect(result.readyRequest.materialized.env.GITLAB_SUBFOLDER).toBe('gitlab');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
-  });
-
-  it('preserves explicit profile GitLab CLI values over a managed capability', async () => {
-    const result = await buildPromptWrapperRequests(
-      createMetadata({
-        envVars: {
-          GITLAB_TOKEN: 'explicit-profile-token',
-          GITLAB_HOST: 'profile.gitlab.example.com',
-          GLAB_IS_OAUTH2: 'false',
-        },
-      })
-    );
-
-    expect(result.readyRequest.repo).toMatchObject({
-      token: 'kgl2.default',
-      platform: 'gitlab',
-    });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('explicit-profile-token');
-    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('profile.gitlab.example.com');
-    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
   });
 
   it('preserves an explicit profile GLAB_IS_OAUTH2 value when injecting a managed GitLab token', async () => {
@@ -1994,71 +1477,47 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     );
 
     expect(result.ready).toMatchObject({
-      gitToken: 'kgl2.default',
+      gitToken: 'resolved-gitlab-token',
       gitlabTokenManaged: true,
     });
     expect(result.readyRequest.repo).toMatchObject({
-      token: 'kgl2.default',
+      token: 'resolved-gitlab-token',
       platform: 'gitlab',
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
   });
 
-  it('materializes a review-origin GitLab project capability with OAuth mode disabled', async () => {
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
+  it('materializes generic review-origin GitLab project tokens with OAuth mode disabled', async () => {
+    tokenMocks.resolveManagedGitLabToken.mockResolvedValueOnce({
       success: true,
-      value: {
-        capability: 'kgl2.project',
-        gitUrl: 'https://gitlab.com/acme/repo.git',
-        instanceOrigin: 'https://gitlab.com',
-        instanceHost: 'gitlab.com',
-        projectPath: 'acme/repo',
-        integrationId: 'project_token_1',
-        authType: 'pat',
-        identity: { accountId: null, accountLogin: null },
-        glabIsOAuth2: false,
-      },
+      token: 'resolved-project-token',
+      glabIsOAuth2: false,
     });
     const result = await buildPromptWrapperRequests(createGitLabCodeReviewMetadata());
 
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
-      expect.any(Object),
-      {
-        gitUrl: 'https://gitlab.com/acme/repo.git',
-        userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
-        orgId: undefined,
-        createdOnPlatform: 'code-review',
-      }
-    );
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalledWith(expect.any(Object), {
+      userId: 'user_test',
+      orgId: undefined,
+      repositoryUrl: 'https://gitlab.com/acme/repo.git',
+      createdOnPlatform: 'code-review',
+    });
     expect(result.readyRequest.repo).toMatchObject({
       kind: 'git',
-      token: 'kgl2.project',
+      token: 'resolved-project-token',
       platform: 'gitlab',
       refreshRemote: true,
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.project');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-project-token');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
-    expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-project-token');
   });
 
-  it('does not allow profile GitLab credentials to replace a review project capability', async () => {
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
+  it('does not allow profile GitLab credentials to replace a resolved project token', async () => {
+    tokenMocks.resolveManagedGitLabToken.mockResolvedValueOnce({
       success: true,
-      value: {
-        capability: 'kgl2.project',
-        gitUrl: 'https://gitlab.com/acme/repo.git',
-        instanceOrigin: 'https://gitlab.com',
-        instanceHost: 'gitlab.com',
-        projectPath: 'acme/repo',
-        integrationId: 'project_token_1',
-        authType: 'pat',
-        identity: { accountId: null, accountLogin: null },
-        glabIsOAuth2: false,
-      },
+      token: 'resolved-project-token',
+      glabIsOAuth2: false,
     });
     const metadata = {
       ...createGitLabCodeReviewMetadata(),
@@ -2073,18 +1532,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
     const result = await buildPromptWrapperRequests(metadata);
 
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.project');
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-project-token');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('false');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
-    expect(JSON.stringify(result.readyRequest)).not.toContain('configured-human-token');
   });
 
   it.each([
-    [
-      'integration_identity_missing',
-      'GitLab token lookup failed (integration_identity_missing). The connected GitLab integration is missing its account identity. Reconnect or reconfigure the integration.',
-    ],
     [
       'no_project_token',
       'GitLab token lookup failed (no_project_token). No GitLab project access token is configured for this repository. Reconfigure or reinstall the GitLab code-review bot for the project.',
@@ -2102,7 +1555,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       'GitLab token lookup failed (project_lookup_failed). The connected GitLab integration cannot read this project. Grant repository access, then reconnect GitLab if required.',
     ],
   ])(
-    'reports actionable review-origin GitLab capability lookup failure for %s without using a human-token fallback',
+    'reports actionable review-origin GitLab token lookup failure for %s without using a human-token fallback',
     async (reason, expectedMessage) => {
       const metadata = createGitLabCodeReviewMetadata();
       if (!metadata.repository || metadata.repository.type !== 'gitlab') {
@@ -2116,7 +1569,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         },
       } satisfies CloudAgentSessionState;
 
-      tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
+      tokenMocks.resolveManagedGitLabToken.mockResolvedValueOnce({
         success: false,
         reason,
       });
@@ -2124,22 +1577,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       await expect(buildPromptWrapperRequests(metadataWithFallbackToken)).rejects.toThrow(
         expectedMessage
       );
-      expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
-        expect.any(Object),
-        {
-          gitUrl: 'https://gitlab.com/acme/repo.git',
-          userId: 'user_test',
-          outboundContainerId: 'small-sandbox-do-id',
-          orgId: undefined,
-          createdOnPlatform: 'code-review',
-        }
-      );
-      expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+      expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalledOnce();
     }
   );
 
   it('keeps reconnect guidance for GitLab OAuth-token lifecycle failures', async () => {
-    tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
+    tokenMocks.resolveManagedGitLabToken.mockResolvedValueOnce({
       success: false,
       reason: 'token_refresh_failed',
     });
@@ -2147,8 +1590,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     await expect(buildPromptWrapperRequests(createGitLabCodeReviewMetadata())).rejects.toThrow(
       'GitLab token lookup failed (token_refresh_failed). Please reconnect your GitLab account.'
     );
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledOnce();
-    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalledOnce();
   });
 
   it('does not use OAuth bearer mode for inferred legacy GitLab tokens', async () => {

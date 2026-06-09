@@ -132,7 +132,6 @@ const MetadataWorkspaceSchema = z
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
     shallow: z.boolean().optional(),
-    managedScmContainment: z.boolean().optional(),
     devcontainerRequested: z.boolean().optional(),
   })
   .strip();

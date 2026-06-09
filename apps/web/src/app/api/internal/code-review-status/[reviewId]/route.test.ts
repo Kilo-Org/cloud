@@ -1250,7 +1250,27 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
-    it('skips infra retry when the failed session used more than 100k tokens', async () => {
+    it.each([
+      {
+        name: 'cost and tokens exceed retry thresholds',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 100_001,
+          totalTokensOut: 0,
+          totalCostMusd: 200_000,
+        },
+      },
+      {
+        name: 'cost and tokens are exactly at retry thresholds',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 60_000,
+          totalTokensOut: 40_000,
+          totalCostMusd: 200_000,
+        },
+      },
+      { name: 'billing usage is unavailable', usage: null },
+    ])('skips infra retry when failed session $name', async ({ usage }) => {
       const retryFlow = mockCreatedInfraRetryFlow({
         failedAttemptId: '00000000-0000-0000-0000-000000000209',
         retryAttemptId: '00000000-0000-0000-0000-000000000210',
@@ -1260,12 +1280,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ status: 'running', session_id: retryFlow.sessionId })
       );
-      mockGetSessionUsageFromBilling.mockResolvedValue({
-        model: 'anthropic/claude-sonnet-4.6',
-        totalTokensIn: 100_001,
-        totalTokensOut: 0,
-        totalCostMusd: 123,
-      });
+      mockGetSessionUsageFromBilling.mockResolvedValue(usage);
 
       const response = await POST(
         makeRequest({
@@ -1293,16 +1308,24 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     it.each([
       {
-        name: 'at the token threshold',
+        name: 'cost is below the threshold',
         usage: {
           model: 'anthropic/claude-sonnet-4.6',
-          totalTokensIn: 60_000,
-          totalTokensOut: 40_000,
-          totalCostMusd: 123,
+          totalTokensIn: 100_001,
+          totalTokensOut: 0,
+          totalCostMusd: 199_999,
         },
       },
-      { name: 'unavailable', usage: null },
-    ])('allows infra retry when failed session usage is $name', async ({ usage }) => {
+      {
+        name: 'tokens are below the threshold',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 99_999,
+          totalTokensOut: 0,
+          totalCostMusd: 200_000,
+        },
+      },
+    ])('allows infra retry when failed session $name', async ({ usage }) => {
       const retryFlow = mockCreatedInfraRetryFlow({
         failedAttemptId: '00000000-0000-0000-0000-000000000211',
         retryAttemptId: '00000000-0000-0000-0000-000000000212',

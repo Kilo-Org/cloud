@@ -236,6 +236,7 @@ function getActionRequiredTerminalReason(
 }
 
 const MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY = 100_000;
+const MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY = 200_000;
 
 function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalReason): boolean {
   return (
@@ -290,7 +291,20 @@ function shouldAutoRetryCodeReviewFailure(
   return !isKnownUnretryableCodeReviewFailure(terminalReason, errorMessage);
 }
 
-async function shouldSkipAutoRetryForFailedSessionTokenUsage(params: {
+type FailedSessionUsage = NonNullable<Awaited<ReturnType<typeof getSessionUsageFromBilling>>>;
+
+function failedSessionTokenCount(usage: FailedSessionUsage): number {
+  return usage.totalTokensIn + usage.totalTokensOut;
+}
+
+function canRetryFailedSessionUsage(usage: FailedSessionUsage): boolean {
+  return (
+    usage.totalCostMusd < MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY ||
+    failedSessionTokenCount(usage) < MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY
+  );
+}
+
+async function shouldSkipAutoRetryForFailedSessionUsage(params: {
   reviewId: string;
   failedAttemptId: string;
   failedCliSessionId?: string | null;
@@ -313,11 +327,11 @@ async function shouldSkipAutoRetryForFailedSessionTokenUsage(params: {
       cliSessionId: params.failedCliSessionId,
       reason: 'usage_unavailable',
     });
-    return false;
+    return true;
   }
 
-  const failedSessionTokens = usage.totalTokensIn + usage.totalTokensOut;
-  if (failedSessionTokens <= MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY) {
+  const failedSessionTokens = failedSessionTokenCount(usage);
+  if (canRetryFailedSessionUsage(usage)) {
     return false;
   }
 
@@ -327,7 +341,9 @@ async function shouldSkipAutoRetryForFailedSessionTokenUsage(params: {
     cliSessionId: params.failedCliSessionId,
     totalTokensIn: usage.totalTokensIn,
     totalTokensOut: usage.totalTokensOut,
+    totalCostMusd: usage.totalCostMusd,
     failedSessionTokens,
+    maxFailedSessionCostMusdForAutoRetry: MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY,
     maxFailedSessionTokensForAutoRetry: MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY,
   });
   return true;
@@ -949,14 +965,14 @@ export async function POST(
       }
 
       const failedCliSessionId = attempt.cli_session_id ?? cliSessionId ?? review.cli_session_id;
-      const skipRetryForTokenUsage = await shouldSkipAutoRetryForFailedSessionTokenUsage({
+      const skipRetryForSessionUsage = await shouldSkipAutoRetryForFailedSessionUsage({
         reviewId,
         failedAttemptId: attempt.id,
         failedCliSessionId,
         reviewCreatedAt: review.created_at,
       });
 
-      if (!skipRetryForTokenUsage) {
+      if (!skipRetryForSessionUsage) {
         const retryAttemptResult = await createInfraRetryAttemptIfMissing({
           codeReviewId: reviewId,
           retryOfAttemptId: attempt.id,

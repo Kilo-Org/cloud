@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useClawAgentMutations } from '../hooks/useClawHooks';
+import { isAmbiguousAgentMutationError, useClawAgentMutations } from '../hooks/useClawHooks';
 import { useClawModelOptions } from '../hooks/useClawModelOptions';
 import { addKilocodeModelPrefix } from './modelSupport';
 
@@ -92,10 +92,11 @@ export function AgentCreateDialog({
       onOpenChange(false);
     } catch (err) {
       // Create can time out at the gateway after the controller already made the
-      // agent (fire-and-forget). Reconcile against a fresh list — but only if the
-      // id did NOT already exist before submit, so a name conflict / reserved
-      // `main` (where the agent pre-exists) is still reported as the real error.
-      if (!existingIds.includes(expectedId)) {
+      // agent (fire-and-forget). Reconcile only for ambiguous (timeout/internal)
+      // failures, and only if the id didn't already exist before submit — so a
+      // deterministic conflict (`agent_exists`, even one a concurrent writer
+      // caused) or reserved `main` is reported as the real error, never success.
+      if (isAmbiguousAgentMutationError(err) && !existingIds.includes(expectedId)) {
         try {
           const list = await refetchAgents();
           if (list.agents.some(a => a.id === expectedId)) {

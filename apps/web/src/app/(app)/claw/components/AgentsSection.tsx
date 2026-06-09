@@ -12,7 +12,11 @@ import type {
   AgentSummary,
 } from '@/lib/kiloclaw/types';
 
-import { useClawAgentMutations, useClawAgents } from '../hooks/useClawHooks';
+import {
+  isAmbiguousAgentMutationError,
+  useClawAgentMutations,
+  useClawAgents,
+} from '../hooks/useClawHooks';
 import { AgentBindingsDialog } from './AgentBindingsDialog';
 import { AgentCreateDialog } from './AgentCreateDialog';
 import { AgentEditDialog } from './AgentEditDialog';
@@ -214,16 +218,19 @@ export function AgentsSection({
       setDeleteTarget(null);
     } catch (err) {
       // Delete can time out at the gateway after the controller already removed
-      // the agent (fire-and-forget). Reconcile before showing an error.
-      try {
-        const list = await refetchAgents();
-        if (!list.agents.some(a => a.id === id)) {
-          toast.success(`Deleted ${label}`);
-          setDeleteTarget(null);
-          return;
+      // the agent (fire-and-forget). Reconcile only ambiguous (timeout/internal)
+      // failures; a deterministic typed error surfaces as-is.
+      if (isAmbiguousAgentMutationError(err)) {
+        try {
+          const list = await refetchAgents();
+          if (!list.agents.some(a => a.id === id)) {
+            toast.success(`Deleted ${label}`);
+            setDeleteTarget(null);
+            return;
+          }
+        } catch {
+          // fall through to the original error
         }
-      } catch {
-        // fall through to the original error
       }
       toast.error(err instanceof Error ? err.message : 'Failed to delete agent', {
         duration: 10000,

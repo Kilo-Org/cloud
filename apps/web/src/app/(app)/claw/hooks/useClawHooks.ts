@@ -10,6 +10,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
 import { useCallback } from 'react';
 
 import { useTRPC } from '@/lib/trpc/utils';
@@ -131,6 +132,22 @@ export function useClawAgents(enabled = true) {
  * success and reconcile errors via `refetchAgents` in their own handlers (so the
  * list isn't fetched twice on a failed create/delete).
  */
+/**
+ * Whether an agent-mutation error is worth reconciling by refetching: an
+ * ambiguous transport/internal failure (e.g. a gateway timeout that may have
+ * still applied server-side). Deterministic typed failures — `agent_exists`,
+ * `reserved_agent_id`, conflicts, etc. (any non-500 tRPC code) — are NOT
+ * reconciled, so we never convert a real conflict into a false success.
+ */
+export function isAmbiguousAgentMutationError(err: unknown): boolean {
+  if (err instanceof TRPCClientError) {
+    const code = err.data?.code;
+    return code === 'INTERNAL_SERVER_ERROR' || code === 'TIMEOUT';
+  }
+  // Non-tRPC (e.g. raw network) errors: treat as ambiguous.
+  return true;
+}
+
 export function useClawAgentMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

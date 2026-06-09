@@ -117,7 +117,7 @@ export function getAnthropicProviderOptionsForVercel(
 }
 
 export function getVercelInferenceProviderConfigForUserByok(
-  provider: BYOKResult
+  provider: Pick<BYOKResult, 'decryptedAPIKey' | 'providerId'>
 ): [VercelUserByokInferenceProviderId, VercelInferenceProviderConfig[]] {
   const key =
     provider.providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral

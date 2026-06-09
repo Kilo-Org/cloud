@@ -182,6 +182,7 @@ function generateRandomRecord(
     generation_time: maybeNull(Math.random() * 3000, 30),
     is_byok: maybeNull(Math.random() < 0.1, 20),
     is_user_byok: Math.random() < 0.05,
+    user_byok_key_id: null,
     streamed: maybeNull(Math.random() < 0.8, 10),
     cancelled: maybeNull(Math.random() < 0.05, 50),
     editor_name: maybeNull(pickRandom(['vscode', 'cursor', 'windsurf', 'vim'], Math.random()), 30),

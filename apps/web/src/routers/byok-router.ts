@@ -418,6 +418,7 @@ export const byokRouter = createTRPCRouter({
 
       const [existingKey] = await db
         .select({
+          id: byok_api_keys.id,
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,

@@ -61,6 +61,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     api_kind: 'chat_completions',
     machine_id: null,
     is_user_byok: false,
+    user_byok_key_candidates: [],
     has_tools: false,
     feature: null,
     session_id: null,

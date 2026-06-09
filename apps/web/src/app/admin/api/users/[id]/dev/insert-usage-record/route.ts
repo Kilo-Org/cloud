@@ -85,6 +85,7 @@ export async function POST(
     generation_time: null,
     is_byok: false,
     is_user_byok: false,
+    user_byok_key_id: null,
     streamed: false,
     cancelled: false,
     editor_name: null,

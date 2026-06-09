@@ -1939,6 +1939,36 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores unknown DB terminal reasons when DB is already terminal', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({
+          success: true,
+          message: 'Review already in terminal state',
+          currentStatus: 'cancelled',
+          terminalReason: 'future_terminal_reason',
+        });
+      }
+      return new Response('cloud-agent should not be called', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    const status = await stub.status();
+    expect(status.status).toBe('cancelled');
+    expect(status.terminalReason).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('terminal cleanup alarm still deletes storage', async () => {
     const stub = getReviewStub();
 

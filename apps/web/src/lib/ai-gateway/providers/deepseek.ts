@@ -16,7 +16,7 @@ const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1048576,
   max_completion_tokens: 384000,
-  gateway: 'vercel', // openrouter seems to be affected by: https://kilo-code.slack.com/archives/C08P0HYC9S4/p1779874852296019
+  gateway: 'vercel', // vercel seems to be less overloaded than openrouter
   flags: ['reasoning', 'vision', 'requires-data-collection'],
   pricing: {
     prompt_per_million: 0.435,

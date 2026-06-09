@@ -5,18 +5,18 @@ import test from 'node:test';
 import { getAlwaysOnGroupIds, getService, resolveGroups } from './services';
 
 test('starts auto model classifier as a core dev service', () => {
-  const service = getService('cloudflare-auto-model-classifier');
+  const service = getService('auto-model-classifier');
 
   assert.equal(service.group, 'core');
   assert.equal(service.type, 'worker');
   assert.equal(service.dir, 'services/auto-model-classifier');
   assert.equal(service.port, 8810);
   assert.match(service.command.join(' '), /pnpm run dev/);
-  assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('cloudflare-auto-model-classifier'));
+  assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('auto-model-classifier'));
 });
 
 test('keeps auto model classifier package dev script compatible with local launcher flags', () => {
-  const service = getService('cloudflare-auto-model-classifier');
+  const service = getService('auto-model-classifier');
   const packageJson = JSON.parse(fs.readFileSync(`${service.dir}/package.json`, 'utf-8')) as {
     scripts?: { dev?: string };
   };
@@ -30,7 +30,7 @@ test('keeps auto model classifier package dev script compatible with local launc
 });
 
 test('preserves auto model classifier backend auth secret name', () => {
-  const service = getService('cloudflare-auto-model-classifier');
+  const service = getService('auto-model-classifier');
   const wranglerConfig = fs.readFileSync(`${service.dir}/wrangler.jsonc`, 'utf-8');
 
   assert.match(wranglerConfig, /"binding": "INTERNAL_API_SECRET_PROD"/);

@@ -40,6 +40,13 @@ type VerboseOpt = typeof INHERIT | (typeof VERBOSE_OPTIONS)[number];
 type ReasoningOpt = typeof INHERIT | (typeof REASONING_OPTIONS)[number];
 type FastModeOpt = typeof INHERIT | 'on' | 'off';
 
+// Map a controller-reported setting value (string | null) to a select option,
+// matching against the known options rather than casting; anything unrecognized
+// (including null) falls back to INHERIT.
+function toOption<T extends string>(raw: string | null, options: readonly T[]): typeof INHERIT | T {
+  return options.find(opt => opt === raw) ?? INHERIT;
+}
+
 // The agent's OWN model (not the inherited/effective one): primary + fallbacks.
 function ownModel(agent: AgentSummary): { primary: string; fallbacks: string[] } {
   const raw = agent.rawModel;
@@ -61,10 +68,19 @@ function LabeledSelect<T extends string>({
   options: readonly T[];
   onChange: (value: T) => void;
 }) {
+  // Radix's onValueChange hands back a plain string. Narrow it to a known value
+  // (INHERIT, which is always rendered, or one of the options) before calling
+  // onChange instead of casting, so an unexpected value can't reach the patch.
+  const isValue = (v: string): v is T => v === INHERIT || options.some(opt => opt === v);
   return (
     <div className="flex flex-col gap-1.5">
       <Label>{label}</Label>
-      <Select value={value} onValueChange={v => onChange(v as T)}>
+      <Select
+        value={value}
+        onValueChange={v => {
+          if (isValue(v)) onChange(v);
+        }}
+      >
         <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
@@ -102,13 +118,13 @@ export function AgentEditDialog({
   const [inheritModel, setInheritModel] = useState(!hadOwnModel);
   const [primary, setPrimary] = useState(initial.primary);
   const [thinking, setThinking] = useState<ThinkingOpt>(
-    (agent.settings.thinkingDefault as ThinkingOpt | null) ?? INHERIT
+    toOption(agent.settings.thinkingDefault, THINKING_OPTIONS)
   );
   const [verbose, setVerbose] = useState<VerboseOpt>(
-    (agent.settings.verboseDefault as VerboseOpt | null) ?? INHERIT
+    toOption(agent.settings.verboseDefault, VERBOSE_OPTIONS)
   );
   const [reasoning, setReasoning] = useState<ReasoningOpt>(
-    (agent.settings.reasoningDefault as ReasoningOpt | null) ?? INHERIT
+    toOption(agent.settings.reasoningDefault, REASONING_OPTIONS)
   );
   const [fastMode, setFastMode] = useState<FastModeOpt>(
     agent.settings.fastModeDefault === null

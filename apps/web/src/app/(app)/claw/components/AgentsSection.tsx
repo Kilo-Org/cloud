@@ -68,6 +68,9 @@ function AgentRow({
   const settings = settingChips(agent.settings);
   // `main` is reserved and cannot be deleted (controller rejects it).
   const deletable = canDelete && agent.id !== 'main';
+  // Binding edits target agents in agents.list; the implicit (unconfigured) main
+  // is rejected with agent_not_found, so don't offer the channels action for it.
+  const showChannels = canBindings && agent.configured;
 
   return (
     <div className="px-4 py-3">
@@ -81,9 +84,9 @@ function AgentRow({
             </Badge>
           )}
         </div>
-        {(canUpdate || canBindings || deletable) && (
+        {(canUpdate || showChannels || deletable) && (
           <div className="flex shrink-0 items-center gap-1">
-            {canBindings && (
+            {showChannels && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -278,7 +281,13 @@ export function AgentsSection({
 
       {/* Mounted only while open so its model-catalog/version queries don't run
           on every page visit (incl. read-only and stopped-machine states). */}
-      {createOpen && <AgentCreateDialog open onOpenChange={setCreateOpen} />}
+      {createOpen && (
+        <AgentCreateDialog
+          open
+          onOpenChange={setCreateOpen}
+          existingIds={data?.agents.map(a => a.id) ?? []}
+        />
+      )}
 
       {editTarget && (
         <AgentEditDialog

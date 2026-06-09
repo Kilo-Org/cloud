@@ -125,11 +125,11 @@ export function useClawAgents(enabled = true) {
  * Agent lifecycle mutations (create / update / delete / bindings), context-aware.
  * Callers pass the base input; the org variant injects organizationId.
  *
- * Invalidation runs on **settled** (success OR error), not just success: an
- * agent mutation can time out at the edge gateway after the controller already
- * applied it (fire-and-forget), so the list must refetch even on error or a
- * created/edited agent stays invisible. `refetchAgents` force-fetches the list
- * so callers can reconcile (did the op actually land despite a timeout?).
+ * Because an agent mutation can time out at the edge gateway AFTER the
+ * controller already applied it (fire-and-forget), the list must refresh even on
+ * error. update/bindings invalidate on settled; create/delete invalidate on
+ * success and reconcile errors via `refetchAgents` in their own handlers (so the
+ * list isn't fetched twice on a failed create/delete).
  */
 export function useClawAgentMutations() {
   const trpc = useTRPC();
@@ -144,16 +144,30 @@ export function useClawAgentMutations() {
   const refetchAgents = (): Promise<AgentConfigListResponse> =>
     queryClient.fetchQuery({ ...listOptions, staleTime: 0 });
 
-  const opts = { onSettled: invalidateAgents };
-  const personalCreate = useMutation(trpc.kiloclaw.createAgent.mutationOptions(opts));
-  const orgCreate = useMutation(trpc.organizations.kiloclaw.createAgent.mutationOptions(opts));
-  const personalUpdate = useMutation(trpc.kiloclaw.updateAgent.mutationOptions(opts));
-  const orgUpdate = useMutation(trpc.organizations.kiloclaw.updateAgent.mutationOptions(opts));
-  const personalDelete = useMutation(trpc.kiloclaw.deleteAgent.mutationOptions(opts));
-  const orgDelete = useMutation(trpc.organizations.kiloclaw.deleteAgent.mutationOptions(opts));
-  const personalBindings = useMutation(trpc.kiloclaw.updateAgentBindings.mutationOptions(opts));
+  // create/delete reconcile explicitly in their own catch handlers (they refetch
+  // to resolve ambiguous timeouts), so they only need success-path invalidation —
+  // avoids a redundant second list fetch on failure.
+  const successOpts = { onSuccess: invalidateAgents };
+  // update/bindings have no reconcile handler, so refresh on settled (success OR
+  // error) to surface a change that a gateway timeout still applied server-side.
+  const settledOpts = { onSettled: invalidateAgents };
+  const personalCreate = useMutation(trpc.kiloclaw.createAgent.mutationOptions(successOpts));
+  const orgCreate = useMutation(
+    trpc.organizations.kiloclaw.createAgent.mutationOptions(successOpts)
+  );
+  const personalUpdate = useMutation(trpc.kiloclaw.updateAgent.mutationOptions(settledOpts));
+  const orgUpdate = useMutation(
+    trpc.organizations.kiloclaw.updateAgent.mutationOptions(settledOpts)
+  );
+  const personalDelete = useMutation(trpc.kiloclaw.deleteAgent.mutationOptions(successOpts));
+  const orgDelete = useMutation(
+    trpc.organizations.kiloclaw.deleteAgent.mutationOptions(successOpts)
+  );
+  const personalBindings = useMutation(
+    trpc.kiloclaw.updateAgentBindings.mutationOptions(settledOpts)
+  );
   const orgBindings = useMutation(
-    trpc.organizations.kiloclaw.updateAgentBindings.mutationOptions(opts)
+    trpc.organizations.kiloclaw.updateAgentBindings.mutationOptions(settledOpts)
   );
 
   return {

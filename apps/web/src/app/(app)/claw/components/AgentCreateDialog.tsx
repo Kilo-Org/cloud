@@ -48,9 +48,13 @@ function workspaceFromName(name: string): string {
 export function AgentCreateDialog({
   open,
   onOpenChange,
+  existingIds,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Agent ids that exist BEFORE this create, so the timeout-reconcile can't
+  // mistake a pre-existing agent (name conflict, reserved `main`) for success.
+  existingIds: string[];
 }) {
   const { createAgent, refetchAgents } = useClawAgentMutations();
   const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
@@ -88,17 +92,21 @@ export function AgentCreateDialog({
       onOpenChange(false);
     } catch (err) {
       // Create can time out at the gateway after the controller already made the
-      // agent (fire-and-forget). Reconcile against a fresh list before erroring.
-      try {
-        const list = await refetchAgents();
-        if (list.agents.some(a => a.id === expectedId)) {
-          toast.success(`Created agent ${trimmedName} (took a moment)`);
-          reset();
-          onOpenChange(false);
-          return;
+      // agent (fire-and-forget). Reconcile against a fresh list — but only if the
+      // id did NOT already exist before submit, so a name conflict / reserved
+      // `main` (where the agent pre-exists) is still reported as the real error.
+      if (!existingIds.includes(expectedId)) {
+        try {
+          const list = await refetchAgents();
+          if (list.agents.some(a => a.id === expectedId)) {
+            toast.success(`Created agent ${trimmedName} (took a moment)`);
+            reset();
+            onOpenChange(false);
+            return;
+          }
+        } catch {
+          // fall through to the original error
         }
-      } catch {
-        // fall through to the original error
       }
       toast.error(err instanceof Error ? err.message : 'Failed to create agent', {
         duration: 10000,

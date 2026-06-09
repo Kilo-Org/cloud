@@ -232,9 +232,9 @@ function classifyCloudAgentNextFreshSessionRetry(
   if (!cloudAgentNextError) {
     return cloudAgentNextFreshRetryClassification(
       undefined,
-      true,
+      false,
       'not_cloud_agent_next_error',
-      'unexpected_non_billing_error_retryable_by_default'
+      'not_cloud_agent_next_error'
     );
   }
 

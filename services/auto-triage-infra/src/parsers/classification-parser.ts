@@ -99,13 +99,7 @@ const parseFromCodeBlock = (
   text: string,
   availableLabels: string[]
 ): ClassificationResult | null => {
-  const codeBlockRegex = /```(?:json|JSON)?\s*\r?\n([\s\S]*?)\r?\n\s*```/g;
-  const codeBlocks: string[] = [];
-  let match;
-
-  while ((match = codeBlockRegex.exec(text)) !== null) {
-    codeBlocks.push(match[1]);
-  }
+  const codeBlocks = extractCodeBlocks(text);
 
   // Try code blocks from last to first (most recent)
   for (let i = codeBlocks.length - 1; i >= 0; i--) {
@@ -119,8 +113,7 @@ const parseFromCodeBlock = (
   }
 
   // Fallback: direct tail search for the last code fence pair.
-  // The regex with lazy quantifier can miss the final block in very large texts
-  // with many ``` markers, so search backwards from the end instead.
+  // Search backwards from the end to recover from unmatched earlier fences.
   const lastFenceEnd = text.lastIndexOf('```');
   if (lastFenceEnd !== -1) {
     const searchStart = Math.max(0, lastFenceEnd - 10_000);
@@ -143,6 +136,57 @@ const parseFromCodeBlock = (
   }
 
   return null;
+};
+
+const extractCodeBlocks = (text: string): string[] => {
+  const codeBlocks: string[] = [];
+  let searchIndex = 0;
+
+  while (searchIndex < text.length) {
+    const openFenceIndex = text.indexOf('```', searchIndex);
+    if (openFenceIndex === -1) break;
+
+    const infoStartIndex = openFenceIndex + 3;
+    const contentStartIndex = text.indexOf('\n', infoStartIndex);
+    if (contentStartIndex === -1) break;
+
+    const fenceInfo = text.substring(infoStartIndex, contentStartIndex).trim();
+    if (fenceInfo !== '' && fenceInfo !== 'json' && fenceInfo !== 'JSON') {
+      searchIndex = contentStartIndex + 1;
+      continue;
+    }
+
+    const closeFenceLineIndex = findClosingFenceLine(text, contentStartIndex + 1);
+    if (closeFenceLineIndex === -1) {
+      searchIndex = contentStartIndex + 1;
+      continue;
+    }
+
+    codeBlocks.push(text.substring(contentStartIndex + 1, closeFenceLineIndex));
+    const closeFenceLineEndIndex = text.indexOf('\n', closeFenceLineIndex);
+    searchIndex = closeFenceLineEndIndex === -1 ? text.length : closeFenceLineEndIndex + 1;
+  }
+
+  return codeBlocks;
+};
+
+const findClosingFenceLine = (text: string, startIndex: number): number => {
+  let lineStartIndex = startIndex;
+
+  while (lineStartIndex < text.length) {
+    const lineEndIndex = text.indexOf('\n', lineStartIndex);
+    const line = text.substring(lineStartIndex, lineEndIndex === -1 ? text.length : lineEndIndex);
+    const leadingWhitespaceLength = line.length - line.trimStart().length;
+
+    if (line.startsWith('```', leadingWhitespaceLength)) {
+      return lineStartIndex;
+    }
+
+    if (lineEndIndex === -1) break;
+    lineStartIndex = lineEndIndex + 1;
+  }
+
+  return -1;
 };
 
 /**

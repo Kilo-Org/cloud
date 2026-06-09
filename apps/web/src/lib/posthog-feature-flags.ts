@@ -65,7 +65,7 @@ export async function isFeatureFlagEnabled(
     });
     return Boolean(isEnabled);
   } catch (error) {
-    console.error(`Error checking feature flag '${flagName}':`, error);
+    console.error("Error checking feature flag '%s':", flagName, error);
     captureException(error, {
       tags: { source: 'posthog_feature_flag_enabled' },
       extra: { flagName, distinctId },

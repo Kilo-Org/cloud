@@ -94,6 +94,8 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab *']).toBeUndefined();
     expect(bashPermissions['gh']).toBeUndefined();
     expect(bashPermissions['gh *']).toBeUndefined();
+    expect(bashPermissions['gh api']).toBeUndefined();
+    expect(bashPermissions['gh api *']).toBeUndefined();
 
     expect(bashPermissions['glab mr diff']).toBe('allow');
     expect(bashPermissions['glab mr diff *']).toBe('allow');
@@ -102,6 +104,12 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab api --method POST *merge_requests/*/discussions*']).toBe('allow');
 
     expect(bashPermissions['gh pr diff']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/reviews']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/reviews *']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/comments']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/comments *']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/*/comments']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/*/comments *']).toBe('allow');
     expect(bashPermissions['gh api repos/*/issues/*/comments --input*']).toBe('allow');
     expect(bashPermissions['gh api repos/*/issues/comments/* -X PATCH*']).toBe('allow');
     expect(bashPermissions['gh api repos/*/pulls/*/reviews --input*']).toBe('allow');

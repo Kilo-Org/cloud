@@ -258,15 +258,6 @@ function classifyCloudAgentNextFreshSessionRetry(
     return cloudAgentNextFreshRetryClassification(cloudAgentNextError, false, 'non_5xx', 'non_5xx');
   }
 
-  if (/\b(cancelled|canceled)\b/i.test(cloudAgentNextError.body)) {
-    return cloudAgentNextFreshRetryClassification(
-      cloudAgentNextError,
-      false,
-      'cancelled',
-      'cancelled_protected'
-    );
-  }
-
   const body = cloudAgentNextError.body.toLowerCase();
   if (isWorkspaceAdmissionCapacityFailure(body)) {
     return cloudAgentNextFreshRetryClassification(

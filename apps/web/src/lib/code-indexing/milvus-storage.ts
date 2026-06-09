@@ -151,9 +151,9 @@ export class MilvusIndexStorage {
 
     // Prepare data for Milvus upsert
     const data = chunks.map((chunk, index) => {
-      // Generate deterministic ID using MD5 hash of organization_id + file_path + text + branch
+      // Generate deterministic ID using SHA-256 hash of organization_id + file_path + text + branch
       const idString = `${chunk.organizationId}|${chunk.projectId}|${chunk.filePath}|${chunk.text}|${chunk.gitBranch}`;
-      const id = createHash('md5').update(idString).digest('hex');
+      const id = createHash('sha256').update(idString).digest('hex');
 
       return {
         id,

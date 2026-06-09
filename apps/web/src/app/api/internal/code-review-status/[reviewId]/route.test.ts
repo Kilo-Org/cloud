@@ -1208,7 +1208,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     });
 
     it.each([
-      'prepareSession failed (400): {"error":{"message":"[\n  {\n    \"origin\": \"string\",\n    \"code\": \"invalid_format\",\n    \"format\": \"regex\"\n  }\n]","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}',
+      'prepareSession failed (400): {"error":{"message":"[\n  {\n    "origin": "string",\n    "code": "invalid_format",\n    "format": "regex"\n  }\n]","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}',
       'prepareSession failed (500): {"error":{"message":"Unexpected prepareSession server failure","code":-32603,"data":{"code":"INTERNAL_SERVER_ERROR","httpStatus":500,"path":"prepareSession"}}}',
       'Wrapper cleanup is required before delivery can launch',
       "ENOENT: no such file or directory, posix_spawn 'git'",

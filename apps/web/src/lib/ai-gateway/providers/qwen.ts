@@ -105,7 +105,7 @@ export const qwen37_plus_model: KiloExclusiveModel = {
         },
       },
       {
-        start_context_length: TOKENS_256K + 1,
+        start_context_length: TOKENS_256K,
         pricing: {
           prompt_per_million: 1.2,
           completion_per_million: 4.8,
@@ -143,7 +143,7 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
         },
       },
       {
-        start_context_length: TOKENS_256K + 1,
+        start_context_length: TOKENS_256K,
         pricing: {
           prompt_per_million: 2,
           completion_per_million: 6,

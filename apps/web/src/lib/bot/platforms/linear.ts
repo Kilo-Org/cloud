@@ -1,6 +1,7 @@
 import { createLinearLinkToken } from '@/lib/bot/linear-link-token';
 import { sanitizeForDelimiters, truncate } from '@/lib/bot/platforms/shared';
 import type { BotPlatform, RequesterInfo } from '@/lib/bot/platforms/types';
+import { startSdkTypingIndicator } from '@/lib/bot/platforms/typing';
 import { BOT_CONTEXT_MESSAGE_LIMIT } from '@/lib/bot/constants';
 import { APP_URL } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -178,6 +179,8 @@ export function createLinearBotPlatform(linearAdapter: LinearAdapter): BotPlatfo
     },
 
     canHandleMessage: () => true,
+
+    startTyping: startSdkTypingIndicator,
 
     async promptLinkAccount({ thread, identity, platformIntegration }) {
       const url = new URL(LINEAR_LINK_PATH, APP_URL);

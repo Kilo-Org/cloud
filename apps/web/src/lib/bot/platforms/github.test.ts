@@ -162,6 +162,48 @@ describe('createGitHubBotPlatform.isEnabledForBot', () => {
   });
 });
 
+describe('createGitHubBotPlatform.startTyping', () => {
+  it('adds GitHub reactions for start and completion', async () => {
+    const addReaction = jest.fn();
+    const thread = {
+      id: 'github:Kilo-Org/on-call:issue:37',
+      adapter: { name: 'github', addReaction },
+    } as unknown as Thread;
+
+    const indicator = await githubPlatform.startTyping({
+      thread,
+      messageId: '101',
+      status: 'Thinking...',
+    });
+    await indicator.complete();
+
+    expect(addReaction).toHaveBeenNthCalledWith(
+      1,
+      'github:Kilo-Org/on-call:issue:37',
+      '101',
+      'eyes'
+    );
+    expect(addReaction).toHaveBeenNthCalledWith(2, 'github:Kilo-Org/on-call:issue:37', '101', '+1');
+  });
+
+  it('does not fail the bot when GitHub reactions fail', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const addReaction = jest.fn().mockRejectedValue(new Error('reaction failed'));
+    const thread = {
+      id: 'github:Kilo-Org/on-call:issue:37',
+      adapter: { name: 'github', addReaction },
+    } as unknown as Thread;
+
+    const indicator = await githubPlatform.startTyping({ thread, messageId: '101' });
+    await indicator.complete();
+
+    expect(addReaction).toHaveBeenCalledTimes(2);
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+
+    warnSpy.mockRestore();
+  });
+});
+
 describe('getGitHubRepositoryReference', () => {
   it('uses GitHub webhook repository metadata when available', () => {
     const reference = getGitHubRepositoryReference(

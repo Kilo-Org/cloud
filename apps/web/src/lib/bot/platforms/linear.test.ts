@@ -220,6 +220,22 @@ describe('createLinearBotPlatform.isEnabledForBot', () => {
   });
 });
 
+describe('createLinearBotPlatform.startTyping', () => {
+  it('falls back to the Chat SDK typing indicator', async () => {
+    const startTyping = jest.fn(async () => undefined);
+    const thread = {
+      id: 'linear:iss-1',
+      adapter: { name: 'linear' },
+      startTyping,
+    } as unknown as Thread;
+
+    const indicator = await linearPlatform.startTyping({ thread, status: 'Thinking...' });
+    await indicator.complete();
+
+    expect(startTyping).toHaveBeenCalledWith('Thinking...');
+  });
+});
+
 describe('createLinearBotPlatform.getRequesterInfo', () => {
   it('surfaces the Linear comment URL as the messageLink', async () => {
     const info = await linearPlatform.getRequesterInfo({

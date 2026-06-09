@@ -11,6 +11,7 @@ import type {
   Thread,
 } from 'chat';
 import type { ContextTriggerMessage } from './shared';
+import type { BotStartTypingParams, BotTypingIndicator } from './typing';
 
 export type RequesterInfo = {
   displayName: string;
@@ -34,6 +35,7 @@ export type BotPlatform = {
     message: Message;
     platformIntegration: PlatformIntegration;
   }): Promise<boolean> | boolean;
+  startTyping(params: BotStartTypingParams): Promise<BotTypingIndicator>;
   promptLinkAccount(params: {
     thread: Thread;
     message: Message;

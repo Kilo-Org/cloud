@@ -26,7 +26,7 @@ import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { runBotAgent, type BotAgentMessageLike } from '@/lib/bot/agent-runner';
 import { botPlatforms } from '@/lib/bot/platforms';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
-import { startTyping, type BotTypingIndicator } from '@/lib/bot/typing';
+import type { BotTypingIndicator } from '@/lib/bot/platforms/typing';
 import { findUserById } from '@/lib/user';
 import type { Thread } from 'chat';
 
@@ -174,10 +174,12 @@ async function startBotThreadTyping(params: {
   thread: Thread;
   platformIntegration: PlatformIntegration;
 }): Promise<BotTypingIndicator> {
-  return await botPlatforms.require(params.platformIntegration.platform).withAuthContext({
+  const botPlatform = botPlatforms.require(params.platformIntegration.platform);
+  return await botPlatform.withAuthContext({
     platformIntegration: params.platformIntegration,
     fn: async () =>
-      await startTyping(params.thread, {
+      await botPlatform.startTyping({
+        thread: params.thread,
         messageId: params.messageId,
         status: 'Processing Cloud Agent result...',
       }),

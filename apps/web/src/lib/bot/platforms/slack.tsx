@@ -11,6 +11,7 @@ import {
   truncate,
 } from '@/lib/bot/platforms/shared';
 import type { BotPlatform, RequesterInfo } from '@/lib/bot/platforms/types';
+import { startSdkTypingIndicator } from '@/lib/bot/platforms/typing';
 import { BOT_CONTEXT_MESSAGE_LIMIT } from '@/lib/bot/constants';
 import { APP_URL } from '@/lib/constants';
 import { getAccessTokenFromInstallation } from '@/lib/integrations/slack-service';
@@ -256,6 +257,7 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
     },
     isEnabledForBot: () => true,
     canHandleMessage: () => true,
+    startTyping: startSdkTypingIndicator,
     async promptLinkAccount({ thread, message, identity, state }) {
       const { thread_ts, ts } = (message as Message<SlackEvent>).raw;
       const isChannelLevel = !thread_ts || thread_ts === ts;

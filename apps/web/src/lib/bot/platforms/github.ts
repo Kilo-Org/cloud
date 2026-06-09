@@ -7,6 +7,7 @@ import {
   truncate,
 } from '@/lib/bot/platforms/shared';
 import type { BotPlatform } from '@/lib/bot/platforms/types';
+import { noopBotTypingIndicator, type BotTypingIndicator } from '@/lib/bot/platforms/typing';
 import { APP_URL } from '@/lib/constants';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -20,6 +21,8 @@ type GitHubInstallationLookup = Pick<GitHubAdapter, 'getInstallationId'>;
 const GITHUB_LINK_PATH = '/github/link';
 const MAX_GITHUB_BODY_LENGTH = 4000;
 const MAX_GITHUB_COMMENT_LENGTH = 1200;
+const GITHUB_PROCESSING_REACTION = 'eyes';
+const GITHUB_COMPLETE_REACTION = '+1';
 
 type GitHubRepositoryReference = {
   id: number | null;
@@ -272,6 +275,24 @@ function isGitHubBotEnabledForIntegration(integration: PlatformIntegration): boo
   return metadata?.bot_enabled === true;
 }
 
+async function addGitHubProgressReaction(params: {
+  messageId: string;
+  reaction: string;
+  stage: 'start' | 'complete';
+  thread: Thread;
+}): Promise<void> {
+  try {
+    await params.thread.adapter.addReaction(params.thread.id, params.messageId, params.reaction);
+  } catch (error) {
+    console.warn('[KiloBot] Failed to update GitHub bot progress reaction:', {
+      error,
+      messageId: params.messageId,
+      stage: params.stage,
+      threadId: params.thread.id,
+    });
+  }
+}
+
 export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup): BotPlatform {
   return {
     platform: PLATFORM.GITHUB,
@@ -297,6 +318,28 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
         platformIntegration,
         getGitHubRepositoryReference(thread, message)
       );
+    },
+    async startTyping({ thread, message, messageId }): Promise<BotTypingIndicator> {
+      const targetMessageId = messageId ?? message?.id;
+      if (!targetMessageId) return noopBotTypingIndicator;
+
+      await addGitHubProgressReaction({
+        thread,
+        messageId: targetMessageId,
+        reaction: GITHUB_PROCESSING_REACTION,
+        stage: 'start',
+      });
+
+      return {
+        complete: async () => {
+          await addGitHubProgressReaction({
+            thread,
+            messageId: targetMessageId,
+            reaction: GITHUB_COMPLETE_REACTION,
+            stage: 'complete',
+          });
+        },
+      };
     },
     async promptLinkAccount({ thread, identity, platformIntegration }) {
       const url = new URL(GITHUB_LINK_PATH, APP_URL);

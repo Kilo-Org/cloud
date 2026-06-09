@@ -123,6 +123,26 @@ async function storedReview(stub: DurableObjectStub<CodeReviewOrchestrator>) {
   );
 }
 
+async function storedAlarm(stub: DurableObjectStub<CodeReviewOrchestrator>) {
+  return runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) =>
+    state.storage.getAlarm()
+  );
+}
+
+async function expectAutoRetryScheduled(stub: DurableObjectStub<CodeReviewOrchestrator>) {
+  await expect(storedReview(stub)).resolves.toMatchObject({
+    status: 'queued',
+    sandboxRetryAttempted: true,
+  });
+
+  const alarm = await storedAlarm(stub);
+  expect(alarm).toEqual(expect.any(Number));
+  if (alarm === null) {
+    throw new Error('Expected auto-retry alarm to be scheduled');
+  }
+  expect(alarm).toBeGreaterThan(Date.now() + 45_000);
+}
+
 describe('CodeReviewOrchestrator recovery', () => {
   const originalFetch = globalThis.fetch;
 
@@ -430,12 +450,31 @@ describe('CodeReviewOrchestrator recovery', () => {
 
     const oldStatus = await failedStub.status();
     expect(oldStatus).toMatchObject({ reviewId, attemptId: failedAttemptId, status: 'running' });
+    await expect(storedReview(failedStub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
 
     const retryStub = getReviewStub(`${reviewId}:${retryAttemptId}`);
     await expect(retryStub.status()).resolves.toMatchObject({
       reviewId,
       attemptId: retryAttemptId,
+      status: 'queued',
+    });
+    const retryAlarm = await storedAlarm(retryStub);
+    expect(retryAlarm).toEqual(expect.any(Number));
+    if (retryAlarm === null) {
+      throw new Error('Expected retry attempt alarm to be scheduled');
+    }
+    expect(retryAlarm).toBeGreaterThan(Date.now() + 45_000);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+
+    const ranRetry = await runDurableObjectAlarm(retryStub);
+    expect(ranRetry).toBe(true);
+    await expect(retryStub.status()).resolves.toMatchObject({
+      reviewId,
+      attemptId: retryAttemptId,
       status: 'running',
+      sessionId: 'agent-retry-fresh',
+      cliSessionId: 'ses_retry_fresh',
     });
   });
 
@@ -565,6 +604,13 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expectAutoRetryScheduled(stub);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
     const status = await stub.status();
     expect(status).toMatchObject({
       status: 'running',
@@ -631,6 +677,13 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expectAutoRetryScheduled(stub);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
     const status = await stub.status();
     expect(status).toMatchObject({
       status: 'running',
@@ -694,6 +747,13 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expectAutoRetryScheduled(stub);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
       status: 'running',
       sessionId: 'agent-workspace-prose-retry',
@@ -745,6 +805,13 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expectAutoRetryScheduled(stub);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
       status: 'running',
       sessionId: 'agent-wrapper-timeout-retry',
@@ -791,6 +858,13 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expectAutoRetryScheduled(stub);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
       status: 'running',
       sessionId: 'agent-kilo-startup-retry',
@@ -837,6 +911,13 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expectAutoRetryScheduled(stub);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
       status: 'running',
       sessionId: 'agent-wrapper-version-retry',
@@ -869,6 +950,13 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expectAutoRetryScheduled(stub);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
       status: 'failed',
       terminalReason: 'sandbox_error',
@@ -1518,6 +1606,16 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expectAutoRetryScheduled(stub);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
       status: 'running',
       sessionId: 'agent-fresh-after-sandbox-500',
@@ -1579,6 +1677,14 @@ describe('CodeReviewOrchestrator recovery', () => {
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    await expectAutoRetryScheduled(stub);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({
       status: 'failed',
       terminalReason: 'sandbox_error',

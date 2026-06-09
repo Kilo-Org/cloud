@@ -364,6 +364,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   /** Fallback alarm for queued reviews accepted by the Worker but not run via waitUntil. */
   private static readonly RUN_REVIEW_FALLBACK_DELAY_MS = 30_000;
 
+  /** Delay before automatic infra retries start a fresh cloud-agent-next session. */
+  private static readonly AUTO_RETRY_DELAY_MS = 60_000;
+
   /** Batch size for event persistence (save every N events to reduce CPU usage) */
   private static readonly EVENT_BATCH_SIZE = 10;
 
@@ -458,9 +461,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     this.state.status = 'queued';
     this.state.updatedAt = new Date().toISOString();
     await this.saveState();
+    await this.ctx.storage.setAlarm(Date.now() + CodeReviewOrchestrator.AUTO_RETRY_DELAY_MS);
 
     console.warn(
-      '[CodeReviewOrchestrator] Retrying with a fresh session after retryable cloud-agent-next failure',
+      '[CodeReviewOrchestrator] Scheduled fresh-session retry after retryable cloud-agent-next failure',
       {
         reviewId: this.state.reviewId,
         source,
@@ -470,13 +474,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         previousCliSessionId,
         previousSandboxId,
         sandboxRetryAttempted: true,
-        retryOutcome: 'attempted',
+        retryOutcome: 'scheduled',
+        retryDelayMs: CodeReviewOrchestrator.AUTO_RETRY_DELAY_MS,
         ...classification,
       }
-    );
-
-    await this.runFreshCloudAgentNextFallback(
-      previousCloudAgentSessionId ?? previousSessionId ?? 'unknown'
     );
 
     return true;
@@ -524,7 +525,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         });
         await this.ctx.storage.deleteAll();
       } else if (this.state.status === 'queued') {
-        console.log('[CodeReviewOrchestrator] Fallback alarm starting queued review', {
+        console.log('[CodeReviewOrchestrator] Queued review alarm starting review', {
           reviewId: this.state.reviewId,
         });
         await this.runReview();
@@ -883,6 +884,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     skipBalanceCheck?: boolean;
     agentVersion?: string;
     previousCloudAgentSessionId?: string;
+    runReviewDelayMs?: number;
   }): Promise<{ status: CodeReviewStatus }> {
     if (!this.state) {
       await this.loadState();
@@ -910,9 +912,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       previousCloudAgentSessionId: params.previousCloudAgentSessionId,
     };
     await this.saveState();
-    await this.ctx.storage.setAlarm(
-      Date.now() + CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS
-    );
+    const runReviewDelayMs =
+      params.runReviewDelayMs ?? CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS;
+    await this.ctx.storage.setAlarm(Date.now() + runReviewDelayMs);
 
     console.log('[CodeReviewOrchestrator] Review created and queued', {
       reviewId: params.reviewId,
@@ -922,7 +924,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     console.log('[CodeReviewOrchestrator] Scheduled queued review fallback alarm', {
       reviewId: params.reviewId,
-      fallbackInMs: CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS,
+      fallbackInMs: runReviewDelayMs,
     });
 
     return { status: this.state.status };
@@ -1017,6 +1019,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: this.state.skipBalanceCheck,
       agentVersion: this.state.agentVersion,
       previousCloudAgentSessionId: undefined,
+      runReviewDelayMs: CodeReviewOrchestrator.AUTO_RETRY_DELAY_MS,
     });
 
     console.warn(
@@ -1027,6 +1030,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         retryAttemptId: params.retryAttemptId,
         reason: params.reason,
         status: started.status,
+        retryDelayMs: CodeReviewOrchestrator.AUTO_RETRY_DELAY_MS,
       }
     );
 
@@ -1127,7 +1131,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   /**
    * RPC method: Run the review.
-   * Called via HTTP context (not alarm) to avoid 15-minute wall time limit.
+   * Called via HTTP context or alarm to start queued work.
    */
   async runReview(): Promise<void> {
     await this.loadState();

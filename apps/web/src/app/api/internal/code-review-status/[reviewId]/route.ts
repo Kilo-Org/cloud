@@ -979,7 +979,7 @@ export async function POST(
             });
 
             if (retryResult.success) {
-              logExceptInTest('[code-review-status] Started fresh retry after infra failure', {
+              logExceptInTest('[code-review-status] Scheduled fresh retry after infra failure', {
                 reviewId,
                 failedAttemptId: attempt.id,
                 retryAttemptId: retryAttempt.id,

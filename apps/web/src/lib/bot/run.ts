@@ -1,6 +1,7 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadAttachments } from '@/lib/bot/attachments';
+import { startProcessingIndicator } from '@/lib/bot/processing-indicator';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
@@ -16,39 +17,43 @@ export async function processLinkedMessage({
   platformIntegration: PlatformIntegration;
   user: User;
 }) {
-  await thread.startTyping('Thinking...');
+  const stopProcessingIndicator = await startProcessingIndicator(thread, message, 'Thinking...');
 
-  let botRequestId: string;
   try {
-    botRequestId = await createBotRequest({
-      createdBy: user.id,
-      organizationId: platformIntegration.owned_by_organization_id ?? null,
-      platformIntegrationId: platformIntegration.id,
-      platform: thread.adapter.name,
-      platformThreadId: thread.id,
-      platformMessageId: message.id,
-      userMessage: message.text,
-      modelUsed: undefined,
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { component: 'kilo-bot', op: 'create-bot-request' },
-      extra: {
-        platform: thread.adapter.name,
+    let botRequestId: string;
+    try {
+      botRequestId = await createBotRequest({
+        createdBy: user.id,
+        organizationId: platformIntegration.owned_by_organization_id ?? null,
         platformIntegrationId: platformIntegration.id,
-        userId: user.id,
-        threadId: thread.id,
-        messageId: message.id,
-      },
-    });
-    await thread.post({
-      markdown:
-        'Sorry, I could not start processing your message because of an internal error. Please try again in a moment.',
-    });
-    return;
-  }
+        platform: thread.adapter.name,
+        platformThreadId: thread.id,
+        platformMessageId: message.id,
+        userMessage: message.text,
+        modelUsed: undefined,
+      });
+    } catch (error) {
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'create-bot-request' },
+        extra: {
+          platform: thread.adapter.name,
+          platformIntegrationId: platformIntegration.id,
+          userId: user.id,
+          threadId: thread.id,
+          messageId: message.id,
+        },
+      });
+      await thread.post({
+        markdown:
+          'Sorry, I could not start processing your message because of an internal error. Please try again in a moment.',
+      });
+      return;
+    }
 
-  await processMessage({ thread, message, platformIntegration, user, botRequestId });
+    await processMessage({ thread, message, platformIntegration, user, botRequestId });
+  } finally {
+    await stopProcessingIndicator();
+  }
 }
 
 async function processMessage({

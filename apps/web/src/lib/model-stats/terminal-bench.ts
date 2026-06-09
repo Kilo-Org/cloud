@@ -5,6 +5,10 @@ import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
 import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
 import { and, eq, notLike } from 'drizzle-orm';
 
+const TerminalBenchSchema = ModelStatsBenchmarksSchema.unwrap()
+  .pick({ kiloBench: true })
+  .optional();
+
 const TTL = process.env.NODE_ENV === 'test' ? 0 : 5 * 60 * 1000;
 
 export type TerminalBenchSummary = {
@@ -25,7 +29,7 @@ export function summarizeTerminalBench(rows: readonly Row[]): TerminalBenchSumma
 
   for (const row of rows) {
     if (!row.isActive || row.openrouterId.startsWith(CUSTOM_LLM_PREFIX)) continue;
-    const result = ModelStatsBenchmarksSchema.safeParse(row.benchmarks);
+    const result = TerminalBenchSchema.safeParse(row.benchmarks);
     if (!result.success) continue;
     const bench = result.data?.kiloBench?.evals['terminal-bench'];
     if (

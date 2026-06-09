@@ -634,7 +634,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // `body.provider.only` field, which doesn't reach a direct partner
     // upstream. Refuse the experimented public id rather than routing
     // around the org's allow-list.
-    if (effectiveProviderContext.experiment && providerConfig?.only !== undefined) {
+    if (effectiveProviderContext.experiment && plan === 'enterprise') {
       return modelNotAllowedResponse();
     }
 

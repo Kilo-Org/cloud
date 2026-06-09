@@ -234,6 +234,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // non-kilocode clients). `taskId` still wins when both are present.
   const sessionHeader = extractHeaderAndLimitLength(request, 'x-kilo-session');
   const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
+
+  const logClientDisconnect = () => {
+    console.log('AI gateway client disconnected', {
+      path,
+      elapsed_ms: Math.round(performance.now() - requestStartedAt),
+      client_request_id: clientRequestId,
+      session_id: taskId ?? sessionHeader,
+    });
+  };
+  if (request.signal.aborted) {
+    logClientDisconnect();
+  } else {
+    request.signal.addEventListener('abort', logClientDisconnect, { once: true });
+  }
+
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;

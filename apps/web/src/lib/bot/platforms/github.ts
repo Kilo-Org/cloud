@@ -276,18 +276,13 @@ function isGitHubBotEnabledForIntegration(integration: PlatformIntegration): boo
 async function reactToTriggerMessage(
   thread: Thread,
   message: Message,
-  op: 'add' | 'remove',
   emoji: string
 ): Promise<void> {
   try {
-    if (op === 'add') {
-      await thread.adapter.addReaction(thread.id, message.id, emoji);
-    } else {
-      await thread.adapter.removeReaction(thread.id, message.id, emoji);
-    }
+    await thread.adapter.addReaction(thread.id, message.id, emoji);
   } catch (error) {
     captureException(error, {
-      tags: { component: 'kilo-bot', op: `github-react-${op}` },
+      tags: { component: 'kilo-bot', op: 'github-react' },
       extra: { threadId: thread.id, messageId: message.id, emoji },
     });
   }
@@ -434,12 +429,9 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
       return { displayName, platform: PLATFORM.GITHUB };
     },
     async startProcessingIndicator({ thread, message }) {
-      await reactToTriggerMessage(thread, message, 'add', 'eyes');
+      await reactToTriggerMessage(thread, message, 'eyes');
       return async () => {
-        await Promise.all([
-          reactToTriggerMessage(thread, message, 'remove', 'eyes'),
-          reactToTriggerMessage(thread, message, 'add', 'thumbs_up'),
-        ]);
+        await reactToTriggerMessage(thread, message, 'thumbs_up');
       };
     },
   };

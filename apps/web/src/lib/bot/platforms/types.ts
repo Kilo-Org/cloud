@@ -65,8 +65,8 @@ export type BotPlatform = {
   /**
    * Signal that the bot is processing the user's message. Slack/Linear use
    * the platform-native typing indicator. GitHub has no typing concept and
-   * reacts to the triggering comment instead (👀 while running, 👍 when
-   * `stop()` is called).
+   * reacts to the triggering comment instead (👀 on start, 👍 added
+   * alongside when `stop()` is called).
    */
   startProcessingIndicator(params: {
     thread: Thread;

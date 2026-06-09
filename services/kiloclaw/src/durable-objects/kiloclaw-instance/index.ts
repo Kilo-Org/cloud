@@ -3558,10 +3558,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const previousLabel = previousOverride
       ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB`
       : 'metadata-only (skewed state)';
-    console.log(
-      `[admin-size-override] clear userId=${this.s.userId} actor=${input.actorEmail} ` +
-        `previous=${previousLabel} reason=${JSON.stringify(input.reason)}`
-    );
+    console.log('[admin-size-override] clear', {
+      userId: this.s.userId,
+      actor: input.actorEmail,
+      previous: previousLabel,
+      reason: input.reason,
+    });
 
     return { previousOverride };
   }

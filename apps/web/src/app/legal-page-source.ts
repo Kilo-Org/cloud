@@ -8,9 +8,20 @@ function absolutizeKiloLinks(html: string, sourceUrl: string): string {
   return html.replaceAll(/(href|src)="\/(?!\/)/g, `$1="${new URL('/', sourceUrl)}`);
 }
 
+function removeScriptElements(html: string): string {
+  let sanitizedHtml = html;
+  let previousHtml: string;
+
+  do {
+    previousHtml = sanitizedHtml;
+    sanitizedHtml = sanitizedHtml.replaceAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+  } while (sanitizedHtml !== previousHtml);
+
+  return sanitizedHtml;
+}
+
 function removeActiveContent(html: string): string {
-  return html
-    .replaceAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+  return removeScriptElements(html)
     .replaceAll(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '')
     .replaceAll(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
 }

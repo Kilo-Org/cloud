@@ -49,6 +49,22 @@ describe('extractTermsMainHtml', () => {
     expect(result).not.toContain('<iframe');
   });
 
+  test('strips script tags reintroduced by malformed nested tags', () => {
+    const html = `
+      <main>
+        <h1>Terms of Service</h1>
+        <scrip<script>alert('removed')</script>t>alert('xss')</script>
+        <p>Terms body</p>
+      </main>
+    `;
+
+    const result = extractTermsMainHtml(html);
+
+    expect(result).toContain('Terms body');
+    expect(result).not.toContain('<script');
+    expect(result).not.toContain('alert(');
+  });
+
   test('keeps content after an inner closing main marker', () => {
     const html = `
       <main>

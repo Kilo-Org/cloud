@@ -103,7 +103,7 @@ export async function isReleaseToggleEnabled(
     );
     return flagValue === true;
   } catch (error) {
-    console.error(`Error checking boolean feature flag '${flagName}':`, error);
+    console.error('Error checking boolean feature flag:', flagName, error);
     captureException(error, {
       tags: { source: 'posthog_feature_flag_boolean_enabled' },
       extra: { flagName, distinctId },

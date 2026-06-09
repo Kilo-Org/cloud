@@ -352,11 +352,11 @@ export async function rewriteFreeModelResponse(
     (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
 
   if (!isFreeModelRequiringCostRemoval && !shouldRedactModelNameInResponse(providerId, model)) {
-    console.debug('[rewriteFreeModelResponse] skipping rewrite');
+    console.debug('[rewriteFreeModelResponse] skipping rewrite for %s', model);
     return null;
   }
 
-  console.debug('[rewriteFreeModelResponse] rewriting response');
+  console.debug('[rewriteFreeModelResponse] rewriting response for %s', model);
   if (kind === 'chat_completions') {
     return rewriteFreeModelResponse_ChatCompletions(response, model);
   }
@@ -367,6 +367,6 @@ export async function rewriteFreeModelResponse(
     return rewriteFreeModelResponse_Messages(response, model);
   }
 
-  console.error('[rewriteFreeModelResponse] implementation error: unrecognized API kind');
+  console.error('[rewriteFreeModelResponse] implementation error: unrecognized API kind %s', kind);
   return null;
 }

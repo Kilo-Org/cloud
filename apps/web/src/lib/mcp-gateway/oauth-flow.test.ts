@@ -1173,23 +1173,29 @@ describe('MCP gateway app OAuth flow', () => {
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.17' }),
     });
-    const preview = await services.authorizationService.previewAuthorization({
-      query: OAuthAuthorizationQuerySchema.parse({
-        client_id: registration.clientId,
-        redirect_uri: 'http://localhost:3000/callback',
-        response_type: 'code',
-        resource: created.route.canonical_url,
-        code_challenge: pkceChallenge(
-          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
-        ),
-        code_challenge_method: 'S256',
-      }),
+    const query = OAuthAuthorizationQuerySchema.parse({
+      client_id: registration.clientId,
+      redirect_uri: 'http://localhost:3000/callback',
+      response_type: 'code',
+      resource: created.route.canonical_url,
+      code_challenge: pkceChallenge(
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
+      ),
+      code_challenge_method: 'S256',
+    });
+    const authorization = await services.authorizationService.authorize({
+      query,
       userId: user.id,
       executionContext: { type: 'personal' },
       allowBrowserOrgResourceContext: true,
     });
+    expect(authorization.kind).toBe('redirect');
+    const [request] = await db
+      .select()
+      .from(mcp_gateway_authorization_requests)
+      .where(eq(mcp_gateway_authorization_requests.config_id, created.config.config_id));
 
-    expect(preview.executionContext).toEqual({ type: 'organization', organizationId });
+    expect(request?.execution_context).toEqual({ type: 'organization', organizationId });
   });
 
   it('rejects an org resource when the authenticated execution context is personal', async () => {

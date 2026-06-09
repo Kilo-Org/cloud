@@ -267,17 +267,7 @@ export function createAuthorizationService(params: {
         executionContext.type === 'personal' &&
         route.ownerScope === 'organization'
       ) {
-        const organizationContext = {
-          type: 'organization' as const,
-          organizationId: route.ownerId,
-        };
-        await params.routeService.authorize({
-          resolved,
-          route,
-          userId: input.userId,
-          executionContext: organizationContext,
-        });
-        executionContext = organizationContext;
+        executionContext = { type: 'organization', organizationId: route.ownerId };
       }
       if (!executionContextMatchesRoute(executionContext, route)) {
         redirectError(
@@ -334,7 +324,7 @@ export function createAuthorizationService(params: {
     executionContext: GatewayExecutionContext;
     allowBrowserOrgResourceContext?: boolean;
   }) {
-    const { client, route, resolved, scopes } = await prepareAuthorization({
+    const { client, route, resolved, scopes, executionContext } = await prepareAuthorization({
       ...input,
       redirectErrors: true,
     });
@@ -354,7 +344,7 @@ export function createAuthorizationService(params: {
         scopes,
         oauthState: input.query.state,
         codeChallenge: input.query.code_challenge ?? null,
-        executionContext: input.executionContext,
+        executionContext,
         instanceId: instance.instance_id,
       });
       if (

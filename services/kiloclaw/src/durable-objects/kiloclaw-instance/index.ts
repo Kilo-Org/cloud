@@ -3527,7 +3527,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
       console.log(
         `[admin-size-override] clear (no-op) userId=${this.s.userId} actor=${input.actorEmail} ` +
-          `reason="${input.reason.replace(/"/g, '\\"')}"`
+          `reason=${JSON.stringify(input.reason)}`
       );
       return { previousOverride: null };
     }

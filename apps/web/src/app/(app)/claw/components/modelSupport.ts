@@ -21,6 +21,21 @@ export const KILOCODE_CATALOG_IDS = new Set([
 
 export const OPENCLAW_DYNAMIC_MODEL_DISCOVERY_VERSION = '2026.03.08';
 
+// KiloClaw model refs live under the `kilocode/` namespace. Catalog/combobox IDs
+// are bare (e.g. `anthropic/claude-sonnet-4.5`); stored model refs are prefixed
+// (e.g. `kilocode/anthropic/claude-sonnet-4.5`). Mirrors the Settings flow
+// (SettingsTab strips for display and re-adds on save).
+export const KILOCODE_MODEL_PREFIX = 'kilocode/';
+
+export function stripKilocodeModelPrefix(id: string): string {
+  return id.startsWith(KILOCODE_MODEL_PREFIX) ? id.slice(KILOCODE_MODEL_PREFIX.length) : id;
+}
+
+// Idempotent: strips any existing prefix first so we never double-prefix.
+export function addKilocodeModelPrefix(id: string): string {
+  return id ? `${KILOCODE_MODEL_PREFIX}${stripKilocodeModelPrefix(id)}` : id;
+}
+
 export function supportsDynamicGatewayModels(openclawVersion: string | null | undefined): boolean {
   return calverAtLeast(cleanVersion(openclawVersion), OPENCLAW_DYNAMIC_MODEL_DISCOVERY_VERSION);
 }

@@ -32,6 +32,7 @@ import {
 import type { AgentSummary } from '@/lib/kiloclaw/types';
 import { useClawAgentMutations } from '../hooks/useClawHooks';
 import { useClawModelOptions } from '../hooks/useClawModelOptions';
+import { addKilocodeModelPrefix, stripKilocodeModelPrefix } from './modelSupport';
 
 const INHERIT = 'inherit';
 
@@ -111,30 +112,47 @@ export function AgentEditDialog({
   const { updateAgent } = useClawAgentMutations();
   const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
 
-  const initial = useMemo(() => ownModel(agent), [agent]);
+  // Work in bare (un-prefixed) model-id space so the combobox value matches the
+  // catalog options; the kilocode/ prefix is re-added when writing.
+  const initial = useMemo(() => {
+    const own = ownModel(agent);
+    return { primary: stripKilocodeModelPrefix(own.primary), fallbacks: own.fallbacks };
+  }, [agent]);
+  // Initial select values. toOption maps null OR an unknown (forward-compat)
+  // value to INHERIT; we diff against THESE rather than the raw settings so an
+  // unknown value left untouched is never mistaken for an explicit unset and
+  // silently deleted on an unrelated save.
+  const initialSettings = useMemo(
+    (): {
+      thinking: ThinkingOpt;
+      verbose: VerboseOpt;
+      reasoning: ReasoningOpt;
+      fastMode: FastModeOpt;
+    } => ({
+      thinking: toOption(agent.settings.thinkingDefault, THINKING_OPTIONS),
+      verbose: toOption(agent.settings.verboseDefault, VERBOSE_OPTIONS),
+      reasoning: toOption(agent.settings.reasoningDefault, REASONING_OPTIONS),
+      fastMode:
+        agent.settings.fastModeDefault === null
+          ? INHERIT
+          : agent.settings.fastModeDefault
+            ? 'on'
+            : 'off',
+    }),
+    [agent.settings]
+  );
+
   // An agent owns a model when rawModel is set — including a fallback-only model
   // (no primary). The inherit toggle is the only way to clear such a model.
   const hadOwnModel = agent.rawModel != null;
   const [inheritModel, setInheritModel] = useState(!hadOwnModel);
   const [primary, setPrimary] = useState(initial.primary);
-  const [thinking, setThinking] = useState<ThinkingOpt>(
-    toOption(agent.settings.thinkingDefault, THINKING_OPTIONS)
-  );
-  const [verbose, setVerbose] = useState<VerboseOpt>(
-    toOption(agent.settings.verboseDefault, VERBOSE_OPTIONS)
-  );
-  const [reasoning, setReasoning] = useState<ReasoningOpt>(
-    toOption(agent.settings.reasoningDefault, REASONING_OPTIONS)
-  );
-  const [fastMode, setFastMode] = useState<FastModeOpt>(
-    agent.settings.fastModeDefault === null
-      ? INHERIT
-      : agent.settings.fastModeDefault
-        ? 'on'
-        : 'off'
-  );
+  const [thinking, setThinking] = useState<ThinkingOpt>(initialSettings.thinking);
+  const [verbose, setVerbose] = useState<VerboseOpt>(initialSettings.verbose);
+  const [reasoning, setReasoning] = useState<ReasoningOpt>(initialSettings.reasoning);
+  const [fastMode, setFastMode] = useState<FastModeOpt>(initialSettings.fastMode);
 
-  // Diff the form against the agent's current values into a controller patch.
+  // Diff the form against the initial values into a controller patch.
   const patch = useMemo(() => {
     const set: AgentUpdateInput['set'] = {};
     const unset: AgentUpdateInput['unset'] = [];
@@ -149,35 +167,29 @@ export function AgentEditDialog({
       const changed = !hadOwnModel || newPrimary !== initial.primary;
       if (changed && (newPrimary !== '' || fallbacks.length > 0)) {
         set.model = {
-          ...(newPrimary !== '' ? { primary: newPrimary } : {}),
+          ...(newPrimary !== '' ? { primary: addKilocodeModelPrefix(newPrimary) } : {}),
           ...(fallbacks.length > 0 ? { fallbacks } : {}),
         };
       }
     }
 
-    if (thinking === INHERIT) {
-      if (agent.settings.thinkingDefault !== null) unset.push('thinkingDefault');
-    } else if (thinking !== agent.settings.thinkingDefault) {
-      set.thinkingDefault = thinking;
+    // Only emit a setting change when it differs from its initial select value,
+    // so an untouched (incl. unknown) value never produces a spurious unset.
+    if (thinking !== initialSettings.thinking) {
+      if (thinking === INHERIT) unset.push('thinkingDefault');
+      else set.thinkingDefault = thinking;
     }
-
-    if (verbose === INHERIT) {
-      if (agent.settings.verboseDefault !== null) unset.push('verboseDefault');
-    } else if (verbose !== agent.settings.verboseDefault) {
-      set.verboseDefault = verbose;
+    if (verbose !== initialSettings.verbose) {
+      if (verbose === INHERIT) unset.push('verboseDefault');
+      else set.verboseDefault = verbose;
     }
-
-    if (reasoning === INHERIT) {
-      if (agent.settings.reasoningDefault !== null) unset.push('reasoningDefault');
-    } else if (reasoning !== agent.settings.reasoningDefault) {
-      set.reasoningDefault = reasoning;
+    if (reasoning !== initialSettings.reasoning) {
+      if (reasoning === INHERIT) unset.push('reasoningDefault');
+      else set.reasoningDefault = reasoning;
     }
-
-    if (fastMode === INHERIT) {
-      if (agent.settings.fastModeDefault !== null) unset.push('fastModeDefault');
-    } else {
-      const next = fastMode === 'on';
-      if (next !== agent.settings.fastModeDefault) set.fastModeDefault = next;
+    if (fastMode !== initialSettings.fastMode) {
+      if (fastMode === INHERIT) unset.push('fastModeDefault');
+      else set.fastModeDefault = fastMode === 'on';
     }
 
     return { set, unset };
@@ -190,7 +202,7 @@ export function AgentEditDialog({
     reasoning,
     fastMode,
     initial,
-    agent.settings,
+    initialSettings,
   ]);
 
   // Not inheriting but no primary and no fallbacks = no model to write.

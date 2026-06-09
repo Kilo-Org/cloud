@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useClawAgentMutations } from '../hooks/useClawHooks';
 import { useClawModelOptions } from '../hooks/useClawModelOptions';
+import { addKilocodeModelPrefix } from './modelSupport';
 
 // Mirror of the controller's normalizeAgentId (openclaw-agent-config.ts) so the
 // derived workspace is 1:1 with the agent id the controller will assign. Using
@@ -77,7 +78,9 @@ export function AgentCreateDialog({
       await createAgent.mutateAsync({
         name: trimmedName,
         workspace: workspaceFromName(trimmedName),
-        model: trimmedModel || undefined,
+        // The combobox yields a bare catalog id; agent model refs are stored
+        // under the kilocode/ namespace.
+        model: trimmedModel ? addKilocodeModelPrefix(trimmedModel) : undefined,
       });
       toast.success(`Created agent ${trimmedName}`);
       reset();

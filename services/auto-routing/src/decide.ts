@@ -3,6 +3,14 @@ import { mirrorPayloadSchema, parseClassifierInput } from './classifier-input';
 import { classifyNormalizedInput } from './model-classifier';
 import type { HonoEnv } from './hono-env';
 
+function emptyDecisionResponse() {
+  return {
+    cost: 0,
+    decision: null,
+    classifierResult: null,
+  };
+}
+
 export const decideHandler: Handler<HonoEnv> = async c => {
   let rawBody: unknown;
   try {
@@ -18,13 +26,20 @@ export const decideHandler: Handler<HonoEnv> = async c => {
 
   const classifierInput = parseClassifierInput(parsed.data);
   if (!classifierInput.success) {
-    return c.json({ error: classifierInput.error }, 400);
+    return c.json(emptyDecisionResponse());
   }
 
   try {
-    const classification = await classifyNormalizedInput(c.env, classifierInput.data);
-    return c.json({ ok: true, classification, normalized: classifierInput.data });
+    const classifier = await classifyNormalizedInput(c.env, classifierInput.data);
+    return c.json({
+      cost: classifier.cost ?? 0,
+      decision: null,
+      classifierResult: {
+        classification: classifier.classification,
+        normalized: classifierInput.data,
+      },
+    });
   } catch {
-    return c.json({ error: 'Classifier model request failed' }, 502);
+    return c.json(emptyDecisionResponse());
   }
 };

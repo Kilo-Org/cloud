@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { OpenRouter } from '@openrouter/sdk';
 import type { ChatResult } from '@openrouter/sdk/models';
-import { CLASSIFIER_MODEL } from './classifier-prompt';
+import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
 import { classifyWithOpenRouter } from './model-classifier';
 import type { NormalizedClassifierInput } from './classifier-input';
 
@@ -36,7 +36,7 @@ describe('OpenRouter classifier call', () => {
       async (): Promise<ChatResult> => ({
         id: 'gen-test',
         created: 1781010000,
-        model: CLASSIFIER_MODEL,
+        model: DEFAULT_CLASSIFIER_MODEL,
         object: 'chat.completion',
         systemFingerprint: null,
         choices: [
@@ -58,13 +58,15 @@ describe('OpenRouter classifier call', () => {
     );
     const client = { chat: { send } } as unknown as OpenRouter;
 
-    await expect(classifyWithOpenRouter(client, normalizedInput)).resolves.toEqual({
+    await expect(
+      classifyWithOpenRouter(client, normalizedInput, 'openai/gpt-5-mini')
+    ).resolves.toEqual({
       cost: 0.00000123,
       classification: modelOutput,
     });
     expect(send).toHaveBeenCalledWith({
       chatRequest: {
-        model: CLASSIFIER_MODEL,
+        model: 'openai/gpt-5-mini',
         messages: expect.any(Array),
         responseFormat: { type: 'json_object' },
         stream: false,
@@ -81,7 +83,7 @@ describe('OpenRouter classifier call', () => {
           async (): Promise<ChatResult> => ({
             id: 'gen-test',
             created: 1781010000,
-            model: CLASSIFIER_MODEL,
+            model: DEFAULT_CLASSIFIER_MODEL,
             object: 'chat.completion',
             systemFingerprint: null,
             choices: [],
@@ -90,8 +92,8 @@ describe('OpenRouter classifier call', () => {
       },
     } as unknown as OpenRouter;
 
-    await expect(classifyWithOpenRouter(client, normalizedInput)).rejects.toThrow(
-      'Classifier model returned no text'
-    );
+    await expect(
+      classifyWithOpenRouter(client, normalizedInput, DEFAULT_CLASSIFIER_MODEL)
+    ).rejects.toThrow('Classifier model returned no text');
   });
 });

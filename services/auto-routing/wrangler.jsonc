@@ -20,6 +20,12 @@
   "observability": {
     "enabled": true,
   },
+  "kv_namespaces": [
+    {
+      "binding": "AUTO_ROUTING_CONFIG",
+      "id": "4316b8db31e347e19cfadad1b6386ad5",
+    },
+  ],
   "secrets_store_secrets": [
     {
       "binding": "INTERNAL_API_SECRET_PROD",

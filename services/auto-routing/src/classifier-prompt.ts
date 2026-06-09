@@ -1,7 +1,7 @@
 import classifierTaxonomy from './classifier-taxonomy.json';
 import type { NormalizedClassifierInput } from './classifier-input';
 
-export const CLASSIFIER_MODEL = 'google/gemma-4-31b-it';
+export const DEFAULT_CLASSIFIER_MODEL = 'google/gemma-4-31b-it';
 
 export type ClassifierMessage = {
   role: 'system' | 'user';

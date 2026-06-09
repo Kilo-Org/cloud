@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildClassifierMessages, CLASSIFIER_MODEL } from './classifier-prompt';
+import { buildClassifierMessages, DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
 import type { NormalizedClassifierInput } from './classifier-input';
 
 const input = {
@@ -17,8 +17,8 @@ const input = {
 } satisfies NormalizedClassifierInput;
 
 describe('classifier prompt', () => {
-  it('uses Gemma 4 31B IT as the classifier model', () => {
-    expect(CLASSIFIER_MODEL).toBe('google/gemma-4-31b-it');
+  it('defaults to Gemma 4 31B IT as the classifier model', () => {
+    expect(DEFAULT_CLASSIFIER_MODEL).toBe('google/gemma-4-31b-it');
   });
 
   it('builds compact taxonomy and request-summary messages', () => {

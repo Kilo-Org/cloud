@@ -1,7 +1,7 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadAttachments } from '@/lib/bot/attachments';
-import { startProcessingIndicator } from '@/lib/bot/processing-indicator';
+import { botPlatforms } from '@/lib/bot/platforms';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
@@ -17,7 +17,12 @@ export async function processLinkedMessage({
   platformIntegration: PlatformIntegration;
   user: User;
 }) {
-  const stopProcessingIndicator = await startProcessingIndicator(thread, message, 'Thinking...');
+  const botPlatform = botPlatforms.requireByAdapter(thread.adapter);
+  const stopProcessingIndicator = await botPlatform.startProcessingIndicator({
+    thread,
+    message,
+    status: 'Thinking...',
+  });
 
   try {
     let botRequestId: string;

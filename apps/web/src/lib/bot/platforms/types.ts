@@ -18,6 +18,13 @@ export type RequesterInfo = {
   platform: Platform;
 };
 
+/**
+ * Called when the bot finishes processing a user's message. On platforms
+ * with a decaying typing indicator (Slack/Linear) this is a no-op; on
+ * GitHub it swaps the in-progress reaction for a completion reaction.
+ */
+export type StopProcessingIndicator = () => Promise<void>;
+
 export type BotPlatform = {
   platform: Platform;
   documentationUrl: string;
@@ -55,6 +62,17 @@ export type BotPlatform = {
     platformIntegration: PlatformIntegration;
     displayName: string;
   }): Promise<RequesterInfo>;
+  /**
+   * Signal that the bot is processing the user's message. Slack/Linear use
+   * the platform-native typing indicator. GitHub has no typing concept and
+   * reacts to the triggering comment instead (👀 while running, 👍 when
+   * `stop()` is called).
+   */
+  startProcessingIndicator(params: {
+    thread: Thread;
+    message: Message;
+    status?: string;
+  }): Promise<StopProcessingIndicator>;
   handleAction?(event: ActionEvent): Promise<void>;
   handleAssistantThreadStarted?(event: AssistantThreadStartedEvent): Promise<void>;
   handleMemberJoinedChannel?(event: MemberJoinedChannelEvent): Promise<void>;

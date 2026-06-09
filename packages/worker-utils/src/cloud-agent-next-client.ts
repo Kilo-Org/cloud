@@ -121,6 +121,7 @@ export type CloudAgentTerminalReason =
   | 'model_not_found'
   | 'github_installation_required'
   | 'github_ip_allow_list'
+  | 'gitlab_project_access_required'
   | 'byok_invalid_key'
   | 'selected_model_unavailable'
   | 'user_cancelled'
@@ -155,9 +156,15 @@ export class CloudAgentNextBillingError extends CloudAgentNextError {
 }
 
 function isBillingErrorBody(body: string): boolean {
-  return ['insufficient credits', 'paid model', 'add credits', 'credits required'].some(pattern =>
-    body.toLowerCase().includes(pattern)
-  );
+  return [
+    'insufficient credits',
+    'paid model',
+    'add credits',
+    'credits required',
+    'credit balance is too low',
+    'insufficient funds',
+    'payment required',
+  ].some(pattern => body.toLowerCase().includes(pattern));
 }
 
 function isCloudAgentSandboxStatus(value: unknown): value is CloudAgentSandboxStatus {

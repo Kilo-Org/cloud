@@ -143,6 +143,65 @@ async function expectAutoRetryScheduled(stub: DurableObjectStub<CodeReviewOrches
   expect(alarm).toBeGreaterThan(Date.now() + 45_000);
 }
 
+async function expectPrepareFailureSchedulesFreshRetry(
+  firstPrepareResponse: () => Response,
+  retrySessionId: string,
+  retryCliSessionId: string
+) {
+  const stub = getReviewStub();
+  let prepareCalls = 0;
+  const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+    const url = String(request);
+    if (url.includes('/api/internal/code-review-status/')) {
+      return Response.json({ success: true });
+    }
+    if (url.includes('/trpc/prepareSession')) {
+      prepareCalls += 1;
+      if (prepareCalls === 1) {
+        return firstPrepareResponse();
+      }
+      return trpcSuccess({
+        cloudAgentSessionId: retrySessionId,
+        kiloSessionId: retryCliSessionId,
+      });
+    }
+    if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+      return trpcSuccess({ executionId: `exec-${retrySessionId}`, status: 'running' });
+    }
+    return new Response('unexpected fetch', { status: 500 });
+  });
+  globalThis.fetch = fetchMock;
+
+  await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+    await state.storage.put('state', codeReview());
+    await state.storage.setAlarm(Date.now() + 30_000);
+  });
+
+  const ran = await runDurableObjectAlarm(stub);
+
+  expect(ran).toBe(true);
+  await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+  expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+  expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+  await expectAutoRetryScheduled(stub);
+
+  const retryRan = await runDurableObjectAlarm(stub);
+  expect(retryRan).toBe(true);
+  await expect(stub.status()).resolves.toMatchObject({
+    status: 'running',
+    sessionId: retrySessionId,
+    cliSessionId: retryCliSessionId,
+  });
+  expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+  expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+  await expect(storedReview(stub)).resolves.toMatchObject({
+    sandboxRetryAttempted: true,
+    status: 'running',
+    sessionId: retrySessionId,
+    cliSessionId: retryCliSessionId,
+  });
+}
+
 describe('CodeReviewOrchestrator recovery', () => {
   const originalFetch = globalThis.fetch;
 
@@ -767,6 +826,83 @@ describe('CodeReviewOrchestrator recovery', () => {
       sessionId: 'agent-workspace-prose-retry',
       cliSessionId: 'ses_workspace_prose_retry',
     });
+  });
+
+  it.each([
+    'Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup',
+    'Workspace admission rejected because disk capacity could not be measured',
+  ])('does not retry workspace admission capacity failures: %s', async message => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(500, `Failed to start wrapper: ${message}`);
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'failed' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({ status: 'failed' });
+    expect(stored?.sandboxRetryAttempted).toBeUndefined();
+  });
+
+  it.each([
+    {
+      name: 'wrapper cleanup blocked',
+      response: () => trpcError(500, 'Wrapper cleanup is required before delivery can launch'),
+      sessionId: 'agent-wrapper-cleanup-retry',
+      cliSessionId: 'ses_wrapper_cleanup_retry',
+    },
+    {
+      name: 'missing git executable',
+      response: () => trpcError(500, "ENOENT: no such file or directory, posix_spawn 'git'"),
+      sessionId: 'agent-missing-git-retry',
+      cliSessionId: 'ses_missing_git_retry',
+    },
+    {
+      name: 'checkout local changes conflict',
+      response: () =>
+        trpcError(
+          500,
+          'Failed to checkout pull ref refs/pull/68/head: error: Your local changes to the following files would be overwritten by checkout:\n\tbuild_gui_exe.bat\nPlease commit your changes or stash them before you switch branches.'
+        ),
+      sessionId: 'agent-checkout-conflict-retry',
+      cliSessionId: 'ses_checkout_conflict_retry',
+    },
+    {
+      name: 'session snapshot restore failure',
+      response: () =>
+        trpcError(500, 'Session snapshot restore failed: kilo import failed exitCode=1'),
+      sessionId: 'agent-snapshot-restore-retry',
+      cliSessionId: 'ses_snapshot_restore_retry',
+    },
+    {
+      name: 'durable object storage reset',
+      response: () =>
+        trpcError(
+          500,
+          'Internal error while starting up Durable Object storage caused object to be reset.'
+        ),
+      sessionId: 'agent-do-storage-reset-retry',
+      cliSessionId: 'ses_do_storage_reset_retry',
+    },
+  ])('retries prepareSession once after $name', async ({ response, sessionId, cliSessionId }) => {
+    await expectPrepareFailureSchedulesFreshRetry(response, sessionId, cliSessionId);
   });
 
   it('retries prepareSession once after wrapper waitForPort readiness timeout', async () => {

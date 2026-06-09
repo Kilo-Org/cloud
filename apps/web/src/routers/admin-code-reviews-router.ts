@@ -19,6 +19,7 @@ import {
  * Matches multiple error message patterns from different error paths:
  * - "Insufficient credits" from cloud-agent-next InsufficientCreditsError
  * - "paid model" / "add credits" / "Credits Required" from the 402 API response body
+ * - credit balance / insufficient funds / payment required variants from provider and BYOK paths
  */
 const isBillingError = sql`(
   ${cloud_agent_code_reviews.terminal_reason} = 'billing'
@@ -26,6 +27,9 @@ const isBillingError = sql`(
   OR ${cloud_agent_code_reviews.error_message} ILIKE '%paid model%'
   OR ${cloud_agent_code_reviews.error_message} ILIKE '%add credits%'
   OR ${cloud_agent_code_reviews.error_message} ILIKE '%Credits Required%'
+  OR ${cloud_agent_code_reviews.error_message} ILIKE '%credit balance is too low%'
+  OR ${cloud_agent_code_reviews.error_message} ILIKE '%insufficient funds%'
+  OR ${cloud_agent_code_reviews.error_message} ILIKE '%payment required%'
 )`;
 
 const isBillingAttemptError = sql`(
@@ -34,6 +38,9 @@ const isBillingAttemptError = sql`(
   OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%paid model%'
   OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%add credits%'
   OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%Credits Required%'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%credit balance is too low%'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%insufficient funds%'
+  OR ${cloud_agent_code_review_attempts.error_message} ILIKE '%payment required%'
 )`;
 
 const isModelNotFound = sql`(
@@ -54,13 +61,19 @@ const excludeBillingErrors = sql`COALESCE(${cloud_agent_code_reviews.terminal_re
   AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%Insufficient credits%'
   AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%paid model%'
   AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%add credits%'
-  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%Credits Required%'`;
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%Credits Required%'
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%credit balance is too low%'
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%insufficient funds%'
+  AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%payment required%'`;
 
 const excludeBillingAttemptErrors = sql`COALESCE(${cloud_agent_code_review_attempts.terminal_reason}, '') <> 'billing'
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%Insufficient credits%'
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%paid model%'
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%add credits%'
-  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%Credits Required%'`;
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%Credits Required%'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%credit balance is too low%'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%insufficient funds%'
+  AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%payment required%'`;
 
 const excludeModelNotFound = sql`COALESCE(${cloud_agent_code_reviews.terminal_reason}, '') <> 'model_not_found'
   AND COALESCE(${cloud_agent_code_reviews.error_message}, '') NOT ILIKE '%model not found%'`;
@@ -73,7 +86,7 @@ const excludeModelNotFoundAttempt = sql`COALESCE(${cloud_agent_code_review_attem
  * Pattern matching is ordered from most-specific to least-specific.
  */
 const errorCategoryExpr = sql<string>`CASE
-  WHEN ${cloud_agent_code_reviews.terminal_reason} IN ('github_installation_required', 'github_ip_allow_list', 'byok_invalid_key', 'selected_model_unavailable') THEN 'Action Required'
+  WHEN ${cloud_agent_code_reviews.terminal_reason} IN ('github_installation_required', 'github_ip_allow_list', 'gitlab_project_access_required', 'byok_invalid_key', 'selected_model_unavailable') THEN 'Action Required'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%rate limit%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Rate limit%' OR ${cloud_agent_code_reviews.error_message} LIKE '%429%' THEN 'Rate Limited'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%timeout%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Timeout%' OR ${cloud_agent_code_reviews.error_message} LIKE '%ETIMEDOUT%' OR ${cloud_agent_code_reviews.error_message} LIKE '%timed out%' THEN 'Timeout'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%context window%' OR ${cloud_agent_code_reviews.error_message} LIKE '%token limit%' OR ${cloud_agent_code_reviews.error_message} LIKE '%too large%' OR ${cloud_agent_code_reviews.error_message} LIKE '%maximum context length%' THEN 'Context Window Exceeded'
@@ -87,7 +100,7 @@ const errorCategoryExpr = sql<string>`CASE
 END`;
 
 const attemptErrorCategoryExpr = sql<string>`CASE
-  WHEN ${cloud_agent_code_review_attempts.terminal_reason} IN ('github_installation_required', 'github_ip_allow_list', 'byok_invalid_key', 'selected_model_unavailable') THEN 'Action Required'
+  WHEN ${cloud_agent_code_review_attempts.terminal_reason} IN ('github_installation_required', 'github_ip_allow_list', 'gitlab_project_access_required', 'byok_invalid_key', 'selected_model_unavailable') THEN 'Action Required'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%rate limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Rate limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%429%' THEN 'Rate Limited'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%timeout%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Timeout%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%ETIMEDOUT%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%timed out%' THEN 'Timeout'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%context window%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%token limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%too large%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%maximum context length%' THEN 'Context Window Exceeded'

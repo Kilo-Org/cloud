@@ -103,6 +103,16 @@ const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
 const REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE =
   'the requested model is not allowed for your team';
 
+function isSelectedModelActionRequiredMessage(message: string): boolean {
+  return (
+    message.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
+    message.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE) ||
+    message.includes('no allowed providers are specified.') ||
+    message.includes('no allowed providers are available for the selected model.') ||
+    message.includes('no endpoints found matching your data policy')
+  );
+}
+
 function findRiskyPattern(command: string): string | null {
   const normalized = command.toLowerCase();
   const match = RISKY_COMMAND_PATTERNS.find(pattern => normalized.includes(pattern));
@@ -143,6 +153,7 @@ type CloudAgentNextFreshRetryFailureCategory =
   | 'non_5xx'
   | 'cancelled'
   | 'deterministic_action_required_failure'
+  | 'deterministic_non_retryable_failure'
   | 'sandbox_api_or_storage_failure'
   | 'wrapper_version_mismatch'
   | 'wrapper_wait_for_port_timeout'
@@ -181,6 +192,14 @@ function cloudAgentNextFreshRetryClassification(
 
 const RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE = 'Wrapper version mismatch'.toLowerCase();
 
+function isWorkspaceAdmissionCapacityFailure(body: string): boolean {
+  return (
+    /workspace admission rejected: \d+ mb available below \d+ mb threshold after cleanup/i.test(
+      body
+    ) || body.includes('workspace admission rejected because disk capacity could not be measured')
+  );
+}
+
 function classifyCloudAgentNextFreshSessionRetry(
   error: unknown
 ): CloudAgentNextFreshRetryClassification {
@@ -201,10 +220,7 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
-  if (
-    normalizedErrorMessage.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
-    normalizedErrorMessage.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)
-  ) {
+  if (isSelectedModelActionRequiredMessage(normalizedErrorMessage)) {
     return cloudAgentNextFreshRetryClassification(
       cloudAgentNextError,
       false,
@@ -236,6 +252,15 @@ function classifyCloudAgentNextFreshSessionRetry(
   }
 
   const body = cloudAgentNextError.body.toLowerCase();
+  if (isWorkspaceAdmissionCapacityFailure(body)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      false,
+      'deterministic_non_retryable_failure',
+      'workspace_admission_capacity_not_retryable'
+    );
+  }
+
   if (
     body.includes('configured session') &&
     body.includes('not found: session get returned no data')
@@ -250,7 +275,6 @@ function classifyCloudAgentNextFreshSessionRetry(
 
   if (
     body.includes('git clone timed out') ||
-    body.includes('failed to checkout pull ref') ||
     body.includes('git-lfs filter-process') ||
     body.includes('object does not exist on the server')
   ) {
@@ -787,10 +811,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     const message = error.message.toLowerCase();
 
-    if (
-      message.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
-      message.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)
-    ) {
+    if (isSelectedModelActionRequiredMessage(message)) {
       return 'selected_model_unavailable';
     }
 

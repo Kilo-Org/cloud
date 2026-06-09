@@ -202,9 +202,15 @@ function isBillingCodeReviewTerminalReason(
     return false;
   }
 
-  return ['insufficient credits', 'paid model', 'add credits', 'credits required'].some(pattern =>
-    message.includes(pattern)
-  );
+  return [
+    'insufficient credits',
+    'paid model',
+    'add credits',
+    'credits required',
+    'credit balance is too low',
+    'insufficient funds',
+    'payment required',
+  ].some(pattern => message.includes(pattern));
 }
 
 function isModelNotFoundCodeReviewTerminalReason(
@@ -250,7 +256,15 @@ function hasKnownUnretryableFailureMessage(errorMessage?: string | null): boolea
     message.includes('maximum runtime') ||
     /\b(cancelled|canceled)\b/i.test(message) ||
     message.includes('superseded') ||
-    message.includes('user interrupted')
+    message.includes('user interrupted') ||
+    message.includes(
+      '[byok] your api key has hit its rate limit. please try again later or check your rate limit settings with your api provider.'
+    ) ||
+    /code reviewer is disabled for owner [^\s]+ on (github|gitlab)/i.test(message) ||
+    /workspace admission rejected: \d+ mb available below \d+ mb threshold after cleanup/i.test(
+      message
+    ) ||
+    message.includes('workspace admission rejected because disk capacity could not be measured')
   );
 }
 
@@ -1020,6 +1034,14 @@ export async function POST(
             sessionId,
           });
           return NextResponse.json({ success: true, retried: true });
+        } else if (retryAttemptResult.outcome === 'existing-for-review') {
+          logExceptInTest('[code-review-status] Fresh retry already consumed for review', {
+            reviewId,
+            failedAttemptId: attempt.id,
+            retryAttemptId: retryAttemptResult.attempt.id,
+            sessionId,
+          });
+          return NextResponse.json({ success: true, retried: false, skipped: 'already-retried' });
         } else if (retryAttemptResult.outcome === 'skipped-inactive') {
           logExceptInTest('[code-review-status] Skipping infra retry for inactive review', {
             reviewId,

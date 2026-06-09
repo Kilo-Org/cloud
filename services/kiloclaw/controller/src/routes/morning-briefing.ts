@@ -28,7 +28,15 @@ async function proxyMorningBriefingRoute(params: {
   // the image is too old. Cloud's `isErrorUnknownRoute` treats a bare 404 as
   // "controller too old", so without this rewrite a transient plugin-load
   // gap surfaces to the user as a spurious "Upgrade Required" banner.
-  // Left false for routes whose 404 is semantic (e.g. "no briefing yet").
+  //
+  // Only `/status` opts in. It drives the dashboard card (and is the only
+  // route whose warm-up handling cloud actually consumes). The mutation
+  // routes are intentionally left as a verbatim 404 → cloud's existing
+  // `isErrorUnknownRoute` → null path: cloud's mutation wrappers only
+  // special-case that bare-404 signal, and the typed 503 code would be
+  // stripped crossing the DO RPC boundary and surface as a generic 500.
+  // The read routes are also left verbatim — their 404 is semantic
+  // ("no briefing yet"), not a plugin-load signal.
   notFoundMeansPluginUnavailable?: boolean;
 }): Promise<Response> {
   if (params.supervisor.getState() !== 'running') {
@@ -101,7 +109,6 @@ export function registerMorningBriefingRoutes(
       path: '/enable',
       method: 'POST',
       body,
-      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -113,7 +120,6 @@ export function registerMorningBriefingRoutes(
       path: '/disable',
       method: 'POST',
       body: {},
-      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -125,7 +131,6 @@ export function registerMorningBriefingRoutes(
       path: '/run',
       method: 'POST',
       body: {},
-      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -138,7 +143,6 @@ export function registerMorningBriefingRoutes(
       path: '/onboarding-briefing',
       method: 'POST',
       body,
-      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -151,7 +155,6 @@ export function registerMorningBriefingRoutes(
       path: '/interests',
       method: 'POST',
       body,
-      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -164,7 +167,6 @@ export function registerMorningBriefingRoutes(
       path: '/user-location',
       method: 'POST',
       body,
-      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });

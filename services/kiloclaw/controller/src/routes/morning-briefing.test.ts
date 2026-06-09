@@ -95,6 +95,32 @@ describe('morning briefing controller routes', () => {
     });
   });
 
+  it('passes a plugin 404 on a mutation route through verbatim (cloud maps bare 404 to null)', async () => {
+    // Mutation routes must NOT get the plugin_unavailable rewrite: cloud's
+    // mutation wrappers only special-case a bare 404 (→ null), and the typed
+    // 503 code would be stripped crossing the DO RPC boundary and surface as
+    // a generic 500. Keeping the verbatim 404 preserves the existing typed path.
+    const app = new Hono();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ error: 'Not Found' }), { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    registerMorningBriefingRoutes(app, createRunningSupervisor(), 'expected-token');
+
+    const response = await app.request('/_kilo/morning-briefing/enable', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer expected-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ cron: '0 7 * * *', timezone: 'America/Chicago' }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Not Found' });
+  });
+
   it('passes a plugin 404 on a read route through verbatim (semantic "no briefing")', async () => {
     const app = new Hono();
     const fetchMock = vi

@@ -48,6 +48,7 @@ function credentialFingerprint(apiKey: string): string {
   if (!BYOK_ENCRYPTION_KEY) {
     throw new Error('BYOK encryption is not configured');
   }
+  // codeql[js/insufficient-password-hash] This HMAC is a keyed fingerprint for duplicate API-key detection, not password storage.
   return createHmac('sha256', BYOK_ENCRYPTION_KEY).update(apiKey).digest('hex');
 }
 

@@ -3,6 +3,7 @@ import {
   markSecurityAgentCommandRetriesExhausted,
   transitionSecurityAgentCommandWithCurrentState,
 } from '@kilocode/db';
+import type * as DbModule from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { ensureManualAnalysisQueueRow } from './db/queries.js';
@@ -13,10 +14,18 @@ import {
   type ManualAnalysisStartCommand,
 } from './manual-analysis.js';
 
-vi.mock('@kilocode/db', () => ({
-  markSecurityAgentCommandRetriesExhausted: vi.fn(),
-  transitionSecurityAgentCommandWithCurrentState: vi.fn(),
-}));
+vi.mock('@kilocode/db', async importOriginal => {
+  const {
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    requireSecurityAgentCommandTransitionOrTerminal,
+  } = await importOriginal<typeof DbModule>();
+  return {
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    markSecurityAgentCommandRetriesExhausted: vi.fn(),
+    requireSecurityAgentCommandTransitionOrTerminal,
+    transitionSecurityAgentCommandWithCurrentState: vi.fn(),
+  };
+});
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('./analysis-start-lifecycle.js', () => ({
   transitionAnalysisStartLifecycle: vi.fn(),

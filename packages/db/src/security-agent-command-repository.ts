@@ -33,6 +33,23 @@ export type SecurityAgentCommandTransitionOutcome =
   | { transitioned: true; command: SecurityAgentCommand }
   | { transitioned: false; command: SecurityAgentCommand | null };
 
+export function isTerminalSecurityAgentCommandTransitionOutcome(
+  outcome: SecurityAgentCommandTransitionOutcome
+): outcome is { transitioned: false; command: SecurityAgentCommand } {
+  return (
+    !outcome.transitioned && Boolean(outcome.command && isTerminalStatus(outcome.command.status))
+  );
+}
+
+export function requireSecurityAgentCommandTransitionOrTerminal(
+  outcome: SecurityAgentCommandTransitionOutcome,
+  transition: 'running' | 'terminal'
+): 'transitioned' | 'terminal' {
+  if (outcome.transitioned) return 'transitioned';
+  if (isTerminalSecurityAgentCommandTransitionOutcome(outcome)) return 'terminal';
+  throw new Error(`Security Agent command ${transition} transition rejected`);
+}
+
 function ownerValues(owner: SecurityAgentCommandOwner) {
   return {
     owned_by_organization_id: owner.type === 'org' ? owner.id : null,

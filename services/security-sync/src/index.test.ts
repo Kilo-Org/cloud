@@ -5,17 +5,26 @@ import {
   markSecurityAgentCommandRetriesExhausted,
   transitionSecurityAgentCommandWithCurrentState,
 } from '@kilocode/db';
+import type * as DbModule from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import { syncOwner } from './sync.js';
 
-vi.mock('@kilocode/db', () => ({
-  createSecurityAgentCommand: vi.fn(),
-  markSecurityAgentCommandQueueAdmissionFailed: vi.fn(),
-  markSecurityAgentCommandRetriesExhausted: vi.fn(),
-  transitionSecurityAgentCommandWithCurrentState: vi.fn(),
-}));
+vi.mock('@kilocode/db', async importOriginal => {
+  const {
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    requireSecurityAgentCommandTransitionOrTerminal,
+  } = await importOriginal<typeof DbModule>();
+  return {
+    createSecurityAgentCommand: vi.fn(),
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    markSecurityAgentCommandQueueAdmissionFailed: vi.fn(),
+    markSecurityAgentCommandRetriesExhausted: vi.fn(),
+    requireSecurityAgentCommandTransitionOrTerminal,
+    transitionSecurityAgentCommandWithCurrentState: vi.fn(),
+  };
+});
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
 vi.mock('./sync.js', () => ({ syncOwner: vi.fn() }));

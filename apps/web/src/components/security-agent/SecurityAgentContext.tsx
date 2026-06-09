@@ -138,6 +138,7 @@ type SecurityAgentProviderAction =
   | { type: 'add-optimistic-analysis'; findingId: string }
   | { type: 'remove-optimistic-analysis'; findingId: string }
   | { type: 'settle-commands'; commands: SecurityAgentCommand[]; gitHubError?: string }
+  | { type: 'prune-processed-commands'; polledCommandIds: Set<string> }
   | { type: 'set-github-error'; error: string | null };
 
 function createSecurityAgentProviderState(): SecurityAgentProviderState {
@@ -187,6 +188,16 @@ function securityAgentProviderReducer(
         gitHubError: action.gitHubError ?? state.gitHubError,
       };
     }
+    case 'prune-processed-commands': {
+      const processedTerminalCommandIds = new Set(
+        [...state.processedTerminalCommandIds].filter(commandId =>
+          action.polledCommandIds.has(commandId)
+        )
+      );
+      return processedTerminalCommandIds.size === state.processedTerminalCommandIds.size
+        ? state
+        : { ...state, processedTerminalCommandIds };
+    }
     case 'set-github-error':
       return { ...state, gitHubError: action.error };
   }
@@ -230,7 +241,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const toggleEnabledInFlightRef = useRef(false);
   const commandSuccessCallbacksRef = useRef<Map<string, () => void>>(null);
 
-  const trackCommand = (commandId: string, onSuccess?: () => void) => {
+  const trackCommand = useCallback((commandId: string, onSuccess?: () => void) => {
     if (onSuccess) {
       if (commandSuccessCallbacksRef.current === null) {
         commandSuccessCallbacksRef.current = new Map();
@@ -238,7 +249,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       commandSuccessCallbacksRef.current.set(commandId, onSuccess);
     }
     dispatchProviderState({ type: 'track-command', commandId });
-  };
+  }, []);
 
   const invalidateAcceptedQueueQueries = useCallback(() => {
     if (isOrg && organizationId) {
@@ -338,8 +349,24 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       query.state.data && query.state.data.length > 0 ? COMMAND_POLL_INTERVAL_MS : false,
   });
 
-  const commandIdsToPoll = new Set(providerState.trackedCommandIds);
-  for (const command of activeCommandsData ?? []) commandIdsToPoll.add(command.id);
+  const commandIdsToPoll = useMemo(() => {
+    const commandIds = new Set(providerState.trackedCommandIds);
+    for (const command of activeCommandsData ?? []) commandIds.add(command.id);
+    return commandIds;
+  }, [activeCommandsData, providerState.trackedCommandIds]);
+
+  useEffect(() => {
+    if (
+      [...providerState.processedTerminalCommandIds].some(
+        commandId => !commandIdsToPoll.has(commandId)
+      )
+    ) {
+      dispatchProviderState({
+        type: 'prune-processed-commands',
+        polledCommandIds: commandIdsToPoll,
+      });
+    }
+  }, [commandIdsToPoll, providerState.processedTerminalCommandIds]);
 
   const commandStatusQueries = useQueries({
     queries: [...commandIdsToPoll].map(commandId => ({
@@ -355,22 +382,28 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
           : false,
     })),
   });
-  const activeCommands = [
-    ...(activeCommandsData ?? []),
-    ...commandStatusQueries.flatMap(query =>
-      query.data?.status === 'accepted' || query.data?.status === 'running' ? [query.data] : []
-    ),
-  ];
+  const activeCommands = useMemo(
+    () => [
+      ...(activeCommandsData ?? []),
+      ...commandStatusQueries.flatMap(query =>
+        query.data?.status === 'accepted' || query.data?.status === 'running' ? [query.data] : []
+      ),
+    ],
+    [activeCommandsData, commandStatusQueries]
+  );
   const hasActiveSyncCommand = activeCommands.some(command => command.commandType === 'sync');
   const hasActiveDismissCommand = activeCommands.some(
     command => command.commandType === 'dismiss_finding'
   );
-  const startingAnalysisIds = new Set(providerState.optimisticStartingAnalysisIds);
-  for (const command of activeCommands) {
-    if (command.commandType === 'start_analysis' && command.findingId) {
-      startingAnalysisIds.add(command.findingId);
+  const startingAnalysisIds = useMemo(() => {
+    const ids = new Set(providerState.optimisticStartingAnalysisIds);
+    for (const command of activeCommands) {
+      if (command.commandType === 'start_analysis' && command.findingId) {
+        ids.add(command.findingId);
+      }
     }
-  }
+    return ids;
+  }, [activeCommands, providerState.optimisticStartingAnalysisIds]);
 
   useEffect(() => {
     const terminalCommands = commandStatusQueries.flatMap(query => {
@@ -682,24 +715,22 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     [isOrg, organizationId, orgSyncMutate, personalSyncMutate]
   );
 
-  const handleDismiss = (
-    finding: SecurityFinding,
-    reason: DismissReason,
-    comment?: string,
-    onSuccess?: () => void
-  ) => {
-    if (isOrg && organizationId) {
-      orgDismissMutate(
-        { organizationId, findingId: finding.id, reason, comment },
-        { onSuccess: data => trackCommand(data.commandId, onSuccess) }
-      );
-    } else {
-      personalDismissMutate(
-        { findingId: finding.id, reason, comment },
-        { onSuccess: data => trackCommand(data.commandId, onSuccess) }
-      );
-    }
-  };
+  const handleDismiss = useCallback(
+    (finding: SecurityFinding, reason: DismissReason, comment?: string, onSuccess?: () => void) => {
+      if (isOrg && organizationId) {
+        orgDismissMutate(
+          { organizationId, findingId: finding.id, reason, comment },
+          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
+        );
+      } else {
+        personalDismissMutate(
+          { findingId: finding.id, reason, comment },
+          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
+        );
+      }
+    },
+    [isOrg, organizationId, orgDismissMutate, personalDismissMutate, trackCommand]
+  );
 
   const handleSaveConfig = useCallback(
     (
@@ -825,49 +856,88 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const triageModelSlug = getOptionalStringField(configData, 'triageModelSlug');
   const analysisModelSlug = getOptionalStringField(configData, 'analysisModelSlug');
 
-  const value: SecurityAgentContextValue = {
-    organizationId,
-    isOrg,
-    hasIntegration,
-    hasPermission,
-    isLoadingPermission,
-    isLoadingConfig,
-    reauthorizeUrl,
-    isEnabled,
-    configData: configData
-      ? {
-          ...configData,
-          repositorySelectionMode: configData.repositorySelectionMode ?? 'selected',
-          selectedRepositoryIds: configData.selectedRepositoryIds ?? [],
-          triageModelSlug,
-          analysisModelSlug,
-          analysisMode: configData.analysisMode ?? 'auto',
-          autoDismissEnabled: configData.autoDismissEnabled ?? false,
-          autoDismissConfidenceThreshold: configData.autoDismissConfidenceThreshold ?? 'high',
-          autoAnalysisEnabled: configData.autoAnalysisEnabled ?? false,
-          autoAnalysisMinSeverity: configData.autoAnalysisMinSeverity ?? 'high',
-          autoAnalysisIncludeExisting: configData.autoAnalysisIncludeExisting ?? false,
-        }
-      : undefined,
-    refetchConfig,
-    allRepositories,
-    filteredRepositories,
-    handleSync,
-    handleDismiss,
-    handleSaveConfig,
-    handleToggleEnabled,
-    handleStartAnalysis,
-    handleDeleteFindings,
-    isSyncing: hasActiveSyncCommand || (isOrg ? isOrgSyncPending : isPersonalSyncPending),
-    isDismissing:
-      hasActiveDismissCommand || (isOrg ? isOrgDismissPending : isPersonalDismissPending),
-    isSavingConfig: isOrg ? isOrgSaveConfigPending : isPersonalSaveConfigPending,
-    isTogglingEnabled: isOrg ? isOrgSetEnabledPending : isPersonalSetEnabledPending,
-    isDeletingFindings: isOrg ? isOrgDeleteFindingsPending : isPersonalDeleteFindingsPending,
-    startingAnalysisIds,
-    gitHubError: providerState.gitHubError,
-    orphanedRepositories: orphanedReposData ?? [],
-  };
+  const value = useMemo<SecurityAgentContextValue>(
+    () => ({
+      organizationId,
+      isOrg,
+      hasIntegration,
+      hasPermission,
+      isLoadingPermission,
+      isLoadingConfig,
+      reauthorizeUrl,
+      isEnabled,
+      configData: configData
+        ? {
+            ...configData,
+            repositorySelectionMode: configData.repositorySelectionMode ?? 'selected',
+            selectedRepositoryIds: configData.selectedRepositoryIds ?? [],
+            triageModelSlug,
+            analysisModelSlug,
+            analysisMode: configData.analysisMode ?? 'auto',
+            autoDismissEnabled: configData.autoDismissEnabled ?? false,
+            autoDismissConfidenceThreshold: configData.autoDismissConfidenceThreshold ?? 'high',
+            autoAnalysisEnabled: configData.autoAnalysisEnabled ?? false,
+            autoAnalysisMinSeverity: configData.autoAnalysisMinSeverity ?? 'high',
+            autoAnalysisIncludeExisting: configData.autoAnalysisIncludeExisting ?? false,
+          }
+        : undefined,
+      refetchConfig,
+      allRepositories,
+      filteredRepositories,
+      handleSync,
+      handleDismiss,
+      handleSaveConfig,
+      handleToggleEnabled,
+      handleStartAnalysis,
+      handleDeleteFindings,
+      isSyncing: hasActiveSyncCommand || (isOrg ? isOrgSyncPending : isPersonalSyncPending),
+      isDismissing:
+        hasActiveDismissCommand || (isOrg ? isOrgDismissPending : isPersonalDismissPending),
+      isSavingConfig: isOrg ? isOrgSaveConfigPending : isPersonalSaveConfigPending,
+      isTogglingEnabled: isOrg ? isOrgSetEnabledPending : isPersonalSetEnabledPending,
+      isDeletingFindings: isOrg ? isOrgDeleteFindingsPending : isPersonalDeleteFindingsPending,
+      startingAnalysisIds,
+      gitHubError: providerState.gitHubError,
+      orphanedRepositories: orphanedReposData ?? [],
+    }),
+    [
+      organizationId,
+      isOrg,
+      hasIntegration,
+      hasPermission,
+      isLoadingPermission,
+      isLoadingConfig,
+      reauthorizeUrl,
+      isEnabled,
+      configData,
+      refetchConfig,
+      allRepositories,
+      filteredRepositories,
+      handleSync,
+      handleDismiss,
+      handleSaveConfig,
+      handleToggleEnabled,
+      handleStartAnalysis,
+      handleDeleteFindings,
+      isOrgSyncPending,
+      isPersonalSyncPending,
+      hasActiveSyncCommand,
+      hasActiveDismissCommand,
+      isOrgDismissPending,
+      isPersonalDismissPending,
+      isOrgSaveConfigPending,
+      isPersonalSaveConfigPending,
+      isOrgSetEnabledPending,
+      isPersonalSetEnabledPending,
+      isOrgDeleteFindingsPending,
+      isPersonalDeleteFindingsPending,
+      startingAnalysisIds,
+      providerState.gitHubError,
+      orphanedReposData,
+      triageModelSlug,
+      analysisModelSlug,
+    ]
+  );
 
   return <SecurityAgentContext.Provider value={value}>{children}</SecurityAgentContext.Provider>;
 }

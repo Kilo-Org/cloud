@@ -2,8 +2,10 @@ import { timingSafeEqual as nodeTimingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import {
   createSecurityAgentCommand,
+  isTerminalSecurityAgentCommandTransitionOutcome,
   markSecurityAgentCommandQueueAdmissionFailed,
   markSecurityAgentCommandRetriesExhausted,
+  requireSecurityAgentCommandTransitionOrTerminal,
   transitionSecurityAgentCommandWithCurrentState,
   type SecurityAgentCommandOwner,
   type SecurityAgentCommandTransitionOutcome,
@@ -315,24 +317,6 @@ function resolveOwner(
   return null;
 }
 
-function isTerminalCommandOutcome(outcome: SecurityAgentCommandTransitionOutcome): boolean {
-  return (
-    !outcome.transitioned &&
-    (outcome.command?.status === 'succeeded' ||
-      outcome.command?.status === 'failed' ||
-      outcome.command?.status === 'no_op')
-  );
-}
-
-function requireTransitionOrTerminal(
-  outcome: SecurityAgentCommandTransitionOutcome,
-  transition: 'running' | 'terminal'
-): 'transitioned' | 'terminal' {
-  if (outcome.transitioned) return 'transitioned';
-  if (isTerminalCommandOutcome(outcome)) return 'terminal';
-  throw new Error(`Security Agent command ${transition} transition rejected`);
-}
-
 function commandCorrelation(body: unknown): {
   commandId?: string;
   commandType?: 'sync' | 'dismiss_finding';
@@ -387,7 +371,7 @@ async function processSecurityDismissMessage(
     fromStatuses: ['accepted', 'running'],
     status: 'running',
   });
-  if (requireTransitionOrTerminal(running, 'running') === 'terminal') {
+  if (requireSecurityAgentCommandTransitionOrTerminal(running, 'running') === 'terminal') {
     console.info('Security Agent dismissal command delivery already terminal', {
       command_id: parsed.data.commandId,
       command_type: 'dismiss_finding',
@@ -409,7 +393,7 @@ async function processSecurityDismissMessage(
     status: result.commandStatus,
     resultCode: result.resultCode,
   });
-  requireTransitionOrTerminal(terminal, 'terminal');
+  requireSecurityAgentCommandTransitionOrTerminal(terminal, 'terminal');
   console.info('Security Agent dismissal command completed', {
     command_id: parsed.data.commandId,
     command_type: 'dismiss_finding',
@@ -455,7 +439,7 @@ async function processSecuritySyncMessage(
       fromStatuses: ['accepted', 'running'],
       status: 'running',
     });
-    if (requireTransitionOrTerminal(running, 'running') === 'terminal') {
+    if (requireSecurityAgentCommandTransitionOrTerminal(running, 'running') === 'terminal') {
       console.info('Security sync command delivery already terminal', {
         command_id: body.commandId,
         command_type: 'sync',
@@ -486,7 +470,7 @@ async function processSecuritySyncMessage(
       status: terminal.status,
       resultCode: terminal.resultCode,
     });
-    requireTransitionOrTerminal(terminalTransition, 'terminal');
+    requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
   }
   console.info('Security sync completed for owner', {
     command_id: body.commandId,
@@ -663,7 +647,7 @@ export default {
               db,
               correlation.commandId
             );
-            if (isTerminalCommandOutcome(exhaustionOutcome)) {
+            if (isTerminalSecurityAgentCommandTransitionOutcome(exhaustionOutcome)) {
               console.info('Security Agent command delivery already terminal after failure', {
                 command_id: correlation.commandId,
                 command_type: correlation.commandType,

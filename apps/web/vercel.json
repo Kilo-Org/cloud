@@ -81,5 +81,10 @@
     "env": {
       "GIT_LFS_SKIP_SMUDGE": "0"
     }
+  },
+  "functions": {
+    "api/openrouter/responses": {
+      "supportsCancellation": true
+    }
   }
 }

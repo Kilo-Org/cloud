@@ -41,7 +41,7 @@ export async function fetchCreditTransactionIdForStripeSession(sessionId: string
   });
 
   if (creditTransaction) {
-    console.info(`Found credit transaction for session ${sessionId}:`, creditTransaction.id);
+    console.info('Found credit transaction for session:', sessionId, creditTransaction.id);
   } else {
     console.info(`No credit transaction found for session ${sessionId}`);
   }

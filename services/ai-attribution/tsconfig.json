@@ -4,7 +4,7 @@
     "module": "ES2022",
     "lib": ["ES2022"],
     "moduleResolution": "bundler",
-    "types": ["jest"],
+    "types": ["@types/node", "jest"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

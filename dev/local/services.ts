@@ -74,16 +74,16 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // core
   nextjs: {
     group: 'core',
-    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe', 'auto-model-classifier'],
+    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe', 'auto-routing'],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
   stripe: { group: 'core', dependsOn: [] },
-  'auto-model-classifier': {
+  'auto-routing': {
     group: 'core',
     dependsOn: [],
-    dir: 'services/auto-model-classifier',
+    dir: 'services/auto-routing',
   },
   // cloud-agent
   'cloud-agent-next': {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 
 const mockedWarnExceptInTest = jest.fn();
 
-import { scheduleAutoModelClassifierMirror } from './auto-model-classifier-mirror';
+import { scheduleAutoRoutingMirror } from './auto-routing-mirror';
 
 const originalFetch = globalThis.fetch;
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
@@ -19,7 +19,7 @@ function makeRequest() {
   });
 }
 
-describe('scheduleAutoModelClassifierMirror', () => {
+describe('scheduleAutoRoutingMirror', () => {
   let scheduledWork: Array<() => void | Promise<void>>;
 
   beforeEach(() => {
@@ -34,7 +34,7 @@ describe('scheduleAutoModelClassifierMirror', () => {
   });
 
   it('schedules a background mirror request with headers and raw body', async () => {
-    scheduleAutoModelClassifierMirror(
+    scheduleAutoRoutingMirror(
       {
         request: makeRequest(),
         path: '/chat/completions',
@@ -42,7 +42,7 @@ describe('scheduleAutoModelClassifierMirror', () => {
       },
       work => scheduledWork.push(work),
       {
-        workerUrl: 'https://auto-model-classifier.example.com',
+        workerUrl: 'https://auto-routing.example.com',
         authToken: 'classifier-token',
       }
     );
@@ -52,7 +52,7 @@ describe('scheduleAutoModelClassifierMirror', () => {
 
     expect(mockedFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockedFetch.mock.calls[0];
-    expect(url).toBe('https://auto-model-classifier.example.com/classify');
+    expect(url).toBe('https://auto-routing.example.com/decide');
     expect(init).toMatchObject({ method: 'POST' });
     const payload = JSON.parse(init?.body as string);
     expect(payload).toMatchObject({
@@ -74,7 +74,7 @@ describe('scheduleAutoModelClassifierMirror', () => {
   it('swallows worker failures', async () => {
     mockedFetch.mockRejectedValueOnce(new Error('worker unavailable'));
 
-    scheduleAutoModelClassifierMirror(
+    scheduleAutoRoutingMirror(
       {
         request: makeRequest(),
         path: '/chat/completions',
@@ -82,16 +82,15 @@ describe('scheduleAutoModelClassifierMirror', () => {
       },
       work => scheduledWork.push(work),
       {
-        workerUrl: 'https://auto-model-classifier.example.com',
+        workerUrl: 'https://auto-routing.example.com',
         authToken: 'classifier-token',
         onError: (message, data) => mockedWarnExceptInTest(message, data),
       }
     );
     await scheduledWork[0]();
 
-    expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
-      'Auto model classifier mirror request failed',
-      { error: 'worker unavailable' }
-    );
+    expect(mockedWarnExceptInTest).toHaveBeenCalledWith('Auto routing mirror request failed', {
+      error: 'worker unavailable',
+    });
   });
 });

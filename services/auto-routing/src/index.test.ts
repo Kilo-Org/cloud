@@ -23,10 +23,10 @@ const mockClassification = {
 };
 
 function request(path: string, init: RequestInit = {}) {
-  return app.request(`https://auto-model-classifier.example.com${path}`, init, env);
+  return app.request(`https://auto-routing.example.com${path}`, init, env);
 }
 
-describe('auto model classifier worker', () => {
+describe('auto routing worker', () => {
   beforeEach(() => {
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassification);
@@ -40,12 +40,12 @@ describe('auto model classifier worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       status: 'ok',
-      service: 'auto-model-classifier',
+      service: 'auto-routing',
     });
   });
 
   it('normalizes mirrored chat completion requests', async () => {
-    const response = await request('/classify', {
+    const response = await request('/decide', {
       method: 'POST',
       headers: {
         authorization: 'Bearer classifier-token',
@@ -113,7 +113,7 @@ describe('auto model classifier worker', () => {
   });
 
   it('normalizes mirrored responses requests', async () => {
-    const response = await request('/classify', {
+    const response = await request('/decide', {
       method: 'POST',
       headers: {
         authorization: 'Bearer classifier-token',
@@ -154,7 +154,7 @@ describe('auto model classifier worker', () => {
   });
 
   it('normalizes mirrored Anthropic messages requests', async () => {
-    const response = await request('/classify', {
+    const response = await request('/decide', {
       method: 'POST',
       headers: {
         authorization: 'Bearer classifier-token',
@@ -193,7 +193,7 @@ describe('auto model classifier worker', () => {
   });
 
   it('rejects mirrored requests with invalid JSON bodies', async () => {
-    const response = await request('/classify', {
+    const response = await request('/decide', {
       method: 'POST',
       headers: {
         authorization: 'Bearer classifier-token',
@@ -213,7 +213,7 @@ describe('auto model classifier worker', () => {
   });
 
   it('rejects mirrored requests without a requested model', async () => {
-    const response = await request('/classify', {
+    const response = await request('/decide', {
       method: 'POST',
       headers: {
         authorization: 'Bearer classifier-token',
@@ -233,7 +233,7 @@ describe('auto model classifier worker', () => {
   });
 
   it('rejects requests without the backend bearer token', async () => {
-    const response = await request('/classify', {
+    const response = await request('/decide', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({

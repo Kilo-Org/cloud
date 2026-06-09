@@ -3,7 +3,7 @@ import { mirrorPayloadSchema, parseClassifierInput } from './classifier-input';
 import { classifyNormalizedInput } from './model-classifier';
 import type { HonoEnv } from './hono-env';
 
-export const classifyHandler: Handler<HonoEnv> = async c => {
+export const decideHandler: Handler<HonoEnv> = async c => {
   let rawBody: unknown;
   try {
     rawBody = await c.req.json();

@@ -98,7 +98,7 @@ test('overrides the pulled web attachment bucket for nextjs development-local ou
   }
 });
 
-test('generates the auto model classifier worker URL for local Next.js', () => {
+test('generates the auto routing worker URL for local Next.js', () => {
   const repo = createRepo({
     '.env.local': '',
     'apps/web/.env.development.local.example': fs.readFileSync(
@@ -110,9 +110,9 @@ test('generates the auto model classifier worker URL for local Next.js', () => {
     const plan = computePlan(repo.root, new Set(['nextjs']));
 
     assert.deepEqual(
-      plan.envDevLocalChanges.find(change => change.key === 'AUTO_MODEL_CLASSIFIER_WORKER_URL'),
+      plan.envDevLocalChanges.find(change => change.key === 'AUTO_ROUTING_WORKER_URL'),
       {
-        key: 'AUTO_MODEL_CLASSIFIER_WORKER_URL',
+        key: 'AUTO_ROUTING_WORKER_URL',
         oldValue: undefined,
         newValue: 'http://localhost:8810',
       }

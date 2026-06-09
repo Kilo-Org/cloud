@@ -4,19 +4,19 @@ import test from 'node:test';
 
 import { getAlwaysOnGroupIds, getService, resolveGroups } from './services';
 
-test('starts auto model classifier as a core dev service', () => {
-  const service = getService('auto-model-classifier');
+test('starts auto routing as a core dev service', () => {
+  const service = getService('auto-routing');
 
   assert.equal(service.group, 'core');
   assert.equal(service.type, 'worker');
-  assert.equal(service.dir, 'services/auto-model-classifier');
+  assert.equal(service.dir, 'services/auto-routing');
   assert.equal(service.port, 8810);
   assert.match(service.command.join(' '), /pnpm run dev/);
-  assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('auto-model-classifier'));
+  assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('auto-routing'));
 });
 
-test('keeps auto model classifier package dev script compatible with local launcher flags', () => {
-  const service = getService('auto-model-classifier');
+test('keeps auto routing package dev script compatible with local launcher flags', () => {
+  const service = getService('auto-routing');
   const packageJson = JSON.parse(fs.readFileSync(`${service.dir}/package.json`, 'utf-8')) as {
     scripts?: { dev?: string };
   };
@@ -29,8 +29,8 @@ test('keeps auto model classifier package dev script compatible with local launc
   assert.equal(launcherFlags.filter(part => part === '--ip').length, 1);
 });
 
-test('preserves auto model classifier backend auth secret name', () => {
-  const service = getService('auto-model-classifier');
+test('preserves auto routing backend auth secret name', () => {
+  const service = getService('auto-routing');
   const wranglerConfig = fs.readFileSync(`${service.dir}/wrangler.jsonc`, 'utf-8');
 
   assert.match(wranglerConfig, /"binding": "INTERNAL_API_SECRET_PROD"/);

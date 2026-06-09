@@ -1,8 +1,8 @@
 import { after } from 'next/server';
-import { AUTO_MODEL_CLASSIFIER_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
+import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { warnExceptInTest } from '@/lib/utils.server';
 
-type ScheduleAutoModelClassifierMirrorParams = {
+type ScheduleAutoRoutingMirrorParams = {
   request: Request;
   path: '/chat/completions' | '/responses' | '/messages';
   bodyText: string;
@@ -10,7 +10,7 @@ type ScheduleAutoModelClassifierMirrorParams = {
 
 type BackgroundScheduler = (work: () => void | Promise<void>) => void;
 
-type AutoModelClassifierMirrorOptions = {
+type AutoRoutingMirrorOptions = {
   workerUrl?: string;
   authToken?: string;
   onError?: (message: string, data: { error: string }) => void;
@@ -20,19 +20,19 @@ function serializeHeaders(headers: Headers): Record<string, string> {
   return Object.fromEntries(headers.entries());
 }
 
-async function sendAutoModelClassifierMirror({
+async function sendAutoRoutingMirror({
   request,
   path,
   bodyText,
   options,
-}: ScheduleAutoModelClassifierMirrorParams & {
-  options: AutoModelClassifierMirrorOptions;
+}: ScheduleAutoRoutingMirrorParams & {
+  options: AutoRoutingMirrorOptions;
 }): Promise<void> {
-  const workerUrl = options.workerUrl ?? AUTO_MODEL_CLASSIFIER_WORKER_URL;
+  const workerUrl = options.workerUrl ?? AUTO_ROUTING_WORKER_URL;
   const authToken = options.authToken ?? INTERNAL_API_SECRET;
   if (!workerUrl || !authToken) return;
 
-  const response = await fetch(`${workerUrl}/classify`, {
+  const response = await fetch(`${workerUrl}/decide`, {
     method: 'POST',
     headers: new Headers({
       authorization: `Bearer ${authToken}`,
@@ -47,21 +47,21 @@ async function sendAutoModelClassifierMirror({
   });
 
   if (!response.ok) {
-    throw new Error(`classifier worker returned ${response.status}`);
+    throw new Error(`auto routing worker returned ${response.status}`);
   }
 }
 
-export function scheduleAutoModelClassifierMirror(
-  params: ScheduleAutoModelClassifierMirrorParams,
+export function scheduleAutoRoutingMirror(
+  params: ScheduleAutoRoutingMirrorParams,
   schedule: BackgroundScheduler = after,
-  options: AutoModelClassifierMirrorOptions = {}
+  options: AutoRoutingMirrorOptions = {}
 ): void {
   schedule(async () => {
     try {
-      await sendAutoModelClassifierMirror({ ...params, options });
+      await sendAutoRoutingMirror({ ...params, options });
     } catch (error) {
       const onError = options.onError ?? warnExceptInTest;
-      onError('Auto model classifier mirror request failed', {
+      onError('Auto routing mirror request failed', {
         error: error instanceof Error ? error.message : String(error),
       });
     }

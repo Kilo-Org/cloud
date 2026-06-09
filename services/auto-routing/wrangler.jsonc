@@ -1,11 +1,17 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
-  "name": "auto-model-classifier",
+  "name": "auto-routing",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "auto-routing.kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
   "dev": {
     "port": 8810,
     "local_protocol": "http",

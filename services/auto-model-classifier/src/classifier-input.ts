@@ -23,12 +23,10 @@ export const mirrorPayloadSchema = z.object({
 });
 
 const modelSchema = z.string().trim().min(1);
-const messageSchema = z
-  .object({
-    role: z.string(),
-    content: z.unknown().optional(),
-  })
-  .passthrough();
+const messageSchema = z.looseObject({
+  role: z.string(),
+  content: z.unknown().optional(),
+});
 
 const commonBodySchema = {
   model: modelSchema,
@@ -38,28 +36,22 @@ const commonBodySchema = {
   tools: z.array(z.unknown()).optional(),
 };
 
-const chatCompletionBodySchema = z
-  .object({
-    ...commonBodySchema,
-    messages: z.array(messageSchema),
-  })
-  .passthrough();
+const chatCompletionBodySchema = z.looseObject({
+  ...commonBodySchema,
+  messages: z.array(messageSchema),
+});
 
-const responsesBodySchema = z
-  .object({
-    ...commonBodySchema,
-    input: z.unknown().optional(),
-    instructions: z.unknown().optional(),
-  })
-  .passthrough();
+const responsesBodySchema = z.looseObject({
+  ...commonBodySchema,
+  input: z.unknown().optional(),
+  instructions: z.unknown().optional(),
+});
 
-const messagesBodySchema = z
-  .object({
-    ...commonBodySchema,
-    system: z.unknown().optional(),
-    messages: z.array(messageSchema),
-  })
-  .passthrough();
+const messagesBodySchema = z.looseObject({
+  ...commonBodySchema,
+  system: z.unknown().optional(),
+  messages: z.array(messageSchema),
+});
 
 export type MirrorPayload = z.infer<typeof mirrorPayloadSchema>;
 

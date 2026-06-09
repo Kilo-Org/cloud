@@ -4,6 +4,7 @@ declare type Hyperdrive = {
 
 declare type Message<T> = {
   body: T;
+  attempts: number;
   ack(): void;
   retry(): void;
 };

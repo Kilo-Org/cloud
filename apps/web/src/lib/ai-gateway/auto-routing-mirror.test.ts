@@ -58,7 +58,7 @@ describe('scheduleAutoRoutingMirror', () => {
     expect(payload).toMatchObject({
       path: '/chat/completions',
       headers: {
-        authorization: 'Bearer user-token',
+        authorization: '[REDACTED]',
         'content-type': 'application/json',
         'x-kilocode-version': '1.2.3',
       },

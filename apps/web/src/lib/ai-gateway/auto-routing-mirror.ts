@@ -1,4 +1,5 @@
 import { after } from 'next/server';
+import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { warnExceptInTest } from '@/lib/utils.server';
 
@@ -41,7 +42,7 @@ async function sendAutoRoutingMirror({
     body: JSON.stringify({
       path,
       receivedAt: new Date().toISOString(),
-      headers: serializeHeaders(request.headers),
+      headers: redactSensitiveHeaders(serializeHeaders(request.headers)),
       body: bodyText,
     }),
   });

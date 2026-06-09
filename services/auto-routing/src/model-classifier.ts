@@ -48,7 +48,7 @@ export async function classifyWithOpenRouter(
 }
 
 function extractClassifierText(result: ChatResult) {
-  const content = result.choices[0]?.message.content as unknown;
+  const content: unknown = result.choices[0]?.message.content;
   if (typeof content === 'string' && content.trim().length > 0) {
     return content;
   }

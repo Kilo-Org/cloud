@@ -7,7 +7,7 @@
     "reasoningComplexity": "One axes.reasoningComplexity.values[].id: low, medium, or high.",
     "riskLevel": "One axes.riskLevel.values[].id: low, medium, or high.",
     "executionMode": "One axes.executionMode.values[].id.",
-    "requiresTools": "One axes.requiresTools.values[].id. Mark true when accurate completion likely requires repository, terminal, browser, or external tool use.",
+    "requiresTools": "Boolean. Mark true when accurate completion likely requires repository, terminal, browser, or external tool use.",
     "confidence": "Number from 0 to 1 representing classification confidence."
   },
   "decisionRules": [

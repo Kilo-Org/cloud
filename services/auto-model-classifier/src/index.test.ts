@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from './index';
+
+const classifyNormalizedInput = vi.hoisted(() => vi.fn());
+
+vi.mock('./model-classifier', () => ({ classifyNormalizedInput }));
 
 const env = {
   INTERNAL_API_SECRET_PROD: {
@@ -7,11 +11,27 @@ const env = {
   },
 } satisfies Pick<Env, 'INTERNAL_API_SECRET_PROD'>;
 
+const mockClassification = {
+  taskType: 'implementation',
+  subtaskType: 'feature_development',
+  contextComplexity: 'medium',
+  reasoningComplexity: 'medium',
+  riskLevel: 'low',
+  executionMode: 'code_change',
+  requiresTools: true,
+  confidence: 0.82,
+};
+
 function request(path: string, init: RequestInit = {}) {
   return app.request(`https://auto-model-classifier.example.com${path}`, init, env);
 }
 
 describe('auto model classifier worker', () => {
+  beforeEach(() => {
+    classifyNormalizedInput.mockReset();
+    classifyNormalizedInput.mockResolvedValue(mockClassification);
+  });
+
   it('returns health without requiring classifier payload fields', async () => {
     const response = await request('/health', {
       headers: { authorization: 'Bearer classifier-token' },
@@ -62,6 +82,7 @@ describe('auto model classifier worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
+      classification: mockClassification,
       normalized: {
         apiKind: 'chat_completions',
         requestedModel: 'anthropic/claude-sonnet-4',
@@ -74,6 +95,19 @@ describe('auto model classifier worker', () => {
           provider: { order: ['anthropic'] },
           providerOptions: { openrouter: { sort: 'price', apiKey: '[REDACTED]' } },
         },
+      },
+    });
+    expect(classifyNormalizedInput).toHaveBeenCalledWith(env, {
+      apiKind: 'chat_completions',
+      requestedModel: 'anthropic/claude-sonnet-4',
+      systemPromptPrefix: 'You classify auto model routing requests.',
+      userPromptPrefix: 'Pick the best model for this request.',
+      messageCount: 3,
+      hasTools: true,
+      stream: true,
+      providerHints: {
+        provider: { order: ['anthropic'] },
+        providerOptions: { openrouter: { sort: 'price', apiKey: '[REDACTED]' } },
       },
     });
   });
@@ -102,6 +136,7 @@ describe('auto model classifier worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
+      classification: mockClassification,
       normalized: {
         apiKind: 'responses',
         requestedModel: 'openai/gpt-5-mini',
@@ -140,6 +175,7 @@ describe('auto model classifier worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
+      classification: mockClassification,
       normalized: {
         apiKind: 'messages',
         requestedModel: 'anthropic/claude-opus-4',
@@ -173,6 +209,7 @@ describe('auto model classifier worker', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'Invalid mirrored request body' });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('rejects mirrored requests without a requested model', async () => {
@@ -192,6 +229,7 @@ describe('auto model classifier worker', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'Invalid classifier body' });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('rejects requests without the backend bearer token', async () => {
@@ -208,5 +246,6 @@ describe('auto model classifier worker', () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 });

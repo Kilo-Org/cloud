@@ -1,6 +1,11 @@
 import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
-import { OAuthAuthorizationQuerySchema, type OAuthAuthorizationQuery } from '@kilocode/mcp-gateway';
+import {
+  createGatewayError,
+  GatewayErrorCode,
+  OAuthAuthorizationQuerySchema,
+  type OAuthAuthorizationQuery,
+} from '@kilocode/mcp-gateway';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { getUserFromAuth } from '@/lib/user/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
@@ -56,6 +61,51 @@ async function authorizationIdentity() {
   if (authFailedResponse) return { response: authFailedResponse };
   if (!user) return { response: NextResponse.json({ error: 'access_denied' }, { status: 401 }) };
   return { user, executionContext: executionContextFromAuth(organizationId) };
+}
+
+async function authorizationExecutionContext(params: {
+  request: NextRequest;
+  query: OAuthAuthorizationQuery;
+  route?: ScopedConnectRoute;
+  userId: string;
+  executionContext: ReturnType<typeof executionContextFromAuth>;
+  services: ReturnType<typeof createGatewayServices>;
+}) {
+  if (params.request.headers.has('Authorization') || params.executionContext.type !== 'personal') {
+    return params.executionContext;
+  }
+  const queryRoute = params.query.resource
+    ? params.services.routeService.parseResource(params.query.resource)
+    : undefined;
+  if (params.route && queryRoute && params.route.rootPath !== queryRoute.rootPath) {
+    throw createGatewayError(GatewayErrorCode.InvalidRequest, 'Resource does not match route', 400);
+  }
+  const candidateRoute = params.route ?? queryRoute;
+  if (!candidateRoute || candidateRoute.ownerScope !== 'organization') {
+    return params.executionContext;
+  }
+  const resolved = params.route
+    ? {
+        route: params.route,
+        resolved: await params.services.routeService.resolveRouteParams(params.route),
+      }
+    : params.query.resource
+      ? await params.services.routeService.resolveResource(params.query.resource)
+      : null;
+  if (!resolved) {
+    return params.executionContext;
+  }
+  const organizationContext = {
+    type: 'organization' as const,
+    organizationId: candidateRoute.ownerId,
+  };
+  await params.services.routeService.authorize({
+    resolved: resolved.resolved,
+    route: resolved.route,
+    userId: params.userId,
+    executionContext: organizationContext,
+  });
+  return organizationContext;
 }
 
 async function authorizeRequest(
@@ -283,7 +333,14 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
-  const executionContext = identity.executionContext;
+  const executionContext = await authorizationExecutionContext({
+    request,
+    query: parsed.data,
+    route,
+    userId: identity.user.id,
+    executionContext: identity.executionContext,
+    services,
+  });
   const preview = await services.authorizationService.previewAuthorization({
     query: parsed.data,
     route,
@@ -341,7 +398,14 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
-  const executionContext = identity.executionContext;
+  const executionContext = await authorizationExecutionContext({
+    request,
+    query: parsed.data,
+    route,
+    userId: identity.user.id,
+    executionContext: identity.executionContext,
+    services,
+  });
   const preview = await services.authorizationService.previewAuthorization({
     query: parsed.data,
     route,

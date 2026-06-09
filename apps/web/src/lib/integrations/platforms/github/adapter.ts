@@ -247,12 +247,22 @@ export async function fetchGitHubInstallationDetails(
  * Used to show that Kilo is reviewing a PR (e.g., 👀 eyes reaction)
  * @param appType - The type of GitHub App to use (defaults to 'standard')
  */
+export type GitHubReaction =
+  | 'eyes'
+  | '+1'
+  | '-1'
+  | 'laugh'
+  | 'confused'
+  | 'heart'
+  | 'hooray'
+  | 'rocket';
+
 export async function addReactionToPR(
   installationId: string,
   owner: string,
   repo: string,
   prNumber: number,
-  reaction: 'eyes' | '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket',
+  reaction: GitHubReaction,
   appType: GitHubAppType = 'standard'
 ): Promise<void> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
@@ -324,13 +334,32 @@ export async function addReactionToPRReviewComment(
   owner: string,
   repo: string,
   commentId: number,
-  reaction: 'eyes' | '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket',
+  reaction: GitHubReaction,
   appType: GitHubAppType = 'standard'
 ): Promise<void> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
 
   await octokit.reactions.createForPullRequestReviewComment({
+    owner,
+    repo,
+    comment_id: commentId,
+    content: reaction,
+  });
+}
+
+export async function addReactionToIssueComment(
+  installationId: string,
+  owner: string,
+  repo: string,
+  commentId: number,
+  reaction: GitHubReaction,
+  appType: GitHubAppType = 'standard'
+): Promise<void> {
+  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  await octokit.reactions.createForIssueComment({
     owner,
     repo,
     comment_id: commentId,

@@ -1646,7 +1646,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
 
-    it('does not terminalize the parent when an infra retry already exists for the review', async () => {
+    it('terminalizes the parent when the infra retry attempt fails', async () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ status: 'running', session_id: 'agent-second-failure' })
       );
@@ -1655,6 +1655,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           id: '00000000-0000-0000-0000-000000000403',
           status: 'failed',
           session_id: 'agent-second-failure',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000402',
         })
       );
       mockGetLatestCodeReviewAttempt.mockResolvedValue(
@@ -1662,17 +1664,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           id: '00000000-0000-0000-0000-000000000403',
           status: 'failed',
           session_id: 'agent-second-failure',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000402',
         })
       );
-      mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
-        outcome: 'existing-for-review',
-        attempt: makeAttempt({
-          id: '00000000-0000-0000-0000-000000000404',
-          attempt_number: 2,
-          retry_reason: 'infra_failure',
-          status: 'running',
-        }),
-      });
 
       const response = await POST(
         makeRequest({
@@ -1685,15 +1680,17 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        success: true,
-        retried: false,
-        skipped: 'already-retried',
-      });
+      expect(mockGetSessionUsageFromBilling).not.toHaveBeenCalled();
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
-      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
-      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage: 'Unexpected backend failure after prior infra retry',
+          terminalReason: 'upstream_error',
+        })
+      );
     });
 
     it('marks the retry attempt failed when retry startup fails', async () => {

@@ -52,7 +52,7 @@ export function AgentCreateDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { createAgent } = useClawAgentMutations();
+  const { createAgent, refetchAgents } = useClawAgentMutations();
   const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
   const [name, setName] = useState('');
   const [model, setModel] = useState('');
@@ -74,6 +74,7 @@ export function AgentCreateDialog({
 
   const onSubmit = async () => {
     if (!canSubmit) return;
+    const expectedId = normalizeAgentId(trimmedName);
     try {
       await createAgent.mutateAsync({
         name: trimmedName,
@@ -86,6 +87,19 @@ export function AgentCreateDialog({
       reset();
       onOpenChange(false);
     } catch (err) {
+      // Create can time out at the gateway after the controller already made the
+      // agent (fire-and-forget). Reconcile against a fresh list before erroring.
+      try {
+        const list = await refetchAgents();
+        if (list.agents.some(a => a.id === expectedId)) {
+          toast.success(`Created agent ${trimmedName} (took a moment)`);
+          reset();
+          onOpenChange(false);
+          return;
+        }
+      } catch {
+        // fall through to the original error
+      }
       toast.error(err instanceof Error ? err.message : 'Failed to create agent', {
         duration: 10000,
       });
@@ -134,6 +148,10 @@ export function AgentCreateDialog({
               className="w-full"
             />
           </div>
+
+          <p className="text-muted-foreground text-xs">
+            Creating an agent can take up to a minute.
+          </p>
         </div>
 
         <DialogFooter>

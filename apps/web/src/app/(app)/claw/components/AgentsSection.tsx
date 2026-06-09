@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Pencil, Plus, Radio, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -13,6 +13,7 @@ import type {
 } from '@/lib/kiloclaw/types';
 
 import { useClawAgentMutations, useClawAgents } from '../hooks/useClawHooks';
+import { AgentBindingsDialog } from './AgentBindingsDialog';
 import { AgentCreateDialog } from './AgentCreateDialog';
 import { AgentEditDialog } from './AgentEditDialog';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
@@ -51,14 +52,18 @@ function AgentRow({
   agent,
   canUpdate,
   canDelete,
+  canBindings,
   onEdit,
   onDelete,
+  onEditChannels,
 }: {
   agent: AgentSummary;
   canUpdate: boolean;
   canDelete: boolean;
+  canBindings: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onEditChannels: () => void;
 }) {
   const settings = settingChips(agent.settings);
   // `main` is reserved and cannot be deleted (controller rejects it).
@@ -76,8 +81,19 @@ function AgentRow({
             </Badge>
           )}
         </div>
-        {(canUpdate || deletable) && (
+        {(canUpdate || canBindings || deletable) && (
           <div className="flex shrink-0 items-center gap-1">
+            {canBindings && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={onEditChannels}
+                aria-label="Edit channels"
+              >
+                <Radio className="h-3.5 w-3.5" />
+              </Button>
+            )}
             {canUpdate && (
               <Button
                 variant="ghost"
@@ -163,29 +179,49 @@ export function AgentsSection({
   canCreate,
   canUpdate,
   canDelete,
+  canBindings,
 }: {
   enabled: boolean;
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
+  canBindings: boolean;
 }) {
   const { data, isLoading, error } = useClawAgents(enabled);
-  const { deleteAgent } = useClawAgentMutations();
+  const { deleteAgent, refetchAgents } = useClawAgentMutations();
 
   const [createOpen, setCreateOpen] = useState(false);
-  // Freeze the agent AND the etag together when opening the editor, so a
+  // Freeze the agent AND the etag together when opening an editor, so a
   // background list refetch can't advance the etag under a stale form (which
   // would let a save bypass the optimistic-concurrency check).
   const [editTarget, setEditTarget] = useState<{ agent: AgentSummary; etag: string } | null>(null);
+  const [channelsTarget, setChannelsTarget] = useState<{
+    agent: AgentSummary;
+    etag: string;
+  } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AgentSummary | null>(null);
 
   const onConfirmDelete = async () => {
     if (!deleteTarget) return;
+    const { id } = deleteTarget;
+    const label = deleteTarget.name ?? deleteTarget.id;
     try {
-      await deleteAgent.mutateAsync(deleteTarget.id);
-      toast.success(`Deleted ${deleteTarget.name ?? deleteTarget.id}`);
+      await deleteAgent.mutateAsync(id);
+      toast.success(`Deleted ${label}`);
       setDeleteTarget(null);
     } catch (err) {
+      // Delete can time out at the gateway after the controller already removed
+      // the agent (fire-and-forget). Reconcile before showing an error.
+      try {
+        const list = await refetchAgents();
+        if (!list.agents.some(a => a.id === id)) {
+          toast.success(`Deleted ${label}`);
+          setDeleteTarget(null);
+          return;
+        }
+      } catch {
+        // fall through to the original error
+      }
       toast.error(err instanceof Error ? err.message : 'Failed to delete agent', {
         duration: 10000,
       });
@@ -225,8 +261,10 @@ export function AgentsSection({
                 agent={agent}
                 canUpdate={canUpdate}
                 canDelete={canDelete}
+                canBindings={canBindings}
                 onEdit={() => setEditTarget({ agent, etag: data.etag })}
                 onDelete={() => setDeleteTarget(agent)}
+                onEditChannels={() => setChannelsTarget({ agent, etag: data.etag })}
               />
             ))}
             <DefaultsRow defaults={data.defaults} />
@@ -250,6 +288,18 @@ export function AgentsSection({
           }}
           agent={editTarget.agent}
           etag={editTarget.etag}
+        />
+      )}
+
+      {channelsTarget && data && (
+        <AgentBindingsDialog
+          open
+          onOpenChange={open => {
+            if (!open) setChannelsTarget(null);
+          }}
+          agent={channelsTarget.agent}
+          etag={channelsTarget.etag}
+          agents={data.agents}
         />
       )}
 

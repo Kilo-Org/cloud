@@ -13,7 +13,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { useTRPC } from '@/lib/trpc/utils';
-import type { AgentCreateInput, AgentUpdateInput } from '@/lib/kiloclaw/agent-schemas';
+import type {
+  AgentBindingsInput,
+  AgentCreateInput,
+  AgentUpdateInput,
+} from '@/lib/kiloclaw/agent-schemas';
+import type { AgentConfigListResponse } from '@/lib/kiloclaw/types';
 import { useClawContext } from '../components/ClawContext';
 
 // Config
@@ -117,42 +122,42 @@ export function useClawAgents(enabled = true) {
 }
 
 /**
- * Agent lifecycle mutations (create / update / delete), context-aware. Callers
- * pass the base input; the org variant injects organizationId. Each mutation
- * invalidates the active listAgents query on success.
+ * Agent lifecycle mutations (create / update / delete / bindings), context-aware.
+ * Callers pass the base input; the org variant injects organizationId.
+ *
+ * Invalidation runs on **settled** (success OR error), not just success: an
+ * agent mutation can time out at the edge gateway after the controller already
+ * applied it (fire-and-forget), so the list must refetch even on error or a
+ * created/edited agent stays invisible. `refetchAgents` force-fetches the list
+ * so callers can reconcile (did the op actually land despite a timeout?).
  */
 export function useClawAgentMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { organizationId } = useClawContext();
 
-  const invalidateAgents = () =>
-    queryClient.invalidateQueries({
-      queryKey: organizationId
-        ? trpc.organizations.kiloclaw.listAgents.queryKey({ organizationId })
-        : trpc.kiloclaw.listAgents.queryKey(),
-    });
+  const listOptions = organizationId
+    ? trpc.organizations.kiloclaw.listAgents.queryOptions({ organizationId })
+    : trpc.kiloclaw.listAgents.queryOptions(undefined);
 
-  const personalCreate = useMutation(
-    trpc.kiloclaw.createAgent.mutationOptions({ onSuccess: invalidateAgents })
-  );
-  const orgCreate = useMutation(
-    trpc.organizations.kiloclaw.createAgent.mutationOptions({ onSuccess: invalidateAgents })
-  );
-  const personalUpdate = useMutation(
-    trpc.kiloclaw.updateAgent.mutationOptions({ onSuccess: invalidateAgents })
-  );
-  const orgUpdate = useMutation(
-    trpc.organizations.kiloclaw.updateAgent.mutationOptions({ onSuccess: invalidateAgents })
-  );
-  const personalDelete = useMutation(
-    trpc.kiloclaw.deleteAgent.mutationOptions({ onSuccess: invalidateAgents })
-  );
-  const orgDelete = useMutation(
-    trpc.organizations.kiloclaw.deleteAgent.mutationOptions({ onSuccess: invalidateAgents })
+  const invalidateAgents = () => queryClient.invalidateQueries({ queryKey: listOptions.queryKey });
+  const refetchAgents = (): Promise<AgentConfigListResponse> =>
+    queryClient.fetchQuery({ ...listOptions, staleTime: 0 });
+
+  const opts = { onSettled: invalidateAgents };
+  const personalCreate = useMutation(trpc.kiloclaw.createAgent.mutationOptions(opts));
+  const orgCreate = useMutation(trpc.organizations.kiloclaw.createAgent.mutationOptions(opts));
+  const personalUpdate = useMutation(trpc.kiloclaw.updateAgent.mutationOptions(opts));
+  const orgUpdate = useMutation(trpc.organizations.kiloclaw.updateAgent.mutationOptions(opts));
+  const personalDelete = useMutation(trpc.kiloclaw.deleteAgent.mutationOptions(opts));
+  const orgDelete = useMutation(trpc.organizations.kiloclaw.deleteAgent.mutationOptions(opts));
+  const personalBindings = useMutation(trpc.kiloclaw.updateAgentBindings.mutationOptions(opts));
+  const orgBindings = useMutation(
+    trpc.organizations.kiloclaw.updateAgentBindings.mutationOptions(opts)
   );
 
   return {
+    refetchAgents,
     createAgent: {
       mutateAsync: (input: AgentCreateInput) =>
         organizationId
@@ -174,7 +179,32 @@ export function useClawAgentMutations() {
           : personalDelete.mutateAsync({ agentId }),
       isPending: organizationId ? orgDelete.isPending : personalDelete.isPending,
     },
+    updateBindings: {
+      mutateAsync: (agentId: string, bindings: AgentBindingsInput) =>
+        organizationId
+          ? orgBindings.mutateAsync({ organizationId, agentId, bindings })
+          : personalBindings.mutateAsync({ agentId, bindings }),
+      isPending: organizationId ? orgBindings.isPending : personalBindings.isPending,
+    },
   };
+}
+
+/** Channel catalog (telegram/discord/slack + `configured`), context-aware. */
+export function useClawChannelCatalog(enabled = true) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.getChannelCatalog.queryOptions(undefined),
+    enabled: enabled && !organizationId,
+  });
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.getChannelCatalog.queryOptions({
+      organizationId: organizationId ?? '',
+    }),
+    enabled: enabled && !!organizationId,
+  });
+  return organizationId ? org : personal;
 }
 
 export function useClawMorningBriefingStatus(enabled: boolean) {

@@ -92,7 +92,13 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
   if (!running) {
     // Machine stopped — AgentsSection renders the "start your machine" hint.
     content = (
-      <AgentsSection enabled={false} canCreate={false} canUpdate={false} canDelete={false} />
+      <AgentsSection
+        enabled={false}
+        canCreate={false}
+        canUpdate={false}
+        canDelete={false}
+        canBindings={false}
+      />
     );
   } else if (versionQuery.isLoading) {
     content = <LoadingCard />;
@@ -126,6 +132,7 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
         canCreate={has('config.agents.create.basic.cli')}
         canUpdate={has('config.agents.update')}
         canDelete={has('config.agents.delete.cli')}
+        canBindings={has('config.agents.bindings.update')}
       />
     );
   }

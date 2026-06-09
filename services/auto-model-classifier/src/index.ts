@@ -4,14 +4,7 @@ import {
   createErrorHandler,
   createNotFoundHandler,
 } from '@kilocode/worker-utils';
-import * as z from 'zod';
-
-const mirrorPayloadSchema = z.object({
-  path: z.string().min(1),
-  receivedAt: z.string().min(1),
-  headers: z.record(z.string(), z.string()),
-  body: z.string(),
-});
+import { mirrorPayloadSchema, parseClassifierInput } from './classifier-input';
 
 type HonoEnv = { Bindings: Env };
 
@@ -37,7 +30,12 @@ app.post('/classify', async c => {
     return c.json({ error: 'Invalid classifier payload' }, 400);
   }
 
-  return c.json({ ok: true });
+  const classifierInput = parseClassifierInput(parsed.data);
+  if (!classifierInput.success) {
+    return c.json({ error: classifierInput.error }, 400);
+  }
+
+  return c.json({ ok: true, normalized: classifierInput.data });
 });
 
 app.notFound(createNotFoundHandler());

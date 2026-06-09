@@ -18,6 +18,10 @@ export type RequesterInfo = {
   platform: Platform;
 };
 
+export type BotTypingIndicator = {
+  done(): Promise<void>;
+};
+
 export type BotPlatform = {
   platform: Platform;
   documentationUrl: string;
@@ -50,6 +54,12 @@ export type BotPlatform = {
     triggerMessage: ContextTriggerMessage;
     platformIntegration: PlatformIntegration;
   }): Promise<string>;
+  startTyping?(params: {
+    thread: Thread;
+    message: Message;
+    platformIntegration: PlatformIntegration;
+    text: string;
+  }): Promise<BotTypingIndicator | void>;
   getRequesterInfo(params: {
     message: Message;
     platformIntegration: PlatformIntegration;

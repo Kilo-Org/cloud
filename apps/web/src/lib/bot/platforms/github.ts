@@ -13,7 +13,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { GitHubAdapter, GitHubRawMessage } from '@chat-adapter/github';
 import { Octokit } from '@octokit/rest';
 import type { PlatformIntegration } from '@kilocode/db';
-import type { Message, Thread } from 'chat';
+import { emoji, type Message, type Thread } from 'chat';
 
 type GitHubInstallationLookup = Pick<GitHubAdapter, 'getInstallationId'>;
 
@@ -272,6 +272,23 @@ function isGitHubBotEnabledForIntegration(integration: PlatformIntegration): boo
   return metadata?.bot_enabled === true;
 }
 
+async function addGitHubReactionBestEffort(
+  thread: Thread,
+  message: Message,
+  reaction: typeof emoji.eyes | typeof emoji.check
+): Promise<void> {
+  try {
+    await thread.adapter.addReaction(thread.id, message.id, reaction);
+  } catch (error) {
+    console.warn('[bot] Failed to add GitHub bot reaction', {
+      threadId: thread.id,
+      messageId: message.id,
+      reaction: reaction.name,
+      error,
+    });
+  }
+}
+
 export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup): BotPlatform {
   return {
     platform: PLATFORM.GITHUB,
@@ -408,6 +425,15 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
       lines.push('', 'Comment that triggered this bot run:', formatUserMessage(trigger));
 
       return lines.join('\n');
+    },
+    async startTyping({ thread, message }) {
+      await addGitHubReactionBestEffort(thread, message, emoji.eyes);
+
+      return {
+        async done() {
+          await addGitHubReactionBestEffort(thread, message, emoji.check);
+        },
+      };
     },
     async getRequesterInfo({ displayName }) {
       return { displayName, platform: PLATFORM.GITHUB };

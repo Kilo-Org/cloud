@@ -5,19 +5,22 @@ import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
 import { startTyping } from '@/lib/bot/typing';
+import type { BotPlatform } from '@/lib/bot/platforms/types';
 
 export async function processLinkedMessage({
   thread,
   message,
   platformIntegration,
+  botPlatform,
   user,
 }: {
   thread: Thread;
   message: Message;
   platformIntegration: PlatformIntegration;
+  botPlatform: BotPlatform;
   user: User;
 }) {
-  const typingIndicator = await startTyping({ thread, message, platformIntegration });
+  const typingIndicator = await startTyping({ botPlatform, thread, message, platformIntegration });
 
   try {
     let botRequestId: string;

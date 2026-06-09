@@ -258,6 +258,7 @@ describe('bot mention authorization', () => {
       thread,
       message,
       platformIntegration: integration,
+      botPlatform: mockSlackBotPlatform,
       user,
     });
   });

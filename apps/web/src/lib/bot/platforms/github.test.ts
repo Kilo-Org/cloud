@@ -35,6 +35,17 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   generateGitHubInstallationToken: mockGenerateGitHubInstallationToken,
 }));
 
+jest.mock(
+  'chat',
+  () => ({
+    emoji: {
+      check: { name: 'check' },
+      eyes: { name: 'eyes' },
+    },
+  }),
+  { virtual: true }
+);
+
 import type { Message, Thread } from 'chat';
 import type { PlatformIntegration } from '@kilocode/db';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -78,10 +89,14 @@ async function* messages(items: Message[]): AsyncIterable<Message> {
   for (const item of items) yield item;
 }
 
-function createThread(params: { id: string; threadMessages?: Message[] }): Thread {
+function createThread(params: {
+  id: string;
+  threadMessages?: Message[];
+  addReaction?: jest.Mock;
+}): Thread {
   return {
     id: params.id,
-    adapter: { name: 'github' },
+    adapter: { name: 'github', addReaction: params.addReaction ?? jest.fn() },
     isDM: false,
     channel: {
       fetchMetadata: async () => ({
@@ -97,7 +112,7 @@ function createThread(params: { id: string; threadMessages?: Message[] }): Threa
     get messages() {
       return messages(params.threadMessages ?? []);
     },
-  } as Thread;
+  } as unknown as Thread;
 }
 
 function createIntegration(overrides: Partial<PlatformIntegration> = {}): PlatformIntegration {
@@ -449,5 +464,61 @@ describe('createGitHubBotPlatform.getConversationContext', () => {
     expect(context).toContain('This conditional is wrong.');
     expect(context).not.toContain('<github_review_comment id="301"');
     expect(context).toContain('Comment that triggered this bot run:');
+  });
+});
+
+describe('createGitHubBotPlatform.startTyping', () => {
+  it('uses chat-sdk reactions for GitHub processing start and completion', async () => {
+    const addReaction = jest.fn(async () => undefined);
+    const thread = createThread({
+      id: 'github:Kilo-Org/on-call:issue:37',
+      addReaction,
+    });
+    const message = createMessage({ id: '101', text: '@kilocode-dev Please fix this' });
+
+    const indicator = await githubPlatform.startTyping?.({
+      thread,
+      message,
+      platformIntegration: createIntegration(),
+      text: 'Thinking...',
+    });
+    await indicator?.done();
+
+    expect(addReaction).toHaveBeenNthCalledWith(
+      1,
+      thread.id,
+      message.id,
+      expect.objectContaining({ name: 'eyes' })
+    );
+    expect(addReaction).toHaveBeenNthCalledWith(
+      2,
+      thread.id,
+      message.id,
+      expect.objectContaining({ name: 'check' })
+    );
+  });
+
+  it('does not let GitHub reaction failures block processing', async () => {
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const addReaction = jest.fn(async () => {
+      throw new Error('reaction failed');
+    });
+    const thread = createThread({
+      id: 'github:Kilo-Org/on-call:issue:37',
+      addReaction,
+    });
+    const message = createMessage({ id: '101', text: '@kilocode-dev Please fix this' });
+
+    const indicator = await githubPlatform.startTyping?.({
+      thread,
+      message,
+      platformIntegration: createIntegration(),
+      text: 'Thinking...',
+    });
+    await indicator?.done();
+
+    expect(addReaction).toHaveBeenCalledTimes(2);
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(2);
+    consoleWarnSpy.mockRestore();
   });
 });

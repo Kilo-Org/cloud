@@ -144,13 +144,16 @@ async function reprocessLinkedMessage(
     const platformIntegration = await getPlatformIntegration(identity);
     if (!platformIntegration) return;
 
-    await botPlatforms.require(platformIntegration.platform).withAuthContext({
+    const botPlatform = botPlatforms.require(platformIntegration.platform);
+
+    await botPlatform.withAuthContext({
       platformIntegration,
       fn: async () => {
         await processLinkedMessage({
           thread,
           message,
           platformIntegration,
+          botPlatform,
           user,
         });
       },

@@ -44,7 +44,8 @@ import {
   ExperimentUpstreamSchema,
   type ExperimentUpstream,
 } from '@/lib/ai-gateway/experiments/upstream-schema';
-import { CustomLlmMetadataSchema, type CustomLlmMetadata } from '@kilocode/db/schema-types';
+import { parseMetadataJson } from '@/lib/ai-gateway/experiments/metadata-json';
+import { CustomLlmMetadataSchema } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { toast } from 'sonner';
 import { Plus, ChevronLeft, KeyRound, RefreshCw, Pencil } from 'lucide-react';
@@ -57,37 +58,6 @@ const INITIAL_UPSTREAM: ExperimentUpstream = {
   internal_id: '',
   base_url: '',
 };
-
-function parseMetadataJson(
-  value: string
-): { success: true; data: CustomLlmMetadata | null } | { success: false; error: string } {
-  if (!value.trim()) {
-    return { success: true, data: null };
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch {
-    return { success: false, error: 'Invalid JSON syntax' };
-  }
-
-  if (parsed === null) {
-    return { success: true, data: null };
-  }
-
-  const result = StrictCustomLlmMetadataSchema.safeParse(parsed);
-  if (!result.success) {
-    return {
-      success: false,
-      error: result.error.issues
-        .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-        .join('\n'),
-    };
-  }
-
-  return { success: true, data: result.data };
-}
 
 type Status = 'draft' | 'active' | 'paused' | 'completed';
 

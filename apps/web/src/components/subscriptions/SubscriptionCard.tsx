@@ -18,6 +18,7 @@ export function SubscriptionCard({
   isTerminal = false,
   warningTone,
   statusNote,
+  action,
 }: {
   icon: ReactNode;
   title: ReactNode;
@@ -31,16 +32,20 @@ export function SubscriptionCard({
   isTerminal?: boolean;
   warningTone?: 'warning' | 'info';
   statusNote?: string | null;
+  action?: ReactNode;
 }) {
   return (
-    <Link href={href} className="block">
-      <Card
-        className={cn(
-          'transition-all hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md',
-          isTerminal && 'opacity-55',
-          warningTone === 'warning' && 'border-amber-500/40 bg-amber-500/5',
-          warningTone === 'info' && 'border-blue-500/40 bg-blue-500/5'
-        )}
+    <Card
+      className={cn(
+        'transition-all hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md',
+        isTerminal && 'opacity-55',
+        warningTone === 'warning' && 'border-amber-500/40 bg-amber-500/5',
+        warningTone === 'info' && 'border-border bg-muted/40'
+      )}
+    >
+      <Link
+        href={href}
+        className="block focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-start md:justify-between">
           <div className="flex min-w-0 gap-3">
@@ -60,7 +65,7 @@ export function SubscriptionCard({
                 <p
                   className={cn(
                     'text-sm font-medium',
-                    warningTone === 'warning' ? 'text-amber-300' : 'text-blue-300'
+                    warningTone === 'warning' ? 'text-amber-300' : 'text-muted-foreground'
                   )}
                 >
                   {statusNote}
@@ -82,7 +87,10 @@ export function SubscriptionCard({
           </div>
           <ChevronRight className="text-muted-foreground size-5 shrink-0 self-center md:mt-3" />
         </CardContent>
-      </Card>
-    </Link>
+      </Link>
+      {action ? (
+        <div className="flex px-5 pb-5 [&>button]:w-full sm:[&>button]:w-auto">{action}</div>
+      ) : null}
+    </Card>
   );
 }

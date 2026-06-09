@@ -787,6 +787,52 @@ describe('CodeReviewOrchestrator recovery', () => {
     await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
   });
 
+  it('retries prepareSession once after wrapper version mismatch', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcError(
+            500,
+            'Wrapper version mismatch after startup: expected 2.0.0, got 1.9.9'
+          );
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-wrapper-version-retry',
+          kiloSessionId: 'ses_wrapper_version_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-wrapper-version-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-wrapper-version-retry',
+      cliSessionId: 'ses_wrapper_version_retry',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expect(storedReview(stub)).resolves.toMatchObject({ sandboxRetryAttempted: true });
+  });
+
   it('fails after a second sandbox 500 without initiating', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {

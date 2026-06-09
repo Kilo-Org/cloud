@@ -17,6 +17,7 @@ const agentMocks = {
   updateAgent: jest.fn(),
   updateAgentDefaults: jest.fn(),
   deleteAgent: jest.fn(),
+  updateAgentBindings: jest.fn(),
 };
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
@@ -175,6 +176,26 @@ describe('kiloclaw agent procedures (personal namespace)', () => {
     expect(agentMocks.deleteAgent.mock.calls[0][1]).toBe('work');
   });
 
+  it('updateAgentBindings forwards agentId and the bindings payload', async () => {
+    agentMocks.updateAgentBindings.mockResolvedValue({
+      ok: true,
+      etag: 'e2',
+      agent: AGENT_SUMMARY,
+    });
+    const caller = await createCallerForUser(personalUser.id);
+
+    await caller.kiloclaw.updateAgentBindings({
+      agentId: 'work',
+      bindings: { etag: 'e1', channels: ['slack'] },
+    });
+
+    expect(agentMocks.updateAgentBindings.mock.calls[0][1]).toBe('work');
+    expect(agentMocks.updateAgentBindings.mock.calls[0][2]).toEqual({
+      etag: 'e1',
+      channels: ['slack'],
+    });
+  });
+
   it('rejects invalid input before calling the client (non-absolute workspace)', async () => {
     const caller = await createCallerForUser(personalUser.id);
 
@@ -272,6 +293,24 @@ describe('kiloclaw agent procedures (org namespace)', () => {
         patch: { set: { thinkingDefault: 'high' } },
       })
     ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('updateAgentBindings forwards the bindings payload for an org instance', async () => {
+    agentMocks.updateAgentBindings.mockResolvedValue({
+      ok: true,
+      etag: 'e2',
+      agent: AGENT_SUMMARY,
+    });
+    const caller = await createCallerForUser(orgOwner.id);
+
+    await caller.organizations.kiloclaw.updateAgentBindings({
+      organizationId: orgId,
+      agentId: 'work',
+      bindings: { channels: ['slack'] },
+    });
+
+    expect(agentMocks.updateAgentBindings.mock.calls[0][1]).toBe('work');
+    expect(agentMocks.updateAgentBindings.mock.calls[0][2]).toEqual({ channels: ['slack'] });
   });
 
   it('returns NOT_FOUND when the org has no active instance', async () => {

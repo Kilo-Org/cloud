@@ -10,6 +10,7 @@ import {
   AgentCreateInputSchema,
   AgentUpdateInputSchema,
   AgentDefaultsUpdateInputSchema,
+  AgentBindingsInputSchema,
 } from '@/lib/kiloclaw/agent-schemas';
 import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
@@ -1703,6 +1704,29 @@ export const organizationKiloclawRouter = createTRPCRouter({
         return await client.deleteAgent(ctx.user.id, input.agentId, workerInstanceId(instance));
       } catch (err) {
         handleFileOperationError(err, 'delete agent');
+      }
+    }),
+
+  updateAgentBindings: organizationMemberMutationProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid(),
+        agentId: AgentIdSchema,
+        bindings: AgentBindingsInputSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.updateAgentBindings(
+          ctx.user.id,
+          input.agentId,
+          input.bindings,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'update agent bindings');
       }
     }),
 

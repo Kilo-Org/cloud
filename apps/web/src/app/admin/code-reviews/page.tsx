@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { CodeReviewStats } from '@/app/admin/components/CodeReviewStats';
@@ -39,7 +39,8 @@ const breadcrumbs = (
   </BreadcrumbItem>
 );
 
-type RangeType = '7d' | 'interval';
+type PresetRangeType = '30m' | '1h' | '2h' | '7d';
+type RangeType = PresetRangeType | 'interval';
 type OwnershipType = 'all' | 'personal' | 'organization';
 type RetryAccountingModeType = 'final_outcome' | 'all_attempts';
 
@@ -76,9 +77,19 @@ type DateIntervalValidation = {
 };
 
 const dateRangeOptions = [
+  { value: '30m', label: 'Last 30 min' },
+  { value: '1h', label: 'Last 1h' },
+  { value: '2h', label: 'Last 2h' },
   { value: '7d', label: 'Last 7 days' },
   { value: 'interval', label: 'Date interval' },
 ] satisfies { value: RangeType; label: string }[];
+
+const presetRangeDurations = {
+  '30m': 30 * 60 * 1000,
+  '1h': 60 * 60 * 1000,
+  '2h': 2 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+} satisfies Record<PresetRangeType, number>;
 
 function toDatetimeLocalInput(date: Date): string {
   return format(date, "yyyy-MM-dd'T'HH:mm");
@@ -93,9 +104,9 @@ function roundUpToDatetimeLocalMinute(date: Date): Date {
   return minuteDate;
 }
 
-function createTrailingSevenDayIntervalState(): DateIntervalState {
+function createTrailingIntervalState(durationMs: number): DateIntervalState {
   const end = roundUpToDatetimeLocalMinute(new Date());
-  const start = subDays(end, 7);
+  const start = new Date(end.getTime() - durationMs);
 
   return {
     activeInterval: {
@@ -107,6 +118,10 @@ function createTrailingSevenDayIntervalState(): DateIntervalState {
       endInput: toDatetimeLocalInput(end),
     },
   };
+}
+
+function createPresetIntervalState(rangeType: PresetRangeType): DateIntervalState {
+  return createTrailingIntervalState(presetRangeDurations[rangeType]);
 }
 
 function parseDatetimeLocal(value: string): Date | null {
@@ -143,8 +158,8 @@ function formatDateIntervalLabel(value: string): string {
 
 export default function CodeReviewsPage() {
   const [rangeType, setRangeType] = useState<RangeType>('7d');
-  const [dateIntervalState, setDateIntervalState] = useState<DateIntervalState>(
-    createTrailingSevenDayIntervalState
+  const [dateIntervalState, setDateIntervalState] = useState<DateIntervalState>(() =>
+    createPresetIntervalState('7d')
   );
   const [isExporting, setIsExporting] = useState(false);
 
@@ -189,9 +204,9 @@ export default function CodeReviewsPage() {
 
   const handleRangeTypeChange = (nextRangeType: RangeType) => {
     setRangeType(nextRangeType);
-    if (nextRangeType !== '7d') return;
+    if (nextRangeType === 'interval') return;
 
-    setDateIntervalState(createTrailingSevenDayIntervalState());
+    setDateIntervalState(createPresetIntervalState(nextRangeType));
   };
 
   const handleIntervalDraftChange = (field: keyof DateIntervalDraft, value: string) => {
@@ -230,8 +245,8 @@ export default function CodeReviewsPage() {
   const handleRefresh = useCallback(() => {
     if (isIntervalDraftInvalid) return;
 
-    if (rangeType === '7d') {
-      const nextPresetState = createTrailingSevenDayIntervalState();
+    if (rangeType !== 'interval') {
+      const nextPresetState = createPresetIntervalState(rangeType);
       if (
         nextPresetState.activeInterval.startDate !== startDate ||
         nextPresetState.activeInterval.endDate !== endDate

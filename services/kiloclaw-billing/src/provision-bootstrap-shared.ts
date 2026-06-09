@@ -2,6 +2,8 @@ import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import {
   CURRENT_KILOCLAW_PRICE_VERSION,
   LEGACY_KILOCLAW_PRICE_VERSION,
+  classifyKiloClawCommitTerm,
+  findLatestPreCutoffUserCommitSwitchQualification,
   getKiloClawPricingCatalogEntry,
   insertKiloClawSubscriptionChangeLog,
   kiloclaw_earlybird_purchases,
@@ -522,6 +524,76 @@ function currentSubscriptionRecency(subscription: KiloClawSubscription): number 
   );
 }
 
+type PersonalTransferSafety =
+  | { safe: true }
+  | {
+      safe: false;
+      reason:
+        | 'provider_state_mismatch'
+        | 'missing_qualification_evidence'
+        | 'boundary_mismatch'
+        | 'conflicting_qualification_evidence';
+    };
+
+async function assessPersonalTransferSafety(
+  tx: Pick<WorkerDb, 'execute' | 'insert' | 'select' | 'update'>,
+  subscription: KiloClawSubscription
+): Promise<PersonalTransferSafety> {
+  const providerOwnershipConsistent =
+    (subscription.payment_source !== 'stripe' || subscription.stripe_subscription_id !== null) &&
+    (subscription.stripe_schedule_id === null || subscription.stripe_subscription_id !== null) &&
+    (subscription.payment_source !== null ||
+      (subscription.stripe_subscription_id === null && subscription.stripe_schedule_id === null));
+  if (!providerOwnershipConsistent) {
+    return { safe: false, reason: 'provider_state_mismatch' };
+  }
+
+  if (subscription.scheduled_plan === 'standard' && subscription.scheduled_by !== 'user') {
+    return { safe: false, reason: 'provider_state_mismatch' };
+  }
+
+  const switchQualification =
+    subscription.scheduled_plan === 'commit'
+      ? await findLatestPreCutoffUserCommitSwitchQualification(tx, subscription.id)
+      : null;
+  let classification: ReturnType<typeof classifyKiloClawCommitTerm>;
+  try {
+    classification = classifyKiloClawCommitTerm({
+      plan: subscription.plan,
+      scheduledPlan: subscription.scheduled_plan,
+      scheduledBy: subscription.scheduled_by,
+      currentPeriodStart: subscription.current_period_start,
+      currentPeriodEnd: subscription.current_period_end,
+      commitEndsAt: subscription.commit_ends_at,
+      qualifiedAt: switchQualification?.qualifiedAt,
+      qualificationSource: switchQualification?.qualificationSource,
+    });
+  } catch {
+    classification = 'ambiguous';
+  }
+
+  if (classification === 'ambiguous') {
+    const missingSwitchQualification =
+      subscription.scheduled_plan === 'commit' && switchQualification === null;
+    const boundaryMismatch =
+      subscription.plan === 'commit' &&
+      subscription.commit_ends_at !== null &&
+      subscription.current_period_end !== null &&
+      parseSubscriptionTimestamp(subscription.commit_ends_at) !==
+        parseSubscriptionTimestamp(subscription.current_period_end);
+    return {
+      safe: false,
+      reason: missingSwitchQualification
+        ? 'missing_qualification_evidence'
+        : boundaryMismatch
+          ? 'boundary_mismatch'
+          : 'conflicting_qualification_evidence',
+    };
+  }
+
+  return { safe: true };
+}
+
 async function createSuccessorPersonalSubscription(
   params: BootstrapProvisionWithDbParams & {
     source: KiloClawSubscription;
@@ -571,6 +643,16 @@ async function createSuccessorPersonalSubscription(
 
     if (existingTargetRow) {
       throw new Error('Target instance already has a subscription row');
+    }
+
+    const safety = await assessPersonalTransferSafety(tx, before);
+    if (!safety.safe) {
+      console.error('[kiloclaw-billing/bootstrap] Aborting unsafe personal subscription transfer', {
+        subscriptionId: before.id,
+        targetInstanceId: input.instanceId,
+        reason: safety.reason,
+      });
+      throw new Error(`Unsafe personal subscription transfer: ${safety.reason}`);
     }
 
     const [insertedSuccessor] = await tx
@@ -635,18 +717,17 @@ async function createSuccessorPersonalSubscription(
       throw new Error('Failed to update predecessor personal subscription row');
     }
 
-    const successor =
-      before.stripe_subscription_id || before.stripe_schedule_id
-        ? await tx
-            .update(kiloclaw_subscriptions)
-            .set({
-              stripe_subscription_id: before.stripe_subscription_id,
-              stripe_schedule_id: before.stripe_schedule_id,
-            })
-            .where(eq(kiloclaw_subscriptions.id, insertedSuccessor.id))
-            .returning()
-            .then(rows => rows[0] ?? null)
-        : insertedSuccessor;
+    const successor = before.stripe_subscription_id
+      ? await tx
+          .update(kiloclaw_subscriptions)
+          .set({
+            stripe_subscription_id: before.stripe_subscription_id,
+            stripe_schedule_id: before.stripe_schedule_id,
+          })
+          .where(eq(kiloclaw_subscriptions.id, insertedSuccessor.id))
+          .returning()
+          .then(rows => rows[0] ?? null)
+      : insertedSuccessor;
 
     if (!successor) {
       throw new Error('Failed to restore successor Stripe ownership');

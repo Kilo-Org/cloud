@@ -6,6 +6,7 @@ import {
   type WrapperPromptPart,
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
+import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 import { git, logToFile, runProcess, type ExecResult } from './utils.js';
 import { restoreSession } from './restore-session.js';
 
@@ -251,31 +252,21 @@ async function refreshGitRemoteToken(
   }
 }
 
-async function writeSessionFiles(request: WrapperSessionReadyRequest): Promise<void> {
+async function writeSessionAuthFile(request: WrapperSessionReadyRequest): Promise<void> {
   const kiloAuthDir = path.join(request.workspace.sessionHome, '.local/share/kilo');
   await fs.mkdir(kiloAuthDir, { recursive: true });
   await fs.writeFile(
     path.join(kiloAuthDir, 'auth.json'),
     JSON.stringify({ kilo: { type: 'api', key: request.session.workerAuthToken } }, null, 2)
   );
+}
 
+async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promise<void> {
   const rulesDir = path.join(request.workspace.sessionHome, '.kilocode/rules');
   await fs.mkdir(rulesDir, { recursive: true });
   await fs.writeFile(
     path.join(rulesDir, 'cloud-agent.md'),
-    [
-      '# Cloud Agent Environment',
-      '',
-      "You are running inside a sandboxed cloud container, not on the user's local machine.",
-      'The filesystem is ephemeral and will not persist after the session ends.',
-      "Do not assume access to the user's local files, browsers, or desktop environment.",
-      '',
-      '## Temporary Files',
-      '',
-      `When you need to create temporary or scratch files, use \`/tmp/${request.agentSessionId}/\` as your scratch directory.`,
-      'This path is pre-approved for file access and will not trigger permission prompts.',
-      '',
-    ].join('\n')
+    buildCloudAgentRules(request.agentSessionId)
   );
 }
 
@@ -475,6 +466,8 @@ export async function prepareWrapperBootstrapWorkspace(
   await ensureWorkspaceDirectories(request);
 
   try {
+    await writeCloudAgentRules(request);
+
     if (workspaceWasWarm) {
       logToFile(
         `bootstrap warm workspace refreshing remote kiloSessionId=${request.kiloSessionId}`
@@ -500,7 +493,7 @@ export async function prepareWrapperBootstrapWorkspace(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
 
-      await writeSessionFiles(request);
+      await writeSessionAuthFile(request);
       await writeRuntimeSkills(request);
 
       progress?.(

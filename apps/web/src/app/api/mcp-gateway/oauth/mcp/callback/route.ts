@@ -30,6 +30,9 @@ export async function GET(request: NextRequest) {
       code,
       userId: user.id,
     });
+    if (!callback.authorizationRequest) {
+      return NextResponse.redirect(callback.completionUrl);
+    }
     const finalized = await services.authorizationService.completeProviderAuthorization({
       authorizationRequest: callback.authorizationRequest,
     });

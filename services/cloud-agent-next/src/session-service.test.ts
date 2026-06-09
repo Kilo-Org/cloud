@@ -68,11 +68,13 @@ import {
   buildCommandGuardBashPermissions,
   fetchSessionMetadata,
   getCommandGuardPolicy,
+  writeGlobalRules,
 } from './session-service.js';
 import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 import type { ExecutionSession, SandboxInstance, SessionId } from './types.js';
 import type { FencedWrapperDispatchRequest } from './execution/types.js';
+import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
 import {
   SandboxCapacityInspectionError,
   WorkspaceCapacityAdmissionRejectedError,
@@ -246,6 +248,20 @@ function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
+
+describe('writeGlobalRules', () => {
+  it('writes the shared Cloud Agent rules for the session', async () => {
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(createSession(), false, writeFile);
+
+    await writeGlobalRules(sandbox, '/home/agent_test', 'agent_test');
+
+    expect(writeFile).toHaveBeenCalledWith(
+      '/home/agent_test/.kilocode/rules/cloud-agent.md',
+      buildCloudAgentRules('agent_test')
+    );
+  });
+});
 
 describe('SessionService.prepareWorkspace', () => {
   beforeEach(() => {

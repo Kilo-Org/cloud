@@ -599,6 +599,50 @@ function getRelevantFields(
       value: <DateWithRelative date={sub.destruction_deadline} severity="warn" withTime />,
     });
   }
+  if (sub.plan === 'commit' || sub.scheduled_plan === 'commit') {
+    const pendingFinalTerm = sub.plan === 'standard' && sub.scheduled_plan === 'commit';
+    const standardConsent = sub.scheduled_plan === 'standard' && sub.scheduled_by === 'user';
+    fields.push({
+      label: 'Commit retirement',
+      value: pendingFinalTerm
+        ? 'Pending final term'
+        : standardConsent
+          ? 'Standard scheduled'
+          : sub.cancel_at_period_end
+            ? 'Final term non-renewing'
+            : 'Final term',
+    });
+    fields.push({
+      label: 'Qualification authority',
+      value: pendingFinalTerm ? (
+        'Subscription change log'
+      ) : sub.plan === 'commit' && sub.current_period_start ? (
+        <span>
+          Current period{' '}
+          <span className="text-muted-foreground text-xs">
+            ({formatDate(sub.current_period_start)})
+          </span>
+        </span>
+      ) : (
+        '—'
+      ),
+    });
+    fields.push({
+      label: 'Final term boundary',
+      value: (
+        <DateWithRelative
+          date={sub.commit_ends_at ?? sub.current_period_end}
+          severity="warn"
+          withTime
+        />
+      ),
+    });
+    fields.push({
+      label: 'Standard consent',
+      value: standardConsent ? 'Recorded by user schedule' : 'Not recorded',
+    });
+  }
+
   if (sub.scheduled_plan) {
     fields.push({
       label: 'Scheduled plan',

@@ -13,6 +13,7 @@ import type {
 } from '@kilocode/db/schema-types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
+import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
@@ -33,6 +34,12 @@ export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
 export const REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH = {
   none: { reasoning: { enabled: false, effort: 'none' } },
   ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+} as const;
+
+export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
+  none: { reasoning: { enabled: false, effort: 'none' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
 } as const;
 
 const REASONING_VARIANTS_CLAUDE_BASE = {
@@ -105,6 +112,9 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   }
   if (isStepModel(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
+  }
+  if (isDeepseekModel(model)) {
+    return REASONING_VARIANTS_NONE_HIGH_XHIGH;
   }
   return undefined;
 }

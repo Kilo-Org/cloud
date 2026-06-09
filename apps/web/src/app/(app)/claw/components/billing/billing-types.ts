@@ -19,7 +19,38 @@ export function formatMicrodollars(microdollars: number): string {
   return `$${(microdollars / 1_000_000).toFixed(2)}`;
 }
 
+export function formatKiloClawFundingSource(source: KiloClawFundingSource | null): string {
+  if (source === 'stripe') return 'Stripe';
+  if (source === 'credits') return 'Credits';
+  return 'your current payment source';
+}
+
+export function formatStandardContinuationPrice(microdollars: number | null): string {
+  return microdollars === null
+    ? 'your lineage Standard monthly price'
+    : `${formatMicrodollars(microdollars)}/month`;
+}
+
 export type ClawPlan = 'commit' | 'standard';
+export type CommitRetirementState =
+  | 'pending_final_term'
+  | 'final_term'
+  | 'standard_scheduled'
+  | 'completed'
+  | 'manual_review';
+export type KiloClawFundingSource = 'stripe' | 'credits';
+
+export type KiloClawRetirementDisplay = {
+  isFinalCommitTerm: boolean;
+  commitRetirementState: CommitRetirementState | null;
+  finalCommitEndsAt: string | null;
+  standardContinuationPriceMicrodollars: number | null;
+  currentFundingSource: KiloClawFundingSource | null;
+  futureFundingSource: KiloClawFundingSource | null;
+  standardContinuationScheduled: boolean;
+  needsSupportReview: boolean;
+};
+
 export type KiloPassUpsellTier = '19' | '49' | '199';
 export type KiloPassUpsellCadence = 'monthly' | 'yearly';
 export type KiloPassUpsellActivationPreview = {
@@ -173,6 +204,47 @@ export function formatKiloClawPlanPrice(input: KiloClawPlanPriceParams): string 
   return input.plan === 'commit' ? `${price}/6-month commit` : `${price}/month`;
 }
 
+export function getKiloClawRetirementDisplay(input: {
+  plan: string;
+  paymentSource: string | null;
+  hasStripeFunding: boolean;
+  commitEndsAt?: string | null;
+  isFinalCommitTerm?: boolean;
+  commitRetirementState?: CommitRetirementState | null;
+  finalCommitEndsAt?: string | null;
+  standardContinuationPriceMicrodollars?: number | null;
+  currentFundingSource?: KiloClawFundingSource | null;
+  futureFundingSource?: KiloClawFundingSource | null;
+  standardContinuationScheduled?: boolean;
+  needsSupportReview?: boolean;
+}): KiloClawRetirementDisplay {
+  const currentFundingSource = input.hasStripeFunding
+    ? 'stripe'
+    : input.paymentSource === 'credits'
+      ? 'credits'
+      : null;
+  const commitRetirementState = input.commitRetirementState ?? null;
+  const standardContinuationScheduled =
+    input.standardContinuationScheduled ?? commitRetirementState === 'standard_scheduled';
+  const isFinalCommitTerm =
+    input.isFinalCommitTerm ??
+    (input.plan === 'commit' &&
+      (commitRetirementState === 'final_term' || standardContinuationScheduled));
+
+  return {
+    isFinalCommitTerm,
+    commitRetirementState,
+    finalCommitEndsAt:
+      input.finalCommitEndsAt ?? (isFinalCommitTerm ? (input.commitEndsAt ?? null) : null),
+    standardContinuationPriceMicrodollars: input.standardContinuationPriceMicrodollars ?? null,
+    currentFundingSource: input.currentFundingSource ?? currentFundingSource,
+    futureFundingSource:
+      input.futureFundingSource ?? input.currentFundingSource ?? currentFundingSource,
+    standardContinuationScheduled,
+    needsSupportReview: input.needsSupportReview ?? commitRetirementState === 'manual_review',
+  };
+}
+
 export function formatKiloClawFirstChargeLabel(params: {
   plan: ClawPlan;
   costMicrodollars: number;
@@ -226,6 +298,8 @@ export type ClawBillingStatus = {
   intendedPriceVersion: string;
   /** Self-service instance entitlement for the intended price version. */
   intendedSelfServiceInstanceType: string;
+  /** Server-derived policy decision for whether fresh Commit selection is allowed. */
+  commitPlanAvailable?: boolean;
   creditEnrollmentPreview: Record<
     ClawPlan,
     {
@@ -271,6 +345,14 @@ export type ClawBillingStatus = {
     showConversionPrompt: boolean;
     /** True when Stripe subscription is being cancelled to convert to credit-funded billing. */
     pendingConversion: boolean;
+    isFinalCommitTerm?: boolean;
+    commitRetirementState?: CommitRetirementState | null;
+    finalCommitEndsAt?: string | null;
+    standardContinuationPriceMicrodollars?: number | null;
+    currentFundingSource?: KiloClawFundingSource | null;
+    futureFundingSource?: KiloClawFundingSource | null;
+    standardContinuationScheduled?: boolean;
+    needsSupportReview?: boolean;
     referralRewards: {
       totalAppliedMonths: number;
       applications: Array<{

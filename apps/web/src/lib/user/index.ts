@@ -46,6 +46,8 @@ import {
   slack_bot_requests,
   bot_requests,
   cloud_agent_code_reviews,
+  code_review_feedback_events,
+  code_review_memory_proposals,
   kiloclaw_instances,
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
@@ -831,7 +833,8 @@ export class SoftDeletePreconditionError extends Error {
  *   security_agent_repository_sync_state,
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
- *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
+ *   cloud_agent_code_reviews, review memory feedback/proposals,
+ *   device_auth_requests, auto_top_up_configs,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
@@ -1098,6 +1101,12 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_memory_proposals)
+      .where(eq(code_review_memory_proposals.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_feedback_events)
+      .where(eq(code_review_feedback_events.owned_by_user_id, userId));
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));

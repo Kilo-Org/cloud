@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { app } from './index';
 
 const env = {
-  BACKEND_AUTH_TOKEN: 'classifier-token',
-} satisfies Env;
+  INTERNAL_API_SECRET_PROD: {
+    get: async () => 'classifier-token',
+  },
+} satisfies Pick<Env, 'INTERNAL_API_SECRET_PROD'>;
 
 function request(path: string, init: RequestInit = {}) {
   return app.request(`https://auto-model-classifier.example.com${path}`, init, env);

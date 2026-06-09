@@ -14,16 +14,11 @@
   "observability": {
     "enabled": true,
   },
-  "secrets": {
-    "required": ["BACKEND_AUTH_TOKEN"],
-  },
-  "env": {
-    "dev": {
-      "name": "auto-model-classifier-dev",
-      "workers_dev": true,
-      "secrets": {
-        "required": ["BACKEND_AUTH_TOKEN"],
-      },
+  "secrets_store_secrets": [
+    {
+      "binding": "INTERNAL_API_SECRET_PROD",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
     },
-  },
+  ],
 }

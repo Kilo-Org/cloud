@@ -772,6 +772,47 @@ export async function importOpenclawWorkspace(
   }
 }
 
+/** Controller-owned code meaning "image has the routes, plugin not loaded yet". */
+function isMorningBriefingPluginUnavailable(error: unknown): boolean {
+  return (
+    error instanceof GatewayControllerError && error.code === 'morning_briefing_plugin_unavailable'
+  );
+}
+
+/**
+ * Transient "plugin/gateway still coming up" status the dashboard renders as
+ * a warmup state (not the terminal "Upgrade Required" banner). The card keys
+ * off `code === 'gateway_warming_up'`; the message is informational only.
+ */
+function morningBriefingWarmingUp(): z.infer<typeof MorningBriefingStatusResponseSchema> {
+  return {
+    ok: true,
+    reconcileState: 'in_progress',
+    error: 'Morning Briefing is starting up, retrying shortly.',
+    code: 'gateway_warming_up',
+    retryAfterSec: 2,
+  };
+}
+
+/**
+ * True when the controller image advertises the morning-briefing capability,
+ * i.e. the image actually carries the bundled plugin routes. Used to tell a
+ * transient route blip on a *capable* image apart from a genuinely too-old
+ * controller. Fails closed (treat as unsupported) when the version route is
+ * itself unreachable — the same conservative default as a missing route.
+ */
+async function controllerSupportsMorningBriefing(
+  state: InstanceMutableState,
+  env: KiloClawEnv
+): Promise<boolean> {
+  try {
+    const version = await getControllerVersion(state, env);
+    return version?.capabilities?.includes('morning-briefing.status') ?? false;
+  } catch {
+    return false;
+  }
+}
+
 export async function getMorningBriefingStatus(
   state: InstanceMutableState,
   env: KiloClawEnv
@@ -787,15 +828,26 @@ export async function getMorningBriefingStatus(
       { timeoutMs: 5_000 }
     );
   } catch (error) {
-    if (isErrorUnknownRoute(error)) return null;
+    // The image carries the routes but the in-container plugin has not
+    // finished loading (common right after a redeploy onto a new :latest
+    // image). Surface a transient warmup state, never "Upgrade Required".
+    if (isMorningBriefingPluginUnavailable(error)) {
+      return morningBriefingWarmingUp();
+    }
     if (isMorningBriefingWarmupControllerError(error)) {
-      return {
-        ok: true,
-        reconcileState: 'in_progress',
-        error: 'Gateway warming up, retrying shortly.',
-        code: 'gateway_warming_up',
-        retryAfterSec: 2,
-      };
+      return morningBriefingWarmingUp();
+    }
+    if (isErrorUnknownRoute(error)) {
+      // The route is missing entirely — an old controller's proxy catch-all
+      // (401 `controller_route_unavailable`) or a bare 404. Only declare the
+      // image "too old" (→ null → controller_route_unavailable → upgrade
+      // banner) when it genuinely does NOT advertise the morning-briefing
+      // capability. A capable image hitting this path is a transient blip,
+      // so we keep the user in a warmup state instead of nagging an upgrade.
+      if (await controllerSupportsMorningBriefing(state, env)) {
+        return morningBriefingWarmingUp();
+      }
+      return null;
     }
     throw error;
   }

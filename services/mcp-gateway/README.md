@@ -31,7 +31,7 @@ pnpm --filter cloudflare-mcp-gateway dev
 
 ## Local key material
 
-The key generator emits a matching app/Worker key bundle without writing secrets to disk:
+The key generator emits a matching app/Worker key bundle without writing secrets to disk. App keyset env values are base64-encoded JSON so they are easier to paste into Vercel. Base64 is only transport formatting, not protection: these values still contain secret key material and must be handled as secrets. Worker keyset values remain raw JSON for Wrangler secrets:
 
 ```bash
 pnpm --filter cloudflare-mcp-gateway keys:generate

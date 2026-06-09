@@ -22,7 +22,7 @@ export async function getFeatureFlagPayload<T>(
     const flagPayload = await posthogClient
       .getFeatureFlagPayload(flagName, 'server-config-fetch')
       .catch(error => {
-        console.error(`Error fetching feature flag '${flagName}':`, error);
+        console.error('Error fetching feature flag:', flagName, error);
         captureException(error, {
           tags: { source: 'posthog_feature_flag_payload' },
           extra: { flagName },

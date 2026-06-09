@@ -91,8 +91,21 @@ function bindGlobalFeedSession(state: WrapperState): void {
   });
 }
 
-function makeKiloClient(serverUrl = 'http://127.0.0.1:4321'): WrapperKiloClient {
-  return { serverUrl } as WrapperKiloClient;
+function makeKiloClient(
+  serverUrl = 'http://127.0.0.1:4321',
+  statuses: Record<string, { type: string; [key: string]: unknown }> = {}
+): WrapperKiloClient {
+  return { serverUrl, getSessionStatuses: async () => statuses } as WrapperKiloClient;
+}
+
+function rootStatusFrame(status: { type: string; [key: string]: unknown }): string {
+  return JSON.stringify({
+    directory: process.cwd(),
+    payload: {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root_1', status },
+    },
+  });
 }
 
 afterEach(() => {
@@ -197,6 +210,7 @@ describe('openKiloGlobalFeed', () => {
       Authorization: 'Bearer worker-token',
     });
     expect(ws.sent).toEqual([
+      rootStatusFrame({ type: 'idle' }),
       JSON.stringify({
         directory: '/workspace/root',
         payload: { type: 'message.updated', properties: { id: 'msg_1' } },
@@ -206,6 +220,72 @@ describe('openKiloGlobalFeed', () => {
         payload: { type: 'session.idle', properties: { sessionID: 'child' } },
       }),
     ]);
+  });
+
+  it('bootstraps the current non-idle root status when the worker feed connects', async () => {
+    const state = new WrapperState();
+    bindGlobalFeedSession(state);
+    const fetchImpl = asFetch(async () => new Response(streamFromChunks([]), { status: 200 }));
+
+    const connection = openKiloGlobalFeed({
+      state,
+      kiloClient: makeKiloClient('http://127.0.0.1:4321', {
+        kilo_root_1: { type: 'busy' },
+        kilo_child_1: { type: 'retry', attempt: 1, message: 'retrying', next: 123 },
+      }),
+      fetchImpl,
+      WebSocketImpl: FakeWebSocket as unknown as GlobalFeedWebSocketImpl,
+      retryDelayMs: 60_000,
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+    connection.close();
+    await connection.done;
+
+    const sent = FakeWebSocket.instances[0].sent.map(frame => JSON.parse(frame));
+    expect(sent).toEqual([
+      {
+        directory: process.cwd(),
+        payload: {
+          type: 'session.status',
+          properties: { sessionID: 'kilo_root_1', status: { type: 'busy' } },
+        },
+      },
+    ]);
+  });
+
+  it('retries the feed when the authoritative root status bootstrap fails', async () => {
+    const state = new WrapperState();
+    bindGlobalFeedSession(state);
+    let statusAttempt = 0;
+    let secondAttemptStarted: (() => void) | undefined;
+    const secondAttempt = new Promise<void>(resolve => {
+      secondAttemptStarted = resolve;
+    });
+    const kiloClient = {
+      ...makeKiloClient(),
+      getSessionStatuses: async () => {
+        statusAttempt += 1;
+        if (statusAttempt === 1) throw new Error('status unavailable');
+        secondAttemptStarted?.();
+        return {};
+      },
+    } as WrapperKiloClient;
+
+    const connection = openKiloGlobalFeed({
+      state,
+      kiloClient,
+      fetchImpl: asFetch(async () => new Response(streamFromChunks([]), { status: 200 })),
+      WebSocketImpl: FakeWebSocket as unknown as GlobalFeedWebSocketImpl,
+    });
+
+    await secondAttempt;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    connection.close();
+    await connection.done;
+
+    expect(statusAttempt).toBeGreaterThanOrEqual(2);
+    expect(FakeWebSocket.instances.at(-1)?.sent).toContain(rootStatusFrame({ type: 'idle' }));
   });
 
   it('forwards substantive events from a CRLF feed split between delimiter bytes', async () => {
@@ -238,6 +318,7 @@ describe('openKiloGlobalFeed', () => {
     await connection.done;
 
     expect(FakeWebSocket.instances[0].sent).toEqual([
+      rootStatusFrame({ type: 'idle' }),
       JSON.stringify({
         directory: '/workspace/root',
         payload: { type: 'message.updated', properties: { id: 'msg_crlf' } },
@@ -302,6 +383,7 @@ describe('openKiloGlobalFeed', () => {
     // dropped and the following normal event was still forwarded.
     expect(FakeWebSocket.instances.length).toBe(1);
     expect(FakeWebSocket.instances[0].sent).toEqual([
+      rootStatusFrame({ type: 'idle' }),
       JSON.stringify({
         directory: '/workspace/root',
         payload: { type: 'message.updated', properties: { id: 'msg_after_oversized' } },
@@ -312,8 +394,9 @@ describe('openKiloGlobalFeed', () => {
   it('drops an event under backpressure then forwards later events once pressure clears', async () => {
     const state = new WrapperState();
     bindGlobalFeedSession(state);
-    // First read is backed up; the second read has drained.
-    FakeWebSocket.bufferedAmountSequence = [Number.MAX_SAFE_INTEGER, 0];
+    // Bootstrap status send drains first; then the first feed event is backed
+    // up and the second read has drained.
+    FakeWebSocket.bufferedAmountSequence = [0, Number.MAX_SAFE_INTEGER, 0];
     const fetchImpl = asFetch(async () => {
       return new Response(
         streamFromChunks([
@@ -338,6 +421,7 @@ describe('openKiloGlobalFeed', () => {
 
     expect(FakeWebSocket.instances.length).toBe(1);
     expect(FakeWebSocket.instances[0].sent).toEqual([
+      rootStatusFrame({ type: 'idle' }),
       JSON.stringify({
         directory: '/workspace/root',
         payload: { type: 'message.updated', properties: { id: 'msg_sent' } },

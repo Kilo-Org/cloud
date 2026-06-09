@@ -1,9 +1,5 @@
 import * as z from 'zod';
-import type {
-  ExecutionMode,
-  RetryableResultCode,
-  SessionMessageIntent,
-} from '../execution/types.js';
+import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { logger } from '../logger.js';
 import { AttachmentsSchema, CallbackTargetSchema } from '../persistence/schemas.js';
@@ -57,6 +53,7 @@ const SessionMessageIntentSchema = z.object({
         messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
         command: z.string().min(1),
         arguments: z.string(),
+        snapshotInitialization: z.literal('wait').optional(),
       })
       .strict(),
   ]),
@@ -78,6 +75,7 @@ const PendingFlushFailureCodeSchema = z.enum([
   'NOT_FOUND',
   'BAD_REQUEST',
   'INTERNAL',
+  'PERMANENT_EXECUTION_FAILURE',
   'PENDING_QUEUE_FULL',
   'MODEL_MISSING',
   'UNKNOWN',
@@ -490,14 +488,7 @@ export async function recordPendingFlushFailure(
   now: number,
   options: {
     policy: PendingFlushPolicy;
-    code?:
-      | RetryableResultCode
-      | 'NOT_FOUND'
-      | 'BAD_REQUEST'
-      | 'INTERNAL'
-      | 'PENDING_QUEUE_FULL'
-      | 'MODEL_MISSING'
-      | 'UNKNOWN';
+    code?: PendingFlushFailureCode;
     subtype?: WorkspaceFailureSubtype;
     safeFailureMessage?: string;
     retryable?: boolean;
@@ -570,17 +561,7 @@ export async function recordPendingFlushFailure(
   }
   return { message: updated, attempts, exhausted, nextFlushAttemptAt };
 }
-function isRetryableFlushCode(
-  code:
-    | RetryableResultCode
-    | 'NOT_FOUND'
-    | 'BAD_REQUEST'
-    | 'INTERNAL'
-    | 'PENDING_QUEUE_FULL'
-    | 'MODEL_MISSING'
-    | 'UNKNOWN'
-    | undefined
-): boolean {
+function isRetryableFlushCode(code: PendingFlushFailureCode | undefined): boolean {
   return (
     code === undefined ||
     code === 'UNKNOWN' ||

@@ -155,6 +155,7 @@ export const SessionMessageStateSchema = z
             messageId: z.string(),
             command: z.string(),
             arguments: z.string(),
+            snapshotInitialization: z.literal('wait').optional(),
           }),
         ]),
         agent: z.object({ mode: z.string(), model: z.string(), variant: z.string().optional() }),
@@ -183,6 +184,7 @@ export const SessionMessageStateSchema = z
               messageId: z.string(),
               command: z.string(),
               arguments: z.string(),
+              snapshotInitialization: z.literal('wait').optional(),
             }),
           ])
           .optional(),
@@ -352,6 +354,7 @@ function normalizeParsedSessionMessageState(
         messageId: z.string(),
         command: z.string(),
         arguments: z.string(),
+        snapshotInitialization: z.literal('wait').optional(),
       }),
     ])
     .safeParse(state.turn);

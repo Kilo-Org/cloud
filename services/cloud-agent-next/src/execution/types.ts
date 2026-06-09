@@ -54,6 +54,7 @@ export type CommandExecutionTurnSubmission = {
   id?: string | null;
   command: string;
   arguments: string;
+  snapshotInitialization?: 'wait';
   attachments?: Attachments;
 };
 
@@ -72,6 +73,7 @@ export type AcceptedCommandTurn = {
   messageId: string;
   command: string;
   arguments: string;
+  snapshotInitialization?: 'wait';
 };
 
 export type AcceptedExecutionTurn = AcceptedPromptTurn | AcceptedCommandTurn;

@@ -1106,6 +1106,33 @@ describe('SessionMessageQueue', () => {
     expect(harness.events).toHaveLength(0);
   });
 
+  it('persists command snapshot policy as immutable durable intent', async () => {
+    const harness = createQueueHarness();
+    const request = {
+      userId: 'user_test' as UserId,
+      turn: {
+        type: 'command' as const,
+        id: FIRST_MESSAGE_ID,
+        command: 'init',
+        arguments: '',
+        snapshotInitialization: 'wait' as const,
+      },
+    };
+
+    const admitted = await harness.queue.admitSubmittedMessage(request);
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    const replay = await harness.queue.admitSubmittedMessage(request);
+    const changedReplay = await harness.queue.admitSubmittedMessage({
+      ...request,
+      turn: { ...request.turn, snapshotInitialization: undefined },
+    });
+
+    expect(admitted).toMatchObject({ success: true, messageId: FIRST_MESSAGE_ID });
+    expect(pending?.intent?.turn).toMatchObject({ snapshotInitialization: 'wait' });
+    expect(replay).toMatchObject({ success: true, messageId: FIRST_MESSAGE_ID });
+    expect(changedReplay).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+  });
+
   it('admits prompt documents as canonical attachments in durable pending state', async () => {
     const harness = createQueueHarness();
     const attachments = {
@@ -1620,6 +1647,84 @@ describe('SessionMessageQueue', () => {
     expect(pending?.nextFlushAttemptAt).toBeDefined();
     expect(pending?.deliveryDisposition).toBeUndefined();
     expect(harness.terminalizations).toHaveLength(0);
+  });
+
+  it.each([
+    [
+      'invalid request',
+      ExecutionError.invalidRequest(
+        'GitHub token or active app installation required for this repository (no_installation_found)'
+      ),
+      'invalid_delivery_request',
+    ],
+    ['missing session', ExecutionError.sessionNotFound('agent_test'), 'session_metadata_missing'],
+    [
+      'wrapper job conflict',
+      ExecutionError.wrapperJobConflict('wrapper is busy'),
+      'delivery_failure_unknown',
+    ],
+  ] as const)(
+    'terminalizes thrown permanent %s without retrying',
+    async (_name, error, failureCode) => {
+      const harness = createQueueHarness({
+        deliver: async () => Promise.reject(error),
+      });
+      await harness.queue.admitSubmittedMessage({
+        userId: 'user_test' as UserId,
+        turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'do not retry permanent failure' },
+      });
+
+      const drain = await harness.queue.drainNextPendingMessage();
+
+      expect(harness.deliver).toHaveBeenCalledOnce();
+      expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+      expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+      expect(harness.terminalizations).toHaveLength(1);
+      expect(harness.terminalizations[0]?.params).toMatchObject({
+        kind: 'failed',
+        error: error.message,
+        completionSource: 'delivery_failure',
+        failureStage: 'pre_dispatch',
+        failureCode,
+        attempts: 1,
+      });
+    }
+  );
+
+  it('replaces an earlier retryable cause with a later permanent failure', async () => {
+    const permanentError = ExecutionError.wrapperJobConflict('wrapper is busy');
+    const deliver = vi
+      .fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>()
+      .mockRejectedValueOnce(
+        ExecutionError.workspaceSetupFailed('workspace temporarily unavailable')
+      )
+      .mockRejectedValueOnce(permanentError);
+    const harness = createQueueHarness({ deliver });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'stop after permanent failure' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected workspace setup failure to be retried');
+    }
+
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    const drain = await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.deliver).toHaveBeenCalledTimes(2);
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      error: permanentError.message,
+      failureStage: 'pre_dispatch',
+      failureCode: 'delivery_failure_unknown',
+      attempts: 2,
+    });
   });
 
   it('preserves a thrown workspace setup failure through retry exhaustion', async () => {

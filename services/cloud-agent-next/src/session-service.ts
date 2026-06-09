@@ -2109,6 +2109,9 @@ export class SessionService {
         command: turn.command,
         ...(turn.arguments.length > 0 ? { args: turn.arguments } : {}),
         messageId: turn.messageId,
+        ...(turn.snapshotInitialization !== undefined
+          ? { snapshotInitialization: turn.snapshotInitialization }
+          : {}),
         agent: {
           mode: promptAgent,
           model: { modelID: agent.model },
@@ -2844,7 +2847,8 @@ export class SessionService {
     env: PersistenceEnv,
     organizationId: string | undefined,
     createdOnPlatform: string,
-    title?: string
+    title?: string,
+    gitUrl?: string
   ): Promise<void> {
     try {
       await env.SESSION_INGEST.createSessionForCloudAgent({
@@ -2854,6 +2858,7 @@ export class SessionService {
         organizationId,
         createdOnPlatform,
         title,
+        gitUrl,
       });
     } catch (error) {
       logger

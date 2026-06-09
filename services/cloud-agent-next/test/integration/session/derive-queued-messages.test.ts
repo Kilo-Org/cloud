@@ -65,6 +65,41 @@ describe('deriveQueuedMessages (/stream connect catch-up)', () => {
     expect(snapshots).toEqual([]);
   });
 
+  it('retains the initial message snapshot after wrapper acceptance', async () => {
+    const sessionId = 'agent_initial_snapshot';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const snapshot = await runInDurableObject(stub, async instance => {
+      await instance.registerSession(
+        groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'Build me a CLI',
+          mode: 'code',
+          model: 'claude',
+          initialMessageId: MSG_INITIAL,
+        })
+      );
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: MSG_INITIAL,
+        status: 'accepted',
+        prompt: 'Build me a CLI',
+        createdAt: 1700000000000,
+        queuedAt: 1700000000100,
+        acceptedAt: 1700000000200,
+      });
+      return instance.getInitialMessageSnapshot();
+    });
+
+    expect(snapshot).toEqual({
+      messageId: MSG_INITIAL,
+      content: 'Build me a CLI',
+      timestamp: 1700000000100,
+    });
+  });
+
   it('returns every entry in the pending_message:* queue', async () => {
     const sessionId = 'agent_queued_derive_2';
     const stub = env.CLOUD_AGENT_SESSION.get(

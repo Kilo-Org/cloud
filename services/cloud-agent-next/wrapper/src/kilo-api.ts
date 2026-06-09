@@ -16,6 +16,7 @@ import type { KiloClient as SDKClient } from '@kilocode/sdk';
 import { createKiloClient as createV2Client } from '@kilocode/sdk/v2';
 import { logToFile } from './utils.js';
 import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slash-commands.js';
+import type { SessionStatus } from '../../src/shared/protocol.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -174,6 +175,40 @@ function requireSdkData<T>(result: { data?: T; error?: unknown }, operation: str
   return result.data;
 }
 
+function isJsonNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isSessionStatus(value: unknown): value is SessionStatus {
+  if (!isRecord(value) || typeof value.type !== 'string') return false;
+  if (value.type === 'idle' || value.type === 'busy') return true;
+  if (value.type === 'offline') {
+    return typeof value.requestID === 'string' && typeof value.message === 'string';
+  }
+  if (value.type !== 'retry') return false;
+  if (
+    !isJsonNumber(value.attempt) ||
+    typeof value.message !== 'string' ||
+    !isJsonNumber(value.next)
+  ) {
+    return false;
+  }
+  if (value.action === undefined) return true;
+  return (
+    isRecord(value.action) &&
+    typeof value.action.reason === 'string' &&
+    typeof value.action.provider === 'string' &&
+    typeof value.action.title === 'string' &&
+    typeof value.action.message === 'string' &&
+    typeof value.action.label === 'string' &&
+    (value.action.link === undefined || typeof value.action.link === 'string')
+  );
+}
+
+function isSessionStatusMap(value: unknown): value is Record<string, SessionStatus> {
+  return isRecord(value) && Object.values(value).every(isSessionStatus);
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -264,7 +299,7 @@ export type WrapperKiloClient = {
   ) => Promise<boolean>;
   answerQuestion: (questionId: string, answers: string[][]) => Promise<boolean>;
   rejectQuestion: (questionId: string) => Promise<boolean>;
-  getSessionStatuses: () => Promise<Record<string, { type: string; [key: string]: unknown }>>;
+  getSessionStatuses: () => Promise<Record<string, SessionStatus>>;
   getQuestions: () => Promise<
     Array<{ id: string; sessionID: string; tool?: { messageID: string; callID: string } }>
   >;
@@ -459,7 +494,11 @@ export function createWrapperKiloClient(
 
     getSessionStatuses: async () => {
       const result = await v2Client.session.status();
-      return (result.data ?? {}) as Record<string, { type: string; [key: string]: unknown }>;
+      const statuses: unknown = requireSdkData(result, 'Session status');
+      if (!isSessionStatusMap(statuses)) {
+        throw new Error('Session status returned invalid data');
+      }
+      return statuses;
     },
 
     getQuestions: async () => {

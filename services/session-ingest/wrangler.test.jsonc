@@ -20,6 +20,10 @@
         "name": "SESSION_INGEST_DO",
         "class_name": "SessionIngestDO",
       },
+      {
+        "name": "USER_CONNECTION_DO",
+        "class_name": "UserConnectionDO",
+      },
     ],
   },
 
@@ -27,6 +31,26 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["SessionIngestDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["UserConnectionDO"],
+    },
+  ],
+
+  "services": [
+    {
+      "binding": "SESSION_INGEST",
+      "service": "session-ingest-test",
+      "entrypoint": "SessionIngestRPC",
+    },
+  ],
+
+  "secrets_store_secrets": [
+    {
+      "binding": "INTERNAL_API_SECRET_PROD",
+      "store_id": "00000000000000000000000000000000",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
     },
   ],
 

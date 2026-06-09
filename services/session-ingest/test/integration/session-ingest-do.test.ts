@@ -1,14 +1,17 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 
 import {
   decodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
 } from '@kilocode/session-ingest-contracts';
 import {
+  KILO_SDK_EXACT_MESSAGE_PART_ROW_WORK_CAP,
   KILO_SDK_HISTORY_BOUNDED_MESSAGE_SCAN_ROW_WORK_CAP,
   MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
   MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES,
+  readKiloSdkMessage,
 } from '../../src/dos/kilo-sdk-materialization';
 import { INGEST_CHUNK_MAX_BYTES, MAX_INGEST_ITEM_BYTES } from '../../src/util/ingest-limits';
 
@@ -56,6 +59,7 @@ describe('SessionIngestDO integration', () => {
         await expect(stub.ingest(items, envelopeUserId, sessionId, 1, 1)).resolves.toEqual({
           accepted: true,
           changes: [],
+          attentionSignals: [],
         });
         await runInDurableObject(stub, async (_instance, state) => {
           const rows = [
@@ -299,6 +303,389 @@ describe('SessionIngestDO integration', () => {
 
       expect(await stub.readKiloSdkSessionSnapshot()).toEqual({
         kind: 'retryable_failure',
+      });
+    });
+  });
+
+  describe('SDK exact message reads', () => {
+    it('directly materializes the selected message and its parts', async () => {
+      const sessionId = 'ses_sdk_exact_message_000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const info = {
+        id: 'msg_exact_01',
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: 100 },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      };
+      const part = {
+        id: 'prt_exact_01',
+        sessionID: sessionId,
+        messageID: info.id,
+        type: 'text' as const,
+        text: 'selected',
+      };
+      await stub.ingest(
+        [
+          { type: 'message', data: info },
+          { type: 'part', data: part },
+          {
+            type: 'message',
+            data: {
+              ...info,
+              id: 'msg_other_02',
+              time: { created: 200 },
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      await expect(stub.readKiloSdkMessage(info.id)).resolves.toEqual({
+        kind: 'value',
+        message: { info, parts: [part] },
+      });
+      await expect(stub.readKiloSdkMessage('msg_missing_03')).resolves.toEqual({
+        kind: 'not_found',
+      });
+    });
+
+    it('returns retryable_failure when selected parts change during initial snapshot enumeration', async () => {
+      const sessionId = 'ses_sdk_exact_initial_race_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const messageId = 'msg_exact_initial_race';
+      const partId = 'prt_exact_initial_race';
+      await stub.ingest(
+        [
+          {
+            type: 'message',
+            data: {
+              id: messageId,
+              sessionID: sessionId,
+              role: 'user' as const,
+              time: { created: 100 },
+              agent: 'build',
+              model: { providerID: 'provider', modelID: 'model' },
+            },
+          },
+          {
+            type: 'part',
+            data: {
+              id: partId,
+              sessionID: sessionId,
+              messageID: messageId,
+              type: 'text' as const,
+              text: 'before',
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        let allCallCount = 0;
+        const wrapQuery = <T extends object>(query: T): T =>
+          new Proxy(query, {
+            get(target, property, receiver) {
+              const value: unknown = Reflect.get(target, property, receiver);
+              if (typeof value !== 'function') return value;
+              if (property === 'all') {
+                return (...args: unknown[]) => {
+                  allCallCount += 1;
+                  if (allCallCount === 2) {
+                    state.storage.sql.exec(
+                      'DELETE FROM ingest_items WHERE item_id = ?',
+                      `${messageId}/${partId}`
+                    );
+                  }
+                  return Reflect.apply(value, target, args);
+                };
+              }
+              return (...args: unknown[]) => {
+                const result: unknown = Reflect.apply(value, target, args);
+                return typeof result === 'object' && result !== null ? wrapQuery(result) : result;
+              };
+            },
+          });
+        const racingDb = new Proxy(db, {
+          get(target, property, receiver) {
+            if (property !== 'select') return Reflect.get(target, property, receiver);
+            return (...args: Parameters<typeof db.select>) => wrapQuery(db.select(...args));
+          },
+        });
+
+        await expect(
+          readKiloSdkMessage(racingDb, env.SESSION_INGEST_R2, messageId)
+        ).resolves.toEqual({
+          kind: 'retryable_failure',
+          phase: 'page_parts',
+        });
+      });
+    });
+
+    it('validates selected storage, body, and part identities', async () => {
+      const sessionId = 'ses_sdk_exact_identity_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+          'message/msg_selected',
+          'message',
+          JSON.stringify({
+            id: 'msg_other',
+            sessionID: sessionId,
+            role: 'user',
+            time: { created: 100 },
+            agent: 'build',
+            model: { providerID: 'provider', modelID: 'model' },
+          })
+        );
+      });
+
+      await expect(stub.readKiloSdkMessage('msg_selected')).resolves.toEqual({
+        kind: 'invalid_data',
+      });
+    });
+
+    it('returns invalid_data when an exact selected part storage and body identity disagree', async () => {
+      const sessionId = 'ses_sdk_exact_part_mismatch_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const messageId = 'msg_exact_part_mismatch';
+      await stub.ingest(
+        [
+          {
+            type: 'message',
+            data: {
+              id: messageId,
+              sessionID: sessionId,
+              role: 'user' as const,
+              time: { created: 100 },
+              agent: 'build',
+              model: { providerID: 'provider', modelID: 'model' },
+            },
+          },
+          {
+            type: 'part',
+            data: {
+              id: 'prt_storage_identity',
+              sessionID: sessionId,
+              messageID: messageId,
+              type: 'text' as const,
+              text: 'stored',
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'UPDATE ingest_items SET item_data = ? WHERE item_id = ?',
+          JSON.stringify({
+            id: 'prt_body_identity',
+            sessionID: sessionId,
+            messageID: messageId,
+            type: 'text',
+            text: 'body',
+          }),
+          `${messageId}/prt_storage_identity`
+        );
+      });
+
+      await expect(stub.readKiloSdkMessage(messageId)).resolves.toEqual({ kind: 'invalid_data' });
+    });
+
+    it('returns page_parts too_large for an oversized R2-backed exact selected part', async () => {
+      const sessionId = 'ses_sdk_exact_part_oversized_001';
+      const stub = getStub(kiloUserId, sessionId);
+      const messageId = 'msg_exact_part_oversized';
+      const partId = 'prt_exact_part_oversized';
+      const oversizedKey = `items/${sessionId}/part/oversized-exact`;
+      await env.SESSION_INGEST_R2.put(
+        oversizedKey,
+        'x'.repeat(MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES + 1)
+      );
+      await stub.ingest(
+        [
+          {
+            type: 'message',
+            data: {
+              id: messageId,
+              sessionID: sessionId,
+              role: 'user' as const,
+              time: { created: 100 },
+              agent: 'build',
+              model: { providerID: 'provider', modelID: 'model' },
+            },
+          },
+          {
+            type: 'part',
+            data: {
+              id: partId,
+              sessionID: sessionId,
+              messageID: messageId,
+              type: 'text' as const,
+              text: 'not-used',
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000,
+        { [`${messageId}/${partId}`]: oversizedKey }
+      );
+
+      await expect(stub.readKiloSdkMessage(messageId)).resolves.toEqual({
+        kind: 'too_large',
+        maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
+        phase: 'page_parts',
+      });
+    });
+
+    it('returns page_parts too_large before enumerating an excessive exact part set', async () => {
+      const sessionId = 'ses_sdk_exact_part_rows_oversize01';
+      const stub = getStub(kiloUserId, sessionId);
+      const messageId = 'msg_exact_part_rows_oversize';
+      await stub.ingest(
+        [
+          {
+            type: 'message',
+            data: {
+              id: messageId,
+              sessionID: sessionId,
+              role: 'user' as const,
+              time: { created: 100 },
+              agent: 'build',
+              model: { providerID: 'provider', modelID: 'model' },
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index <= KILO_SDK_EXACT_MESSAGE_PART_ROW_WORK_CAP; index += 1) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+            `${messageId}/prt_${String(index).padStart(4, '0')}`,
+            'part',
+            JSON.stringify({
+              id: `prt_${String(index).padStart(4, '0')}`,
+              sessionID: sessionId,
+              messageID: messageId,
+              type: 'text',
+              text: 'x',
+            })
+          );
+        }
+      });
+
+      await expect(stub.readKiloSdkMessage(messageId)).resolves.toEqual({
+        kind: 'too_large',
+        maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
+        phase: 'page_parts',
+      });
+    });
+
+    it('returns page_parts too_large before loading excessive inline exact part bodies', async () => {
+      const sessionId = 'ses_sdk_exact_inline_oversize_001';
+      const stub = getStub(kiloUserId, sessionId);
+      const messageId = 'msg_exact_inline_oversize';
+      await stub.ingest(
+        [
+          {
+            type: 'message',
+            data: {
+              id: messageId,
+              sessionID: sessionId,
+              role: 'user' as const,
+              time: { created: 100 },
+              agent: 'build',
+              model: { providerID: 'provider', modelID: 'model' },
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      const perPartBytes = Math.ceil(
+        MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES / KILO_SDK_EXACT_MESSAGE_PART_ROW_WORK_CAP
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index < KILO_SDK_EXACT_MESSAGE_PART_ROW_WORK_CAP; index += 1) {
+          const id = `prt_inline_${String(index).padStart(4, '0')}`;
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+            `${messageId}/${id}`,
+            'part',
+            JSON.stringify({
+              id,
+              sessionID: sessionId,
+              messageID: messageId,
+              type: 'text',
+              text: 'x'.repeat(perPartBytes),
+            })
+          );
+        }
+      });
+
+      await expect(stub.readKiloSdkMessage(messageId)).resolves.toEqual({
+        kind: 'too_large',
+        maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
+        phase: 'page_parts',
+      });
+    });
+
+    it('preserves exact-message R2 race and size outcomes', async () => {
+      const sessionId = 'ses_sdk_exact_r2_000000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const missing = {
+        id: 'msg_missing_r2',
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: 100 },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      };
+      const oversized = { ...missing, id: 'msg_oversized_r2', time: { created: 200 } };
+      const oversizedKey = `items/${sessionId}/message/oversized-exact`;
+      await env.SESSION_INGEST_R2.put(
+        oversizedKey,
+        'x'.repeat(MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES + 1)
+      );
+      await stub.ingest(
+        [
+          { type: 'message', data: missing },
+          { type: 'message', data: oversized },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000,
+        {
+          [`message/${missing.id}`]: `items/${sessionId}/message/missing-exact`,
+          [`message/${oversized.id}`]: oversizedKey,
+        }
+      );
+
+      await expect(stub.readKiloSdkMessage(missing.id)).resolves.toEqual({
+        kind: 'retryable_failure',
+        phase: 'message_scan',
+      });
+      await expect(stub.readKiloSdkMessage(oversized.id)).resolves.toEqual({
+        kind: 'too_large',
+        maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
+        phase: 'message_scan',
       });
     });
   });

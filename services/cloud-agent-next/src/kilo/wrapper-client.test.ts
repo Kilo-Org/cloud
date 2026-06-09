@@ -697,6 +697,7 @@ describe('WrapperClient', () => {
         command: 'compact',
         args: '--aggressive',
         messageId: 'msg_018f1e2d3c4bCommandWireAAA',
+        snapshotInitialization: 'wait',
         agent: { model: { modelID: 'anthropic/claude-sonnet-4-20250514' } },
         autoCommit: true,
         condenseOnComplete: false,
@@ -711,6 +712,7 @@ describe('WrapperClient', () => {
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain('"messageId":"msg_018f1e2d3c4bCommandWireAAA"');
+      expect(execCall).toContain('"snapshotInitialization":"wait"');
       expect(execCall).toContain('"modelID":"anthropic/claude-sonnet-4-20250514"');
       expect(execCall).toContain('"autoCommit":true');
       expect(execCall).toContain('"condenseOnComplete":false');

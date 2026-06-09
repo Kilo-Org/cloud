@@ -1193,6 +1193,19 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.getSessionMessageQueue().snapshotForStreamConnect();
   }
 
+  async getInitialMessageSnapshot(): Promise<QueuedMessageSnapshot | null> {
+    const metadata = await this.getMetadata();
+    const messageId = metadata?.initialMessage?.id;
+    if (!messageId) return null;
+    const state = await getSessionMessageState(this.ctx.storage, messageId);
+    if (!state) return null;
+    return {
+      messageId,
+      content: state.prompt,
+      timestamp: state.queuedAt ?? state.createdAt,
+    };
+  }
+
   /**
    * Get count of connected stream clients.
    *

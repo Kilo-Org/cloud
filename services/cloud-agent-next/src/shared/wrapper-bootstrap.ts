@@ -111,6 +111,7 @@ export type WrapperCommandRequest = {
   command: string;
   args?: string;
   messageId: string;
+  snapshotInitialization?: 'wait';
   agent?: WrapperPromptAgent;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;

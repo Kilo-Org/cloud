@@ -1331,6 +1331,13 @@
       "when": 1784224821060,
       "tag": "0189_elite_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1784539287393,
+      "tag": "0190_rare_the_stranger",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+CREATE INDEX CONCURRENTLY "IDX_cli_sessions_v2_user_git_url_updated" ON "cli_sessions_v2" USING btree ("kilo_user_id","git_url","updated_at") WHERE "cli_sessions_v2"."git_url" IS NOT NULL AND "cli_sessions_v2"."parent_session_id" IS NULL AND "cli_sessions_v2"."cloud_agent_session_id" IS NOT NULL;

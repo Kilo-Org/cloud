@@ -193,6 +193,28 @@ export function openKiloGlobalFeed(options: OpenKiloGlobalFeedOptions): KiloGlob
     }
   }
 
+  function sendToWorker(ws: WebSocket, event: unknown): void {
+    if (ws.readyState !== OPEN_READY_STATE) return;
+    const serialized = JSON.stringify(event);
+    const pendingBytes = ws.bufferedAmount + encoder.encode(serialized).byteLength;
+    if (pendingBytes > MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES) {
+      throw new Error('Kilo global feed WebSocket buffer limit exceeded');
+    }
+    ws.send(serialized);
+  }
+
+  async function sendCurrentRootStatus(ws: WebSocket): Promise<void> {
+    const statuses = await options.kiloClient.getSessionStatuses();
+    const status = statuses[session.kiloSessionId] ?? { type: 'idle' as const };
+    sendToWorker(ws, {
+      directory: process.cwd(),
+      payload: {
+        type: 'session.status',
+        properties: { sessionID: session.kiloSessionId, status },
+      },
+    });
+  }
+
   async function runAttempt(): Promise<void> {
     const abortController = new AbortController();
     attemptAbortController = abortController;
@@ -242,6 +264,7 @@ export function openKiloGlobalFeed(options: OpenKiloGlobalFeedOptions): KiloGlob
     if (!response.ok || !response.body) {
       throw new Error(`Kilo global event stream failed: ${response.status}`);
     }
+    await sendCurrentRootStatus(ws);
 
     let backpressureSince: number | undefined;
     for await (const data of parseSseDataStream(response.body)) {

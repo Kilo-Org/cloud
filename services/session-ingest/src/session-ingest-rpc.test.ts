@@ -25,6 +25,7 @@ vi.mock('drizzle-orm', async importOriginal => {
   return {
     ...actual,
     desc: vi.fn(actual.desc),
+    eq: vi.fn(actual.eq),
     gte: vi.fn(actual.gte),
     isNotNull: vi.fn(actual.isNotNull),
     or: vi.fn(actual.or),
@@ -45,12 +46,13 @@ import {
   decodeKiloSdkMessagesCursor,
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   encodeKiloSdkMessagesCursor,
+  createSessionForCloudAgentSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   messageIdSchema,
   partIdSchema,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
-import { desc, gte, isNotNull, or } from 'drizzle-orm';
+import { desc, eq, gte, isNotNull, or } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
 
@@ -105,6 +107,24 @@ function makeDbFakes(rows: MappingRow[]) {
     select: vi.fn(() => select),
   };
   return { db, select, selectResult };
+}
+
+function makeCreateDbFake(existing: unknown[] = [], persisted: unknown[] = []) {
+  const select = {
+    from: vi.fn(() => select),
+    where: vi.fn(() => select),
+    limit: vi.fn(async () => existing),
+  };
+  const insert = {
+    values: vi.fn(() => insert),
+    onConflictDoUpdate: vi.fn(() => insert),
+    returning: vi.fn(async () => persisted),
+  };
+  const db = {
+    select: vi.fn(() => select),
+    insert: vi.fn(() => insert),
+  };
+  return { db, insert };
 }
 
 function makeRpc(db: ReturnType<typeof makeDbFakes>['db']) {
@@ -169,6 +189,200 @@ describe('Kilo SDK message cursor codec', () => {
     expect(() =>
       decodeKiloSdkMessagesCursor(encodeUnchecked({ id: 'other_01', time: 1 }))
     ).toThrow();
+  });
+});
+
+describe('createSessionForCloudAgentSchema', () => {
+  it('accepts omitted and safe HTTPS repository identity', () => {
+    const base = {
+      sessionId: sdkSessionInfoFixture.id,
+      kiloUserId: 'usr_owner',
+      cloudAgentSessionId: 'agent_root',
+      createdOnPlatform: 'cloud-agent',
+    };
+
+    expect(createSessionForCloudAgentSchema.safeParse(base).success).toBe(true);
+    expect(
+      createSessionForCloudAgentSchema.safeParse({
+        ...base,
+        gitUrl: 'https://github.com/acme/widgets',
+      }).success
+    ).toBe(true);
+    expect(
+      createSessionForCloudAgentSchema.safeParse({
+        ...base,
+        gitUrl: 'https://git.example.com/widgets.git',
+      }).success
+    ).toBe(true);
+  });
+
+  it.each([
+    'not-a-url',
+    'git@github.com:acme/widgets.git',
+    'https://token@github.com/acme/widgets',
+    'https://github.com/acme/widgets?token=secret',
+    'https://github.com/acme/widgets#readme',
+  ])('rejects unsafe repository identity %s', gitUrl => {
+    expect(
+      createSessionForCloudAgentSchema.safeParse({
+        sessionId: sdkSessionInfoFixture.id,
+        kiloUserId: 'usr_owner',
+        cloudAgentSessionId: 'agent_root',
+        createdOnPlatform: 'cloud-agent',
+        gitUrl,
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('SessionIngestRPC.createSessionForCloudAgent', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('accepts the legacy create contract when repository identity is omitted', async () => {
+    const { db, insert } = makeCreateDbFake();
+    const rpc = makeRpc(db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({
+        sessionId: sdkSessionInfoFixture.id,
+        kiloUserId: 'usr_owner',
+        cloudAgentSessionId: 'agent_root',
+        createdOnPlatform: 'cloud-agent',
+      })
+    ).resolves.toBeUndefined();
+
+    expect(insert.values).not.toHaveBeenCalledWith(
+      expect.objectContaining({ git_url: expect.anything() })
+    );
+  });
+
+  it.each([
+    'not-a-url',
+    'git@github.com:acme/widgets.git',
+    'https://token@github.com/acme/widgets',
+    'https://github.com/acme/widgets?token=secret',
+    'https://github.com/acme/widgets#readme',
+  ])('rejects unsafe repository identity %s before querying or persisting', async gitUrl => {
+    const { db, insert } = makeCreateDbFake();
+    const rpc = makeRpc(db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({
+        sessionId: sdkSessionInfoFixture.id,
+        kiloUserId: 'usr_owner',
+        cloudAgentSessionId: 'agent_root',
+        createdOnPlatform: 'cloud-agent',
+        gitUrl,
+      })
+    ).rejects.toThrow();
+
+    expect(db.select).not.toHaveBeenCalled();
+    expect(insert.values).not.toHaveBeenCalled();
+  });
+
+  it('normalizes repository identity on insert and only fills null identity on conflict', async () => {
+    const { db, insert } = makeCreateDbFake(
+      [],
+      [
+        {
+          session_id: sdkSessionInfoFixture.id,
+          created_at: new Date(0),
+          updated_at: new Date(0),
+          title: null,
+          created_on_platform: 'cloud-agent',
+          organization_id: null,
+          git_url: 'https://github.com/acme/widgets',
+          git_branch: null,
+          parent_session_id: null,
+          status: null,
+          status_updated_at: null,
+        },
+      ]
+    );
+    const rpc = makeRpc(db as never);
+
+    await rpc.createSessionForCloudAgent({
+      sessionId: sdkSessionInfoFixture.id,
+      kiloUserId: 'usr_owner',
+      cloudAgentSessionId: 'agent_root',
+      createdOnPlatform: 'cloud-agent',
+      gitUrl: 'https://GitHub.com/ACME/Widgets.git',
+    });
+
+    expect(insert.values).toHaveBeenCalledWith(
+      expect.objectContaining({ git_url: 'https://github.com/acme/widgets' })
+    );
+    expect(insert.onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ set: expect.objectContaining({ git_url: expect.anything() }) })
+    );
+  });
+
+  it('atomically rejects a concurrent conflicting repository identity before ownership updates', async () => {
+    const { db, insert } = makeCreateDbFake([], []);
+    const rpc = makeRpc(db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({
+        sessionId: sdkSessionInfoFixture.id,
+        kiloUserId: 'usr_owner',
+        cloudAgentSessionId: 'agent_competing_root',
+        organizationId: 'org_competing',
+        createdOnPlatform: 'cloud-agent',
+        gitUrl: 'https://github.com/other/repo',
+      })
+    ).rejects.toThrow('repository identity conflict');
+
+    expect(insert.onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ setWhere: expect.anything() })
+    );
+  });
+
+  it('rejects a different non-null repository identity on creation conflict', async () => {
+    const { db } = makeCreateDbFake([
+      {
+        cloud_agent_session_id: 'agent_root',
+        organization_id: null,
+        git_url: 'https://github.com/acme/widgets',
+      },
+    ]);
+    const rpc = makeRpc(db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({
+        sessionId: sdkSessionInfoFixture.id,
+        kiloUserId: 'usr_owner',
+        cloudAgentSessionId: 'agent_root',
+        createdOnPlatform: 'cloud-agent',
+        gitUrl: 'https://github.com/other/repo',
+      })
+    ).rejects.toThrow('repository identity conflict');
+  });
+
+  it('preserves existing repository identity when creation omits it', async () => {
+    const { db, insert } = makeCreateDbFake([
+      {
+        cloud_agent_session_id: 'agent_root',
+        organization_id: null,
+        git_url: 'https://github.com/acme/widgets',
+      },
+    ]);
+    const rpc = makeRpc(db as never);
+
+    await rpc.createSessionForCloudAgent({
+      sessionId: sdkSessionInfoFixture.id,
+      kiloUserId: 'usr_owner',
+      cloudAgentSessionId: 'agent_root',
+      createdOnPlatform: 'cloud-agent',
+    });
+
+    expect(insert.values).not.toHaveBeenCalledWith(
+      expect.objectContaining({ git_url: expect.anything() })
+    );
+    expect(insert.onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ set: expect.not.objectContaining({ git_url: expect.anything() }) })
+    );
   });
 });
 
@@ -334,6 +548,183 @@ describe('SessionIngestRPC.getCloudAgentRootSessionSnapshot', () => {
         kiloSessionId: sdkSessionInfoFixture.id,
       })
     ).rejects.toThrow('snapshot unavailable');
+  });
+});
+
+describe('SessionIngestRPC.getCloudAgentRootSessionMessage', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('distinguishes an unavailable owned root from an exact missing message', async () => {
+    const { db: missingDb } = makeDbFakes([]);
+    const missingRpc = makeRpc(missingDb);
+    await expect(
+      missingRpc.getCloudAgentRootSessionMessage({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        messageId: sdkUserMessageFixture.id,
+      })
+    ).resolves.toBeNull();
+
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    const readKiloSdkMessage = vi.fn(async () => ({ kind: 'not_found' as const }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessage } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentRootSessionMessage({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        messageId: sdkUserMessageFixture.id,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      cloudAgentSessionId: 'agent_owned_root',
+      message: { kind: 'not_found' },
+    });
+    expect(readKiloSdkMessage).toHaveBeenCalledWith(sdkUserMessageFixture.id);
+  });
+
+  it('returns an exact stored message only for the selected owned root', async () => {
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessage: vi.fn(async () => ({ kind: 'value', message: sdkStoredMessageFixture })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentRootSessionMessage({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        messageId: sdkUserMessageFixture.id,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      cloudAgentSessionId: 'agent_owned_root',
+      message: { kind: 'value', message: sdkStoredMessageFixture },
+    });
+  });
+
+  it('normalizes historical diffs and omits well-identified unknown parts for exact reads', async () => {
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    const currentDiff = {
+      file: '/workspace/private/current.ts',
+      patch: '@@ -1 +1 @@',
+      additions: 1,
+      deletions: 1,
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessage: vi.fn(async () => ({
+        kind: 'value',
+        message: {
+          info: {
+            ...sdkUserMessageFixture,
+            summary: {
+              title: 'Persisted summary',
+              diffs: [
+                {
+                  file: '/workspace/private/historical.ts',
+                  before: 'const value = 1;',
+                  after: 'const value = 2;',
+                  additions: 1,
+                  deletions: 1,
+                },
+                currentDiff,
+              ],
+            },
+          },
+          parts: [
+            sdkTextPartFixture,
+            {
+              id: 'prt_future_01',
+              sessionID: sdkSessionInfoFixture.id,
+              messageID: sdkUserMessageFixture.id,
+              type: 'future-safe-part',
+              payload: { value: 'new CLI field' },
+            },
+          ],
+        },
+      })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentRootSessionMessage({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        messageId: sdkUserMessageFixture.id,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      cloudAgentSessionId: 'agent_owned_root',
+      message: {
+        kind: 'value',
+        message: {
+          info: {
+            ...sdkUserMessageFixture,
+            summary: { title: 'Persisted summary', diffs: [currentDiff] },
+          },
+          parts: [sdkTextPartFixture],
+        },
+      },
+    });
+  });
+
+  it('returns invalid_data for unknown exact-read parts with malformed identities', async () => {
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessage: vi.fn(async () => ({
+        kind: 'value',
+        message: {
+          info: sdkUserMessageFixture,
+          parts: [
+            {
+              id: 'other_future_01',
+              sessionID: sdkSessionInfoFixture.id,
+              messageID: sdkUserMessageFixture.id,
+              type: 'future-safe-part',
+            },
+          ],
+        },
+      })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentRootSessionMessage({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        messageId: sdkUserMessageFixture.id,
+      })
+    ).resolves.toMatchObject({ message: { kind: 'invalid_data' } });
+  });
+
+  it('maps malformed exact-message DO output to invalid_data and validates input first', async () => {
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessage: vi.fn(async () => ({ kind: 'value', message: { info: {}, parts: [] } })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentRootSessionMessage({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        messageId: sdkUserMessageFixture.id,
+      })
+    ).resolves.toMatchObject({ message: { kind: 'invalid_data' } });
+
+    vi.resetAllMocks();
+    const invalidRpc = makeRpc(makeDbFakes([]).db);
+    await expect(
+      invalidRpc.getCloudAgentRootSessionMessage({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        messageId: 'not-a-message',
+      })
+    ).rejects.toThrow();
+    expect(getWorkerDb).not.toHaveBeenCalled();
   });
 });
 
@@ -882,6 +1273,45 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
     expect(desc).toHaveBeenNthCalledWith(2, cli_sessions_v2.session_id);
     expect(select.orderBy).toHaveBeenCalled();
     expect(select.limit).toHaveBeenCalledWith(2);
+  });
+
+  it('normalizes and filters repository roots before ordering and limiting', async () => {
+    const timestamp = '2026-05-28 09:13:37.651263+00';
+    const { db, select } = makeDbFakes([
+      {
+        kiloSessionId: sdkSessionInfoFixture.id,
+        cloudAgentSessionId: 'agent_repo_root',
+        title: 'Repository root',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.listCloudAgentRootSessionsByGitUrl({
+        kiloUserId: 'usr_owner',
+        gitUrl: 'https://GitHub.com/ACME/Widgets.git',
+        limit: 1,
+      })
+    ).resolves.toHaveLength(1);
+
+    expect(eq).toHaveBeenCalledWith(cli_sessions_v2.git_url, 'https://github.com/acme/widgets');
+    expect(select.where).toHaveBeenCalledBefore(select.orderBy);
+    expect(select.orderBy).toHaveBeenCalledBefore(select.limit);
+    expect(select.limit).toHaveBeenCalledWith(1);
+    expect(or).toHaveBeenCalled();
+    expect(isNotNull).toHaveBeenCalledWith(cli_sessions_v2.cloud_agent_session_id);
+  });
+
+  it('requires a repository identity before querying repository roots', async () => {
+    const { db } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.listCloudAgentRootSessionsByGitUrl({ kiloUserId: 'usr_owner', gitUrl: '' })
+    ).rejects.toThrow();
+    expect(db.select).not.toHaveBeenCalled();
   });
 
   it('returns mapped roots without requiring a materialized SDK snapshot and bounds titles', async () => {

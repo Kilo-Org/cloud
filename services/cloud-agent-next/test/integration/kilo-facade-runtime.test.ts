@@ -13,6 +13,18 @@ type WrapperIdentity = {
   wrapperConnectionId: string;
 };
 
+type ProducerSource = {
+  userId: string;
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+};
+
+const defaultProducerSource = {
+  userId,
+  cloudAgentSessionId,
+  kiloSessionId,
+} satisfies ProducerSource;
+
 type SseDataReader = {
   next(): Promise<unknown>;
   cancel(): Promise<void>;
@@ -52,17 +64,20 @@ function createSseDataReader(response: Response): SseDataReader {
   };
 }
 
-async function configureCurrentProducer(identity: WrapperIdentity): Promise<void> {
+async function configureCurrentProducer(
+  identity: WrapperIdentity,
+  source: ProducerSource = defaultProducerSource
+): Promise<void> {
   const session = env.CLOUD_AGENT_SESSION.get(
-    env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`)
+    env.CLOUD_AGENT_SESSION.idFromName(`${source.userId}:${source.cloudAgentSessionId}`)
   );
   await runInDurableObject(session, async instance => {
     const metadata = await instance.getMetadata();
     if (!metadata) {
       await registerReadySession(instance, {
-        sessionId: cloudAgentSessionId,
-        userId,
-        kiloSessionId,
+        sessionId: source.cloudAgentSessionId,
+        userId: source.userId,
+        kiloSessionId: source.kiloSessionId,
         prompt: 'runtime facade fixture',
         mode: 'code',
         model: 'test-model',
@@ -73,18 +88,24 @@ async function configureCurrentProducer(identity: WrapperIdentity): Promise<void
   });
 }
 
-async function connectProducer(identity: WrapperIdentity): Promise<WebSocket> {
+async function connectProducer(
+  identity: WrapperIdentity,
+  source: ProducerSource = defaultProducerSource
+): Promise<WebSocket> {
   const query = new URLSearchParams({
-    userId,
-    cloudAgentSessionId,
-    kiloSessionId,
+    userId: source.userId,
+    cloudAgentSessionId: source.cloudAgentSessionId,
+    kiloSessionId: source.kiloSessionId,
     wrapperRunId: identity.wrapperRunId,
     wrapperGeneration: String(identity.wrapperGeneration),
     wrapperConnectionId: identity.wrapperConnectionId,
   });
-  const response = await SELF.fetch(`http://worker.test/kilo-global-feed-test?${query}`, {
-    headers: { Upgrade: 'websocket' },
-  });
+  const response = await SELF.fetch(
+    `http://worker.test/kilo-global-feed-test?${query.toString()}`,
+    {
+      headers: { Upgrade: 'websocket' },
+    }
+  );
   if (response.status !== 101 || !response.webSocket) {
     throw new Error(`Unexpected producer upgrade response: ${response.status}`);
   }
@@ -315,6 +336,46 @@ describe('UserKiloFacade in the Workers runtime', () => {
     }
   });
 
+  it('serves the sparse root status map from producer WebSocket attachments', async () => {
+    const source = {
+      userId: 'user_facade_status',
+      cloudAgentSessionId: 'agent_facade_status',
+      kiloSessionId: 'ses_33333333333333333333333333',
+    } satisfies ProducerSource;
+    const identity = {
+      wrapperRunId: 'wr_facade_status_1',
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_facade_status_1',
+    } satisfies WrapperIdentity;
+    await configureCurrentProducer(identity, source);
+    const producer = await connectProducer(identity, source);
+
+    try {
+      producer.send(
+        JSON.stringify({
+          directory: '/workspace/private/session',
+          payload: {
+            type: 'session.status',
+            properties: { sessionID: source.kiloSessionId, status: { type: 'busy' } },
+          },
+        })
+      );
+
+      let status: unknown;
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const response = await SELF.fetch(
+          `http://worker.test/kilo-test/kilo/session/status?userId=${source.userId}`
+        );
+        status = await response.json();
+        if (JSON.stringify(status).includes('busy')) break;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      expect(status).toEqual({ [source.kiloSessionId]: { type: 'busy' } });
+    } finally {
+      producer.close(1000, 'test complete');
+    }
+  });
+
   it('replaces an older producer and rejects its stale reconnect', async () => {
     const firstIdentity = {
       wrapperRunId: 'wr_facade_replaced_1',
@@ -346,7 +407,7 @@ describe('UserKiloFacade in the Workers runtime', () => {
       wrapperConnectionId: firstIdentity.wrapperConnectionId,
     });
     const staleResponse = await SELF.fetch(
-      `http://worker.test/kilo-global-feed-test?${staleQuery}`,
+      `http://worker.test/kilo-global-feed-test?${staleQuery.toString()}`,
       { headers: { Upgrade: 'websocket' } }
     );
     expect(staleResponse.status).toBe(409);

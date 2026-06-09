@@ -479,7 +479,8 @@ describe('prepareSession endpoint', () => {
       expect.any(Object),
       'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       'code-review',
-      expect.stringMatching(/^New session - /)
+      expect.stringMatching(/^New session - /),
+      'https://github.com/acme/repo'
     );
     expect(doStub.registerSession).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1584,6 +1585,16 @@ describe('start endpoint', () => {
     });
 
     expect(steps).toEqual(['session-report', 'sandbox', 'sandbox-report', 'visible', 'admission']);
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      'https://github.com/acme/repo'
+    );
     expect(createSessionReportMock).toHaveBeenCalledWith(
       {
         cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
@@ -1600,6 +1611,27 @@ describe('start endpoint', () => {
       expect.any(Object)
     );
     expect(recordSessionFailureMock).not.toHaveBeenCalled();
+  });
+
+  it('sanitizes GitLab repository identity before visible ownership creation', async () => {
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    await caller.start({
+      message: { prompt: 'Create GitLab ownership' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'gitlab', url: 'https://token@gitlab.com/acme/repo.git?ref=main#readme' },
+    });
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.any(Object),
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      'https://gitlab.com/acme/repo.git'
+    );
   });
 
   it('admits canonical document attachments through one grouped creation operation', async () => {

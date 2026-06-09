@@ -1,3 +1,4 @@
+import { sessionUpdatedMetadataMessageSchema } from '@kilocode/session-ingest-contracts';
 import { describe, it, expect } from 'vitest';
 import {
   CLIOutboundMessageSchema,
@@ -300,6 +301,68 @@ describe('WebInboundMessageSchema', () => {
     const msg = { type: 'unknown', data: {} };
     const result = WebInboundMessageSchema.safeParse(msg);
     expect(result.success).toBe(false);
+  });
+});
+
+describe('sessionUpdatedMetadataMessageSchema', () => {
+  const session = {
+    source: 'v2',
+    sessionId: validSessionId,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:01.000Z',
+    title: 'Test',
+    createdOnPlatform: 'web',
+    organizationId: null,
+    gitUrl: null,
+    gitBranch: null,
+    parentSessionId: null,
+    status: 'idle',
+    statusUpdatedAt: null,
+  };
+
+  it('accepts only the shared v2 session.updated metadata message', () => {
+    expect(
+      sessionUpdatedMetadataMessageSchema.safeParse({
+        type: 'system',
+        event: 'session.updated',
+        data: { source: 'v2', session, changedAt: session.updatedAt },
+      }).success
+    ).toBe(true);
+  });
+
+  it.each([
+    { type: 'system', event: 'sessions.list', data: { sessions: [] } },
+    { type: 'event', event: 'session.updated', data: { source: 'v2', session } },
+    {
+      type: 'system',
+      event: 'session.status.updated',
+      data: { source: 'v2', session, changedAt: session.updatedAt },
+    },
+    {
+      type: 'system',
+      event: 'session.updated',
+      data: { source: 'v1', session, changedAt: session.updatedAt },
+    },
+    {
+      type: 'system',
+      event: 'session.updated',
+      data: {
+        source: 'v2',
+        session: { ...session, sessionId: undefined },
+        changedAt: session.updatedAt,
+      },
+    },
+    {
+      type: 'system',
+      event: 'session.updated',
+      data: {
+        source: 'v2',
+        session: { ...session, sessionId: 'not-a-kilo-session' },
+        changedAt: session.updatedAt,
+      },
+    },
+  ])('rejects messages outside the narrow facade metadata contract', message => {
+    expect(sessionUpdatedMetadataMessageSchema.safeParse(message).success).toBe(false);
   });
 });
 

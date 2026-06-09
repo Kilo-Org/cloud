@@ -1,3 +1,10 @@
+import {
+  sessionEventV2RowSchema,
+  sessionRowEventPayloadSchema,
+  sessionStatusSchema,
+  type SessionEventV2Row,
+  type SessionRowEventPayload,
+} from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 
 // Use z.string() for session IDs (not the strict sessionIdSchema from ws-protocol)
@@ -93,28 +100,9 @@ export const WebOutboundMessageSchema = z.discriminatedUnion('type', [
 
 // -- V2 session system events -------------------------------------------------
 
-export const SessionStatusSchema = z.enum(['idle', 'busy', 'question', 'permission', 'retry']);
-
-export const SessionEventV2RowSchema = z.object({
-  source: z.literal('v2'),
-  sessionId: z.string(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  title: z.string().nullable(),
-  createdOnPlatform: z.string().nullable(),
-  organizationId: z.string().nullable(),
-  gitUrl: z.string().nullable(),
-  gitBranch: z.string().nullable(),
-  parentSessionId: z.string().nullable(),
-  status: SessionStatusSchema.nullable(),
-  statusUpdatedAt: z.string().nullable(),
-});
-
-export const SessionRowEventPayloadSchema = z.object({
-  source: z.literal('v2'),
-  session: SessionEventV2RowSchema,
-  changedAt: z.string(),
-});
+export const SessionStatusSchema = sessionStatusSchema;
+export const SessionEventV2RowSchema = sessionEventV2RowSchema;
+export const SessionRowEventPayloadSchema = sessionRowEventPayloadSchema;
 
 // Temporary rollout compatibility: remove the lightweight branch after all web clients consume full session rows.
 export const SessionStatusUpdatedPayloadSchema = z.union([
@@ -188,8 +176,7 @@ export type CLIOutboundMessage = z.infer<typeof CLIOutboundMessageSchema>;
 export type CLIInboundMessage = z.infer<typeof CLIInboundMessageSchema>;
 export type WebOutboundMessage = z.infer<typeof WebOutboundMessageSchema>;
 export type WebInboundMessage = z.infer<typeof WebInboundMessageSchema>;
-export type SessionEventV2Row = z.infer<typeof SessionEventV2RowSchema>;
-export type SessionRowEventPayload = z.infer<typeof SessionRowEventPayloadSchema>;
+export type { SessionEventV2Row, SessionRowEventPayload };
 export type SessionStatusUpdatedPayload = z.infer<typeof SessionStatusUpdatedPayloadSchema>;
 export type SessionDeletedPayload = z.infer<typeof SessionDeletedPayloadSchema>;
 export type SessionEventPayload = z.infer<typeof SessionEventPayloadSchema>;

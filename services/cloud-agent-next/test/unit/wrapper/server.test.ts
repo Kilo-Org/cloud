@@ -40,6 +40,7 @@ function createMockKiloClient(): WrapperKiloClient {
     abortSession: vi.fn().mockResolvedValue(true),
     summarizeSession: vi.fn().mockResolvedValue(true),
     sendCommand: vi.fn().mockResolvedValue(undefined),
+    listCommands: vi.fn().mockResolvedValue([]),
     answerPermission: vi.fn().mockResolvedValue(true),
     answerQuestion: vi.fn().mockResolvedValue(true),
     rejectQuestion: vi.fn().mockResolvedValue(true),
@@ -50,6 +51,9 @@ function createMockKiloClient(): WrapperKiloClient {
     getNetworkWaits: vi.fn().mockResolvedValue([]),
     resumeNetworkWait: vi.fn().mockResolvedValue(true),
     listEffectiveModels: vi.fn().mockResolvedValue([]),
+    createPty: vi.fn(),
+    resizePty: vi.fn(),
+    deletePty: vi.fn().mockResolvedValue(true),
     subscribeEvents: vi.fn().mockResolvedValue({ stream: undefined }),
     serverUrl: 'http://127.0.0.1:0',
   };
@@ -1021,6 +1025,53 @@ describe('createCommandHandler', () => {
       );
     }
   );
+
+  it('forwards snapshot initialization policy for regular commands', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const handler = createCommandHandler(defaultServerConfig, deps);
+
+    const response = await handler(
+      jsonRequest({
+        command: 'review/security',
+        args: '--strict',
+        messageId: 'msg_command_wait',
+        snapshotInitialization: 'wait',
+        session: completeBinding,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(deps.kiloClient.sendCommand).toHaveBeenCalledWith({
+      sessionId: 'kilo_sess_1',
+      command: 'review/security',
+      args: '--strict',
+      messageId: 'msg_command_wait',
+      snapshotInitialization: 'wait',
+    });
+  });
+
+  it('rejects unsupported snapshot initialization policy at the wrapper boundary', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const handler = createCommandHandler(defaultServerConfig, deps);
+
+    const response = await handler(
+      jsonRequest({
+        command: 'init',
+        snapshotInitialization: 'continue',
+        session: completeBinding,
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(readJson(response)).resolves.toEqual({
+      error: 'INVALID_REQUEST',
+      message: 'snapshotInitialization must be wait when provided',
+    });
+    expect(state.hasSession).toBe(false);
+    expect(deps.kiloClient.sendCommand).not.toHaveBeenCalled();
+  });
 
   it('routes compact through session summarize with the selected model', async () => {
     const state = new WrapperState();

@@ -1,36 +1,41 @@
-import { WorkerEntrypoint } from 'cloudflare:workers';
 import { eq, and, desc, gte, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
 import {
   createSessionForCloudAgentSchema,
   deleteSessionForCloudAgentSchema,
+  getCloudAgentRootSessionMessageSchema,
   getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
   kiloSdkSessionSnapshotOutcomeSchema,
+  listCloudAgentRootSessionsByGitUrlSchema,
   listCloudAgentRootSessionsSchema,
+  persistedKiloSdkExactMessageReadSchema,
   persistedKiloSdkMessageHistorySchema,
   resolveCloudAgentRootSessionSchema,
   type CloudAgentRootSessionSnapshot,
   type CloudAgentRootSessionSummary,
   type CreateSessionForCloudAgentParams,
   type DeleteSessionForCloudAgentParams,
+  type GetCloudAgentRootSessionMessageParams,
+  type GetCloudAgentRootSessionMessageResult,
   type GetCloudAgentRootSessionMessagesParams,
   type GetCloudAgentRootSessionMessagesResult,
   type GetCloudAgentRootSessionSnapshotParams,
   type GetCloudAgentRootSessionSnapshotResult,
   type GetSessionMessagesParams,
   type GetSessionMessagesResult,
+  type ListCloudAgentRootSessionsByGitUrlParams,
   type ListCloudAgentRootSessionsParams,
   type ResolveCloudAgentRootSessionForKiloSessionParams,
   type ResolveCloudAgentRootSessionForKiloSessionResult,
   type SessionIngestRpcMethods,
 } from '@kilocode/session-ingest-contracts';
 
-import type { Env } from './env';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
+import { InternalUserEventsEntrypoint } from './internal-user-events-entrypoint';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
-import { withDORetry } from '@kilocode/worker-utils';
+import { normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 import { app } from './app';
 import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
 
@@ -55,10 +60,14 @@ function personalOrAccessibleOrganizationCondition() {
   return or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id));
 }
 
-export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIngestRpcMethods {
+export class SessionIngestRPC
+  extends InternalUserEventsEntrypoint
+  implements SessionIngestRpcMethods
+{
   // Delegate HTTP requests to the Hono app so callers using the service
   // binding can `.fetch()` against this entrypoint (not just call RPC methods).
   fetch(request: Request): Response | Promise<Response> {
+    if (new URL(request.url).pathname === '/internal/user/events') return super.fetch(request);
     return app.fetch(request, this.env, this.ctx);
   }
 
@@ -73,6 +82,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const parsed = createSessionForCloudAgentSchema.parse(params);
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const gitUrl = parsed.gitUrl === undefined ? undefined : normalizeGitUrl(parsed.gitUrl);
 
     const existingRows = await db
       .select()
@@ -85,11 +95,15 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       )
       .limit(1);
     const existingRow = existingRows[0];
+    if (existingRow?.git_url != null && gitUrl !== undefined && existingRow.git_url !== gitUrl) {
+      throw new Error('Cloud Agent root repository identity conflict');
+    }
 
     const hasMeaningfulChange = existingRow
       ? existingRow.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
         (parsed.organizationId !== undefined &&
-          existingRow.organization_id !== parsed.organizationId)
+          existingRow.organization_id !== parsed.organizationId) ||
+        (gitUrl !== undefined && existingRow.git_url === null)
       : true;
 
     const [persistedRow] = await db
@@ -101,6 +115,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         organization_id: parsed.organizationId ?? null,
         created_on_platform: parsed.createdOnPlatform,
         ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+        ...(gitUrl !== undefined ? { git_url: gitUrl } : {}),
         version: 0,
       })
       .onConflictDoUpdate({
@@ -110,9 +125,21 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           ...(parsed.organizationId !== undefined
             ? { organization_id: parsed.organizationId }
             : {}),
+          ...(gitUrl !== undefined
+            ? { git_url: sql`coalesce(${cli_sessions_v2.git_url}, ${gitUrl})` }
+            : {}),
         },
+        ...(gitUrl !== undefined
+          ? {
+              setWhere: or(isNull(cli_sessions_v2.git_url), eq(cli_sessions_v2.git_url, gitUrl)),
+            }
+          : {}),
       })
       .returning();
+
+    if (gitUrl !== undefined && (!persistedRow || persistedRow.git_url !== gitUrl)) {
+      throw new Error('Cloud Agent root repository identity conflict');
+    }
 
     if (hasMeaningfulChange && persistedRow) {
       const session = mapSessionEventRow(persistedRow);
@@ -166,6 +193,33 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       kiloSessionId: parsed.kiloSessionId,
       cloudAgentSessionId: mapping.cloudAgentSessionId,
     });
+  }
+
+  async getCloudAgentRootSessionMessage(
+    params: GetCloudAgentRootSessionMessageParams
+  ): Promise<GetCloudAgentRootSessionMessageResult> {
+    const parsed = getCloudAgentRootSessionMessageSchema.parse(params);
+    const mapping = await this.findOwnedRootCloudAgentMapping(parsed);
+    if (!mapping) {
+      return null;
+    }
+
+    const rawMessage = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+      () =>
+        getSessionIngestDO(this.env, {
+          kiloUserId: parsed.kiloUserId,
+          sessionId: parsed.kiloSessionId,
+        }),
+      stub => stub.readKiloSdkMessage(parsed.messageId),
+      'SessionIngestDO.readKiloSdkMessage'
+    );
+    const message = persistedKiloSdkExactMessageReadSchema.safeParse(rawMessage);
+
+    return {
+      kiloSessionId: parsed.kiloSessionId,
+      cloudAgentSessionId: mapping.cloudAgentSessionId,
+      message: message.success ? message.data : { kind: 'invalid_data' },
+    };
   }
 
   async getCloudAgentRootSessionMessages(
@@ -235,15 +289,31 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     params: ListCloudAgentRootSessionsParams
   ): Promise<CloudAgentRootSessionSummary[]> {
     const parsed = listCloudAgentRootSessionsSchema.parse(params);
+    return this.listCloudAgentRoots(parsed);
+  }
+
+  async listCloudAgentRootSessionsByGitUrl(
+    params: ListCloudAgentRootSessionsByGitUrlParams
+  ): Promise<CloudAgentRootSessionSummary[]> {
+    const parsed = listCloudAgentRootSessionsByGitUrlSchema.parse(params);
+    return this.listCloudAgentRoots({ ...parsed, gitUrl: normalizeGitUrl(parsed.gitUrl) });
+  }
+
+  private async listCloudAgentRoots(
+    params: ListCloudAgentRootSessionsParams & { gitUrl?: string }
+  ): Promise<CloudAgentRootSessionSummary[]> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     const conditions = [
-      eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
+      eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
       isNull(cli_sessions_v2.parent_session_id),
       isNotNull(cli_sessions_v2.cloud_agent_session_id),
       personalOrAccessibleOrganizationCondition(),
     ];
-    if (parsed.start !== undefined) {
-      conditions.push(gte(cli_sessions_v2.updated_at, new Date(parsed.start).toISOString()));
+    if (params.gitUrl !== undefined) {
+      conditions.push(eq(cli_sessions_v2.git_url, params.gitUrl));
+    }
+    if (params.start !== undefined) {
+      conditions.push(gte(cli_sessions_v2.updated_at, new Date(params.start).toISOString()));
     }
 
     const rows = await db
@@ -257,10 +327,10 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         updatedAt: cli_sessions_v2.updated_at,
       })
       .from(cli_sessions_v2)
-      .leftJoin(organization_memberships, organizationMembershipJoinCondition(parsed.kiloUserId))
+      .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
       .where(and(...conditions))
       .orderBy(desc(cli_sessions_v2.updated_at), desc(cli_sessions_v2.session_id))
-      .limit(parsed.limit);
+      .limit(params.limit ?? 100);
 
     const sessions: CloudAgentRootSessionSummary[] = [];
     for (const row of rows) {

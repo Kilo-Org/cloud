@@ -32,6 +32,7 @@ import {
 } from './session-metrics';
 import migrations from '../../drizzle/migrations';
 import {
+  readKiloSdkMessage,
   readKiloSdkMessages,
   readKiloSdkSessionSnapshot,
   type KiloSdkSessionSnapshotRead,
@@ -444,6 +445,10 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   async readKiloSdkMessages(params: { limit?: number; before?: string }) {
     return readKiloSdkMessages(this.db, this.env.SESSION_INGEST_R2, params);
+  }
+
+  async readKiloSdkMessage(messageId: string) {
+    return readKiloSdkMessage(this.db, this.env.SESSION_INGEST_R2, messageId);
   }
 
   async getAllStream(): Promise<ReadableStream<Uint8Array>> {

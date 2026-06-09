@@ -1834,6 +1834,45 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.repo).toMatchObject({ token: 'kgh2.default' });
   });
 
+  it('preserves command snapshot policy in the wrapper request', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'command',
+          messageId: 'msg_018f1e2d3c4bCommandWaitAAA',
+          command: 'init',
+          arguments: '--strict',
+          snapshotInitialization: 'wait',
+        },
+        agent: { mode: 'code', model: 'test-model', variant: 'thinking' },
+        workspace: { sandboxId: 'usr-abcdef', metadata: createMetadata() },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_command',
+            wrapperGeneration: 2,
+            wrapperConnectionId: 'conn_command',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    expect(result.type).toBe('command');
+    if (result.type !== 'command') throw new Error('Expected command delivery request');
+    expect(result.commandRequest).toMatchObject({
+      command: 'init',
+      args: '--strict',
+      messageId: 'msg_018f1e2d3c4bCommandWaitAAA',
+      snapshotInitialization: 'wait',
+      agent: { mode: 'code', model: { modelID: 'test-model' }, variant: 'thinking' },
+    });
+  });
+
   it('passes persisted devcontainer intent to the active wrapper readiness request', async () => {
     const service = new SessionService();
     const env = createEnv();
@@ -2508,6 +2547,33 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
     expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalled();
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
+  });
+
+  it('classifies no_installation_found as a permanent execution failure', async () => {
+    tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValueOnce({
+      success: false,
+      error: {
+        reason: 'no_installation_found',
+        message: 'GitHub managed auth lookup failed (no_installation_found)',
+      },
+    });
+
+    await expect(
+      buildPromptWrapperRequests(
+        createMetadata({
+          githubRepo: 'acme/repo',
+          gitUrl: undefined,
+          gitToken: undefined,
+          platform: 'github',
+          credentialContainment: { github: false, gitlab: false, kilocode: false },
+        })
+      )
+    ).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+      retryable: false,
+      message:
+        'GitHub token or active app installation required for this repository (no_installation_found)',
+    });
   });
 
   it('uses a capability for selected-user GitHub remote and managed GH_TOKEN', async () => {
@@ -3191,6 +3257,26 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 });
 
 describe('SessionService session-ingest compatibility', () => {
+  it('creates a visible session with its repository identity', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      'cloud-agent',
+      undefined,
+      'https://GitHub.com/ACME/Widgets.git'
+    );
+
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ gitUrl: 'https://GitHub.com/ACME/Widgets.git' })
+    );
+  });
+
   it('creates a visible session without projecting reporting milestones', async () => {
     const env = createEnv();
     const service = new SessionService();

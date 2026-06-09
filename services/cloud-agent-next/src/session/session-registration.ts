@@ -15,6 +15,7 @@
  * metadata; generic git repositories may still carry an explicit token.
  */
 import { TRPCError } from '@trpc/server';
+import { sanitizeGitUrl } from '@kilocode/worker-utils';
 
 import type { Env, SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
@@ -66,6 +67,11 @@ export type SessionRegistrationResult = {
 export type StartedSessionResult = Omit<SessionRegistrationResult, 'initialTurn'> & {
   admission: Extract<SessionMessageAdmissionResult, { success: true }>;
 };
+
+function repositoryGitUrl(repository: SessionCreateRequest['repository']): string {
+  if (repository.type === 'github') return `https://github.com/${repository.repo}`;
+  return sanitizeGitUrl(repository.url);
+}
 
 function acceptInitialTurn(initialTurn: ExecutionTurnSubmission): AcceptedExecutionTurn {
   const messageId = initialTurn.id ?? createMessageId();
@@ -225,7 +231,8 @@ async function allocateNewSession(
       ctx.env,
       input.options?.kilocodeOrganizationId,
       createdOnPlatform,
-      defaultTitle
+      defaultTitle,
+      repositoryGitUrl(input.repository)
     );
   } catch (error) {
     await recordCloudAgentSessionFailure(

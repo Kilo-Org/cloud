@@ -4,7 +4,6 @@ import type {
   AdmitAcceptedSessionMessageRequest,
   MessageDeliveryRequest,
   MessageDeliveryResult,
-  RetryableResultCode,
   SessionMessageAdmissionResult,
   SessionMessageIntent,
   SubmittedSessionMessageRequest,
@@ -204,13 +203,14 @@ function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
       return { failureStage: 'pre_dispatch', failureCode: 'model_missing' };
     case 'WRAPPER_FINALIZING':
     case 'INTERNAL':
+    case 'PERMANENT_EXECUTION_FAILURE':
     case 'UNKNOWN':
     case undefined:
       return { failureStage: 'pre_dispatch', failureCode: 'delivery_failure_unknown' };
   }
 }
 
-function knownPreDispatchExecutionFailureCode(error: unknown): RetryableResultCode | undefined {
+function knownPreDispatchExecutionFailureCode(error: unknown): PendingFlushFailureCode | undefined {
   if (!isExecutionError(error)) return undefined;
   switch (error.code) {
     case 'SANDBOX_CONNECT_FAILED':
@@ -220,8 +220,12 @@ function knownPreDispatchExecutionFailureCode(error: unknown): RetryableResultCo
     case 'WRAPPER_START_FAILED':
       // Orchestration also uses this code when prompt dispatch fails after wrapper readiness.
       return undefined;
+    case 'INVALID_REQUEST':
+      return error.retryable ? undefined : 'BAD_REQUEST';
+    case 'SESSION_NOT_FOUND':
+      return error.retryable ? undefined : 'NOT_FOUND';
     default:
-      return undefined;
+      return error.retryable ? undefined : 'PERMANENT_EXECUTION_FAILURE';
   }
 }
 
@@ -877,6 +881,7 @@ export function createSessionMessageQueue(
                 messageId,
                 command: explicitTurn.command,
                 arguments: explicitTurn.arguments,
+                snapshotInitialization: explicitTurn.snapshotInitialization,
               },
         agent: {
           mode: modeInput,

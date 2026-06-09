@@ -131,7 +131,7 @@ export default {
         return new Response('Missing kiloSessionId parameter', { status: 400 });
       }
       const facade = env.USER_KILO_FACADE.get(env.USER_KILO_FACADE.idFromName(userId));
-      return facade.openPublicSessionEventStream(kiloSessionId);
+      return facade.openPublicSessionEventStream(userId, kiloSessionId);
     }
 
     if (url.pathname === '/kilo-global-feed-test') {

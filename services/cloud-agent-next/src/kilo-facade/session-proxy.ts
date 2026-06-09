@@ -23,26 +23,6 @@ export type LiveWrapperTarget = {
   port: number;
 };
 
-export function decideSessionKiloFacadeRoute(
-  input: SessionKiloFacadePolicyInput
-): SessionKiloFacadeDecision {
-  const suffix = input.kiloRelativePath.slice(
-    `/session/${encodeURIComponent(input.kiloSessionId)}`.length
-  );
-  const supported =
-    (input.method === 'GET' && (suffix === '' || suffix === '/message')) ||
-    (input.method === 'POST' && (suffix === '/prompt_async' || suffix === '/abort'));
-  if (!supported) {
-    return {
-      kind: 'reject',
-      status: 501,
-      code: 'KILO_ROUTE_UNSUPPORTED',
-      message: 'Kilo facade route is not supported',
-    };
-  }
-  return { kind: 'proxy-live-wrapper' };
-}
-
 export function buildWrapperKiloProxyUrl(params: {
   wrapperPort: number;
   kiloRelativePath: string;

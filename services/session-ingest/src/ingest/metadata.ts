@@ -20,6 +20,13 @@ type SessionMetadataUpdates = Partial<
   >
 >;
 
+export function preserveCloudAgentRootGitUrl(
+  current: string | null,
+  incoming: string | null
+): string | null {
+  return current ?? incoming;
+}
+
 export function computeSessionMetadataUpdates(
   mergedChanges: Map<string, string | null>,
   now: () => string = () => new Date().toISOString()
@@ -60,7 +67,7 @@ export async function applyMetadataChanges(
   const parentSessionId = mergedChanges.has('parentId')
     ? (mergedChanges.get('parentId') ?? null)
     : undefined;
-  const changedNonStatus =
+  const changedNonStatus = () =>
     mergedChanges.has('title') ||
     mergedChanges.has('platform') ||
     mergedChanges.has('orgId') ||
@@ -69,12 +76,15 @@ export async function applyMetadataChanges(
     parentSessionId !== undefined;
 
   const notification = await db.transaction(async tx => {
-    const statusChange =
-      status === undefined
-        ? { changed: false, previousStatus: null }
-        : await (async () => {
-            const [statusRow] = await tx
-              .select({ status: cli_sessions_v2.status })
+    const locked =
+      status !== undefined || updates.git_url !== undefined
+        ? await (async () => {
+            const [row] = await tx
+              .select({
+                status: cli_sessions_v2.status,
+                gitUrl: cli_sessions_v2.git_url,
+                cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+              })
               .from(cli_sessions_v2)
               .where(
                 and(
@@ -84,12 +94,25 @@ export async function applyMetadataChanges(
               )
               .limit(1)
               .for('update');
-            if (!statusRow) return null;
-            const previousStatus = SessionStatusSchema.nullable().parse(statusRow.status);
-            return { changed: status !== previousStatus, previousStatus };
-          })();
+            return row ?? null;
+          })()
+        : undefined;
+    if (locked === null) return null;
 
-    if (!statusChange) return null;
+    const previousStatus = SessionStatusSchema.nullable().parse(locked?.status ?? null);
+    const statusChange = {
+      changed: status !== undefined && status !== previousStatus,
+      previousStatus,
+    };
+    if (updates.git_url !== undefined && locked?.cloudAgentSessionId != null) {
+      const incoming = updates.git_url;
+      updates.git_url = preserveCloudAgentRootGitUrl(locked.gitUrl, incoming);
+      if (locked.gitUrl !== null && incoming !== locked.gitUrl) {
+        console.warn('Ignored Cloud Agent root repository identity replacement', { sessionId });
+        delete updates.git_url;
+        mergedChanges.delete('gitUrl');
+      }
+    }
 
     if (Object.keys(updates).length > 0) {
       await tx
@@ -142,7 +165,7 @@ export async function applyMetadataChanges(
       }
     }
 
-    if (!changedNonStatus && !statusChange.changed) return null;
+    if (!changedNonStatus() && !statusChange.changed) return null;
 
     const [persistedRow] = await tx
       .select({
@@ -167,7 +190,7 @@ export async function applyMetadataChanges(
     if (!persistedRow) return null;
 
     return {
-      changedNonStatus,
+      changedNonStatus: changedNonStatus(),
       changedStatus: statusChange.changed,
       previousStatus: statusChange.previousStatus,
       session: mapSessionEventRow(persistedRow),

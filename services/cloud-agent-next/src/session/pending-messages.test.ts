@@ -121,6 +121,25 @@ describe('createPendingSessionMessageFromIntent', () => {
     expect(stored).not.toHaveProperty('callbackUrl');
   });
 
+  it('round-trips command snapshot policy in current V2 storage', async () => {
+    const storage = createMemoryStorage();
+    const intent: SessionMessageIntent = {
+      turn: {
+        type: 'command',
+        messageId: BASE_MSG_ID,
+        command: 'init',
+        arguments: '',
+        snapshotInitialization: 'wait',
+      },
+      agent: { mode: 'code', model: 'claude' },
+    };
+
+    await storePendingSessionMessage(storage, createPendingSessionMessageFromIntent(intent, 42));
+
+    const [listed] = await listPendingSessionMessages(storage);
+    expect(listed?.intent).toEqual(intent);
+  });
+
   it('creates a canonical document message from a session message intent', () => {
     const intent: SessionMessageIntent = {
       turn: {

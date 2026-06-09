@@ -5581,6 +5581,12 @@ export const cli_sessions_v2 = pgTable(
     index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
     index('IDX_cli_sessions_v2_created_at').on(table.created_at),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    index('IDX_cli_sessions_v2_user_git_url_updated')
+      .on(table.kilo_user_id, table.git_url, table.updated_at)
+      .concurrently()
+      .where(
+        sql`${table.git_url} IS NOT NULL AND ${table.parent_session_id} IS NULL AND ${table.cloud_agent_session_id} IS NOT NULL`
+      ),
     // Supports joins from github_branch_pull_requests on (git_url, git_branch).
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
   ]

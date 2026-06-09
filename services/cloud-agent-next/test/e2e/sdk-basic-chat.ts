@@ -99,6 +99,15 @@ function findAssistantWithText(
   );
 }
 
+function findAssistantByParentID(
+  messages: MessageEntry[],
+  parentID: string
+): MessageEntry | undefined {
+  return messages.find(
+    entry => entry.info.role === 'assistant' && entry.info.parentID === parentID
+  );
+}
+
 function assertProjectedAssistant(entry: MessageEntry, directory: string, action: string): void {
   assert.equal(entry.info.role, 'assistant', `${action} did not return an assistant message`);
   if (entry.info.role !== 'assistant') return;
@@ -318,7 +327,38 @@ async function main(): Promise<void> {
     assert.notEqual(warmBootstrapAssistant, undefined);
     if (warmBootstrapAssistant) {
       assertProjectedAssistant(warmBootstrapAssistant, rootDirectory, 'warm session.messages()');
+      const warmBootstrapMessage = requireData(
+        await client.session.message({
+          sessionID: rootSessionID,
+          messageID: warmBootstrapAssistant.info.id,
+          directory: rootDirectory,
+        }),
+        'warm session.message()'
+      );
+      assert.equal(warmBootstrapMessage.info.id, warmBootstrapAssistant.info.id);
+      assertProjectedAssistant(warmBootstrapMessage, rootDirectory, 'warm session.message()');
     }
+    assert.deepEqual(
+      requireData(await client.question.list({ directory: rootDirectory }), 'warm question.list()'),
+      [],
+      'warm root unexpectedly had pending questions'
+    );
+    assert.deepEqual(
+      requireData(
+        await client.permission.list({ directory: rootDirectory }),
+        'warm permission.list()'
+      ),
+      [],
+      'warm root unexpectedly had pending permissions'
+    );
+    assert.deepEqual(
+      requireData(
+        await client.suggestion.list({ directory: rootDirectory }),
+        'warm suggestion.list()'
+      ),
+      [],
+      'warm root unexpectedly had pending suggestions'
+    );
 
     await stopOwnedSandboxFamilies(root.cloudAgentSessionId, ownedSandboxFamilies);
 
@@ -339,7 +379,36 @@ async function main(): Promise<void> {
     );
     if (coldBootstrapAssistant) {
       assertProjectedAssistant(coldBootstrapAssistant, rootDirectory, 'cold session.messages()');
+      const coldBootstrapMessage = requireData(
+        await client.session.message({
+          sessionID: rootSessionID,
+          messageID: coldBootstrapAssistant.info.id,
+          directory: rootDirectory,
+        }),
+        'cold session.message()'
+      );
+      assert.deepEqual(
+        coldBootstrapMessage,
+        coldBootstrapAssistant,
+        'cold session.message() returned a different persisted message'
+      );
+      assertProjectedAssistant(coldBootstrapMessage, rootDirectory, 'cold session.message()');
     }
+    const coldStatuses = requireData(await client.session.status(), 'cold session.status()');
+    assert.equal(
+      coldStatuses[rootSessionID],
+      undefined,
+      'cold root unexpectedly had a non-idle status'
+    );
+    const selectedColdStatuses = requireData(
+      await client.session.status({ directory: rootDirectory }),
+      'selected cold session.status()'
+    );
+    assert.equal(
+      selectedColdStatuses[rootSessionID],
+      undefined,
+      'selected cold root unexpectedly had a non-idle status'
+    );
 
     const scopedEvents = await client.event.subscribe(
       { directory: rootDirectory },
@@ -407,6 +476,70 @@ async function main(): Promise<void> {
       }
       assertProjectedAssistant(asyncAssistant, rootDirectory, 'promptAsync result');
     }
+
+    const commands = requireData(
+      await client.command.list({ directory: rootDirectory }),
+      'warm command.list()'
+    );
+    const initCommand = commands.find(command => command.name === 'init');
+    assert.notEqual(initCommand, undefined, 'command.list() omitted the built-in init command');
+    if (initCommand) {
+      assert.equal(initCommand.template, '', 'command.list() exposed an executable template');
+      assert.equal(Array.isArray(initCommand.hints), true, 'command.list() omitted command hints');
+    }
+
+    const commandMessageID = createMessageId();
+    const scopedCommandWakeEvent = waitForEvent(
+      scopedEvents.stream,
+      'scoped command wake stream',
+      event => isCorrelatedAssistantWakeEvent(event, rootSessionID, commandMessageID)
+    );
+    const globalCommandWakeEvent = waitForEvent(
+      globalEvents.stream,
+      'global command wake stream',
+      event => isProjectedGlobalWakeEvent(event, rootSessionID, commandMessageID)
+    );
+    const commandAcknowledgement = requireData(
+      await client.session.command({
+        sessionID: rootSessionID,
+        directory: rootDirectory,
+        messageID: commandMessageID,
+        command: 'init',
+        arguments: '',
+      }),
+      'session.command()'
+    );
+    assert.equal(commandAcknowledgement.info.role, 'assistant');
+    assert.equal(commandAcknowledgement.info.sessionID, rootSessionID);
+    assert.equal(commandAcknowledgement.info.parentID, commandMessageID);
+    assert.notEqual(commandAcknowledgement.info.id, commandMessageID);
+    assert.equal(commandAcknowledgement.info.time.completed, undefined);
+    assert.equal(commandAcknowledgement.info.finish, undefined);
+    assert.deepEqual(commandAcknowledgement.parts, []);
+    assertProjectedAssistant(
+      commandAcknowledgement,
+      rootDirectory,
+      'session.command() acknowledgement'
+    );
+    await Promise.all([scopedCommandWakeEvent, globalCommandWakeEvent]);
+
+    const commandMessages = await pollFor(async () => {
+      const messages = requireData(
+        await client.session.messages({ sessionID: rootSessionID, limit: 50 }),
+        'command result messages()'
+      );
+      return findAssistantByParentID(messages, commandMessageID) ? messages : undefined;
+    }, 'command assistant result');
+    const commandAssistant = findAssistantByParentID(commandMessages, commandMessageID);
+    assert.notEqual(commandAssistant, undefined, 'command transcript lost correlation');
+    if (commandAssistant) {
+      assertProjectedAssistant(commandAssistant, rootDirectory, 'session.command() result');
+    }
+    assert.equal(
+      commandMessages.some(entry => entry.info.id === commandAcknowledgement.info.id),
+      false,
+      'synthetic command acknowledgement was persisted'
+    );
 
     const unsupportedSyncMessageID = createMessageId();
     const unsupportedSyncPrompt = await client.session.prompt({

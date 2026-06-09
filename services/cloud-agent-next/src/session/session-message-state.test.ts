@@ -142,6 +142,25 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     expect(loaded).not.toHaveProperty('finalization');
   });
 
+  it('round-trips command snapshot policy in an admission snapshot', async () => {
+    const storage = createFakeStorage();
+    const state = createQueuedSessionMessageState({
+      turn: {
+        type: 'command',
+        messageId: VALID_MESSAGE_ID,
+        command: 'init',
+        arguments: '',
+        snapshotInitialization: 'wait',
+      },
+      agent: { mode: 'code', model: 'default-model' },
+    });
+    await putSessionMessageState(storage, state);
+
+    const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+
+    expect(loaded?.admissionSnapshot?.turn).toMatchObject({ snapshotInitialization: 'wait' });
+  });
+
   it('round-trips canonical attachments in an admission snapshot', async () => {
     const storage = createFakeStorage();
     const attachments = {

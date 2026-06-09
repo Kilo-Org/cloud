@@ -109,6 +109,7 @@ type CommandBody = {
   command: string;
   args?: string;
   messageId?: string;
+  snapshotInitialization?: unknown;
   agent?: WrapperPromptAgent;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
@@ -572,6 +573,13 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
     } catch {
       return errorResponse('INVALID_REQUEST', 'Invalid JSON body', 400);
     }
+    if (body.snapshotInitialization !== undefined && body.snapshotInitialization !== 'wait') {
+      return errorResponse(
+        'INVALID_REQUEST',
+        'snapshotInitialization must be wait when provided',
+        400
+      );
+    }
 
     const bindError = await bindSessionContext(body.session ?? body.execution, config, deps);
     if (bindError) return bindError;
@@ -652,7 +660,10 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
           });
         }
       } else {
-        const snapshotInitialization = snapshotInitializationForPlatform(session.platform);
+        const snapshotInitialization =
+          body.snapshotInitialization === 'wait'
+            ? 'wait'
+            : snapshotInitializationForPlatform(session.platform);
         result = await kiloClient.sendCommand({
           sessionId: session.kiloSessionId,
           command: body.command,

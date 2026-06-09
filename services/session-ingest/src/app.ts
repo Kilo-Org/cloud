@@ -8,10 +8,9 @@ import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
 import { api } from './routes/api';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
-import { getSessionExport } from './services/session-export';
+import { internalRoutes } from './internal-routes';
+import { internalUserEventRoutes } from './internal-user-events';
 import { withDORetry } from '@kilocode/worker-utils';
-
-const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
 export const app = new Hono<{
   Bindings: Env;
@@ -66,31 +65,5 @@ app.get('/session/:sessionId', async c => {
   });
 });
 
-// Internal route for service-binding HTTP fetch (secret-protected)
-app.get('/internal/session/:sessionId/export', async c => {
-  const secret = c.req.header('X-Internal-Secret');
-  const expected = await c.env.INTERNAL_API_SECRET_PROD.get();
-
-  if (!secret || !expected) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
-  }
-
-  const encoder = new TextEncoder();
-  const a = encoder.encode(secret);
-  const b = encoder.encode(expected);
-
-  if (a.byteLength !== b.byteLength || !crypto.subtle.timingSafeEqual(a, b)) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
-  }
-
-  const kiloUserId = c.req.header('X-Kilo-User-Id');
-  if (!kiloUserId) return c.json({ success: false, error: 'Missing X-Kilo-User-Id' }, 400);
-
-  const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
-  if (!parsed.success) return c.json({ success: false, error: 'Invalid sessionId' }, 400);
-
-  const stream = await getSessionExport(c.env, parsed.data, kiloUserId);
-  if (stream === null) return c.json({ success: false, error: 'Session not found' }, 404);
-
-  return c.body(stream, 200, { 'content-type': 'application/json; charset=utf-8' });
-});
+app.route('/internal', internalUserEventRoutes);
+app.route('/internal', internalRoutes);

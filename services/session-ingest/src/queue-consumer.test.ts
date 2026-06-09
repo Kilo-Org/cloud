@@ -52,7 +52,7 @@ import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { notifyUserSessionEvent } from './session-events';
 import { QUEUE_RETRY_DELAY_SECONDS, createItemExtractor, queue } from './queue-consumer';
-import { computeSessionMetadataUpdates } from './ingest/metadata';
+import { computeSessionMetadataUpdates, preserveCloudAgentRootGitUrl } from './ingest/metadata';
 
 const encoder = new TextEncoder();
 
@@ -920,6 +920,242 @@ describe('computeSessionMetadataUpdates', () => {
   it('ignores a null "platform" change (creation value stays sticky)', () => {
     const updates = computeSessionMetadataUpdates(new Map([['platform', null]]), fixedNow);
     expect('created_on_platform' in updates).toBe(false);
+  });
+});
+
+describe('preserveCloudAgentRootGitUrl', () => {
+  it('fills missing identity and accepts the same normalized identity', () => {
+    expect(preserveCloudAgentRootGitUrl(null, 'https://github.com/acme/widgets')).toBe(
+      'https://github.com/acme/widgets'
+    );
+    expect(
+      preserveCloudAgentRootGitUrl(
+        'https://github.com/acme/widgets',
+        'https://github.com/acme/widgets'
+      )
+    ).toBe('https://github.com/acme/widgets');
+  });
+
+  it('preserves a mapped root identity when metadata clears or replaces it', () => {
+    expect(preserveCloudAgentRootGitUrl('https://github.com/acme/widgets', null)).toBe(
+      'https://github.com/acme/widgets'
+    );
+    expect(
+      preserveCloudAgentRootGitUrl(
+        'https://github.com/acme/widgets',
+        'https://github.com/other/repo'
+      )
+    ).toBe('https://github.com/acme/widgets');
+  });
+});
+
+describe('queue Cloud Agent root repository identity', () => {
+  it.each([
+    { parentSessionId: null, incoming: 'https://github.com/other/repo' },
+    {
+      parentSessionId: 'ses_parent_123456789012345678',
+      incoming: 'https://github.com/other/repo',
+    },
+    { parentSessionId: null, incoming: null },
+  ])(
+    'acknowledges rejected later gitUrl $incoming without updating or notifying for mapped parent $parentSessionId',
+    async ({ parentSessionId, incoming }) => {
+      vi.mocked(notifyUserSessionEvent).mockClear();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const sessionId = 'ses_12345678901234567890123456';
+      const existing = 'https://github.com/acme/widgets';
+      const selectResults: unknown[][] = [
+        [{ session_id: sessionId }],
+        [
+          {
+            status: null,
+            gitUrl: existing,
+            cloudAgentSessionId: 'agent_root',
+            parentSessionId,
+          },
+        ],
+      ];
+      const selectResult = vi.fn(async () => selectResults.shift() ?? []);
+      const select = {
+        from: vi.fn(() => select),
+        where: vi.fn(() => select),
+        limit: vi.fn(() => select),
+        for: vi.fn(() => select),
+        then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
+      };
+      const update = {
+        set: vi.fn(() => update),
+        where: vi.fn(() => update),
+        then: vi.fn((resolve: (value: undefined) => unknown) => resolve(undefined)),
+      };
+      const dbRef: Record<string, unknown> = {};
+      const db = {
+        select: vi.fn(() => select),
+        update: vi.fn(() => update),
+        transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(dbRef)),
+      } as unknown as ReturnType<typeof getWorkerDb>;
+      Object.assign(dbRef, db);
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        ingest: vi.fn(async () => ({ changes: [{ name: 'gitUrl', value: incoming }] })),
+      } as never);
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              JSON.stringify({
+                data: [
+                  {
+                    type: 'kilo_meta',
+                    data: { platform: 'cloud-agent', gitUrl: incoming ?? existing },
+                  },
+                ],
+              })
+            )
+          );
+          controller.close();
+        },
+      });
+      const remove = vi.fn(async () => undefined);
+      const env = {
+        HYPERDRIVE: { connectionString: 'postgres://test' },
+        SESSION_INGEST_R2: {
+          get: vi.fn(async () => ({ body })),
+          delete: remove,
+          put: vi.fn(async () => undefined),
+        },
+      } as never;
+      const ack = vi.fn();
+      const retry = vi.fn();
+      const batch = {
+        messages: [
+          {
+            body: {
+              r2Key: 'ingest/rejected-git-url',
+              kiloUserId: 'usr_test',
+              sessionId,
+              ingestVersion: 2,
+              ingestedAt: 2,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never;
+      const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+
+      await queue(batch, env, ctx);
+
+      expect(update.set).not.toHaveBeenCalled();
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+      expect(remove).toHaveBeenCalledWith('ingest/rejected-git-url');
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'Ignored Cloud Agent root repository identity replacement',
+        {
+          sessionId,
+        }
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(existing);
+      if (incoming !== null) expect(JSON.stringify(warn.mock.calls)).not.toContain(incoming);
+    }
+  );
+
+  it('fills a null mapped-session gitUrl from later kilo_meta', async () => {
+    vi.mocked(notifyUserSessionEvent).mockClear();
+    const sessionId = 'ses_12345678901234567890123456';
+    const incoming = 'https://github.com/acme/widgets';
+    const persistedSession = {
+      session_id: sessionId,
+      created_at: '2026-05-05T00:00:00.000Z',
+      updated_at: '2026-05-05T00:00:01.000Z',
+      title: null,
+      created_on_platform: 'cloud-agent',
+      organization_id: null,
+      git_url: incoming,
+      git_branch: null,
+      parent_session_id: null,
+      status: null,
+      status_updated_at: null,
+    };
+    const selectResults: unknown[][] = [
+      [{ session_id: sessionId }],
+      [{ status: null, gitUrl: null, cloudAgentSessionId: 'agent_root', parentSessionId: null }],
+      [persistedSession],
+    ];
+    const selectResult = vi.fn(async () => selectResults.shift() ?? []);
+    const select = {
+      from: vi.fn(() => select),
+      where: vi.fn(() => select),
+      limit: vi.fn(() => select),
+      for: vi.fn(() => select),
+      then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
+    };
+    const update = {
+      set: vi.fn(() => update),
+      where: vi.fn(() => update),
+      then: vi.fn((resolve: (value: undefined) => unknown) => resolve(undefined)),
+    };
+    const dbRef: Record<string, unknown> = {};
+    const db = {
+      select: vi.fn(() => select),
+      update: vi.fn(() => update),
+      transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(dbRef)),
+    } as unknown as ReturnType<typeof getWorkerDb>;
+    Object.assign(dbRef, db);
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      ingest: vi.fn(async () => ({ changes: [{ name: 'gitUrl', value: incoming }] })),
+    } as never);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            JSON.stringify({
+              data: [{ type: 'kilo_meta', data: { platform: 'cloud-agent', gitUrl: incoming } }],
+            })
+          )
+        );
+        controller.close();
+      },
+    });
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => ({ body })),
+        delete: vi.fn(async () => undefined),
+        put: vi.fn(async () => undefined),
+      },
+    } as never;
+    const ack = vi.fn();
+    const batch = {
+      messages: [
+        {
+          body: {
+            r2Key: 'ingest/fill-git-url',
+            kiloUserId: 'usr_test',
+            sessionId,
+            ingestVersion: 2,
+            ingestedAt: 2,
+          },
+          ack,
+          retry: vi.fn(),
+        },
+      ],
+    } as never;
+    const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+
+    await queue(batch, env, ctx);
+
+    expect(update.set).toHaveBeenCalledWith({ git_url: incoming });
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_test',
+      expect.objectContaining({ type: 'session.updated' }),
+      ctx
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -1,6 +1,42 @@
 import { z } from 'zod';
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
+
+export const sessionStatusSchema = z.enum(['idle', 'busy', 'question', 'permission', 'retry']);
+
+export const sessionEventV2RowSchema = z.object({
+  source: z.literal('v2'),
+  sessionId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  title: z.string().nullable(),
+  createdOnPlatform: z.string().nullable(),
+  organizationId: z.string().nullable(),
+  gitUrl: z.string().nullable(),
+  gitBranch: z.string().nullable(),
+  parentSessionId: z.string().nullable(),
+  status: sessionStatusSchema.nullable(),
+  statusUpdatedAt: z.string().nullable(),
+});
+export type SessionEventV2Row = z.infer<typeof sessionEventV2RowSchema>;
+
+export const sessionRowEventPayloadSchema = z.object({
+  source: z.literal('v2'),
+  session: sessionEventV2RowSchema,
+  changedAt: z.string(),
+});
+export type SessionRowEventPayload = z.infer<typeof sessionRowEventPayloadSchema>;
+
+const sessionUpdatedMetadataPayloadSchema = sessionRowEventPayloadSchema.extend({
+  session: sessionEventV2RowSchema.extend({ sessionId: sessionIdSchema }),
+});
+
+export const sessionUpdatedMetadataMessageSchema = z.object({
+  type: z.literal('system'),
+  event: z.literal('session.updated'),
+  data: sessionUpdatedMetadataPayloadSchema,
+});
+export type SessionUpdatedMetadataMessage = z.infer<typeof sessionUpdatedMetadataMessageSchema>;
 export const messageIdSchema = z
   .string()
   .startsWith('msg')
@@ -14,6 +50,28 @@ export const partIdSchema = z
     message: 'part IDs must not contain / or U+0000',
   });
 const sdkMetadataSchema = z.record(z.string(), z.unknown());
+export const safeRepositoryUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2048)
+  .refine(value => {
+    try {
+      const url = new URL(value);
+      const pathSegments = url.pathname.split('/').filter(Boolean);
+      const minimumPathSegments = ['github.com', 'gitlab.com'].includes(url.hostname) ? 2 : 1;
+      return (
+        url.protocol === 'https:' &&
+        url.username === '' &&
+        url.password === '' &&
+        url.search === '' &&
+        url.hash === '' &&
+        pathSegments.length >= minimumPathSegments
+      );
+    } catch {
+      return false;
+    }
+  }, 'repository URL must be a safe HTTPS repository URL');
 
 export const createSessionForCloudAgentSchema = z.object({
   sessionId: sessionIdSchema,
@@ -22,6 +80,7 @@ export const createSessionForCloudAgentSchema = z.object({
   organizationId: z.string().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),
+  gitUrl: safeRepositoryUrlSchema.optional(),
 });
 export type CreateSessionForCloudAgentParams = z.input<typeof createSessionForCloudAgentSchema>;
 
@@ -145,6 +204,12 @@ export const listCloudAgentRootSessionsSchema = z.object({
   start: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
 });
 export type ListCloudAgentRootSessionsParams = z.input<typeof listCloudAgentRootSessionsSchema>;
+export const listCloudAgentRootSessionsByGitUrlSchema = listCloudAgentRootSessionsSchema.extend({
+  gitUrl: safeRepositoryUrlSchema,
+});
+export type ListCloudAgentRootSessionsByGitUrlParams = z.input<
+  typeof listCloudAgentRootSessionsByGitUrlSchema
+>;
 export type CloudAgentRootSessionSummary = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
@@ -442,6 +507,22 @@ export const kiloSdkStoredMessageSchema = z.object({
 });
 export type KiloSdkStoredMessage = z.infer<typeof kiloSdkStoredMessageSchema>;
 
+export const kiloSdkExactMessageReadSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('value'), message: kiloSdkStoredMessageSchema }),
+  z.object({ kind: z.literal('not_found') }),
+  z.object({
+    kind: z.literal('too_large'),
+    maximumBytes: z.number().int().positive(),
+    phase: z.enum(['message_scan', 'page_parts']),
+  }),
+  z.object({
+    kind: z.literal('retryable_failure'),
+    phase: z.enum(['message_scan', 'page_parts']),
+  }),
+  z.object({ kind: z.literal('invalid_data') }),
+]);
+export type KiloSdkExactMessageRead = z.infer<typeof kiloSdkExactMessageReadSchema>;
+
 export const kiloSdkMessageHistoryPageSchema = z.object({
   messages: z.array(kiloSdkStoredMessageSchema),
   nextCursor: z.string().nullable(),
@@ -567,6 +648,16 @@ function normalizePersistedKiloSdkMessageHistory(value: unknown): unknown {
   };
 }
 
+function normalizePersistedKiloSdkExactMessageRead(value: unknown): unknown {
+  if (!isRecord(value) || value.kind !== 'value') return value;
+  return { ...value, message: normalizePersistedKiloSdkStoredMessage(value.message).message };
+}
+
+export const persistedKiloSdkExactMessageReadSchema = z.preprocess(
+  normalizePersistedKiloSdkExactMessageRead,
+  kiloSdkExactMessageReadSchema
+);
+
 export const persistedKiloSdkMessageHistorySchema = z.preprocess(
   normalizePersistedKiloSdkMessageHistory,
   kiloSdkMessageHistorySchema
@@ -687,6 +778,19 @@ export type AuthorizedSessionMessages = {
 };
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
+export const getCloudAgentRootSessionMessageSchema = resolveCloudAgentRootSessionSchema.extend({
+  messageId: messageIdSchema,
+});
+export type GetCloudAgentRootSessionMessageParams = z.input<
+  typeof getCloudAgentRootSessionMessageSchema
+>;
+export type CloudAgentRootSessionMessage = {
+  kiloSessionId: string;
+  cloudAgentSessionId: string;
+  message: KiloSdkExactMessageRead;
+};
+export type GetCloudAgentRootSessionMessageResult = CloudAgentRootSessionMessage | null;
+
 export type SessionIngestRpcMethods = {
   createSessionForCloudAgent: (params: CreateSessionForCloudAgentParams) => Promise<void>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
@@ -699,8 +803,14 @@ export type SessionIngestRpcMethods = {
   listCloudAgentRootSessions: (
     params: ListCloudAgentRootSessionsParams
   ) => Promise<CloudAgentRootSessionSummary[]>;
+  listCloudAgentRootSessionsByGitUrl: (
+    params: ListCloudAgentRootSessionsByGitUrlParams
+  ) => Promise<CloudAgentRootSessionSummary[]>;
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;
   getSessionMessages: (params: GetSessionMessagesParams) => Promise<GetSessionMessagesResult>;
+  getCloudAgentRootSessionMessage: (
+    params: GetCloudAgentRootSessionMessageParams
+  ) => Promise<GetCloudAgentRootSessionMessageResult>;
 };

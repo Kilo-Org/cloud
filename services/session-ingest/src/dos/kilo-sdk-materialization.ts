@@ -19,6 +19,7 @@ export const MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES = 8 * 1024 * 1024;
 export const MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES = 8 * 1024 * 1024;
 export const KILO_SDK_HISTORY_CANDIDATE_OVERHEAD_BYTES = 256;
 const KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE = 64;
+export const KILO_SDK_EXACT_MESSAGE_PART_ROW_WORK_CAP = 2 * KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE;
 // Bound cold positive-limit scans to two SQLite batches before failing unsafe continuation.
 export const KILO_SDK_HISTORY_BOUNDED_MESSAGE_SCAN_ROW_WORK_CAP =
   2 * KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE;
@@ -50,9 +51,19 @@ export type KiloSdkSessionSnapshotRead =
   | { kind: 'retryable_failure' }
   | KiloSdkInvalidData;
 
+type KiloSdkStoredMessageValue = {
+  info: Record<string, unknown>;
+  parts: Record<string, unknown>[];
+};
+
+export type KiloSdkExactMessageRead =
+  | { kind: 'value'; message: KiloSdkStoredMessageValue }
+  | { kind: 'not_found' }
+  | KiloSdkHistoryReadFailure;
+
 type KiloSdkMessagesRead =
   | {
-      messages: Array<{ info: Record<string, unknown>; parts: Record<string, unknown>[] }>;
+      messages: KiloSdkStoredMessageValue[];
       nextCursor: string | null;
       omittedItemCount: number;
     }
@@ -71,6 +82,21 @@ export function createKiloSdkHistoryReadBudget(
 }
 
 type ItemDataRef = Pick<typeof ingestItems.$inferSelect, 'item_data' | 'item_data_r2_key'>;
+type ExactMessageSnapshotRow = ItemDataRef &
+  Pick<typeof ingestItems.$inferSelect, 'id' | 'item_id'>;
+type ExactMessagePartEnumerationRef = Pick<
+  typeof ingestItems.$inferSelect,
+  'id' | 'item_id' | 'item_data_r2_key'
+> & { inlineByteLength: number | null };
+type ExactMessageSnapshot = {
+  messageRow: ExactMessageSnapshotRow;
+  partRows: ExactMessageSnapshotRow[];
+};
+type ExactMessageSnapshotRead =
+  | ExactMessageSnapshot
+  | KiloSdkHistoryTooLarge
+  | KiloSdkHistoryRetryableFailure
+  | null;
 
 type MaterializedKiloSdkMessage = {
   info: Record<string, unknown>;
@@ -127,6 +153,38 @@ export async function readKiloSdkSessionSnapshot(
     r2,
     MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES
   );
+}
+
+export async function readKiloSdkMessage(
+  db: DrizzleSqliteDODatabase,
+  r2: R2Bucket,
+  messageId: string
+): Promise<KiloSdkExactMessageRead> {
+  if (!messageIdSchema.safeParse(messageId).success) return { kind: 'invalid_data' };
+  const snapshot = readExactMessageSnapshot(db, messageId);
+  if (snapshot === null) return { kind: 'not_found' };
+  if (isKiloSdkHistoryReadFailure(snapshot)) return snapshot;
+  const { messageRow, partRows } = snapshot;
+
+  const storageIdentity = parsePersistedKiloSdkMessageStorageIdentity(messageRow.item_id);
+  if (!storageIdentity || storageIdentity.messageId !== messageId) return { kind: 'invalid_data' };
+  const budget = createKiloSdkHistoryReadBudget();
+  const materialized = await readKiloSdkHistoryCandidate(
+    messageRow.id,
+    rowId => readItemReference(db, rowId),
+    r2,
+    budget,
+    'message_scan'
+  );
+  const outcome = resolveKiloSdkHistoryCandidateOutcome(materialized, 'fail', 'message_scan');
+  if (outcome.kind === 'skip') return { kind: 'retryable_failure', phase: 'message_scan' };
+  if (outcome.kind !== 'value') return outcome;
+  const identity = readMessageIdentity(outcome.value);
+  if (!identity || identity.id !== messageId) return { kind: 'invalid_data' };
+
+  const hydratedParts = await hydrateExactKiloSdkMessageParts(r2, budget, identity, partRows);
+  if (isKiloSdkHistoryReadFailure(hydratedParts)) return hydratedParts;
+  return { kind: 'value', message: { info: outcome.value, parts: hydratedParts } };
 }
 
 export async function readKiloSdkMessages(
@@ -218,6 +276,110 @@ export async function readKiloSdkMessages(
 
 function messageItemId(messageId: string): string {
   return `message/${messageId}`;
+}
+
+function readExactMessageSnapshot(
+  db: DrizzleSqliteDODatabase,
+  messageId: string
+): ExactMessageSnapshotRead {
+  const messageRow = db
+    .select({
+      id: ingestItems.id,
+      item_id: ingestItems.item_id,
+      item_data: ingestItems.item_data,
+      item_data_r2_key: ingestItems.item_data_r2_key,
+    })
+    .from(ingestItems)
+    .where(
+      and(eq(ingestItems.item_type, 'message'), eq(ingestItems.item_id, messageItemId(messageId)))
+    )
+    .limit(1)
+    .get();
+  if (!messageRow) return null;
+
+  const partRange = getPartItemIdentityRange(messageId);
+  const partRefs: ExactMessagePartEnumerationRef[] = db
+    .select({
+      id: ingestItems.id,
+      item_id: ingestItems.item_id,
+      item_data_r2_key: ingestItems.item_data_r2_key,
+      inlineByteLength: sql<
+        number | null
+      >`CASE WHEN ${ingestItems.item_data_r2_key} IS NULL THEN length(CAST(${ingestItems.item_data} AS BLOB)) ELSE NULL END`,
+    })
+    .from(ingestItems)
+    .where(
+      and(
+        eq(ingestItems.item_type, 'part'),
+        gte(ingestItems.item_id, partRange.start),
+        lt(ingestItems.item_id, partRange.end)
+      )
+    )
+    .orderBy(ingestItems.id)
+    .limit(KILO_SDK_EXACT_MESSAGE_PART_ROW_WORK_CAP + 1)
+    .all();
+  if (partRefs.length > KILO_SDK_EXACT_MESSAGE_PART_ROW_WORK_CAP) {
+    return {
+      kind: 'too_large',
+      maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
+      phase: 'page_parts',
+    };
+  }
+  let estimatedBytes = 0;
+  for (const partRef of partRefs) {
+    estimatedBytes += KILO_SDK_HISTORY_CANDIDATE_OVERHEAD_BYTES + (partRef.inlineByteLength ?? 0);
+    if (estimatedBytes > MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES) {
+      return {
+        kind: 'too_large',
+        maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
+        phase: 'page_parts',
+      };
+    }
+  }
+  const partRows: ExactMessageSnapshotRow[] = [];
+  let lastPartRowId = 0;
+  for (;;) {
+    const rows = db
+      .select({
+        id: ingestItems.id,
+        item_id: ingestItems.item_id,
+        item_data: ingestItems.item_data,
+        item_data_r2_key: ingestItems.item_data_r2_key,
+      })
+      .from(ingestItems)
+      .where(
+        and(
+          eq(ingestItems.item_type, 'part'),
+          gte(ingestItems.item_id, partRange.start),
+          lt(ingestItems.item_id, partRange.end),
+          gt(ingestItems.id, lastPartRowId)
+        )
+      )
+      .orderBy(ingestItems.id)
+      .limit(KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE)
+      .all();
+    if (rows.length === 0) break;
+    partRows.push(...rows);
+    lastPartRowId = rows[rows.length - 1]?.id ?? lastPartRowId;
+    if (rows.length < KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE) break;
+  }
+  if (
+    partRows.length !== partRefs.length ||
+    partRows.some((row, index) => {
+      const ref = partRefs[index];
+      return (
+        ref === undefined ||
+        row.id !== ref.id ||
+        row.item_id !== ref.item_id ||
+        row.item_data_r2_key !== ref.item_data_r2_key ||
+        (row.item_data_r2_key === null &&
+          new TextEncoder().encode(row.item_data).byteLength !== ref.inlineByteLength)
+      );
+    })
+  ) {
+    return { kind: 'retryable_failure', phase: 'page_parts' };
+  }
+  return { messageRow, partRows };
 }
 
 function parsePersistedKiloSdkMessageStorageIdentity(
@@ -541,6 +703,43 @@ function countOmittedKiloSdkMessageRows(
   if (!storageIdentity) return { kind: 'invalid_data' };
   const parts = countKiloSdkMessagePartRowsByMessageId(db, storageIdentity.messageId);
   return parts.kind === 'invalid_data' ? parts : { kind: 'count', count: 1 + parts.count };
+}
+
+async function hydrateExactKiloSdkMessageParts(
+  r2: R2Bucket,
+  budget: KiloSdkHistoryReadBudget,
+  identity: KiloSdkMessagesLegacyCursor,
+  partRows: ExactMessageSnapshotRow[]
+): Promise<Record<string, unknown>[] | KiloSdkHistoryReadFailure> {
+  const parts: Record<string, unknown>[] = [];
+  for (const partRow of partRows) {
+    const storageIdentity = parsePersistedKiloSdkPartStorageIdentity(partRow.item_id, identity.id);
+    if (!storageIdentity) return { kind: 'invalid_data' };
+    if (budget.consumedBytes + KILO_SDK_HISTORY_CANDIDATE_OVERHEAD_BYTES > budget.maximumBytes) {
+      return { kind: 'too_large', maximumBytes: budget.maximumBytes, phase: 'page_parts' };
+    }
+    budget.consumedBytes += KILO_SDK_HISTORY_CANDIDATE_OVERHEAD_BYTES;
+    const materialized = await readKiloSdkHistoryItem(partRow, r2, budget, 'page_parts');
+    if (materialized.kind === 'intrinsically_too_large') {
+      return {
+        kind: 'too_large',
+        maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
+        phase: 'page_parts',
+      };
+    }
+    if (materialized.kind !== 'value') return materialized;
+    const bodyIdentity = readPartIdentity(materialized.value);
+    if (
+      !bodyIdentity ||
+      bodyIdentity.messageId !== identity.id ||
+      bodyIdentity.messageId !== storageIdentity.messageId ||
+      bodyIdentity.partId !== storageIdentity.partId
+    ) {
+      return { kind: 'invalid_data' };
+    }
+    parts.push(materialized.value);
+  }
+  return parts.sort(compareKiloSdkPart);
 }
 
 async function hydrateKiloSdkMessageParts(

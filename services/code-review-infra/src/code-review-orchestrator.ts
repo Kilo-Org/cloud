@@ -200,6 +200,22 @@ function isWorkspaceAdmissionCapacityFailure(body: string): boolean {
   );
 }
 
+function hasKnownRetryableFreshSessionFailure(body: string): boolean {
+  return (
+    body.includes('failed to create workspace directory') ||
+    body.includes('wrapper cleanup is required before delivery can launch') ||
+    body.includes("enoent: no such file or directory, posix_spawn 'git'") ||
+    (body.includes('failed to checkout pull ref') &&
+      body.includes(
+        'your local changes to the following files would be overwritten by checkout'
+      )) ||
+    body.includes('session snapshot restore failed') ||
+    body.includes(
+      'internal error while starting up durable object storage caused object to be reset'
+    )
+  );
+}
+
 function classifyCloudAgentNextFreshSessionRetry(
   error: unknown
 ): CloudAgentNextFreshRetryClassification {
@@ -307,6 +323,15 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
+  if (hasKnownRetryableFreshSessionFailure(body)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'sandbox_api_or_storage_failure',
+      'known_retryable_5xx_body_signal'
+    );
+  }
+
   const parsedBody = parseJsonBody(cloudAgentNextError.body);
   if (hasRetryableSandboxMarker(parsedBody)) {
     return cloudAgentNextFreshRetryClassification(
@@ -362,9 +387,9 @@ function classifyCloudAgentNextFreshSessionRetry(
 
   return cloudAgentNextFreshRetryClassification(
     cloudAgentNextError,
-    true,
+    false,
     'unclassified_5xx',
-    'retryable_by_default_unclassified_5xx'
+    'unclassified_5xx'
   );
 }
 

@@ -45,6 +45,8 @@ import {
   createAiSdkProvider,
   formatDirectByokModelId,
 } from '@/lib/ai-gateway/providers/direct-byok';
+import { ENABLE_BEDROCK_OPENAI_BYOK } from '@/lib/constants';
+import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 
 const CODESTRAL_FIM_URL = 'https://codestral.mistral.ai/v1/fim/completions';
 const CODESTRAL_TEST_MODEL = 'codestral-2508';
@@ -121,6 +123,15 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
       if (!providerParsed.success) continue;
       const providerId = providerParsed.data;
       if (!result[providerId]) result[providerId] = [];
+
+      if (
+        !ENABLE_BEDROCK_OPENAI_BYOK &&
+        providerId === 'bedrock' &&
+        isOpenAiModel(vercelModel.id)
+      ) {
+        continue;
+      }
+
       result[providerId].push(openRouterModel.name + ' (' + openRouterModel.id + ')');
     }
   }

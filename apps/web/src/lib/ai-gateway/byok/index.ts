@@ -13,6 +13,8 @@ import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import { getVercelModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
+import { ENABLE_BEDROCK_OPENAI_BYOK } from '@/lib/constants';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
   if (isCodestralModel(modelId)) {
@@ -32,6 +34,11 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
     return [];
   }
   console.debug(`[getModelUserByokProviders] found user byok providers for ${modelId}`, providers);
+
+  if (!ENABLE_BEDROCK_OPENAI_BYOK && isOpenAiModel(modelId)) {
+    return providers.filter(p => p !== VercelUserByokInferenceProviderIdSchema.enum.bedrock);
+  }
+
   return providers;
 }
 

@@ -218,6 +218,30 @@ const PENDING_REGISTRY_CLEANUP_KEY = 'pendingRegistryCleanup';
 const SKIP_PROVISION_RESERVATION_RELEASE_KEY = 'skipProvisionReservationRelease';
 const REGISTRY_CLEANUP_RETRY_MS = 60_000;
 
+const JSON_LOG_STRING_ESCAPES: Record<string, string> = {
+  '\b': '\\b',
+  '\f': '\\f',
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+  '"': '\\"',
+  '\\': '\\\\',
+};
+
+function formatJsonLogString(value: string): string {
+  let result = '"';
+  for (const char of value) {
+    const escaped = JSON_LOG_STRING_ESCAPES[char];
+    if (escaped) {
+      result += escaped;
+      continue;
+    }
+    const code = char.charCodeAt(0);
+    result += code < 0x20 ? `\\u${code.toString(16).padStart(4, '0')}` : char;
+  }
+  return `${result}"`;
+}
+
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
   private startInProgress = false;
@@ -3487,7 +3511,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           previousOverride ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB` : 'none'
         } ` +
         `new=${input.size.cpus}/${input.size.memory_mb}MB cpu_kind=${input.size.cpu_kind ?? 'shared'} ` +
-        `reason=${JSON.stringify(input.reason)}`
+        `reason=${formatJsonLogString(input.reason)}`
     );
 
     return { previousOverride, newOverride: input.size };

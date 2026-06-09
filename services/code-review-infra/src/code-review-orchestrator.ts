@@ -388,8 +388,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   /** Fallback alarm for queued reviews accepted by the Worker but not run via waitUntil. */
   private static readonly RUN_REVIEW_FALLBACK_DELAY_MS = 30_000;
 
-  /** Delay before automatic infra retries start a fresh cloud-agent-next session. */
-  private static readonly AUTO_RETRY_DELAY_MS = 60_000;
+  /** Jitter range before automatic infra retries start a fresh cloud-agent-next session. */
+  private static readonly AUTO_RETRY_MIN_DELAY_MS = 2 * 60_000;
+  private static readonly AUTO_RETRY_MAX_DELAY_MS = 5 * 60_000;
 
   /** Batch size for event persistence (save every N events to reduce CPU usage) */
   private static readonly EVENT_BATCH_SIZE = 10;
@@ -413,6 +414,16 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   private getCloudAgentNextClient(): CloudAgentNextFetchClient {
     this.cloudAgentNextClient ??= createCloudAgentNextFetchClient(this.env.CLOUD_AGENT_NEXT_URL);
     return this.cloudAgentNextClient;
+  }
+
+  private static getAutoRetryDelayMs(): number {
+    const delayRangeMs =
+      CodeReviewOrchestrator.AUTO_RETRY_MAX_DELAY_MS -
+      CodeReviewOrchestrator.AUTO_RETRY_MIN_DELAY_MS;
+    return (
+      CodeReviewOrchestrator.AUTO_RETRY_MIN_DELAY_MS +
+      Math.floor(Math.random() * (delayRangeMs + 1))
+    );
   }
 
   private logCloudAgentNextFreshSessionRetrySkipped(
@@ -484,8 +495,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     this.state.sandboxId = undefined;
     this.state.status = 'queued';
     this.state.updatedAt = new Date().toISOString();
+    const retryDelayMs = CodeReviewOrchestrator.getAutoRetryDelayMs();
     await this.saveState();
-    await this.ctx.storage.setAlarm(Date.now() + CodeReviewOrchestrator.AUTO_RETRY_DELAY_MS);
+    await this.ctx.storage.setAlarm(Date.now() + retryDelayMs);
 
     console.warn(
       '[CodeReviewOrchestrator] Scheduled fresh-session retry after retryable cloud-agent-next failure',
@@ -499,7 +511,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         previousSandboxId,
         sandboxRetryAttempted: true,
         retryOutcome: 'scheduled',
-        retryDelayMs: CodeReviewOrchestrator.AUTO_RETRY_DELAY_MS,
+        retryDelayMs,
         ...classification,
       }
     );
@@ -1026,6 +1038,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     this.state.sandboxRetryAttempted = true;
     await this.saveState();
+    const retryDelayMs = CodeReviewOrchestrator.getAutoRetryDelayMs();
 
     const retryId = this.env.CODE_REVIEW_ORCHESTRATOR.idFromName(
       doNameForAttempt(this.state.reviewId, params.retryAttemptId)
@@ -1040,7 +1053,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: this.state.skipBalanceCheck,
       agentVersion: this.state.agentVersion,
       previousCloudAgentSessionId: undefined,
-      runReviewDelayMs: CodeReviewOrchestrator.AUTO_RETRY_DELAY_MS,
+      runReviewDelayMs: retryDelayMs,
     });
 
     console.warn(
@@ -1051,7 +1064,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         retryAttemptId: params.retryAttemptId,
         reason: params.reason,
         status: started.status,
-        retryDelayMs: CodeReviewOrchestrator.AUTO_RETRY_DELAY_MS,
+        retryDelayMs,
       }
     );
 

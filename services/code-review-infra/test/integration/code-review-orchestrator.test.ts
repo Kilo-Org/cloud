@@ -129,18 +129,32 @@ async function storedAlarm(stub: DurableObjectStub<CodeReviewOrchestrator>) {
   );
 }
 
-async function expectAutoRetryScheduled(stub: DurableObjectStub<CodeReviewOrchestrator>) {
+const AUTO_RETRY_MIN_DELAY_MS = 2 * 60_000;
+const AUTO_RETRY_MAX_DELAY_MS = 5 * 60_000;
+const AUTO_RETRY_ALARM_UPPER_SLACK_MS = 1_000;
+
+function expectAutoRetryAlarmInRange(alarm: number | null, retrySchedulingStartedAt: number) {
+  expect(alarm).toEqual(expect.any(Number));
+  if (alarm === null) {
+    throw new Error('Expected auto-retry alarm to be scheduled');
+  }
+  expect(alarm).toBeGreaterThanOrEqual(retrySchedulingStartedAt + AUTO_RETRY_MIN_DELAY_MS);
+  expect(alarm).toBeLessThanOrEqual(
+    Date.now() + AUTO_RETRY_MAX_DELAY_MS + AUTO_RETRY_ALARM_UPPER_SLACK_MS
+  );
+}
+
+async function expectAutoRetryScheduled(
+  stub: DurableObjectStub<CodeReviewOrchestrator>,
+  retrySchedulingStartedAt: number
+) {
   await expect(storedReview(stub)).resolves.toMatchObject({
     status: 'queued',
     sandboxRetryAttempted: true,
   });
 
   const alarm = await storedAlarm(stub);
-  expect(alarm).toEqual(expect.any(Number));
-  if (alarm === null) {
-    throw new Error('Expected auto-retry alarm to be scheduled');
-  }
-  expect(alarm).toBeGreaterThan(Date.now() + 45_000);
+  expectAutoRetryAlarmInRange(alarm, retrySchedulingStartedAt);
 }
 
 async function expectPrepareFailureSchedulesFreshRetry(
@@ -177,13 +191,14 @@ async function expectPrepareFailureSchedulesFreshRetry(
     await state.storage.setAlarm(Date.now() + 30_000);
   });
 
+  const retrySchedulingStartedAt = Date.now();
   const ran = await runDurableObjectAlarm(stub);
 
   expect(ran).toBe(true);
   await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
   expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
   expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-  await expectAutoRetryScheduled(stub);
+  await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
   const retryRan = await runDurableObjectAlarm(stub);
   expect(retryRan).toBe(true);
@@ -493,6 +508,7 @@ describe('CodeReviewOrchestrator recovery', () => {
       );
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/retry-fresh`, {
       method: 'POST',
       headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
@@ -518,11 +534,7 @@ describe('CodeReviewOrchestrator recovery', () => {
       status: 'queued',
     });
     const retryAlarm = await storedAlarm(retryStub);
-    expect(retryAlarm).toEqual(expect.any(Number));
-    if (retryAlarm === null) {
-      throw new Error('Expected retry attempt alarm to be scheduled');
-    }
-    expect(retryAlarm).toBeGreaterThan(Date.now() + 45_000);
+    expectAutoRetryAlarmInRange(retryAlarm, retrySchedulingStartedAt);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
 
@@ -660,13 +672,14 @@ describe('CodeReviewOrchestrator recovery', () => {
       await state.storage.setAlarm(Date.now() + 30_000);
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    await expectAutoRetryScheduled(stub);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -733,13 +746,14 @@ describe('CodeReviewOrchestrator recovery', () => {
       await state.storage.setAlarm(Date.now() + 30_000);
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    await expectAutoRetryScheduled(stub);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -803,13 +817,14 @@ describe('CodeReviewOrchestrator recovery', () => {
       await state.storage.setAlarm(Date.now() + 30_000);
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    await expectAutoRetryScheduled(stub);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -938,13 +953,14 @@ describe('CodeReviewOrchestrator recovery', () => {
       await state.storage.setAlarm(Date.now() + 30_000);
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    await expectAutoRetryScheduled(stub);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -991,13 +1007,14 @@ describe('CodeReviewOrchestrator recovery', () => {
       await state.storage.setAlarm(Date.now() + 30_000);
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    await expectAutoRetryScheduled(stub);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -1044,13 +1061,14 @@ describe('CodeReviewOrchestrator recovery', () => {
       await state.storage.setAlarm(Date.now() + 30_000);
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    await expectAutoRetryScheduled(stub);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -1083,13 +1101,14 @@ describe('CodeReviewOrchestrator recovery', () => {
       await state.storage.setAlarm(Date.now() + 30_000);
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
     await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    await expectAutoRetryScheduled(stub);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -1739,6 +1758,7 @@ describe('CodeReviewOrchestrator recovery', () => {
       await state.storage.setAlarm(Date.now() + 30_000);
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
@@ -1748,7 +1768,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    await expectAutoRetryScheduled(stub);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -1810,6 +1830,7 @@ describe('CodeReviewOrchestrator recovery', () => {
       await state.storage.setAlarm(Date.now() + 30_000);
     });
 
+    const retrySchedulingStartedAt = Date.now();
     const ran = await runDurableObjectAlarm(stub);
 
     expect(ran).toBe(true);
@@ -1817,7 +1838,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    await expectAutoRetryScheduled(stub);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);

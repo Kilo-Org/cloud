@@ -75,6 +75,58 @@ describe('admin.modelExperiments — basic CRUD', () => {
     expect(created.status).toBe('draft');
     expect(created.public_model_id).toBe('partner/preview-foo');
     expect(created.created_by_user_id).toBe(admin.id);
+    expect(created.metadata).toBeNull();
+  });
+
+  it('creates and updates experiment metadata', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const created = await caller.admin.modelExperiments.create({
+      public_model_id: 'partner/preview-metadata',
+      name: 'Metadata experiment',
+      metadata: {
+        context_length: 128_000,
+        max_completion_tokens: 16_000,
+        supports_image_input: true,
+      },
+    });
+    expect(created.metadata).toEqual({
+      context_length: 128_000,
+      max_completion_tokens: 16_000,
+      supports_image_input: true,
+    });
+
+    const updated = await caller.admin.modelExperiments.update({
+      id: created.id,
+      metadata: {
+        context_length: 200_000,
+        max_completion_tokens: 32_000,
+      },
+    });
+    expect(updated.metadata).toEqual({
+      context_length: 200_000,
+      max_completion_tokens: 32_000,
+    });
+
+    const cleared = await caller.admin.modelExperiments.update({
+      id: created.id,
+      metadata: null,
+    });
+    expect(cleared.metadata).toBeNull();
+  });
+
+  it('rejects invalid experiment metadata', async () => {
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.admin.modelExperiments.create({
+        public_model_id: 'partner/preview-invalid-metadata',
+        name: 'Invalid metadata',
+        metadata: {
+          context_length: 128_000,
+          max_completion_tokens: 16_000,
+          unsupported_property: true,
+        },
+      } as Parameters<typeof caller.admin.modelExperiments.create>[0])
+    ).rejects.toThrow();
   });
 
   it.each(['kilo/preview-foo', 'kilocode/preview-foo', 'kilo-internal/preview-foo'])(
@@ -439,6 +491,20 @@ describe('admin.modelExperiments — state machine', () => {
     await caller.admin.modelExperiments.complete({ id: experimentId });
     await expect(
       caller.admin.modelExperiments.activate({ id: experimentId })
+    ).rejects.toMatchObject({ message: expect.stringContaining('completed') });
+  });
+
+  it('rejects metadata updates on completed experiments', async () => {
+    const { caller, experimentId } = await makeDraftWithTwoVariants(
+      'partner/preview-metadata-done'
+    );
+    await caller.admin.modelExperiments.activate({ id: experimentId });
+    await caller.admin.modelExperiments.complete({ id: experimentId });
+    await expect(
+      caller.admin.modelExperiments.update({
+        id: experimentId,
+        metadata: null,
+      })
     ).rejects.toMatchObject({ message: expect.stringContaining('completed') });
   });
 });

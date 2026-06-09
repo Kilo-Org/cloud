@@ -1,6 +1,7 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadAttachments } from '@/lib/bot/attachments';
+import { startTyping, type BotTypingIndicator } from '@/lib/bot/typing';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
@@ -16,7 +17,7 @@ export async function processLinkedMessage({
   platformIntegration: PlatformIntegration;
   user: User;
 }) {
-  await thread.startTyping('Thinking...');
+  const typingIndicator = await startTyping(thread, { message, status: 'Thinking...' });
 
   let botRequestId: string;
   try {
@@ -48,7 +49,14 @@ export async function processLinkedMessage({
     return;
   }
 
-  await processMessage({ thread, message, platformIntegration, user, botRequestId });
+  await processMessage({
+    thread,
+    message,
+    platformIntegration,
+    user,
+    botRequestId,
+    typingIndicator,
+  });
 }
 
 async function processMessage({
@@ -57,12 +65,14 @@ async function processMessage({
   platformIntegration,
   user,
   botRequestId,
+  typingIndicator,
 }: {
   thread: Thread;
   message: Message;
   platformIntegration: PlatformIntegration;
   user: User;
   botRequestId: string;
+  typingIndicator: BotTypingIndicator;
 }) {
   const startedAt = Date.now();
 
@@ -101,6 +111,7 @@ async function processMessage({
 
     if (!result.startedCloudAgentSession) {
       await thread.post({ markdown: result.finalText });
+      await typingIndicator.complete();
     }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);

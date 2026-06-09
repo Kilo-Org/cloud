@@ -26,6 +26,7 @@ import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { runBotAgent, type BotAgentMessageLike } from '@/lib/bot/agent-runner';
 import { botPlatforms } from '@/lib/bot/platforms';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
+import { startTyping, type BotTypingIndicator } from '@/lib/bot/typing';
 import { findUserById } from '@/lib/user';
 import type { Thread } from 'chat';
 
@@ -169,12 +170,17 @@ async function postBotThreadMessage(params: {
 }
 
 async function startBotThreadTyping(params: {
+  messageId: string;
   thread: Thread;
   platformIntegration: PlatformIntegration;
-}): Promise<void> {
-  await botPlatforms.require(params.platformIntegration.platform).withAuthContext({
+}): Promise<BotTypingIndicator> {
+  return await botPlatforms.require(params.platformIntegration.platform).withAuthContext({
     platformIntegration: params.platformIntegration,
-    fn: async () => await params.thread.startTyping('Processing Cloud Agent result...'),
+    fn: async () =>
+      await startTyping(params.thread, {
+        messageId: params.messageId,
+        status: 'Processing Cloud Agent result...',
+      }),
   });
 }
 
@@ -417,6 +423,7 @@ async function handleCompletedCallback(
   let cloudAgentResultsForPrompt: string;
   let cloudAgentResultsForMessage: string;
   let expectedCloudAgentSessionId: string | undefined = payload.cloudAgentSessionId;
+  let typingIndicator: BotTypingIndicator | null = null;
 
   if (trackedCallbackSession) {
     expectedCloudAgentSessionId = undefined;
@@ -481,7 +488,11 @@ async function handleCompletedCallback(
       );
     }
 
-    await startBotThreadTyping({ thread, platformIntegration });
+    typingIndicator = await startBotThreadTyping({
+      messageId: requestRow.platform_message_id,
+      thread,
+      platformIntegration,
+    });
 
     const failedSessions = readiness.sessions.filter(session => session.status !== 'completed');
     if (failedSessions.length > 0) {
@@ -584,6 +595,14 @@ async function handleCompletedCallback(
     cloudAgentResultsForMessage = finalMessage;
   }
 
+  if (!typingIndicator) {
+    typingIndicator = await startBotThreadTyping({
+      messageId: requestRow.platform_message_id,
+      thread,
+      platformIntegration,
+    });
+  }
+
   if (completedStepCount >= MAX_ITERATIONS) {
     logCallback('Posting completed Cloud Agent result without continuation', {
       botRequestId,
@@ -622,6 +641,7 @@ async function handleCompletedCallback(
       markdown: cloudAgentResultsForMessage,
       platformIntegration,
     });
+    await typingIndicator.complete();
 
     return;
   }
@@ -684,6 +704,7 @@ ${cloudAgentResultsForPrompt}`;
     markdown: continuation.finalText,
     platformIntegration,
   });
+  await typingIndicator.complete();
 }
 
 async function handleFailedCallback(

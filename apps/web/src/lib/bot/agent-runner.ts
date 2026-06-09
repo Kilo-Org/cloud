@@ -13,6 +13,7 @@ import {
   updateBotRequest,
 } from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
+import { startTyping } from '@/lib/bot/typing';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
@@ -274,7 +275,10 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
           let resolvedCloudAgentSessionId: string | undefined;
           let resolvedKiloSessionId: string | undefined;
 
-          await params.thread.startTyping('Spawning Cloud Agent session...');
+          await startTyping(params.thread, {
+            message: params.message,
+            status: 'Spawning Cloud Agent session...',
+          });
 
           const currentStep = getNextBotCallbackStep({
             completedStepCount,

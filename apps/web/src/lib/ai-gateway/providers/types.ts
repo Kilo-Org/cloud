@@ -17,6 +17,7 @@ export type ProviderId =
   | 'dev-tools';
 
 export type BYOKResult = {
+  id: string;
   decryptedAPIKey: string;
   providerId: UserByokProviderId;
 };

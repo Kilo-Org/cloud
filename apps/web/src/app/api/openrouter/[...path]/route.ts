@@ -585,6 +585,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: machineIdHeader,
     user_byok: !!effectiveProviderContext.userByok,
+    user_byok_key_candidates: effectiveProviderContext.userByok?.map(({ id, providerId }) => ({
+      id,
+      providerId,
+    })),
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     botId,
     tokenSource,

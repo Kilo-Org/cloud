@@ -369,6 +369,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       provider,
       userByok: [
         {
+          id: 'byok-key-id',
           decryptedAPIKey: 'byok-key',
           providerId: 'openai',
         },

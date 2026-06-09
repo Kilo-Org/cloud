@@ -120,6 +120,19 @@ export type UsageRecordInsertResult = {
   newMicrodollarsUsed: number | null;
 };
 
+function resolveUserByokKeyId(
+  routingProvider: ProviderId,
+  isByok: boolean | null,
+  inferenceProvider: string | null,
+  candidates: Array<{ id: string; providerId: string }>
+): string | null {
+  if (candidates.length === 0) return null;
+  if (routingProvider !== 'vercel') return candidates.length === 1 ? candidates[0].id : null;
+  if (isByok !== true) return null;
+  const normalizedProvider = inferenceProvider === 'mistral' ? 'codestral' : inferenceProvider;
+  return candidates.find(candidate => candidate.providerId === normalizedProvider)?.id ?? null;
+}
+
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
     kilo_user_id: usageContext.kiloUserId,
@@ -136,6 +149,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     api_kind: usageContext.api_kind,
     machine_id: usageContext.machine_id,
     is_user_byok: usageContext.user_byok,
+    user_byok_key_candidates: usageContext.user_byok_key_candidates ?? [],
     has_tools: usageContext.has_tools,
     feature: usageContext.feature,
     session_id: usageContext.session_id,
@@ -184,8 +198,21 @@ export async function toInsertableDbUsageRecord(
   const id = randomUUID();
   const created_at = new Date().toISOString();
 
-  const { kilo_user_id, organization_id, project_id, provider, ttfb_ms, ...metadataFromContext } =
-    usageContextInfo;
+  const {
+    kilo_user_id,
+    organization_id,
+    project_id,
+    provider,
+    ttfb_ms,
+    user_byok_key_candidates,
+    ...metadataFromContext
+  } = usageContextInfo;
+  const user_byok_key_id = resolveUserByokKeyId(
+    provider,
+    usageStats.is_byok,
+    usageStats.inference_provider,
+    user_byok_key_candidates
+  );
 
   const core: MicrodollarUsage = {
     id,
@@ -218,6 +245,7 @@ export async function toInsertableDbUsageRecord(
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
     is_byok: usageStats.is_byok,
+    user_byok_key_id,
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
@@ -525,6 +553,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               generation_time,
               is_byok,
               is_user_byok,
+              user_byok_key_id,
               streamed,
               cancelled,
               has_tools,
@@ -565,6 +594,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.generation_time},
               ${metadataFields.is_byok},
               ${metadataFields.is_user_byok},
+              ${metadataFields.user_byok_key_id}::uuid,
               ${metadataFields.streamed},
               ${metadataFields.cancelled},
               ${metadataFields.has_tools},

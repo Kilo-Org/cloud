@@ -103,7 +103,11 @@ function setBYOKAuth() {
   });
   mockedGetBYOKforOrganization.mockResolvedValue(null);
   mockedGetBYOKforUser.mockResolvedValue([
-    { providerId: 'inception', decryptedAPIKey: 'user-supplied-key' },
+    {
+      id: 'byok-key-id',
+      providerId: 'inception',
+      decryptedAPIKey: 'user-supplied-key',
+    },
   ] as never);
 }
 

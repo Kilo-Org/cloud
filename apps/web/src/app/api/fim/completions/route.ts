@@ -177,6 +177,7 @@ export async function POST(request: NextRequest) {
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
+    user_byok_key_candidates: userByok?.map(({ id, providerId }) => ({ id, providerId })),
     has_tools: false,
     feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
     session_id: taskId ?? null,

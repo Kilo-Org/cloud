@@ -129,6 +129,8 @@ export type MicrodollarUsageContext = {
   machine_id: string | null;
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
+  /** Candidate key identifiers used to resolve the key selected by the upstream provider. */
+  user_byok_key_candidates?: Array<{ id: string; providerId: string }>;
   has_tools: boolean;
   botId?: string;
   tokenSource?: string;
@@ -212,6 +214,7 @@ export type UsageMetaData = {
   generation_time: number | null;
   is_byok: boolean | null;
   is_user_byok: boolean;
+  user_byok_key_id: string | null;
   streamed: boolean | null;
   cancelled: boolean | null;
   editor_name: string | null;

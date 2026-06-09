@@ -1068,4 +1068,41 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
 
     expect(metadata.api_kind).toBe('audio_transcriptions');
   });
+
+  test('stores the BYOK key selected by the inference provider', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      {
+        ...baseUsageStats,
+        is_byok: true,
+        inference_provider: 'anthropic',
+      },
+      extractUsageContextInfo(
+        makeUsageContext({
+          provider: 'vercel',
+          user_byok: true,
+          user_byok_key_candidates: [
+            { id: 'openai-key-id', providerId: 'openai' },
+            { id: 'anthropic-key-id', providerId: 'anthropic' },
+          ],
+        })
+      )
+    );
+
+    expect(metadata.user_byok_key_id).toBe('anthropic-key-id');
+  });
+
+  test('does not store a candidate key when system credentials were used', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      baseUsageStats,
+      extractUsageContextInfo(
+        makeUsageContext({
+          provider: 'vercel',
+          user_byok: true,
+          user_byok_key_candidates: [{ id: 'candidate-key-id', providerId: 'openai' }],
+        })
+      )
+    );
+
+    expect(metadata.user_byok_key_id).toBeNull();
+  });
 });

@@ -36,13 +36,16 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
 }
 
 export function decryptByokRow({
+  id,
   encrypted_api_key,
   provider_id,
 }: {
+  id: string;
   encrypted_api_key: EncryptedData;
   provider_id: string;
-}) {
+}): BYOKResult {
   return {
+    id,
     decryptedAPIKey: decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY),
     providerId: UserByokProviderIdSchema.parse(provider_id),
   };
@@ -58,6 +61,7 @@ export async function getBYOKforUser(
   }
   const rows = await fromDb
     .select({
+      id: byok_api_keys.id,
       encrypted_api_key: byok_api_keys.encrypted_api_key,
       provider_id: byok_api_keys.provider_id,
     })
@@ -84,6 +88,7 @@ export async function getBYOKforOrganization(
   }
   const rows = await fromDb
     .select({
+      id: byok_api_keys.id,
       encrypted_api_key: byok_api_keys.encrypted_api_key,
       provider_id: byok_api_keys.provider_id,
     })

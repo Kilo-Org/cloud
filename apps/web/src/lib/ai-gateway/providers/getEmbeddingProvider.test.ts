@@ -53,7 +53,9 @@ describe('getEmbeddingProvider', () => {
 
   it('should route to Vercel AI Gateway when BYOK is available', async () => {
     const user = createTestUser();
-    const mockByokResult = [{ decryptedAPIKey: 'sk-test', providerId: 'openai' as const }];
+    const mockByokResult = [
+      { id: 'user-key-id', decryptedAPIKey: 'sk-test', providerId: 'openai' as const },
+    ];
 
     mockedGetModelUserByokProviders.mockResolvedValue(['openai']);
     mockedGetBYOKforUser.mockResolvedValue(mockByokResult);
@@ -67,7 +69,13 @@ describe('getEmbeddingProvider', () => {
 
   it('should check organization BYOK when organizationId is provided', async () => {
     const user = createTestUser();
-    const mockByokResult = [{ decryptedAPIKey: 'sk-org', providerId: 'mistral' as const }];
+    const mockByokResult = [
+      {
+        id: 'organization-key-id',
+        decryptedAPIKey: 'sk-org',
+        providerId: 'mistral' as const,
+      },
+    ];
 
     mockedGetModelUserByokProviders.mockResolvedValue(['mistral']);
     mockedGetBYOKforOrganization.mockResolvedValue(mockByokResult);

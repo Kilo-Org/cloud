@@ -307,7 +307,7 @@ function failedSessionTokenCount(usage: FailedSessionUsage): number {
 
 function canRetryFailedSessionUsage(usage: FailedSessionUsage): boolean {
   return (
-    usage.totalCostMusd < MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY ||
+    usage.totalCostMusd < MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY &&
     failedSessionTokenCount(usage) < MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY
   );
 }

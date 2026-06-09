@@ -1269,6 +1269,24 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           totalCostMusd: 200_000,
         },
       },
+      {
+        name: 'cost is below the threshold but tokens exceed it',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 100_001,
+          totalTokensOut: 0,
+          totalCostMusd: 199_999,
+        },
+      },
+      {
+        name: 'tokens are below the threshold but cost is at it',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 99_999,
+          totalTokensOut: 0,
+          totalCostMusd: 200_000,
+        },
+      },
       { name: 'billing usage is unavailable', usage: null },
     ])('skips infra retry when failed session $name', async ({ usage }) => {
       const retryFlow = mockCreatedInfraRetryFlow({
@@ -1308,21 +1326,12 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     it.each([
       {
-        name: 'cost is below the threshold',
-        usage: {
-          model: 'anthropic/claude-sonnet-4.6',
-          totalTokensIn: 100_001,
-          totalTokensOut: 0,
-          totalCostMusd: 199_999,
-        },
-      },
-      {
-        name: 'tokens are below the threshold',
+        name: 'cost and tokens are below thresholds',
         usage: {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 99_999,
           totalTokensOut: 0,
-          totalCostMusd: 200_000,
+          totalCostMusd: 199_999,
         },
       },
     ])('allows infra retry when failed session $name', async ({ usage }) => {

@@ -19,6 +19,17 @@ async function proxyMorningBriefingRoute(params: {
   path: string;
   method: 'GET' | 'POST';
   body?: unknown;
+  // When true, a 404 from the in-container plugin is rewritten to a
+  // controller-owned `morning_briefing_plugin_unavailable` (503) instead of
+  // being passed through verbatim. Because this controller image registered
+  // the `/_kilo/morning-briefing/*` routes, a 404 from the plugin can only
+  // mean the OpenClaw `kiloclaw-morning-briefing` plugin has not finished
+  // loading yet (common right after a redeploy onto a new image) — NOT that
+  // the image is too old. Cloud's `isErrorUnknownRoute` treats a bare 404 as
+  // "controller too old", so without this rewrite a transient plugin-load
+  // gap surfaces to the user as a spurious "Upgrade Required" banner.
+  // Left false for routes whose 404 is semantic (e.g. "no briefing yet").
+  notFoundMeansPluginUnavailable?: boolean;
 }): Promise<Response> {
   if (params.supervisor.getState() !== 'running') {
     return new Response(JSON.stringify({ error: 'Gateway not running' }), {
@@ -27,8 +38,9 @@ async function proxyMorningBriefingRoute(params: {
     });
   }
 
+  let response: Response;
   try {
-    return await fetch(`http://127.0.0.1:3001${MORNING_BRIEFING_PREFIX}${params.path}`, {
+    response = await fetch(`http://127.0.0.1:3001${MORNING_BRIEFING_PREFIX}${params.path}`, {
       method: params.method,
       headers: {
         authorization: `Bearer ${params.gatewayToken}`,
@@ -43,6 +55,18 @@ async function proxyMorningBriefingRoute(params: {
       headers: { 'content-type': 'application/json' },
     });
   }
+
+  if (params.notFoundMeansPluginUnavailable && response.status === 404) {
+    return new Response(
+      JSON.stringify({
+        code: 'morning_briefing_plugin_unavailable',
+        error: 'Morning Briefing plugin is still loading',
+      }),
+      { status: 503, headers: { 'content-type': 'application/json' } }
+    );
+  }
+
+  return response;
 }
 
 export function registerMorningBriefingRoutes(
@@ -64,6 +88,7 @@ export function registerMorningBriefingRoutes(
       gatewayToken: expectedToken,
       path: '/status',
       method: 'GET',
+      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -76,6 +101,7 @@ export function registerMorningBriefingRoutes(
       path: '/enable',
       method: 'POST',
       body,
+      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -87,6 +113,7 @@ export function registerMorningBriefingRoutes(
       path: '/disable',
       method: 'POST',
       body: {},
+      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -98,6 +125,7 @@ export function registerMorningBriefingRoutes(
       path: '/run',
       method: 'POST',
       body: {},
+      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -110,6 +138,7 @@ export function registerMorningBriefingRoutes(
       path: '/onboarding-briefing',
       method: 'POST',
       body,
+      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -122,6 +151,7 @@ export function registerMorningBriefingRoutes(
       path: '/interests',
       method: 'POST',
       body,
+      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });
@@ -134,6 +164,7 @@ export function registerMorningBriefingRoutes(
       path: '/user-location',
       method: 'POST',
       body,
+      notFoundMeansPluginUnavailable: true,
     });
     return response;
   });

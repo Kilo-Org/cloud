@@ -1443,6 +1443,9 @@ importers:
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
+      '@openrouter/sdk':
+        specifier: ^0.12.79
+        version: 0.12.79
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -5627,6 +5630,9 @@ packages:
     engines: {node: '>=22.19.0'}
     peerDependencies:
       undici: '>=8.3.0 <9'
+
+  '@openrouter/sdk@0.12.79':
+    resolution: {integrity: sha512-0ZpwtnuHh3/B1piW9kHCUIQy6PAsaK/vjFdZuHxmCdAenCyUNsLA2mFpmfHNWRNb+bOO3yBc4IALa264UyzmBA==}
 
   '@opentelemetry/api-logs@0.207.0':
     resolution: {integrity: sha512-lAb0jQRVyleQQGiuuvCOTDVspc14nx6XJjP4FspJ1sNARo3Regq4ZZbrc3rN4b1TYSuUCvgH+UXUPug4SLOqEQ==}
@@ -20732,6 +20738,10 @@ snapshots:
   '@openclaw/proxyline@0.3.3(undici@8.3.0)':
     dependencies:
       undici: 8.3.0
+
+  '@openrouter/sdk@0.12.79':
+    dependencies:
+      zod: 4.4.3
 
   '@opentelemetry/api-logs@0.207.0':
     dependencies:

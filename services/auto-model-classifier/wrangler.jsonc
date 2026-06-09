@@ -20,5 +20,10 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "INTERNAL_API_SECRET_PROD",
     },
+    {
+      "binding": "OPENROUTER_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "OPENROUTER_API_KEY",
+    },
   ],
 }

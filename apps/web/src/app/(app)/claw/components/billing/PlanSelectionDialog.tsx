@@ -63,7 +63,7 @@ function CadenceToggle({
           className={cn(
             'rounded-md px-3.5 py-1.5 text-[13px] font-semibold transition-all',
             cadence === 'monthly'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground'
           )}
         >
@@ -75,7 +75,7 @@ function CadenceToggle({
           className={cn(
             'rounded-md px-3.5 py-1.5 text-[13px] font-semibold transition-all',
             cadence === 'yearly'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground'
           )}
         >
@@ -109,11 +109,10 @@ function TierCard({
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={isSelected}
       className={cn(
-        'relative rounded-xl border p-4 text-left transition-all',
-        isSelected
-          ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]'
-          : 'border-border bg-secondary hover:border-blue-500/30 hover:shadow-[0_0_0_1px_rgba(59,130,246,0.15)]'
+        'relative rounded-xl border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        isSelected ? 'border-border bg-muted' : 'border-border bg-secondary hover:bg-muted'
       )}
     >
       <div className="mb-2.5 flex items-center justify-between">
@@ -143,8 +142,8 @@ function TierCard({
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] font-semibold transition-all',
             isSelected
-              ? 'border-blue-500 bg-blue-600 text-white'
-              : 'border-blue-500/30 bg-blue-500/10 text-blue-300 hover:border-blue-500 hover:bg-blue-500/20 hover:text-white'
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-border bg-muted text-foreground hover:bg-accent'
           )}
         >
           {isSelected ? (
@@ -164,11 +163,13 @@ function HostingRadioGroup({
   hostingPlan,
   onSelect,
   commitDisabled,
+  commitPlanAvailable,
   signupDisplay,
 }: {
   hostingPlan: ClawPlan | null;
   onSelect: (plan: ClawPlan) => void;
   commitDisabled: boolean;
+  commitPlanAvailable: boolean;
   signupDisplay: KiloClawSignupDisplay;
 }) {
   return (
@@ -177,50 +178,48 @@ function HostingRadioGroup({
         Hosting plan for this KiloClaw instance:
       </div>
 
-      <button
-        type="button"
-        disabled={commitDisabled}
-        onClick={() => onSelect('commit')}
-        className={cn(
-          'mb-1.5 flex w-full items-center gap-2.5 rounded-lg border px-3.5 py-2.5 transition-all',
-          commitDisabled && 'pointer-events-none opacity-35',
-          hostingPlan === 'commit'
-            ? 'border-blue-500 bg-blue-500/10'
-            : 'border-border hover:border-neutral-500'
-        )}
-      >
-        <span
+      {commitPlanAvailable ? (
+        <button
+          type="button"
+          disabled={commitDisabled}
+          onClick={() => onSelect('commit')}
           className={cn(
-            'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2',
-            hostingPlan === 'commit' ? 'border-blue-500' : 'border-neutral-500'
+            'mb-1.5 flex w-full items-center gap-2.5 rounded-lg border px-3.5 py-2.5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            commitDisabled && 'pointer-events-none opacity-35',
+            hostingPlan === 'commit' ? 'border-border bg-muted' : 'border-border hover:bg-muted'
           )}
         >
-          {hostingPlan === 'commit' && <span className="h-2 w-2 rounded-full bg-blue-500" />}
-        </span>
-        <span className="text-[13px] font-medium">Commit plan</span>
-        <span className="text-muted-foreground ml-auto text-xs">
-          {signupDisplay.commit.primaryPrice}
-          {signupDisplay.commit.priceDetail}
-        </span>
-      </button>
+          <span
+            className={cn(
+              'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2',
+              hostingPlan === 'commit' ? 'border-primary' : 'border-muted-foreground'
+            )}
+          >
+            {hostingPlan === 'commit' && <span className="h-2 w-2 rounded-full bg-primary" />}
+          </span>
+          <span className="text-[13px] font-medium">Commit plan</span>
+          <span className="text-muted-foreground ml-auto text-xs">
+            {signupDisplay.commit.primaryPrice}
+            {signupDisplay.commit.priceDetail}
+          </span>
+        </button>
+      ) : null}
 
       <button
         type="button"
         onClick={() => onSelect('standard')}
         className={cn(
-          'flex w-full items-center gap-2.5 rounded-lg border px-3.5 py-2.5 transition-all',
-          hostingPlan === 'standard'
-            ? 'border-blue-500 bg-blue-500/10'
-            : 'border-border hover:border-neutral-500'
+          'flex w-full items-center gap-2.5 rounded-lg border px-3.5 py-2.5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+          hostingPlan === 'standard' ? 'border-border bg-muted' : 'border-border hover:bg-muted'
         )}
       >
         <span
           className={cn(
             'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2',
-            hostingPlan === 'standard' ? 'border-blue-500' : 'border-neutral-500'
+            hostingPlan === 'standard' ? 'border-primary' : 'border-muted-foreground'
           )}
         >
-          {hostingPlan === 'standard' && <span className="h-2 w-2 rounded-full bg-blue-500" />}
+          {hostingPlan === 'standard' && <span className="h-2 w-2 rounded-full bg-primary" />}
         </span>
         <span className="text-[13px] font-medium">Standard plan</span>
         <span className="ml-auto flex items-center gap-1.5 text-xs">
@@ -239,12 +238,12 @@ function HostingRadioGroup({
         </span>
       </button>
 
-      {commitDisabled && (
+      {commitPlanAvailable && commitDisabled ? (
         <p className="text-muted-foreground mt-1 pl-0.5 text-[11px]">
-          Commit plan requires {signupDisplay.commit.primaryPrice} in credits. Choose a tier that
-          covers the first charge.
+          Commit requires {signupDisplay.commit.primaryPrice} in credits. Choose a tier that covers
+          the first charge.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -267,9 +266,10 @@ function HostingOnlyPlanCard({
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={isSelected}
       className={cn(
-        'relative rounded-lg border-2 p-3.5 text-center transition-all',
-        isSelected ? 'border-blue-500 bg-blue-500/10' : 'border-border hover:border-neutral-500'
+        'relative rounded-lg border p-3.5 text-center transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        isSelected ? 'border-border bg-muted' : 'border-border hover:bg-muted'
       )}
     >
       <div className="text-sm font-semibold">{isCommit ? 'Commit' : 'Standard'}</div>
@@ -379,7 +379,7 @@ function CreditEnrollmentSection({
         <Button
           onClick={onEnroll}
           disabled={isPending}
-          variant="primary"
+          variant="default"
           className="w-full py-3 font-semibold"
         >
           {isPending ? 'Activating…' : `Pay ${formatMicrodollars(costMicrodollars)} with Credits`}
@@ -430,7 +430,7 @@ function CreditEnrollmentSection({
       </div>
       <Link
         href="/credits"
-        className="mt-3 block text-center text-sm font-medium text-blue-400 hover:text-blue-300"
+        className="text-foreground hover:text-muted-foreground mt-3 block text-center text-sm font-medium underline underline-offset-4"
       >
         Add credits to your balance
       </Link>
@@ -540,6 +540,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   const creditEnrollmentPreview = billing?.creditEnrollmentPreview ?? null;
   const kiloPassUpsellPreview = billing?.kiloPassUpsellPreview ?? null;
   const activeInstanceId = billing?.activeInstanceId ?? null;
+  const commitPlanAvailable = billing?.commitPlanAvailable ?? false;
   const showKiloPassUpsell = !hasActiveKiloPass;
   const signupDisplay = createKiloClawSignupDisplay({
     standardCostMicrodollars:
@@ -568,12 +569,14 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
       ? (kiloPassUpsellPreview?.commit?.[cadence]?.[selectedTier] ?? null)
       : null;
   const commitPreviewLoading = selectedTier !== null && selectedCommitPreview === null;
-  const commitDisabled = selectedCommitPreview
-    ? !selectedCommitPreview.eligible
-    : commitPreviewLoading || !isCommitAvailable(selectedTier, cadence);
+  const commitDisabled =
+    !commitPlanAvailable ||
+    (selectedCommitPreview
+      ? !selectedCommitPreview.eligible
+      : commitPreviewLoading || !isCommitAvailable(selectedTier, cadence));
 
   function isCommitEligibleForSelection(tier: Tier | null, selectedCadence: Cadence) {
-    if (!tier) return false;
+    if (!commitPlanAvailable || !tier) return false;
     const preview = kiloPassUpsellPreview?.commit?.[selectedCadence]?.[tier] ?? null;
     return preview ? preview.eligible : false;
   }
@@ -663,7 +666,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
     : selectedKiloPassInsufficient
       ? 'Choose a larger tier or add credits'
       : kiloPassReady
-        ? 'Get Kilo Pass + Hosting'
+        ? 'Get Kilo Pass + hosting'
         : 'Select a tier and hosting plan';
 
   const hostingOnlyCostMicrodollars = hostingOnlyPlan
@@ -685,7 +688,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
         <div className="max-h-[85vh] space-y-4 overflow-y-auto pr-1">
           <div className="text-center">
             <DialogTitle className="text-foreground text-2xl font-bold">
-              Choose Your KiloClaw Subscription
+              Choose your KiloClaw subscription
             </DialogTitle>
             <p className="text-muted-foreground mt-2">
               Choose how to activate hosting for this instance
@@ -695,16 +698,14 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
           {showKiloPassUpsell && (
             <>
               {/* Section 1: Kilo Pass (Recommended) */}
-              <div
-                className={cn(
-                  'rounded-xl border p-5 transition-all',
-                  'border-blue-500/30 bg-gradient-to-b from-blue-500/[0.04] to-transparent shadow-[0_0_0_1px_rgba(59,130,246,0.08)]'
-                )}
-              >
+              <div className={cn('rounded-xl border p-5 transition-all', 'border-border bg-card')}>
                 <div className="mb-3 flex items-center gap-2.5">
                   <Crown className="h-5 w-5 text-amber-400" />
                   <h3 className="flex-1 text-base font-semibold">Activate with Kilo Pass</h3>
-                  <Badge className="rounded-full border-transparent bg-blue-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-blue-300 ring-1 ring-blue-500/30">
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                  >
                     Recommended
                   </Badge>
                 </div>
@@ -747,6 +748,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
                     hostingPlan={hostingPlan}
                     onSelect={handleHostingPlanSelect}
                     commitDisabled={commitDisabled}
+                    commitPlanAvailable={commitPlanAvailable}
                     signupDisplay={signupDisplay}
                   />
                 )}
@@ -761,7 +763,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
                 <Button
                   onClick={handleKiloPassCheckout}
                   disabled={!kiloPassReady || kiloPassUpsell.isPending}
-                  variant="primary"
+                  variant="default"
                   className="w-full py-3.5 text-base font-semibold"
                 >
                   {kiloPassUpsell.isPending ? 'Redirecting to Stripe…' : kiloPassButtonLabel}
@@ -798,13 +800,15 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
 
             <p className="text-muted-foreground mb-3.5 text-[13px]">{hostingSectionDescription}</p>
 
-            <div className="mb-4 grid grid-cols-2 gap-2">
-              <HostingOnlyPlanCard
-                plan="commit"
-                isSelected={hostingOnlyPlan === 'commit'}
-                onSelect={() => handleHostingOnlySelect('commit')}
-                signupDisplay={signupDisplay}
-              />
+            <div className={cn('mb-4 grid gap-2', commitPlanAvailable && 'grid-cols-2')}>
+              {commitPlanAvailable ? (
+                <HostingOnlyPlanCard
+                  plan="commit"
+                  isSelected={hostingOnlyPlan === 'commit'}
+                  onSelect={() => handleHostingOnlySelect('commit')}
+                  signupDisplay={signupDisplay}
+                />
+              ) : null}
               <HostingOnlyPlanCard
                 plan="standard"
                 isSelected={hostingOnlyPlan === 'standard'}

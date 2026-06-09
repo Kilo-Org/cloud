@@ -118,6 +118,34 @@ const AbsolutePathSchema = z
   .max(1024)
   .refine(value => value.startsWith('/'), { message: 'Path must be absolute' });
 
+// Declarative channel-route set (PUT /_kilo/config/agents/:id/bindings).
+// `channels` is the agent's full channel-level route set (single-account cloud).
+export const AgentBindingsInputSchema = z
+  .object({
+    etag: z.string().min(1).max(128).optional(),
+    // Guards mirror the controller's AgentBindingsPutBodySchema so invalid
+    // channels are rejected here with a clear message instead of a generic
+    // controller 400: no leading dash (flag-like) and no `:` account specifier
+    // (this endpoint manages only channel-level default-account routes).
+    channels: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(64)
+          .refine(value => !value.startsWith('-'), {
+            message: 'Channel must not begin with a dash',
+          })
+          .refine(value => !value.includes(':'), {
+            message: 'Channel must not include an account specifier',
+          })
+      )
+      .max(50),
+  })
+  .strict();
+export type AgentBindingsInput = z.infer<typeof AgentBindingsInputSchema>;
+
 // Create body (POST /_kilo/config/agents).
 export const AgentCreateInputSchema = z
   .object({

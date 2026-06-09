@@ -12,6 +12,7 @@ import type {
   WrapperPromptRequest,
   WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap';
+import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 
 function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyRequest> = {}) {
   const request: WrapperSessionReadyRequest = {
@@ -134,6 +135,12 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         path.join(request.workspace.sessionHome, '.kilocode/skills/test-skill/SKILL.md')
       )
     ).toBe(true);
+    expect(
+      await fsp.readFile(
+        path.join(request.workspace.sessionHome, '.kilocode/rules/cloud-agent.md'),
+        'utf8'
+      )
+    ).toBe(buildCloudAgentRules(request.agentSessionId));
   });
 
   it('fetches and checks out strict GitHub pull refs directly', async () => {
@@ -324,6 +331,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     });
     await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+    const rulesPath = path.join(request.workspace.sessionHome, '.kilocode/rules/cloud-agent.md');
+    await fsp.mkdir(path.dirname(rulesPath), { recursive: true });
+    await fsp.writeFile(rulesPath, 'stale rules');
 
     const gitCalls: string[][] = [];
     const deps: WrapperBootstrapDeps = {
@@ -347,6 +357,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(gitCalls).toEqual([
       ['remote', 'set-url', 'origin', 'https://oauth2:gitlab-token@gitlab.com/acme/repo.git'],
     ]);
+    expect(await fsp.readFile(rulesPath, 'utf8')).toBe(
+      buildCloudAgentRules(request.agentSessionId)
+    );
   });
 
   it('refreshes a warm GitHub remote, author, and selected CLI credential', async () => {

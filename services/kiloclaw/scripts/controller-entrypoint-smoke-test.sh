@@ -151,6 +151,30 @@ PATCH_RESP=$(curl -sS -X PATCH \
 PATCH_MODEL=$(echo "$PATCH_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('agent',{}).get('model',{}).get('primary',''))" 2>/dev/null || echo "")
 check "patch updates created agent model" "kilocode/kilo-auto/balanced" "$PATCH_MODEL"
 
+# Binding edit delegates to the OpenClaw CLI. Configure a channel so the bind
+# has a valid target, then declaratively set + clear the agent's routes.
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channels":{"discord":{"accounts":{"default":{"token":"smoke"}}}}}' \
+  "http://127.0.0.1:${PORT}/_kilo/config/patch" >/dev/null
+
+BIND_RESP=$(curl -sS -X PUT \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channels":["discord"]}' \
+  "http://127.0.0.1:${PORT}/_kilo/config/agents/crud-smoke/bindings")
+BIND_HAS=$(echo "$BIND_RESP" | python3 -c "import sys,json; print(any(b.get('channel')=='discord' for b in json.load(sys.stdin).get('agent',{}).get('bindings',[])))" 2>/dev/null || echo "")
+check "PUT bindings routes discord to the agent" "True" "$BIND_HAS"
+
+CLEAR_RESP=$(curl -sS -X PUT \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channels":[]}' \
+  "http://127.0.0.1:${PORT}/_kilo/config/agents/crud-smoke/bindings")
+CLEAR_EMPTY=$(echo "$CLEAR_RESP" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('agent',{}).get('bindings',[])) == 0)" 2>/dev/null || echo "")
+check "PUT bindings can clear routes" "True" "$CLEAR_EMPTY"
+
 DELETE_RESP=$(curl -sS -X DELETE \
   -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:${PORT}/_kilo/config/agents/crud-smoke")

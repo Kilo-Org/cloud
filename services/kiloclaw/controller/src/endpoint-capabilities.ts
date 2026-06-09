@@ -9,6 +9,7 @@ export const CONTROLLER_ENDPOINT_CAPABILITIES = [
   'config.agents.create.basic.cli',
   'config.agents.update',
   'config.agents.delete.cli',
+  'config.agents.bindings.update',
   'config.agent-defaults.update',
   'config.tools-md.google-workspace',
   'env.patch',

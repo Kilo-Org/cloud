@@ -1166,6 +1166,7 @@ const AGENT_CONFIG_ERROR_CODES = new Set([
   'invalid_agent_request',
   'invalid_agent_config',
   'invalid_config_after_patch',
+  'agent_binding_rollback_failed', // 500 — binding change rejected but routing left uncertain
   'openclaw_cli_failed', // 502 — controller CLI message is generic
   'openclaw_cli_timeout', // 504
 ]);
@@ -3039,6 +3040,45 @@ platform.delete('/agents/:agentId', async c => {
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeAgentConfigError(err, 'agent delete');
+    return jsonError(message, status, code);
+  }
+});
+
+// PUT /api/platform/agents/:agentId/bindings — declaratively set channel routes.
+const UpdateAgentBindingsSchema = z.object({
+  userId: z.string().min(1),
+  bindings: z.record(z.string(), z.unknown()),
+});
+
+platform.put('/agents/:agentId/bindings', async c => {
+  const result = await parseBody(c, UpdateAgentBindingsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+  const { userId, bindings } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgentBindings(agentId, bindings).then(r => r),
+      'updateAgentBindings',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError(
+        'agent bindings update',
+        response.agentError
+      );
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent bindings update');
     return jsonError(message, status, code);
   }
 });

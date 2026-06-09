@@ -22,6 +22,7 @@ renewal work.
 
 Draft -- created 2026-05-13 from credit-renewal lifecycle policy
 decisions.
+Updated 2026-06-05 -- Commit retirement boundary and enforcement safety.
 
 ## Conventions
 
@@ -71,6 +72,12 @@ capitals, as shown here.
 - **Downstream enforcement**: Billing lifecycle actions that can suspend,
   stop, warn, or destroy an instance after subscription expiry,
   past-due grace expiry, or destruction deadline expiry.
+- **Final Commit boundary cancellation**: Expected pure-credit outcome where
+  a final Commit term reaches its authorized boundary without explicit
+  Standard continuation and cancels without deduction or period advancement.
+- **Stripe retirement guard sweep**: Lifecycle activity that makes an eligible
+  Stripe-funded final Commit term non-renewing beginning 30 days before its
+  verified final boundary.
 
 ## Overview
 
@@ -135,8 +142,7 @@ downstream enforcement can proceed.
 3. If the subscription's current credit-renewal boundary no longer
    matches the item boundary, the item MUST be treated as stale or
    superseded and MUST NOT apply another deduction for that boundary.
-4. If the subscription is no longer a current eligible pure-credit row,
-   the item MUST be skipped without billing mutation.
+4. Before any renewal mutation, processing MUST recompute Commit eligibility from existing subscription fields and change-log evidence. An anomaly MUST fail closed, prevent another Commit deduction, report through logs and Sentry, and remain retryable. If the subscription is otherwise no longer a current eligible pure-credit row, the item MUST be skipped without billing mutation.
 5. If the associated instance or ownership context makes the row
    ineligible for personal credit renewal, the item MUST be skipped
    without billing mutation. Instance destruction alone MUST NOT make a
@@ -181,7 +187,9 @@ downstream enforcement can proceed.
    system reaches the correct billing outcome for that boundary.
 2. A successful deduction and period advancement is an expected outcome.
 3. Processing cancel-at-period-end by canceling the subscription at the
-   due boundary is an expected outcome.
+   due boundary is an expected outcome. Canceling a final Commit term at its
+   authorized boundary without a Commit deduction, auto top-up, or period
+   advancement is also an expected outcome.
 4. Marking a subscription past-due because effective balance is
    insufficient and auto top-up is unavailable, disabled, or already
    triggered for the boundary is an expected outcome.
@@ -222,6 +230,23 @@ downstream enforcement can proceed.
 8. Operator resolution or waiver MUST be auditable with actor, time,
    and reason.
 
+### Stripe Commit Retirement Guard
+
+1. The lifecycle MUST run a Stripe retirement guard sweep for current
+   personal Stripe-funded final Commit terms whose verified final boundary is
+   within 30 days and that lack explicit Standard continuation.
+2. Each guard item MUST re-read local and live provider state, reconcile
+   hidden or conflicting schedules, and idempotently set provider and local
+   cancellation at period end without creating another Commit phase.
+3. A guard retry MUST remain safe after timeout or duplicate delivery. An unknown provider outcome, conflicting schedule, or unverified boundary MUST fail closed, attempt provider non-renewal when possible, report through logs and Sentry, and retry or recompute rather than infer success.
+4. Guard processing failures MUST retry and alert operators before the final
+   boundary. A failure for one subscription MUST NOT prevent other guard items
+   from processing.
+5. Explicit Standard continuation confirmed before the final boundary MUST
+   replace guard cancellation with the lineage-priced Standard transition.
+6. The guard MUST NOT own hybrid successful payment, period advancement, or
+   plan mutation; invoice settlement retains that ownership.
+
 ### Downstream Enforcement Protection
 
 1. Downstream enforcement MUST skip a subscription-renewal boundary
@@ -240,6 +265,7 @@ downstream enforcement can proceed.
 6. If credit-renewal backlog or retry age creates credible risk of
    false suspension or destruction, the system SHOULD add a stronger
    protection mechanism before continuing rollout.
+7. Commit retirement MUST NOT add a durable review lifecycle or operator-resolution barrier. Each renewal and enforcement attempt MUST recompute from existing subscription and change-log state; ambiguous Commit renewal fails closed and is retried after logging and Sentry reporting.
 
 ### Observability and Operator Control
 
@@ -307,6 +333,11 @@ The following SHOULD-level operational improvements remain future work:
    retry age approaches downstream enforcement grace windows.
 
 ## Changelog
+
+### 2026-06-05 -- Commit retirement lifecycle safety
+
+- Added final Commit cancellation as an expected pure-credit outcome.
+- Added idempotent Stripe retirement guard requirements and fail-closed anomaly handling while preserving invoice-settlement ownership.
 
 ### 2026-05-13 -- Initial spec
 

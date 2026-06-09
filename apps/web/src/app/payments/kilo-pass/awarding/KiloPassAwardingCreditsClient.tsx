@@ -59,17 +59,22 @@ export function KiloPassAwardingCreditsClient() {
   const [redirectSecondsRemaining, setRedirectSecondsRemaining] = useState<number | null>(null);
 
   const checkoutSessionId = searchParams.get('session_id') ?? '';
-  const clawHostingPlan = searchParams.get('clawHostingPlan');
-  const clawInstanceId = searchParams.get('clawInstanceId');
-  const isClawAutoActivation = !!clawHostingPlan;
 
   const [activationStep, setActivationStep] = useState<ActivationStep>('payment');
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
 
-  const enrollWithCredits = useMutation(
-    trpc.kiloclaw.enrollWithCredits.mutationOptions({
-      onSuccess: () => {
-        setActivationStep('done');
+  const activateCheckoutHosting = useMutation(
+    trpc.kiloPass.activateCheckoutHosting.mutationOptions({
+      onSuccess: result => {
+        if (result.activated) {
+          setActivationStep('done');
+          return;
+        }
+        setEnrollmentError(
+          result.hostingIntent === 'expired_commit'
+            ? 'Commit hosting is no longer available. Activate month-to-month Standard from KiloClaw.'
+            : 'Checkout did not include a hosting activation intent.'
+        );
       },
       onError: error => {
         setEnrollmentError(error.message);
@@ -104,40 +109,24 @@ export function KiloPassAwardingCreditsClient() {
   });
 
   const isReady = query.data?.creditsAwarded === true;
+  const isClawAutoActivation =
+    query.data?.hostingIntent !== 'none' && query.data?.hostingIntent != null;
   const hasSubscription = query.data?.subscription != null;
   const showWelcomePromoIneligibleNotice =
     query.data?.welcomePromoIneligibleDueToReusedFingerprint === true;
-
-  // For KiloClaw auto-activation: advance step when credits are awarded, then enroll
-  useEffect(() => {
-    if (!isClawAutoActivation || !isReady) return;
-    if (activationStep === 'payment') {
-      setActivationStep('credits');
-    }
-  }, [isClawAutoActivation, isReady, activationStep]);
+  const visibleActivationStep =
+    activationStep === 'done'
+      ? activationStep
+      : isClawAutoActivation && isReady
+        ? 'hosting'
+        : activationStep;
 
   useEffect(() => {
-    if (!isClawAutoActivation || activationStep !== 'credits') return;
+    if (!isClawAutoActivation || !isReady || enrollmentTriggered.current) return;
 
-    // Credits awarded — trigger enrollment
-    setActivationStep('hosting');
-    if (
-      !enrollmentTriggered.current &&
-      (clawHostingPlan === 'standard' || clawHostingPlan === 'commit')
-    ) {
-      enrollmentTriggered.current = true;
-      enrollWithCredits.mutate({
-        plan: clawHostingPlan,
-        ...(clawInstanceId ? { instanceId: clawInstanceId } : {}),
-      });
-    }
-  }, [
-    isClawAutoActivation,
-    activationStep,
-    clawHostingPlan,
-    clawInstanceId,
-    enrollWithCredits.mutate,
-  ]);
+    enrollmentTriggered.current = true;
+    activateCheckoutHosting.mutate({ sessionId: checkoutSessionId });
+  }, [isClawAutoActivation, isReady, activateCheckoutHosting.mutate, checkoutSessionId]);
 
   // Standard (non-KiloClaw) flow: redirect to /profile when ready
   useEffect(() => {
@@ -347,7 +336,7 @@ export function KiloPassAwardingCreditsClient() {
               <CardTitle>Setting up your hosting</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4">
-              <ActivationSteps current={activationStep} />
+              <ActivationSteps current={visibleActivationStep} />
               <div className="text-muted-foreground text-sm">
                 This can take a few seconds while we finalize your setup.
               </div>

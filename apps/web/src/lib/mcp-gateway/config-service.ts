@@ -7,7 +7,9 @@ import {
   buildScopedConnectRootPath,
   createGatewayError,
   GatewayErrorCode,
+  GatewayAuthMode,
 } from '@kilocode/mcp-gateway';
+import type { MCPGatewayProviderScopeSource } from '@kilocode/db/schema-types';
 import {
   mcp_gateway_assignments,
   mcp_gateway_config_secrets,
@@ -19,7 +21,6 @@ import {
 } from '@kilocode/db/schema';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
-import type { GatewayAuthMode } from '@kilocode/mcp-gateway';
 import type { GatewayAppConfig } from './config';
 import { createGatewayRepository, type GatewayRepository } from './repository';
 import { configSecretAad, nowIso, randomToken } from './crypto';
@@ -29,19 +30,34 @@ import { createAuditService } from './audit-service';
 
 const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
 
+function normalizeProviderScopes(scopes: string[] | null | undefined): string[] | null {
+  if (!scopes) return null;
+  const normalized = [...new Set(scopes.map(scope => scope.trim()).filter(Boolean))].sort();
+  return normalized.length > 0 ? normalized : null;
+}
+
 export function createConfigService(params: {
   repository: GatewayRepository;
   config: GatewayAppConfig;
   discoveryService: GatewayDiscoveryService;
 }) {
-  async function discoverProviderMetadata(input: { remoteUrl: string; authMode: GatewayAuthMode }) {
+  async function discoverProviderMetadata(input: {
+    remoteUrl: string;
+    authMode: GatewayAuthMode;
+    providerIssuer?: string;
+    providerScopes?: string[];
+  }) {
     if (input.authMode !== 'oauth_dynamic' && input.authMode !== 'oauth_static') return null;
     const discovery = await params.discoveryService.discoverRemoteProvider(input.remoteUrl);
-    const provider = discovery.providerCandidates[0];
+    const provider = input.providerIssuer
+      ? discovery.providerCandidates.find(candidate => candidate.issuer === input.providerIssuer)
+      : discovery.providerCandidates[0];
     if (!provider) {
       throw createGatewayError(
         GatewayErrorCode.InvalidRequest,
-        'Remote provider metadata could not be discovered',
+        input.providerIssuer
+          ? 'Requested provider issuer was not discovered by the remote MCP server'
+          : 'Remote provider metadata could not be discovered',
         400
       );
     }
@@ -52,7 +68,107 @@ export function createConfigService(params: {
         400
       );
     }
-    return provider;
+    const overrideScopes = normalizeProviderScopes(input.providerScopes);
+    const providerScopes = overrideScopes ?? normalizeProviderScopes(discovery.providerScopes);
+    const providerScopeSource: MCPGatewayProviderScopeSource = overrideScopes
+      ? 'override'
+      : providerScopes && discovery.providerScopeSource === 'discovered'
+        ? 'discovered'
+        : 'none';
+    return {
+      metadata: provider,
+      providerScopes,
+      providerScopeSource,
+      providerResource: discovery.providerResource,
+    };
+  }
+
+  function initialStaticProviderCredentials(input: {
+    authMode: GatewayAuthMode;
+    staticProviderClientId?: string;
+    staticProviderClientSecret?: string;
+  }) {
+    const hasClientId = input.staticProviderClientId !== undefined;
+    const hasClientSecret = input.staticProviderClientSecret !== undefined;
+    if (!hasClientId && !hasClientSecret) return null;
+    if (
+      input.authMode !== GatewayAuthMode.OAuthStatic ||
+      !input.staticProviderClientId ||
+      !input.staticProviderClientSecret
+    ) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidRequest,
+        'Manual provider credentials require OAuth static mode and both credential values',
+        400
+      );
+    }
+    return {
+      clientId: input.staticProviderClientId,
+      clientSecret: input.staticProviderClientSecret,
+    };
+  }
+
+  function initialStaticHeaders(input: {
+    authMode: GatewayAuthMode;
+    staticHeaders?: Record<string, string>;
+  }) {
+    if (!input.staticHeaders || Object.keys(input.staticHeaders).length === 0) return null;
+    if (input.authMode !== GatewayAuthMode.StaticHeaders) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidRequest,
+        'Static headers require static-headers auth mode',
+        400
+      );
+    }
+    parseStaticHeaders(input.staticHeaders);
+    return input.staticHeaders;
+  }
+
+  function encryptSecret(input: {
+    configId: string;
+    kind: (typeof GatewaySecretKind)[keyof typeof GatewaySecretKind];
+    value: Record<string, unknown>;
+  }) {
+    return encryptKeyedEnvelope(
+      JSON.stringify({ kind: input.kind, value: input.value }),
+      secretScheme,
+      params.config.credentialKeyset.active,
+      configSecretAad(input.configId, input.kind)
+    );
+  }
+
+  async function insertInitialStaticProviderCredentials(
+    tx: GatewayRepository['database'],
+    configId: string,
+    credentials: { clientId: string; clientSecret: string } | null
+  ) {
+    if (!credentials) return;
+    await tx.insert(mcp_gateway_config_secrets).values({
+      config_id: configId,
+      secret_kind: GatewaySecretKind.StaticProviderCredentials,
+      encrypted_secret: encryptSecret({
+        configId,
+        kind: GatewaySecretKind.StaticProviderCredentials,
+        value: credentials,
+      }),
+    });
+  }
+
+  async function insertInitialStaticHeaders(
+    tx: GatewayRepository['database'],
+    configId: string,
+    headers: Record<string, string> | null
+  ) {
+    if (!headers) return;
+    await tx.insert(mcp_gateway_config_secrets).values({
+      config_id: configId,
+      secret_kind: GatewaySecretKind.StaticHeaders,
+      encrypted_secret: encryptSecret({
+        configId,
+        kind: GatewaySecretKind.StaticHeaders,
+        value: { headers },
+      }),
+    });
   }
 
   async function createPersonalConfig(input: {
@@ -60,12 +176,20 @@ export function createConfigService(params: {
     name: string;
     remoteUrl: string;
     authMode: GatewayAuthMode;
+    providerIssuer?: string;
+    providerScopes?: string[];
+    staticProviderClientId?: string;
+    staticProviderClientSecret?: string;
+    staticHeaders?: Record<string, string>;
     pathPassthrough?: boolean;
   }) {
+    const staticProviderCredentials = initialStaticProviderCredentials(input);
+    const staticHeaders = initialStaticHeaders(input);
     await validatePublicHttpsDestination(input.remoteUrl);
     const discoveredProviderMetadata = await discoverProviderMetadata(input);
     return await params.repository.database.transaction(async tx => {
       const repository = createGatewayRepository(tx);
+      const auditService = createAuditService(repository);
       const created = await repository.createConfigWithRoute({
         ownerScope: GatewayOwnerScope.Personal,
         ownerId: input.userId,
@@ -74,11 +198,20 @@ export function createConfigService(params: {
         authMode: input.authMode,
         sharingMode: GatewaySharingMode.SingleUser,
         pathPassthrough: input.pathPassthrough ?? false,
-        discoveredProviderMetadata,
+        discoveredProviderMetadata: discoveredProviderMetadata?.metadata ?? null,
+        providerScopes: discoveredProviderMetadata?.providerScopes ?? null,
+        providerScopeSource: discoveredProviderMetadata?.providerScopeSource ?? 'none',
+        providerResource: discoveredProviderMetadata?.providerResource ?? null,
         createdByUserId: input.userId,
         gatewayBaseUrl: params.config.gatewayBaseUrl,
       });
-      await createAuditService(repository).record({
+      await insertInitialStaticProviderCredentials(
+        tx,
+        created.config.config_id,
+        staticProviderCredentials
+      );
+      await insertInitialStaticHeaders(tx, created.config.config_id, staticHeaders);
+      await auditService.record({
         actorUserId: input.userId,
         ownerScope: created.config.owner_scope,
         ownerId: created.config.owner_id,
@@ -87,6 +220,28 @@ export function createConfigService(params: {
         eventType: 'config_created',
         outcome: 'success',
       });
+      if (staticProviderCredentials) {
+        await auditService.record({
+          actorUserId: input.userId,
+          ownerScope: created.config.owner_scope,
+          ownerId: created.config.owner_id,
+          configId: created.config.config_id,
+          eventType: 'config_secret_updated',
+          outcome: 'success',
+          metadata: { kind: GatewaySecretKind.StaticProviderCredentials },
+        });
+      }
+      if (staticHeaders) {
+        await auditService.record({
+          actorUserId: input.userId,
+          ownerScope: created.config.owner_scope,
+          ownerId: created.config.owner_id,
+          configId: created.config.config_id,
+          eventType: 'config_secret_updated',
+          outcome: 'success',
+          metadata: { kind: GatewaySecretKind.StaticHeaders },
+        });
+      }
       return created;
     });
   }
@@ -97,10 +252,17 @@ export function createConfigService(params: {
     name: string;
     remoteUrl: string;
     authMode: GatewayAuthMode;
+    providerIssuer?: string;
+    providerScopes?: string[];
+    staticProviderClientId?: string;
+    staticProviderClientSecret?: string;
+    staticHeaders?: Record<string, string>;
     sharingMode: GatewaySharingMode;
     initialAssignedUserId?: string;
     pathPassthrough?: boolean;
   }) {
+    const staticProviderCredentials = initialStaticProviderCredentials(input);
+    const staticHeaders = initialStaticHeaders(input);
     await validatePublicHttpsDestination(input.remoteUrl);
     const discoveredProviderMetadata = await discoverProviderMetadata(input);
     if (input.sharingMode === GatewaySharingMode.SingleUser && !input.initialAssignedUserId) {
@@ -112,6 +274,7 @@ export function createConfigService(params: {
     }
     return await params.repository.database.transaction(async tx => {
       const repository = createGatewayRepository(tx);
+      const auditService = createAuditService(repository);
       if (input.initialAssignedUserId) {
         const membership = await repository.findMembership(
           input.initialAssignedUserId,
@@ -133,7 +296,10 @@ export function createConfigService(params: {
         authMode: input.authMode,
         sharingMode: input.sharingMode,
         pathPassthrough: input.pathPassthrough ?? false,
-        discoveredProviderMetadata,
+        discoveredProviderMetadata: discoveredProviderMetadata?.metadata ?? null,
+        providerScopes: discoveredProviderMetadata?.providerScopes ?? null,
+        providerScopeSource: discoveredProviderMetadata?.providerScopeSource ?? 'none',
+        providerResource: discoveredProviderMetadata?.providerResource ?? null,
         createdByUserId: input.actorUserId,
         gatewayBaseUrl: params.config.gatewayBaseUrl,
       });
@@ -146,7 +312,13 @@ export function createConfigService(params: {
             input.sharingMode === GatewaySharingMode.SingleUser ? 'single_user' : null,
         });
       }
-      await createAuditService(repository).record({
+      await insertInitialStaticProviderCredentials(
+        tx,
+        created.config.config_id,
+        staticProviderCredentials
+      );
+      await insertInitialStaticHeaders(tx, created.config.config_id, staticHeaders);
+      await auditService.record({
         actorUserId: input.actorUserId,
         ownerScope: created.config.owner_scope,
         ownerId: created.config.owner_id,
@@ -155,6 +327,28 @@ export function createConfigService(params: {
         eventType: 'config_created',
         outcome: 'success',
       });
+      if (staticProviderCredentials) {
+        await auditService.record({
+          actorUserId: input.actorUserId,
+          ownerScope: created.config.owner_scope,
+          ownerId: created.config.owner_id,
+          configId: created.config.config_id,
+          eventType: 'config_secret_updated',
+          outcome: 'success',
+          metadata: { kind: GatewaySecretKind.StaticProviderCredentials },
+        });
+      }
+      if (staticHeaders) {
+        await auditService.record({
+          actorUserId: input.actorUserId,
+          ownerScope: created.config.owner_scope,
+          ownerId: created.config.owner_id,
+          configId: created.config.config_id,
+          eventType: 'config_secret_updated',
+          outcome: 'success',
+          metadata: { kind: GatewaySecretKind.StaticHeaders },
+        });
+      }
       return created;
     });
   }
@@ -219,12 +413,7 @@ export function createConfigService(params: {
       parseStaticHeaders(stringHeaders);
     }
 
-    const encryptedSecret = encryptKeyedEnvelope(
-      JSON.stringify({ kind: input.kind, value: input.value }),
-      secretScheme,
-      params.config.credentialKeyset.active,
-      configSecretAad(input.configId, input.kind)
-    );
+    const encryptedSecret = encryptSecret(input);
     const materialChange = input.kind === GatewaySecretKind.StaticProviderCredentials;
 
     return await params.repository.database.transaction(async tx => {
@@ -269,6 +458,60 @@ export function createConfigService(params: {
         });
       }
       return secret;
+    });
+  }
+
+  async function updateProviderScopes(input: {
+    configId: string;
+    providerScopes: string[] | null;
+  }) {
+    return await params.repository.database.transaction(async tx => {
+      const [config] = await tx
+        .select()
+        .from(mcp_gateway_configs)
+        .where(eq(mcp_gateway_configs.config_id, input.configId))
+        .limit(1);
+      if (!config) {
+        throw createGatewayError(GatewayErrorCode.NotFound, 'Config not found', 404);
+      }
+      if (
+        config.auth_mode !== GatewayAuthMode.OAuthDynamic &&
+        config.auth_mode !== GatewayAuthMode.OAuthStatic
+      ) {
+        throw createGatewayError(
+          GatewayErrorCode.InvalidRequest,
+          'Provider scopes require OAuth provider sign-in',
+          400
+        );
+      }
+      const currentScopes = normalizeProviderScopes(config.provider_scopes);
+      const nextScopes = normalizeProviderScopes(input.providerScopes);
+      const sameScopes =
+        currentScopes === null && nextScopes === null
+          ? true
+          : currentScopes?.length === nextScopes?.length &&
+            currentScopes?.every((scope, index) => scope === nextScopes?.[index]);
+      const nextSource: MCPGatewayProviderScopeSource = nextScopes ? 'override' : 'none';
+      if (sameScopes && config.provider_scope_source === nextSource) return config;
+      await revokeConfigGrants(tx, input.configId);
+      const [updated] = await tx
+        .update(mcp_gateway_configs)
+        .set({
+          provider_scopes: nextScopes,
+          provider_scope_source: nextSource,
+          config_version: sql`${mcp_gateway_configs.config_version} + 1`,
+        })
+        .where(eq(mcp_gateway_configs.config_id, input.configId))
+        .returning();
+      await createAuditService(createGatewayRepository(tx)).record({
+        ownerScope: updated.owner_scope,
+        ownerId: updated.owner_id,
+        configId: updated.config_id,
+        eventType: 'config_updated',
+        outcome: 'success',
+        metadata: { providerScopes: nextScopes, providerScopeSource: nextSource },
+      });
+      return updated;
     });
   }
 
@@ -381,7 +624,11 @@ export function createConfigService(params: {
     return assignment;
   }
 
-  async function revokeAssignment(input: { configId: string; userId: string }) {
+  async function revokeAssignment(input: {
+    configId: string;
+    userId: string;
+    actorUserId: string;
+  }) {
     return await params.repository.database.transaction(async tx => {
       const assignment = await removeAssignmentState(tx, input.configId, input.userId);
       if (!assignment) return null;
@@ -395,7 +642,7 @@ export function createConfigService(params: {
           ownerScope: config.owner_scope,
           ownerId: config.owner_id,
           configId: config.config_id,
-          actorUserId: assignment.assigned_by_kilo_user_id,
+          actorUserId: input.actorUserId,
           eventType: 'assignment_removed',
           outcome: 'success',
         });
@@ -536,6 +783,7 @@ export function createConfigService(params: {
     createPersonalConfig,
     createOrganizationConfig,
     upsertSecret,
+    updateProviderScopes,
     rotateRoute,
     revokeAssignment,
     assignUser,

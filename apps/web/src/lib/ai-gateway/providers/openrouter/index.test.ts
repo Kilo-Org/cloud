@@ -8,7 +8,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { minimax_m3_discounted_model } from '@/lib/ai-gateway/providers/minimax';
+import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
 import {
@@ -25,7 +25,7 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 const originalFetch = global.fetch;
 
 const disabledPaidModel = {
-  ...minimax_m3_discounted_model,
+  ...qwen36_plus_stealth_model,
   public_id: 'vendor/disabled-paid-model',
   internal_id: 'vendor/disabled-paid-model-internal',
   display_name: 'Disabled Paid Kilo Model',
@@ -163,11 +163,6 @@ describe('shouldSuppressOpenRouterModel', () => {
     expect(seed_20_code_free_model.status).toBe('disabled');
     expect(seed_20_code_free_model.pricing).toBeNull();
     expect(shouldSuppressOpenRouterModel(seed_20_code_free_model)).toBe(true);
-  });
-
-  it('does not suppress disabled paid Kilo-exclusive models from OpenRouter', () => {
-    expect(minimax_m3_discounted_model.status).toBe('disabled');
-    expect(shouldSuppressOpenRouterModel(minimax_m3_discounted_model)).toBe(false);
   });
 
   it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {

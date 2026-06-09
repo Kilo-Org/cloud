@@ -84,6 +84,7 @@ import {
   MCPGatewayOwnerScope,
   MCPGatewayAuthMode,
   MCPGatewaySharingMode,
+  MCPGatewayProviderScopeSource,
   MCPGatewayRouteStatus,
   MCPGatewayInstanceStatus,
   MCPGatewayProviderGrantStatus,
@@ -119,6 +120,9 @@ import type {
   BuildStatus,
   Provider,
   CodeReviewAgentConfig,
+  ReviewMemoryEvidenceItem,
+  ReviewMemoryPlatform,
+  ReviewMemoryProposalStatus,
   DependabotAlertRaw,
   SecurityFindingAnalysis,
   NormalizedOpenRouterResponse,
@@ -212,6 +216,7 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayOwnerScope,
   MCPGatewayAuthMode,
   MCPGatewaySharingMode,
+  MCPGatewayProviderScopeSource,
   MCPGatewayRouteStatus,
   MCPGatewayInstanceStatus,
   MCPGatewayProviderGrantStatus,
@@ -3936,6 +3941,102 @@ export const cloud_agent_code_reviews = pgTable(
 
 export type CloudAgentCodeReview = typeof cloud_agent_code_reviews.$inferSelect;
 
+export const code_review_feedback_events = pgTable(
+  'code_review_feedback_events',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    repo_full_name: text().notNull(),
+    pr_number: integer(),
+    kilo_comment_id: text().notNull(),
+    reply_excerpt: text().notNull(),
+    kilo_comment_excerpt: text(),
+    dedupe_hash: text().notNull(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_code_review_feedback_events_dedupe_hash').on(table.dedupe_hash),
+    index('idx_code_review_feedback_events_owned_by_org_id').on(table.owned_by_organization_id),
+    index('idx_code_review_feedback_events_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_feedback_events_platform_repo').on(table.platform, table.repo_full_name),
+    index('idx_code_review_feedback_events_created_at').on(table.created_at),
+    check(
+      'code_review_feedback_events_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewFeedbackEvent = typeof code_review_feedback_events.$inferSelect;
+
+export const code_review_memory_proposals = pgTable(
+  'code_review_memory_proposals',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    platform: text().$type<ReviewMemoryPlatform>().notNull(),
+    repo_full_name: text().notNull(),
+    status: text().$type<ReviewMemoryProposalStatus>().notNull().default('open'),
+    title: text().notNull(),
+    rationale: text().notNull(),
+    proposed_markdown: text().notNull(),
+    evidence: jsonb().$type<ReviewMemoryEvidenceItem[]>().default([]).notNull(),
+    positive_count: integer().notNull().default(0),
+    negative_count: integer().notNull().default(0),
+    neutral_count: integer().notNull().default(0),
+    change_request_url: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('idx_code_review_memory_proposals_owned_by_org_id').on(table.owned_by_organization_id),
+    index('idx_code_review_memory_proposals_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_code_review_memory_proposals_platform_repo_status').on(
+      table.platform,
+      table.repo_full_name,
+      table.status
+    ),
+    index('idx_code_review_memory_proposals_updated_at').on(table.updated_at),
+    uniqueIndex('UQ_code_review_memory_proposals_org_active_scope')
+      .on(table.owned_by_organization_id, table.platform, table.repo_full_name)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+      ),
+    uniqueIndex('UQ_code_review_memory_proposals_user_active_scope')
+      .on(table.owned_by_user_id, table.platform, table.repo_full_name)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+      ),
+    check(
+      'code_review_memory_proposals_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewMemoryProposal = typeof code_review_memory_proposals.$inferSelect;
+
 export const cloud_agent_code_review_attempts = pgTable(
   'cloud_agent_code_review_attempts',
   {
@@ -7445,6 +7546,12 @@ export const mcp_gateway_configs = pgTable(
     remote_url: text().notNull(),
     auth_mode: text().$type<MCPGatewayAuthMode>().notNull(),
     sharing_mode: text().$type<MCPGatewaySharingMode>().notNull(),
+    provider_scopes: text().array(),
+    provider_scope_source: text()
+      .$type<MCPGatewayProviderScopeSource>()
+      .notNull()
+      .default(MCPGatewayProviderScopeSource.None),
+    provider_resource: text(),
     enabled: boolean().notNull().default(true),
     path_passthrough: boolean().notNull().default(false),
     config_version: integer().notNull().default(1),
@@ -7472,6 +7579,11 @@ export const mcp_gateway_configs = pgTable(
     enumCheck('mcp_gateway_configs_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
     enumCheck('mcp_gateway_configs_auth_mode', table.auth_mode, MCPGatewayAuthMode),
     enumCheck('mcp_gateway_configs_sharing_mode', table.sharing_mode, MCPGatewaySharingMode),
+    enumCheck(
+      'mcp_gateway_configs_provider_scope_source',
+      table.provider_scope_source,
+      MCPGatewayProviderScopeSource
+    ),
   ]
 );
 

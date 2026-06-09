@@ -22,6 +22,30 @@ function makeSnapshot(diffs: Array<{ file: string; after: string; status: string
   });
 }
 
+function makeSessionDiffSnapshot(patch: string): string {
+  return JSON.stringify({
+    info: snapshotInfo(),
+    sessionDiff: [
+      {
+        file: 'src/index.ts',
+        patch,
+        additions: 1,
+        deletions: 0,
+        status: 'modified',
+      },
+    ],
+    messages: [
+      {
+        info: {
+          summary: {
+            diffs: [{ file: 'legacy.txt', after: 'legacy content', status: 'modified' }],
+          },
+        },
+      },
+    ],
+  });
+}
+
 function makeMultiMessageSnapshot(
   ...messageDiffs: Array<Array<{ file: string; after: string; status: string }>>
 ): string {
@@ -401,6 +425,68 @@ describe('restoreSession', () => {
 
     // Verify deleted file was removed
     expect(fs.existsSync(path.join(workspace, 'old-file.txt'))).toBe(false);
+  });
+
+  it('prefers top-level patch session diffs over legacy message summaries', async () => {
+    const repo = path.join(tmpDir, 'repo');
+    fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    Bun.spawnSync(['git', 'config', 'user.name', 'Test User'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'before\n');
+    Bun.spawnSync(['git', 'add', '.'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'commit', '-m', 'initial'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'after\n');
+    const proc = Bun.spawnSync(['git', 'diff', '--src-prefix=a/', '--dst-prefix=b/'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const patch = new TextDecoder().decode(proc.stdout);
+
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    Bun.spawnSync(['git', 'config', 'user.name', 'Test User'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(path.join(workspace, 'src/index.ts'), 'before\n');
+    Bun.spawnSync(['git', 'add', '.'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'commit', '-m', 'initial'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    mockFetchOk(makeSessionDiffSnapshot(patch));
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    });
+    expect(fs.readFileSync(path.join(workspace, 'src/index.ts'), 'utf-8')).toBe('after\n');
+    expect(fs.existsSync(path.join(workspace, 'legacy.txt'))).toBe(false);
   });
 
   it('succeeds with zero diffs when messages array is empty', async () => {

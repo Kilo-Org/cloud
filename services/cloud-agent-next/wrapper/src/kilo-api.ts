@@ -113,6 +113,7 @@ export type WrapperKiloClient = {
     model?: { providerID?: string; modelID: string };
     system?: string;
     tools?: Record<string, boolean>;
+    snapshotInitialization?: 'wait';
   }) => Promise<void>;
   abortSession: (opts: { sessionId: string }) => Promise<boolean>;
   summarizeSession: (opts: {
@@ -125,6 +126,7 @@ export type WrapperKiloClient = {
     command: string;
     args?: string;
     messageId?: string;
+    snapshotInitialization?: 'wait';
   }) => Promise<unknown>;
   /** Fetch the full slash command catalog from kilo, trimmed to wire shape. */
   listCommands: () => Promise<SlashCommandInfo[]>;
@@ -248,6 +250,9 @@ export function createWrapperKiloClient(
         ...(opts.system ? { system: opts.system } : {}),
         ...(opts.tools ? { tools: opts.tools } : {}),
         ...(opts.agent ? { agent: opts.agent } : {}),
+        ...(opts.snapshotInitialization
+          ? { snapshotInitialization: opts.snapshotInitialization }
+          : {}),
       });
       if (result.error !== undefined) {
         throw new Error(
@@ -277,13 +282,14 @@ export function createWrapperKiloClient(
     },
 
     sendCommand: async opts => {
-      const result = await sdkClient.session.command({
-        path: { id: opts.sessionId },
-        body: {
-          command: opts.command,
-          arguments: opts.args ?? '',
-          ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
-        },
+      const result = await v2Client.session.command({
+        sessionID: opts.sessionId,
+        command: opts.command,
+        arguments: opts.args ?? '',
+        ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
+        ...(opts.snapshotInitialization
+          ? { snapshotInitialization: opts.snapshotInitialization }
+          : {}),
       });
       if (result.error !== undefined) {
         throw new Error(

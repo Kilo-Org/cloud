@@ -231,7 +231,10 @@ export const PullRequestReviewCommentPayloadSchema = z.object({
     body: z.string(),
     user: z.object({
       login: z.string(),
+      type: z.string().optional(),
     }),
+    in_reply_to_id: z.number().int().nullable().optional(),
+    created_at: z.string().optional(),
     html_url: z.string(),
     path: z.string(),
     line: z.number().nullable().optional(),

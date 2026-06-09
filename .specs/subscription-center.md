@@ -24,6 +24,7 @@ Updated 2026-05-28 -- Coding Plans sold-out availability notification intent.
 Updated 2026-05-28 -- Credit-funded payment source label.
 Updated 2026-05-28 -- Coding Plans API key configuration summary.
 Updated 2026-05-28 -- Coding Plans billing history USD amount display.
+Updated 2026-06-05 -- KiloClaw final Commit term continuation behavior.
 
 ## Conventions
 
@@ -228,14 +229,23 @@ future, the system MUST redirect from the old path to the new one.
     actions:
     - View subscription status (active, trialing, past_due, suspended,
       cancelled)
-    - Switch between hosting plans (standard / commit)
+    - Select Standard for fresh enrollment; Commit MUST remain visible only
+      for active or historical records and qualified pending obligations
+    - For a final Commit term, explicitly continue month-to-month as Standard
+      or cancel that scheduled continuation before the final boundary
     - Cancel subscription
-    - Switch payment source (Stripe / credits) where applicable
+    - Switch payment source (Stripe / credits) where applicable; final Commit
+      Stripe-to-credits conversion also schedules pure-credit Standard
 
 26. Each KiloClaw detail page MUST display:
     - Instance identifier and status
     - Current plan and billing period
     - Payment source
+    - For a final Commit term: persistent final-term notice, final date,
+      lineage-priced Standard monthly price, current and future funding source,
+      default cancellation outcome, and `Continue month-to-month` action
+    - After Standard opt-in: scheduled Standard start date and an action to
+      cancel month-to-month continuation
     - Trial status and expiration date (if trialing)
     - Suspension/destruction deadlines (if applicable)
     - Inline billing history for this instance's subscription (see
@@ -243,16 +253,20 @@ future, the system MUST redirect from the old path to the new one.
     - Link to the Stripe customer portal for payment method management
       (if Stripe-funded)
 
-KiloClaw summary and detail views MUST display the pricing applicable
-to the subscription, including subscriptions enrolled under earlier
-pricing. Scheduled or requested plan changes MUST display pricing that
-will apply if the change completes.
+KiloClaw summary cards and detail views MUST display the pricing applicable
+to the subscription, including subscriptions enrolled under earlier pricing.
+Scheduled or requested plan changes MUST display pricing that will apply if
+the change completes. Every final Commit summary card and detail view MUST
+state that hosting ends on the final date unless the customer continues
+month-to-month, and MUST expose the continuation action directly. When retirement state cannot be derived safely, the surface MUST hide unsafe billing actions, preserve only access supported by canonical state, and show a generic temporary billing-state error without exposing internal reason codes.
 
 When the user has no non-terminal KiloClaw subscription, the enrollment
-view MUST display the currently available offer and price. Canceled
-KiloClaw history MUST NOT cause an earlier price or entitlement to
-appear as the available offer. Stripe-funded enrollment awaiting invoice
-settlement MUST be presented as pending rather than active.
+view MUST display Standard as the only currently available offer after the
+Commit sales cutoff. Canceled KiloClaw history MUST NOT cause Commit, an
+earlier price, or an earlier entitlement to appear as the available offer.
+Stripe-funded enrollment awaiting invoice settlement MUST be presented as
+pending rather than active. Active and terminal history MUST continue to show
+historical Commit names, prices, invoices, and credit deductions.
 
 ### Coding Plans Subscriptions (Personal Route)
 
@@ -448,6 +462,11 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-06-05 -- KiloClaw final Commit continuation
+
+- Replaced two-way post-cutoff plan switching with explicit final Commit continuation into lineage-priced Standard.
+- Required final date, funding, default cancellation, continuation/undo actions, fail-closed ambiguous-state presentation, and historical Commit display.
 
 ### 2026-05-28 -- Personal product navigation and return context
 

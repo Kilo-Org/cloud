@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { logToFile, runProcess } from './utils.js';
 
@@ -17,7 +18,8 @@ export type RestoreResult =
 
 type SnapshotDiff = {
   file: string;
-  after: string;
+  after?: string;
+  patch?: string;
   status: string;
 };
 
@@ -345,7 +347,7 @@ async function validateSnapshotInfoId(snapshotPath: string): Promise<SnapshotInf
 // ~half the memory of a V8 heap.
 // `objects` filters out non-object .summary values (e.g. compaction messages set summary=true)
 const JQ_EXTRACT_DIFFS_FILTER =
-  'reduce (.messages[]?.info.summary | objects | .diffs[]? // empty) as $d ({}; .[$d.file] = $d) | [.[]]';
+  'reduce (if ((.sessionDiff? // []) | length) > 0 then .sessionDiff[] else (.messages[]?.info.summary | objects | .diffs[]? // empty) end) as $d ({}; if (($d.file? | type) == "string") then .[$d.file] = $d else . end) | [.[]]';
 
 /**
  * Extract last-write-wins diffs from a snapshot file. Prefers a jq subprocess
@@ -387,6 +389,7 @@ export async function extractDiffs(snapshotPath: string): Promise<SnapshotDiff[]
  */
 async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[] | null> {
   type SnapshotShape = {
+    sessionDiff?: SnapshotDiff[];
     messages?: Array<{
       info?: {
         summary?: { diffs?: SnapshotDiff[] };
@@ -401,6 +404,12 @@ async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[]
     return null;
   }
   const dedup = new Map<string, SnapshotDiff>();
+  if (Array.isArray(parsed.sessionDiff) && parsed.sessionDiff.length > 0) {
+    for (const diff of parsed.sessionDiff) {
+      if (diff && typeof diff.file === 'string') dedup.set(diff.file, diff);
+    }
+    return Array.from(dedup.values());
+  }
   for (const message of parsed.messages ?? []) {
     const summary = message?.info?.summary;
     if (!summary || typeof summary !== 'object') continue;
@@ -409,6 +418,26 @@ async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[]
     }
   }
   return Array.from(dedup.values());
+}
+
+function applyPatch(workspacePath: string, diff: SnapshotDiff): boolean {
+  if (!diff.patch) return false;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-session-diff-'));
+  const file = path.join(dir, 'change.patch');
+  try {
+    fs.writeFileSync(file, diff.patch);
+    const proc = Bun.spawnSync(['git', 'apply', '--3way', '--whitespace=nowarn', file], {
+      cwd: workspacePath,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    if (proc.exitCode === 0) return true;
+    const stderr = new TextDecoder().decode(proc.stderr).trim();
+    log(`git apply failed file=${diff.file} stderr=${stderr}`);
+    return false;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -565,6 +594,15 @@ export async function restoreSession(
     let skipped = 0;
 
     for (const diff of uniqueDiffs) {
+      if (diff.patch) {
+        if (applyPatch(workspacePath, diff)) {
+          applied++;
+        } else {
+          skipped++;
+        }
+        continue;
+      }
+
       const fp = path.resolve(resolvedWorkspace, diff.file);
 
       if (!fp.startsWith(resolvedWorkspace + '/')) {

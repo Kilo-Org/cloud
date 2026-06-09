@@ -1,4 +1,4 @@
-name: Critical-only CodeQL config
+name: High-and-critical CodeQL config
 
 query-filters:
   - include:
@@ -8,4 +8,4 @@ query-filters:
         - alert
         - path-alert
       tags contain: security
-      security-severity: /^(9(\.[0-9])?|10(\.0)?)$/
+      security-severity: /^(7(\.[0-9])?|8(\.[0-9])?|9(\.[0-9])?|10(\.0)?)$/

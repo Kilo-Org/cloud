@@ -1,4 +1,4 @@
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
@@ -92,40 +92,14 @@ export function buildStartCommand(serviceName: string): string {
   // would try to descend into <dir>/<dir> which doesn't exist.
   if (svc.dir !== '.' && svc.command[0] === 'pnpm') {
     const [, ...rest] = svc.command;
-    return `${getCommandEnvironmentPrefix()}${getPnpmCommand()} --filter {./${svc.dir}} ${rest.join(' ')}`;
+    return `pnpm --filter {./${svc.dir}} ${rest.join(' ')}`;
   }
 
   const parts: string[] = [];
   if (svc.dir !== '.') parts.push(`cd ${shellQuote(path.join(findRepoRoot(), svc.dir))}`);
-  parts.push(`${getCommandEnvironmentPrefix()}${svc.command.join(' ')}`);
+  parts.push(svc.command.join(' '));
 
   return parts.join(' && ');
-}
-
-function getCommandEnvironmentPrefix(): string {
-  const env = ['PATH', 'PNPM_HOME', 'COREPACK_HOME', 'npm_execpath']
-    .map(key => {
-      const value = process.env[key];
-      return value === undefined || value === '' ? undefined : `${key}=${shellQuote(value)}`;
-    })
-    .filter(value => value !== undefined);
-
-  return env.length === 0 ? '' : `${env.join(' ')} `;
-}
-
-function getPnpmCommand(): string {
-  const pnpmHome = process.env.PNPM_HOME;
-  if (pnpmHome) {
-    const pnpmPath = path.join(pnpmHome, 'pnpm');
-    if (fs.existsSync(pnpmPath)) return shellQuote(pnpmPath);
-  }
-
-  const npmExecPath = process.env.npm_execpath;
-  if (npmExecPath && npmExecPath.includes('pnpm')) {
-    return `node ${shellQuote(npmExecPath)}`;
-  }
-
-  return 'pnpm';
 }
 
 // ---------------------------------------------------------------------------
@@ -134,26 +108,23 @@ function getPnpmCommand(): string {
 
 export function startServiceInTmux(sessionName: string, serviceName: string): void {
   const svc = getService(serviceName);
-  const winIndex = createWindow(sessionName, serviceName);
-  if (svc.type === 'infra') {
-    // Profile-gated services need --profile on every compose subcommand,
-    // including `logs`. Without it, Compose v2 filters the service out of
-    // the graph and the tmux pane is silent or errors. Shell-quote the
-    // profile and service names — they are safe identifiers today but the
-    // quoting keeps the command robust if a future maintainer adds a name
-    // containing whitespace or metacharacters.
-    const profile = getInfraProfile(serviceName);
-    const profileArg = profile ? `--profile ${shellQuote(profile)} ` : '';
-    sendKeys(
-      sessionName,
-      serviceName,
-      `docker compose ${profileArg}-f dev/docker-compose.yml logs -f ${shellQuote(serviceName)}`
-    );
-  } else {
-    sendKeys(sessionName, serviceName, buildStartCommand(serviceName));
-  }
+  const startupCommand =
+    svc.type === 'infra' ? buildInfraLogCommand(serviceName) : buildStartCommand(serviceName);
+  const winIndex = createWindow(sessionName, serviceName, startupCommand);
   const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
   pipePane(sessionName, winIndex, 0, buildLogPipeCommand(logPath));
+}
+
+function buildInfraLogCommand(serviceName: string): string {
+  // Profile-gated services need --profile on every compose subcommand,
+  // including `logs`. Without it, Compose v2 filters the service out of
+  // the graph and the tmux pane is silent or errors. Shell-quote the
+  // profile and service names — they are safe identifiers today but the
+  // quoting keeps the command robust if a future maintainer adds a name
+  // containing whitespace or metacharacters.
+  const profile = getInfraProfile(serviceName);
+  const profileArg = profile ? `--profile ${shellQuote(profile)} ` : '';
+  return `docker compose ${profileArg}-f dev/docker-compose.yml logs -f ${shellQuote(serviceName)}`;
 }
 
 function buildLogPipeCommand(logPath: string): string {
@@ -286,8 +257,7 @@ export function showServiceInTmux(
 export function showGroupInTmux(
   sessionName: string,
   serviceNames: string[],
-  currentPaneNames: string,
-  currentViewedIsGroup: boolean
+  currentPaneNames: string
 ): string {
   if (serviceNames.length === 0) return currentPaneNames;
   try {

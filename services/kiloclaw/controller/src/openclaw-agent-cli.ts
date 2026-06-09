@@ -74,8 +74,18 @@ type CliProcessResult = {
   stderr: string;
 };
 
+// Raw result that does NOT reject on a non-zero exit — `openclaw agents bind`
+// exits 1 on a binding conflict while still printing its JSON summary, so we
+// must capture stdout regardless of exit code.
+type CliRawResult = {
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+};
+
 export type OpenClawAgentCliDeps = {
   run: (args: string[]) => Promise<CliProcessResult>;
+  runRaw: (args: string[]) => Promise<CliRawResult>;
 };
 
 export class OpenClawAgentCliError extends Error {
@@ -118,6 +128,23 @@ const defaultDeps: OpenClawAgentCliDeps = {
             return;
           }
           resolve({ stdout, stderr });
+        }
+      );
+    }),
+  runRaw: args =>
+    new Promise(resolve => {
+      execFile(
+        'openclaw',
+        args,
+        {
+          env: process.env,
+          timeout: AGENT_CLI_TIMEOUT_MS,
+          maxBuffer: AGENT_CLI_MAX_OUTPUT_BYTES,
+          encoding: 'utf8',
+        },
+        (error, stdout, stderr) => {
+          const timedOut = !!error && 'killed' in error && error.killed === true;
+          resolve({ stdout: stdout ?? '', stderr: stderr ?? '', timedOut });
         }
       );
     }),
@@ -184,4 +211,95 @@ export async function deleteAgentViaCli(
 ): Promise<DeleteAgentCliResult> {
   const result = await deps.run(['agents', 'delete', agentId, '--force', '--json']);
   return parseCliJson(result.stdout, DeleteResultSchema);
+}
+
+// ── Bindings (controller delegates all routing semantics to the CLI) ──
+
+// `openclaw agents bindings [--agent <id>] --json` output entry.
+const CliBindingMatchSchema = z.object({ channel: z.string().min(1) }).passthrough();
+const CliBindingSchema = z
+  .object({
+    agentId: NormalizedCliAgentIdSchema,
+    match: CliBindingMatchSchema,
+    description: z.string().optional(),
+  })
+  .passthrough();
+const ListBindingsResultSchema = z.array(CliBindingSchema);
+
+// `agents bind --json` summary. `conflicts` are descriptive strings.
+const BindResultSchema = z.object({
+  agentId: NormalizedCliAgentIdSchema,
+  added: z.array(z.string()),
+  updated: z.array(z.string()),
+  skipped: z.array(z.string()),
+  conflicts: z.array(z.string()),
+});
+const UnbindResultSchema = z.object({
+  agentId: NormalizedCliAgentIdSchema,
+  removed: z.array(z.string()),
+  missing: z.array(z.string()),
+  conflicts: z.array(z.string()),
+});
+
+export type CliBinding = z.infer<typeof CliBindingSchema>;
+export type BindAgentCliResult = z.infer<typeof BindResultSchema>;
+export type UnbindAgentCliResult = z.infer<typeof UnbindResultSchema>;
+
+export async function listAgentBindingsViaCli(
+  agentId: string | undefined,
+  deps: OpenClawAgentCliDeps = defaultDeps
+): Promise<CliBinding[]> {
+  const args = ['agents', 'bindings', ...(agentId ? ['--agent', agentId] : []), '--json'];
+  const result = await deps.run(args);
+  return parseCliJson(result.stdout, ListBindingsResultSchema);
+}
+
+// Parse a bind/unbind raw result: the CLI prints JSON even when it exits 1 on a
+// conflict, so prefer stdout; fall back to typed failures (timeout / not-found).
+function parseRawCliResult<T>(raw: CliRawResult, schema: z.ZodType<T>): T {
+  try {
+    return parseCliJson(raw.stdout, schema);
+  } catch {
+    if (raw.timedOut) {
+      throw new OpenClawAgentCliError(
+        504,
+        'openclaw_cli_timeout',
+        'OpenClaw agent command timed out'
+      );
+    }
+    throw mapCliFailure(`${raw.stderr}\n${raw.stdout}`);
+  }
+}
+
+// Each spec is `channel[:accountId]`.
+export async function bindAgentViaCli(
+  agentId: string,
+  specs: string[],
+  deps: OpenClawAgentCliDeps = defaultDeps
+): Promise<BindAgentCliResult> {
+  const args = [
+    'agents',
+    'bind',
+    '--agent',
+    agentId,
+    ...specs.flatMap(spec => ['--bind', spec]),
+    '--json',
+  ];
+  return parseRawCliResult(await deps.runRaw(args), BindResultSchema);
+}
+
+export async function unbindAgentViaCli(
+  agentId: string,
+  specs: string[],
+  deps: OpenClawAgentCliDeps = defaultDeps
+): Promise<UnbindAgentCliResult> {
+  const args = [
+    'agents',
+    'unbind',
+    '--agent',
+    agentId,
+    ...specs.flatMap(spec => ['--bind', spec]),
+    '--json',
+  ];
+  return parseRawCliResult(await deps.runRaw(args), UnbindResultSchema);
 }

@@ -1,17 +1,17 @@
 // Docker socket proxy that injects HostConfig.Privileged=true into
-// `POST /containers/create` requests.
+// `SandboxDIND` container create requests.
 //
 // Why this exists
 // ---------------
-// Cloudflare Containers run our `SandboxSmall` image (Docker-in-Docker)
-// privileged in production, but local `wrangler dev` has no supported way
-// to set Docker container create options like `HostConfig.Privileged=true`.
-// Without that, rootless dockerd inside the Sandbox container fails to set
-// up its mounts and `/var/run/docker.sock` never appears.
+// Cloudflare Containers run our `SandboxDIND` image privileged in production,
+// but local `wrangler dev` has no supported way to set Docker container create
+// options like `HostConfig.Privileged=true`. Without that, rootless dockerd
+// inside the SandboxDIND container fails to set up its mounts and
+// `/var/run/docker.sock` never appears.
 //
 // Workaround: run a small Unix-socket proxy on the developer machine that
-// forwards Docker API calls to the host's real Docker socket and rewrites
-// `POST /containers/create` bodies to set `HostConfig.Privileged=true`.
+// forwards Docker API calls to the host's real Docker socket and rewrites only
+// `SandboxDIND` create bodies to set `HostConfig.Privileged=true`.
 // `pnpm dev` then runs Wrangler with `DOCKER_HOST` pointed at this proxy.
 //
 // This matches the workaround documented in cloudflare/sandbox-sdk#662 and
@@ -83,10 +83,10 @@ const server = net.createServer(client => {
 
     const header = buffered.slice(0, headerEnd).toString('utf8');
     const bodyStart = headerEnd + 4;
-    const match = header.match(/^POST\s+\S*\/containers\/create(?:\?|\s)/);
+    const createRequest = header.match(/^POST\s+(\S*\/containers\/create(?:\?\S*)?)\s/);
     const contentLength = header.match(/\r\nContent-Length:\s*(\d+)/i);
 
-    if (!match || !contentLength) {
+    if (!createRequest || !contentLength) {
       patched = true;
       upstream.write(buffered);
       return;
@@ -102,6 +102,17 @@ const server = net.createServer(client => {
     try {
       payload = JSON.parse(body);
     } catch {
+      patched = true;
+      upstream.write(buffered);
+      return;
+    }
+
+    const containerName = new URL(createRequest[1], 'http://docker').searchParams.get('name');
+    const isSandboxDind =
+      containerName?.includes('-SandboxDIND-') &&
+      typeof payload.Image === 'string' &&
+      payload.Image.startsWith('cloudflare-dev/sandboxdind:');
+    if (!isSandboxDind) {
       patched = true;
       upstream.write(buffered);
       return;

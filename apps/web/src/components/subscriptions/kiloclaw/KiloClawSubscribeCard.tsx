@@ -16,6 +16,7 @@ type KiloClawSubscribeCardProps = {
   standardCostMicrodollars?: number;
   commitCostMicrodollars?: number;
   hasActiveKiloPass: boolean;
+  commitPlanAvailable?: boolean;
 };
 
 type KiloClawPlanCardProps = {
@@ -109,6 +110,7 @@ export function KiloClawSubscribeCard({
   standardCostMicrodollars = PLAN_COST_MICRODOLLARS.standard,
   commitCostMicrodollars = PLAN_COST_MICRODOLLARS.commit,
   hasActiveKiloPass,
+  commitPlanAvailable = false,
 }: KiloClawSubscribeCardProps) {
   const signupDisplay: KiloClawSignupDisplay = createKiloClawSignupDisplay({
     standardCostMicrodollars,
@@ -141,10 +143,11 @@ export function KiloClawSubscribeCard({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 lg:gap-5">
+      <div className={cn('grid gap-4 lg:gap-5', commitPlanAvailable && 'sm:grid-cols-2')}>
         <KiloClawPlanCard
           title="Standard"
           cadenceLabel="Monthly"
+          badge={commitPlanAvailable ? undefined : 'Available plan'}
           price={signupDisplay.standard.primaryPrice}
           priceDetail={
             signupDisplay.standard.introDetail
@@ -158,17 +161,20 @@ export function KiloClawSubscribeCard({
               : undefined
           }
           ctaLabel="Sign up in KiloClaw"
+          isRecommended={!commitPlanAvailable}
         />
-        <KiloClawPlanCard
-          title="Commit"
-          cadenceLabel="6 months"
-          badge="Best value"
-          price={signupDisplay.commit.primaryPrice}
-          priceDetail={signupDisplay.commit.priceDetail}
-          details={commitDetails}
-          ctaLabel="Sign up in KiloClaw"
-          isRecommended
-        />
+        {commitPlanAvailable ? (
+          <KiloClawPlanCard
+            title="Commit"
+            cadenceLabel="6 months"
+            badge="Best value"
+            price={signupDisplay.commit.primaryPrice}
+            priceDetail={signupDisplay.commit.priceDetail}
+            details={commitDetails}
+            ctaLabel="Sign up in KiloClaw"
+            isRecommended
+          />
+        ) : null}
       </div>
 
       <div className="space-y-2 text-xs">

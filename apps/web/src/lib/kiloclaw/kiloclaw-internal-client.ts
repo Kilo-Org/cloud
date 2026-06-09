@@ -1006,6 +1006,23 @@ export class KiloClawInternalClient {
     );
   }
 
+  async updateAgentBindings(
+    userId: string,
+    agentId: string,
+    bindings: Record<string, unknown>,
+    instanceId?: string
+  ): Promise<AgentMutationResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/agents/${encodeURIComponent(agentId)}/bindings${params}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ userId, bindings }),
+      },
+      { userId }
+    );
+  }
+
   async deleteAgent(
     userId: string,
     agentId: string,

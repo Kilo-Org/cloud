@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "name": "auto-model-classifier",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "dev": {
+    "port": 8810,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "secrets": {
+    "required": ["BACKEND_AUTH_TOKEN"],
+  },
+  "env": {
+    "dev": {
+      "name": "auto-model-classifier-dev",
+      "workers_dev": true,
+      "secrets": {
+        "required": ["BACKEND_AUTH_TOKEN"],
+      },
+    },
+  },
+}

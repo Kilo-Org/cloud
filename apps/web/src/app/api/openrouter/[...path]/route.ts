@@ -96,6 +96,7 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { scheduleAutoModelClassifierMirror } from '@/lib/ai-gateway/auto-model-classifier-mirror';
 
 export const maxDuration = 800;
 
@@ -166,6 +167,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
+  scheduleAutoModelClassifierMirror({ request, path, bodyText: requestBodyText });
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: GatewayRequest;
   try {

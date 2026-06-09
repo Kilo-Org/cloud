@@ -116,6 +116,20 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['gh api repos/*/issues/comments/* -X PATCH*']).toBe('allow');
     expect(bashPermissions['gh api repos/*/pulls/*/reviews --input*']).toBe('allow');
 
+    for (const readOnlyGhApiCommand of [
+      'gh api repos/*/pulls/*/reviews',
+      'gh api repos/*/pulls/*/comments',
+      'gh api repos/*/issues/*/comments',
+    ]) {
+      for (const mutationFlag of ['--method*', '-X*', '-f*', '-F*', '--field*', '--raw-field*']) {
+        const deniedCommand = `${readOnlyGhApiCommand} ${mutationFlag}`;
+        expect(bashPermissions[deniedCommand]).toBe('deny');
+        expect(bashPermissions[`${deniedCommand} *`]).toBe('deny');
+      }
+    }
+    expect(bashPermissions['gh api repos/*/pulls/*/comments --input*']).toBe('deny');
+    expect(bashPermissions['gh api repos/*/pulls/*/comments --input* *']).toBe('deny');
+
     expect(bashPermissions['git']).toBe('allow');
     expect(bashPermissions['git *']).toBe('allow');
     expect(bashPermissions['git fetch']).toBe('allow');

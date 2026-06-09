@@ -10,9 +10,8 @@ import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
 } from '@/lib/organizations/organization-types';
-import type { User, Organization } from '@kilocode/db/schema';
-import { model_experiment, organizations } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { type User, type Organization, organizations } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '@/lib/drizzle';
 
@@ -250,17 +249,6 @@ describe('organizations settings trpc router', () => {
   });
 
   describe('listAvailableModels procedure', () => {
-    const experimentPublicIds = ['kilo/preview-allowed-by-policy', 'kilo/preview-denied-by-policy'];
-
-    async function deleteExperimentModels() {
-      await db
-        .delete(model_experiment)
-        .where(inArray(model_experiment.public_model_id, experimentPublicIds));
-    }
-
-    beforeEach(deleteExperimentModels);
-    afterEach(deleteExperimentModels);
-
     function makeOpenRouterModel(id: string): OpenRouterModel {
       return {
         id,
@@ -293,24 +281,12 @@ describe('organizations settings trpc router', () => {
       } satisfies OpenRouterModelsResponse;
 
       mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
-      await db.insert(model_experiment).values([
-        {
-          public_model_id: 'kilo/preview-allowed-by-policy',
-          name: 'Allowed experiment',
-          status: 'active',
-        },
-        {
-          public_model_id: 'kilo/preview-denied-by-policy',
-          name: 'Denied experiment',
-          status: 'active',
-        },
-      ]);
 
       const orgWithDenyList = await createTestOrganization(
         'Model Deny List',
         owner.id,
         0,
-        { model_deny_list: ['openai/gpt-4o', 'kilo/preview-denied-by-policy'] },
+        { model_deny_list: ['openai/gpt-4o'] },
         false
       );
       await addUserToOrganization(orgWithDenyList.id, member.id, 'member');
@@ -320,10 +296,7 @@ describe('organizations settings trpc router', () => {
         organizationId: orgWithDenyList.id,
       });
 
-      expect(result.data.map(model => model.id)).toEqual([
-        'anthropic/claude-3-opus',
-        'kilo/preview-allowed-by-policy',
-      ]);
+      expect(result.data.map(model => model.id)).toEqual(['anthropic/claude-3-opus']);
     });
 
     it('should include new models from allowed providers when they are not denied', async () => {

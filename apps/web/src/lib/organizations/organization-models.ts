@@ -26,7 +26,7 @@ export async function getAvailableModelsForOrganization(
   }
 
   const responseData = await getEnhancedOpenRouterModels();
-  const restrictionCandidates = responseData.data;
+  const restrictionCandidates = [...responseData.data];
 
   let filteredModels = restrictionCandidates;
   if (hasActiveModelRestrictions(restrictions)) {

@@ -9,10 +9,11 @@
  * the actual network request to the correct tRPC route.
  */
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { useTRPC } from '@/lib/trpc/utils';
+import type { AgentCreateInput, AgentUpdateInput } from '@/lib/kiloclaw/agent-schemas';
 import { useClawContext } from '../components/ClawContext';
 
 // Config
@@ -92,6 +93,88 @@ export function useClawControllerVersion(enabled: boolean) {
   });
 
   return organizationId ? org : personal;
+}
+
+// Agents (read-only fleet)
+
+export function useClawAgents(enabled = true) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.listAgents.queryOptions(undefined),
+    enabled: enabled && !organizationId,
+  });
+
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.listAgents.queryOptions({
+      organizationId: organizationId ?? '',
+    }),
+    enabled: enabled && !!organizationId,
+  });
+
+  return organizationId ? org : personal;
+}
+
+/**
+ * Agent lifecycle mutations (create / update / delete), context-aware. Callers
+ * pass the base input; the org variant injects organizationId. Each mutation
+ * invalidates the active listAgents query on success.
+ */
+export function useClawAgentMutations() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const { organizationId } = useClawContext();
+
+  const invalidateAgents = () =>
+    queryClient.invalidateQueries({
+      queryKey: organizationId
+        ? trpc.organizations.kiloclaw.listAgents.queryKey({ organizationId })
+        : trpc.kiloclaw.listAgents.queryKey(),
+    });
+
+  const personalCreate = useMutation(
+    trpc.kiloclaw.createAgent.mutationOptions({ onSuccess: invalidateAgents })
+  );
+  const orgCreate = useMutation(
+    trpc.organizations.kiloclaw.createAgent.mutationOptions({ onSuccess: invalidateAgents })
+  );
+  const personalUpdate = useMutation(
+    trpc.kiloclaw.updateAgent.mutationOptions({ onSuccess: invalidateAgents })
+  );
+  const orgUpdate = useMutation(
+    trpc.organizations.kiloclaw.updateAgent.mutationOptions({ onSuccess: invalidateAgents })
+  );
+  const personalDelete = useMutation(
+    trpc.kiloclaw.deleteAgent.mutationOptions({ onSuccess: invalidateAgents })
+  );
+  const orgDelete = useMutation(
+    trpc.organizations.kiloclaw.deleteAgent.mutationOptions({ onSuccess: invalidateAgents })
+  );
+
+  return {
+    createAgent: {
+      mutateAsync: (input: AgentCreateInput) =>
+        organizationId
+          ? orgCreate.mutateAsync({ organizationId, agent: input })
+          : personalCreate.mutateAsync(input),
+      isPending: organizationId ? orgCreate.isPending : personalCreate.isPending,
+    },
+    updateAgent: {
+      mutateAsync: (agentId: string, patch: AgentUpdateInput) =>
+        organizationId
+          ? orgUpdate.mutateAsync({ organizationId, agentId, patch })
+          : personalUpdate.mutateAsync({ agentId, patch }),
+      isPending: organizationId ? orgUpdate.isPending : personalUpdate.isPending,
+    },
+    deleteAgent: {
+      mutateAsync: (agentId: string) =>
+        organizationId
+          ? orgDelete.mutateAsync({ organizationId, agentId })
+          : personalDelete.mutateAsync({ agentId }),
+      isPending: organizationId ? orgDelete.isPending : personalDelete.isPending,
+    },
+  };
 }
 
 export function useClawMorningBriefingStatus(enabled: boolean) {

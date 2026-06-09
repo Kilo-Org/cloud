@@ -14,7 +14,9 @@ import { z } from 'zod';
 // Agent ids normalize to <=64 chars on the controller.
 export const AgentIdSchema = z.string().trim().min(1).max(64);
 
-const ThinkingDefaultSchema = z.enum([
+// Single source of truth for the per-agent setting option values, shared by the
+// Zod enums below and the editor UI (AgentEditDialog) so they can't drift.
+export const THINKING_OPTIONS = [
   'off',
   'minimal',
   'low',
@@ -23,9 +25,13 @@ const ThinkingDefaultSchema = z.enum([
   'xhigh',
   'adaptive',
   'max',
-]);
-const VerboseDefaultSchema = z.enum(['off', 'on', 'full']);
-const ReasoningDefaultSchema = z.enum(['on', 'off', 'stream']);
+] as const;
+export const VERBOSE_OPTIONS = ['off', 'on', 'full'] as const;
+export const REASONING_OPTIONS = ['on', 'off', 'stream'] as const;
+
+const ThinkingDefaultSchema = z.enum(THINKING_OPTIONS);
+const VerboseDefaultSchema = z.enum(VERBOSE_OPTIONS);
+const ReasoningDefaultSchema = z.enum(REASONING_OPTIONS);
 
 // A model value to write: primary and/or fallbacks (at least one).
 const ModelInputSchema = z

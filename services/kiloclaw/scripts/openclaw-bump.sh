@@ -65,6 +65,21 @@ emit_pr_result() {
   emit pr_url "$2"
 }
 
+# True (0) if version $1 is strictly greater than $2. Both are CalVer X.Y.Z with
+# numeric segments, so compare segment by segment and avoid GNU-only `sort -V`
+# (BSD sort on macOS has no -V).
+version_gt() {
+  local -a a b
+  IFS=. read -r -a a <<< "$1"
+  IFS=. read -r -a b <<< "$2"
+  local i
+  for i in 0 1 2; do
+    if [ "${a[i]:-0}" -gt "${b[i]:-0}" ]; then return 0; fi
+    if [ "${a[i]:-0}" -lt "${b[i]:-0}" ]; then return 1; fi
+  done
+  return 1
+}
+
 # Portable in-place replace of every occurrence of the current version with the
 # target. Dots in the search are escaped so they match literally.
 replace_version() {
@@ -90,6 +105,17 @@ apply_edits() {
   new=$((n + 1))
   tmp="$(mktemp)"
   sed "s/RUN echo \"${n}\"/RUN echo \"${new}\"/" "$DOCKERFILE" > "$tmp" && mv "$tmp" "$DOCKERFILE"
+
+  # Refresh the adjacent "# Build cache bust:" comment so its date and vN label do
+  # not drift; AGENTS.md asks for the comment to be updated alongside the counter.
+  # replace_version already updated the openclaw-<version> part of the comment.
+  local cv newcv
+  cv="$(grep -oE 'Build cache bust: [0-9]{4}-[0-9]{2}-[0-9]{2}-v[0-9]+' "$DOCKERFILE" | grep -oE 'v[0-9]+$' | grep -oE '[0-9]+' || true)"
+  if [ -n "$cv" ]; then
+    newcv=$((cv + 1))
+    tmp="$(mktemp)"
+    sed "s/\(Build cache bust: \)[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-v[0-9]\{1,\}/\1$(date +%F)-v${newcv}/" "$DOCKERFILE" > "$tmp" && mv "$tmp" "$DOCKERFILE"
+  fi
 
   # Insert a changelog entry at the top of the array. Assert the anchor exists
   # exactly once and that the entry lands, so a changed declaration cannot
@@ -251,7 +277,7 @@ if [ "$CURRENT" = "$TARGET" ]; then
   echo "openclaw-bump: Dockerfile already pins $TARGET. Nothing to do."
   exit 0
 fi
-if [ "$(printf '%s\n%s\n' "$CURRENT" "$TARGET" | sort -V | tail -n1)" != "$TARGET" ]; then
+if ! version_gt "$TARGET" "$CURRENT"; then
   emit action noop-newer
   echo "openclaw-bump: Dockerfile pin $CURRENT is newer than target $TARGET. Nothing to do."
   exit 0

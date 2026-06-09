@@ -50,6 +50,9 @@ when they appear in all capitals.
 - **Execution context**: The caller's current Kilo context: personal or one
   specific organization. Authorization, refresh, token issuance, and runtime
   proxying MUST use authoritative execution context, not route inference alone.
+  Browser OAuth entry points that do not carry an organization header may establish
+  org context from an org resource only after authoritative membership and assignment
+  authorization against that exact resolved route.
 - **Connection instance**: A per-user record associated with one config. In v1,
   there is at most one non-terminal instance for each
   `(owner_scope, owner_id, user_id, config_id)` tuple.

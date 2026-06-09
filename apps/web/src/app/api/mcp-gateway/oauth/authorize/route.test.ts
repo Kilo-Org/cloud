@@ -14,6 +14,7 @@ const mockPreviewAuthorization =
   >();
 const mockAuthorize =
   jest.fn<(params: unknown) => Promise<{ kind: 'provider_redirect'; authorizationUrl: string }>>();
+const mockRouteAuthorize = jest.fn();
 
 jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: mockGetUserFromAuth,
@@ -26,7 +27,20 @@ jest.mock('@/lib/mcp-gateway/services', () => ({
       parseResource: () => ({
         ownerScope: 'organization',
         ownerId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+        rootPath:
+          '/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
       }),
+      resolveResource: async () => ({
+        route: {
+          ownerScope: 'organization',
+          ownerId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+          rootPath:
+            '/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
+        },
+        resolved: {},
+      }),
+      resolveRouteParams: async () => ({}),
+      authorize: mockRouteAuthorize,
     },
     authorizationService: {
       previewAuthorization: mockPreviewAuthorization,
@@ -125,7 +139,7 @@ describe('POST /api/mcp-gateway/oauth/authorize', () => {
 });
 
 describe('GET /api/mcp-gateway/oauth/authorize', () => {
-  test('passes the authenticated execution context through unchanged', async () => {
+  test('derives org execution context from an authorized browser resource', async () => {
     mockGetUserFromAuth.mockResolvedValue({ user: { id: 'user-1' }, organizationId: undefined });
     mockPreviewAuthorization.mockResolvedValue({
       clientId: 'mcp:client',
@@ -140,8 +154,36 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
 
     expect(response.status).toBe(200);
     expect(mockPreviewAuthorization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        executionContext: {
+          type: 'organization',
+          organizationId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+        },
+      })
+    );
+  });
+
+  test('keeps explicit API execution context unchanged', async () => {
+    mockGetUserFromAuth.mockResolvedValue({ user: { id: 'user-1' }, organizationId: undefined });
+    mockPreviewAuthorization.mockResolvedValue({
+      clientId: 'mcp:client',
+      clientName: 'Codex',
+      resource:
+        'http://localhost:8806/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
+      scopes: ['profile'],
+    });
+    const request = new NextRequest(authorizationUrl(), {
+      headers: { Authorization: 'Bearer api-token' },
+    });
+
+    const response = await loadedRoute().GET(request);
+    if (!response) throw new Error('Expected authorization response');
+
+    expect(response.status).toBe(200);
+    expect(mockPreviewAuthorization).toHaveBeenCalledWith(
       expect.objectContaining({ executionContext: { type: 'personal' } })
     );
+    expect(mockRouteAuthorize).not.toHaveBeenCalled();
   });
 
   test('rejects duplicate OAuth singleton query parameters', async () => {

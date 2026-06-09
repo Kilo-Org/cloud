@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/encryption": "workspace:*",
     "aws4fetch": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

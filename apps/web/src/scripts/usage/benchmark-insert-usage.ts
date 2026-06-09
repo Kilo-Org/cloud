@@ -39,6 +39,10 @@ function randomInt(avg: number, min = 0, max = avg * 3): number {
   return Math.max(min, Math.min(max, Math.round(avg + (Math.random() - 0.5) * (max - min))));
 }
 
+function randomCoordinate(min: number, max: number): number {
+  return min + (secureRandomInt(0, 1_000_000) / 1_000_000) * (max - min);
+}
+
 function pickRandom<T>(arr: T[], rand: number): T {
   return arr[Math.floor(rand * arr.length)];
 }
@@ -138,11 +142,11 @@ function generateRandomRecord(
       metaStats.vercel_ip_city_id_null_pct
     ),
     http_x_vercel_ip_latitude: maybeNull(
-      Math.random() * 180 - 90,
+      randomCoordinate(-90, 90),
       metaStats.vercel_ip_latitude_null_pct
     ),
     http_x_vercel_ip_longitude: maybeNull(
-      secureRandomInt(0, 360_000_000) / 1_000_000 - 180,
+      randomCoordinate(-180, 180),
       metaStats.vercel_ip_longitude_null_pct
     ),
     http_x_vercel_ja4_digest: maybeNull(

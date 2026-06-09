@@ -90,9 +90,9 @@ async function generateAndStoreEmbedding(
   const embeddingService = createEmbeddingService('mistral-text');
   const { embedding } = await embeddingService.embedSingle(sourceText);
 
-  // 3. Generate point ID (MD5 hash of unique identifier)
+  // 3. Generate point ID (SHA-256 hash of unique identifier)
   const idString = `${organizationId}|${repoFullName}|${issueNumber}`;
-  const pointId = createHash('md5').update(idString).digest('hex');
+  const pointId = createHash('sha256').update(idString).digest('hex');
 
   // 4. Store in Milvus
   await getMilvusClient().upsert({

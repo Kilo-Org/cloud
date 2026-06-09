@@ -460,7 +460,7 @@ export async function fetchAllDependabotAlerts(
         return { status: 'alerts_disabled' };
       }
 
-      throw new Error(`GitHub API error ${response.status} for ${repoOwner}/${repoName}: ${body}`);
+      throw new Error(`GitHub API error ${response.status} for ${repoOwner}/${repoName}`);
     }
 
     const json: unknown = await response.json();
@@ -1418,7 +1418,11 @@ async function syncRepo(params: {
   if (fetchResult.status === 'alerts_disabled') {
     console.info(`Dependabot alerts disabled for ${repoFullName}, skipping`);
     result.skipped = 1;
-    await recordSecurityAgentRepositorySyncSuccess(database, { owner: commandOwner, repoFullName });
+    await recordSecurityAgentRepositorySyncFailure(database, {
+      owner: commandOwner,
+      repoFullName,
+      failureCode: 'DEPENDABOT_ALERTS_DISABLED',
+    });
     return result;
   }
 

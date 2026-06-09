@@ -1,11 +1,6 @@
 import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
-import {
-  createGatewayError,
-  GatewayErrorCode,
-  OAuthAuthorizationQuerySchema,
-  type OAuthAuthorizationQuery,
-} from '@kilocode/mcp-gateway';
+import { OAuthAuthorizationQuerySchema, type OAuthAuthorizationQuery } from '@kilocode/mcp-gateway';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { getUserFromAuth } from '@/lib/user/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
@@ -63,56 +58,12 @@ async function authorizationIdentity() {
   return { user, executionContext: executionContextFromAuth(organizationId) };
 }
 
-async function authorizationExecutionContext(params: {
-  request: NextRequest;
-  query: OAuthAuthorizationQuery;
-  route?: ScopedConnectRoute;
-  userId: string;
-  executionContext: ReturnType<typeof executionContextFromAuth>;
-  services: ReturnType<typeof createGatewayServices>;
-}) {
-  if (params.request.headers.has('Authorization') || params.executionContext.type !== 'personal') {
-    return params.executionContext;
-  }
-  const queryRoute = params.query.resource
-    ? params.services.routeService.parseResource(params.query.resource)
-    : undefined;
-  if (params.route && queryRoute && params.route.rootPath !== queryRoute.rootPath) {
-    throw createGatewayError(GatewayErrorCode.InvalidRequest, 'Resource does not match route', 400);
-  }
-  const candidateRoute = params.route ?? queryRoute;
-  if (!candidateRoute || candidateRoute.ownerScope !== 'organization') {
-    return params.executionContext;
-  }
-  const resolved = params.route
-    ? {
-        route: params.route,
-        resolved: await params.services.routeService.resolveRouteParams(params.route),
-      }
-    : params.query.resource
-      ? await params.services.routeService.resolveResource(params.query.resource)
-      : null;
-  if (!resolved) {
-    return params.executionContext;
-  }
-  const organizationContext = {
-    type: 'organization' as const,
-    organizationId: candidateRoute.ownerId,
-  };
-  await params.services.routeService.authorize({
-    resolved: resolved.resolved,
-    route: resolved.route,
-    userId: params.userId,
-    executionContext: organizationContext,
-  });
-  return organizationContext;
-}
-
 async function authorizeRequest(
   query: OAuthAuthorizationQuery,
   route: ScopedConnectRoute | undefined,
   userId: string,
-  executionContext: ReturnType<typeof executionContextFromAuth>
+  executionContext: ReturnType<typeof executionContextFromAuth>,
+  allowBrowserOrgResourceContext: boolean
 ) {
   const services = createGatewayServices();
   const result = await services.authorizationService.authorize({
@@ -120,6 +71,7 @@ async function authorizeRequest(
     route,
     userId,
     executionContext,
+    allowBrowserOrgResourceContext,
   });
   if (result.kind === 'provider_redirect') {
     return NextResponse.redirect(result.authorizationUrl, 303);
@@ -333,28 +285,23 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
-  const executionContext = await authorizationExecutionContext({
-    request,
-    query: parsed.data,
-    route,
-    userId: identity.user.id,
-    executionContext: identity.executionContext,
-    services,
-  });
+  const executionContext = identity.executionContext;
   const preview = await services.authorizationService.previewAuthorization({
     query: parsed.data,
     route,
     userId: identity.user.id,
     executionContext,
+    allowBrowserOrgResourceContext: !request.headers.has('Authorization'),
     redirectErrors: true,
   });
+  const resolvedExecutionContext = preview.executionContext;
   const approvalState = randomToken(32);
   const approvalCookie = `${approvalState}.${approvalSignature({
     approvalState,
     clientId: preview.clientId,
     resource: preview.resource,
     scopes: preview.scopes,
-    executionContext,
+    executionContext: resolvedExecutionContext,
     secret: services.config.rateLimitSecret,
   })}`;
   const inputs = Object.entries(parsed.data)
@@ -398,21 +345,16 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
-  const executionContext = await authorizationExecutionContext({
-    request,
-    query: parsed.data,
-    route,
-    userId: identity.user.id,
-    executionContext: identity.executionContext,
-    services,
-  });
+  const executionContext = identity.executionContext;
   const preview = await services.authorizationService.previewAuthorization({
     query: parsed.data,
     route,
     userId: identity.user.id,
     executionContext,
+    allowBrowserOrgResourceContext: !request.headers.has('Authorization'),
     redirectErrors: true,
   });
+  const resolvedExecutionContext = preview.executionContext;
   const cookieState = request.cookies.get(consentCookieName)?.value;
   const [cookieApprovalState, cookieSignature] = cookieState?.split('.') ?? [];
   const expectedSignature = approvalSignature({
@@ -420,7 +362,7 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     clientId: preview.clientId,
     resource: preview.resource,
     scopes: preview.scopes,
-    executionContext,
+    executionContext: resolvedExecutionContext,
     secret: services.config.rateLimitSecret,
   });
   if (
@@ -439,7 +381,13 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
       )
     );
   }
-  const response = await authorizeRequest(parsed.data, route, identity.user.id, executionContext);
+  const response = await authorizeRequest(
+    parsed.data,
+    route,
+    identity.user.id,
+    resolvedExecutionContext,
+    !request.headers.has('Authorization')
+  );
   response.cookies.delete(consentCookieName);
   return response;
 }

@@ -6,12 +6,15 @@ const mockGetUserFromAuth =
   jest.fn<
     (params: { adminOnly: boolean }) => Promise<{ user: { id: string }; organizationId?: string }>
   >();
-const mockPreviewAuthorization =
-  jest.fn<
-    (
-      params: unknown
-    ) => Promise<{ clientId: string; clientName: string; resource: string; scopes: string[] }>
-  >();
+const mockPreviewAuthorization = jest.fn<
+  (params: unknown) => Promise<{
+    clientId: string;
+    clientName: string;
+    resource: string;
+    scopes: string[];
+    executionContext: { type: string; organizationId?: string };
+  }>
+>();
 const mockAuthorize =
   jest.fn<(params: unknown) => Promise<{ kind: 'provider_redirect'; authorizationUrl: string }>>();
 const mockRouteAuthorize = jest.fn();
@@ -99,10 +102,10 @@ function approvalRequest(approvalState: string, cookie: string) {
 }
 
 describe('POST /api/mcp-gateway/oauth/authorize', () => {
-  test('uses a see-other redirect for a provider authorization after approval', async () => {
+  test('uses a see-other redirect for a browser org provider authorization after approval', async () => {
     mockGetUserFromAuth.mockResolvedValue({
       user: { id: 'user-1' },
-      organizationId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+      organizationId: undefined,
     });
     mockPreviewAuthorization.mockResolvedValue({
       clientId: 'mcp:client',
@@ -110,6 +113,10 @@ describe('POST /api/mcp-gateway/oauth/authorize', () => {
       resource:
         'http://localhost:8806/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
       scopes: ['profile'],
+      executionContext: {
+        type: 'organization',
+        organizationId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+      },
     });
     mockAuthorize.mockResolvedValue({
       kind: 'provider_redirect',
@@ -135,6 +142,22 @@ describe('POST /api/mcp-gateway/oauth/authorize', () => {
     expect(response.headers.get('location')).toBe(
       'https://mcp.linear.app/authorize?state=provider-state'
     );
+    expect(mockPreviewAuthorization).toHaveBeenCalledTimes(2);
+    expect(mockPreviewAuthorization).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        allowBrowserOrgResourceContext: true,
+        executionContext: { type: 'personal' },
+      })
+    );
+    expect(mockAuthorize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowBrowserOrgResourceContext: true,
+        executionContext: {
+          type: 'organization',
+          organizationId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+        },
+      })
+    );
   });
 });
 
@@ -147,6 +170,10 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
       resource:
         'http://localhost:8806/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
       scopes: ['profile'],
+      executionContext: {
+        type: 'organization',
+        organizationId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+      },
     });
 
     const response = await loadedRoute().GET(new NextRequest(authorizationUrl()));
@@ -155,10 +182,8 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
     expect(response.status).toBe(200);
     expect(mockPreviewAuthorization).toHaveBeenCalledWith(
       expect.objectContaining({
-        executionContext: {
-          type: 'organization',
-          organizationId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
-        },
+        allowBrowserOrgResourceContext: true,
+        executionContext: { type: 'personal' },
       })
     );
   });
@@ -171,6 +196,10 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
       resource:
         'http://localhost:8806/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
       scopes: ['profile'],
+      executionContext: {
+        type: 'organization',
+        organizationId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+      },
     });
     const request = new NextRequest(authorizationUrl(), {
       headers: { Authorization: 'Bearer api-token' },

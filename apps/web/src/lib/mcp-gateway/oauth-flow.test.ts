@@ -1143,6 +1143,55 @@ describe('MCP gateway app OAuth flow', () => {
     ).rejects.toThrow();
   });
 
+  it('allows an authorized browser org resource without an explicit org header', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const organizationId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: organizationId, name: 'Gateway Org' });
+    await db.insert(organization_memberships).values({
+      organization_id: organizationId,
+      kilo_user_id: user.id,
+      role: 'owner',
+    });
+    const created = await services.configService.createOrganizationConfig({
+      organizationId,
+      actorUserId: user.id,
+      name: 'Org MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+      sharingMode: 'single_user',
+      initialAssignedUserId: user.id,
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'profile',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.17' }),
+    });
+    const preview = await services.authorizationService.previewAuthorization({
+      query: OAuthAuthorizationQuerySchema.parse({
+        client_id: registration.clientId,
+        redirect_uri: 'http://localhost:3000/callback',
+        response_type: 'code',
+        resource: created.route.canonical_url,
+        code_challenge: pkceChallenge(
+          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
+        ),
+        code_challenge_method: 'S256',
+      }),
+      userId: user.id,
+      executionContext: { type: 'personal' },
+      allowBrowserOrgResourceContext: true,
+    });
+
+    expect(preview.executionContext).toEqual({ type: 'organization', organizationId });
+  });
+
   it('rejects an org resource when the authenticated execution context is personal', async () => {
     const config = await createTestConfig();
     const services = createGatewayServices({ config });

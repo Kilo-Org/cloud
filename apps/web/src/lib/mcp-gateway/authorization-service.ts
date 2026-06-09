@@ -216,6 +216,7 @@ export function createAuthorizationService(params: {
     route?: ScopedConnectRoute;
     userId: string;
     executionContext: GatewayExecutionContext;
+    allowBrowserOrgResourceContext?: boolean;
     redirectErrors?: boolean;
   }) {
     const client = await params.clientService.findClientById(input.query.client_id);
@@ -253,6 +254,7 @@ export function createAuthorizationService(params: {
     }
     let route: ScopedConnectRoute;
     let resolved: ResolvedGatewayRoute;
+    let executionContext = input.executionContext;
     try {
       const resolvedRoute = await resolveAuthorizationRoute({
         query: input.query,
@@ -260,7 +262,24 @@ export function createAuthorizationService(params: {
       });
       route = resolvedRoute.route;
       resolved = resolvedRoute.resolved;
-      if (!executionContextMatchesRoute(input.executionContext, route)) {
+      if (
+        input.allowBrowserOrgResourceContext &&
+        executionContext.type === 'personal' &&
+        route.ownerScope === 'organization'
+      ) {
+        const organizationContext = {
+          type: 'organization' as const,
+          organizationId: route.ownerId,
+        };
+        await params.routeService.authorize({
+          resolved,
+          route,
+          userId: input.userId,
+          executionContext: organizationContext,
+        });
+        executionContext = organizationContext;
+      }
+      if (!executionContextMatchesRoute(executionContext, route)) {
         redirectError(
           GatewayErrorCode.AccessDenied,
           'Execution context does not match resource owner'
@@ -270,7 +289,7 @@ export function createAuthorizationService(params: {
         resolved,
         route,
         userId: input.userId,
-        executionContext: input.executionContext,
+        executionContext,
       });
     } catch (error) {
       if (input.redirectErrors && error instanceof Error) {
@@ -287,7 +306,7 @@ export function createAuthorizationService(params: {
       }
       throw error;
     }
-    return { client, route, resolved, scopes };
+    return { client, route, resolved, scopes, executionContext };
   }
 
   async function previewAuthorization(input: {
@@ -295,6 +314,7 @@ export function createAuthorizationService(params: {
     route?: ScopedConnectRoute;
     userId: string;
     executionContext: GatewayExecutionContext;
+    allowBrowserOrgResourceContext?: boolean;
     redirectErrors?: boolean;
   }) {
     const prepared = await prepareAuthorization(input);
@@ -303,6 +323,7 @@ export function createAuthorizationService(params: {
       clientName: prepared.client.client_name,
       resource: prepared.resolved.route.canonical_url,
       scopes: prepared.scopes,
+      executionContext: prepared.executionContext,
     };
   }
 
@@ -311,6 +332,7 @@ export function createAuthorizationService(params: {
     route?: ScopedConnectRoute;
     userId: string;
     executionContext: GatewayExecutionContext;
+    allowBrowserOrgResourceContext?: boolean;
   }) {
     const { client, route, resolved, scopes } = await prepareAuthorization({
       ...input,

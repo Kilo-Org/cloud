@@ -37,7 +37,7 @@ Target a specific test file: `pnpm test -- <path>`. Run tests for a specific ser
 
 ## apps/web UI Work
 
-When editing files under `apps/web/src/**`, use the `/kilo-design` skill.
+When editing UI files in `apps/web` — React components, pages, layouts, or styles (`.tsx`/`.css`) — use the `/kilo-design` skill.
 
 ## Coding Standards
 

@@ -2,4 +2,4 @@
 
 ## UI Work
 
-When editing files under `apps/web/src/**`, use the `/kilo-design` skill.
+When editing UI files in `apps/web` — React components, pages, layouts, or styles (`.tsx`/`.css`) — use the `/kilo-design` skill.

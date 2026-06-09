@@ -154,11 +154,11 @@
     {
       "class_name": "SandboxSmall",
       "image": "./Dockerfile",
-      "instance_type": "standard-2",
+      "instance_type": "standard-3",
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.21",
       },
-      "max_instances": 400,
+      "max_instances": 200,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -335,7 +335,7 @@
         {
           "class_name": "SandboxSmall",
           "image": "./Dockerfile.dev",
-          "instance_type": "standard-2",
+          "instance_type": "standard-3",
           "image_vars": {
             "KILOCODE_CLI_VERSION": "7.3.21",
           },

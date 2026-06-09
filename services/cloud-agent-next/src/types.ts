@@ -187,7 +187,7 @@ export type GitTokenService = {
 
 export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session sandbox containers (standard-2) */
+  /** Durable Object namespace for per-session sandbox containers (standard-3) */
   SandboxSmall: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for Docker-in-Docker per-session sandbox containers (standard-3) */
   SandboxDIND: DurableObjectNamespace<Sandbox>;

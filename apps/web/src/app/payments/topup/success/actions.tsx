@@ -11,7 +11,8 @@ import { getAndClearPaymentReturnUrl } from '@/lib/payment-return-url';
 
 export async function fetchCreditTransactionIdForStripeSession(sessionId: string) {
   console.info(
-    `Fetching credit transaction ID for Stripe session: ${sessionId}`,
+    'Fetching credit transaction ID for Stripe session:',
+    sessionId,
     new Date().toISOString()
   );
   if (!sessionId || typeof sessionId !== 'string') {

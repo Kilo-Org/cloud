@@ -104,6 +104,7 @@
     "@types/js-yaml": "4.0.9",
     "@types/mdx": "2.0.13",
     "@upstash/redis": "^1.38.0",
+    "@vercel/firewall": "1.2.1",
     "@vercel/functions": "3.4.6",
     "@vercel/otel": "2.1.2",
     "@workos-inc/node": "catalog:",

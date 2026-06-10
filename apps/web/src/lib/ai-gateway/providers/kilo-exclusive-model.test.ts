@@ -91,6 +91,22 @@ describe('calculateCost_mUsd', () => {
 });
 
 describe('convertFromKiloExclusiveModel', () => {
+  it('derives free and training metadata independently', () => {
+    const freePrivateModel = convertFromKiloExclusiveModel(makeModel({ internal_id: 'vendor/free' }));
+    const paidTrainingModel = convertFromKiloExclusiveModel(
+      makeModel({
+        internal_id: 'vendor/paid',
+        flags: ['requires-data-collection'],
+        pricing: [{ start_context_length: 0, pricing: pricing(1) }],
+      })
+    );
+
+    expect(freePrivateModel.isFree).toBe(true);
+    expect(freePrivateModel.mayTrainOnYourPrompts).toBe(false);
+    expect(paidTrainingModel.isFree).toBe(false);
+    expect(paidTrainingModel.mayTrainOnYourPrompts).toBe(true);
+  });
+
   it('only exposes the cheapest pricing tier in model metadata', () => {
     const model = makeModel({
       internal_id: 'vendor/x',

@@ -104,7 +104,7 @@ export function isKiloExclusiveModelRequiringDataCollection(model: string): bool
     m =>
       m.public_id === model &&
       m.status !== 'disabled' &&
-      (!m.pricing || m.flags.includes('requires-data-collection'))
+      m.flags.includes('requires-data-collection')
   );
 }
 

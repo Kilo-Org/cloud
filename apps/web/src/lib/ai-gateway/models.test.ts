@@ -87,6 +87,25 @@ describe('isFreeModel', () => {
       expect(getInferenceProvider(qwen37_plus_model)).toBe('alibaba');
     });
 
+    test('requires data collection only for explicitly flagged offerings', () => {
+      const unpricedUnflaggedModel = kiloExclusiveModels.find(
+        model =>
+          model.status !== 'disabled' &&
+          !model.pricing &&
+          !model.flags.includes('requires-data-collection')
+      );
+      expect(unpricedUnflaggedModel).toBeDefined();
+      if (unpricedUnflaggedModel) {
+        expect(isKiloExclusiveModelRequiringDataCollection(unpricedUnflaggedModel.public_id)).toBe(
+          false
+        );
+      }
+
+      expect(
+        isKiloExclusiveModelRequiringDataCollection(claude_opus_4_7_stealth_model.public_id)
+      ).toBe(true);
+    });
+
     test('requires data collection for paid training-enabled offerings', () => {
       expect(
         isKiloExclusiveModelRequiringDataCollection(claude_opus_4_7_stealth_model.public_id)

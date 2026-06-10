@@ -20,6 +20,12 @@
   "observability": {
     "enabled": true,
   },
+  "analytics_engine_datasets": [
+    {
+      "binding": "AUTO_ROUTING_CLASSIFIER_METRICS",
+      "dataset": "auto_routing_classifier_metrics",
+    },
+  ],
   "kv_namespaces": [
     {
       "binding": "AUTO_ROUTING_CONFIG",

@@ -5,11 +5,16 @@ const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 
 vi.mock('./model-classifier', () => ({ classifyNormalizedInput }));
 
+const writeDataPoint = vi.fn();
+
 const env = {
   INTERNAL_API_SECRET_PROD: {
     get: async () => 'classifier-token',
   },
-} satisfies Pick<Env, 'INTERNAL_API_SECRET_PROD'>;
+  AUTO_ROUTING_CLASSIFIER_METRICS: {
+    writeDataPoint,
+  },
+};
 
 const mockClassification = {
   taskType: 'implementation',
@@ -24,6 +29,7 @@ const mockClassification = {
 
 const mockClassifierResult = {
   cost: 0.00000123,
+  classifierModel: 'google/gemma-4-31b-it',
   classification: mockClassification,
 };
 
@@ -35,6 +41,7 @@ describe('auto routing worker', () => {
   beforeEach(() => {
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
+    writeDataPoint.mockReset();
   });
 
   it('returns health without requiring classifier payload fields', async () => {
@@ -117,6 +124,23 @@ describe('auto routing worker', () => {
         provider: { order: ['anthropic'] },
         providerOptions: { openrouter: { sort: 'price', apiKey: '[REDACTED]' } },
       },
+    });
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      indexes: ['google/gemma-4-31b-it'],
+      blobs: [
+        'google/gemma-4-31b-it',
+        'anthropic/claude-sonnet-4',
+        'chat_completions',
+        'classified',
+        'implementation',
+        'feature_development',
+        'medium',
+        'medium',
+        'code_change',
+        '1',
+        '0.8-1.0',
+      ],
+      doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, expect.any(Number)],
     });
   });
 
@@ -274,6 +298,11 @@ describe('auto routing worker', () => {
       classifierResult: null,
     });
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      indexes: ['unknown'],
+      blobs: ['unknown', '', '', 'invalid_body', '', '', '', '', '', '', ''],
+      doubles: [0, 0, -1, 0, 0, 9],
+    });
   });
 
   it('returns a null classifier result when the mirrored request has no requested model', async () => {
@@ -325,6 +354,23 @@ describe('auto routing worker', () => {
       cost: 0,
       decision: null,
       classifierResult: null,
+    });
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      indexes: ['unknown'],
+      blobs: [
+        'unknown',
+        'anthropic/claude-sonnet-4',
+        'chat_completions',
+        'classifier_error',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ],
+      doubles: [expect.any(Number), 0, -1, 1, 0, expect.any(Number)],
     });
   });
 

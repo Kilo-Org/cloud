@@ -62,6 +62,7 @@ describe('OpenRouter classifier call', () => {
       classifyWithOpenRouter(client, normalizedInput, 'openai/gpt-5-mini')
     ).resolves.toEqual({
       cost: 0.00000123,
+      classifierModel: 'openai/gpt-5-mini',
       classification: modelOutput,
     });
     expect(send).toHaveBeenCalledWith({

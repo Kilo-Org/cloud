@@ -8,6 +8,7 @@ import { createOpenRouterClient } from './openrouter';
 
 export type ClassifierRunResult = {
   cost: number | null;
+  classifierModel: string;
   classification: ClassifierOutput;
 };
 
@@ -43,6 +44,7 @@ export async function classifyWithOpenRouter(
 
   return {
     cost: result.usage?.cost ?? null,
+    classifierModel,
     classification: parseClassifierOutput(extractClassifierText(result)),
   };
 }

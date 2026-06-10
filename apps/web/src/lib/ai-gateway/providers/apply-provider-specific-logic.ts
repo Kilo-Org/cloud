@@ -8,7 +8,11 @@ import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/prov
 import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  isClaudeModel,
+  isFableModel,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
@@ -87,6 +91,18 @@ function applyPreferredProvider(
   }
 }
 
+export function applyOpenRouterModelsFallback(
+  requestedModel: string,
+  requestToMutate: GatewayRequest
+) {
+  if (isFableModel(requestedModel)) {
+    requestToMutate.body.models = [requestToMutate.body.model, CLAUDE_OPUS_CURRENT_MODEL_ID];
+    return;
+  }
+
+  delete requestToMutate.body.models;
+}
+
 export function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
@@ -97,6 +113,7 @@ export function applyProviderSpecificLogic(
   userId: string,
   taskId: string | null
 ) {
+  applyOpenRouterModelsFallback(requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

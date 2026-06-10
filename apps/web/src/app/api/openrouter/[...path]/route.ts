@@ -189,7 +189,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return malformedJsonResponse(e);
   }
 
-  delete requestBodyParsed.body.models; // OpenRouter specific field we do not support
   if (
     typeof requestBodyParsed.body.model !== 'string' ||
     requestBodyParsed.body.model.trim().length === 0

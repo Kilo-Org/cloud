@@ -261,15 +261,17 @@ describe('model validation', () => {
   });
 
   it('fails closed when an override validation endpoint returns a malformed response', async () => {
+    vi.useFakeTimers();
     fetchMock.mockResolvedValue(Response.json({ unexpected: true }));
 
-    await expect(
-      assertKiloModelAvailable({
-        env: { KILO_OPENROUTER_BASE: 'http://localhost:8811/api' } as Env,
-        submittedModel: 'available/model',
-        procedure: 'start',
-      })
-    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    const validation = assertKiloModelAvailable({
+      env: { KILO_OPENROUTER_BASE: 'http://localhost:8811/api' } as Env,
+      submittedModel: 'available/model',
+      procedure: 'start',
+    }).catch((error: unknown) => error);
+    await vi.runAllTimersAsync();
+
+    await expect(validation).resolves.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
   });
 
   it('calls the organization-scoped override validation endpoint', async () => {

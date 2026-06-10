@@ -39,6 +39,16 @@ const analysisScopes = [
   'analysis',
   'stats',
   'dashboardStats',
+  'autoDismissEligible',
+] as const satisfies readonly SecurityAgentInvalidationScope[];
+
+export const deletedSecurityAgentFindingsScopes = [
+  'findings',
+  'findingDetails',
+  'stats',
+  'dashboardStats',
+  'orphanedRepositories',
+  'autoDismissEligible',
 ] as const satisfies readonly SecurityAgentInvalidationScope[];
 
 export function getSecurityAgentInvalidationScopesForCommand(

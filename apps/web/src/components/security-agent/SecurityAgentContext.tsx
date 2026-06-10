@@ -20,6 +20,7 @@ import {
   securityAgentCommandAdmissionCopy,
 } from './security-agent-command-copy';
 import {
+  deletedSecurityAgentFindingsScopes,
   getSecurityAgentInvalidationScopesForCommand,
   type SecurityAgentInvalidationScope,
 } from './security-agent-command-invalidation';
@@ -749,13 +750,7 @@ function useSecurityAgentProviderValue(
         toast.success('Findings deleted', {
           description: `${data.deletedCount} findings were permanently deleted`,
         });
-        invalidateSecurityAgentQueryScopes([
-          'findings',
-          'stats',
-          'dashboardStats',
-          'orphanedRepositories',
-          'autoDismissEligible',
-        ]);
+        invalidateSecurityAgentQueryScopes(deletedSecurityAgentFindingsScopes);
       },
       onError: error => {
         toast.error('Failed to delete findings', { description: error.message });
@@ -888,13 +883,7 @@ function useSecurityAgentProviderValue(
           toast.success('Findings deleted', {
             description: `${data.deletedCount} findings were permanently deleted`,
           });
-          invalidateSecurityAgentQueryScopes([
-            'findings',
-            'stats',
-            'dashboardStats',
-            'orphanedRepositories',
-            'autoDismissEligible',
-          ]);
+          invalidateSecurityAgentQueryScopes(deletedSecurityAgentFindingsScopes);
         },
         onError: error => {
           toast.error('Failed to delete findings', { description: error.message });

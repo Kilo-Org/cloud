@@ -1,5 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
-import { getSecurityAgentInvalidationScopesForCommand } from './security-agent-command-invalidation';
+import {
+  deletedSecurityAgentFindingsScopes,
+  getSecurityAgentInvalidationScopesForCommand,
+} from './security-agent-command-invalidation';
 
 describe('getSecurityAgentInvalidationScopesForCommand', () => {
   it('refreshes permission and freshness data after sync terminals', () => {
@@ -17,11 +20,17 @@ describe('getSecurityAgentInvalidationScopesForCommand', () => {
     expect(scopes).not.toContain('permissionStatus');
   });
 
-  it('keeps analysis terminals scoped to finding analysis views', () => {
+  it('keeps analysis terminals scoped to finding analysis and eligibility views', () => {
     const scopes = getSecurityAgentInvalidationScopesForCommand('start_analysis');
 
-    expect(scopes).toEqual(expect.arrayContaining(['findings', 'analysis']));
+    expect(scopes).toEqual(expect.arrayContaining(['findings', 'analysis', 'autoDismissEligible']));
     expect(scopes).not.toContain('repositories');
     expect(scopes).not.toContain('permissionStatus');
+  });
+
+  it('refreshes cached finding details after bulk delete', () => {
+    expect(deletedSecurityAgentFindingsScopes).toEqual(
+      expect.arrayContaining(['findings', 'findingDetails', 'orphanedRepositories'])
+    );
   });
 });

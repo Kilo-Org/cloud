@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { OpenRouter } from '@openrouter/sdk';
 import type { ChatResult } from '@openrouter/sdk/models';
 import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
-import { classifyWithOpenRouter } from './model-classifier';
+import { classifyWithOpenRouter, type ClassifierRunError } from './model-classifier';
 import type { NormalizedClassifierInput } from './classifier-input';
 
 const normalizedInput = {
@@ -95,6 +95,49 @@ describe('OpenRouter classifier call', () => {
 
     await expect(
       classifyWithOpenRouter(client, normalizedInput, DEFAULT_CLASSIFIER_MODEL)
-    ).rejects.toThrow('Classifier model returned no text');
+    ).rejects.toMatchObject({
+      message: 'Classifier model returned no text',
+      cost: null,
+      classifierModel: DEFAULT_CLASSIFIER_MODEL,
+    } satisfies Partial<ClassifierRunError>);
+  });
+
+  it('preserves classifier cost and model when output validation fails', async () => {
+    const client = {
+      chat: {
+        send: vi.fn(
+          async (): Promise<ChatResult> => ({
+            id: 'gen-test',
+            created: 1781010000,
+            model: DEFAULT_CLASSIFIER_MODEL,
+            object: 'chat.completion',
+            systemFingerprint: null,
+            choices: [
+              {
+                finishReason: 'stop',
+                index: 0,
+                message: { role: 'assistant', content: '{"taskType":"invalid"}' },
+              },
+            ],
+            usage: {
+              promptTokens: 100,
+              promptTokensDetails: { cachedTokens: 0 },
+              completionTokens: 20,
+              completionTokensDetails: { reasoningTokens: 0 },
+              totalTokens: 120,
+              cost: 0.00000123,
+            },
+          })
+        ),
+      },
+    } as unknown as OpenRouter;
+
+    await expect(
+      classifyWithOpenRouter(client, normalizedInput, DEFAULT_CLASSIFIER_MODEL)
+    ).rejects.toMatchObject({
+      message: 'Classifier model returned invalid classification',
+      cost: 0.00000123,
+      classifierModel: DEFAULT_CLASSIFIER_MODEL,
+    } satisfies Partial<ClassifierRunError>);
   });
 });

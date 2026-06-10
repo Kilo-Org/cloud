@@ -103,6 +103,13 @@ function formatPercent(value: number) {
 }
 
 function formatCredits(value: number) {
+  if (value > 0 && value < 0.0001) {
+    return new Intl.NumberFormat('en-US', {
+      maximumSignificantDigits: 3,
+      notation: 'compact',
+    }).format(value);
+  }
+
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: value > 0 && value < 1 ? 4 : 2,
     maximumFractionDigits: value > 0 && value < 1 ? 4 : 2,

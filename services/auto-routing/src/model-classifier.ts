@@ -12,6 +12,23 @@ export type ClassifierRunResult = {
   classification: ClassifierOutput;
 };
 
+export type ClassifierRunFailureMetadata = {
+  cost: number | null;
+  classifierModel: string;
+};
+
+export class ClassifierRunError extends Error {
+  readonly cost: number | null;
+  readonly classifierModel: string;
+
+  constructor(message: string, metadata: ClassifierRunFailureMetadata) {
+    super(message);
+    this.name = 'ClassifierRunError';
+    this.cost = metadata.cost;
+    this.classifierModel = metadata.classifierModel;
+  }
+}
+
 type ClassifierEnv = Pick<Env, 'AUTO_ROUTING_CONFIG' | 'OPENROUTER_API_KEY'>;
 
 export async function classifyNormalizedInput(
@@ -42,10 +59,29 @@ export async function classifyWithOpenRouter(
     },
   });
 
+  const cost = result.usage?.cost ?? null;
+  const text = extractClassifierText(result);
+  if (!text) {
+    throw new ClassifierRunError('Classifier model returned no text', {
+      cost,
+      classifierModel,
+    });
+  }
+
+  let classification: ClassifierOutput;
+  try {
+    classification = parseClassifierOutput(text);
+  } catch {
+    throw new ClassifierRunError('Classifier model returned invalid classification', {
+      cost,
+      classifierModel,
+    });
+  }
+
   return {
-    cost: result.usage?.cost ?? null,
+    cost,
     classifierModel,
-    classification: parseClassifierOutput(extractClassifierText(result)),
+    classification,
   };
 }
 
@@ -54,6 +90,5 @@ function extractClassifierText(result: ChatResult) {
   if (typeof content === 'string' && content.trim().length > 0) {
     return content;
   }
-
-  throw new Error('Classifier model returned no text');
+  return null;
 }

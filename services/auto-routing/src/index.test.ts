@@ -364,7 +364,12 @@ describe('auto routing worker', () => {
   });
 
   it('returns a null classifier result when the classifier request fails', async () => {
-    classifyNormalizedInput.mockRejectedValueOnce(new Error('OpenRouter unavailable'));
+    classifyNormalizedInput.mockRejectedValueOnce(
+      Object.assign(new Error('Classifier model returned invalid classification'), {
+        cost: 0.00000123,
+        classifierModel: 'google/gemma-4-31b-it',
+      })
+    );
 
     const response = await request('/decide', {
       method: 'POST',
@@ -391,9 +396,9 @@ describe('auto routing worker', () => {
       classifierResult: null,
     });
     expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ['unknown'],
+      indexes: ['google/gemma-4-31b-it'],
       blobs: [
-        'unknown',
+        'google/gemma-4-31b-it',
         'anthropic/claude-sonnet-4',
         'chat_completions',
         'classifier_error',
@@ -406,7 +411,7 @@ describe('auto routing worker', () => {
         '',
         '',
       ],
-      doubles: [expect.any(Number), 0, -1, 1, 0, expect.any(Number)],
+      doubles: [expect.any(Number), 0.00000123, -1, 1, 0, expect.any(Number)],
     });
   });
 

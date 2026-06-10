@@ -13,6 +13,25 @@ function emptyDecisionResponse(): AutoRoutingDecisionResponse {
   };
 }
 
+function getClassifierFailureMetadata(error: unknown): {
+  cost?: number | null;
+  classifierModel?: string;
+} {
+  if (!error || typeof error !== 'object') {
+    return {};
+  }
+
+  const maybeMetadata = error as { cost?: unknown; classifierModel?: unknown };
+  return {
+    cost:
+      typeof maybeMetadata.cost === 'number' || maybeMetadata.cost === null
+        ? maybeMetadata.cost
+        : undefined,
+    classifierModel:
+      typeof maybeMetadata.classifierModel === 'string' ? maybeMetadata.classifierModel : undefined,
+  };
+}
+
 export const decideHandler: Handler<HonoEnv> = async c => {
   let rawBody: unknown;
   try {
@@ -64,12 +83,15 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       },
     };
     return c.json(response);
-  } catch {
+  } catch (error) {
     const classifierDurationMs = performance.now() - startedAt;
+    const classifierFailureMetadata = getClassifierFailureMetadata(error);
     writeClassifierMetricsDataPoint(c.env, {
       status: 'classifier_error',
+      classifierModel: classifierFailureMetadata.classifierModel,
       sessionId: parsed.data.sessionId,
       input: classifierInput.data,
+      classifierCostCredits: classifierFailureMetadata.cost,
       classifierDurationMs,
       bodyBytes,
     });

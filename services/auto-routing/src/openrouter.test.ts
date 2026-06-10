@@ -1,20 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   OPENROUTER_APP_TITLE,
   OPENROUTER_HTTP_REFERER,
   createOpenRouterClient,
 } from './openrouter';
 
-type OpenRouterClientOptions = {
-  _options: {
-    apiKey: string;
-    httpReferer: string;
-    appTitle: string;
-  };
-};
+const openRouterConstructorCalls = vi.hoisted(() => [] as unknown[]);
+
+vi.mock('@openrouter/sdk', () => ({
+  OpenRouter: class {
+    chat = { send: vi.fn() };
+
+    constructor(options: unknown) {
+      openRouterConstructorCalls.push(options);
+    }
+  },
+}));
 
 describe('createOpenRouterClient', () => {
   it('creates an OpenRouter SDK client that matches the Next.js OpenRouter attribution', async () => {
+    openRouterConstructorCalls.length = 0;
+
     const client = await createOpenRouterClient({
       OPENROUTER_API_KEY: {
         get: async () => 'sk-or-test',
@@ -22,10 +28,12 @@ describe('createOpenRouterClient', () => {
     } satisfies Pick<Env, 'OPENROUTER_API_KEY'>);
 
     expect(client).toHaveProperty('chat');
-
-    const options = (client as OpenRouterClientOptions)._options;
-    expect(options.apiKey).toBe('sk-or-test');
-    expect(options.httpReferer).toBe(OPENROUTER_HTTP_REFERER);
-    expect(options.appTitle).toBe(OPENROUTER_APP_TITLE);
+    expect(openRouterConstructorCalls).toEqual([
+      {
+        apiKey: 'sk-or-test',
+        httpReferer: OPENROUTER_HTTP_REFERER,
+        appTitle: OPENROUTER_APP_TITLE,
+      },
+    ]);
   });
 });

@@ -61,9 +61,7 @@ describe('custom model pricing', () => {
           cacheWriteTokens: 30_000,
         })
       )
-    ).toBe(
-      Math.round(50_000 * 1.25 + 10_000 * 3.75 + 20_000 * 0.125 + 30_000 * 1.5625)
-    );
+    ).toBe(Math.round(50_000 * 1.25 + 10_000 * 3.75 + 20_000 * 0.125 + 30_000 * 1.5625));
   });
 
   test('calculates both Qwen3.7 Plus context tiers from token usage', () => {

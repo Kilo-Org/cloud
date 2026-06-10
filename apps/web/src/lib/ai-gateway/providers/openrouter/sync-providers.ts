@@ -155,46 +155,11 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   return data.data.models;
 }
 
-async function syncProviders(
-  providers: OpenRouterProvider[],
-  vercelModels: Record<string, StoredModel>
+function injectExtraByokModels(
+  openRouterModels: Map<string, OpenRouterModel>,
+  vercelModels: Record<string, StoredModel>,
+  providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>
 ) {
-  if (providers.length === 0) {
-    throw new Error('No providers found in OpenRouter response');
-  }
-
-  // Limit concurrent requests to 3
-  const limit = pLimit(3);
-  let processedCount = 0;
-
-  console.log('Fetching models for all providers...');
-
-  // Fetch models for each provider and collect relationships
-  const providerModelData = await Promise.all(
-    providers.map(provider =>
-      limit(async () => {
-        const models = await fetchModelsForProvider(provider);
-
-        processedCount++;
-        if (processedCount % 10 === 0) {
-          console.log(`Processed ${processedCount}/${providers.length} providers...`);
-        }
-
-        return {
-          provider,
-          models,
-        };
-      })
-    )
-  );
-
-  const openRouterModels = new Map<string, OpenRouterModel>();
-  for (const { models } of providerModelData) {
-    for (const model of models) {
-      openRouterModels.set(normalizeModelId(model.slug), model);
-    }
-  }
-
   for (const model of openRouterModels.values()) {
     const vercelModel = vercelModels[mapModelIdToVercel(model.slug, false)];
     if (!vercelModel) continue;
@@ -239,6 +204,49 @@ async function syncProviders(
       }
     }
   }
+}
+
+async function syncProviders(
+  providers: OpenRouterProvider[],
+  vercelModels: Record<string, StoredModel>
+) {
+  if (providers.length === 0) {
+    throw new Error('No providers found in OpenRouter response');
+  }
+
+  // Limit concurrent requests to 3
+  const limit = pLimit(3);
+  let processedCount = 0;
+
+  console.log('Fetching models for all providers...');
+
+  // Fetch models for each provider and collect relationships
+  const providerModelData = await Promise.all(
+    providers.map(provider =>
+      limit(async () => {
+        const models = await fetchModelsForProvider(provider);
+
+        processedCount++;
+        if (processedCount % 10 === 0) {
+          console.log(`Processed ${processedCount}/${providers.length} providers...`);
+        }
+
+        return {
+          provider,
+          models,
+        };
+      })
+    )
+  );
+
+  const openRouterModels = new Map<string, OpenRouterModel>();
+  for (const { models } of providerModelData) {
+    for (const model of models) {
+      openRouterModels.set(normalizeModelId(model.slug), model);
+    }
+  }
+
+  injectExtraByokModels(openRouterModels, vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm => {

@@ -1,3 +1,4 @@
+import { ExecutionError } from '../execution/errors.js';
 import { ExecutionOrchestrator } from '../execution/orchestrator.js';
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import type {
@@ -219,6 +220,11 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         });
         await putWrapperLease(storage, cleanupLease);
         await dependencies.requestAlarmAtOrBefore?.(now);
+        if (observation.status === 'inspection-failed') {
+          throw ExecutionError.sandboxConnectFailed(
+            'Sandbox connection failed during wrapper discovery'
+          );
+        }
         throw cleanupBlockedError(cleanupLease);
       }
     }
@@ -243,6 +249,11 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       });
       await putWrapperLease(storage, cleanupLease);
       await dependencies.requestAlarmAtOrBefore?.(now);
+      if (observation.status === 'inspection-failed') {
+        throw ExecutionError.sandboxConnectFailed(
+          'Sandbox connection failed during wrapper discovery'
+        );
+      }
       throw cleanupBlockedError(cleanupLease);
     }
 

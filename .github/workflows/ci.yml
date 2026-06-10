@@ -295,6 +295,8 @@ jobs:
           VERCEL_ENV: production
           NEXTAUTH_URL: https://ci-build.invalid
           POSTGRES_URL: postgres://unused:unused@localhost:5432/unused
+          UPSTASH_REDIS_REST_URL: https://redis.test.invalid
+          UPSTASH_REDIS_REST_TOKEN: dummy-test-redis-token
           SENTRY_AUTH_TOKEN: ''
           NODE_OPTIONS: '--max-old-space-size=8192'
         run: pnpm run build

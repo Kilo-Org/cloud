@@ -19,6 +19,16 @@ describe('auto routing contracts', () => {
       })
     ).toMatchObject({ sessionId: 'session-123' });
 
+    expect(() =>
+      MirrorPayloadSchema.parse({
+        path: '/chat/completions',
+        receivedAt: 'not-a-timestamp',
+        sessionId: 'session-123',
+        headers: { 'content-type': 'application/json' },
+        body: '{"model":"auto","messages":[]}',
+      })
+    ).toThrow();
+
     expect(
       AutoRoutingDecisionResponseSchema.parse({
         cost: 0,

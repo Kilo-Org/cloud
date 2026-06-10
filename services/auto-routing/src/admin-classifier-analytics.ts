@@ -4,6 +4,7 @@ import {
   type AutoRoutingClassifierAnalyticsResponse,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
+import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
 
 const PERIODS = {
@@ -15,41 +16,44 @@ const PERIODS = {
 
 type AnalyticsPeriod = AutoRoutingAnalyticsPeriod;
 
-type AnalyticsEngineResponse<T> = {
-  data: T[];
-};
+const analyticsNumberSchema = z.union([z.number(), z.string()]);
+const optionalAnalyticsNumberSchema = analyticsNumberSchema.optional();
 
-type SummaryRow = {
-  total_requests?: number;
-  classified_requests?: number;
-  classifier_errors?: number;
-  invalid_requests?: number;
-  total_cost_credits?: number;
-  avg_duration_ms?: number;
-  p95_duration_ms?: number;
-  avg_confidence?: number;
-  with_session_id?: number;
-  unique_sessions?: number;
-  requires_tools?: number;
-  mirrored_has_tools?: number;
-  avg_body_bytes?: number;
-};
+const SummaryRowSchema = z.looseObject({
+  total_requests: optionalAnalyticsNumberSchema,
+  classified_requests: optionalAnalyticsNumberSchema,
+  classifier_errors: optionalAnalyticsNumberSchema,
+  invalid_requests: optionalAnalyticsNumberSchema,
+  total_cost_credits: optionalAnalyticsNumberSchema,
+  avg_duration_ms: optionalAnalyticsNumberSchema,
+  p95_duration_ms: optionalAnalyticsNumberSchema,
+  avg_confidence: optionalAnalyticsNumberSchema,
+  with_session_id: optionalAnalyticsNumberSchema,
+  unique_sessions: optionalAnalyticsNumberSchema,
+  requires_tools: optionalAnalyticsNumberSchema,
+  mirrored_has_tools: optionalAnalyticsNumberSchema,
+  avg_body_bytes: optionalAnalyticsNumberSchema,
+});
+type SummaryRow = z.infer<typeof SummaryRowSchema>;
 
-type StatusBreakdownRow = {
-  status: string;
-  requests: number;
-};
+const StatusBreakdownRowSchema = z.looseObject({
+  status: z.string(),
+  requests: analyticsNumberSchema,
+});
+type StatusBreakdownRow = z.infer<typeof StatusBreakdownRowSchema>;
 
-type TaskTypeBreakdownRow = {
-  task_type: string;
-  requests: number;
-  avg_confidence?: number;
-};
+const TaskTypeBreakdownRowSchema = z.looseObject({
+  task_type: z.string(),
+  requests: analyticsNumberSchema,
+  avg_confidence: optionalAnalyticsNumberSchema,
+});
+type TaskTypeBreakdownRow = z.infer<typeof TaskTypeBreakdownRowSchema>;
 
-type ClassifierModelBreakdownRow = {
-  classifier_model: string;
-  requests: number;
-};
+const ClassifierModelBreakdownRowSchema = z.looseObject({
+  classifier_model: z.string(),
+  requests: analyticsNumberSchema,
+});
+type ClassifierModelBreakdownRow = z.infer<typeof ClassifierModelBreakdownRowSchema>;
 
 function emptyAnalyticsResponse(period: AnalyticsPeriod): AutoRoutingClassifierAnalyticsResponse {
   return {
@@ -87,7 +91,12 @@ function buildSinceClause(period: AnalyticsPeriod): string {
   return `timestamp > NOW() - ${PERIODS[period].interval}`;
 }
 
-async function queryAnalyticsEngine<T>(env: Env, apiToken: string, sql: string): Promise<T[]> {
+async function queryAnalyticsEngine<RowSchema extends z.ZodType>(
+  env: Env,
+  apiToken: string,
+  sql: string,
+  rowSchema: RowSchema
+): Promise<Array<z.infer<RowSchema>>> {
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${env.O11Y_CF_ACCOUNT_ID}/analytics_engine/sql`,
     {
@@ -102,7 +111,7 @@ async function queryAnalyticsEngine<T>(env: Env, apiToken: string, sql: string):
     throw new Error(`Analytics Engine query failed (${response.status}): ${errorText}`);
   }
 
-  const result = (await response.json()) as AnalyticsEngineResponse<T>;
+  const result = z.object({ data: z.array(rowSchema) }).parse(await response.json());
   return result.data;
 }
 
@@ -198,17 +207,24 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
   try {
     const apiToken = await c.env.O11Y_CF_AE_API_TOKEN.get();
     [summaryRows, statusRows, taskRows, modelRows] = await Promise.all([
-      queryAnalyticsEngine<SummaryRow>(c.env, apiToken, buildSummaryQuery(period)),
-      queryAnalyticsEngine<StatusBreakdownRow>(c.env, apiToken, buildStatusBreakdownQuery(period)),
-      queryAnalyticsEngine<TaskTypeBreakdownRow>(
+      queryAnalyticsEngine(c.env, apiToken, buildSummaryQuery(period), SummaryRowSchema),
+      queryAnalyticsEngine(
         c.env,
         apiToken,
-        buildTaskTypeBreakdownQuery(period)
+        buildStatusBreakdownQuery(period),
+        StatusBreakdownRowSchema
       ),
-      queryAnalyticsEngine<ClassifierModelBreakdownRow>(
+      queryAnalyticsEngine(
         c.env,
         apiToken,
-        buildClassifierModelBreakdownQuery(period)
+        buildTaskTypeBreakdownQuery(period),
+        TaskTypeBreakdownRowSchema
+      ),
+      queryAnalyticsEngine(
+        c.env,
+        apiToken,
+        buildClassifierModelBreakdownQuery(period),
+        ClassifierModelBreakdownRowSchema
       ),
     ]);
   } catch (error) {

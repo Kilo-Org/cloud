@@ -320,12 +320,27 @@ export function AutoRoutingAdminContent() {
     },
   });
 
+  const isRefreshing =
+    classifierModelQuery.isFetching ||
+    analyticsQuery.isFetching ||
+    openRouterModelsQuery.isFetching;
+  const classifierModelError =
+    classifierModelQuery.error instanceof Error ? classifierModelQuery.error.message : undefined;
+  const openRouterModelsError =
+    openRouterModelsQuery.error instanceof Error ? openRouterModelsQuery.error.message : undefined;
   const currentModel = classifierModelQuery.data?.model ?? '';
-  const hasModelChange = selectedModel.trim().length > 0 && selectedModel !== currentModel;
+  const hasClassifierModelLoaded = classifierModelQuery.isSuccess && currentModel.length > 0;
+  const hasModelChange =
+    hasClassifierModelLoaded && selectedModel.trim().length > 0 && selectedModel !== currentModel;
   const summary = analyticsQuery.data?.summary;
   const totalRequests = summary?.totalRequests ?? 0;
   const classifiedRate = totalRequests > 0 ? (summary?.classifiedRequests ?? 0) / totalRequests : 0;
   const sessionRate = totalRequests > 0 ? (summary?.withSessionId ?? 0) / totalRequests : 0;
+  const analyticsErrorMessage =
+    analyticsQuery.error instanceof Error
+      ? analyticsQuery.error.message
+      : 'Failed to load classifier analytics';
+  const hasInitialAnalyticsError = analyticsQuery.isError && !analyticsQuery.data;
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -342,16 +357,12 @@ export function AutoRoutingAdminContent() {
           onClick={() => {
             void classifierModelQuery.refetch();
             void analyticsQuery.refetch();
+            void openRouterModelsQuery.refetch();
           }}
-          disabled={classifierModelQuery.isFetching || analyticsQuery.isFetching}
+          disabled={isRefreshing}
           className="w-fit"
         >
-          <RefreshCw
-            className={cn(
-              'size-4',
-              (classifierModelQuery.isFetching || analyticsQuery.isFetching) && 'animate-spin'
-            )}
-          />
+          <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
           Refresh
         </Button>
       </div>
@@ -367,7 +378,7 @@ export function AutoRoutingAdminContent() {
             value={selectedModel}
             onValueChange={setSelectedModel}
             isLoading={openRouterModelsQuery.isLoading || classifierModelQuery.isLoading}
-            error={openRouterModelsQuery.error?.message ?? undefined}
+            error={classifierModelError ?? openRouterModelsError}
             placeholder={classifierModelQuery.data?.defaultModel ?? 'Select classifier model'}
             className="w-full"
           />
@@ -390,13 +401,18 @@ export function AutoRoutingAdminContent() {
             OpenRouter credits are reported as credits.
           </p>
         </div>
-        <div className="flex w-fit rounded-md border p-1">
+        <div
+          className="flex w-fit rounded-md border p-1"
+          role="group"
+          aria-label="Analytics period"
+        >
           {periods.map(option => (
             <Button
               key={option.value}
               type="button"
               size="sm"
               variant={period === option.value ? 'secondary' : 'ghost'}
+              aria-pressed={period === option.value}
               onClick={() => setPeriod(option.value)}
               className="h-8 px-3"
             >
@@ -408,68 +424,76 @@ export function AutoRoutingAdminContent() {
 
       {analyticsQuery.error ? (
         <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-          {analyticsQuery.error instanceof Error
-            ? analyticsQuery.error.message
-            : 'Failed to load classifier analytics'}
+          {analyticsErrorMessage}
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          title="Requests"
-          value={formatNumber(totalRequests)}
-          detail={`${formatPercent(classifiedRate)} classified`}
-          icon={Route}
-          loading={analyticsQuery.isLoading}
-        />
-        <MetricCard
-          title="Classifier Latency"
-          value={`${formatDecimal(summary?.avgDurationMs ?? 0)} ms`}
-          detail={`p95 ${formatDecimal(summary?.p95DurationMs ?? 0)} ms`}
-          icon={Clock3}
-          loading={analyticsQuery.isLoading}
-        />
-        <MetricCard
-          title="Classifier Cost"
-          value={formatCredits(summary?.totalCostCredits ?? 0)}
-          detail="OpenRouter credits"
-          icon={DollarSign}
-          loading={analyticsQuery.isLoading}
-        />
-        <MetricCard
-          title="Session Coverage"
-          value={formatPercent(sessionRate)}
-          detail={`${formatNumber(summary?.uniqueSessions ?? 0)} unique sessions`}
-          icon={BarChart3}
-          loading={analyticsQuery.isLoading}
-        />
-      </div>
+      {hasInitialAnalyticsError ? (
+        <Card className="rounded-lg">
+          <CardContent className="text-muted-foreground p-4 text-sm">
+            Classifier analytics could not be loaded. Refresh the page to try again.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              title="Requests"
+              value={formatNumber(totalRequests)}
+              detail={`${formatPercent(classifiedRate)} classified`}
+              icon={Route}
+              loading={analyticsQuery.isLoading}
+            />
+            <MetricCard
+              title="Classifier Latency"
+              value={`${formatDecimal(summary?.avgDurationMs ?? 0)} ms`}
+              detail={`p95 ${formatDecimal(summary?.p95DurationMs ?? 0)} ms`}
+              icon={Clock3}
+              loading={analyticsQuery.isLoading}
+            />
+            <MetricCard
+              title="Classifier Cost"
+              value={formatCredits(summary?.totalCostCredits ?? 0)}
+              detail="OpenRouter credits"
+              icon={DollarSign}
+              loading={analyticsQuery.isLoading}
+            />
+            <MetricCard
+              title="Session Coverage"
+              value={formatPercent(sessionRate)}
+              detail={`${formatNumber(summary?.uniqueSessions ?? 0)} unique sessions`}
+              icon={BarChart3}
+              loading={analyticsQuery.isLoading}
+            />
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          title="Classifier Errors"
-          value={formatNumber(summary?.classifierErrors ?? 0)}
-          detail={`${formatNumber(summary?.invalidRequests ?? 0)} invalid inputs`}
-          icon={BarChart3}
-          loading={analyticsQuery.isLoading}
-        />
-        <MetricCard
-          title="Requires Tools"
-          value={formatNumber(summary?.requiresTools ?? 0)}
-          detail={`${formatNumber(summary?.mirroredHasTools ?? 0)} mirrored with tools`}
-          icon={Route}
-          loading={analyticsQuery.isLoading}
-        />
-        <MetricCard
-          title="Body Size"
-          value={`${formatDecimal(summary?.avgBodyBytes ?? 0)} B`}
-          detail={`${formatPercent(summary?.avgConfidence ?? 0)} avg confidence`}
-          icon={BarChart3}
-          loading={analyticsQuery.isLoading}
-        />
-      </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <MetricCard
+              title="Classifier Errors"
+              value={formatNumber(summary?.classifierErrors ?? 0)}
+              detail={`${formatNumber(summary?.invalidRequests ?? 0)} invalid inputs`}
+              icon={BarChart3}
+              loading={analyticsQuery.isLoading}
+            />
+            <MetricCard
+              title="Requires Tools"
+              value={formatNumber(summary?.requiresTools ?? 0)}
+              detail={`${formatNumber(summary?.mirroredHasTools ?? 0)} mirrored with tools`}
+              icon={Route}
+              loading={analyticsQuery.isLoading}
+            />
+            <MetricCard
+              title="Body Size"
+              value={`${formatDecimal(summary?.avgBodyBytes ?? 0)} B`}
+              detail={`${formatPercent(summary?.avgConfidence ?? 0)} avg confidence`}
+              icon={BarChart3}
+              loading={analyticsQuery.isLoading}
+            />
+          </div>
 
-      <BreakdownTables analytics={analyticsQuery.data} loading={analyticsQuery.isLoading} />
+          <BreakdownTables analytics={analyticsQuery.data} loading={analyticsQuery.isLoading} />
+        </>
+      )}
     </div>
   );
 }

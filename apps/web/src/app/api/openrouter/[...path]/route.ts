@@ -168,7 +168,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
   const authPromise = getUserFromAuth({ adminOnly: false });
-  scheduleAutoRoutingMirror({ request, path, bodyText: requestBodyText, authContext: authPromise });
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: GatewayRequest;
   try {
@@ -708,6 +707,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (rulesEngineDecision.delayMs > 0) {
     await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
   }
+
+  scheduleAutoRoutingMirror({
+    request,
+    path,
+    bodyText: requestBodyText,
+    authContext: Promise.resolve({ organizationId }),
+  });
 
   const response = await upstreamRequest({
     path,

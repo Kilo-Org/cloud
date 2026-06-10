@@ -653,4 +653,14 @@ describe('auto routing worker', () => {
     });
     expect(mockedFetch).not.toHaveBeenCalled();
   });
+
+  it('rejects malformed Analytics Engine responses', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify({ data: {} }), { status: 200 }));
+
+    const response = await request('/admin/classifier-analytics?period=24h', {
+      headers: { authorization: 'Bearer classifier-token' },
+    });
+
+    expect(response.status).toBe(500);
+  });
 });

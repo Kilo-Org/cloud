@@ -5,7 +5,7 @@ export type MirrorPath = z.infer<typeof MirrorPathSchema>;
 
 export const MirrorPayloadSchema = z.object({
   path: MirrorPathSchema,
-  receivedAt: z.string().min(1),
+  receivedAt: z.string().datetime(),
   sessionId: z.string().trim().min(1).nullable(),
   headers: z.record(z.string(), z.string()),
   body: z.string(),

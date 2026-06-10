@@ -161,12 +161,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         const description = isFreeNemotronModel(model.id)
           ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
           : model.description;
+        const isFree = await isFreeModel(model.id);
         return {
           ...model,
           name: formatName(model, preferredIndex),
           description,
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
-          isFree: await isFreeModel(model.id),
+          isFree: model.isFree ?? isFree,
+          mayTrainOnYourPrompts: model.mayTrainOnYourPrompts ?? isFree,
           opencode: model.opencode ?? getOpenCodeSettings(model.id),
           architecture: addPdf
             ? {

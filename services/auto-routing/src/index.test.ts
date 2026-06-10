@@ -66,6 +66,7 @@ describe('auto routing worker', () => {
       body: JSON.stringify({
         path: '/chat/completions',
         receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: 'task-123',
         headers: {
           authorization: 'Bearer user-token',
           'x-kilocode-version': '1.2.3',
@@ -139,6 +140,7 @@ describe('auto routing worker', () => {
         'code_change',
         '1',
         '0.8-1.0',
+        'task-123',
       ],
       doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, expect.any(Number)],
     });
@@ -159,6 +161,7 @@ describe('auto routing worker', () => {
       body: JSON.stringify({
         path: '/chat/completions',
         receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: null,
         headers: {},
         body: JSON.stringify({
           model: 'anthropic/claude-sonnet-4',
@@ -200,6 +203,7 @@ describe('auto routing worker', () => {
       body: JSON.stringify({
         path: '/responses',
         receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: null,
         headers: { 'x-kilocode-version': '1.2.3' },
         body: JSON.stringify({
           model: 'openai/gpt-5-mini',
@@ -244,6 +248,7 @@ describe('auto routing worker', () => {
       body: JSON.stringify({
         path: '/messages',
         receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: null,
         headers: { 'x-kilocode-version': '1.2.3' },
         body: JSON.stringify({
           model: 'anthropic/claude-opus-4',
@@ -286,6 +291,7 @@ describe('auto routing worker', () => {
       body: JSON.stringify({
         path: '/chat/completions',
         receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: null,
         headers: {},
         body: '{"model":',
       }),
@@ -300,7 +306,7 @@ describe('auto routing worker', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['unknown'],
-      blobs: ['unknown', '', '', 'invalid_body', '', '', '', '', '', '', ''],
+      blobs: ['unknown', '', '', 'invalid_body', '', '', '', '', '', '', '', ''],
       doubles: [0, 0, -1, 0, 0, 9],
     });
   });
@@ -315,6 +321,7 @@ describe('auto routing worker', () => {
       body: JSON.stringify({
         path: '/chat/completions',
         receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: null,
         headers: {},
         body: JSON.stringify({ messages: [] }),
       }),
@@ -341,6 +348,7 @@ describe('auto routing worker', () => {
       body: JSON.stringify({
         path: '/chat/completions',
         receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: null,
         headers: {},
         body: JSON.stringify({
           model: 'anthropic/claude-sonnet-4',
@@ -362,6 +370,7 @@ describe('auto routing worker', () => {
         'anthropic/claude-sonnet-4',
         'chat_completions',
         'classifier_error',
+        '',
         '',
         '',
         '',
@@ -404,6 +413,29 @@ describe('auto routing worker', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
+  it('rejects wrapper payloads without an explicit session id field', async () => {
+    const response = await request('/decide', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        path: '/chat/completions',
+        receivedAt: '2026-06-09T10:00:00.000Z',
+        headers: {},
+        body: JSON.stringify({
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content: 'Pick the best model.' }],
+        }),
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid classifier payload' });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
   it('rejects requests without the backend bearer token', async () => {
     const response = await request('/decide', {
       method: 'POST',
@@ -411,6 +443,7 @@ describe('auto routing worker', () => {
       body: JSON.stringify({
         path: '/chat/completions',
         receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: null,
         headers: {},
         body: '{}',
       }),

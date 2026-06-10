@@ -11,6 +11,7 @@ type ClassifierAnalyticsStatus =
 type ClassifierAnalyticsParams = {
   status: ClassifierAnalyticsStatus;
   classifierModel?: string | null;
+  sessionId?: string | null;
   input?: NormalizedClassifierInput;
   classification?: ClassifierOutput;
   classifierDurationMs?: number;
@@ -34,6 +35,7 @@ type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS'>;
  *   blob9   = executionMode
  *   blob10  = "1" if classified request requires tools, "0" if not, "" if unknown
  *   blob11  = confidence bucket
+ *   blob12  = sessionId, or "" when absent/unavailable
  *   double1 = classifierDurationMs
  *   double2 = classifierCostCredits
  *   double3 = confidence, or -1 if unavailable
@@ -64,6 +66,7 @@ export function writeClassifierMetricsDataPoint(
         classification?.executionMode ?? '',
         classification ? (classification.requiresTools ? '1' : '0') : '',
         classification ? confidenceBucket(classification.confidence) : '',
+        params.sessionId ?? '',
       ],
       doubles: [
         params.classifierDurationMs ?? 0,

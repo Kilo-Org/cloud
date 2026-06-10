@@ -14,6 +14,8 @@ function makeRequest() {
       authorization: 'Bearer user-token',
       'content-type': 'application/json',
       'x-kilocode-version': '1.2.3',
+      'x-kilocode-taskid': 'task-123',
+      'x-kilo-session': 'session-fallback',
     },
     body: JSON.stringify({ model: 'auto', messages: [] }),
   });
@@ -57,9 +59,12 @@ describe('scheduleAutoRoutingMirror', () => {
     const payload = JSON.parse(init?.body as string);
     expect(payload).toMatchObject({
       path: '/chat/completions',
+      sessionId: 'task-123',
       headers: {
         authorization: '[REDACTED]',
         'content-type': 'application/json',
+        'x-kilo-session': 'session-fallback',
+        'x-kilocode-taskid': 'task-123',
         'x-kilocode-version': '1.2.3',
       },
       body: '{"model":"auto","messages":[]}',
@@ -69,6 +74,35 @@ describe('scheduleAutoRoutingMirror', () => {
     const headers = init?.headers as Headers;
     expect(headers.get('authorization')).toBe('Bearer classifier-token');
     expect(headers.get('content-type')).toBe('application/json');
+  });
+
+  it('uses the fallback session header when task id is absent', async () => {
+    const request = new Request('http://localhost:3000/api/openrouter/v1/responses', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-kilo-session': 'session-456',
+      },
+      body: JSON.stringify({ model: 'auto', input: 'hi' }),
+    });
+
+    scheduleAutoRoutingMirror(
+      {
+        request,
+        path: '/responses',
+        bodyText: '{"model":"auto","input":"hi"}',
+      },
+      work => scheduledWork.push(work),
+      {
+        workerUrl: 'https://auto-routing.example.com',
+        authToken: 'classifier-token',
+      }
+    );
+    await scheduledWork[0]();
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const payload = JSON.parse(init?.body as string);
+    expect(payload.sessionId).toBe('session-456');
   });
 
   it('swallows worker failures', async () => {

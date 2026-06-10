@@ -18,6 +18,7 @@ const mirrorPathSchema = z.enum(['/chat/completions', '/responses', '/messages']
 export const mirrorPayloadSchema = z.object({
   path: mirrorPathSchema,
   receivedAt: z.string().min(1),
+  sessionId: z.string().trim().min(1).nullable(),
   headers: z.record(z.string(), z.string()),
   body: z.string(),
 });

@@ -21,6 +21,17 @@ function serializeHeaders(headers: Headers): Record<string, string> {
   return Object.fromEntries(headers.entries());
 }
 
+function extractHeaderAndLimitLength(request: Request, name: string) {
+  return request.headers.get(name)?.slice(0, 500)?.trim() || null;
+}
+
+function extractSessionId(request: Request) {
+  return (
+    extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ??
+    extractHeaderAndLimitLength(request, 'x-kilo-session')
+  );
+}
+
 async function sendAutoRoutingMirror({
   request,
   path,
@@ -42,6 +53,7 @@ async function sendAutoRoutingMirror({
     body: JSON.stringify({
       path,
       receivedAt: new Date().toISOString(),
+      sessionId: extractSessionId(request),
       headers: redactSensitiveHeaders(serializeHeaders(request.headers)),
       body: bodyText,
     }),

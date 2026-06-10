@@ -32,6 +32,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   if (!classifierInput.success) {
     writeClassifierMetricsDataPoint(c.env, {
       status: 'invalid_body',
+      sessionId: parsed.data.sessionId,
       bodyBytes,
     });
     return c.json(emptyDecisionResponse());
@@ -44,6 +45,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     writeClassifierMetricsDataPoint(c.env, {
       status: 'classified',
       classifierModel: classifier.classifierModel,
+      sessionId: parsed.data.sessionId,
       input: classifierInput.data,
       classification: classifier.classification,
       classifierCostCredits: classifier.cost,
@@ -51,9 +53,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       bodyBytes,
     });
     // When routing decisions are implemented, include the prior decision for
-    // this session as an input alongside classifier output. Next.js currently
-    // mirrors session identity indirectly through headers like
-    // `x-kilocode-taskid` and `x-kilo-session`.
+    // this session as an input alongside classifier output.
     return c.json({
       cost: classifier.cost ?? 0,
       decision: null,
@@ -66,6 +66,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const classifierDurationMs = performance.now() - startedAt;
     writeClassifierMetricsDataPoint(c.env, {
       status: 'classifier_error',
+      sessionId: parsed.data.sessionId,
       input: classifierInput.data,
       classifierDurationMs,
       bodyBytes,

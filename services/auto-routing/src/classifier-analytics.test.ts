@@ -41,6 +41,7 @@ describe('classifier analytics', () => {
         classifierModel: 'google/gemma-4-31b-it',
         input,
         classification,
+        sessionId: 'task-123',
         classifierDurationMs: 123.45,
         classifierCostCredits: 0.00000123,
         bodyBytes: 456,
@@ -61,6 +62,7 @@ describe('classifier analytics', () => {
         'code_change',
         '1',
         '0.6-0.8',
+        'task-123',
       ],
       doubles: [123.45, 0.00000123, 0.74, 2, 1, 456],
     });

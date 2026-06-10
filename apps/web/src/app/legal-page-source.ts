@@ -10,7 +10,7 @@ function absolutizeKiloLinks(html: string, sourceUrl: string): string {
 
 function removeActiveContent(html: string): string {
   return html
-    .replaceAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replaceAll(/<script\b[^>]*>[\s\S]*?<\/script\s*[^>]*>/gi, '')
     .replaceAll(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '')
     .replaceAll(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
 }

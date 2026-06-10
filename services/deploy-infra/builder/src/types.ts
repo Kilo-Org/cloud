@@ -189,7 +189,17 @@ export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   DeploymentOrchestrator: DurableObjectNamespace<DeploymentOrchestrator>;
   EventsManager: DurableObjectNamespace<EventsManager>;
+
+  NEXTAUTH_SECRET: SecretsStoreSecret;
+  HYPERDRIVE: Hyperdrive;
+  WORKER_ENV: string;
+  DEPLOY_HOSTNAME_BASE: string;
+  DeployDispatcher: Fetcher;
+  HtmlDeployRateLimiter: RateLimit;
 };
+
+/** Hono app environment with Worker bindings. */
+export type HonoEnv = { Bindings: Env };
 
 /**
  * Request body for POST /deploy
@@ -234,4 +244,10 @@ export type CloudflareApiResponse<T = unknown> = {
   success: boolean;
   result?: T;
   errors?: Array<{ code: number; message: string }>;
+};
+
+export type HtmlDeployResponse = {
+  slug: string;
+  url: string;
+  expires_at: string;
 };

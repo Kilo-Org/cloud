@@ -3108,6 +3108,47 @@ export const deployments = pgTable(
 );
 
 export type Deployment = typeof deployments.$inferSelect;
+
+export const deployments_ephemeral = pgTable(
+  'deployments_ephemeral',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    source_type: text().notNull().$type<'html'>(),
+    internal_worker_name: text().notNull(),
+    deployment_slug: text(),
+    status: text().notNull().$type<'pending' | 'active' | 'cleanup_retry'>(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    next_cleanup_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    cleanup_claim_token: uuid(),
+    cleanup_claimed_until: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_deployments_ephemeral_internal_worker_name').on(table.internal_worker_name),
+    unique('UQ_deployments_ephemeral_deployment_slug').on(table.deployment_slug),
+    index('idx_deployments_ephemeral_owned_by_user_id').on(table.owned_by_user_id),
+    index('idx_deployments_ephemeral_next_cleanup_at').on(table.next_cleanup_at),
+    check('deployments_ephemeral_source_type_check', sql`${table.source_type} IN ('html')`),
+    check(
+      'deployments_ephemeral_status_check',
+      sql`${table.status} IN ('pending', 'active', 'cleanup_retry')`
+    ),
+    check(
+      'deployments_ephemeral_claim_fields_check',
+      sql`(${table.cleanup_claim_token} IS NULL) = (${table.cleanup_claimed_until} IS NULL)`
+    ),
+    check(
+      'deployments_ephemeral_active_fields_check',
+      sql`${table.status} <> 'active' OR (${table.deployment_slug} IS NOT NULL AND ${table.expires_at} IS NOT NULL)`
+    ),
+  ]
+);
+
 export const deployment_env_vars = pgTable(
   'deployment_env_vars',
   {

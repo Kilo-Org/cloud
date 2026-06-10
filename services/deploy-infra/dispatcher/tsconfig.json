@@ -2,14 +2,15 @@
   "compilerOptions": {
     "target": "ES2021",
     "module": "ES2022",
+    "moduleResolution": "bundler",
     "lib": ["ES2021"],
-    "types": ["./worker-configuration.d.ts", "jest"],
+    "types": ["./worker-configuration.d.ts", "@cloudflare/vitest-pool-workers/types", "jest"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test/**/*.ts", "vitest.entrypoint.workers.config.mts"],
   "exclude": ["node_modules"]
 }

@@ -9,6 +9,7 @@
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./hostname-label": "./src/hostname-label.ts",
+    "./deployment-slug": "./src/deployment-slug.ts",
     "./redact-headers": "./src/redact-headers.ts",
     "./normalize-git-url": "./src/normalize-git-url.ts",
     "./kiloclaw-billing-observability": "./src/kiloclaw-billing-observability.ts",

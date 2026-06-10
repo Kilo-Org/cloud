@@ -1128,6 +1128,13 @@
       "when": 1780930460041,
       "tag": "0160_solid_wind_dancer",
       "breakpoints": true
+    },
+    {
+      "idx": 161,
+      "version": "7",
+      "when": 1781006208540,
+      "tag": "0161_smiling_wallop",
+      "breakpoints": true
     }
   ]
 }

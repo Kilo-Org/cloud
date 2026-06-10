@@ -95,6 +95,7 @@ import {
   mcp_gateway_provider_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_oauth_clients,
+  deployments_ephemeral,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -139,6 +140,7 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    await db.delete(deployments_ephemeral);
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
@@ -713,6 +715,87 @@ describe('User', () => {
       expect(userFeedbackCount?.value).toBe(0);
       expect(userProposalCount?.value).toBe(0);
       expect(orgProposalCount?.value).toBe(1);
+    });
+
+    it('should scrub ephemeral deployment ownership and schedule immediate cleanup', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'ephemeral-deployment-delete@example.com',
+      });
+      const otherUser = await insertTestUser({
+        google_user_email: 'ephemeral-deployment-delete-other@example.com',
+      });
+      const cleanupClaimToken = randomUUID();
+      const claimedUntil = '2026-06-03T18:00:00.000Z';
+      const originalCleanupAt = '2026-06-04T18:00:00.000Z';
+      const originalUpdatedAt = '2026-06-02T18:00:00.000Z';
+
+      await db.insert(deployments_ephemeral).values([
+        {
+          owned_by_user_id: user.id,
+          source_type: 'html',
+          internal_worker_name: `qdpl-${randomUUID()}`,
+          deployment_slug: 'soft-delete-ephemeral',
+          status: 'active',
+          expires_at: originalCleanupAt,
+          next_cleanup_at: originalCleanupAt,
+          cleanup_claim_token: cleanupClaimToken,
+          cleanup_claimed_until: claimedUntil,
+          updated_at: originalUpdatedAt,
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          source_type: 'html',
+          internal_worker_name: `qdpl-${randomUUID()}`,
+          deployment_slug: 'soft-delete-ephemeral-other',
+          status: 'active',
+          expires_at: originalCleanupAt,
+          next_cleanup_at: originalCleanupAt,
+          cleanup_claim_token: cleanupClaimToken,
+          cleanup_claimed_until: claimedUntil,
+          updated_at: originalUpdatedAt,
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+      const afterSoftDelete = Date.now();
+
+      const rows = await db
+        .select()
+        .from(deployments_ephemeral)
+        .orderBy(deployments_ephemeral.deployment_slug);
+      const otherDeployment = rows.find(row => row.owned_by_user_id === otherUser.id);
+      const scrubbedDeployment = rows.find(row => row.deployment_slug === 'soft-delete-ephemeral');
+
+      expect(scrubbedDeployment).toEqual(
+        expect.objectContaining({
+          owned_by_user_id: null,
+          status: 'cleanup_retry',
+          cleanup_claim_token: null,
+          cleanup_claimed_until: null,
+        })
+      );
+      if (!scrubbedDeployment) throw new Error('Expected scrubbed ephemeral deployment');
+      const nextCleanupAt = new Date(scrubbedDeployment.next_cleanup_at).getTime();
+      expect(nextCleanupAt).toBeGreaterThan(afterSoftDelete - 5_000);
+      expect(nextCleanupAt).toBeLessThanOrEqual(afterSoftDelete);
+      expect(new Date(scrubbedDeployment.updated_at).getTime()).toBe(nextCleanupAt);
+      expect(otherDeployment).toEqual(
+        expect.objectContaining({
+          owned_by_user_id: otherUser.id,
+          status: 'active',
+          cleanup_claim_token: cleanupClaimToken,
+        })
+      );
+      if (!otherDeployment) throw new Error('Expected untouched ephemeral deployment');
+      expect(new Date(otherDeployment.next_cleanup_at).getTime()).toBe(
+        new Date(originalCleanupAt).getTime()
+      );
+      expect(new Date(otherDeployment.cleanup_claimed_until ?? '').getTime()).toBe(
+        new Date(claimedUntil).getTime()
+      );
+      expect(new Date(otherDeployment.updated_at).getTime()).toBe(
+        new Date(originalUpdatedAt).getTime()
+      );
     });
 
     it('should rotate and scrub App Store account-linked Kilo Pass data', async () => {

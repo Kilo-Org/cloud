@@ -40,6 +40,8 @@ In the main backend `.env`, ensure this variable matches the builder's `BACKEND_
 USER_DEPLOYMENTS_API_AUTH_KEY=<same-value-as-BACKEND_AUTH_TOKEN>
 ```
 
+The dispatcher must accept the same `BACKEND_AUTH_TOKEN` and be running so `/deploy-html` can reserve and remove friendly public slugs through the `DeployDispatcher` service binding.
+
 ### 4. Generate Encryption Keys
 
 Generate a dedicated RSA key pair for encrypting environment variables from the repository root:

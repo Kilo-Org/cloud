@@ -256,24 +256,6 @@ app.post('/reviews/:reviewId/retry-fresh', async (c: Context<HonoEnv>) => {
     'retryFreshAfterInfraFailure'
   );
 
-  if (result) {
-    const retryId = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(
-      doNameForAttempt(reviewId, body.retryAttemptId)
-    );
-    c.executionCtx.waitUntil(
-      withDORetry(
-        () => c.env.CODE_REVIEW_ORCHESTRATOR.get(retryId),
-        stub => stub.runReview(),
-        'runReview'
-      ).catch((error: Error) => {
-        console.error('[POST /reviews/:reviewId/retry-fresh] runReview failed:', {
-          reviewId,
-          error: error.message,
-        });
-      })
-    );
-  }
-
   return c.json({ success: result, reviewId });
 });
 

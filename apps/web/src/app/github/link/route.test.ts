@@ -8,18 +8,11 @@ import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { failureResult } from '@/lib/maybe-result';
 
-const mockIsEnabledForBot = jest.fn();
-
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot/github-link-token');
 jest.mock('@/lib/integrations/platforms/github/app-selector');
 jest.mock('@/lib/bot/platform-helpers');
-jest.mock('@/lib/bot/platforms', () => ({
-  botPlatforms: {
-    require: jest.fn(() => ({ isEnabledForBot: mockIsEnabledForBot })),
-  },
-}));
 jest.mock('@/lib/organizations/organizations');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -75,7 +68,6 @@ describe('GET /github/link', () => {
       owned_by_user_id: null,
       platform_installation_id: INSTALLATION_ID,
     } as never);
-    mockIsEnabledForBot.mockReturnValue(true);
     mockedIsOrganizationMember.mockResolvedValue(true);
   });
 
@@ -176,20 +168,6 @@ describe('GET /github/link', () => {
 
     expect(response.status).toBe(403);
     expect(mockedCreateGitHubBotLinkState).not.toHaveBeenCalled();
-  });
-
-  test('rejects integrations without bot_enabled metadata before redirecting to GitHub', async () => {
-    mockIsEnabledForBot.mockReturnValue(false);
-
-    const { GET } = await import('./route');
-    const response = await GET(makeRequest('/github/link?token=signed-token') as never);
-
-    expect(response.status).toBe(404);
-    await expect(response.text()).resolves.toContain(
-      'GitHub linking is not enabled for this integration'
-    );
-    expect(mockedCreateGitHubBotLinkState).not.toHaveBeenCalled();
-    expect(mockedGetGitHubAppCredentials).not.toHaveBeenCalled();
   });
 
   test('rejects users who do not own a user-owned integration', async () => {

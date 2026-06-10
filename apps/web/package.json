@@ -28,12 +28,12 @@
     "promo": "pnpm -s script src/scripts/encrypt-promo-codes.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "3.0.77",
+    "@ai-sdk/anthropic": "3.0.82",
     "@ai-sdk/gateway": "3.0.114",
     "@ai-sdk/mistral": "3.0.36",
     "@ai-sdk/openai": "3.0.63",
     "@ai-sdk/openai-compatible": "2.0.47",
-    "@anthropic-ai/sdk": "0.95.2",
+    "@anthropic-ai/sdk": "0.104.1",
     "@apple/app-store-server-library": "3.1.0",
     "@aws-sdk/client-s3": "3.1009.0",
     "@aws-sdk/s3-request-presigner": "3.1009.0",

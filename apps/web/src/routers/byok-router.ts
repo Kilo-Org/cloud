@@ -117,7 +117,9 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     if (isCodestralModel(vercelModel.id)) continue;
     if (vercelModel.type !== 'language') continue;
     for (const endpoint of vercelModel.endpoints) {
-      const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(endpoint.tag);
+      const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(
+        endpoint.provider_name ?? endpoint.tag
+      );
       if (!providerParsed.success) continue;
       const providerId = providerParsed.data;
       if (!result[providerId]) result[providerId] = [];

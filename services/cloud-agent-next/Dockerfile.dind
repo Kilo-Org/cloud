@@ -1,4 +1,4 @@
-ARG SANDBOX_VERSION="0.10.3"
+ARG SANDBOX_VERSION="0.11.0"
 
 FROM docker.io/cloudflare/sandbox:${SANDBOX_VERSION}-musl AS cloudflare-sandbox
 

@@ -25,7 +25,7 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
   }
   const providers =
     vercelModelMetadata[mapModelIdToVercel(modelId, false)]?.endpoints
-      .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.tag).data)
+      .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.provider_name ?? ep.tag).data)
       .filter(providerId => providerId !== undefined) ?? [];
   if (providers.length === 0) {
     console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);

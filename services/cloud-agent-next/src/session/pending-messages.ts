@@ -12,7 +12,8 @@ import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.
 
 export const PENDING_SESSION_MESSAGE_LIMIT = 10;
 export const PENDING_FLUSH_RETRY_BASE_DELAY_MS = 2_000;
-// Pending delivery currently gets one redelivery after its initial failed attempt.
+const SANDBOX_CONNECT_RETRY_DELAYS_MS = [5_000] as const;
+// Other pending delivery failures currently get one redelivery after the initial failed attempt.
 const WARM_FOLLOWUP_RETRY_DELAYS_MS = [PENDING_FLUSH_RETRY_BASE_DELAY_MS] as const;
 const COLD_INIT_RETRY_DELAYS_MS = [PENDING_FLUSH_RETRY_BASE_DELAY_MS] as const;
 
@@ -433,9 +434,32 @@ export async function checkPendingSessionMessageCapacity(
       : `Pending message queue is full (${PENDING_SESSION_MESSAGE_LIMIT})`,
   };
 }
+async function replaceStoredPendingSessionMessage(
+  storage: SessionQueueStorage,
+  previous: PendingSessionMessage,
+  updated: PendingSessionMessage
+): Promise<void> {
+  const entries = (await listPendingMessageEntries(storage)).filter(
+    candidate => candidate.message.messageId === previous.messageId
+  );
+  const matchingEntry = entries.find(candidate => candidate.key === pendingMessageKey(previous));
+  const targetKey = matchingEntry?.key ?? entries[0]?.key ?? pendingMessageKey(previous);
+  await storage.put(targetKey, serializePendingSessionMessage(updated));
+  const duplicateKeys = entries.map(candidate => candidate.key).filter(key => key !== targetKey);
+  if (duplicateKeys.length === 0) return;
+  try {
+    await storage.delete(duplicateKeys);
+  } catch {
+    logger
+      .withFields({ messageId: previous.messageId, duplicateCount: duplicateKeys.length })
+      .warn('Failed to clean duplicate pending-message rows after retry update');
+  }
+}
+
 export function shouldSkipPendingFlush(message: PendingSessionMessage, now: number): boolean {
   return message.nextFlushAttemptAt !== undefined && message.nextFlushAttemptAt > now;
 }
+
 export async function recordPendingFlushFailure(
   storage: SessionQueueStorage,
   message: PendingSessionMessage,
@@ -462,16 +486,25 @@ export async function recordPendingFlushFailure(
       })
       .warn('Pending flush failure with unknown error code; treating as retryable');
   }
-  const attempts = (message.flushAttempts ?? 0) + 1;
-  const retryDelays =
-    options.policy === 'cold-init' ? COLD_INIT_RETRY_DELAYS_MS : WARM_FOLLOWUP_RETRY_DELAYS_MS;
   const flushFailureCode =
     options.code === undefined || options.code === 'INTERNAL'
       ? (message.lastFlushFailureCode ?? options.code ?? 'UNKNOWN')
       : options.code;
-  const retryable = isRetryableFlushCode(options.code);
+  const attempts =
+    flushFailureCode === 'SANDBOX_CONNECT_FAILED' &&
+    message.lastFlushFailureCode !== 'SANDBOX_CONNECT_FAILED'
+      ? 1
+      : (message.flushAttempts ?? 0) + 1;
+  const retryDelays =
+    flushFailureCode === 'SANDBOX_CONNECT_FAILED'
+      ? SANDBOX_CONNECT_RETRY_DELAYS_MS
+      : options.policy === 'cold-init'
+        ? COLD_INIT_RETRY_DELAYS_MS
+        : WARM_FOLLOWUP_RETRY_DELAYS_MS;
+  const retryable = isRetryableFlushCode(flushFailureCode);
   const exhausted = !retryable || attempts > retryDelays.length;
-  const nextFlushAttemptAt = exhausted ? undefined : now + retryDelays[attempts - 1];
+  const retryDelay = retryDelays[attempts - 1];
+  const nextFlushAttemptAt = exhausted || retryDelay === undefined ? undefined : now + retryDelay;
   const updated: PendingSessionMessage = {
     ...message,
     flushAttempts: attempts,
@@ -480,21 +513,13 @@ export async function recordPendingFlushFailure(
     lastFlushFailureCode: flushFailureCode,
     deliveryDisposition: exhausted ? 'terminalization-pending' : undefined,
   };
-  const entries = (await listPendingMessageEntries(storage)).filter(
-    candidate => candidate.message.messageId === message.messageId
-  );
-  const matchingEntry = entries.find(candidate => candidate.key === pendingMessageKey(message));
-  const targetKey = matchingEntry?.key ?? entries[0]?.key ?? pendingMessageKey(message);
-  await storage.put(targetKey, serializePendingSessionMessage(updated));
-  const duplicateKeys = entries.map(candidate => candidate.key).filter(key => key !== targetKey);
-  if (duplicateKeys.length > 0) {
-    try {
-      await storage.delete(duplicateKeys);
-    } catch {
-      logger
-        .withFields({ messageId: message.messageId, duplicateCount: duplicateKeys.length })
-        .warn('Failed to clean duplicate pending-message rows after retry update');
-    }
+  await replaceStoredPendingSessionMessage(storage, message, updated);
+  if (flushFailureCode === 'SANDBOX_CONNECT_FAILED') {
+    logger
+      .withFields({ messageId: message.messageId, attempts, nextFlushAttemptAt })
+      .warn(
+        exhausted ? 'Sandbox connection retry exhausted' : 'Sandbox connection retry scheduled'
+      );
   }
   return { message: updated, attempts, exhausted, nextFlushAttemptAt };
 }

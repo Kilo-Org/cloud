@@ -582,6 +582,76 @@ describe('SessionMessageQueue', () => {
     expect(pending?.lastFlushError).toBeUndefined();
   });
 
+  it('fails the second sandbox attempt when wrapper cleanup remains blocked', async () => {
+    const now = 200_000;
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'fail blocked sandbox retry',
+        createdAt: 100_000,
+        flushAttempts: 1,
+        nextFlushAttemptAt: now,
+        lastFlushError: 'Sandbox connection failed during wrapper discovery',
+        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
+      })
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    let drain;
+    try {
+      drain = await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    expect(harness.deliver).not.toHaveBeenCalled();
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'sandbox_connect_failed',
+    });
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
+  });
+
+  it('keeps the fixed five-second sandbox retry deadline ahead of cleanup backoff', async () => {
+    const now = 200_000;
+    const retryAt = now + 5_000;
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'wake for fixed sandbox retry',
+        createdAt: 100_000,
+        flushAttempts: 1,
+        nextFlushAttemptAt: retryAt,
+        lastFlushError: 'Sandbox connection failed during wrapper discovery',
+        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
+      })
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    let drain;
+    try {
+      drain = await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(drain).toEqual({ retryAt, remainingPendingCount: 1 });
+    expect(harness.deliver).not.toHaveBeenCalled();
+  });
+
   it('retains a queued message without consuming an attempt while wrapper cleanup blocks delivery', async () => {
     const retryAt = 50_000;
     const harness = createQueueHarness({
@@ -601,6 +671,45 @@ describe('SessionMessageQueue', () => {
     expect(pending?.messageId).toBe(FIRST_MESSAGE_ID);
     expect(pending?.flushAttempts).toBeUndefined();
     expect(pending?.lastFlushError).toBeUndefined();
+  });
+
+  it('fails the second sandbox attempt when delivery discovers blocked cleanup', async () => {
+    const now = 200_000;
+    const harness = createQueueHarness({
+      deliver: async () => {
+        throw new WrapperCleanupBlockedError(now + 300_000);
+      },
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'fail sandbox retry blocked during delivery',
+        createdAt: 100_000,
+        flushAttempts: 1,
+        nextFlushAttemptAt: now,
+        lastFlushError: 'Sandbox connection failed during wrapper discovery',
+        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
+      })
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    let drain;
+    try {
+      drain = await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'sandbox_connect_failed',
+    });
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
   });
 
   it('admits a durable queued message once and replays the original acknowledgement', async () => {
@@ -1269,11 +1378,13 @@ describe('SessionMessageQueue', () => {
       turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'terminalize after retry' },
     });
     await harness.queue.drainNextPendingMessage();
-    const pending = await listPendingSessionMessages(harness.storage);
-    if (pending[0]?.nextFlushAttemptAt !== undefined) {
-      vi.spyOn(Date, 'now').mockReturnValueOnce(pending[0].nextFlushAttemptAt);
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.nextFlushAttemptAt).toBeDefined();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(pending?.nextFlushAttemptAt ?? 0);
+    try {
       await harness.queue.drainNextPendingMessage();
-      vi.restoreAllMocks();
+    } finally {
+      clock.mockRestore();
     }
 
     expect(harness.terminalizations.at(-1)?.params).toMatchObject({

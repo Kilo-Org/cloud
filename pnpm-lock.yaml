@@ -7,11 +7,11 @@ settings:
 catalogs:
   default:
     '@cloudflare/vitest-pool-workers':
-      specifier: 0.16.4
-      version: 0.16.4
+      specifier: 0.16.13
+      version: 0.16.13
     '@cloudflare/workers-types':
-      specifier: 4.20260511.1
-      version: 4.20260511.1
+      specifier: 4.20260605.1
+      version: 4.20260605.1
     '@octokit/auth-app':
       specifier: 8.2.0
       version: 8.2.0
@@ -79,8 +79,8 @@ catalogs:
       specifier: 1.0.0
       version: 1.0.0
     wrangler:
-      specifier: 4.90.1
-      version: 4.90.1
+      specifier: 4.98.0
+      version: 4.98.0
     zod:
       specifier: 4.4.3
       version: 4.4.3
@@ -488,8 +488,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/anthropic':
-        specifier: 3.0.77
-        version: 3.0.77(zod@4.4.3)
+        specifier: 3.0.82
+        version: 3.0.82(zod@4.4.3)
       '@ai-sdk/gateway':
         specifier: 3.0.114
         version: 3.0.114(zod@4.4.3)
@@ -503,8 +503,8 @@ importers:
         specifier: 2.0.47
         version: 2.0.47(zod@4.4.3)
       '@anthropic-ai/sdk':
-        specifier: 0.95.2
-        version: 0.95.2(zod@4.4.3)
+        specifier: 0.104.1
+        version: 0.104.1(zod@4.4.3)
       '@apple/app-store-server-library':
         specifier: 3.1.0
         version: 3.1.0
@@ -780,7 +780,7 @@ importers:
         version: 14.25.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       emoji-mart:
         specifier: 5.6.0
         version: 5.6.0
@@ -994,7 +994,7 @@ importers:
         version: link:../encryption
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1022,7 +1022,7 @@ importers:
         version: link:../kiloclaw-instance-tiers
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       pg:
         specifier: 8.20.0
         version: 8.20.0
@@ -1229,7 +1229,7 @@ importers:
         version: 8.13.0
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       stripe:
         specifier: 'catalog:'
         version: 19.3.1(@types/node@25.5.2)
@@ -1297,7 +1297,7 @@ importers:
         version: 1.0.20
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -1325,7 +1325,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -1353,7 +1353,7 @@ importers:
         version: 5.9.3
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/app-builder:
     dependencies:
@@ -1368,7 +1368,7 @@ importers:
         version: 8.0.3
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       jsonwebtoken:
         specifier: 'catalog:'
         version: 9.0.3
@@ -1387,7 +1387,7 @@ importers:
         version: 0.7.21(@xterm/xterm@6.0.0)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
@@ -1411,7 +1411,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/auto-fix-infra:
     dependencies:
@@ -1424,7 +1424,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260514.1
@@ -1436,7 +1436,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/auto-triage-infra:
     dependencies:
@@ -1452,7 +1452,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260514.1
@@ -1461,7 +1461,7 @@ importers:
         version: 5.9.3
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/cloud-agent:
     dependencies:
@@ -1485,7 +1485,7 @@ importers:
         version: 11.17.0(typescript@5.9.3)
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       jsonwebtoken:
         specifier: 'catalog:'
         version: 9.0.3
@@ -1498,10 +1498,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
@@ -1525,13 +1525,13 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/cloud-agent-next:
     dependencies:
       '@cloudflare/sandbox':
-        specifier: 0.10.3
-        version: 0.10.3(@xterm/xterm@6.0.0)
+        specifier: 0.11.0
+        version: 0.11.0(@xterm/xterm@6.0.0)
       '@hono/trpc-server':
         specifier: 0.4.2
         version: 0.4.2(@trpc/server@11.17.0(typescript@5.9.3))(hono@4.12.18)
@@ -1558,7 +1558,7 @@ importers:
         version: 11.17.0(typescript@5.9.3)
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -1579,14 +1579,14 @@ importers:
         version: 4.4.3
     devDependencies:
       '@cloudflare/containers':
-        specifier: 0.3.5
-        version: 0.3.5
+        specifier: 0.3.7
+        version: 0.3.7
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@kilocode/sdk':
-        specifier: 7.2.52
-        version: 7.2.52
+        specifier: 7.3.21
+        version: 7.3.21
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
@@ -1616,7 +1616,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       ws:
         specifier: ^8.18.0
         version: 8.20.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -1669,10 +1669,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260514.1
@@ -1684,7 +1684,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/db-proxy:
     dependencies:
@@ -1706,7 +1706,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/jest':
         specifier: 30.0.0
         version: 30.0.0
@@ -1727,7 +1727,7 @@ importers:
         version: 5.9.3
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/deploy-infra/builder:
     dependencies:
@@ -1739,7 +1739,7 @@ importers:
         version: link:../../../packages/worker-utils
       '@sentry/cloudflare':
         specifier: 10.43.0
-        version: 10.43.0(@cloudflare/workers-types@4.20260511.1)
+        version: 10.43.0(@cloudflare/workers-types@4.20260605.1)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -1755,7 +1755,7 @@ importers:
         version: 0.6.11
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@sentry/cli':
         specifier: 3.4.2
         version: 3.4.2
@@ -1785,7 +1785,7 @@ importers:
         version: 5.9.3
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/deploy-infra/dispatcher:
     dependencies:
@@ -1822,7 +1822,7 @@ importers:
         version: 5.9.3
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/event-service:
     dependencies:
@@ -1837,7 +1837,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -1850,7 +1850,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -1865,7 +1865,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/gastown:
     dependencies:
@@ -1883,13 +1883,13 @@ importers:
         version: link:../../packages/worker-utils
       '@sentry/cloudflare':
         specifier: 9.47.1
-        version: 9.47.1(@cloudflare/workers-types@4.20260511.1)
+        version: 9.47.1(@cloudflare/workers-types@4.20260605.1)
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.17.0(typescript@5.9.3)
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -1914,10 +1914,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@sentry/cli':
         specifier: 3.4.2
         version: 3.4.2
@@ -1938,7 +1938,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/gastown/container:
     dependencies:
@@ -1984,7 +1984,7 @@ importers:
         version: 22.0.1
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -2000,7 +2000,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/gmail-push:
     dependencies:
@@ -2016,7 +2016,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260514.1
@@ -2028,7 +2028,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/images-mcp:
     dependencies:
@@ -2053,7 +2053,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
@@ -2071,7 +2071,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kilo-chat:
     dependencies:
@@ -2101,7 +2101,7 @@ importers:
         version: 0.5.4
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -2123,7 +2123,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/content-disposition':
         specifier: 0.5.9
         version: 0.5.9
@@ -2144,7 +2144,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kilo-ops:
     dependencies:
@@ -2160,7 +2160,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2169,7 +2169,7 @@ importers:
         version: 5.9.3
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kiloclaw:
     dependencies:
@@ -2199,7 +2199,7 @@ importers:
         version: 0.9.5
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -2230,7 +2230,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kiloclaw-billing:
     dependencies:
@@ -2248,7 +2248,7 @@ importers:
         version: 4.1.0
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       jose:
         specifier: 'catalog:'
         version: 6.2.3
@@ -2273,7 +2273,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kiloclaw-inbound-email:
     dependencies:
@@ -2282,7 +2282,7 @@ importers:
         version: link:../../packages/db
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       node-html-markdown:
         specifier: 2.0.0
         version: 2.0.0
@@ -2301,7 +2301,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kiloclaw/controller:
     dependencies:
@@ -2378,7 +2378,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -2391,7 +2391,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2406,7 +2406,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/model-eval-ingest:
     dependencies:
@@ -2418,7 +2418,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -2437,7 +2437,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/notifications:
     dependencies:
@@ -2455,7 +2455,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       expo-server-sdk:
         specifier: 6.1.0
         version: 6.1.0(patch_hash=7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b)
@@ -2471,7 +2471,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2489,7 +2489,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/o11y:
     dependencies:
@@ -2498,7 +2498,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -2508,7 +2508,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2526,7 +2526,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/security-auto-analysis:
     dependencies:
@@ -2538,7 +2538,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       workers-tagged-logger:
         specifier: 'catalog:'
         version: 1.0.0
@@ -2560,7 +2560,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/security-sync:
     dependencies:
@@ -2572,7 +2572,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -2591,7 +2591,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/session-ingest:
     dependencies:
@@ -2609,7 +2609,7 @@ importers:
         version: 0.0.22
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -2619,10 +2619,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2643,7 +2643,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/wasteland:
     dependencies:
@@ -2658,7 +2658,7 @@ importers:
         version: link:../../packages/worker-utils
       '@sentry/cloudflare':
         specifier: ^9
-        version: 9.47.1(@cloudflare/workers-types@4.20260511.1)
+        version: 9.47.1(@cloudflare/workers-types@4.20260605.1)
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.17.0(typescript@5.9.3)
@@ -2680,10 +2680,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260511.1
+        version: 4.20260605.1
       '@sentry/cli':
         specifier: 3.4.2
         version: 3.4.2
@@ -2701,7 +2701,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/webhook-agent-ingest:
     dependencies:
@@ -2722,7 +2722,7 @@ importers:
         version: 10.0.1
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
+        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0)
       hono:
         specifier: 4.12.18
         version: 4.12.18
@@ -2735,7 +2735,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2756,7 +2756,7 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
 packages:
 
@@ -2768,8 +2768,8 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  '@ai-sdk/anthropic@3.0.77':
-    resolution: {integrity: sha512-ML8C2M1YvPA1ulEx4TiyF0k1xvC2ikEiPBIC1PPQ0a5xELUGrO2lAaEzsTEoJ+eCeDd8PSBuFJjs+r+9yIwQXA==}
+  '@ai-sdk/anthropic@3.0.82':
+    resolution: {integrity: sha512-WKKou2wbhGGYV8PSALAPyV2YY4nfCqCPkyBzYtJtDA9yCcIFwsbtkTNgg7bqtLCVzeEsY7wwxRoCWy+EMfrw/A==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -2822,8 +2822,8 @@ packages:
       '@faker-js/faker': ^7.0.0 || ^8.0.0 || ^9.0.0
       zod: ^3.21.4
 
-  '@anthropic-ai/sdk@0.91.1':
-    resolution: {integrity: sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==}
+  '@anthropic-ai/sdk@0.104.1':
+    resolution: {integrity: sha512-gGACa/+IaiXzRRmF96aOhamoBgapKRBiFWbmmTFP8aMkpaEcuStF+Q61bjo4vPxBM7gqWJNZqsngslRdnLHv0Q==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -2831,8 +2831,8 @@ packages:
       zod:
         optional: true
 
-  '@anthropic-ai/sdk@0.95.2':
-    resolution: {integrity: sha512-Egddwo3sheo1PzUrMkZnH6VkQYwS0h/b/i8vSK8Ta9M45UQipAMeDFH57dYuDAfXMEUUGeKw6CMlremgMZgrSQ==}
+  '@anthropic-ai/sdk@0.91.1':
+    resolution: {integrity: sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -3862,15 +3862,15 @@ packages:
   '@cloudflare/containers@0.3.4':
     resolution: {integrity: sha512-6kWodmgBSug/rr9fjcWrZcKhxmWTEc1BTKC6nVv7yvYaRRvV3rZPZjq9R17eN0l9cl2LNc03wp/Z6OV+0uDwXA==}
 
-  '@cloudflare/containers@0.3.5':
-    resolution: {integrity: sha512-P6jYEDkw1Q9qWRr9iFBxe1fozI5HfGMY6XrNg/jROPGZykcYrrzOluUqXv+q4N8gIoRXPCqJJ1FGALbTqnYTkg==}
+  '@cloudflare/containers@0.3.7':
+    resolution: {integrity: sha512-DM9dm3FnIBSyiSJ1FLavKwl/lk3oAmTaynCzZQ9pZR0ncRPquSxkxd8Nu2MFILxmDDsPkxKsSNEh9mHHMty4Fw==}
 
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
     engines: {node: '>=22.0.0'}
 
-  '@cloudflare/sandbox@0.10.3':
-    resolution: {integrity: sha512-UHAbkYpS5iB7WwOIN/+x3JC+mP0NPFcpgCXKoxCycwwfyp46Gq5eX4KffTp7WWFa4ghM04ZDkqmn9r4/959IbA==}
+  '@cloudflare/sandbox@0.11.0':
+    resolution: {integrity: sha512-OdM26ucJlc5B4en8eZMI0C8/UE3gk9bi2sqmElsGyqZIk6nhAo1HqHQynmuLKIHfNo6qo4bt12tWjTgFzzzgBg==}
     peerDependencies:
       '@openai/agents': ^0.3.3
       '@opencode-ai/sdk': ^1.1.40
@@ -3917,45 +3917,45 @@ packages:
       workerd:
         optional: true
 
-  '@cloudflare/vitest-pool-workers@0.16.4':
-    resolution: {integrity: sha512-wsZGaMvvHd2x6NY7qEbJ05OvqbZkRrREMsxGy0AdubIYE1drbEAickmAK0wnLHXIuGRaiR9aMugQt8HPA+7nJg==}
+  '@cloudflare/vitest-pool-workers@0.16.13':
+    resolution: {integrity: sha512-nTuEiuLv+YoLrGfftdlBJB3nJJELT/9VVuBlF2JDpnv3uAOCXaZcniP+K5C9Mcg0xSopvFLAL45Q7Hco1hHOLQ==}
     peerDependencies:
       '@vitest/runner': ^4.1.0
       '@vitest/snapshot': ^4.1.0
       vitest: ^4.1.0
 
-  '@cloudflare/workerd-darwin-64@1.20260508.1':
-    resolution: {integrity: sha512-IT3r6VgiSwIesL4AJbxjgxvIxwWZqM7BKkhYAzOKHl4GF2M0TxeOahUIXd+CYXVZgHX8ceEg+MXbEehPelJyNg==}
+  '@cloudflare/workerd-darwin-64@1.20260603.1':
+    resolution: {integrity: sha512-cEXDWu6V3ZrpmwWkM4OJE9AeXjdAgOY5rh8EHhcBVCuP5rxnzUbPzLtrVOHx0UUUAcCrFq0Xsa6mZKL1VUZsKQ==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [darwin]
 
-  '@cloudflare/workerd-darwin-arm64@1.20260508.1':
-    resolution: {integrity: sha512-JTVsisOJPcNKw0qovPjqyBWYahfdhUh7/9NICiG5wxaEQ45PYKdoqNq0hOAAIqvqoxsKZBvTgcPTJREPqk7avA==}
+  '@cloudflare/workerd-darwin-arm64@1.20260603.1':
+    resolution: {integrity: sha512-uBPK4LaWJNbbCYwPnUAehlHbbVulhVZPZsdcAhBPfZhHb3QAuAEPAQepO/P67R3V6Cni4YGx1fLbL8A5wwoaNA==}
     engines: {node: '>=16'}
     cpu: [arm64]
     os: [darwin]
 
-  '@cloudflare/workerd-linux-64@1.20260508.1':
-    resolution: {integrity: sha512-zO38pCc27YlsZiPYcaZnosy0/t7abXrRU3VEO1oKfUvnaCpHgphDG+VsrmHL+kntda6hrtNwg2jLeMAqqIjnjw==}
+  '@cloudflare/workerd-linux-64@1.20260603.1':
+    resolution: {integrity: sha512-ht9l6/8Tk7Rp6kA4S9oFZ4X8u0VjnnFdmU/6B3fnABYKREYTKh2RdOqXqXxcp5eNJseireKnWik/hQOPK1CutQ==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [linux]
 
-  '@cloudflare/workerd-linux-arm64@1.20260508.1':
-    resolution: {integrity: sha512-XhJa780Ia6MNIrtxn/ruZHS79b9pu5EKPfRNReaUqxy8erPT2fs93axMfFoS9kIkcaRRj/1TOUKcTeAMoywY7w==}
+  '@cloudflare/workerd-linux-arm64@1.20260603.1':
+    resolution: {integrity: sha512-LJZ6x00rAjSrobV4m0ZW0TpH5ilBbKcWBzlH+y+KOUsIE/CpTuhAzKV43TbSnFLRX5+jrWKiz2v0hO91lPXy6A==}
     engines: {node: '>=16'}
     cpu: [arm64]
     os: [linux]
 
-  '@cloudflare/workerd-windows-64@1.20260508.1':
-    resolution: {integrity: sha512-QdDOK3B/Ul1s3QmIwDrFyx9230to6LsNmWcVR8w+TYjNZuRPzqQBgusp78LO7MlqCoEl9dvIcN00jkJnLtBSfw==}
+  '@cloudflare/workerd-windows-64@1.20260603.1':
+    resolution: {integrity: sha512-DvwqkXMAJRPoDN4PxapAwhlz/6ouD+6R1ttbAEK3cWD/QBvFF5STx7Ds/9Irf+rBly3np3uHWkeX+wZnNFEuzA==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
 
-  '@cloudflare/workers-types@4.20260511.1':
-    resolution: {integrity: sha512-FA+si7cOq9i/gtCHhIc0XJL0l1F/ApF+m00752Aj7WZFJrj3ZulT2T8/+rT3BabMT0QEnqFEGIqCgrmqhgEfMg==}
+  '@cloudflare/workers-types@4.20260605.1':
+    resolution: {integrity: sha512-9YJaGPQwuQYFHoElVhJP40ZmUO/Z2OiBon58sKpHjgwq5btC/B2BZLC45AQ14k+1I+hjcY2z2t2R6uUxU9AqwQ==}
 
   '@codemirror/autocomplete@6.20.1':
     resolution: {integrity: sha512-1cvg3Vz1dSSToCNlJfRA2WSI4ht3K+WplO0UMOgmUYPivCyy2oueZY6Lx7M9wThm7SDUBViRmuT+OG/i8+ON9A==}
@@ -10060,6 +10060,9 @@ packages:
     resolution: {integrity: sha512-Mz9QMT5fJe7bKI7MH31UilT5cEK5EHHRCccw/YRFsRY47AuNgaV6HY3rscp0/I4Q+tTW/5zoqpSeRRI54TkDWA==}
     engines: {node: '>= 0.10'}
 
+  cjs-module-lexer@1.2.3:
+    resolution: {integrity: sha512-0TNiGstbQmCFwt4akjjBg5pLRTSyj/PkWQ1ZoO2zntmg9yLqSRxwEa4iCfQLGjqhiqBfOJa7W/E8wfGrTDmlZQ==}
+
   cjs-module-lexer@1.4.3:
     resolution: {integrity: sha512-9z8TZaGM1pfswYeXrUpzPrkx8UnWYdhJclsiYMm6x/w5+nN+8Tf/LnAgfLGQCm59qAOxU8WwHEq2vNwF6i4j+Q==}
 
@@ -13451,8 +13454,8 @@ packages:
     resolution: {integrity: sha512-I9jwMn07Sy/IwOj3zVkVik2JTvgpaykDZEigL6Rx6N9LbMywwUSMtxET+7lVoDLLd3O3IXwJwvuuns8UB/HeAg==}
     engines: {node: '>=4'}
 
-  miniflare@4.20260508.0:
-    resolution: {integrity: sha512-h3aG+PA8jEH76V4ZtBAbs3g7kjMfHJUF8hPvxeeajLTKwir+G+dqfBODg5yF9MT29LqrZKCRQRqzfHPWX4kCIg==}
+  miniflare@4.20260603.0:
+    resolution: {integrity: sha512-+kMQYB82gC8MPOuojHur3icQsUeZUEJ+Sphuo5rVC3Ri9txBLAW/mH33b9OVrpmkogQeaaqPS4tPtugJZhk5Kw==}
     engines: {node: '>=22.0.0'}
     hasBin: true
 
@@ -16270,20 +16273,20 @@ packages:
   wordwrap@1.0.0:
     resolution: {integrity: sha512-gvVzJFlPycKc5dZN4yPkP8w7Dc37BtP1yczEneOb4uq34pXZcvrtRTmWV8W+Ume+XCxKgbjM+nevkyFPMybd4Q==}
 
-  workerd@1.20260508.1:
-    resolution: {integrity: sha512-VlnjyH3AjVddpSK7J54nsCVgf8i2733pl8GjKttfNi7vN/hEjjAk20d2b1nDToOLKvRQpTewRnVkqaaeGHCaAw==}
+  workerd@1.20260603.1:
+    resolution: {integrity: sha512-NPcbhI1++CS+fnELyXtsIR52en+5kwr/OrKeiQeYXGy10HxmPdsQBv9N+DU7hJIOOmBHhOGAAsoGDjyiQ2YCaA==}
     engines: {node: '>=16'}
     hasBin: true
 
   workers-tagged-logger@1.0.0:
     resolution: {integrity: sha512-tp5PAs48hSpF2GIbH0S186MBXuMe8u9uuHZR0Jmw/I8+NIiQblor5EpYJ5lOaE8u9s84mVme6Iv+ueC1C/beog==}
 
-  wrangler@4.90.1:
-    resolution: {integrity: sha512-u2KrieKSMfRM0toTst/CfDtcRraeoVjmcExcMWgILM/ytq3qcDhuOAULoZSyPHzma43lfLJy1BC544drFyqe1A==}
+  wrangler@4.98.0:
+    resolution: {integrity: sha512-cXfFUuF4rMIvE0hiMnXjEAB27ERryaCgquBJdUoPIjFzYYE1rbRdMUkEdQ18qDPUtsPvhJdqxLntixT9OfSzQw==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
-      '@cloudflare/workers-types': ^4.20260508.1
+      '@cloudflare/workers-types': ^4.20260603.1
     peerDependenciesMeta:
       '@cloudflare/workers-types':
         optional: true
@@ -16320,18 +16323,6 @@ packages:
     peerDependencies:
       bufferutil: ^4.0.1
       utf-8-validate: ^5.0.2
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
-  ws@8.18.0:
-    resolution: {integrity: sha512-8VbfWfHLbbwu3+N6OKsOMpBdT4kXPDDB9cJk2bJ6mh9ucxdlnNvH1e+roYkKmN9Nxw2yjz7VzeO9oOz2zJ04Pw==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
     peerDependenciesMeta:
       bufferutil:
         optional: true
@@ -16506,7 +16497,7 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
-  '@ai-sdk/anthropic@3.0.77(zod@4.4.3)':
+  '@ai-sdk/anthropic@3.0.82(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)
@@ -16561,16 +16552,16 @@ snapshots:
       randexp: 0.5.3
       zod: 4.4.3
 
-  '@anthropic-ai/sdk@0.91.1(zod@4.4.3)':
-    dependencies:
-      json-schema-to-ts: 3.1.1
-    optionalDependencies:
-      zod: 4.4.3
-
-  '@anthropic-ai/sdk@0.95.2(zod@4.4.3)':
+  '@anthropic-ai/sdk@0.104.1(zod@4.4.3)':
     dependencies:
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
+    optionalDependencies:
+      zod: 4.4.3
+
+  '@anthropic-ai/sdk@0.91.1(zod@4.4.3)':
+    dependencies:
+      json-schema-to-ts: 3.1.1
     optionalDependencies:
       zod: 4.4.3
 
@@ -18214,9 +18205,9 @@ snapshots:
       '@chromaui/rrweb-snapshot': 2.0.0-alpha.18-noAbsolute
       '@playwright/test': 1.58.2
       '@segment/analytics-node': 2.1.3
-      '@storybook/addon-essentials': 8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/addon-essentials': 8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@storybook/csf': 0.1.13
-      '@storybook/manager-api': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/manager-api': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@storybook/server-webpack5': 8.5.8(@swc/core@1.15.18)(esbuild@0.27.4)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))(typescript@5.9.3)
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
@@ -18242,9 +18233,9 @@ snapshots:
       '@chromaui/rrweb-snapshot': 2.0.0-alpha.18-noAbsolute
       '@playwright/test': 1.58.2
       '@segment/analytics-node': 2.1.3
-      '@storybook/addon-essentials': 8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/addon-essentials': 8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@storybook/csf': 0.1.13
-      '@storybook/manager-api': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/manager-api': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@storybook/server-webpack5': 8.5.8(esbuild@0.27.4)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))(typescript@5.9.3)
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
@@ -18300,13 +18291,13 @@ snapshots:
 
   '@cloudflare/containers@0.3.4': {}
 
-  '@cloudflare/containers@0.3.5': {}
+  '@cloudflare/containers@0.3.7': {}
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
-  '@cloudflare/sandbox@0.10.3(@xterm/xterm@6.0.0)':
+  '@cloudflare/sandbox@0.11.0(@xterm/xterm@6.0.0)':
     dependencies:
-      '@cloudflare/containers': 0.3.4
+      '@cloudflare/containers': 0.3.7
       aws4fetch: 1.0.20
       capnweb: 0.8.0
       hono: 4.12.18
@@ -18324,43 +18315,43 @@ snapshots:
     optionalDependencies:
       '@xterm/xterm': 6.0.0
 
-  '@cloudflare/unenv-preset@2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260508.1)':
+  '@cloudflare/unenv-preset@2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260603.1)':
     dependencies:
       unenv: 2.0.0-rc.24
     optionalDependencies:
-      workerd: 1.20260508.1
+      workerd: 1.20260603.1
 
-  '@cloudflare/vitest-pool-workers@0.16.4(@cloudflare/workers-types@4.20260511.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)':
+  '@cloudflare/vitest-pool-workers@0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)':
     dependencies:
       '@vitest/runner': 4.1.6
       '@vitest/snapshot': 4.1.6
-      cjs-module-lexer: 1.4.3
+      cjs-module-lexer: 1.2.3
       esbuild: 0.27.4
-      miniflare: 4.20260508.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
-      wrangler: 4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      miniflare: 4.20260603.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      wrangler: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
       - bufferutil
       - utf-8-validate
 
-  '@cloudflare/workerd-darwin-64@1.20260508.1':
+  '@cloudflare/workerd-darwin-64@1.20260603.1':
     optional: true
 
-  '@cloudflare/workerd-darwin-arm64@1.20260508.1':
+  '@cloudflare/workerd-darwin-arm64@1.20260603.1':
     optional: true
 
-  '@cloudflare/workerd-linux-64@1.20260508.1':
+  '@cloudflare/workerd-linux-64@1.20260603.1':
     optional: true
 
-  '@cloudflare/workerd-linux-arm64@1.20260508.1':
+  '@cloudflare/workerd-linux-arm64@1.20260603.1':
     optional: true
 
-  '@cloudflare/workerd-windows-64@1.20260508.1':
+  '@cloudflare/workerd-windows-64@1.20260603.1':
     optional: true
 
-  '@cloudflare/workers-types@4.20260511.1': {}
+  '@cloudflare/workers-types@4.20260605.1': {}
 
   '@codemirror/autocomplete@6.20.1':
     dependencies:
@@ -22807,19 +22798,19 @@ snapshots:
       '@sentry/cli-win32-i686': 3.4.2
       '@sentry/cli-win32-x64': 3.4.2
 
-  '@sentry/cloudflare@10.43.0(@cloudflare/workers-types@4.20260511.1)':
+  '@sentry/cloudflare@10.43.0(@cloudflare/workers-types@4.20260605.1)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@sentry/core': 10.43.0
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260511.1
+      '@cloudflare/workers-types': 4.20260605.1
 
-  '@sentry/cloudflare@9.47.1(@cloudflare/workers-types@4.20260511.1)':
+  '@sentry/cloudflare@9.47.1(@cloudflare/workers-types@4.20260605.1)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@sentry/core': 9.47.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260511.1
+      '@cloudflare/workers-types': 4.20260605.1
 
   '@sentry/core@10.37.0': {}
 
@@ -23506,7 +23497,7 @@ snapshots:
 
   '@stitches/core@1.2.8': {}
 
-  '@storybook/addon-actions@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-actions@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@storybook/global': 5.0.0
       '@types/uuid': 9.0.8
@@ -23515,26 +23506,26 @@ snapshots:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       uuid: 9.0.1
 
-  '@storybook/addon-backgrounds@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-backgrounds@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@storybook/global': 5.0.0
       memoizerific: 1.11.3
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
 
-  '@storybook/addon-controls@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-controls@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@storybook/global': 5.0.0
       dequal: 2.0.3
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
 
-  '@storybook/addon-docs@8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-docs@8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@mdx-js/react': 3.1.1(@types/react@19.2.14)(react@19.2.6)
-      '@storybook/blocks': 8.5.8(react-dom@19.2.4(react@19.2.6))(react@19.2.6)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/csf-plugin': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/react-dom-shim': 8.5.8(react-dom@19.2.4(react@19.2.6))(react@19.2.6)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/blocks': 8.5.8(react-dom@19.2.4(react@19.2.6))(react@19.2.6)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/csf-plugin': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/react-dom-shim': 8.5.8(react-dom@19.2.4(react@19.2.6))(react@19.2.6)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       react: 19.2.6
       react-dom: 19.2.4(react@19.2.6)
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
@@ -23555,23 +23546,23 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
 
-  '@storybook/addon-essentials@8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-essentials@8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
-      '@storybook/addon-actions': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/addon-backgrounds': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/addon-controls': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/addon-docs': 8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/addon-highlight': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/addon-measure': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/addon-outline': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/addon-toolbars': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/addon-viewport': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/addon-actions': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/addon-backgrounds': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/addon-controls': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/addon-docs': 8.5.8(@types/react@19.2.14)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/addon-highlight': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/addon-measure': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/addon-outline': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/addon-toolbars': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/addon-viewport': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
     transitivePeerDependencies:
       - '@types/react'
 
-  '@storybook/addon-highlight@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-highlight@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@storybook/global': 5.0.0
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
@@ -23583,13 +23574,13 @@ snapshots:
     optionalDependencies:
       react: 19.2.6
 
-  '@storybook/addon-measure@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-measure@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@storybook/global': 5.0.0
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       tiny-invariant: 1.3.3
 
-  '@storybook/addon-outline@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-outline@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@storybook/global': 5.0.0
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
@@ -23600,16 +23591,16 @@ snapshots:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
 
-  '@storybook/addon-toolbars@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-toolbars@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
 
-  '@storybook/addon-viewport@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/addon-viewport@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       memoizerific: 1.11.3
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
 
-  '@storybook/blocks@8.5.8(react-dom@19.2.4(react@19.2.6))(react@19.2.6)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/blocks@8.5.8(react-dom@19.2.4(react@19.2.6))(react@19.2.6)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@storybook/csf': 0.1.12
       '@storybook/icons': 1.6.0(react-dom@19.2.4(react@19.2.6))(react@19.2.6)
@@ -23621,7 +23612,7 @@ snapshots:
 
   '@storybook/builder-webpack5@8.5.8(@swc/core@1.15.18)(esbuild@0.27.4)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))(typescript@5.9.3)':
     dependencies:
-      '@storybook/core-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/core-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@types/semver': 7.7.1
       browser-assert: 1.2.1
       case-sensitive-paths-webpack-plugin: 2.4.0
@@ -23657,7 +23648,7 @@ snapshots:
 
   '@storybook/builder-webpack5@8.5.8(esbuild@0.27.4)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))(typescript@5.9.3)':
     dependencies:
-      '@storybook/core-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/core-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@types/semver': 7.7.1
       browser-assert: 1.2.1
       case-sensitive-paths-webpack-plugin: 2.4.0
@@ -23719,11 +23710,11 @@ snapshots:
       - uglify-js
       - webpack-cli
 
-  '@storybook/components@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/components@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
 
-  '@storybook/core-webpack@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/core-webpack@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
@@ -23733,7 +23724,7 @@ snapshots:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
 
-  '@storybook/csf-plugin@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/csf-plugin@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       unplugin: 1.16.1
@@ -23758,7 +23749,7 @@ snapshots:
       react: 19.2.6
       react-dom: 19.2.4(react@19.2.6)
 
-  '@storybook/manager-api@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/manager-api@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
 
@@ -23846,17 +23837,17 @@ snapshots:
       - uglify-js
       - webpack-cli
 
-  '@storybook/preset-server-webpack@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/preset-server-webpack@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
-      '@storybook/core-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/core-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@storybook/global': 5.0.0
-      '@storybook/server': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/server': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       safe-identifier: 0.4.2
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
       yaml-loader: 0.8.1
 
-  '@storybook/preview-api@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/preview-api@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
 
@@ -23874,7 +23865,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@storybook/react-dom-shim@8.5.8(react-dom@19.2.4(react@19.2.6))(react@19.2.6)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/react-dom-shim@8.5.8(react-dom@19.2.4(react@19.2.6))(react@19.2.6)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       react: 19.2.6
       react-dom: 19.2.4(react@19.2.6)
@@ -23905,8 +23896,8 @@ snapshots:
   '@storybook/server-webpack5@8.5.8(@swc/core@1.15.18)(esbuild@0.27.4)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))(typescript@5.9.3)':
     dependencies:
       '@storybook/builder-webpack5': 8.5.8(@swc/core@1.15.18)(esbuild@0.27.4)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))(typescript@5.9.3)
-      '@storybook/preset-server-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/server': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/preset-server-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/server': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
     transitivePeerDependencies:
       - '@rspack/core'
@@ -23919,8 +23910,8 @@ snapshots:
   '@storybook/server-webpack5@8.5.8(esbuild@0.27.4)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))(typescript@5.9.3)':
     dependencies:
       '@storybook/builder-webpack5': 8.5.8(esbuild@0.27.4)(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))(typescript@5.9.3)
-      '@storybook/preset-server-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/server': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/preset-server-webpack': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/server': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
     transitivePeerDependencies:
       - '@rspack/core'
@@ -23931,14 +23922,14 @@ snapshots:
       - webpack-cli
     optional: true
 
-  '@storybook/server@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/server@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
-      '@storybook/components': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/components': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@storybook/csf': 0.1.12
       '@storybook/global': 5.0.0
-      '@storybook/manager-api': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/preview-api': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
-      '@storybook/theming': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))
+      '@storybook/manager-api': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/preview-api': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@storybook/theming': 8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
       ts-dedent: 2.2.0
       yaml: 2.8.4
@@ -23973,7 +23964,7 @@ snapshots:
       - supports-color
       - ts-node
 
-  '@storybook/theming@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)))':
+  '@storybook/theming@8.5.8(storybook@9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       storybook: 9.1.20(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vite@8.0.10(@types/node@25.5.2)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4))
 
@@ -24635,7 +24626,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.0.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/expect@3.2.4':
     dependencies:
@@ -24721,7 +24712,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -25664,6 +25655,8 @@ snapshots:
       safe-buffer: 5.2.1
       to-buffer: 1.2.2
 
+  cjs-module-lexer@1.2.3: {}
+
   cjs-module-lexer@1.4.3: {}
 
   cjs-module-lexer@2.2.0: {}
@@ -26420,9 +26413,9 @@ snapshots:
       esbuild: 0.27.4
       tsx: 4.21.0
 
-  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260511.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0):
+  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(kysely@0.29.2)(pg@8.20.0):
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260511.1
+      '@cloudflare/workers-types': 4.20260605.1
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.18.0
       '@upstash/redis': 1.38.0
@@ -30074,13 +30067,13 @@ snapshots:
 
   min-indent@1.0.1: {}
 
-  miniflare@4.20260508.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  miniflare@4.20260603.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.34.5
       undici: 7.25.0
-      workerd: 1.20260508.1
-      ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      workerd: 1.20260603.1
+      ws: 8.20.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
       - bufferutil
@@ -33580,13 +33573,13 @@ snapshots:
 
   wordwrap@1.0.0: {}
 
-  workerd@1.20260508.1:
+  workerd@1.20260603.1:
     optionalDependencies:
-      '@cloudflare/workerd-darwin-64': 1.20260508.1
-      '@cloudflare/workerd-darwin-arm64': 1.20260508.1
-      '@cloudflare/workerd-linux-64': 1.20260508.1
-      '@cloudflare/workerd-linux-arm64': 1.20260508.1
-      '@cloudflare/workerd-windows-64': 1.20260508.1
+      '@cloudflare/workerd-darwin-64': 1.20260603.1
+      '@cloudflare/workerd-darwin-arm64': 1.20260603.1
+      '@cloudflare/workerd-linux-64': 1.20260603.1
+      '@cloudflare/workerd-linux-arm64': 1.20260603.1
+      '@cloudflare/workerd-windows-64': 1.20260603.1
 
   workers-tagged-logger@1.0.0:
     dependencies:
@@ -33594,18 +33587,18 @@ snapshots:
     optionalDependencies:
       hono: 4.12.18
 
-  wrangler@4.90.1(@cloudflare/workers-types@4.20260511.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  wrangler@4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260508.1)
+      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260603.1)
       blake3-wasm: 2.1.5
       esbuild: 0.27.4
-      miniflare: 4.20260508.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      miniflare: 4.20260603.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       path-to-regexp: 8.4.2
       unenv: 2.0.0-rc.24
-      workerd: 1.20260508.1
+      workerd: 1.20260603.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260511.1
+      '@cloudflare/workers-types': 4.20260605.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - bufferutil
@@ -33649,11 +33642,6 @@ snapshots:
       signal-exit: 4.1.0
 
   ws@7.5.10(bufferutil@4.1.0)(utf-8-validate@6.0.6):
-    optionalDependencies:
-      bufferutil: 4.1.0
-      utf-8-validate: 6.0.6
-
-  ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     optionalDependencies:
       bufferutil: 4.1.0
       utf-8-validate: 6.0.6

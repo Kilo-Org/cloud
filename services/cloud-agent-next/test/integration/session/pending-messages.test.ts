@@ -13,6 +13,7 @@ import {
   type PendingSessionMessage,
 } from '../../../src/session/pending-messages.js';
 import { createEventQueries } from '../../../src/session/queries/events.js';
+import { PENDING_FLUSH_DEBOUNCE_MS } from '../../../src/session/session-message-queue.js';
 import {
   getSessionMessageState,
   listMessagesWithPendingCallbacks,
@@ -244,6 +245,80 @@ describe('pending session messages', () => {
     expect(result.queueResult).toMatchObject({ success: true, outcome: 'queued' });
     expect(result.staleAlarm).toBeDefined();
     expect(result.refreshedAlarm).toBeGreaterThan(result.staleAlarm ?? result.now);
+  });
+
+  it('pulls a far-future alarm forward when durable pending work already exists', async () => {
+    const userId = 'user_pending_reconstruct_alarm';
+    const sessionId = 'agent_pending_reconstruct_alarm';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-reconstruct-alarm',
+      });
+      await storePendingSessionMessage(
+        instance.ctx.storage,
+        createMessage({
+          messageId: 'msg_018f1e2d3c4bReconAlrmAbCdE',
+          content: 'recover pending drain',
+          createdAt: Date.now(),
+        })
+      );
+      const now = Date.now();
+      const farFutureAlarm = now + 5 * 60 * 1000;
+      await instance.ctx.storage.setAlarm(farFutureAlarm);
+
+      await instance['ensureAlarmScheduled']();
+
+      return { now, farFutureAlarm, repairedAlarm: await instance.ctx.storage.getAlarm() };
+    });
+
+    expect(result.repairedAlarm).toBeGreaterThan(result.now);
+    expect(result.repairedAlarm).toBeLessThan(result.farFutureAlarm);
+    expect(result.repairedAlarm).toBeLessThanOrEqual(result.now + 2_000);
+  });
+
+  it('pre-arms the next wake-up before alarm work can block', async () => {
+    const userId = 'user_pending_alarm_prearm';
+    const sessionId = 'agent_pending_alarm_prearm';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      let releaseFlush: ((result: { remainingPendingCount: number }) => void) | undefined;
+      let markFlushStarted: (() => void) | undefined;
+      const flushStarted = new Promise<void>(resolve => {
+        markFlushStarted = resolve;
+      });
+      const blockedFlush = new Promise<{ remainingPendingCount: number }>(resolve => {
+        releaseFlush = resolve;
+      });
+      (instance as any).flushOnePendingSessionMessage = async () => {
+        markFlushStarted?.();
+        return blockedFlush;
+      };
+      await instance.ctx.storage.deleteAlarm();
+
+      const startedAt = Date.now();
+      const alarmRun = instance.alarm();
+      await flushStarted;
+      const prearmed = await instance.ctx.storage.getAlarm();
+      releaseFlush?.({ remainingPendingCount: 0 });
+      await alarmRun;
+      return { startedAt, prearmed };
+    });
+
+    expect(result.prearmed).not.toBeNull();
+    expect(result.prearmed).toBeGreaterThanOrEqual(result.startedAt);
+    expect(result.prearmed).toBeLessThanOrEqual(result.startedAt + PENDING_FLUSH_DEBOUNCE_MS + 100);
   });
 
   it('flushes one FIFO message on alarm and deletes after orchestrator accepts', async () => {
@@ -532,7 +607,7 @@ describe('pending session messages', () => {
     expect(result.finalLease.state).toBe('owns_wrapper');
   });
 
-  it('does not consume a delivery attempt when wrapper authorization discovers required cleanup', async () => {
+  it('records a retryable sandbox failure when wrapper authorization discovers required cleanup', async () => {
     const userId = 'user_pending_cleanup_discovery';
     const sessionId = 'agent_pending_cleanup_discovery';
     const stub = env.CLOUD_AGENT_SESSION.get(
@@ -566,24 +641,40 @@ describe('pending session messages', () => {
         createMessage({
           messageId: 'msg_018f1e2d3c4bCleanDiscAbCdE',
           content: 'deliver after cleanup discovery',
-          createdAt: 1,
+          createdAt: Date.now(),
         })
       );
 
+      const attemptStartedAt = Date.now();
       await instance.alarm();
+      const attemptFinishedAt = Date.now();
       return {
         authorizationInspections,
         deliveryAttempts,
+        attemptStartedAt,
+        attemptFinishedAt,
         pending: await listPendingSessionMessages(instance.ctx.storage),
         lease: await getWrapperLease(instance.ctx.storage),
+        alarm: await instance.ctx.storage.getAlarm(),
       };
     });
 
     expect(result.authorizationInspections).toBe(1);
     expect(result.deliveryAttempts).toBe(0);
     expect(result.pending).toHaveLength(1);
-    expect(result.pending[0]?.flushAttempts).toBeUndefined();
-    expect(result.pending[0]?.lastFlushError).toBeUndefined();
+    expect(result.pending[0]?.flushAttempts).toBe(1);
+    expect(result.pending[0]?.lastFlushError).toBe(
+      'Sandbox connection failed during wrapper discovery'
+    );
+    expect(result.pending[0]?.lastFlushFailureCode).toBe('SANDBOX_CONNECT_FAILED');
+    expect(result.pending[0]?.nextFlushAttemptAt).toBeGreaterThanOrEqual(
+      result.attemptStartedAt + 5_000
+    );
+    expect(result.pending[0]?.nextFlushAttemptAt).toBeLessThanOrEqual(
+      result.attemptFinishedAt + 5_000
+    );
+    expect(result.alarm).not.toBeNull();
+    expect(result.alarm).toBeLessThanOrEqual(result.pending[0]?.nextFlushAttemptAt ?? 0);
     expect(result.pending[0]?.deliveryDisposition).toBeUndefined();
     expect(result.lease).toMatchObject({
       state: 'stop_needed',

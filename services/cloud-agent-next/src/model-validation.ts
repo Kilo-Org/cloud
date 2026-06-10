@@ -6,6 +6,8 @@ import { dispatchedKilocodeModelId } from './persistence/model-utils.js';
 import type { PersistenceEnv } from './persistence/types.js';
 
 const MODEL_VALIDATION_TIMEOUT_MS = 5_000;
+const MODEL_VALIDATION_MAX_ATTEMPTS = 3;
+const MODEL_VALIDATION_RETRY_BASE_DELAY_MS = 100;
 const MODEL_UNAVAILABLE_MESSAGE = 'Selected model is not available for this cloud agent session';
 const MODEL_VALIDATION_UNAVAILABLE_MESSAGE = 'Model availability could not be verified';
 
@@ -44,6 +46,11 @@ const officialValidationResponseSchema = z.union([
   z.object({ valid: z.literal(false), reason: z.literal('unavailable') }),
 ]);
 
+type EndpointValidationResult =
+  | { type: 'validated'; valid: boolean }
+  | { type: 'http-error'; status: number }
+  | { type: 'unavailable' };
+
 function effectiveCatalogContext(input: AssertKiloModelAvailableInput): EffectiveCatalogContext {
   return {
     token: input.env.KILOCODE_TOKEN_OVERRIDE ?? input.originalToken,
@@ -74,6 +81,57 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
   }
 }
 
+function isTransientValidationStatus(status: number): boolean {
+  return status === 429 || (status >= 500 && status <= 599);
+}
+
+async function waitBeforeValidationRetry(attempt: number): Promise<void> {
+  const delayMs = MODEL_VALIDATION_RETRY_BASE_DELAY_MS * 2 ** attempt;
+  await new Promise(resolve => setTimeout(resolve, delayMs));
+}
+
+async function validateEndpoint(url: string, init: RequestInit): Promise<EndpointValidationResult> {
+  for (let attempt = 0; attempt < MODEL_VALIDATION_MAX_ATTEMPTS; attempt += 1) {
+    const response = await fetchWithTimeout(url, init);
+    if (!response) {
+      if (attempt < MODEL_VALIDATION_MAX_ATTEMPTS - 1) {
+        await waitBeforeValidationRetry(attempt);
+      }
+      continue;
+    }
+
+    if (!response.ok) {
+      if (!isTransientValidationStatus(response.status)) {
+        return { type: 'http-error', status: response.status };
+      }
+      if (attempt < MODEL_VALIDATION_MAX_ATTEMPTS - 1) {
+        await waitBeforeValidationRetry(attempt);
+      }
+      continue;
+    }
+
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      if (attempt < MODEL_VALIDATION_MAX_ATTEMPTS - 1) {
+        await waitBeforeValidationRetry(attempt);
+      }
+      continue;
+    }
+
+    const parsed = officialValidationResponseSchema.safeParse(body);
+    if (parsed.success) {
+      return { type: 'validated', valid: parsed.data.valid };
+    }
+    if (attempt < MODEL_VALIDATION_MAX_ATTEMPTS - 1) {
+      await waitBeforeValidationRetry(attempt);
+    }
+  }
+
+  return { type: 'unavailable' };
+}
+
 function anonymousCatalogContext(feature: string): EffectiveCatalogContext {
   return { feature };
 }
@@ -93,28 +151,23 @@ async function validateFromOfficialSource(
   modelId: string,
   context: EffectiveCatalogContext
 ): Promise<ModelValidationResult> {
-  const response = await fetchWithTimeout(officialValidationUrl(env, context.organizationId), {
+  const result = await validateEndpoint(officialValidationUrl(env, context.organizationId), {
     method: 'POST',
     headers: requestHeaders(context),
     body: JSON.stringify({ modelId }),
   });
-  if (!response) return { type: 'validation-unavailable', source: 'official' };
-  if (response.status === 404) return { type: 'skipped', source: 'official' };
-  if (response.status === 401 && (context.token || context.organizationId)) {
-    return validateFromOfficialSource(env, modelId, anonymousCatalogContext(context.feature));
-  }
-  if (response.status === 403) return { type: 'access-denied', source: 'official' };
-  if (!response.ok) return { type: 'validation-unavailable', source: 'official' };
-
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
+  if (result.type === 'unavailable') {
     return { type: 'validation-unavailable', source: 'official' };
   }
-  const parsed = officialValidationResponseSchema.safeParse(body);
-  if (!parsed.success) return { type: 'validation-unavailable', source: 'official' };
-  return parsed.data.valid
+  if (result.type === 'http-error') {
+    if (result.status === 404) return { type: 'skipped', source: 'official' };
+    if (result.status === 401 && (context.token || context.organizationId)) {
+      return validateFromOfficialSource(env, modelId, anonymousCatalogContext(context.feature));
+    }
+    if (result.status === 403) return { type: 'access-denied', source: 'official' };
+    return { type: 'validation-unavailable', source: 'official' };
+  }
+  return result.valid
     ? { type: 'valid', source: 'official' }
     : { type: 'unavailable-model', source: 'official' };
 }
@@ -163,27 +216,22 @@ async function validateFromOverrideSource(
   const validationUrl = tokenSelectedSource
     ? `${baseURL}/models/validate`
     : buildKiloOverrideValidationUrl(baseURL, context.organizationId);
-  const response = await fetchWithTimeout(validationUrl, {
+  const result = await validateEndpoint(validationUrl, {
     method: 'POST',
     headers: requestHeaders(context),
     body: JSON.stringify({ modelId }),
   });
-  if (!response) return { type: 'validation-unavailable', source: 'override' };
-  if (response.status === 401 && (context.token || context.organizationId)) {
-    return validateFromOfficialSource(env, modelId, anonymousCatalogContext(context.feature));
-  }
-  if (response.status === 403) return { type: 'access-denied', source: 'override' };
-  if (!response.ok) return { type: 'validation-unavailable', source: 'override' };
-
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
+  if (result.type === 'unavailable') {
     return { type: 'validation-unavailable', source: 'override' };
   }
-  const parsed = officialValidationResponseSchema.safeParse(body);
-  if (!parsed.success) return { type: 'validation-unavailable', source: 'override' };
-  return parsed.data.valid
+  if (result.type === 'http-error') {
+    if (result.status === 401 && (context.token || context.organizationId)) {
+      return validateFromOfficialSource(env, modelId, anonymousCatalogContext(context.feature));
+    }
+    if (result.status === 403) return { type: 'access-denied', source: 'override' };
+    return { type: 'validation-unavailable', source: 'override' };
+  }
+  return result.valid
     ? { type: 'valid', source: 'override' }
     : { type: 'unavailable-model', source: 'override' };
 }

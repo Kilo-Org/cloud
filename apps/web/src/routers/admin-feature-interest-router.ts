@@ -42,8 +42,11 @@ const DetailInputSchema = z.object({
   offset: z.number().min(0).default(0),
 });
 
+// Escape backslashes and single quotes so user input cannot alter the SQL literal boundary.
+// Also escape LIKE wildcards (% and _) so they are treated as literals, not pattern wildcards.
+// Wildcard escaping must come after backslash-doubling so the escape characters are correctly doubled.
 const escapeHogQLStringLiteral = (value: string) =>
-  value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/%/g, '\\%').replace(/_/g, '\\_');
 
 export const adminFeatureInterestRouter = createTRPCRouter({
   // Feature Interest Leaderboard

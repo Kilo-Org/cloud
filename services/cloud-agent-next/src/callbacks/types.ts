@@ -3,6 +3,11 @@ export type CallbackTarget = {
   headers?: Record<string, string>;
 };
 
+export type CallbackTextTruncation = {
+  originalUtf8ByteLength: number;
+  retainedUtf8ByteLength: number;
+};
+
 export type ExecutionCallbackPayload = {
   sessionId: string;
   cloudAgentSessionId: string;
@@ -12,6 +17,8 @@ export type ExecutionCallbackPayload = {
   messageId?: string;
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
+  /** Present when errorMessage was shortened to fit the callback queue. */
+  errorMessageTruncation?: CallbackTextTruncation;
   lastSeenBranch?: string;
   kiloSessionId?: string;
   /** Gate result reported by the agent when gate_threshold is active */
@@ -21,6 +28,8 @@ export type ExecutionCallbackPayload = {
    * Undefined when no assistant message has been recorded yet.
    */
   lastAssistantMessageText?: string;
+  /** Present when lastAssistantMessageText was omitted to fit the callback queue. */
+  lastAssistantMessageTextTruncation?: CallbackTextTruncation;
   /**
    * Deterministic idempotency key based on messageId.
    * Receivers can use this to safely deduplicate retried callbacks after a

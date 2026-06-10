@@ -15,6 +15,7 @@
     "./kilo-pass-bonus-projection": "./src/kilo-pass-bonus-projection.ts",
     "./git-url": "./src/git-url.ts",
     "./callback-token": "./src/callback-token.ts",
+    "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
     "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",
     "./security-auto-analysis-policy": "./src/security-auto-analysis-policy.ts",

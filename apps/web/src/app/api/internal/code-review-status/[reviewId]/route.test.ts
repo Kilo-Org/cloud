@@ -292,6 +292,41 @@ function makeIntegration(overrides: Partial<PlatformIntegration> = {}): Platform
   };
 }
 
+function mockCreatedInfraRetryFlow(
+  overrides: {
+    failedAttemptId?: string;
+    retryAttemptId?: string;
+    sessionId?: string;
+    cliSessionId?: string | null;
+  } = {}
+) {
+  const failedAttemptId = overrides.failedAttemptId ?? '00000000-0000-0000-0000-000000000601';
+  const retryAttemptId = overrides.retryAttemptId ?? '00000000-0000-0000-0000-000000000602';
+  const sessionId = overrides.sessionId ?? 'agent-old';
+  const cliSessionId = overrides.cliSessionId ?? null;
+  const failedAttempt = makeAttempt({
+    id: failedAttemptId,
+    status: 'failed',
+    session_id: sessionId,
+    cli_session_id: cliSessionId,
+  });
+
+  mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(failedAttempt);
+  mockGetLatestCodeReviewAttempt.mockResolvedValue(failedAttempt);
+  mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
+    outcome: 'created',
+    attempt: makeAttempt({
+      id: retryAttemptId,
+      attempt_number: 2,
+      retry_reason: 'infra_failure',
+      retry_of_attempt_id: failedAttemptId,
+      status: 'pending',
+    }),
+  });
+
+  return { failedAttemptId, retryAttemptId, sessionId, cliSessionId };
+}
+
 // --- Tests ---
 
 import type { POST as POSTType } from './route';
@@ -491,6 +526,34 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it.each([
+      'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.',
+      'Payment Required: [BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',
+      'Payment required to continue running this model.',
+    ])('infers expanded billing terminalReason for %s', async errorMessage => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage,
+          terminalReason: 'billing',
+        })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+    });
+
     it('infers BYOK invalid-key callbacks as action-required failures', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
@@ -531,6 +594,83 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           output: expect.objectContaining({ title: 'BYOK API key needs attention' }),
         }),
         'standard'
+      );
+    });
+
+    it('infers BYOK permission callbacks as action-required failures', async () => {
+      const errorMessage =
+        'Forbidden: [BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.';
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          terminalReason: 'byok_invalid_key',
+        })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'byok_invalid_key',
+          errorMessage,
+        })
+      );
+    });
+
+    it('infers GitLab project-access callbacks as action-required failures', async () => {
+      const errorMessage =
+        'Dispatch failed: Failed to create Project Access Token for GitLab code review on owner/repo. Error: GitLab create Project Access Token failed: 400 - {"message":"400 Bad request - User does not have permission"}';
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          terminalReason: 'gitlab_project_access_required',
+        })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+          platform: 'gitlab',
+          reviewId: REVIEW_ID,
+          reason: 'gitlab_project_access_required',
+          errorMessage,
+        })
+      );
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'GitLab Project Access Token required for Code Reviewer',
+        }),
+        'https://gitlab.com'
       );
     });
 
@@ -629,6 +769,43 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'standard'
       );
     });
+
+    it.each([
+      'No allowed providers are specified.',
+      'No allowed providers are available for the selected model.',
+      'No endpoints found matching your data policy (Free model training). Configure: https://openrouter.ai/settings/privacy',
+    ])(
+      'infers provider-policy callbacks as selected-model action-required failures',
+      async errorMessage => {
+        mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            errorMessage,
+          }),
+          makeParams(REVIEW_ID)
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+          REVIEW_ID,
+          'failed',
+          expect.objectContaining({
+            errorMessage,
+            terminalReason: 'selected_model_unavailable',
+          })
+        );
+        expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+        expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+        expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+          expect.objectContaining({
+            reason: 'selected_model_unavailable',
+            errorMessage,
+          })
+        );
+      }
+    );
 
     it('infers GitHub installation and IP allow-list callback failures', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
@@ -758,7 +935,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetIntegrationById.mockResolvedValue(makeIntegration());
 
       await POST(
-        makeRequest({ status: 'failed', errorMessage: 'Repository not found' }),
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Repository not found after execution exceeded maximum runtime',
+        }),
         makeParams(REVIEW_ID)
       );
 
@@ -799,7 +979,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       await POST(
         makeRequest({
           status: 'failed',
-          errorMessage: 'Timeout exceeded',
+          errorMessage: 'Execution exceeded maximum runtime',
           terminalReason: 'timeout',
         }),
         makeParams(REVIEW_ID)
@@ -818,7 +998,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       await POST(
         makeRequest({
           status: 'failed',
-          errorMessage: 'Sandbox returned HTTP 500',
+          errorMessage: 'Execution exceeded maximum runtime',
           terminalReason: 'sandbox_error',
         }),
         makeParams(REVIEW_ID)
@@ -991,6 +1171,209 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
+    it('retries an unclassified failed callback without marking parent terminal', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000205',
+        retryAttemptId: '00000000-0000-0000-0000-000000000206',
+        sessionId: 'agent-unclassified-old',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage: 'Unexpected backend failure while publishing results',
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: 'Unexpected backend failure while publishing results',
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      'prepareSession failed (400): {"error":{"message":"[\n  {\n    "origin": "string",\n    "code": "invalid_format",\n    "format": "regex"\n  }\n]","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}',
+      'prepareSession failed (500): {"error":{"message":"Unexpected prepareSession server failure","code":-32603,"data":{"code":"INTERNAL_SERVER_ERROR","httpStatus":500,"path":"prepareSession"}}}',
+      'Wrapper cleanup is required before delivery can launch',
+      "ENOENT: no such file or directory, posix_spawn 'git'",
+      'Failed to checkout pull ref refs/pull/68/head: error: Your local changes to the following files would be overwritten by checkout:\n\tbuild_gui_exe.bat\nPlease commit your changes or stash them before you switch branches.',
+      'Session snapshot restore failed: kilo import failed exitCode=1',
+      'prepareSession failed (500): {"error":{"message":"Internal error while starting up Durable Object storage caused object to be reset.","code":-32603,"data":{"code":"INTERNAL_SERVER_ERROR","httpStatus":500,"path":"prepareSession"}}}',
+    ])('retries corrected retryable failed callback: %s', async errorMessage => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000207',
+        retryAttemptId: '00000000-0000-0000-0000-000000000208',
+        sessionId: 'agent-corrected-retryable-old',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: errorMessage,
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        name: 'cost and tokens exceed retry thresholds',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 100_001,
+          totalTokensOut: 0,
+          totalCostMusd: 200_000,
+        },
+      },
+      {
+        name: 'cost and tokens are exactly at retry thresholds',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 60_000,
+          totalTokensOut: 40_000,
+          totalCostMusd: 200_000,
+        },
+      },
+      {
+        name: 'cost is below the threshold but tokens exceed it',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 100_001,
+          totalTokensOut: 0,
+          totalCostMusd: 199_999,
+        },
+      },
+      {
+        name: 'tokens are below the threshold but cost is at it',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 99_999,
+          totalTokensOut: 0,
+          totalCostMusd: 200_000,
+        },
+      },
+      { name: 'billing usage is unavailable', usage: null },
+    ])('skips infra retry when failed session $name', async ({ usage }) => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000209',
+        retryAttemptId: '00000000-0000-0000-0000-000000000210',
+        sessionId: 'agent-expensive-old',
+        cliSessionId: 'ses_expensive_failed',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(usage);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage: 'Unexpected backend failure after a long run',
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_expensive_failed',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'upstream_error' })
+      );
+    });
+
+    it.each([
+      {
+        name: 'cost and tokens are below thresholds',
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          totalTokensIn: 99_999,
+          totalTokensOut: 0,
+          totalCostMusd: 199_999,
+        },
+      },
+    ])('allows infra retry when failed session $name', async ({ usage }) => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000211',
+        retryAttemptId: '00000000-0000-0000-0000-000000000212',
+        sessionId: 'agent-allowed-old',
+        cliSessionId: 'ses_allowed_failed',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(usage);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage: 'Unexpected backend failure after a bounded run',
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_allowed_failed',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: 'Unexpected backend failure after a bounded run',
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+    });
+
     it('does not retry when the parent review is already superseded', async () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ status: 'cancelled', terminal_reason: 'superseded' })
@@ -1028,6 +1411,70 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       });
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      'Too Many Requests: [BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
+      'Dispatch failed: Code Reviewer is disabled for owner user:fd16292d-e963-4838-bc62-21611f000ccd on github',
+    ])('does not retry deterministic retry-suppression-only failures: %s', async errorMessage => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'running' }));
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage,
+          terminalReason: undefined,
+        })
+      );
+    });
+
+    it('retries low-disk workspace admission callbacks as transient infra failures', async () => {
+      const errorMessage =
+        'Failed to start wrapper: Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup';
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000213',
+        retryAttemptId: '00000000-0000-0000-0000-000000000214',
+        sessionId: 'agent-workspace-admission-old',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: errorMessage,
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
 
@@ -1242,6 +1689,53 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
 
+    it('terminalizes the parent when the infra retry attempt fails', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-second-failure' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000403',
+          status: 'failed',
+          session_id: 'agent-second-failure',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000402',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000403',
+          status: 'failed',
+          session_id: 'agent-second-failure',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000402',
+        })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-second-failure',
+          errorMessage: 'Unexpected backend failure after prior infra retry',
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).not.toHaveBeenCalled();
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage: 'Unexpected backend failure after prior infra retry',
+          terminalReason: 'upstream_error',
+        })
+      );
+    });
+
     it('marks the retry attempt failed when retry startup fails', async () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ status: 'running', session_id: 'agent-old' })
@@ -1421,7 +1915,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       await POST(
         makeRequest({
           status: 'failed',
-          errorMessage: 'Something went wrong',
+          errorMessage: 'Execution exceeded maximum runtime',
           terminalReason: 'upstream_error',
         }),
         makeParams(REVIEW_ID)
@@ -1543,7 +2037,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       await POST(
         makeRequest({
           status: 'failed',
-          errorMessage: 'Something went wrong',
+          errorMessage: 'Execution exceeded maximum runtime',
           terminalReason: 'upstream_error',
         }),
         makeParams(REVIEW_ID)

@@ -71,8 +71,6 @@ function createDeps(overrides: Partial<AgentRouteDeps> = {}): AgentRouteDeps {
     listBindingSummaries: vi.fn(
       async () => new Map([['research', [{ channel: 'slack', accountId: null, advanced: false }]]])
     ),
-    // Default: the CLI removed the workspace (OpenClaw 2026.6.x behavior).
-    pathExists: vi.fn(() => false),
     ...overrides,
   };
 }
@@ -174,7 +172,7 @@ describe('agent config mutation routes', () => {
     expect(await response.json()).toMatchObject({ code: 'invalid_agent_request' });
   });
 
-  it('deletes through serialized CLI execution and reports the verified disposition', async () => {
+  it('deletes through serialized CLI execution without claiming filesystem disposition', async () => {
     let serializedMutations = 0;
     const deps = createDeps({
       serializeMutation: async operation => {
@@ -189,25 +187,11 @@ describe('agent config mutation routes', () => {
     expect(response.status).toBe(200);
     expect(serializedMutations).toBe(1);
     expect(deps.deleteViaCli).toHaveBeenCalledWith('research');
-    // Disposition is verified against the CLI-reported workspace path.
-    expect(deps.pathExists).toHaveBeenCalledWith('/root/.openclaw/workspace-research');
+    // Per spec rule 11 the controller MUST NOT claim verified deletion/retention.
     expect(await response.json()).toMatchObject({
       ok: true,
       agentId: 'research',
-      filesystemDisposition: 'deleted',
-    });
-  });
-
-  it('reports a retained disposition when the workspace survives deletion', async () => {
-    const deps = createDeps({ pathExists: vi.fn(() => true) });
-    const response = await makeApp(deps).request('/_kilo/config/agents/research', {
-      method: 'DELETE',
-    });
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      ok: true,
-      filesystemDisposition: 'retained',
+      filesystemDisposition: 'unverified',
     });
   });
 

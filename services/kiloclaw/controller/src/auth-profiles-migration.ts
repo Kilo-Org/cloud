@@ -1,24 +1,26 @@
 /**
- * Migrate kilocode `auth-profiles.json` entries from plaintext `key` to an
+ * Migrate kilocode `auth-profiles.json` entries from a plaintext key to an
  * env-backed `keyRef` SecretRef.
  *
  * Background: `openclaw onboard` (pre `--secret-input-mode ref`) wrote the
- * literal `KILOCODE_API_KEY` into `<root>/agents/<id>/agent/auth-profiles.json`
- * under `profiles.kilocode:default.key`. OpenClaw's auth resolver prefers
- * configured auth-profiles over env vars, so once the literal is on disk,
- * rotating `KILOCODE_API_KEY` in the gateway process env has no effect —
- * the gateway keeps authenticating with the stale on-disk value.
+ * literal `KILOCODE_API_KEY` into `<agentDir>/auth-profiles.json` under
+ * `profiles.kilocode:default.key` (older builds used the `api_key` alias).
+ * OpenClaw's auth resolver prefers configured auth-profiles over env vars, so
+ * once the literal is on disk, rotating `KILOCODE_API_KEY` in the gateway
+ * process env has no effect — the gateway keeps authenticating with the stale
+ * on-disk value. On 2026.6.1+ `openclaw doctor --fix` also imports the literal
+ * into per-agent SQLite verbatim (it strips the plaintext only when a `keyRef`
+ * is present), so a pre-doctor conversion is what keeps plaintext out of SQLite.
  *
  * Fix: rewrite each such profile to use a SecretRef that points back at the
- * same env var. OpenClaw's `buildPersistedAuthProfileSecretsStore` strips
- * the plaintext `key` when `keyRef` is set, and runtime resolution reads
+ * same env var. OpenClaw's `buildPersistedAuthProfileSecretsStore` strips the
+ * plaintext when `keyRef` is set, and runtime resolution reads
  * `process.env.KILOCODE_API_KEY` on every `secrets reload` — so rotation
  * becomes: update env var → call `openclaw secrets reload`.
  *
  * This migration is idempotent and safe to run on every boot (and every
- * rotation) — profiles already carrying a `keyRef` or lacking a plaintext
- * `key` are left untouched. Malformed JSON is logged and skipped, never
- * fatal.
+ * rotation) — profiles already carrying a `keyRef` or lacking a plaintext key
+ * are left untouched. Malformed JSON is logged and skipped, never fatal.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -73,6 +75,48 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 /**
+ * Resolve the set of agent directories that may contain an `auth-profiles.json`.
+ *
+ * Combines the conventional `<rootDir>/agents/*&#47;agent` layout with any
+ * explicitly-configured custom `agentDir`s (KiloClaw allows arbitrary absolute
+ * agent directories, and OpenClaw doctor migrates auth profiles in those too).
+ * Returns absolute directory paths, each expected to hold `auth-profiles.json`
+ * directly. Never throws.
+ */
+function collectAgentDirs(
+  rootDir: string,
+  deps: AuthProfilesMigrationDeps,
+  extraAgentDirs: string[]
+): string[] {
+  const dirs = new Set<string>();
+
+  const agentsDir = path.join(rootDir, 'agents');
+  if (deps.existsSync(agentsDir)) {
+    let agentIds: string[] = [];
+    try {
+      agentIds = deps.readdirSync(agentsDir);
+    } catch (error) {
+      console.warn(`[auth-profiles-migration] Failed to list ${agentsDir}:`, error);
+    }
+    for (const agentId of agentIds) {
+      const agentRoot = path.join(agentsDir, agentId);
+      try {
+        if (!deps.statSync(agentRoot).isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      dirs.add(path.join(agentRoot, AGENT_SUBDIR));
+    }
+  }
+
+  for (const dir of extraAgentDirs) {
+    if (isNonEmptyString(dir)) dirs.add(dir);
+  }
+
+  return [...dirs];
+}
+
+/**
  * Rewrite a single profile in place. Returns true when the profile was
  * actually changed (so callers can track whether the file needs writing).
  */
@@ -80,9 +124,13 @@ function migrateProfile(profile: UnknownRecord): boolean {
   if (profile.type !== 'api_key') return false;
   if (profile.provider !== KILOCODE_PROVIDER) return false;
   if (profile.keyRef !== undefined) return false;
-  if (!isNonEmptyString(profile.key)) return false;
+  // OpenClaw doctor normalizes the historical `api_key` field to `key` during
+  // its SQLite import, so the literal may live under either name. Convert both
+  // before doctor runs, otherwise the plaintext is imported verbatim.
+  if (!isNonEmptyString(profile.key) && !isNonEmptyString(profile.api_key)) return false;
 
   delete profile.key;
+  delete profile.api_key;
   profile.keyRef = {
     source: 'env',
     provider: 'default',
@@ -150,16 +198,18 @@ function migrateOneFile(filePath: string, deps: AuthProfilesMigrationDeps): stri
 }
 
 /**
- * Scan `<rootDir>/agents/*&#47;agent/auth-profiles.json` and migrate each file
- * in place. `rootDir` is typically the openclaw state dir (e.g.
- * `/root/.openclaw`).
+ * Migrate `<agentDir>/auth-profiles.json` for every resolved agent directory
+ * (conventional layout plus any configured custom `agentDir`s in
+ * `extraAgentDirs`) in place. `rootDir` is typically the openclaw state dir
+ * (e.g. `/root/.openclaw`).
  *
- * Returns a report for logging. Never throws — individual file failures
- * produce warnings and are skipped.
+ * Returns a report for logging. Never throws — individual file failures produce
+ * warnings and are skipped.
  */
 export function migrateKilocodeAuthProfilesToKeyRef(
   rootDir: string,
-  deps: AuthProfilesMigrationDeps = defaultDeps
+  deps: AuthProfilesMigrationDeps = defaultDeps,
+  extraAgentDirs: string[] = []
 ): AuthProfilesMigrationReport {
   const report: AuthProfilesMigrationReport = {
     filesScanned: 0,
@@ -167,28 +217,8 @@ export function migrateKilocodeAuthProfilesToKeyRef(
     profilesMigrated: 0,
   };
 
-  const agentsDir = path.join(rootDir, 'agents');
-  if (!deps.existsSync(agentsDir)) {
-    return report;
-  }
-
-  let agentIds: string[];
-  try {
-    agentIds = deps.readdirSync(agentsDir);
-  } catch (error) {
-    console.warn(`[auth-profiles-migration] Failed to list ${agentsDir}:`, error);
-    return report;
-  }
-
-  for (const agentId of agentIds) {
-    const agentRoot = path.join(agentsDir, agentId);
-    try {
-      if (!deps.statSync(agentRoot).isDirectory()) continue;
-    } catch {
-      continue;
-    }
-
-    const filePath = path.join(agentRoot, AGENT_SUBDIR, AUTH_PROFILES_FILENAME);
+  for (const agentDir of collectAgentDirs(rootDir, deps, extraAgentDirs)) {
+    const filePath = path.join(agentDir, AUTH_PROFILES_FILENAME);
     if (!deps.existsSync(filePath)) continue;
 
     report.filesScanned += 1;
@@ -205,64 +235,42 @@ export function migrateKilocodeAuthProfilesToKeyRef(
   return report;
 }
 
-export type AuthProfileBackupCleanupReport = {
+export type AuthProfileBackupHardenReport = {
   dirsScanned: number;
-  backupsRemoved: number;
   backupsHardened: number;
+  backupsFailed: number;
 };
 
 /**
- * Remove the plaintext backups OpenClaw's auth-profile SQLite migration leaves
- * behind under `<rootDir>/agents/*&#47;agent/`.
+ * Tighten the permissions of the plaintext backups OpenClaw's auth-profile
+ * SQLite migration leaves behind under each resolved agent directory.
  *
  * Since 2026.6.1, `openclaw doctor --fix` imports legacy `auth-profiles.json`
  * (and its state/legacy siblings) into a per-agent SQLite store and backs the
  * original up as `<name>.sqlite-import.<epoch-ms>.bak` before deleting it. That
  * backup is produced with `fs.copyFileSync`, which does NOT preserve the
- * source's `0o600` mode — it lands at `0o644` — and it retains the plaintext
- * provider key. The authoritative SQLite store holds a keyRef and
- * `/root/.openclaw` is `0o700`, but the backup still breaks the
- * "no plaintext provider key on disk" invariant the controller maintains.
+ * source's `0o600` mode — it lands at `0o644`, leaving a world-readable copy of
+ * any credential the pre-doctor migration could not convert to a keyRef.
  *
- * Nothing reads these backups after import — OpenClaw's migration only keys off
- * the presence of the original JSON — so removal is safe and idempotent. When a
- * backup cannot be removed, fall back to tightening it to `0o600` so the
- * plaintext is at least owner-only.
- *
- * Never throws; individual failures are logged and skipped.
+ * We deliberately do NOT delete these backups: OpenClaw 2026.6.5 can silently
+ * skip a malformed profile while importing its siblings, and the backup is the
+ * only recovery copy of the source. Instead we strip the world/group bits so
+ * the credential is owner-only (matching `/root/.openclaw` at `0o700` and the
+ * `0o600` auth files), preserving the recovery copy without the over-broad
+ * exposure. Never throws; individual failures are logged and skipped.
  */
-export function removeAuthProfileSqliteImportBackups(
+export function hardenAuthProfileSqliteImportBackups(
   rootDir: string,
-  deps: AuthProfilesMigrationDeps = defaultDeps
-): AuthProfileBackupCleanupReport {
-  const report: AuthProfileBackupCleanupReport = {
+  deps: AuthProfilesMigrationDeps = defaultDeps,
+  extraAgentDirs: string[] = []
+): AuthProfileBackupHardenReport {
+  const report: AuthProfileBackupHardenReport = {
     dirsScanned: 0,
-    backupsRemoved: 0,
     backupsHardened: 0,
+    backupsFailed: 0,
   };
 
-  const agentsDir = path.join(rootDir, 'agents');
-  if (!deps.existsSync(agentsDir)) {
-    return report;
-  }
-
-  let agentIds: string[];
-  try {
-    agentIds = deps.readdirSync(agentsDir);
-  } catch (error) {
-    console.warn(`[auth-profiles-migration] Failed to list ${agentsDir}:`, error);
-    return report;
-  }
-
-  for (const agentId of agentIds) {
-    const agentRoot = path.join(agentsDir, agentId);
-    try {
-      if (!deps.statSync(agentRoot).isDirectory()) continue;
-    } catch {
-      continue;
-    }
-
-    const agentDir = path.join(agentRoot, AGENT_SUBDIR);
+  for (const agentDir of collectAgentDirs(rootDir, deps, extraAgentDirs)) {
     if (!deps.existsSync(agentDir)) continue;
 
     let entries: string[];
@@ -278,25 +286,12 @@ export function removeAuthProfileSqliteImportBackups(
       if (!SQLITE_IMPORT_BACKUP_RE.test(entry)) continue;
       const backupPath = path.join(agentDir, entry);
       try {
-        deps.unlinkSync(backupPath);
-        report.backupsRemoved += 1;
-        console.log(`[auth-profiles-migration] removed plaintext migration backup ${backupPath}`);
+        deps.chmodSync(backupPath, 0o600);
+        report.backupsHardened += 1;
+        console.log(`[auth-profiles-migration] hardened migration backup to 0o600 ${backupPath}`);
       } catch (error) {
-        // Could not remove — at minimum strip the world/group bits so the
-        // plaintext key is owner-only rather than 0o644.
-        try {
-          deps.chmodSync(backupPath, 0o600);
-          report.backupsHardened += 1;
-          console.warn(
-            `[auth-profiles-migration] could not remove ${backupPath}, tightened to 0o600:`,
-            error
-          );
-        } catch (chmodError) {
-          console.warn(
-            `[auth-profiles-migration] failed to remove or harden ${backupPath}:`,
-            chmodError
-          );
-        }
+        report.backupsFailed += 1;
+        console.warn(`[auth-profiles-migration] failed to harden ${backupPath}:`, error);
       }
     }
   }

@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import type { Context, Hono } from 'hono';
 import {
   AgentConfigError,
@@ -34,7 +33,6 @@ export type AgentRouteDeps = {
   deleteViaCli: typeof deleteAgentViaCli;
   setBindings: typeof updateAgentBindings;
   listBindingSummaries: typeof listAgentBindingSummaries;
-  pathExists: (p: string) => boolean;
 };
 
 const defaultDeps: AgentRouteDeps = {
@@ -48,7 +46,6 @@ const defaultDeps: AgentRouteDeps = {
   deleteViaCli: deleteAgentViaCli,
   setBindings: updateAgentBindings,
   listBindingSummaries: listAgentBindingSummaries,
-  pathExists: p => fs.existsSync(p),
 };
 
 function errorStatus(status: number): 400 | 404 | 409 | 422 | 500 | 502 | 504 {
@@ -185,12 +182,10 @@ export function registerAgentConfigRoutes(app: Hono, deps: AgentRouteDeps = defa
   app.delete('/_kilo/config/agents/:agentId', async c => {
     try {
       const deleted = await deps.serializeMutation(() => deps.deleteViaCli(c.req.param('agentId')));
-      // OpenClaw 2026.6.x's `agents delete` recursively removes the agent
-      // workspace (older versions retained it). Verify the actual on-disk
-      // outcome from the CLI-reported workspace path rather than assuming, so
-      // the disposition is accurate across OpenClaw versions.
-      const filesystemDisposition = deps.pathExists(deleted.workspace) ? 'retained' : 'deleted';
-      return c.json({ ok: true, ...deleted, filesystemDisposition });
+      // Per .specs/kiloclaw-controller.md rule 11, the response MUST NOT claim
+      // verified filesystem deletion or retention — filesystem disposition is
+      // determined by the installed OpenClaw CLI/runtime, not the controller.
+      return c.json({ ok: true, ...deleted, filesystemDisposition: 'unverified' });
     } catch (error) {
       return respondError(c, error);
     }

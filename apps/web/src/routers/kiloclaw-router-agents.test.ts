@@ -161,7 +161,7 @@ describe('kiloclaw agent procedures (personal namespace)', () => {
   it('deleteAgent forwards the agentId', async () => {
     agentMocks.deleteAgent.mockResolvedValue({
       ok: true,
-      filesystemDisposition: 'deleted',
+      filesystemDisposition: 'unverified',
       agentId: 'work',
       workspace: '/w',
       agentDir: '/s',

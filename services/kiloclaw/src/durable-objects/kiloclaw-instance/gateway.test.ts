@@ -570,7 +570,7 @@ describe('agent config mutation timeouts', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           ok: true,
-          filesystemDisposition: 'deleted',
+          filesystemDisposition: 'unverified',
           agentId: 'work',
           workspace: '/workspace/work',
           agentDir: '/state/work',

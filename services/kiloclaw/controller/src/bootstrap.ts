@@ -24,7 +24,7 @@ import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
 import {
   migrateKilocodeAuthProfilesToKeyRef,
-  removeAuthProfileSqliteImportBackups,
+  hardenAuthProfileSqliteImportBackups,
 } from './auth-profiles-migration';
 import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 
@@ -735,6 +735,43 @@ function toAuthProfilesMigrationDeps(deps: BootstrapDeps): AuthProfilesMigration
   };
 }
 
+/**
+ * Resolve the absolute `agentDir`s OpenClaw has configured, via the offline
+ * `openclaw agents list --json`. KiloClaw allows custom (arbitrary absolute)
+ * agent directories, and OpenClaw doctor migrates auth profiles in those too —
+ * so the keyRef migration and backup hardening must cover the same candidates,
+ * not just `<state>/agents/<id>/agent`. Returns [] if enumeration or parsing
+ * fails; callers still cover the conventional layout.
+ */
+function resolveConfiguredAgentDirs(deps: BootstrapDeps): string[] {
+  let raw: string;
+  try {
+    raw = deps.execFileSync('openclaw', ['agents', 'list', '--json']);
+  } catch (error) {
+    console.warn(
+      '[controller] could not enumerate agent dirs; auth migration uses the conventional layout only:',
+      error
+    );
+    return [];
+  }
+  if (!raw || !raw.trim()) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const dirs: string[] = [];
+    for (const entry of parsed) {
+      if (entry && typeof entry === 'object') {
+        const agentDir = (entry as { agentDir?: unknown }).agentDir;
+        if (typeof agentDir === 'string' && agentDir.length > 0) dirs.push(agentDir);
+      }
+    }
+    return dirs;
+  } catch (error) {
+    console.warn('[controller] could not parse agent list for auth migration:', error);
+    return [];
+  }
+}
+
 function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
   let parsed: unknown;
   try {
@@ -784,6 +821,11 @@ function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
 export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
   const configExists = deps.existsSync(CONFIG_PATH);
   const cwDeps = toConfigWriterDeps(deps);
+  // Custom agent directories OpenClaw migrates auth profiles in. Resolved so the
+  // keyRef migration and backup hardening below cover the same candidates, not
+  // just the conventional `<state>/agents/<id>/agent` layout. Empty on fresh
+  // installs (no agents yet) and when enumeration is unavailable.
+  const configuredAgentDirs = configExists ? resolveConfiguredAgentDirs(deps) : [];
 
   if (!configExists) {
     console.log('No existing config found, running openclaw onboard...');
@@ -811,7 +853,8 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     // the JSON; this idempotent migration no-ops when there is nothing to fix.
     const preDoctorMigration = migrateKilocodeAuthProfilesToKeyRef(
       CONFIG_DIR,
-      toAuthProfilesMigrationDeps(deps)
+      toAuthProfilesMigrationDeps(deps),
+      configuredAgentDirs
     );
     if (preDoctorMigration.profilesMigrated > 0) {
       console.log(
@@ -857,7 +900,8 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   // on first load).
   const migrationReport = migrateKilocodeAuthProfilesToKeyRef(
     CONFIG_DIR,
-    toAuthProfilesMigrationDeps(deps)
+    toAuthProfilesMigrationDeps(deps),
+    configuredAgentDirs
   );
   if (migrationReport.profilesMigrated > 0) {
     console.log(
@@ -867,16 +911,18 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
 
   // OpenClaw 2026.6.1+ `doctor` imports auth-profiles.json into a per-agent
   // SQLite store and leaves a world-readable (0o644) `*.sqlite-import.<ts>.bak`
-  // behind that still contains the plaintext provider key. The SQLite store
-  // holds a keyRef, so the backup is redundant; remove it to keep plaintext
-  // keys off disk. No-op on fresh installs and already-cleaned instances.
-  const backupCleanup = removeAuthProfileSqliteImportBackups(
+  // behind that can still hold a plaintext credential the pre-doctor migration
+  // could not convert. Keep the backup (it is OpenClaw's only recovery copy if
+  // the import silently skipped a profile) but tighten it to 0o600 so the
+  // credential is owner-only. No-op when there is nothing to harden.
+  const backupHarden = hardenAuthProfileSqliteImportBackups(
     CONFIG_DIR,
-    toAuthProfilesMigrationDeps(deps)
+    toAuthProfilesMigrationDeps(deps),
+    configuredAgentDirs
   );
-  if (backupCleanup.backupsRemoved > 0 || backupCleanup.backupsHardened > 0) {
+  if (backupHarden.backupsHardened > 0 || backupHarden.backupsFailed > 0) {
     console.log(
-      `[controller] auth-profile backup cleanup: removed ${backupCleanup.backupsRemoved}, hardened ${backupCleanup.backupsHardened}`
+      `[controller] auth-profile backup hardening: hardened ${backupHarden.backupsHardened}, failed ${backupHarden.backupsFailed}`
     );
   }
 

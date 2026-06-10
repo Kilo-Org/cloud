@@ -186,7 +186,7 @@ describe('platform agent config routes', () => {
   it('DELETE /agents/:agentId deletes one agent', async () => {
     const deleteAgent = vi.fn().mockResolvedValue({
       ok: true,
-      filesystemDisposition: 'deleted',
+      filesystemDisposition: 'unverified',
       agentId: 'work',
       workspace: '/workspace/work',
       agentDir: '/state/work',
@@ -201,7 +201,7 @@ describe('platform agent config routes', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ filesystemDisposition: 'deleted' });
+    expect(await response.json()).toMatchObject({ filesystemDisposition: 'unverified' });
     expect(deleteAgent).toHaveBeenCalledWith('work');
   });
 

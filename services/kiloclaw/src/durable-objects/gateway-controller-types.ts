@@ -373,16 +373,11 @@ export const AgentCreateResponseSchema = z.object({
 export type AgentCreateResponse = z.infer<typeof AgentCreateResponseSchema>;
 
 // DELETE /_kilo/config/agents/:id → { ok, filesystemDisposition, agentId, ... }
-// filesystemDisposition reports whether the agent workspace remained on disk:
-//   - 'deleted'    — OpenClaw 2026.6.x removed the workspace; the controller
-//                    verified the path is gone.
-//   - 'retained'   — the workspace still exists after deletion.
-//   - 'unverified' — emitted by older controller images that did not verify.
-// Accept all three so the worker tolerates mixed controller versions during a
-// rollout. The UI must surface the disposition honestly.
+// filesystemDisposition is always 'unverified' — the controller does not confirm
+// the workspace/state/session dirs were removed. The UI must surface this honestly.
 export const AgentDeleteResponseSchema = z.object({
   ok: z.boolean(),
-  filesystemDisposition: z.enum(['deleted', 'retained', 'unverified']),
+  filesystemDisposition: z.literal('unverified'),
   agentId: z.string(),
   workspace: z.string(),
   agentDir: z.string(),

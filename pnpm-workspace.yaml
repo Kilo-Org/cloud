@@ -59,6 +59,9 @@ minimumReleaseAgeExclude:
   - '@typescript/native-preview-linux-x64'
   - '@typescript/native-preview-win32-arm64'
   - '@typescript/native-preview-win32-x64'
+  # Anthropic adds new parameters regularly and we can't really wait for them to stabilize
+  - '@ai-sdk/anthropic'
+  - '@anthropic-ai/sdk'
   # Kilo SDK releases are owned internally and adopted with pinned runtime validation.
   - '@kilocode/sdk'
   # KiloClaw pins and live-smoke-validates OpenClaw image upgrades before rollout.

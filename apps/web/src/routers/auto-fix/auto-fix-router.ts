@@ -370,7 +370,7 @@ export const autoFixRouter = createTRPCRouter({
         // Build config object with defaults for optional fields
         const config: AutoFixAgentConfig = {
           enabled_for_issues: fullInput.enabled_for_issues,
-          enabled_for_review_comments: false,
+          enabled_for_review_comments: fullInput.enabled_for_review_comments ?? false,
           repository_selection_mode: fullInput.repository_selection_mode,
           selected_repository_ids: fullInput.selected_repository_ids ?? [],
           skip_labels: fullInput.skip_labels ?? [],
@@ -392,7 +392,7 @@ export const autoFixRouter = createTRPCRouter({
           agentType: 'auto_fix',
           platform: 'github',
           config,
-          isEnabled: fullInput.enabled_for_issues,
+          isEnabled: fullInput.enabled_for_issues || config.enabled_for_review_comments,
           createdBy: ctx.user.id,
         });
 

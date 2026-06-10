@@ -67,7 +67,10 @@ export const TriggerSourceSchema = z.enum(['label', 'review_comment']);
 export const AutoFixAgentConfigSchema = z
   .object({
     enabled_for_issues: z.boolean().describe('Enable auto fix for GitHub issues'),
-    enabled_for_review_comments: z.boolean().default(false).describe('Legacy review-comment flag'),
+    enabled_for_review_comments: z
+      .boolean()
+      .default(false)
+      .describe('Enable auto fix for PR review comment @kilo mentions'),
     repository_selection_mode: z
       .enum(['all', 'selected'])
       .describe('Whether to fix all repositories or only selected ones'),
@@ -126,6 +129,7 @@ export const SaveAutoFixConfigSchema = z
   .object({
     organizationId: z.string().uuid(),
     enabled_for_issues: z.boolean(),
+    enabled_for_review_comments: z.boolean().optional(),
     repository_selection_mode: z.enum(['all', 'selected']),
     selected_repository_ids: z.array(z.number().int().positive()).optional(),
     skip_labels: z.array(z.string()).optional(),

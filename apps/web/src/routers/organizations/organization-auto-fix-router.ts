@@ -20,6 +20,7 @@ import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 const SaveAutoFixConfigInputSchema = z
   .object({
     enabled_for_issues: z.boolean(),
+    enabled_for_review_comments: z.boolean().optional(),
     repository_selection_mode: z.enum(['all', 'selected']),
     selected_repository_ids: z.array(z.number()).optional(),
     skip_labels: z.array(z.string()).optional(),
@@ -87,7 +88,7 @@ export const organizationAutoFixRouter = createTRPCRouter({
         // Build config object with defaults for optional fields
         const config: AutoFixAgentConfig = {
           enabled_for_issues: input.enabled_for_issues,
-          enabled_for_review_comments: false,
+          enabled_for_review_comments: input.enabled_for_review_comments ?? false,
           repository_selection_mode: input.repository_selection_mode,
           selected_repository_ids: input.selected_repository_ids ?? [],
           skip_labels: input.skip_labels ?? [],
@@ -108,7 +109,7 @@ export const organizationAutoFixRouter = createTRPCRouter({
           agentType: 'auto_fix',
           platform: 'github',
           config,
-          isEnabled: input.enabled_for_issues,
+          isEnabled: input.enabled_for_issues || config.enabled_for_review_comments,
           createdBy: ctx.user.id,
         });
 

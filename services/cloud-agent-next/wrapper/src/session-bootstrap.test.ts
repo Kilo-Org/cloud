@@ -362,6 +362,47 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     );
   });
 
+  it('refreshes a warm generic git remote with the current credential', async () => {
+    const repositoryUrl = 'https://git.example.com/acme/repo.git';
+    const token = 'fresh-generic-token';
+    const request = makeRequest(tmpDir, {
+      workspace: {
+        workspacePath: path.join(tmpDir, 'workspace'),
+        sessionHome: path.join(tmpDir, 'home'),
+        branchName: 'main',
+        preferSnapshot: true,
+      },
+      repo: {
+        kind: 'git',
+        url: repositoryUrl,
+        token,
+        refreshRemote: true,
+      },
+    });
+    await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+    const gitCalls: string[][] = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        gitCalls.push(args);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      runProcess: async () => {
+        throw new Error('setup commands should not run on warm path');
+      },
+      restoreSession: async () => {
+        throw new Error('session restore should not run on warm path');
+      },
+    });
+
+    const authenticatedRemote = new URL(repositoryUrl);
+    authenticatedRemote.username = 'x-access-token';
+    authenticatedRemote.password = token;
+
+    expect(result.workspaceWasWarm).toBe(true);
+    expect(gitCalls).toEqual([['remote', 'set-url', 'origin', authenticatedRemote.toString()]]);
+  });
+
   it('refreshes a warm GitHub remote, author, and selected CLI credential', async () => {
     const request = makeRequest(tmpDir, {
       workspace: {

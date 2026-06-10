@@ -677,12 +677,12 @@ describe('SessionService.prepareWorkspace', () => {
     );
   });
 
-  it('uses stored generic git tokens without managed provider lookup', async () => {
+  it('uses the refreshed stored generic git token for a cold clone', async () => {
     const session = createSession(false);
     const sandbox = createSandbox(session);
     const metadata = createMetadata({
       gitUrl: 'https://git.example.com/acme/repo.git',
-      gitToken: 'generic-git-token',
+      gitToken: 'fresh-generic-git-token',
       platform: undefined,
       gitlabTokenManaged: undefined,
     });
@@ -701,9 +701,45 @@ describe('SessionService.prepareWorkspace', () => {
       session,
       '/workspace/user/sessions/agent_test',
       'https://git.example.com/acme/repo.git',
-      'generic-git-token',
+      'fresh-generic-git-token',
       undefined,
       { platform: undefined }
+    );
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
+  });
+
+  it('refreshes a warm generic git remote with the stored token', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const metadata = createMetadata({
+      gitUrl: 'https://git.example.com/acme/repo.git',
+      gitToken: 'fresh-generic-git-token',
+      platform: undefined,
+      gitlabTokenManaged: undefined,
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sessionHome: '/home/agent_test',
+      branchName: 'session/agent_test',
+      sandboxId: 'usr-abcdef',
+    });
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
+    expect(workspaceMocks.updateGitRemoteToken).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://git.example.com/acme/repo.git',
+      'fresh-generic-git-token',
+      undefined
     );
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
@@ -1442,6 +1478,26 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     );
 
     expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('explicit-profile-token');
+  });
+
+  it('requests warm remote refresh for generic git credentials', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'https://git.example.com/acme/repo.git',
+        gitToken: 'fresh-generic-git-token',
+        platform: undefined,
+        gitlabTokenManaged: undefined,
+      })
+    );
+
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'https://git.example.com/acme/repo.git',
+      token: 'fresh-generic-git-token',
+      refreshRemote: true,
+    });
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
   });
 
   it('materializes OAuth bearer mode with a self-managed GitLab host', async () => {

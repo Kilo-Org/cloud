@@ -4,6 +4,7 @@ import type {
   AdmitAcceptedSessionMessageRequest,
   MessageDeliveryRequest,
   MessageDeliveryResult,
+  RepositoryCredentialUpdate,
   RetryableResultCode,
   SessionMessageAdmissionResult,
   SessionMessageIntent,
@@ -131,6 +132,12 @@ export type SessionMessageQueue = {
 export type SessionMessageQueueDependencies = {
   storage: SessionMessageQueueStorage;
   getMetadata: () => Promise<SessionMetadata | null>;
+  applyRepositoryCredentialUpdate?: (
+    messageId: string,
+    update: RepositoryCredentialUpdate,
+    replay: boolean
+  ) => Promise<void>;
+  finalizeRepositoryCredentialUpdate?: (messageId: string) => Promise<void>;
   requireSessionId: () => Promise<string>;
   validateModeAgainstRuntimeAgents: (metadata: SessionMetadata, mode: string) => string | null;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
@@ -490,6 +497,8 @@ export function createSessionMessageQueue(
   const {
     storage,
     getMetadata,
+    applyRepositoryCredentialUpdate,
+    finalizeRepositoryCredentialUpdate,
     requireSessionId,
     validateModeAgainstRuntimeAgents,
     getDeliveryContext,
@@ -581,7 +590,8 @@ export function createSessionMessageQueue(
 
   async function getExistingAdmissionAckForMessageId(
     messageId: string,
-    requestedIntent?: SessionMessageIntent
+    requestedIntent?: SessionMessageIntent,
+    beforeSuccessfulReplay?: () => Promise<void>
   ): Promise<SessionMessageAdmissionResult | undefined> {
     const pendingMessage = await getQueuedMessageByMessageId(storage, messageId);
     const metadata = pendingMessage ? await getMetadata() : undefined;
@@ -623,16 +633,19 @@ export function createSessionMessageQueue(
 
     if (messageState) {
       if (messageState.status === 'queued') {
+        await beforeSuccessfulReplay?.();
         const repairIntent = persistedIntent ?? requestedIntent;
         if (repairIntent) await completeQueuedAdmissionEffects(repairIntent);
         return buildAdmissionAck(messageId);
       }
       if (messageState.status === 'accepted') {
+        await beforeSuccessfulReplay?.();
         return buildAdmissionAck(messageId, 'sent');
       }
     }
 
     if (pendingMessage) {
+      await beforeSuccessfulReplay?.();
       await repairMissingQueuedStateFromPendingMessage(pendingMessage);
       const repairIntent = persistedIntent ?? requestedIntent;
       if (repairIntent) await completeQueuedAdmissionEffects(repairIntent);
@@ -706,9 +719,24 @@ export function createSessionMessageQueue(
     await putSessionMessageState(storage, repairedState);
   }
 
-  async function admitIntent(intent: SessionMessageIntent): Promise<SessionMessageAdmissionResult> {
+  async function admitIntent(
+    intent: SessionMessageIntent,
+    beforeAdmissionEffects?: (replay: boolean) => Promise<void>,
+    afterAdmissionPersistence?: () => Promise<void>
+  ): Promise<SessionMessageAdmissionResult> {
     const { turn } = intent;
-    const idempotentResult = await getExistingAdmissionAckForMessageId(turn.messageId, intent);
+    const beforeSuccessfulReplay =
+      beforeAdmissionEffects || afterAdmissionPersistence
+        ? async () => {
+            await beforeAdmissionEffects?.(true);
+            await afterAdmissionPersistence?.();
+          }
+        : undefined;
+    const idempotentResult = await getExistingAdmissionAckForMessageId(
+      turn.messageId,
+      intent,
+      beforeSuccessfulReplay
+    );
     if (idempotentResult) return idempotentResult;
 
     const capacityError = await checkPendingQueueCapacity();
@@ -720,9 +748,12 @@ export function createSessionMessageQueue(
       ? { required: true, target: callbackTarget }
       : undefined;
 
+    // Rotate session credentials before pending work can become visible to an existing drain alarm.
+    await beforeAdmissionEffects?.(false);
     await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
     const messageState = createQueuedSessionMessageState(intent, callbackSnapshot);
     await putSessionMessageState(storage, messageState);
+    await afterAdmissionPersistence?.();
     await completeQueuedAdmissionEffects(intent);
     return buildAdmissionAck(turn.messageId);
   }
@@ -839,11 +870,17 @@ export function createSessionMessageQueue(
             requestedFinalization?.condenseOnComplete ?? metadata.finalization?.condenseOnComplete,
         },
       };
-      const existingAdmission = await getExistingAdmissionAckForMessageId(messageId, intent);
-      if (existingAdmission) return existingAdmission;
-      const capacityError = await checkPendingQueueCapacity();
-      if (capacityError) return capacityError;
-      return await admitIntent(intent);
+      const credentialUpdate = request.repositoryCredentialUpdate;
+      const applyCredentialUpdate =
+        credentialUpdate && applyRepositoryCredentialUpdate
+          ? (replay: boolean) =>
+              applyRepositoryCredentialUpdate(messageId, credentialUpdate, replay)
+          : undefined;
+      const finalizeCredentialUpdate =
+        credentialUpdate && finalizeRepositoryCredentialUpdate
+          ? () => finalizeRepositoryCredentialUpdate(messageId)
+          : undefined;
+      return await admitIntent(intent, applyCredentialUpdate, finalizeCredentialUpdate);
     } catch (error) {
       if (isExecutionError(error)) {
         if (error.retryable) {

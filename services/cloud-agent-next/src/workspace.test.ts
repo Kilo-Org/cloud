@@ -42,6 +42,7 @@ import {
   LOW_DISK_THRESHOLD_MB,
   STALE_DIR_MIN_AGE_SECONDS,
 } from './workspace';
+import { shellQuote } from './kilo/utils.js';
 import {
   SandboxCapacityInspectionError,
   WorkspaceCapacityAdmissionRejectedError,
@@ -780,6 +781,22 @@ describe('disk space checking', () => {
 
       expect(mockExec).toHaveBeenCalledWith(
         expect.stringContaining('x-access-token:new-token'),
+        expect.any(Object)
+      );
+    });
+
+    it('shell-quotes caller-controlled generic git tokens', async () => {
+      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+      const workspacePath = "/workspace/user's-repo";
+      const token = "'$(touch /tmp/pwn)'";
+      const authenticatedUrl = new URL('https://example.com/repo.git');
+      authenticatedUrl.username = 'x-access-token';
+      authenticatedUrl.password = token;
+
+      await updateGitRemoteToken(fakeSession, workspacePath, 'https://example.com/repo.git', token);
+
+      expect(mockExec).toHaveBeenCalledWith(
+        `cd ${shellQuote(workspacePath)} && git remote set-url origin ${shellQuote(authenticatedUrl.toString())}`,
         expect.any(Object)
       );
     });

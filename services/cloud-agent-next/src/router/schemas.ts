@@ -240,7 +240,7 @@ const SendMessageV2Options = z.object({
     .string()
     .optional()
     .describe(
-      'Deprecated compatibility field. Accepted for older clients but ignored; provider credentials are managed by the server.'
+      'Compatibility field whose non-empty values rotate credentials for generic git repositories. Managed provider credentials remain server-resolved.'
     ),
   ...AttachmentFieldsSchema,
   messageId: MessageIdSchema.nullish().describe('Optional message ID for correlating the request'),

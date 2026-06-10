@@ -196,10 +196,16 @@ export type QueueExecutionTurnCommand = {
   finalization?: TurnFinalization;
 };
 
+/** Transient repository credential mutation applied during message admission. */
+export type RepositoryCredentialUpdate = {
+  genericGitToken: string;
+};
+
 /** Current-path submitted message before durable admission resolves identity/defaults. */
 export type SubmittedSessionMessageRequest = {
   userId: UserId;
   botId?: string;
+  repositoryCredentialUpdate?: RepositoryCredentialUpdate;
 } & QueueExecutionTurnCommand;
 
 /** Already-canonical current message intent admitted without recreating its turn identity. */

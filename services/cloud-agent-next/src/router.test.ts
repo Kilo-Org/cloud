@@ -1975,7 +1975,7 @@ describe('legacy V2 execution response compatibility', () => {
     );
   });
 
-  it('sendMessageV2 accepts deprecated token fields without queueing token overrides', async () => {
+  it('sendMessageV2 forwards only the generic git credential update', async () => {
     const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
 
     await caller.sendMessageV2({
@@ -1984,7 +1984,7 @@ describe('legacy V2 execution response compatibility', () => {
       mode: 'code',
       model: 'test-model',
       githubToken: 'deprecated-github-token',
-      gitToken: 'deprecated-git-token',
+      gitToken: 'fresh-generic-git-token',
     });
 
     const request = admitSubmittedMessage.mock.calls[0]?.[0];
@@ -1995,8 +1995,28 @@ describe('legacy V2 execution response compatibility', () => {
         prompt: 'follow up',
         attachments: undefined,
       },
+      repositoryCredentialUpdate: {
+        genericGitToken: 'fresh-generic-git-token',
+      },
     });
+    expect(request).not.toHaveProperty('githubToken');
     expect(request).not.toHaveProperty('tokenOverrides');
+  });
+
+  it('sendMessageV2 ignores an empty generic git credential update', async () => {
+    const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
+
+    await caller.sendMessageV2({
+      cloudAgentSessionId: validSessionId,
+      prompt: 'follow up',
+      mode: 'code',
+      model: 'test-model',
+      gitToken: '   ',
+    });
+
+    expect(admitSubmittedMessage.mock.calls[0]?.[0]).not.toHaveProperty(
+      'repositoryCredentialUpdate'
+    );
   });
 
   it('sendMessageV2 queues structured commands without flattening them into prompt text', async () => {

@@ -397,16 +397,34 @@ describe('CloudAgentSession message admission', () => {
         gitToken: 'old-token',
       });
 
-      const request = queueUserMessageInput({
-        userId,
-        prompt: 'followup prompt',
-        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-      });
+      const request = {
+        ...queueUserMessageInput({
+          userId,
+          prompt: 'followup prompt',
+          messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        }),
+        repositoryCredentialUpdate: {
+          genericGitToken: 'fresh-token',
+        },
+      };
 
       const startResult = await instance.admitSubmittedMessage(request);
       const metadata = await instance.getMetadata();
+      const credentialMarker = await instance.ctx.storage.get(
+        'repository_credential_update:msg_018f1e2d3c4bAbCdEfGhIjKlMn'
+      );
+      const credentialMessageId = await instance.ctx.storage.get(
+        'repository_credential_message_id'
+      );
       const pending = await listPendingSessionMessages(instance.ctx.storage);
-      return { startResult, metadata, plan: capturedPlan, pending };
+      return {
+        startResult,
+        metadata,
+        credentialMarker,
+        credentialMessageId,
+        plan: capturedPlan,
+        pending,
+      };
     });
 
     expect(result.startResult.success).toBe(true);
@@ -414,12 +432,73 @@ describe('CloudAgentSession message admission', () => {
 
     expect(result.startResult.messageId).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
     expect(result.startResult.outcome).toBe('queued');
-    expect(result.metadata?.repository?.token).toBe('old-token');
+    expect(result.metadata?.repository?.token).toBe('fresh-token');
+    expect(result.metadata?.repository).not.toHaveProperty('credentialMessageId');
+    expect(result.credentialMarker).toBeUndefined();
+    expect(result.credentialMessageId).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
     expect(result.plan).toBeNull();
     expect(result.pending).toHaveLength(1);
     expect(result.pending[0]?.messageId).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
     expect(result.pending[0]?.content).toBe('followup prompt');
     expect(result.pending[0]?.executionId).toBe(result.startResult.executionId);
+  });
+
+  it.each([
+    {
+      provider: 'GitHub',
+      userId: 'user_exec_github_credentials',
+      sessionId: 'agent_exec_github_credentials',
+      githubRepo: 'acme/repo',
+      githubToken: 'stored-github-token',
+      gitUrl: undefined,
+      platform: 'github' as const,
+    },
+    {
+      provider: 'managed GitLab',
+      userId: 'user_exec_gitlab_credentials',
+      sessionId: 'agent_exec_gitlab_credentials',
+      githubRepo: undefined,
+      githubToken: undefined,
+      gitUrl: 'https://gitlab.com/acme/repo.git',
+      platform: 'gitlab' as const,
+    },
+  ])('ignores generic credential updates for $provider repositories', async fixture => {
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${fixture.userId}:${fixture.sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId: fixture.sessionId,
+        userId: fixture.userId,
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-followup',
+        githubRepo: fixture.githubRepo,
+        githubToken: fixture.githubToken,
+        gitUrl: fixture.gitUrl,
+        platform: fixture.platform,
+      });
+      const before = await instance.getMetadata();
+      const admission = await instance.admitSubmittedMessage({
+        ...queueUserMessageInput({
+          userId: fixture.userId,
+          prompt: 'followup prompt',
+          messageId:
+            fixture.platform === 'github'
+              ? 'msg_018f1e2d3c4bAbCdEfGhIjKlM1'
+              : 'msg_018f1e2d3c4bAbCdEfGhIjKlM2',
+        }),
+        repositoryCredentialUpdate: {
+          genericGitToken: 'caller-generic-token',
+        },
+      });
+      const after = await instance.getMetadata();
+      return { admission, before, after };
+    });
+
+    expect(result.admission.success).toBe(true);
+    expect(result.after?.repository).toEqual(result.before?.repository);
   });
 
   it('flushes queued follow-up using the originally queued execution options', async () => {
@@ -928,26 +1007,125 @@ describe('CloudAgentSession message admission', () => {
         })
       );
       await instance.alarm();
-      const retryResult = await instance.admitSubmittedMessage(
-        queueUserMessageInput({
+      const retryResult = await instance.admitSubmittedMessage({
+        ...queueUserMessageInput({
           userId,
           prompt: 'accept once',
           messageId: 'msg_018f1e2d3c4bActRetAbCdEfGh',
-        })
-      );
+        }),
+        repositoryCredentialUpdate: {
+          genericGitToken: 'retry-token',
+        },
+      });
+      const metadata = await instance.getMetadata();
       const pending = await listPendingSessionMessages(instance.ctx.storage);
-      return { retryResult, pending, callCount };
+      return { retryResult, metadata, pending, callCount };
     });
 
     expect(result.retryResult.success).toBe(true);
     if (!result.retryResult.success) return;
     expect(result.retryResult.outcome).toBe('queued');
     expect(result.retryResult.compatibilityDelivery).toBe('sent');
+    expect(result.metadata?.repository?.token).toBe('retry-token');
     expect(result.pending).toHaveLength(0);
     expect(result.callCount).toBe(1);
   });
 
-  it('does not persist token overrides when model validation fails', async () => {
+  it('does not let an older credential retry without queue state roll back a newer token', async () => {
+    const userId = 'user_exec_credential_order' as const;
+    const sessionId = 'agent_exec_credential_order' as const;
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-followup',
+        gitUrl: 'https://example.com/repo.git',
+        gitToken: 'old-token',
+      });
+      const firstMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlN1';
+      const firstRequest = {
+        ...queueUserMessageInput({
+          userId,
+          prompt: 'first followup',
+          messageId: firstMessageId,
+        }),
+        repositoryCredentialUpdate: {
+          genericGitToken: 'first-token',
+        },
+      };
+      await (instance as any).applyRepositoryCredentialUpdate(
+        firstMessageId,
+        firstRequest.repositoryCredentialUpdate
+      );
+      await instance.admitSubmittedMessage({
+        ...queueUserMessageInput({
+          userId,
+          prompt: 'second followup',
+          messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlN2',
+        }),
+        repositoryCredentialUpdate: {
+          genericGitToken: 'second-token',
+        },
+      });
+      const replay = await instance.admitSubmittedMessage({
+        ...firstRequest,
+        repositoryCredentialUpdate: {
+          genericGitToken: 'replayed-first-token',
+        },
+      });
+      const metadata = await instance.getMetadata();
+      return { replay, metadata };
+    });
+
+    expect(result.replay.success).toBe(true);
+    expect(result.metadata?.repository?.token).toBe('second-token');
+  });
+
+  it('does not rotate generic credentials for a mismatched message replay', async () => {
+    const userId = 'user_exec_credential_mismatch' as const;
+    const sessionId = 'agent_exec_credential_mismatch' as const;
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-followup',
+        gitUrl: 'https://example.com/repo.git',
+        gitToken: 'old-token',
+      });
+      const messageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlN3';
+      await instance.admitSubmittedMessage({
+        ...queueUserMessageInput({ userId, prompt: 'original', messageId }),
+        repositoryCredentialUpdate: {
+          genericGitToken: 'accepted-token',
+        },
+      });
+      const replay = await instance.admitSubmittedMessage({
+        ...queueUserMessageInput({ userId, prompt: 'changed', messageId }),
+        repositoryCredentialUpdate: {
+          genericGitToken: 'rejected-token',
+        },
+      });
+      const metadata = await instance.getMetadata();
+      return { replay, metadata };
+    });
+
+    expect(result.replay).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    expect(result.metadata?.repository?.token).toBe('accepted-token');
+  });
+
+  it('does not rotate generic credentials when model validation fails', async () => {
     const userId = 'user_exec_invalid_model' as const;
     const sessionId = 'agent_exec_invalid_model' as const;
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -966,14 +1144,17 @@ describe('CloudAgentSession message admission', () => {
         gitToken: 'old-token',
       });
 
-      const startResult = await instance.admitSubmittedMessage(
-        queueUserMessageInput({
+      const startResult = await instance.admitSubmittedMessage({
+        ...queueUserMessageInput({
           userId,
           prompt: 'bad model',
           model: '',
           messageId: 'msg_018f1e2d3c4bInvModAbCdEfGh',
-        })
-      );
+        }),
+        repositoryCredentialUpdate: {
+          genericGitToken: 'rejected-token',
+        },
+      });
       const metadata = await instance.getMetadata();
       const pending = await listPendingSessionMessages(instance.ctx.storage);
       return { startResult, metadata, pending };

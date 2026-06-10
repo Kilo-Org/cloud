@@ -1592,7 +1592,9 @@ export class SessionService {
         ...(repositoryShallow(metadata) !== undefined
           ? { shallow: repositoryShallow(metadata) }
           : {}),
-        refreshRemote: tokens.gitlabTokenManaged === true,
+        refreshRemote:
+          tokens.gitToken !== undefined &&
+          (git.type === 'git' || tokens.gitlabTokenManaged === true),
       };
     }
 
@@ -1988,12 +1990,12 @@ export class SessionService {
    * Refresh the embedded credentials in the workspace's git remote URL on the
    * warm fast path.
    *
-   * GitHub App installation tokens expire after ~1h, and server-resolved GitLab
-   * credentials can rotate independently of a warm workspace. The URL-embedded
-   * credentials from the original clone go stale quickly. `GH_TOKEN` /
-   * `GITLAB_TOKEN` env vars don't rescue `git` itself (they only affect the
-   * provider CLIs / GitLab HTTP integrations), so we rewrite `origin` whenever
-   * the token is resolved by us.
+   * GitHub App installation tokens, server-resolved GitLab credentials, and
+   * caller-managed generic git credentials can all rotate independently of a
+   * warm workspace. The URL-embedded credentials from the original clone go
+   * stale quickly. `GH_TOKEN` / `GITLAB_TOKEN` env vars don't rescue `git`
+   * itself (they only affect the provider CLIs / GitLab HTTP integrations), so
+   * we rewrite `origin` whenever current credentials are available.
    */
   private async refreshGitRemoteToken(
     session: ExecutionSession,
@@ -2018,7 +2020,10 @@ export class SessionService {
 
     const git = gitRepository(metadata);
     if (git) {
-      if (tokens.gitToken !== undefined && tokens.gitlabTokenManaged === true) {
+      if (
+        tokens.gitToken !== undefined &&
+        (git.type === 'git' || tokens.gitlabTokenManaged === true)
+      ) {
         await updateGitRemoteToken(
           session,
           context.workspacePath,

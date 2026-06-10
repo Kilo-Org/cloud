@@ -10,6 +10,7 @@ import { TRPCError } from '@trpc/server';
 
 import type {
   QueueExecutionTurnCommand,
+  RepositoryCredentialUpdate,
   SessionMessageAdmissionResult,
   SubmittedSessionMessageRequest,
   RetryableResultCode,
@@ -70,6 +71,7 @@ export function throwAdmissionError(
 
 export type QueueMessageInput = {
   cloudAgentSessionId: string;
+  repositoryCredentialUpdate?: RepositoryCredentialUpdate;
 } & QueueExecutionTurnCommand;
 
 export type QueueMessageContext = {
@@ -153,6 +155,9 @@ export async function queueMessage(
     },
     agent: input.agent,
     finalization: input.finalization,
+    ...(input.repositoryCredentialUpdate
+      ? { repositoryCredentialUpdate: input.repositoryCredentialUpdate }
+      : {}),
   };
 
   const result = await withDORetry<

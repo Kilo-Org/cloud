@@ -126,6 +126,10 @@ export function createSessionExecutionV2Handlers() {
               autoCommit: input.autoCommit,
               condenseOnComplete: input.condenseOnComplete,
             } satisfies TurnFinalization,
+            repositoryCredentialUpdate:
+              input.gitToken !== undefined && input.gitToken.trim().length > 0
+                ? { genericGitToken: input.gitToken }
+                : undefined,
           };
           const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
           const ack =

@@ -72,6 +72,7 @@ import type {
   MessageDeliveryRequest,
   AdmitAcceptedSessionMessageRequest,
   LegacyRegisteredInitialAdmissionRequest,
+  RepositoryCredentialUpdate,
   MessageDeliveryResult,
   SessionMessageAdmissionResult,
   SubmittedSessionMessageRequest,
@@ -155,6 +156,8 @@ const EVENT_RETENTION_MS = Limits.SESSION_TTL_MS;
 
 /** Storage key for tracking last activity timestamp */
 const LAST_ACTIVITY_KEY = 'last_activity';
+const REPOSITORY_CREDENTIAL_MESSAGE_ID_KEY = 'repository_credential_message_id';
+const REPOSITORY_CREDENTIAL_UPDATE_PREFIX = 'repository_credential_update:';
 const EXPLICIT_DELETION_PENDING_KEY = 'explicit_deletion_pending';
 
 /** Kilo server idle timeout: 15 minutes */
@@ -597,6 +600,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       this.sessionMessageQueue = createSessionMessageQueue({
         storage: this.ctx.storage,
         getMetadata: () => this.getMetadata(),
+        applyRepositoryCredentialUpdate: (messageId, update, replay) =>
+          this.applyRepositoryCredentialUpdate(messageId, update, replay),
+        finalizeRepositoryCredentialUpdate: messageId =>
+          this.finalizeRepositoryCredentialUpdate(messageId),
         requireSessionId: () => this.requireSessionId(),
         validateModeAgainstRuntimeAgents,
         getDeliveryContext: () => this.getPendingMessageDeliveryContext(),
@@ -1116,6 +1123,55 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     // Track activity for session TTL
     await this.updateLastActivity();
+  }
+
+  private async applyRepositoryCredentialUpdate(
+    messageId: string,
+    update: RepositoryCredentialUpdate,
+    replay: boolean
+  ): Promise<void> {
+    const credentialUpdateKey = `${REPOSITORY_CREDENTIAL_UPDATE_PREFIX}${messageId}`;
+    const stored = await this.ctx.storage.get([
+      'metadata',
+      REPOSITORY_CREDENTIAL_MESSAGE_ID_KEY,
+      credentialUpdateKey,
+    ]);
+    const storedMetadata = stored.get('metadata');
+    const metadata = storedMetadata ? parseSessionMetadata(storedMetadata) : null;
+    if (metadata?.repository?.type !== 'git') return;
+
+    const currentCredentialMessageId = stored.get(REPOSITORY_CREDENTIAL_MESSAGE_ID_KEY);
+    const credentialUpdateWasApplied = stored.get(credentialUpdateKey) === true;
+    if (
+      currentCredentialMessageId !== undefined &&
+      currentCredentialMessageId !== messageId &&
+      (replay || credentialUpdateWasApplied)
+    ) {
+      return;
+    }
+
+    const now = Date.now();
+    const serialized = serializeSessionMetadata({
+      ...metadata,
+      repository: {
+        ...metadata.repository,
+        token: update.genericGitToken,
+      },
+      lifecycle: {
+        ...metadata.lifecycle,
+        version: now,
+      },
+    });
+    await this.ctx.storage.put({
+      metadata: serialized,
+      [REPOSITORY_CREDENTIAL_MESSAGE_ID_KEY]: messageId,
+      [credentialUpdateKey]: true,
+      [LAST_ACTIVITY_KEY]: now,
+    });
+  }
+
+  private async finalizeRepositoryCredentialUpdate(messageId: string): Promise<void> {
+    await this.ctx.storage.delete(`${REPOSITORY_CREDENTIAL_UPDATE_PREFIX}${messageId}`);
   }
 
   /**

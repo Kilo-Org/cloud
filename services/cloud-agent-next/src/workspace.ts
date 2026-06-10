@@ -882,7 +882,7 @@ export async function updateGitRemoteToken(
 
   const result = await timedExec(
     session,
-    `cd '${workspacePath}' && git remote set-url origin '${newUrl.toString()}'`,
+    `cd ${shellQuote(workspacePath)} && git remote set-url origin ${shellQuote(newUrl.toString())}`,
     'git.updateRemoteToken'
   );
 

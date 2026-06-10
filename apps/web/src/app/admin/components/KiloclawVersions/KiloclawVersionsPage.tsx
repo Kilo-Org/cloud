@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Badge } from '@/components/ui/badge';
@@ -388,6 +388,40 @@ function InstanceDistributionPanel() {
   );
 
   const total = data?.total ?? 0;
+  const rows = data?.rows ?? [];
+
+  // Classify each bucket for color + label. Mirrors the catalog table accents:
+  // blue = :latest, purple = candidate, red = disabled, amber = old/superseded,
+  // muted = "no tag yet" (DO hasn't reconciled). `pct` is unrounded so the bar
+  // segments stay proportional; the legend rounds for display.
+  const segments = rows.map((row, i) => {
+    const isLatest = row.is_latest === true;
+    const isCandidate = !isLatest && (row.rollout_percent ?? 0) > 0;
+    const isDisabled = row.status === 'disabled';
+    const isUnknown = row.tracked_image_tag == null;
+    const color = isLatest
+      ? 'bg-blue-600'
+      : isCandidate
+        ? 'bg-purple-600'
+        : isDisabled
+          ? 'bg-red-800'
+          : isUnknown
+            ? 'bg-muted-foreground/40'
+            : 'bg-amber-600';
+    const label = isUnknown ? 'no tag yet' : (row.openclaw_version ?? row.tracked_image_tag ?? '');
+    const pct = total > 0 ? (row.count / total) * 100 : 0;
+    return {
+      key: row.tracked_image_tag ?? `__unknown__${i}`,
+      color,
+      label,
+      pct,
+      count: row.count,
+      pinnedCount: row.pinned_count,
+      isUnknown,
+      isCandidate,
+      rolloutPercent: row.rollout_percent,
+    };
+  });
 
   return (
     <Card>
@@ -421,126 +455,54 @@ function InstanceDistributionPanel() {
           <div className="flex justify-center py-4">
             <Loader2 className="h-4 w-4 animate-spin" />
           </div>
-        ) : !data || data.rows.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="text-muted-foreground text-sm">No active instances.</p>
         ) : (
           <div className="flex flex-col gap-3">
+            {/* Single stacked bar — fixed height regardless of how many versions
+                are in the fleet, so it never pushes the catalog table down. */}
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+              {segments.map(seg => (
+                <div
+                  key={seg.key}
+                  className={seg.color}
+                  style={{ width: `${seg.pct}%`, minWidth: seg.count > 0 ? '3px' : 0 }}
+                  title={`${seg.label}: ${seg.count} (${Math.round(seg.pct)}%)`}
+                />
+              ))}
+            </div>
+            {/* Compact wrapping legend — grows far slower than a row-per-version table. */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
+              {segments.map(seg => (
+                <div key={seg.key} className="flex items-center gap-1.5">
+                  <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-sm ${seg.color}`} />
+                  <span
+                    className={seg.isUnknown ? 'text-muted-foreground italic' : ''}
+                    title={seg.label}
+                  >
+                    {seg.label.length > 22 ? `${seg.label.slice(0, 22)}…` : seg.label}
+                  </span>
+                  {seg.isCandidate && (
+                    <Badge className="bg-purple-600 px-1 py-0 text-[10px] text-white">
+                      <Rocket className="mr-0.5 h-2.5 w-2.5" />
+                      {seg.rolloutPercent}%
+                    </Badge>
+                  )}
+                  <span className="font-medium tabular-nums">{Math.round(seg.pct)}%</span>
+                  <span className="text-muted-foreground tabular-nums">({seg.count})</span>
+                  {seg.pinnedCount > 0 && (
+                    <span className="text-muted-foreground inline-flex items-center gap-0.5">
+                      <Anchor className="h-3 w-3" />
+                      {seg.pinnedCount}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
             <p className="text-muted-foreground text-xs">
               {total} active instance{total === 1 ? '' : 's'} · tag data from DO reconciler, may lag
               ~30 min for idle instances
             </p>
-            <div className="overflow-hidden rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Image Tag</TableHead>
-                    <TableHead>OpenClaw</TableHead>
-                    <TableHead>State</TableHead>
-                    <TableHead>Count</TableHead>
-                    <TableHead className="w-[60px]">Fleet %</TableHead>
-                    <TableHead className="w-[70px]">Pinned</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.rows.map((row, i) => {
-                    const isLatest = row.is_latest === true;
-                    const isCandidate = !isLatest && (row.rollout_percent ?? 0) > 0;
-                    const isDisabled = row.status === 'disabled';
-                    const isUnknown = row.tracked_image_tag == null;
-
-                    const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
-
-                    const accent = isLatest
-                      ? 'border-l-4 border-l-blue-600'
-                      : isCandidate
-                        ? 'border-l-4 border-l-purple-600'
-                        : isDisabled
-                          ? 'border-l-4 border-l-red-800'
-                          : isUnknown
-                            ? 'border-l-4 border-l-border'
-                            : 'border-l-4 border-l-amber-600';
-
-                    const barColor = isLatest
-                      ? 'bg-blue-600'
-                      : isCandidate
-                        ? 'bg-purple-600'
-                        : isDisabled
-                          ? 'bg-red-800/60'
-                          : isUnknown
-                            ? 'bg-muted-foreground/30'
-                            : 'bg-amber-600/60';
-
-                    return (
-                      <TableRow key={row.tracked_image_tag ?? `__unknown__${i}`} className={accent}>
-                        <TableCell>
-                          {isUnknown ? (
-                            <span className="text-muted-foreground text-xs italic">no tag yet</span>
-                          ) : (
-                            <code className="text-xs" title={row.tracked_image_tag ?? undefined}>
-                              {(row.tracked_image_tag ?? '').length > 28
-                                ? `${row.tracked_image_tag!.slice(0, 28)}…`
-                                : row.tracked_image_tag}
-                            </code>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {row.openclaw_version ?? <span className="text-muted-foreground">—</span>}
-                        </TableCell>
-                        <TableCell>
-                          {isLatest ? (
-                            <Badge className="bg-blue-600 text-xs text-white">
-                              <Anchor className="mr-1 h-3 w-3" />
-                              :latest
-                            </Badge>
-                          ) : isCandidate ? (
-                            <Badge className="bg-purple-600 text-xs text-white">
-                              <Rocket className="mr-1 h-3 w-3" />
-                              {row.rollout_percent}%
-                            </Badge>
-                          ) : isDisabled ? (
-                            <Badge variant="destructive" className="text-xs">
-                              disabled
-                            </Badge>
-                          ) : isUnknown ? (
-                            <Badge variant="outline" className="text-muted-foreground text-xs">
-                              unknown
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-muted-foreground text-xs">
-                              old
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className={`h-full rounded-full ${barColor}`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-medium tabular-nums">{row.count}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm tabular-nums">
-                          {pct}%
-                        </TableCell>
-                        <TableCell>
-                          {row.pinned_count > 0 ? (
-                            <Badge variant="secondary" className="text-xs">
-                              <Anchor className="mr-1 h-3 w-3" />
-                              {row.pinned_count}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
           </div>
         )}
       </CardContent>
@@ -604,6 +566,21 @@ export function VersionsTab() {
       sortDir,
     })
   );
+
+  // Live fleet distribution by image tag, powering the per-row "Fleet" column.
+  // This is the SAME query the InstanceDistributionPanel uses, so React Query
+  // dedupes it — no extra network round-trip.
+  const { data: distribution } = useQuery(
+    trpc.admin.kiloclawVersions.getVersionDistribution.queryOptions()
+  );
+  const fleetTotal = distribution?.total ?? 0;
+  const fleetByTag = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of distribution?.rows ?? []) {
+      if (row.tracked_image_tag != null) map.set(row.tracked_image_tag, row.count);
+    }
+    return map;
+  }, [distribution]);
 
   // Rows that are eligible for bulk disable on the current page. Excludes
   // :latest (kiloclaw service refuses to disable it) and already-disabled
@@ -896,6 +873,7 @@ export function VersionsTab() {
                 activeDir={sortDir}
                 onSort={handleSort}
               />
+              <TableHead className="w-[110px]">Instances</TableHead>
               <SortableHeader
                 column="published_at"
                 label="Published"
@@ -909,13 +887,13 @@ export function VersionsTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center">
+                <TableCell colSpan={8} className="text-center">
                   <Loader2 className="mx-auto h-4 w-4 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : data?.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground text-center">
+                <TableCell colSpan={8} className="text-muted-foreground text-center">
                   No versions found
                 </TableCell>
               </TableRow>
@@ -933,6 +911,8 @@ export function VersionsTab() {
                   : isCandidate
                     ? 'border-l-4 border-l-purple-600'
                     : 'border-l-4 border-l-transparent';
+                const fleetCount = fleetByTag.get(version.image_tag) ?? 0;
+                const fleetPct = fleetTotal > 0 ? Math.round((fleetCount / fleetTotal) * 100) : 0;
                 return (
                   <TableRow key={version.id} className={accent}>
                     <TableCell className="py-2">
@@ -990,6 +970,27 @@ export function VersionsTab() {
                         <Badge variant="outline" className="text-muted-foreground">
                           available
                         </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm tabular-nums">
+                      {fleetTotal > 0 && fleetCount > 0 ? (
+                        <div
+                          className="flex items-center gap-2"
+                          title={`${fleetCount} of ${fleetTotal} active instances`}
+                        >
+                          <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={`h-full rounded-full ${isLatest ? 'bg-blue-600' : isCandidate ? 'bg-purple-600' : 'bg-amber-600'}`}
+                              style={{ width: `${fleetPct}%` }}
+                            />
+                          </div>
+                          <span>
+                            {fleetPct}%{' '}
+                            <span className="text-muted-foreground">({fleetCount})</span>
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">

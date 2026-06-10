@@ -74,7 +74,7 @@ export function AutoFixConfigForm({ organizationId }: AutoFixConfigFormProps) {
   // Update local state when config loads
   useEffect(() => {
     if (configData) {
-      setIsEnabled(configData.isEnabled);
+      setIsEnabled(configData.enabled_for_issues);
       setRepositorySelectionMode(configData.repository_selection_mode || 'all');
       setSelectedRepositoryIds(configData.selected_repository_ids || []);
       setSkipLabels((configData.skip_labels || []).join(', '));

@@ -27,6 +27,7 @@ import {
   Megaphone,
   Coins,
   Scale,
+  Route,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -193,6 +194,11 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'Gateway',
     url: '/admin/gateway',
     icon: () => <Network />,
+  },
+  {
+    title: () => 'Auto Routing',
+    url: '/admin/auto-routing',
+    icon: () => <Route />,
   },
   {
     title: () => 'Coding plans',

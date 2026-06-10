@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from './index';
 
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
@@ -6,13 +6,26 @@ const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 vi.mock('./model-classifier', () => ({ classifyNormalizedInput }));
 
 const writeDataPoint = vi.fn();
+const configGet = vi.fn();
+const configPut = vi.fn();
+const analyticsTokenGet = vi.fn();
+const originalFetch = globalThis.fetch;
+const mockedFetch = vi.fn<typeof globalThis.fetch>();
 
 const env = {
   INTERNAL_API_SECRET_PROD: {
     get: async () => 'classifier-token',
   },
+  AUTO_ROUTING_CONFIG: {
+    get: configGet,
+    put: configPut,
+  },
   AUTO_ROUTING_CLASSIFIER_METRICS: {
     writeDataPoint,
+  },
+  O11Y_CF_ACCOUNT_ID: 'test-account-id',
+  O11Y_CF_AE_API_TOKEN: {
+    get: analyticsTokenGet,
   },
 };
 
@@ -37,11 +50,25 @@ function request(path: string, init: RequestInit = {}) {
   return app.request(`https://auto-routing.example.com${path}`, init, env);
 }
 
+function localRequest(path: string, init: RequestInit = {}) {
+  return app.request(`http://localhost:8810${path}`, init, env);
+}
+
 describe('auto routing worker', () => {
   beforeEach(() => {
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
     writeDataPoint.mockReset();
+    configGet.mockReset();
+    configPut.mockReset();
+    analyticsTokenGet.mockReset();
+    analyticsTokenGet.mockResolvedValue('analytics-token');
+    mockedFetch.mockReset();
+    globalThis.fetch = mockedFetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   it('returns health without requiring classifier payload fields', async () => {
@@ -452,5 +479,178 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('returns the configured classifier model', async () => {
+    configGet.mockResolvedValueOnce('google/gemma-4-31b-it');
+
+    const response = await request('/admin/classifier-model', {
+      headers: { authorization: 'Bearer classifier-token' },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      model: 'google/gemma-4-31b-it',
+      defaultModel: 'google/gemma-4-31b-it',
+    });
+    expect(configGet).toHaveBeenCalledWith('classifier_model');
+  });
+
+  it('updates the configured classifier model', async () => {
+    const response = await request('/admin/classifier-model', {
+      method: 'PUT',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ model: 'google/gemma-4-31b-it:free' }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      model: 'google/gemma-4-31b-it:free',
+      defaultModel: 'google/gemma-4-31b-it',
+    });
+    expect(configPut).toHaveBeenCalledWith('classifier_model', 'google/gemma-4-31b-it:free');
+  });
+
+  it('rejects blank classifier model updates', async () => {
+    const response = await request('/admin/classifier-model', {
+      method: 'PUT',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ model: '   ' }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid classifier model' });
+    expect(configPut).not.toHaveBeenCalled();
+  });
+
+  it('queries classifier analytics for a selected period', async () => {
+    mockedFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              total_requests: 10,
+              classified_requests: 8,
+              classifier_errors: 1,
+              invalid_requests: 1,
+              total_cost_credits: 0.0000123,
+              avg_duration_ms: 123.4,
+              p95_duration_ms: 456.7,
+              avg_confidence: 0.82,
+              with_session_id: 9,
+              unique_sessions: '7',
+              requires_tools: 5,
+              mirrored_has_tools: 6,
+              avg_body_bytes: 2048,
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+    mockedFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              { status: 'classified', requests: 8 },
+              { status: 'classifier_error', requests: 1 },
+            ],
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [{ task_type: 'implementation', requests: 5, avg_confidence: 0.9 }],
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [{ classifier_model: 'google/gemma-4-31b-it', requests: 10 }],
+          }),
+          { status: 200 }
+        )
+      );
+
+    const response = await request('/admin/classifier-analytics?period=24h', {
+      headers: { authorization: 'Bearer classifier-token' },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      period: '24h',
+      summary: {
+        totalRequests: 10,
+        classifiedRequests: 8,
+        classifierErrors: 1,
+        invalidRequests: 1,
+        totalCostCredits: 0.0000123,
+        avgDurationMs: 123.4,
+        p95DurationMs: 456.7,
+        avgConfidence: 0.82,
+        withSessionId: 9,
+        uniqueSessions: 7,
+        requiresTools: 5,
+        mirroredHasTools: 6,
+        avgBodyBytes: 2048,
+      },
+      statusBreakdown: [
+        { status: 'classified', requests: 8 },
+        { status: 'classifier_error', requests: 1 },
+      ],
+      taskTypeBreakdown: [{ taskType: 'implementation', requests: 5, avgConfidence: 0.9 }],
+      classifierModelBreakdown: [{ classifierModel: 'google/gemma-4-31b-it', requests: 10 }],
+    });
+    expect(analyticsTokenGet).toHaveBeenCalled();
+    expect(mockedFetch).toHaveBeenCalledWith(
+      'https://api.cloudflare.com/client/v4/accounts/test-account-id/analytics_engine/sql',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { Authorization: 'Bearer analytics-token' },
+      })
+    );
+  });
+
+  it('returns empty analytics locally when the local Analytics Engine secret is absent', async () => {
+    analyticsTokenGet.mockRejectedValueOnce(new Error('Secret "O11Y_CF_AE_API_TOKEN" not found'));
+
+    const response = await localRequest('/admin/classifier-analytics?period=1h', {
+      headers: { authorization: 'Bearer classifier-token' },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      period: '1h',
+      summary: {
+        totalRequests: 0,
+        classifiedRequests: 0,
+        classifierErrors: 0,
+        invalidRequests: 0,
+        totalCostCredits: 0,
+        avgDurationMs: 0,
+        p95DurationMs: 0,
+        avgConfidence: 0,
+        withSessionId: 0,
+        uniqueSessions: 0,
+        requiresTools: 0,
+        mirroredHasTools: 0,
+        avgBodyBytes: 0,
+      },
+      statusBreakdown: [],
+      taskTypeBreakdown: [],
+      classifierModelBreakdown: [],
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 });

@@ -10,3 +10,16 @@ export async function getClassifierModel(env: ClassifierConfigEnv): Promise<stri
 
   return trimmedModel && trimmedModel.length > 0 ? trimmedModel : DEFAULT_CLASSIFIER_MODEL;
 }
+
+export async function setClassifierModel(
+  env: ClassifierConfigEnv,
+  model: string
+): Promise<string | null> {
+  const trimmedModel = model.trim();
+  if (trimmedModel.length === 0) {
+    return null;
+  }
+
+  await env.AUTO_ROUTING_CONFIG.put(CLASSIFIER_MODEL_CONFIG_KEY, trimmedModel);
+  return trimmedModel;
+}

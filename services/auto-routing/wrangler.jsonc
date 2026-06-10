@@ -22,6 +22,9 @@
   "observability": {
     "enabled": true,
   },
+  "vars": {
+    "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+  },
   "analytics_engine_datasets": [
     {
       "binding": "AUTO_ROUTING_CLASSIFIER_METRICS",
@@ -44,6 +47,11 @@
       "binding": "OPENROUTER_API_KEY",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "OPENROUTER_API_KEY",
+    },
+    {
+      "binding": "O11Y_CF_AE_API_TOKEN",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "O11Y_CF_AE_API_TOKEN",
     },
   ],
 }

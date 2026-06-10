@@ -561,23 +561,31 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
 
   /**
    * Returns a breakdown of the ACTIVE fleet grouped by each instance's
-   * last-reported `tracked_image_tag`. Joined with the catalog so callers can
-   * classify each bucket as :latest, candidate, old-available, disabled, or
-   * "no tag yet" (null — DO hasn't reconciled yet).
+   * `tracked_image_tag`. Joined with the catalog so callers can classify each
+   * bucket as :latest, candidate, old-available, disabled, or "no tag yet"
+   * (null — DO hasn't reconciled yet).
    *
    * "Active" uses the same predicate as admin instance listing and fleet-upgrade
    * logic — not destroyed, not trial-stopped, and not suspended — so these
-   * counts match the live, billable fleet rather than inflating rollout
-   * percentages with suspended/trial-stopped instances. The subscriptions inner
-   * join is safe for COUNT(*): `instance_id` is unique on kiloclaw_subscriptions
+   * counts match the billable fleet rather than inflating percentages with
+   * suspended/trial-stopped instances. The subscriptions inner join is safe for
+   * COUNT(*): `instance_id` is unique on kiloclaw_subscriptions
    * (UQ_kiloclaw_subscriptions_instance), so it never multiplies instance rows.
+   *
+   * IMPORTANT: `tracked_image_tag` is the instance's TARGET tag — the image it
+   * will run on its next provision/restart/redeploy — not necessarily the image
+   * currently executing. `applyPinnedVersion` (and rollout selection) write the
+   * resolved tag into DO state without restarting the machine, and the alarm
+   * later denormalizes it here. So this is a "target version" distribution, not
+   * a live-running census; an instance can appear in a new bucket before it has
+   * actually redeployed. The UI labels it accordingly.
    *
    * `pinned_count` tells how many instances in that bucket have an admin pin —
    * useful when assessing rollout coverage since pinned instances are immune to
    * the rollout selector.
    *
-   * Note: `tracked_image_tag` is a denormalized column updated by the DO alarm
-   * reconciler; it may lag up to ~30 min for idle instances.
+   * Note: denormalized by the DO alarm reconciler; may lag up to ~30 min for
+   * idle instances.
    */
   getVersionDistribution: adminProcedure.query(async () => {
     const rows = await db

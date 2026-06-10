@@ -383,7 +383,7 @@ function StartRolloutButton({
  */
 function InstanceDistributionPanel() {
   const trpc = useTRPC();
-  const { data, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery(
+  const { data, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useQuery(
     trpc.admin.kiloclawVersions.getVersionDistribution.queryOptions()
   );
 
@@ -458,6 +458,26 @@ function InstanceDistributionPanel() {
           <div className="flex justify-center py-4">
             <Loader2 className="h-4 w-4 animate-spin" />
           </div>
+        ) : isError ? (
+          // Distinguish a load failure from a genuinely empty fleet — rendering
+          // "No active instances" on error would hide an outage as valid
+          // zero-fleet data and could mislead rollout decisions.
+          <div className="flex items-center justify-between gap-3 rounded-md border border-red-800/50 bg-red-950/20 px-3 py-2.5 text-sm">
+            <span className="flex items-center gap-2 text-red-300">
+              <AlertTriangle className="h-4 w-4" />
+              Couldn't load distribution — counts unavailable.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw className={`mr-1 h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+              Retry
+            </Button>
+          </div>
         ) : rows.length === 0 ? (
           <p className="text-muted-foreground text-sm">No active instances.</p>
         ) : (
@@ -503,8 +523,10 @@ function InstanceDistributionPanel() {
               ))}
             </div>
             <p className="text-muted-foreground text-xs">
-              {total} active instance{total === 1 ? '' : 's'} · tag data from DO reconciler, may lag
-              ~30 min for idle instances
+              {total} active instance{total === 1 ? '' : 's'} · grouped by each instance's{' '}
+              <span className="font-medium">target</span> image tag (applied on next
+              provision/restart/redeploy — an instance may still be running its previous image until
+              then). Denormalized from the DO; may lag ~30 min for idle instances.
             </p>
           </div>
         )}
@@ -573,7 +595,7 @@ export function VersionsTab() {
   // Live fleet distribution by image tag, powering the per-row "Fleet" column.
   // This is the SAME query the InstanceDistributionPanel uses, so React Query
   // dedupes it — no extra network round-trip.
-  const { data: distribution } = useQuery(
+  const { data: distribution, isError: distributionError } = useQuery(
     trpc.admin.kiloclawVersions.getVersionDistribution.queryOptions()
   );
   const fleetTotal = distribution?.total ?? 0;
@@ -976,10 +998,16 @@ export function VersionsTab() {
                       )}
                     </TableCell>
                     <TableCell className="text-sm tabular-nums">
-                      {fleetTotal > 0 && fleetCount > 0 ? (
+                      {distributionError ? (
+                        // Counts failed to load — don't render "—", which would
+                        // imply a confirmed zero instances on this version.
+                        <span className="text-muted-foreground italic" title="Counts unavailable">
+                          n/a
+                        </span>
+                      ) : fleetTotal > 0 && fleetCount > 0 ? (
                         <div
                           className="flex items-center gap-2"
-                          title={`${fleetCount} of ${fleetTotal} active instances`}
+                          title={`${fleetCount} of ${fleetTotal} active instances target this version`}
                         >
                           <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
                             <div

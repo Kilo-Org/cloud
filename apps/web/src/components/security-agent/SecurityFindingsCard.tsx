@@ -322,13 +322,13 @@ export function SecurityFindingsCard({
 
       <div className="border-border overflow-hidden rounded-xl border">
         {state.isLoading ? (
-          <output className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
+          <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
             <RefreshCw
               className="size-5 animate-spin motion-reduce:animate-none"
               aria-hidden="true"
             />
             Loading findings...
-          </output>
+          </div>
         ) : findings.length === 0 ? (
           <div className="text-muted-foreground flex flex-col items-center justify-center px-6 py-12 text-center">
             <AlertTriangle className="mb-2 size-8" aria-hidden="true" />

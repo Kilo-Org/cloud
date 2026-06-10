@@ -469,7 +469,7 @@ function LoadingPanel({
   children?: React.ReactNode;
 }) {
   return (
-    <output
+    <div
       className="block rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3"
       aria-live="polite"
     >
@@ -479,7 +479,7 @@ function LoadingPanel({
       </div>
       {detail && <p className="text-muted-foreground mt-1 text-xs">{detail}</p>}
       {children && <div className="mt-2">{children}</div>}
-    </output>
+    </div>
   );
 }
 

@@ -48,12 +48,13 @@ export function StatusOverview({
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <output className="block space-y-4" aria-label="Loading finding status">
+          <div className="block space-y-4" aria-live="polite">
+            <span className="sr-only">Loading finding status</span>
             <Skeleton className="h-8 w-24" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
-          </output>
+          </div>
         ) : total === 0 ? (
           <p className="text-muted-foreground py-8 text-center text-sm">
             No findings synced yet. Refresh GitHub data to check your repositories.

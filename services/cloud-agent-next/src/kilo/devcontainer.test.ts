@@ -58,7 +58,10 @@ describe('sandbox image versions', () => {
     expect(dindDockerfile).toContain(`ARG SANDBOX_VERSION="${sandboxVersion}"`);
   });
 
-  it('keeps the Kilo SDK and CLI pins aligned across sandbox runtimes', () => {
+  it('keeps the Kilo SDK pins and CLI runtime pins internally aligned', () => {
+    const packageJson = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url).href), 'utf8')
+    ) as { devDependencies: Record<string, string> };
     const wrapperPackageJson = JSON.parse(
       readFileSync(
         fileURLToPath(new URL('../../wrapper/package.json', import.meta.url).href),
@@ -83,7 +86,9 @@ describe('sandbox image versions', () => {
     );
     const imageVar = `"KILOCODE_CLI_VERSION": "${KILO_CLI_VERSION}"`;
 
-    expect(wrapperPackageJson.dependencies['@kilocode/sdk']).toBe(KILO_CLI_VERSION);
+    expect(wrapperPackageJson.dependencies['@kilocode/sdk']).toBe(
+      packageJson.devDependencies['@kilocode/sdk']
+    );
     expect(dockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(devDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(dindDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);

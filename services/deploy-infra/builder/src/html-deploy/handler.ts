@@ -146,7 +146,7 @@ export async function htmlDeployHandler(c: Context<HonoEnv>): Promise<Response> 
   const deployer = new Deployer(cloudflareApi);
   const dispatcher = new HtmlDeployDispatcherClient(
     c.env.DeployDispatcher,
-    c.env.BACKEND_AUTH_TOKEN,
+    c.env.DISPATCHER_AUTH_TOKEN,
     hostnameBase
   );
 

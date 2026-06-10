@@ -46,6 +46,7 @@ jest.mock('../html-deploy/repository', () => ({
 }));
 jest.mock('../assets/static.worker.js', () => 'export default {}', { virtual: true });
 
+import { HtmlDeployDispatcherClient } from '../html-deploy/dispatcher-client';
 import { htmlDeployHandler } from '../html-deploy/handler';
 
 const pendingDeployment = {
@@ -103,6 +104,7 @@ function createContext(
       CLOUDFLARE_ACCOUNT_ID: 'account',
       CLOUDFLARE_API_TOKEN: 'token',
       BACKEND_AUTH_TOKEN: 'backend-token',
+      DISPATCHER_AUTH_TOKEN: 'dispatcher-token',
       DEPLOY_HOSTNAME_BASE: 'd.kiloapps.io',
       DeployDispatcher: {},
     },
@@ -215,6 +217,7 @@ describe('HTML deployment admission', () => {
 describe('HTML deployment lifecycle', () => {
   it('records a pending deployment before deploying, mapping, and activating it', async () => {
     const attempted: string[] = [];
+    const context = createContext();
     mockCreatePendingEphemeralDeployment.mockImplementationOnce(async () => {
       attempted.push('pending-insert');
       return pendingDeployment;
@@ -234,10 +237,15 @@ describe('HTML deployment lifecycle', () => {
       return true;
     });
 
-    const response = await htmlDeployHandler(createContext() as never);
+    const response = await htmlDeployHandler(context as never);
 
     expect(response.status).toBe(200);
     expect(attempted).toEqual(['pending-insert', 'deploy', 'map', 'enable-banner', 'activate']);
+    expect(HtmlDeployDispatcherClient).toHaveBeenCalledWith(
+      context.env.DeployDispatcher,
+      'dispatcher-token',
+      'd.kiloapps.io'
+    );
   });
 
   it('marks cleanup and independently tears down resources when deployment fails', async () => {

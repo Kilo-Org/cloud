@@ -19,10 +19,13 @@ export function generateProviderSpecificHash(payload: string, provider: Provider
       : provider.id === 'openrouter'
         ? 'henk is a boss'
         : provider.apiUrl;
-  return crypto
-    .createHash('sha256')
-    .update(salt + pepper + payload)
-    .digest('base64');
+  return (
+    crypto
+      .createHash('sha256')
+      // codeql[js/insufficient-password-hash] This hashes stable AI-provider tracking IDs, not passwords or credentials.
+      .update(salt + pepper + payload)
+      .digest('base64')
+  );
 }
 
 export function generateVercelDownstreamSafetyIdentifier(userId: string): string {

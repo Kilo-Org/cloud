@@ -7,10 +7,10 @@ import {
   type AutoRoutingClassifierAnalyticsResponse,
   type AutoRoutingClassifierModelResponse,
 } from '@kilocode/auto-routing-contracts';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { BarChart3, Clock3, DollarSign, RefreshCw, Route, Save } from 'lucide-react';
+import { BarChart3, Clock3, DollarSign, HelpCircle, RefreshCw, Route, Save } from 'lucide-react';
 import * as z from 'zod';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   OpenRouterModelsResponseSchema,
   type OpenRouterModelsResponse,
@@ -116,24 +117,50 @@ function formatCredits(value: number) {
   }).format(value);
 }
 
+function MetricHelp({ label, description }: { label: string; description: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Explain ${label}`}
+          className="text-muted-foreground hover:text-foreground h-6 w-6"
+        >
+          <HelpCircle className="size-3.5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="end" className="max-w-80">
+        {description}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function MetricCard({
   title,
   value,
   detail,
   icon: Icon,
   loading,
+  help,
 }: {
   title: string;
   value: string;
   detail?: string;
   icon: typeof BarChart3;
   loading?: boolean;
+  help: string;
 }) {
   return (
     <Card className="rounded-lg">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
         <CardTitle className="text-muted-foreground text-sm font-medium">{title}</CardTitle>
-        <Icon className="text-muted-foreground size-4" />
+        <div className="flex items-center gap-1">
+          <Icon className="text-muted-foreground size-4" />
+          <MetricHelp label={title} description={help} />
+        </div>
       </CardHeader>
       <CardContent className="p-4 pt-0">
         {loading ? (
@@ -142,6 +169,30 @@ function MetricCard({
           <div className="text-2xl font-semibold tabular-nums">{value}</div>
         )}
         {detail ? <p className="text-muted-foreground mt-1 text-xs">{detail}</p> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BreakdownCard({
+  title,
+  help,
+  loading,
+  children,
+}: {
+  title: string;
+  help: string;
+  loading: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="rounded-lg">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
+        <CardTitle className="text-base">{title}</CardTitle>
+        <MetricHelp label={title} description={help} />
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        {loading ? <Skeleton className="h-40 w-full" /> : children}
       </CardContent>
     </Card>
   );
@@ -166,117 +217,100 @@ function BreakdownTables({
 }) {
   return (
     <div className="grid gap-4 xl:grid-cols-3">
-      <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Status</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          {loading ? (
-            <Skeleton className="h-40 w-full" />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Requests</TableHead>
+      <BreakdownCard
+        title="Status"
+        help="Breakdown by raw classifier status: classified, classifier_error, invalid_json, invalid_envelope, and invalid_body."
+        loading={loading}
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Requests</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {analytics?.statusBreakdown.length ? (
+              analytics.statusBreakdown.map(row => (
+                <TableRow key={row.status}>
+                  <TableCell>
+                    <Badge variant="outline">{row.status || 'unknown'}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(row.requests)}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {analytics?.statusBreakdown.length ? (
-                  analytics.statusBreakdown.map(row => (
-                    <TableRow key={row.status}>
-                      <TableCell>
-                        <Badge variant="outline">{row.status || 'unknown'}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(row.requests)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <EmptyTableRow colSpan={2} />
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))
+            ) : (
+              <EmptyTableRow colSpan={2} />
+            )}
+          </TableBody>
+        </Table>
+      </BreakdownCard>
 
-      <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Task Types</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          {loading ? (
-            <Skeleton className="h-40 w-full" />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Task</TableHead>
-                  <TableHead className="text-right">Requests</TableHead>
-                  <TableHead className="text-right">Confidence</TableHead>
+      <BreakdownCard
+        title="Task Types"
+        help="Successful classifier task categories and their average classifier confidence."
+        loading={loading}
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Task</TableHead>
+              <TableHead className="text-right">Requests</TableHead>
+              <TableHead className="text-right">Confidence</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {analytics?.taskTypeBreakdown.length ? (
+              analytics.taskTypeBreakdown.map(row => (
+                <TableRow key={row.taskType}>
+                  <TableCell className="capitalize">{row.taskType.replaceAll('_', ' ')}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(row.requests)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatPercent(row.avgConfidence)}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {analytics?.taskTypeBreakdown.length ? (
-                  analytics.taskTypeBreakdown.map(row => (
-                    <TableRow key={row.taskType}>
-                      <TableCell className="capitalize">
-                        {row.taskType.replaceAll('_', ' ')}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(row.requests)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatPercent(row.avgConfidence)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <EmptyTableRow colSpan={3} />
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))
+            ) : (
+              <EmptyTableRow colSpan={3} />
+            )}
+          </TableBody>
+        </Table>
+      </BreakdownCard>
 
-      <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-base">Classifier Models</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          {loading ? (
-            <Skeleton className="h-40 w-full" />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Model</TableHead>
-                  <TableHead className="text-right">Requests</TableHead>
+      <BreakdownCard
+        title="Classifier Models"
+        help="Classifier model used for each request, or unknown when no classifier call happened."
+        loading={loading}
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Model</TableHead>
+              <TableHead className="text-right">Requests</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {analytics?.classifierModelBreakdown.length ? (
+              analytics.classifierModelBreakdown.map(row => (
+                <TableRow key={row.classifierModel}>
+                  <TableCell className="max-w-64 truncate font-mono text-xs">
+                    {row.classifierModel || 'unknown'}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(row.requests)}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {analytics?.classifierModelBreakdown.length ? (
-                  analytics.classifierModelBreakdown.map(row => (
-                    <TableRow key={row.classifierModel}>
-                      <TableCell className="max-w-64 truncate font-mono text-xs">
-                        {row.classifierModel || 'unknown'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(row.requests)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <EmptyTableRow colSpan={2} />
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))
+            ) : (
+              <EmptyTableRow colSpan={2} />
+            )}
+          </TableBody>
+        </Table>
+      </BreakdownCard>
     </div>
   );
 }
@@ -375,8 +409,12 @@ export function AutoRoutingAdminContent() {
       </div>
 
       <Card className="rounded-lg">
-        <CardHeader className="p-4 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
           <CardTitle className="text-base">Classifier Model</CardTitle>
+          <MetricHelp
+            label="Classifier Model"
+            description="The OpenRouter model used by the auto-routing classifier. Saving changes updates KV config, so the classifier can change without a redeploy."
+          />
         </CardHeader>
         <CardContent className="grid gap-4 p-4 pt-0 lg:grid-cols-[1fr_auto] lg:items-end">
           <ModelCombobox
@@ -450,6 +488,7 @@ export function AutoRoutingAdminContent() {
               detail={`${formatPercent(classifiedRate)} classified`}
               icon={Route}
               loading={analyticsQuery.isLoading}
+              help="Total auto-routing analytics rows in the selected period. Includes classified requests, classifier errors, and invalid input statuses."
             />
             <MetricCard
               title="Classifier Latency"
@@ -457,6 +496,7 @@ export function AutoRoutingAdminContent() {
               detail={`p95 ${formatDecimal(summary?.p95DurationMs ?? 0)} ms`}
               icon={Clock3}
               loading={analyticsQuery.isLoading}
+              help="Average classifier runtime for requests that reached classifier execution. The detail shows p95 latency."
             />
             <MetricCard
               title="Classifier Cost"
@@ -464,6 +504,7 @@ export function AutoRoutingAdminContent() {
               detail="OpenRouter credits"
               icon={DollarSign}
               loading={analyticsQuery.isLoading}
+              help="Summed OpenRouter classifier cost in OpenRouter credits, not USD."
             />
             <MetricCard
               title="Session Coverage"
@@ -471,6 +512,7 @@ export function AutoRoutingAdminContent() {
               detail={`${formatNumber(summary?.uniqueSessions ?? 0)} unique sessions`}
               icon={BarChart3}
               loading={analyticsQuery.isLoading}
+              help="Percent of analytics rows with a session id. The detail shows distinct non-empty sessions."
             />
           </div>
 
@@ -481,6 +523,7 @@ export function AutoRoutingAdminContent() {
               detail={`${formatNumber(summary?.invalidRequests ?? 0)} invalid inputs`}
               icon={BarChart3}
               loading={analyticsQuery.isLoading}
+              help="Requests where the mirrored input was parseable, but classifier execution or classifier output failed. The detail counts malformed JSON, envelope, or body inputs."
             />
             <MetricCard
               title="Requires Tools"
@@ -488,6 +531,7 @@ export function AutoRoutingAdminContent() {
               detail={`${formatNumber(summary?.mirroredHasTools ?? 0)} mirrored with tools`}
               icon={Route}
               loading={analyticsQuery.isLoading}
+              help="Classified requests where the classifier output says the task requires tools. The detail counts original mirrored requests that included tools."
             />
             <MetricCard
               title="Body Size"
@@ -495,6 +539,7 @@ export function AutoRoutingAdminContent() {
               detail={`${formatPercent(summary?.avgConfidence ?? 0)} avg confidence`}
               icon={BarChart3}
               loading={analyticsQuery.isLoading}
+              help="Average mirrored body size in bytes. The detail shows average classifier confidence for successful classifications."
             />
           </div>
 

@@ -132,4 +132,5 @@ allowBuilds:
   '@google/genai': false
   koffi: false
   openclaw: false
+  '@openrouter/sdk': false
   tree-sitter-bash: false

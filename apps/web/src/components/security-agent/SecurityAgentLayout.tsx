@@ -42,7 +42,7 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
   const navItems = [
     { label: 'Dashboard', href: basePath, icon: LayoutDashboard },
     { label: 'Findings', href: `${basePath}/findings`, icon: ListChecks },
-    { label: 'Config', href: `${basePath}/config`, icon: Settings2 },
+    { label: 'Settings', href: `${basePath}/config`, icon: Settings2 },
   ];
 
   // Refresh installation mutation (only used in layout for permission alert)
@@ -85,13 +85,13 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
       {/* Header */}
       <div className="space-y-2">
         <p className="text-muted-foreground">
-          Monitor and manage Dependabot security alerts for your repositories
+          Monitor and manage Dependabot security alerts across your repositories.
         </p>
         <a
           href="https://kilo.ai/docs/contributing/architecture/security-reviews"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-2 inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
+          className="focus-visible:ring-ring mt-2 inline-flex items-center gap-1 rounded-sm text-sm text-blue-400 underline decoration-blue-400/40 underline-offset-4 transition-colors hover:text-blue-300 focus-visible:ring-2 focus-visible:outline-none"
         >
           Learn how to use it
           <ExternalLink className="size-4" />
@@ -100,7 +100,10 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
 
       {/* Sub-navigation — hidden when GitHub is not installed */}
       {hasIntegration && (
-        <nav className="flex gap-1 border-b border-gray-800">
+        <nav
+          className="border-border flex gap-1 overflow-x-auto border-b"
+          aria-label="Security Agent"
+        >
           {navItems.map(item => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -108,11 +111,12 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                  'focus-visible:ring-ring flex shrink-0 items-center gap-2 rounded-t-md border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
                   active
-                    ? 'border-primary text-primary'
-                    : 'text-muted-foreground hover:text-foreground border-transparent hover:border-gray-600'
+                    ? 'border-brand-primary text-foreground'
+                    : 'text-muted-foreground hover:text-foreground border-transparent hover:border-border'
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -127,17 +131,20 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
       {showPermissionRequired && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Additional Permissions Required</AlertTitle>
+          <AlertTitle>Additional permissions required</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>
               Security Agent requires the <code>vulnerability_alerts</code> permission to access
-              Dependabot alerts. Please re-authorize the GitHub App to grant this permission.
+              Dependabot alerts. Re-authorize GitHub App to grant this permission.
             </p>
             <div className="flex flex-wrap gap-3">
               {reauthorizeUrl && (
-                <Button asChild>
+                <Button
+                  asChild
+                  className="bg-brand-primary text-primary-foreground hover:bg-brand-primary/90"
+                >
                   <a href={reauthorizeUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
+                    <ExternalLink className="size-4" aria-hidden="true" />
                     Re-authorize GitHub App
                   </a>
                 </Button>
@@ -148,13 +155,15 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
                 disabled={isRefreshing}
                 className="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               >
-                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Refreshing...' : 'Refresh Permissions'}
+                <RefreshCw
+                  className={`size-4 ${isRefreshing ? 'animate-spin motion-reduce:animate-none' : ''}`}
+                  aria-hidden="true"
+                />
+                {isRefreshing ? 'Refreshing...' : 'Refresh permissions'}
               </Button>
             </div>
             <p className="text-sm opacity-80">
-              Already approved the new permissions in GitHub? Click &quot;Refresh Permissions&quot;
-              to update.
+              Already approved permissions in GitHub? Refresh permissions to update Security Agent.
             </p>
           </AlertDescription>
         </Alert>

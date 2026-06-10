@@ -32,7 +32,7 @@ const severityMeta: Record<Severity, { label: string; dotColor: string }> = {
 const severities: Severity[] = ['critical', 'high', 'medium', 'low'];
 
 function formatDays(days: number | null): string {
-  if (days === null) return '\u2014';
+  if (days === null) return 'N/A';
   return `${days.toFixed(1)}d`;
 }
 
@@ -40,9 +40,9 @@ export function MeanTimeToResolution({ mttr, isLoading }: MeanTimeToResolutionPr
   const hasAnyData = severities.some(sev => mttr.bySeverity[sev].count > 0);
 
   return (
-    <Card className="border border-gray-800 bg-gray-900/50">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Mean Time to Resolution</CardTitle>
+        <CardTitle className="text-sm font-medium">Mean time to resolution</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -54,7 +54,7 @@ export function MeanTimeToResolution({ mttr, isLoading }: MeanTimeToResolutionPr
           </div>
         ) : !hasAnyData ? (
           <div className="text-muted-foreground py-4 text-center text-sm">
-            No resolution data yet
+            Resolution time appears after a finding is fixed.
           </div>
         ) : (
           <div className="space-y-3">
@@ -64,15 +64,24 @@ export function MeanTimeToResolution({ mttr, isLoading }: MeanTimeToResolutionPr
               const withinSla = data.avgDays !== null && data.avgDays <= data.slaDays;
 
               return (
-                <div key={sev} className="flex items-center justify-between text-sm">
+                <div
+                  key={sev}
+                  className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div className="flex items-center gap-2">
                     <span className={cn('h-2 w-2 rounded-full', meta.dotColor)} />
                     <span className="text-muted-foreground w-16 font-medium">{meta.label}</span>
-                    <span className="font-semibold text-white">{formatDays(data.avgDays)}</span>
-                    <span className="text-muted-foreground text-xs">/ SLA: {data.slaDays}d</span>
+                    <span className="font-mono font-semibold tabular-nums">
+                      {formatDays(data.avgDays)}
+                    </span>
+                    <span className="text-muted-foreground font-mono text-xs tabular-nums">
+                      / SLA: {data.slaDays}d
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-xs">{data.count} fixed</span>
+                    <span className="text-muted-foreground font-mono text-xs tabular-nums">
+                      {data.count} fixed
+                    </span>
                     {data.avgDays !== null &&
                       (withinSla ? (
                         <CheckCircle2 className="h-4 w-4 text-green-400" />

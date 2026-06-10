@@ -34,11 +34,11 @@ export function RepositoryFilter({
       onValueChange={v => onValueChange(v === 'all' ? undefined : v)}
       disabled={isLoading}
     >
-      <SelectTrigger className="w-[200px]">
-        <SelectValue placeholder="All Repositories" />
+      <SelectTrigger className="w-full sm:w-52" aria-label="Filter by repository">
+        <SelectValue placeholder="All repositories" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">All Repositories</SelectItem>
+        <SelectItem value="all">All repositories</SelectItem>
         {repositories.map(repo => (
           <SelectItem key={repo.id} value={repo.fullName}>
             {repo.fullName}

@@ -116,6 +116,9 @@ function getOptionalStringField(source: unknown, key: string): string | undefine
 }
 
 const COMMAND_POLL_INTERVAL_MS = 3000;
+const EMPTY_REPOSITORIES: SecurityAgentContextValue['allRepositories'] = [];
+const EMPTY_REPOSITORY_IDS: number[] = [];
+const EMPTY_ORPHANED_REPOSITORIES: SecurityAgentContextValue['orphanedRepositories'] = [];
 
 type SecurityAgentCommand = {
   id: string;
@@ -228,7 +231,9 @@ type SecurityAgentProviderProps = {
   children: React.ReactNode;
 };
 
-export function SecurityAgentProvider({ organizationId, children }: SecurityAgentProviderProps) {
+function useSecurityAgentProviderValue(
+  organizationId: string | undefined
+): SecurityAgentContextValue {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isOrg = !!organizationId;
@@ -466,9 +471,8 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
+          toast.error('GitHub integration error', {
+            description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
           toast.error('Sync failed', { description: message });
@@ -512,7 +516,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       onSuccess: async data => {
         if ('initialSyncAdmissionFailed' in data && data.initialSyncAdmissionFailed) {
           toast.warning('Security Agent enabled', {
-            description: 'Initial sync could not be queued. Run Sync to retry.',
+            description: 'Initial sync could not be queued. Sync findings to retry.',
           });
         } else if ('initialSync' in data && data.initialSync) {
           toast.success('Security Agent enabled', {
@@ -545,9 +549,8 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
+          toast.error('GitHub integration error', {
+            description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
           toast.error(manualAnalysisAdmissionCopy.failureTitle, {
@@ -590,9 +593,8 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
+          toast.error('GitHub integration error', {
+            description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
           toast.error('Sync failed', { description: message });
@@ -636,7 +638,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       onSuccess: async data => {
         if ('initialSyncAdmissionFailed' in data && data.initialSyncAdmissionFailed) {
           toast.warning('Security Agent enabled', {
-            description: 'Initial sync could not be queued. Run Sync to retry.',
+            description: 'Initial sync could not be queued. Sync findings to retry.',
           });
         } else if ('initialSync' in data && data.initialSync) {
           toast.success('Security Agent enabled', {
@@ -669,9 +671,8 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
+          toast.error('GitHub integration error', {
+            description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
           toast.error(manualAnalysisAdmissionCopy.failureTitle, {
@@ -841,9 +842,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const hasPermission = permissionData?.hasPermissions ?? false;
   const reauthorizeUrl = permissionData?.reauthorizeUrl ?? undefined;
   const isEnabled = configData ? configData.isEnabled : undefined;
-  const allRepositories = reposData ?? [];
+  const allRepositories = reposData ?? EMPTY_REPOSITORIES;
   const repositorySelectionMode = configData?.repositorySelectionMode ?? 'selected';
-  const selectedRepositoryIds = configData?.selectedRepositoryIds ?? [];
+  const selectedRepositoryIds = configData?.selectedRepositoryIds ?? EMPTY_REPOSITORY_IDS;
 
   const filteredRepositories = useMemo(
     () =>
@@ -898,7 +899,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       isDeletingFindings: isOrg ? isOrgDeleteFindingsPending : isPersonalDeleteFindingsPending,
       startingAnalysisIds,
       gitHubError: providerState.gitHubError,
-      orphanedRepositories: orphanedReposData ?? [],
+      orphanedRepositories: orphanedReposData ?? EMPTY_ORPHANED_REPOSITORIES,
     }),
     [
       organizationId,
@@ -939,5 +940,10 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     ]
   );
 
+  return value;
+}
+
+export function SecurityAgentProvider({ organizationId, children }: SecurityAgentProviderProps) {
+  const value = useSecurityAgentProviderValue(organizationId);
   return <SecurityAgentContext.Provider value={value}>{children}</SecurityAgentContext.Provider>;
 }

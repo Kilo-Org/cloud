@@ -29,6 +29,7 @@ import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
+import { CloudAgentCallbackFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { postIssueComment } from '@/lib/auto-fix/github/post-comment';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
@@ -47,6 +48,7 @@ const CallbackPayloadSchema = z
     cloudAgentSessionId: z.string().optional(),
     status: callbackStatusEnum,
     errorMessage: z.string().optional(),
+    failure: CloudAgentCallbackFailureSchema,
     lastSeenBranch: z.string().optional(),
   })
   .refine(data => data.sessionId || data.cloudAgentSessionId, {
@@ -62,7 +64,7 @@ function normalizePayload(raw: z.infer<typeof CallbackPayloadSchema>): {
   return {
     sessionId: raw.sessionId ?? raw.cloudAgentSessionId,
     status: raw.status,
-    errorMessage: raw.errorMessage,
+    errorMessage: raw.failure?.message ?? raw.errorMessage,
     lastSeenBranch: raw.lastSeenBranch,
   };
 }

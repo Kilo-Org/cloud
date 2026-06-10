@@ -7,8 +7,15 @@ import {
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
-import { git, logToFile, runProcess, type ExecResult } from './utils.js';
+import {
+  createSafeProcessDiagnostic,
+  git,
+  logToFile,
+  runProcess,
+  type ExecResult,
+} from './utils.js';
 import { restoreSession } from './restore-session.js';
+import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-error.js';
 
 const SETUP_COMMAND_TIMEOUT_MS = 300_000;
 const GIT_COMMAND_TIMEOUT_MS = 120_000;
@@ -46,8 +53,48 @@ export type WrapperBootstrapDeps = {
   restoreSession?: typeof restoreSession;
 };
 
-function sanitizeGitOutput(output: string): string {
-  return output.replace(/(oauth2|x-access-token|x-token-auth):([^@]+)@/gi, '$1:***@');
+const GIT_FAILURE_PATTERNS = [
+  { subtype: 'sandbox_storage_full', pattern: /no space left on device|disk quota exceeded/i },
+  {
+    subtype: 'git_authentication_failed',
+    pattern: /authentication failed|could not read username|http 401|http 403/i,
+  },
+  {
+    subtype: 'git_network_failed',
+    pattern:
+      /remote end hung up|connection (?:reset|timed out)|could not resolve host|failed to connect/i,
+  },
+  {
+    subtype: 'git_pack_corrupt',
+    pattern: /bad object|pack.*corrupt|invalid index-pack output|early eof/i,
+  },
+] as const;
+
+function classifyGitFailure(result: ExecResult, operation: 'clone' | 'checkout') {
+  if (result.terminationReason === 'timeout') {
+    return operation === 'clone' ? 'git_clone_timeout' : 'git_checkout_timeout';
+  }
+  const output = `${result.stderr}\n${result.stdout}`;
+  if (
+    operation === 'checkout' &&
+    /would be overwritten|index\.lock.*exists|unable to create.*index\.lock/i.test(output)
+  ) {
+    return 'git_checkout_conflict';
+  }
+  return (
+    GIT_FAILURE_PATTERNS.find(entry => entry.pattern.test(output))?.subtype ??
+    'workspace_setup_unknown'
+  );
+}
+
+function gitOperationError(
+  result: ExecResult,
+  operation: 'clone' | 'checkout'
+): WrapperBootstrapError {
+  const label = operation === 'clone' ? 'Repository clone' : 'Repository checkout';
+  const subtype = classifyGitFailure(result, operation);
+  const message = result.terminationReason === 'timeout' ? `${label} timed out` : `${label} failed`;
+  return workspaceBootstrapError(subtype, message, createSafeProcessDiagnostic(result));
 }
 
 function authenticatedUrl(
@@ -106,7 +153,7 @@ async function cloneRepository(
 
   const result = await runGit(args, { timeoutMs: GIT_COMMAND_TIMEOUT_MS });
   if (result.exitCode !== 0) {
-    throw new Error(`Git clone failed: ${sanitizeGitOutput(result.stderr || result.stdout)}`);
+    throw gitOperationError(result, 'clone');
   }
 
   const authorName =
@@ -133,11 +180,15 @@ async function branchExists(
   remote: boolean
 ): Promise<boolean> {
   const ref = remote ? `origin/${branch}` : branch;
-  const result = await runGit(['rev-parse', '--verify', ref], {
+  const result = await runGit(['rev-parse', '--verify', '--quiet', ref], {
     cwd: workspacePath,
     timeoutMs: GIT_COMMAND_TIMEOUT_MS,
   });
-  return result.exitCode === 0;
+  if (result.exitCode === 0) return true;
+  if (result.exitCode !== 1 || result.terminationReason !== undefined) {
+    throw gitOperationError(result, 'checkout');
+  }
+  return false;
 }
 
 const GITHUB_PULL_REF_PATTERN = /^refs\/pull\/\d+\/head$/;
@@ -157,9 +208,7 @@ async function fetchSyntheticReviewRef(
     timeoutMs: GIT_COMMAND_TIMEOUT_MS,
   });
   if (fetchResult.exitCode !== 0) {
-    throw new Error(
-      `Failed to fetch pull ref ${branchName}: ${sanitizeGitOutput(fetchResult.stderr || fetchResult.stdout)}`
-    );
+    throw gitOperationError(fetchResult, 'checkout');
   }
 
   const checkoutResult = await runGit(['checkout', '-B', branchName, 'FETCH_HEAD'], {
@@ -167,9 +216,7 @@ async function fetchSyntheticReviewRef(
     timeoutMs: GIT_COMMAND_TIMEOUT_MS,
   });
   if (checkoutResult.exitCode !== 0) {
-    throw new Error(
-      `Failed to checkout pull ref ${branchName}: ${sanitizeGitOutput(checkoutResult.stderr || checkoutResult.stdout)}`
-    );
+    throw gitOperationError(checkoutResult, 'checkout');
   }
 }
 
@@ -183,7 +230,13 @@ async function prepareBranch(
     return;
   }
 
-  await runGit(['fetch', 'origin'], { cwd: workspacePath, timeoutMs: GIT_COMMAND_TIMEOUT_MS });
+  const fetchResult = await runGit(['fetch', 'origin'], {
+    cwd: workspacePath,
+    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+  });
+  if (fetchResult.exitCode !== 0) {
+    throw gitOperationError(fetchResult, 'checkout');
+  }
 
   if (await branchExists(runGit, workspacePath, branchName, false)) {
     const result = await runGit(['checkout', branchName], {
@@ -191,7 +244,7 @@ async function prepareBranch(
       timeoutMs: GIT_COMMAND_TIMEOUT_MS,
     });
     if (result.exitCode !== 0) {
-      throw new Error(`Failed to checkout branch ${branchName}`);
+      throw gitOperationError(result, 'checkout');
     }
     return;
   }
@@ -202,13 +255,18 @@ async function prepareBranch(
       timeoutMs: GIT_COMMAND_TIMEOUT_MS,
     });
     if (result.exitCode !== 0) {
-      throw new Error(`Failed to checkout branch ${branchName}`);
+      throw gitOperationError(result, 'checkout');
     }
     return;
   }
 
   if (strictBranch) {
-    throw new Error(`Branch "${branchName}" not found in repository`);
+    throw workspaceBootstrapError(
+      'git_branch_missing',
+      'Requested repository branch was not found',
+      undefined,
+      false
+    );
   }
 
   const result = await runGit(['checkout', '-b', branchName], {
@@ -328,9 +386,15 @@ async function bootstrapEmptyKiloSession(
   );
   if (!result.ok) {
     logToFile(
-      `bootstrap empty kilo session failed kiloSessionId=${request.kiloSessionId} step=${result.step} code=${result.code ?? '(none)'} error=${result.error}`
+      `bootstrap empty kilo session failed kiloSessionId=${request.kiloSessionId} step=${result.step} code=${result.code ?? '(none)'} subtype=${result.subtype ?? '(none)'}`
     );
-    throw new Error(`Session bootstrap failed: ${result.error}`);
+    throw workspaceBootstrapError(
+      result.subtype ?? 'workspace_setup_unknown',
+      result.subtype === 'kilo_import_timeout'
+        ? 'Session import timed out'
+        : 'Session import failed',
+      result.detail
+    );
   }
   logToFile(
     `bootstrap empty kilo session ready kiloSessionId=${request.kiloSessionId} diffsApplied=${result.diffs.applied} diffsSkipped=${result.diffs.skipped} diffsTotal=${result.diffs.total}`
@@ -353,10 +417,16 @@ async function restoreOrBootstrapKiloSession(
       return;
     }
     logToFile(
-      `bootstrap snapshot restore failed kiloSessionId=${request.kiloSessionId} step=${result.step} code=${result.code ?? '(none)'} error=${result.error}`
+      `bootstrap snapshot restore failed kiloSessionId=${request.kiloSessionId} step=${result.step} code=${result.code ?? '(none)'} subtype=${result.subtype ?? '(none)'}`
     );
     if (result.code !== 404) {
-      throw new Error(`Session snapshot restore failed: ${result.error}`);
+      throw workspaceBootstrapError(
+        result.subtype ?? 'workspace_setup_unknown',
+        result.subtype === 'kilo_import_timeout'
+          ? 'Session import timed out'
+          : 'Session restore failed',
+        result.detail
+      );
     }
     logToFile(
       `bootstrap snapshot missing; falling back to empty import kiloSessionId=${request.kiloSessionId}`
@@ -376,13 +446,18 @@ async function runSetupCommands(
   logToFile(
     `bootstrap setup commands starting kiloSessionId=${request.kiloSessionId} count=${setupCommands.length} failFast=${failFast} workspacePath=${request.workspace.workspacePath}`
   );
-  for (const command of setupCommands) {
+  for (const [commandIndex, command] of setupCommands.entries()) {
     const result = await run('sh', ['-lc', command], {
       cwd: request.workspace.workspacePath,
       timeoutMs: SETUP_COMMAND_TIMEOUT_MS,
     });
     if (result.exitCode !== 0 && failFast) {
-      throw new Error(`Setup command failed: ${command} (exit code ${result.exitCode})`);
+      const timedOut = result.terminationReason === 'timeout';
+      throw workspaceBootstrapError(
+        timedOut ? 'setup_command_timeout' : 'setup_command_failed',
+        `Setup command ${commandIndex + 1} ${timedOut ? 'timed out' : 'failed'}`,
+        createSafeProcessDiagnostic(result)
+      );
     }
   }
   logToFile(
@@ -513,14 +588,17 @@ export async function prepareWrapperBootstrapWorkspace(
     );
     return { workspaceWasWarm };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const bootstrapError =
+      error instanceof WrapperBootstrapError
+        ? error
+        : workspaceBootstrapError('workspace_setup_unknown', 'Workspace setup failed');
     logToFile(
-      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} error=${message}`
+      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'}`
     );
     if (workspaceNeedsBootstrap) {
       await cleanupWorkspace(request);
       logToFile(`bootstrap workspace cleanup finished kiloSessionId=${request.kiloSessionId}`);
     }
-    throw error;
+    throw bootstrapError;
   }
 }

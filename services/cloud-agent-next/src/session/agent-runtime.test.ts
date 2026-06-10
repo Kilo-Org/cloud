@@ -7,7 +7,7 @@ import type {
   WorkspaceReady,
 } from '../execution/types.js';
 import { WrapperFinalizingError } from '../kilo/wrapper-client.js';
-import { createAgentRuntime } from './agent-runtime.js';
+import { createAgentRuntime, WRAPPER_NO_OUTPUT_TIMEOUT_MS } from './agent-runtime.js';
 import { getWrapperLease, getWrapperRuntimeState } from './wrapper-runtime-state.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 
@@ -186,8 +186,11 @@ describe('AgentRuntime', () => {
     ]);
     expect(wrapperState.wrapperRunId).toBe(result.wrapperRunId);
     expect(wrapperState.wrapperIdleDeadlineAt).toBeUndefined();
-    expect(wrapperState.noOutputDeadlineAt).toEqual(expect.any(Number));
-    expect(wrapperState.nextPingAt).toEqual(expect.any(Number));
+    const [{ acceptedAt }] = accepted;
+    expect(acceptedAt).toEqual(expect.any(Number));
+    if (acceptedAt === undefined) throw new Error('Expected accepted delivery timestamp');
+    expect(wrapperState.noOutputDeadlineAt).toBe(acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS);
+    expect(wrapperState.nextPingAt).toBe(acceptedAt + 60_000);
   });
 
   it('fences the dispatching message until acceptance bookkeeping completes', async () => {

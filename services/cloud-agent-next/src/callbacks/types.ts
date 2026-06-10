@@ -1,3 +1,5 @@
+import type { SafeFailureProjection } from '../session/safe-failure-projection.js';
+
 export type CallbackTarget = {
   url: string;
   headers?: Record<string, string>;
@@ -17,6 +19,7 @@ export type ExecutionCallbackPayload = {
   messageId?: string;
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
+  failure?: SafeFailureProjection;
   /** Present when errorMessage was shortened to fit the callback queue. */
   errorMessageTruncation?: CallbackTextTruncation;
   lastSeenBranch?: string;

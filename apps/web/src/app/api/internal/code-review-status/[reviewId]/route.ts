@@ -73,6 +73,10 @@ import {
 } from '@kilocode/db/schema-types';
 import { isCloudAgentNextBillingErrorBody } from '@kilocode/worker-utils/cloud-agent-next-client';
 import {
+  CloudAgentCallbackFailureSchema,
+  type CloudAgentSafeFailure,
+} from '@kilocode/worker-utils/cloud-agent-failure';
+import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
   getCodeReviewActionRequiredCopy,
@@ -96,6 +100,8 @@ type OrchestratorPayload = {
 /**
  * Payload from cloud-agent-next callback (ExecutionCallbackPayload).
  */
+type CloudAgentCallbackFailure = CloudAgentSafeFailure;
+
 type CloudAgentNextCallbackPayload = {
   sessionId?: string;
   cloudAgentSessionId?: string;
@@ -103,6 +109,7 @@ type CloudAgentNextCallbackPayload = {
   kiloSessionId?: string;
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
+  failure?: CloudAgentCallbackFailure;
   terminalReason?: CodeReviewTerminalReason;
   lastSeenBranch?: string;
   gateResult?: 'pass' | 'fail';
@@ -143,6 +150,9 @@ function normalizePayload(raw: StatusUpdatePayload): {
   const sessionId =
     raw.sessionId ?? ('cloudAgentSessionId' in raw ? raw.cloudAgentSessionId : undefined);
 
+  const failure = CloudAgentCallbackFailureSchema.parse('failure' in raw ? raw.failure : undefined);
+  const errorMessage = failure?.message ?? raw.errorMessage;
+
   // Validate terminalReason against allowlist to prevent free-form text in the DB
   const validReasons: ReadonlySet<string> = new Set(CODE_REVIEW_TERMINAL_REASONS);
   let terminalReason: CodeReviewTerminalReason | undefined =
@@ -154,7 +164,7 @@ function normalizePayload(raw: StatusUpdatePayload): {
     }
   }
 
-  const actionRequiredReason = classifyCodeReviewActionRequiredFailure(raw.errorMessage);
+  const actionRequiredReason = classifyCodeReviewActionRequiredFailure(errorMessage);
   if (!terminalReason && actionRequiredReason) {
     if (status === 'cancelled') {
       status = 'failed';
@@ -165,7 +175,7 @@ function normalizePayload(raw: StatusUpdatePayload): {
   // Infer billing when no explicit terminalReason was provided.
   // v1: billing errors arrive as 'interrupted' (→ cancelled) with billing error text
   // v2: billing errors arrive as 'failed' with billing error text (after wrapper fix)
-  if (!terminalReason && isBillingCodeReviewTerminalReason(undefined, raw.errorMessage)) {
+  if (!terminalReason && isBillingCodeReviewTerminalReason(undefined, errorMessage)) {
     if (status === 'cancelled') {
       status = 'failed'; // billing is not a user cancellation
     }
@@ -174,7 +184,7 @@ function normalizePayload(raw: StatusUpdatePayload): {
 
   if (
     (raw.status === 'failed' || raw.status === 'interrupted') &&
-    isModelNotFoundCodeReviewTerminalReason(terminalReason, raw.errorMessage)
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
   ) {
     status = 'cancelled';
     terminalReason = 'model_not_found';
@@ -188,7 +198,7 @@ function normalizePayload(raw: StatusUpdatePayload): {
     status,
     sessionId,
     cliSessionId,
-    errorMessage: raw.errorMessage,
+    errorMessage: errorMessage,
     terminalReason,
     gateResult: raw.gateResult,
   };

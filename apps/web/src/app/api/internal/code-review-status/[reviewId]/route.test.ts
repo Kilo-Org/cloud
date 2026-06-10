@@ -440,6 +440,57 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
   });
 
   describe('normalization', () => {
+    it('prefers a bounded structured failure message', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'legacy error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'workspace_setup_failed',
+            subtype: 'git_clone_timeout',
+            attempts: 2,
+            message: 'Repository clone timed out',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ errorMessage: 'Repository clone timed out' })
+      );
+    });
+
+    it.each([
+      { code: 'future_failure_code' },
+      { subtype: 'future_workspace_failure' },
+      { extra: true },
+      { attempts: -1 },
+      { message: 'x'.repeat(4_097) },
+    ])(
+      'discards incompatible structured failure and uses the legacy fallback: %o',
+      async failure => {
+        mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            errorMessage: 'legacy error',
+            failure,
+          }),
+          makeParams(REVIEW_ID)
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+          expect.objectContaining({ errorMessage: 'legacy error' })
+        );
+      }
+    );
+
     it('maps interrupted status to cancelled with interrupted terminal reason', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 

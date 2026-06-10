@@ -257,13 +257,14 @@ describe('restoreSession', () => {
     }
   });
 
-  it('returns download error when fetch throws', async () => {
-    globalThis.fetch = asFetch(() => Promise.reject(new Error('network failure')));
+  it('returns a fixed download error when fetch throws', async () => {
+    globalThis.fetch = asFetch(() => Promise.reject(new Error('network token secret')));
     const result = await restoreSession(SESSION_ID, workspace);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error).toContain('network failure');
+      expect(result.error).toBe('snapshot download failed');
+      expect(result.error).not.toContain('network token secret');
       expect(result.code).toBeNull();
       expect(result.step).toBe('download');
     }
@@ -346,7 +347,9 @@ describe('restoreSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.step).toBe('import');
+      expect(result.subtype).toBe('kilo_import_failed');
       expect(result.error).toContain('kilo import failed');
+      expect(result.detail).toContain('exit code 1');
     }
   });
 
@@ -359,7 +362,9 @@ describe('restoreSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.step).toBe('import');
+      expect(result.subtype).toBe('kilo_import_timeout');
       expect(result.error).toContain('kilo import timed out');
+      expect(result.detail).toContain('timeout');
     }
     expect(fs.existsSync(TMP_PATH)).toBe(false);
   });

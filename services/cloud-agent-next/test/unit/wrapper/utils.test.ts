@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { git, runProcess } from '../../../wrapper/src/utils.js';
+import { createSafeProcessDiagnostic, git, runProcess } from '../../../wrapper/src/utils.js';
 
 const createdRepos: string[] = [];
 
@@ -16,12 +16,72 @@ async function createRepo(): Promise<string> {
 }
 
 describe('runProcess', () => {
-  it('runs non-git commands with captured output', async () => {
+  it('runs non-git commands with captured output and elapsed time', async () => {
     const result = await runProcess(process.execPath, ['-e', 'console.log("hello")'], {
       timeoutMs: 5_000,
     });
 
-    expect(result).toEqual({ stdout: 'hello\n', stderr: '', exitCode: 0 });
+    expect(result.stdout).toBe('hello\n');
+    expect(result.stderr).toBe('');
+    expect(result.exitCode).toBe(0);
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('bounds output while retaining the most recent tail', async () => {
+    const result = await runProcess(
+      process.execPath,
+      ['-e', 'process.stderr.write("a".repeat(20000) + "latest-error")'],
+      { timeoutMs: 5_000, maxOutputBytes: 1_024 }
+    );
+
+    expect(Buffer.byteLength(result.stderr)).toBeLessThanOrEqual(1_024);
+    expect(result.stderr).toContain('latest-error');
+    expect(result.stderrTruncated).toBe(true);
+  });
+});
+
+describe('createSafeProcessDiagnostic', () => {
+  it('returns only allowlisted process metadata', () => {
+    const sensitiveValues = [
+      'bare-unlabeled-token',
+      'private-file-content',
+      'url-secret',
+      'bearer-secret',
+      'cookie-secret',
+      'env-secret',
+    ];
+    const detail = createSafeProcessDiagnostic({
+      stdout: sensitiveValues.slice(0, 2).join('\n'),
+      stderr: [
+        'https://user:url-secret@example.com/repo.git',
+        'Authorization: Bearer bearer-secret',
+        'Cookie: session=cookie-secret',
+        'SECRET_VALUE=env-secret',
+      ].join('\n'),
+      exitCode: 2,
+      elapsedMs: 42,
+      stdoutTruncated: true,
+    });
+
+    expect(detail).toBe('termination nonzero exit, exit code 2, elapsed 42ms, output truncated');
+    for (const sensitiveValue of sensitiveValues) expect(detail).not.toContain(sensitiveValue);
+  });
+
+  it.each([
+    {
+      result: { stdout: '', stderr: '', exitCode: 124, terminationReason: 'timeout' as const },
+      expected: 'termination timeout',
+    },
+    {
+      result: { stdout: '', stderr: '', exitCode: 124, terminationReason: 'abort' as const },
+      expected: 'termination abort',
+    },
+    {
+      result: { stdout: '', stderr: '', exitCode: 0, elapsedMs: 7 },
+      expected: 'termination completed, elapsed 7ms',
+    },
+  ])('reports structured termination metadata', ({ result, expected }) => {
+    expect(createSafeProcessDiagnostic(result)).toBe(expected);
   });
 });
 

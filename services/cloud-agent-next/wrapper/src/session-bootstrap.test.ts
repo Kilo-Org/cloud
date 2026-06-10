@@ -235,8 +235,188 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     });
   });
 
-  it('still fails fresh cold bootstraps when a setup command fails', async () => {
+  it.each([
+    {
+      name: 'clone timeout',
+      stage: 'clone',
+      result: { stdout: '', stderr: '', exitCode: 124, terminationReason: 'timeout' as const },
+      subtype: 'git_clone_timeout',
+    },
+    {
+      name: 'clone authentication failure',
+      stage: 'clone',
+      result: {
+        stdout: '',
+        stderr: 'fatal: Authentication failed for credentialed repository',
+        exitCode: 128,
+      },
+      subtype: 'git_authentication_failed',
+    },
+    {
+      name: 'clone network failure',
+      stage: 'clone',
+      result: { stdout: '', stderr: 'fatal: the remote end hung up unexpectedly', exitCode: 128 },
+      subtype: 'git_network_failed',
+    },
+    {
+      name: 'clone corrupt pack',
+      stage: 'clone',
+      result: { stdout: '', stderr: 'fatal: pack has bad object at offset', exitCode: 128 },
+      subtype: 'git_pack_corrupt',
+    },
+    {
+      name: 'clone storage exhaustion',
+      stage: 'clone',
+      result: { stdout: '', stderr: 'fatal: No space left on device', exitCode: 128 },
+      subtype: 'sandbox_storage_full',
+    },
+    {
+      name: 'checkout timeout',
+      stage: 'checkout',
+      result: { stdout: '', stderr: '', exitCode: 124, terminationReason: 'timeout' as const },
+      subtype: 'git_checkout_timeout',
+    },
+    {
+      name: 'checkout conflict',
+      stage: 'checkout',
+      result: {
+        stdout: '',
+        stderr: 'untracked working tree files would be overwritten by checkout',
+        exitCode: 1,
+      },
+      subtype: 'git_checkout_conflict',
+    },
+  ])('classifies $name without exposing credentials', async ({ stage, result, subtype }) => {
     const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    const deps: WrapperBootstrapDeps = {
+      git: async args => {
+        if (args[0] === 'clone') {
+          if (stage === 'clone') return result;
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+        }
+        if (args[0] === 'rev-parse') return { stdout: 'main', stderr: '', exitCode: 0 };
+        if (args[0] === 'checkout' && stage === 'checkout') return result;
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: false,
+        imported: true,
+        diffs: { applied: 0, skipped: 0, total: 0 },
+      }),
+    };
+
+    expect(prepareWrapperBootstrapWorkspace(request, undefined, deps)).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype,
+      retryable: true,
+    });
+  });
+
+  it('keeps strict-branch fetch timeouts retryable', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.strictBranch = true;
+    request.materialized.setupCommands = [];
+
+    expect(
+      prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+            return { stdout: '', stderr: '', exitCode: 0 };
+          }
+          if (args[0] === 'fetch') {
+            return {
+              stdout: '',
+              stderr: '',
+              exitCode: 124,
+              terminationReason: 'timeout',
+            };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      })
+    ).rejects.toMatchObject({
+      subtype: 'git_checkout_timeout',
+      retryable: true,
+    });
+  });
+
+  it('keeps strict-branch reference probe timeouts retryable', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.strictBranch = true;
+    request.materialized.setupCommands = [];
+
+    expect(
+      prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') {
+            return {
+              stdout: '',
+              stderr: '',
+              exitCode: 124,
+              terminationReason: 'timeout',
+            };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      })
+    ).rejects.toMatchObject({
+      subtype: 'git_checkout_timeout',
+      retryable: true,
+    });
+  });
+
+  it('classifies strict missing branches', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.strictBranch = true;
+    request.materialized.setupCommands = [];
+    expect(
+      prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          return { stdout: '', stderr: '', exitCode: args[0] === 'rev-parse' ? 1 : 0 };
+        },
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      })
+    ).rejects.toMatchObject({
+      subtype: 'git_branch_missing',
+      retryable: false,
+    });
+  });
+
+  it('still fails fresh cold bootstraps without exposing setup command or output', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = ['private-tool --token argv-secret'];
     const deps: WrapperBootstrapDeps = {
       git: async args => {
         if (args[0] === 'clone') {
@@ -247,7 +427,19 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         }
         return { stdout: '', stderr: '', exitCode: 0 };
       },
-      runProcess: async () => ({ stdout: '', stderr: 'install failed', exitCode: 1 }),
+      runProcess: async () => ({
+        stdout: 'private-file-content',
+        stderr: [
+          'bare-unlabeled-token',
+          'https://user:url-secret@example.com/repo.git',
+          'Authorization: Bearer bearer-secret',
+          'Cookie: session=cookie-secret',
+          'SECRET_VALUE=env-secret',
+        ].join('\n'),
+        exitCode: 1,
+        elapsedMs: 17,
+        stderrTruncated: true,
+      }),
       restoreSession: async () => ({
         ok: true,
         downloaded: false,
@@ -267,7 +459,76 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       throw new Error('Expected setup command failure');
     }
 
-    expect(setupError.message).toContain('Setup command failed: pnpm install (exit code 1)');
+    expect(setupError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'setup_command_failed',
+      retryable: true,
+    });
+    expect(setupError.message).toBe('Setup command 1 failed');
+    expect(setupError).toMatchObject({
+      detail: 'termination nonzero exit, exit code 1, elapsed 17ms, output truncated',
+    });
+    const projectedError = JSON.stringify(setupError);
+    for (const sensitiveValue of [
+      'private-tool',
+      'argv-secret',
+      'private-file-content',
+      'bare-unlabeled-token',
+      'url-secret',
+      'bearer-secret',
+      'cookie-secret',
+      'env-secret',
+    ]) {
+      expect(projectedError).not.toContain(sensitiveValue);
+    }
+  });
+
+  it('classifies setup command timeouts with a safe command index', async () => {
+    const request = makeRequest(tmpDir);
+    expect(
+      prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args[0] === 'clone') {
+            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
+              recursive: true,
+            });
+          }
+          if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        runProcess: async () => ({
+          stdout: '',
+          stderr: 'Authorization: Bearer setup-secret',
+          exitCode: 124,
+          terminationReason: 'timeout',
+          elapsedMs: 300_000,
+        }),
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      })
+    ).rejects.toMatchObject({
+      subtype: 'setup_command_timeout',
+      message: expect.not.stringContaining('setup-secret'),
+      detail: expect.not.stringContaining('setup-secret'),
+    });
+  });
+
+  it('uses an unknown workspace subtype for untyped failures', async () => {
+    const request = makeRequest(tmpDir);
+    expect(
+      prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async () => {
+          throw new Error('unexpected internal failure');
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'workspace_setup_unknown',
+    });
   });
 
   it('resumes unfinished cold bootstraps when a prior attempt left a git workspace behind', async () => {

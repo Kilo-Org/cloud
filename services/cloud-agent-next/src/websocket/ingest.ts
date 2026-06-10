@@ -27,8 +27,9 @@ import {
 import type { CompleteEventData, KilocodeEventData, CloudStatusData } from '../shared/protocol.js';
 import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
-import type { WrapperSupervisor } from '../session/wrapper-supervisor.js';
+import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
 import type { TerminalizeParams } from '../session/session-message-state.js';
+import { classifyAssistantFailureMessage } from '../session/safe-failure-projection.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -54,12 +55,14 @@ const kilocodeEventSchema = z
 const interruptedEventSchema = z.object({
   reason: z.string().optional(),
   exitCode: z.number().optional(),
+  interruptionSource: z.literal('container_shutdown').optional(),
 });
 
 const errorEventSchema = z.object({
   fatal: z.boolean().optional(),
   error: z.string().optional(),
   message: z.string().optional(),
+  errorSource: z.literal('assistant').optional(),
 });
 
 const cloudMessageCompletedEventSchema = z.object({
@@ -84,6 +87,78 @@ function getAssistantErrorMessage(error: unknown): string | undefined {
     }
   }
   return 'Assistant message failed';
+}
+
+function sanitizeKilocodeEventData(data: unknown): unknown {
+  if (typeof data !== 'object' || data === null) return data;
+  const eventData = data as Record<string, unknown>;
+  if (typeof eventData.properties !== 'object' || eventData.properties === null) return data;
+  const properties = eventData.properties as Record<string, unknown>;
+
+  if (eventData.event === 'message.updated') {
+    if (typeof properties.info !== 'object' || properties.info === null) return data;
+    const info = properties.info as Record<string, unknown>;
+    if (info.role !== 'assistant' || info.error === undefined || info.error === null) return data;
+    return {
+      ...eventData,
+      properties: {
+        ...properties,
+        info: {
+          ...info,
+          error: classifyAssistantFailureMessage(info.error),
+        },
+      },
+    };
+  }
+
+  if (eventData.event === 'session.error') {
+    return {
+      ...eventData,
+      properties: {
+        ...properties,
+        error: classifyAssistantFailureMessage(properties.error),
+      },
+    };
+  }
+
+  return data;
+}
+
+function sanitizePublicEventData(eventType: string, data: unknown): unknown {
+  if (eventType === 'kilocode') return sanitizeKilocodeEventData(data);
+
+  if (eventType === 'error') {
+    const parsed = errorEventSchema.safeParse(data);
+    if (!parsed.success) return {};
+    const rawError = parsed.data.error ?? parsed.data.message;
+    const safeMessage =
+      parsed.data.errorSource === 'assistant'
+        ? classifyAssistantFailureMessage(rawError)
+        : 'Agent wrapper failed';
+    return {
+      fatal: parsed.data.fatal,
+      ...(parsed.data.errorSource ? { errorSource: parsed.data.errorSource } : {}),
+      error: safeMessage,
+      message: safeMessage,
+    };
+  }
+
+  if (eventType === 'interrupted') {
+    const parsed = interruptedEventSchema.safeParse(data);
+    if (!parsed.success) return {};
+    return {
+      reason:
+        parsed.data.interruptionSource === 'container_shutdown'
+          ? 'Container shutdown'
+          : 'Wrapper interrupted',
+      ...(parsed.data.exitCode === undefined ? {} : { exitCode: parsed.data.exitCode }),
+      ...(parsed.data.interruptionSource
+        ? { interruptionSource: parsed.data.interruptionSource }
+        : {}),
+    };
+  }
+
+  return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,13 +263,7 @@ export function createIngestHandler(
   broadcastFn: (event: StoredEvent) => void,
   doContext: IngestDOContext
 ) {
-  async function forwardIngestTerminalEvent(params: {
-    wrapperRunId: string;
-    status: 'completed' | 'failed' | 'interrupted';
-    error?: string;
-    gateResult?: 'pass' | 'fail';
-    messageIds?: string[];
-  }): Promise<void> {
+  async function forwardIngestTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
     await doContext.wrapperSupervisor.onTerminalEvent(params);
   }
 
@@ -451,7 +520,8 @@ export function createIngestHandler(
           : Date.now();
 
         const eventType = ingestEvent.streamEventType;
-        const payload = JSON.stringify(ingestEvent.data ?? {});
+        const publicEventData = sanitizePublicEventData(eventType, ingestEvent.data ?? {});
+        const payload = JSON.stringify(publicEventData);
         const eventTypeStr: string = eventType;
 
         const now = Date.now();
@@ -488,10 +558,7 @@ export function createIngestHandler(
             ingestEvent.data
           );
           if (!parsedCloudMessageCompleted.success) {
-            console.warn(
-              'Invalid cloud.message.completed event payload',
-              parsedCloudMessageCompleted.error
-            );
+            console.warn('Invalid cloud.message.completed event payload');
             return;
           }
 
@@ -612,7 +679,7 @@ export function createIngestHandler(
             );
             ws.serializeAttachment(attachment);
           } else {
-            console.warn('Invalid kilocode event payload', parsedKilocode.error);
+            console.warn('Invalid kilocode event payload');
           }
         }
 
@@ -639,6 +706,7 @@ export function createIngestHandler(
                     assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
                     reason: 'assistant_error',
                     error: assistantError,
+                    safeFailureMessage: classifyAssistantFailureMessage(assistantError),
                     completionSource: 'assistant_message_event',
                   },
                   wrapperRunId
@@ -695,7 +763,7 @@ export function createIngestHandler(
 
           const parsedComplete = completeEventSchema.safeParse(ingestEvent.data);
           if (!parsedComplete.success) {
-            console.warn('Invalid complete event payload', parsedComplete.error);
+            console.warn('Invalid complete event payload');
             return;
           }
           await handleBranchCapture(parsedComplete.data as CompleteEventData, {
@@ -723,7 +791,7 @@ export function createIngestHandler(
         if (eventType === 'interrupted') {
           const parsedInterrupted = interruptedEventSchema.safeParse(ingestEvent.data);
           if (!parsedInterrupted.success) {
-            console.warn('Invalid interrupted event payload', parsedInterrupted.error);
+            console.warn('Invalid interrupted event payload');
             return;
           }
           const interruptedError = parsedInterrupted.data.reason ?? 'User interrupted';
@@ -731,6 +799,7 @@ export function createIngestHandler(
             wrapperRunId,
             status: 'interrupted',
             error: interruptedError,
+            interruptionSource: parsedInterrupted.data.interruptionSource,
           });
           logger
             .withFields({
@@ -745,19 +814,23 @@ export function createIngestHandler(
         if (eventType === 'error') {
           const parsedError = errorEventSchema.safeParse(ingestEvent.data);
           if (!parsedError.success) {
-            console.warn('Invalid error event payload', parsedError.error);
+            console.warn('Invalid error event payload');
             return;
           }
           const errorData = parsedError.data;
           if (errorData.fatal) {
             const fatalMessage = errorData.error ?? errorData.message ?? 'Fatal error';
+            const safeFatalMessage =
+              errorData.errorSource === 'assistant'
+                ? classifyAssistantFailureMessage(fatalMessage)
+                : 'Agent wrapper failed';
             broadcastFn({
               id: 0 as EventId,
               execution_id: eventSourceId,
               session_id: sessionId,
               stream_event_type: 'cloud.status',
               payload: JSON.stringify({
-                cloudStatus: { type: 'error', message: fatalMessage },
+                cloudStatus: { type: 'error', message: safeFatalMessage },
               } satisfies CloudStatusData),
               timestamp,
             });
@@ -765,6 +838,7 @@ export function createIngestHandler(
               wrapperRunId,
               status: 'failed',
               error: fatalMessage,
+              errorSource: errorData.errorSource,
             });
             logger
               .withFields({
@@ -776,21 +850,9 @@ export function createIngestHandler(
               .warn('Fatal wrapper error event forwarded to session coordinator');
           }
         }
-      } catch (error) {
-        logger
-          .withFields({
-            sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-          .error('Error processing wrapper ingest message');
-        ws.send(
-          JSON.stringify(
-            createErrorMessage(
-              'WS_INTERNAL_ERROR',
-              error instanceof Error ? error.message : 'Failed to process event'
-            )
-          )
-        );
+      } catch {
+        logger.withFields({ sessionId }).error('Error processing wrapper ingest message');
+        ws.send(JSON.stringify(createErrorMessage('WS_INTERNAL_ERROR', 'Failed to process event')));
       }
     },
 

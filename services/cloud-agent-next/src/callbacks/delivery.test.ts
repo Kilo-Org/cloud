@@ -164,18 +164,30 @@ describe('deliverCallbackJob', () => {
       expect(result.type).toBe('success');
     });
 
-    it('should send correct payload to fetch', async () => {
+    it('forwards optional structured failure unchanged', async () => {
       const mockFetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
       globalThis.fetch = mockFetch;
       const target: CallbackTarget = { url: 'https://example.com/callback' };
+      const payload: ExecutionCallbackPayload = {
+        ...mockPayload,
+        status: 'failed',
+        errorMessage: 'legacy error',
+        failure: {
+          stage: 'pre_dispatch',
+          code: 'workspace_setup_failed',
+          subtype: 'git_clone_timeout',
+          attempts: 2,
+          message: 'Repository clone timed out',
+        },
+      };
 
-      await deliverCallbackJob(target, mockPayload, 1);
+      await deliverCallbackJob(target, payload, 1);
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://example.com/callback',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify(mockPayload),
+          body: JSON.stringify(payload),
         })
       );
     });

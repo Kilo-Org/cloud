@@ -25,6 +25,8 @@ import {
 import type { ExecutionSession, SandboxInstance } from '../types.js';
 import type { WrapperInstanceLease } from '../agent-sandbox/protocol.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
+import type { WrapperSessionReadyRequest } from '../shared/wrapper-bootstrap.js';
+import { logger } from '../logger.js';
 
 vi.mock('./ports.js', () => ({
   randomPort: vi.fn(() => 10000 + Math.floor(Math.random() * 50000)),
@@ -287,6 +289,88 @@ describe('WrapperClient', () => {
       );
       expect('executeSession' in client).toBe(false);
       expect(session.exec).not.toHaveBeenCalled();
+    });
+
+    it('propagates validated workspace failure diagnostics', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          Response.json(
+            {
+              error: 'WORKSPACE_SETUP_FAILED',
+              message: 'Workspace setup failed',
+              subtype: 'git_clone_timeout',
+              detail: 'Repository clone timed out after 120 seconds',
+              retryable: false,
+            },
+            { status: 503 }
+          )
+        ),
+      };
+      const client = new WrapperClient({
+        session: createMockSession(createSuccessResponse({})),
+        port: defaultPort,
+        transport,
+      });
+
+      await expect(
+        client.ensureSessionReady({} as WrapperSessionReadyRequest)
+      ).rejects.toMatchObject({
+        code: 'WORKSPACE_SETUP_FAILED',
+        workspaceFailureSubtype: 'git_clone_timeout',
+        safeDetail: 'Repository clone timed out after 120 seconds',
+        retryable: false,
+      });
+    });
+
+    it('keeps old workspace failure responses compatible', async () => {
+      const transport: WrapperTransport = {
+        request: vi
+          .fn()
+          .mockResolvedValue(
+            Response.json(
+              { error: 'WORKSPACE_SETUP_FAILED', message: 'Workspace setup failed' },
+              { status: 503 }
+            )
+          ),
+      };
+      const client = new WrapperClient({
+        session: createMockSession(createSuccessResponse({})),
+        port: defaultPort,
+        transport,
+      });
+
+      await expect(
+        client.ensureSessionReady({} as WrapperSessionReadyRequest)
+      ).rejects.toMatchObject({
+        code: 'WORKSPACE_SETUP_FAILED',
+        workspaceFailureSubtype: undefined,
+        safeDetail: undefined,
+      });
+    });
+
+    it('rejects invalid workspace failure diagnostics at the shared boundary', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          Response.json(
+            {
+              error: 'WORKSPACE_SETUP_FAILED',
+              message: 'Workspace setup failed',
+              subtype: 'credential_leak',
+              detail: 'x'.repeat(8_193),
+            },
+            { status: 503 }
+          )
+        ),
+      };
+      const client = new WrapperClient({
+        session: createMockSession(createSuccessResponse({})),
+        port: defaultPort,
+        transport,
+      });
+
+      await expect(
+        client.ensureSessionReady({} as WrapperSessionReadyRequest)
+      ).rejects.toMatchObject({ code: 'PARSE_ERROR' });
     });
   });
 
@@ -901,8 +985,7 @@ describe('WrapperClient', () => {
 
       // ensureRunning makes ONE attempt (port retry lives in ensureWrapper)
       expect(session.startProcess).toHaveBeenCalledTimes(1);
-      // getLogs should be called on the single failed attempt
-      expect(getLogsMock).toHaveBeenCalledTimes(1);
+      expect(getLogsMock).not.toHaveBeenCalled();
       // pkill should be called to clean up the failed process
       const execCalls = (session.exec as ReturnType<typeof vi.fn>).mock.calls;
       const pkillCalls = execCalls.filter(call => String(call[0]).includes('pkill'));
@@ -934,22 +1017,30 @@ describe('WrapperClient', () => {
       expect(session.startProcess).toHaveBeenCalledTimes(1);
     });
 
-    it('preserves sandbox waitForPort failures as the not-ready cause', async () => {
-      const session = createMockSession(createCurlError(7, 'Connection refused'));
-      const sandboxStartupError = new Error('Process exited before ready');
-      Object.assign(sandboxStartupError, {
-        name: 'ProcessExitedBeforeReadyError',
-        httpStatus: 500,
+    it('does not expose startup diagnostics in errors or structured logs', async () => {
+      const startupSecret = 'startup-token-secret';
+      const stdoutSecret = 'stdout-token-secret';
+      const stderrSecret = 'stderr-token-secret';
+      const wrapperLogSecret = 'wrapper-log-token-secret';
+      const session = createMockSession((command: string) => {
+        if (command.includes('cat ')) {
+          return { exitCode: 0, stdout: wrapperLogSecret };
+        }
+        return createCurlError(7, 'Connection refused');
       });
-
+      const getLogsMock = vi.fn().mockResolvedValue({
+        stdout: stdoutSecret,
+        stderr: stderrSecret,
+      });
       (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: 'mock-process-1',
-        waitForPort: vi.fn().mockRejectedValue(sandboxStartupError),
-        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockRejectedValue(new Error(startupSecret)),
+        getLogs: getLogsMock,
       });
-
+      const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => logger);
       const client = new WrapperClient({ session, port: defaultPort });
 
+      let thrown: unknown;
       try {
         await client.ensureRunning({
           agentSessionId,
@@ -957,40 +1048,29 @@ describe('WrapperClient', () => {
           maxWaitMs: 100,
           workspacePath: '/workspace/test',
         });
-        expect.fail('Expected ensureRunning to throw');
       } catch (error) {
-        expect(error).toBeInstanceOf(WrapperNotReadyError);
-        expect(error).toHaveProperty('cause', sandboxStartupError);
+        thrown = error;
       }
-    });
 
-    it('calls getLogs on process when startup fails', async () => {
-      const session = createMockSession(createCurlError(7, 'Connection refused'));
-
-      const getLogsMock = vi.fn().mockResolvedValue({
-        stdout: 'wrapper output before crash',
-        stderr: 'illegal instruction',
+      expect(thrown).toBeInstanceOf(WrapperNotReadyError);
+      expect(thrown).toMatchObject({
+        message: 'Wrapper did not become ready',
+        code: 'NOT_READY',
       });
-
-      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
-        id: 'mock-process-id',
-        waitForPort: vi.fn().mockRejectedValue(new Error('Process exited with code 132')),
-        getLogs: getLogsMock,
+      expect((thrown as Error).cause).toBeUndefined();
+      expect(getLogsMock).not.toHaveBeenCalled();
+      expect(session.exec).not.toHaveBeenCalledWith(expect.stringContaining('cat '));
+      const logged = JSON.stringify(loggerError.mock.calls);
+      for (const secret of [startupSecret, stdoutSecret, stderrSecret, wrapperLogSecret]) {
+        expect(String(thrown)).not.toContain(secret);
+        expect(logged).not.toContain(secret);
+      }
+      expect(loggerError).toHaveBeenCalledWith('Wrapper startup failed', {
+        port: defaultPort,
+        processId: 'mock-process-id',
+        timeoutMs: 100,
       });
-
-      const client = new WrapperClient({ session, port: defaultPort });
-
-      await expect(
-        client.ensureRunning({
-          agentSessionId,
-          userId,
-          maxWaitMs: 100,
-          workspacePath: '/workspace/test',
-        })
-      ).rejects.toThrow(WrapperNotReadyError);
-
-      // getLogs should be called on the single failed attempt
-      expect(getLogsMock).toHaveBeenCalledTimes(1);
+      loggerError.mockRestore();
     });
 
     it('uses default wrapper path and calls startProcess', async () => {

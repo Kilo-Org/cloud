@@ -488,8 +488,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/anthropic':
-        specifier: 3.0.77
-        version: 3.0.77(zod@4.4.3)
+        specifier: 3.0.82
+        version: 3.0.82(zod@4.4.3)
       '@ai-sdk/gateway':
         specifier: 3.0.114
         version: 3.0.114(zod@4.4.3)
@@ -503,8 +503,8 @@ importers:
         specifier: 2.0.47
         version: 2.0.47(zod@4.4.3)
       '@anthropic-ai/sdk':
-        specifier: 0.95.2
-        version: 0.95.2(zod@4.4.3)
+        specifier: 0.104.1
+        version: 0.104.1(zod@4.4.3)
       '@apple/app-store-server-library':
         specifier: 3.1.0
         version: 3.1.0
@@ -2768,8 +2768,8 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  '@ai-sdk/anthropic@3.0.77':
-    resolution: {integrity: sha512-ML8C2M1YvPA1ulEx4TiyF0k1xvC2ikEiPBIC1PPQ0a5xELUGrO2lAaEzsTEoJ+eCeDd8PSBuFJjs+r+9yIwQXA==}
+  '@ai-sdk/anthropic@3.0.82':
+    resolution: {integrity: sha512-WKKou2wbhGGYV8PSALAPyV2YY4nfCqCPkyBzYtJtDA9yCcIFwsbtkTNgg7bqtLCVzeEsY7wwxRoCWy+EMfrw/A==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -2822,8 +2822,8 @@ packages:
       '@faker-js/faker': ^7.0.0 || ^8.0.0 || ^9.0.0
       zod: ^3.21.4
 
-  '@anthropic-ai/sdk@0.91.1':
-    resolution: {integrity: sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==}
+  '@anthropic-ai/sdk@0.104.1':
+    resolution: {integrity: sha512-gGACa/+IaiXzRRmF96aOhamoBgapKRBiFWbmmTFP8aMkpaEcuStF+Q61bjo4vPxBM7gqWJNZqsngslRdnLHv0Q==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -2831,8 +2831,8 @@ packages:
       zod:
         optional: true
 
-  '@anthropic-ai/sdk@0.95.2':
-    resolution: {integrity: sha512-Egddwo3sheo1PzUrMkZnH6VkQYwS0h/b/i8vSK8Ta9M45UQipAMeDFH57dYuDAfXMEUUGeKw6CMlremgMZgrSQ==}
+  '@anthropic-ai/sdk@0.91.1':
+    resolution: {integrity: sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -16506,7 +16506,7 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
-  '@ai-sdk/anthropic@3.0.77(zod@4.4.3)':
+  '@ai-sdk/anthropic@3.0.82(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)
@@ -16561,16 +16561,16 @@ snapshots:
       randexp: 0.5.3
       zod: 4.4.3
 
-  '@anthropic-ai/sdk@0.91.1(zod@4.4.3)':
-    dependencies:
-      json-schema-to-ts: 3.1.1
-    optionalDependencies:
-      zod: 4.4.3
-
-  '@anthropic-ai/sdk@0.95.2(zod@4.4.3)':
+  '@anthropic-ai/sdk@0.104.1(zod@4.4.3)':
     dependencies:
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
+    optionalDependencies:
+      zod: 4.4.3
+
+  '@anthropic-ai/sdk@0.91.1(zod@4.4.3)':
+    dependencies:
+      json-schema-to-ts: 3.1.1
     optionalDependencies:
       zod: 4.4.3
 

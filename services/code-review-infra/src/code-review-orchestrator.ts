@@ -203,6 +203,15 @@ function isWorkspaceAdmissionCapacityFailure(body: string): boolean {
 function hasKnownRetryableFreshSessionFailure(body: string): boolean {
   return (
     body.includes('failed to create workspace directory') ||
+    body.includes('failed to prepare session home') ||
+    body.includes(
+      'disk capacity inspection cannot run because the sandbox filesystem is unusable'
+    ) ||
+    body.includes(
+      'workspace admission probe cannot run because the sandbox filesystem is unusable'
+    ) ||
+    /\benospc\b/.test(body) ||
+    body.includes('no space left on device') ||
     body.includes('wrapper cleanup is required before delivery can launch') ||
     body.includes("enoent: no such file or directory, posix_spawn 'git'") ||
     (body.includes('failed to checkout pull ref') &&
@@ -262,9 +271,9 @@ function classifyCloudAgentNextFreshSessionRetry(
   if (isWorkspaceAdmissionCapacityFailure(body)) {
     return cloudAgentNextFreshRetryClassification(
       cloudAgentNextError,
-      false,
-      'deterministic_non_retryable_failure',
-      'workspace_admission_capacity_not_retryable'
+      true,
+      'sandbox_api_or_storage_failure',
+      'workspace_admission_capacity_retryable'
     );
   }
 
@@ -280,8 +289,16 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
+  if (body.includes('git clone timed out')) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'repo_clone_or_checkout_failure',
+      'git_clone_timeout_retryable'
+    );
+  }
+
   if (
-    body.includes('git clone timed out') ||
     body.includes('git-lfs filter-process') ||
     body.includes('object does not exist on the server')
   ) {
@@ -299,9 +316,9 @@ function classifyCloudAgentNextFreshSessionRetry(
   ) {
     return cloudAgentNextFreshRetryClassification(
       cloudAgentNextError,
-      false,
+      true,
       'sandbox_api_or_storage_failure',
-      'storage_failure_not_retryable_by_code_review_classifier'
+      'durable_object_storage_failure_retryable'
     );
   }
 

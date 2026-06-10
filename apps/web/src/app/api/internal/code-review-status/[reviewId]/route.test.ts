@@ -1417,8 +1417,6 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     it.each([
       'Too Many Requests: [BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
       'Dispatch failed: Code Reviewer is disabled for owner user:fd16292d-e963-4838-bc62-21611f000ccd on github',
-      'Failed to start wrapper: Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup',
-      'Failed to start wrapper: Workspace admission rejected because disk capacity could not be measured',
     ])('does not retry deterministic retry-suppression-only failures: %s', async errorMessage => {
       mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'running' }));
 
@@ -1442,6 +1440,42 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           terminalReason: undefined,
         })
       );
+    });
+
+    it('retries low-disk workspace admission callbacks as transient infra failures', async () => {
+      const errorMessage =
+        'Failed to start wrapper: Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup';
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000213',
+        retryAttemptId: '00000000-0000-0000-0000-000000000214',
+        sessionId: 'agent-workspace-admission-old',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: errorMessage,
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
 
     it('does not start a fresh retry if the review becomes superseded before worker startup', async () => {

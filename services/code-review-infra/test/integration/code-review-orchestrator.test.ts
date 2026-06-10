@@ -844,37 +844,34 @@ describe('CodeReviewOrchestrator recovery', () => {
   });
 
   it.each([
-    'Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup',
-    'Workspace admission rejected because disk capacity could not be measured',
-  ])('does not retry workspace admission capacity failures: %s', async message => {
-    const stub = getReviewStub();
-    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
-      const url = String(request);
-      if (url.includes('/api/internal/code-review-status/')) {
-        return Response.json({ success: true });
-      }
-      if (url.includes('/trpc/prepareSession')) {
-        return trpcError(500, `Failed to start wrapper: ${message}`);
-      }
-      return new Response('unexpected fetch', { status: 500 });
-    });
-    globalThis.fetch = fetchMock;
-
-    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
-      await state.storage.put('state', codeReview());
-      await state.storage.setAlarm(Date.now() + 30_000);
-    });
-
-    const ran = await runDurableObjectAlarm(stub);
-
-    expect(ran).toBe(true);
-    await expect(stub.status()).resolves.toMatchObject({ status: 'failed' });
-    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
-    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
-    const stored = await storedReview(stub);
-    expect(stored).toMatchObject({ status: 'failed' });
-    expect(stored?.sandboxRetryAttempted).toBeUndefined();
-  });
+    {
+      name: 'workspace admission low disk',
+      response: () =>
+        trpcError(
+          500,
+          'Failed to start wrapper: Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup'
+        ),
+      sessionId: 'agent-workspace-admission-retry',
+      cliSessionId: 'ses_workspace_admission_retry',
+    },
+    {
+      name: 'git clone timeout',
+      response: () => trpcError(500, 'git clone timed out after 600000ms'),
+      sessionId: 'agent-git-clone-timeout-retry',
+      cliSessionId: 'ses_git_clone_timeout_retry',
+    },
+    {
+      name: 'durable object storage timeout',
+      response: () => trpcError(500, 'durable object storage operation exceeded timeout'),
+      sessionId: 'agent-do-storage-timeout-retry',
+      cliSessionId: 'ses_do_storage_timeout_retry',
+    },
+  ])(
+    'retries prepareSession once after transient $name',
+    async ({ response, sessionId, cliSessionId }) => {
+      await expectPrepareFailureSchedulesFreshRetry(response, sessionId, cliSessionId);
+    }
+  );
 
   it.each([
     {

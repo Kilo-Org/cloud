@@ -257,11 +257,7 @@ function hasKnownUnretryableFailureMessage(errorMessage?: string | null): boolea
     message.includes(
       '[byok] your api key has hit its rate limit. please try again later or check your rate limit settings with your api provider.'
     ) ||
-    /code reviewer is disabled for owner [^\s]+ on (github|gitlab)/i.test(message) ||
-    /workspace admission rejected: \d+ mb available below \d+ mb threshold after cleanup/i.test(
-      message
-    ) ||
-    message.includes('workspace admission rejected because disk capacity could not be measured')
+    /code reviewer is disabled for owner [^\s]+ on (github|gitlab)/i.test(message)
   );
 }
 

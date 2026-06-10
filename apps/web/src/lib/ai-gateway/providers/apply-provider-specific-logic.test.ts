@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { applyOpenRouterModelsFallback } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { applyGatewayModelsFallback } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
@@ -15,13 +15,13 @@ function makeRequest(model: string, models?: string[]): GatewayRequest {
   };
 }
 
-describe('applyOpenRouterModelsFallback', () => {
+describe('applyGatewayModelsFallback', () => {
   it.each<ProviderId>(['openrouter', 'vercel'])(
     'sets Opus as the Fable fallback for the %s provider',
     providerId => {
       const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
 
-      applyOpenRouterModelsFallback(providerId, 'anthropic/claude-fable-5', request);
+      applyGatewayModelsFallback(providerId, 'anthropic/claude-fable-5', request);
 
       expect(request.body.models).toEqual([
         'anthropic/claude-fable-5',
@@ -33,7 +33,7 @@ describe('applyOpenRouterModelsFallback', () => {
   it('removes caller-provided fallbacks for Fable on other providers', () => {
     const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
 
-    applyOpenRouterModelsFallback('martian', 'anthropic/claude-fable-5', request);
+    applyGatewayModelsFallback('martian', 'anthropic/claude-fable-5', request);
 
     expect(request.body.models).toBeUndefined();
   });
@@ -41,7 +41,7 @@ describe('applyOpenRouterModelsFallback', () => {
   it('removes caller-provided fallbacks for other models', () => {
     const request = makeRequest('openai/gpt-4o', ['caller/fallback']);
 
-    applyOpenRouterModelsFallback('openrouter', 'openai/gpt-4o', request);
+    applyGatewayModelsFallback('openrouter', 'openai/gpt-4o', request);
 
     expect(request.body.models).toBeUndefined();
   });

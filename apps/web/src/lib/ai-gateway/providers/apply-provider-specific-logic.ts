@@ -91,7 +91,7 @@ function applyPreferredProvider(
   }
 }
 
-export function applyOpenRouterModelsFallback(
+export function applyGatewayModelsFallback(
   providerId: ProviderId,
   requestedModel: string,
   requestToMutate: GatewayRequest
@@ -114,7 +114,7 @@ export function applyProviderSpecificLogic(
   userId: string,
   taskId: string | null
 ) {
-  applyOpenRouterModelsFallback(provider.id, requestedModel, requestToMutate);
+  applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

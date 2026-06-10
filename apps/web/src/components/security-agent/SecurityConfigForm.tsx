@@ -24,13 +24,11 @@ type SecurityConfigFormProps = {
   organizationId?: string;
   initialConfig: SecurityConfigFormState;
   repositories: SecurityRepository[];
-  repositoriesSyncedAt?: string | null;
   viewState: {
     enabled: boolean;
     isLoadingRepositories?: boolean;
     isSaving: boolean;
     isToggling: boolean;
-    isRefreshingRepositories?: boolean;
   };
   onSave: (config: SecurityConfigSavePayload) => void;
   onToggleEnabled: (
@@ -40,7 +38,6 @@ type SecurityConfigFormProps = {
       'repositorySelectionMode' | 'selectedRepositoryIds'
     >
   ) => void;
-  onRefreshRepositories?: () => void;
 };
 
 const DEFAULT_SLA_CONFIG: SlaConfig = {
@@ -87,14 +84,11 @@ export function SecurityConfigForm({
   organizationId,
   initialConfig,
   repositories,
-  repositoriesSyncedAt,
   viewState,
   onSave,
   onToggleEnabled,
-  onRefreshRepositories,
 }: SecurityConfigFormProps) {
-  const { enabled, isLoadingRepositories, isSaving, isToggling, isRefreshingRepositories } =
-    viewState;
+  const { enabled, isLoadingRepositories, isSaving, isToggling } = viewState;
   const initialConfigFingerprint = configFingerprint(initialConfig);
   const [localConfig, setLocalConfig] = useState<LocalConfigState>(() => ({
     draft: initialConfig,
@@ -151,10 +145,7 @@ export function SecurityConfigForm({
       <RepositorySection
         {...stateProps}
         repositories={repositories}
-        repositoriesSyncedAt={repositoriesSyncedAt}
         isLoading={isLoadingRepositories}
-        isRefreshing={isRefreshingRepositories}
-        onRefresh={onRefreshRepositories}
       />
       <AgentStatusSection
         enabled={enabled}

@@ -6,11 +6,9 @@ import {
 import { getWorkerDb } from '@kilocode/db/client';
 import { discoverDueOwners, reconcileStaleAnalysisQueueRows } from './db/queries.js';
 import { logger } from './logger.js';
+import { getSecurityAgentCommandLifecycleConfig } from './command-lifecycle-config.js';
 
 const DISPATCH_OWNER_LIMIT = 100;
-const ACCEPTED_COMMAND_TIMEOUT_MS = 5 * 60 * 1000;
-const RUNNING_COMMAND_TIMEOUT_MS = 30 * 60 * 1000;
-const COMMAND_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function dispatchDueOwners(env: CloudflareEnv): Promise<{
   dispatchId: string;
@@ -27,13 +25,14 @@ export async function dispatchDueOwners(env: CloudflareEnv): Promise<{
   });
 
   const now = Date.now();
+  const commandLifecycleConfig = getSecurityAgentCommandLifecycleConfig(env);
   const commandReconciliation = await reconcileStaleSecurityAgentCommands(db, {
-    acceptedBefore: new Date(now - ACCEPTED_COMMAND_TIMEOUT_MS),
-    runningBefore: new Date(now - RUNNING_COMMAND_TIMEOUT_MS),
+    acceptedBefore: new Date(now - commandLifecycleConfig.acceptedCommandTimeoutMs),
+    runningBefore: new Date(now - commandLifecycleConfig.runningCommandTimeoutMs),
   });
   const deletedCommandCount = await deleteRetainedSecurityAgentCommands(
     db,
-    new Date(now - COMMAND_RETENTION_MS)
+    new Date(now - commandLifecycleConfig.commandRetentionMs)
   );
   logger.info('Reconciled stale security agent commands before owner dispatch', {
     stale_accepted_command_ids: commandReconciliation.staleAccepted.map(command => command.id),

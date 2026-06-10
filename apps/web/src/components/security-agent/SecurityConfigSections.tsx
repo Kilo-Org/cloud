@@ -1,20 +1,9 @@
 'use client';
 
 import type { Dispatch, SetStateAction } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import {
-  AlertCircle,
-  AlertTriangle,
-  Bot,
-  Clock,
-  Info,
-  RefreshCw,
-  ScanSearch,
-  Settings,
-} from 'lucide-react';
+import { AlertCircle, AlertTriangle, Bot, Clock, Info, ScanSearch, Settings } from 'lucide-react';
 import { RepositoryMultiSelect } from '@/components/code-reviews/RepositoryMultiSelect';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -193,48 +182,17 @@ export function RepositorySection({
   state,
   setState,
   repositories,
-  repositoriesSyncedAt,
   isLoading,
-  isRefreshing,
-  onRefresh,
 }: StateProps & {
   repositories: SecurityRepository[];
-  repositoriesSyncedAt?: string | null;
   isLoading?: boolean;
-  isRefreshing?: boolean;
-  onRefresh?: () => void;
 }) {
-  const refreshAction = onRefresh ? (
-    <div className="flex items-center gap-2 self-end sm:self-auto">
-      <span className="text-muted-foreground text-xs">
-        Last synced:{' '}
-        {repositoriesSyncedAt
-          ? formatDistanceToNow(new Date(repositoriesSyncedAt), { addSuffix: true })
-          : 'Never'}
-      </span>
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={onRefresh}
-        disabled={isRefreshing || isLoading}
-        aria-label="Refresh repositories"
-      >
-        <RefreshCw
-          className={cn('size-4', isRefreshing && 'animate-spin motion-reduce:animate-none')}
-          aria-hidden="true"
-        />
-      </Button>
-    </div>
-  ) : undefined;
-
   return (
     <Card>
       <SectionHeader
         icon={Settings}
         title="Repository selection"
         description="Choose which repositories Security Agent monitors."
-        action={refreshAction}
       />
       <CardContent className="space-y-4">
         {isLoading ? (

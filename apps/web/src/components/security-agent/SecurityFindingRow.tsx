@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { cn } from '@/lib/utils';
 import { SeverityBadge } from './SeverityBadge';
-import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
+import { securityAgentCommandAdmissionCopy } from './security-agent-command-copy';
 
 type Outcome = {
   icon: typeof CheckCircle2;
@@ -233,7 +233,7 @@ export function SecurityFindingRow({
               className="size-3 animate-spin motion-reduce:animate-none"
               aria-hidden="true"
             />
-            {manualAnalysisAdmissionCopy.pendingLabel}
+            {securityAgentCommandAdmissionCopy.start_analysis.pendingLabel}
           </Button>
         ) : finding.analysis?.triage?.suggestedAction === 'manual_review' &&
           finding.status === 'open' ? (

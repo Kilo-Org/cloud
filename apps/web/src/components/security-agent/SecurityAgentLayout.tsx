@@ -52,7 +52,29 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
         toast.success('Permissions refreshed', {
           description: 'GitHub App permissions have been updated from GitHub.',
         });
-        void queryClient.invalidateQueries();
+        const input = organizationId ? { organizationId } : undefined;
+        void queryClient.invalidateQueries({
+          queryKey: trpc.githubApps.getInstallation.queryKey(input),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.githubApps.listIntegrations.queryKey(input),
+        });
+        if (isOrg && organizationId) {
+          const ownerInput = { organizationId };
+          void queryClient.invalidateQueries({
+            queryKey: trpc.organizations.securityAgent.getPermissionStatus.queryKey(ownerInput),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: trpc.organizations.securityAgent.getRepositories.queryKey(ownerInput),
+          });
+        } else {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.securityAgent.getPermissionStatus.queryKey(),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: trpc.securityAgent.getRepositories.queryKey(),
+          });
+        }
       },
       onError: (error: { message: string }) => {
         toast.error('Failed to refresh permissions', { description: error.message });

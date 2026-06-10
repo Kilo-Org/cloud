@@ -30,7 +30,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSecurityAgent } from './SecurityAgentContext';
-import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
+import { securityAgentCommandAdmissionCopy } from './security-agent-command-copy';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
 type FindingAnalysis = SecurityFinding['analysis'];
@@ -283,7 +283,7 @@ function FindingTriage({
         <LoadingPanel
           message={
             isAwaitingAnalysisStart || analysisStatus === 'pending'
-              ? `${manualAnalysisAdmissionCopy.pendingLabel}…`
+              ? `${securityAgentCommandAdmissionCopy.start_analysis.pendingLabel}…`
               : 'Triage in progress…'
           }
         />
@@ -402,7 +402,7 @@ function FindingAnalysis({
       <LoadingPanel
         message={
           isAwaitingAnalysisStart || analysisStatus === 'pending'
-            ? `${manualAnalysisAdmissionCopy.pendingLabel}…`
+            ? `${securityAgentCommandAdmissionCopy.start_analysis.pendingLabel}…`
             : 'Codebase analysis in progress…'
         }
         detail="This usually takes 1–2 minutes. The agent is searching your codebase."

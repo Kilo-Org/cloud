@@ -1918,6 +1918,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     let pendingFlushRetryAt: number | undefined;
     let remainingPendingCount: number | undefined;
+    let terminalEffectRepairRetryAt: number | undefined;
     let alarmWorkFailed = false;
 
     try {
@@ -1952,6 +1953,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       try {
         await this.getMessageSettlementOutbox().repairTerminalEffects();
       } catch (error) {
+        terminalEffectRepairRetryAt = Date.now() + PENDING_FLUSH_DEBOUNCE_MS;
         logger
           .withFields({
             sessionId: this.sessionId,
@@ -1995,6 +1997,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const deadlines = await this.getNextAlarmDeadlines();
       if (alarmWorkFailed) {
         deadlines.push(currentTime + PENDING_FLUSH_DEBOUNCE_MS);
+      }
+      if (terminalEffectRepairRetryAt !== undefined) {
+        deadlines.push(terminalEffectRepairRetryAt);
       }
       if (pendingFlushRetryAt !== undefined) {
         deadlines.push(pendingFlushRetryAt);

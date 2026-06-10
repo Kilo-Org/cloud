@@ -11,6 +11,13 @@ When `merge_strategy: 'pr'` is configured:
 3. **Auto-resolve detects comments** — `poll_pr` checks for unresolved review threads, dispatches polecat to fix
 4. **Auto-merge** — once all comments resolved and CI passes, grace period timer starts, then PR is merged via API
 
+### Convoy Merge Modes
+
+Convoys (multi-bead jobs) come in two flavors, controlled by `convoy_merge_mode` in town config:
+
+- **`review-and-merge`** — each bead opens a PR directly to `main`. Independent landings.
+- **`review-then-land`** (default) — each bead's PR targets a shared **convoy feature branch**, and a single **landing PR** is opened from that feature branch to `main` after all beads close. Test this with [Test C](#test-c-review-then-land-convoy-via-direct-sling).
+
 ## Prerequisites
 
 - Wrangler dev server running for gastown (`pnpm dev` in `cloudflare-gastown/`, port 8803)
@@ -317,14 +324,14 @@ gh api repos/$REPO/pulls/$PR_NUMBER/comments \
 
 ### Expected Timeline
 
-| Step                         | Duration     |
-| ---------------------------- | ------------ |
-| Mayor slings bead            | ~30s         |
-| Polecat works + pushes code  | 2-5 min      |
-| Refinery reviews, creates PR | 1-3 min      |
-| Rework cycle (if needed)     | 2-5 min      |
-| Auto-merge grace period      | 2 min        |
-| **Total**                    | **6-15 min** |
+| Step | Duration |
+|---|---|
+| Mayor slings bead | ~30s |
+| Polecat works + pushes code | 2-5 min |
+| Refinery reviews, creates PR | 1-3 min |
+| Rework cycle (if needed) | 2-5 min |
+| Auto-merge grace period | 2 min |
+| **Total** | **6-15 min** |
 
 ---
 
@@ -478,15 +485,15 @@ gh api repos/$REPO/pulls/$PR_NUMBER/comments \
 
 ### Expected Timeline
 
-| Step                           | Duration          |
-| ------------------------------ | ----------------- |
-| Mayor slings bead              | ~30s              |
-| Polecat works + creates PR     | 2-5 min           |
-| Human adds review comment      | manual            |
-| Feedback detected by poll_pr   | ~30s (poll cycle) |
-| Polecat resolves feedback      | 1-3 min           |
-| Auto-merge grace period        | 2 min             |
-| **Total (from human comment)** | **4-6 min**       |
+| Step | Duration |
+|---|---|
+| Mayor slings bead | ~30s |
+| Polecat works + creates PR | 2-5 min |
+| Human adds review comment | manual |
+| Feedback detected by poll_pr | ~30s (poll cycle) |
+| Polecat resolves feedback | 1-3 min |
+| Auto-merge grace period | 2 min |
+| **Total (from human comment)** | **4-6 min** |
 
 ---
 
@@ -759,50 +766,237 @@ for pr in prs:
 
 ---
 
+## Test C: review-then-land Convoy via Direct Sling
+
+This tests the **review-then-land** convoy mode where each sub-bead gets its own PR into the convoy's feature branch, and a final landing PR is created from the feature branch into the default branch (`main`).
+
+Unlike Test B (which goes through the mayor's `gt_sling_batch` tool via a chat message), this test directly slings a convoy through a debug endpoint, eliminating mayor LLM variability. Use this when you want a deterministic E2E test of the convoy plumbing itself.
+
+### Prereqs and Debug Endpoints
+
+These dev-only endpoints are used by this test (all `application/json`, no auth in dev):
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/debug/towns/:townId/rigs` | List rigs registered with the town (returns `{ rigs: [...] }`) |
+| POST | `/debug/towns/:townId/sling-convoy` | Directly call `Town.slingConvoy()` — bypasses the mayor |
+| GET | `/debug/towns/:townId/convoys` | List active convoys with progress (`closed_beads`/`total_beads`) |
+
+The `sling-convoy` body matches `Town.slingConvoy()` input:
+
+```json
+{
+  "rigId": "<rig-uuid>",
+  "convoyTitle": "Bogus convoy E2E test 175337",
+  "merge_mode": "review-then-land",
+  "staged": false,
+  "tasks": [
+    { "title": "Add src/utils/foo.ts with function bar" },
+    { "title": "Add src/utils/baz.ts ...", "depends_on": [0] }
+  ]
+}
+```
+
+### C.1. Look Up the Rig
+
+```bash
+RIG_ID=$(curl -s $BASE/debug/towns/$TOWN_ID/rigs | python3 -c "import sys, json; print(json.load(sys.stdin)['rigs'][0]['id'])")
+echo "RIG_ID=$RIG_ID"
+```
+
+### C.2. Confirm Town Configured for review-then-land
+
+```bash
+curl -s $BASE/debug/towns/$TOWN_ID/config | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print('merge_strategy:', d.get('merge_strategy'))
+print('convoy_merge_mode:', d.get('convoy_merge_mode'))
+print('refinery.auto_merge:', d.get('refinery',{}).get('auto_merge'))
+"
+```
+
+If `convoy_merge_mode` is not `review-then-land`, set it:
+
+```bash
+curl -s -X PATCH $BASE/debug/towns/$TOWN_ID/config \
+  -H "Content-Type: application/json" \
+  -d '{"convoy_merge_mode":"review-then-land","merge_strategy":"pr","refinery":{"auto_merge":true,"auto_merge_delay_minutes":2}}'
+```
+
+### C.3. Sling a 3-Bead Convoy
+
+Use a unique title (timestamp suffix) so subsequent runs don't collide and the feature branch name is easy to grep for:
+
+```bash
+TIMESTAMP=$(date +%H%M%S)
+TITLE="Bogus convoy E2E test $TIMESTAMP"
+RESPONSE=$(curl -s -X POST $BASE/debug/towns/$TOWN_ID/sling-convoy \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"rigId\": \"$RIG_ID\",
+    \"convoyTitle\": \"$TITLE\",
+    \"merge_mode\": \"review-then-land\",
+    \"staged\": false,
+    \"tasks\": [
+      {\"title\": \"Add src/utils/bogus-step1.ts with a single function bogusGreet that returns 'hello bogus'. Include JSDoc. Commit and push.\"},
+      {\"title\": \"Add src/utils/bogus-step2.ts with a single function bogusFarewell that returns 'goodbye bogus'. Include JSDoc. Commit and push.\", \"depends_on\": [0]},
+      {\"title\": \"Add src/utils/bogus-step3.ts with a single function bogusEcho that takes a string and returns it prefixed with 'echo: '. Include JSDoc. Commit and push.\", \"depends_on\": [1]}
+    ]
+  }")
+echo "$RESPONSE" | python3 -c "
+import sys, json
+r = json.load(sys.stdin)
+c = r['convoy']
+print(f'CONVOY_ID={c[\"id\"]}')
+print(f'FEATURE_BRANCH={c[\"feature_branch\"]}')
+for i, b in enumerate(r['beads']):
+    print(f'BEAD{i+1}={b[\"bead\"][\"bead_id\"]}')
+"
+```
+
+Capture the printed env vars (`CONVOY_ID`, `FEATURE_BRANCH`, `BEAD1..3`) into a sourceable file like `/tmp/convoy-test.env` for the rest of the test.
+
+### C.4. Monitor Through the Lifecycle
+
+In **review-then-land** mode you should observe (linear chain of 3 beads, each `depends_on` the previous):
+
+1. Bead 1 → `in_progress` → polecat creates a sub-PR targeting `<feature_branch>` → MR bead → refinery merges sub-PR → bead 1 `closed`
+2. Bead 2 unblocks → same cycle, sub-PR into feature branch
+3. Bead 3 same
+4. After last sub-bead closes: a **landing MR bead** is created with `feature_branch` → `main` PR
+5. Refinery reviews landing PR, auto-merge fires, convoy → `closed`
+
+Monitor with this loop:
+
+```bash
+SLUG=$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\{1,\}/-/g; s/^-\|-$//g' | head -c 40)
+for i in $(seq 1 80); do
+  echo "=== $(date +%H:%M:%S) ==="
+  curl -s $BASE/debug/towns/$TOWN_ID/status | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+alarm = d.get('alarmStatus', {})
+print(f'agents={json.dumps(alarm.get(\"agents\",{}))}  beads={json.dumps(alarm.get(\"beads\",{}))}')
+for b in d.get('beadSummary', []):
+    title = (b.get('title','') or '')[:60]
+    print(f'  {b.get(\"type\",\"?\"):16s} {b.get(\"status\",\"?\"):12s} {title}')
+"
+  curl -s $BASE/debug/towns/$TOWN_ID/convoys | python3 -c "
+import sys, json
+for c in json.load(sys.stdin).get('convoys', []):
+    if c['id'] == '$CONVOY_ID':
+        print(f'  convoy {c[\"status\"]} closed={c[\"closed_beads\"]}/{c[\"total_beads\"]} landed={c[\"landed_at\"]}')
+" 2>/dev/null
+  gh pr list --repo $REPO --state all --search "head:convoy/$SLUG" --limit 10 \
+    --json number,title,headRefName,baseRefName,state,mergedAt 2>/dev/null | python3 -c "
+import sys, json
+prs = json.load(sys.stdin)
+for pr in prs:
+    print(f'  PR #{pr[\"number\"]:3d} {pr[\"state\"]:8s} {pr[\"headRefName\"][:40]} -> {pr[\"baseRefName\"][:40]}')
+" 2>/dev/null
+  # Stop when convoy is gone from active list (indicates closed)
+  ACTIVE=$(curl -s $BASE/debug/towns/$TOWN_ID/convoys | python3 -c "
+import sys, json
+ids = [c['id'] for c in json.load(sys.stdin).get('convoys', [])]
+print('YES' if '$CONVOY_ID' in ids else 'NO')
+" 2>/dev/null)
+  if [ "$ACTIVE" = "NO" ]; then echo '=== CONVOY CLOSED ==='; break; fi
+  sleep 30
+done
+```
+
+### C.5. Verify Final State
+
+After the convoy closes, check:
+
+1. **Sub-bead PRs** — one per non-failed bead, each targeting the convoy feature branch, all merged:
+
+   ```bash
+   gh pr list --repo $REPO --state all --search "head:$FEATURE_BRANCH" --limit 10 \
+     --json number,title,baseRefName,headRefName,state,mergedAt | python3 -m json.tool
+   ```
+
+   Expect: each sub-bead → `baseRefName: <feature_branch>`, `state: MERGED`. The landing PR → `baseRefName: main`, `state: MERGED`.
+
+2. **Landing PR** — base=`main`, head=`<feature_branch>`, merged:
+
+   ```bash
+   gh pr view <landing-pr-number> --repo $REPO --json state,mergedAt,additions,deletions,changedFiles
+   ```
+
+3. **Files actually landed on main**:
+
+   ```bash
+   gh api "repos/$REPO/contents/src/utils?ref=main" --jq '.[] | select(.name | startswith("bogus")) | .name'
+   ```
+
+4. **Convoy progress**: `closed_beads == total_beads`, `landed_at` set, convoy bead `status=closed`.
+
+### Expected Timeline (review-then-land, 3 beads)
+
+| Step | Duration |
+|---|---|
+| Sling-convoy creates 3 issue beads + convoy bead | ~1s |
+| Bead 1 polecat work + sub-PR + refinery merge | 3-5 min |
+| Bead 2 polecat work + sub-PR + refinery merge | 3-5 min |
+| Bead 3 polecat work + sub-PR + refinery merge | 3-5 min |
+| Landing MR created, refinery reviews PR into `main` | 2-3 min |
+| Auto-merge grace period | 2 min |
+| **Total** | **15-25 min** |
+
+### Known Issues Observed in This Flow
+
+- **Polecat occasionally pushes directly to feature branch instead of opening a sub-PR.** The MR bead is still created (via `review_submitted`) and the refinery still merges the work into the feature branch, but `reviewMetadata.pr_url` is `null` and there is no GitHub PR for that sub-bead. This is an LLM compliance issue in the polecat prompt, not a code bug. The convoy still lands successfully.
+- **A failed sub-bead does not block the convoy from landing.** The reconciler treats `failed` blockers the same as `closed` (see `reconciler.ts:960`), so dependents will dispatch and the convoy will land whatever did succeed. If sub-bead 1 of 3 fails, the landing PR will only contain commits from beads 2 and 3. This is by design but worth knowing when interpreting "successful" landings.
+- **Container TLS handshake failures with `github.com`.** A wrangler-managed container may start with a 65535 MTU that breaks outgoing TLS to GitHub (`GnuTLS, handshake failed: The TLS connection was non-properly terminated`). Symptom: every `/agents/start` returns "FAILED for X: git fetch --all --prune failed". Fix: `docker kill $(docker ps -q --filter ancestor=cloudflare-dev/towncontainerdo:*)` — wrangler will spin up a replacement that usually has a working network. The `cloneRepoInner` retry path treats this as non-auth so doesn't retry; the bead burns through `MAX_DISPATCH_ATTEMPTS=5` and ends up `failed` if the container isn't restarted.
+
+---
+
 ## Expected Timelines
 
 ### Scenario 1 (No Review + Auto-Merge)
 
-| Step                       | Duration    |
-| -------------------------- | ----------- |
-| Mayor slings bead          | ~30s        |
-| Polecat works + creates PR | 2-5 min     |
-| Auto-merge grace period    | 2 min       |
-| **Total**                  | **5-8 min** |
+| Step | Duration |
+|---|---|
+| Mayor slings bead | ~30s |
+| Polecat works + creates PR | 2-5 min |
+| Auto-merge grace period | 2 min |
+| **Total** | **5-8 min** |
 
 ### Scenario 2 (Refinery Review + Auto-Merge)
 
-| Step                          | Duration     |
-| ----------------------------- | ------------ |
-| Mayor slings bead             | ~30s         |
-| Polecat works + pushes code   | 2-5 min      |
-| Refinery reviews + creates PR | 1-3 min      |
-| Rework cycle (if needed)      | 2-5 min      |
-| Auto-merge grace period       | 2 min        |
-| **Total**                     | **6-15 min** |
+| Step | Duration |
+|---|---|
+| Mayor slings bead | ~30s |
+| Polecat works + pushes code | 2-5 min |
+| Refinery reviews + creates PR | 1-3 min |
+| Rework cycle (if needed) | 2-5 min |
+| Auto-merge grace period | 2 min |
+| **Total** | **6-15 min** |
 
 ### Scenario 3 (Human Feedback + Auto-Resolve + Auto-Merge)
 
-| Step                       | Duration     |
-| -------------------------- | ------------ |
-| Mayor slings bead          | ~30s         |
-| Polecat works + creates PR | 2-5 min      |
-| Human adds review comment  | manual       |
-| Feedback detected          | ~30s         |
-| Polecat resolves feedback  | 1-3 min      |
-| Auto-merge grace period    | 2 min        |
+| Step | Duration |
+|---|---|
+| Mayor slings bead | ~30s |
+| Polecat works + creates PR | 2-5 min |
+| Human adds review comment | manual |
+| Feedback detected | ~30s |
+| Polecat resolves feedback | 1-3 min |
+| Auto-merge grace period | 2 min |
 | **Total (from task sent)** | **8-12 min** |
 
 ### 3-Bead Convoy (review-and-merge)
 
-| Step                                     | Duration                 |
-| ---------------------------------------- | ------------------------ |
-| Mayor creates convoy + 3 beads           | ~1 min                   |
-| 3 polecats work in parallel + create PRs | 2-5 min                  |
-| 3 refinery reviews (sequential per rig)  | 5-15 min                 |
-| Feedback resolution cycles               | 2-5 min each (if needed) |
-| Auto-merge per PR                        | 2 min grace each         |
-| **Total**                                | **15-30 min**            |
+| Step | Duration |
+|---|---|
+| Mayor creates convoy + 3 beads | ~1 min |
+| 3 polecats work in parallel + create PRs | 2-5 min |
+| 3 refinery reviews (sequential per rig) | 5-15 min |
+| Feedback resolution cycles | 2-5 min each (if needed) |
+| Auto-merge per PR | 2 min grace each |
+| **Total** | **15-30 min** |
 
 ---
 
@@ -863,18 +1057,21 @@ The wrangler container runtime occasionally fails to route DO `container.fetch()
 
 All `/debug/` endpoints are unauthenticated in development. In production, they're protected by Cloudflare Access.
 
-| Method  | Path                                     | Description                                              |
-| ------- | ---------------------------------------- | -------------------------------------------------------- |
-| `GET`   | `/debug/towns/:townId/status`            | Primary status: agents, beads, alarm, patrol, reconciler |
-| `GET`   | `/debug/towns/:townId/config`            | Read town config (dev only)                              |
-| `PATCH` | `/debug/towns/:townId/config`            | Update town config (dev only, partial update)            |
-| `POST`  | `/debug/towns/:townId/reconcile-dry-run` | Run reconciler without applying actions                  |
-| `POST`  | `/debug/towns/:townId/replay-events`     | Replay events from time range                            |
-| `GET`   | `/debug/towns/:townId/drain-status`      | Drain flag + nonce                                       |
-| `GET`   | `/debug/towns/:townId/nudges`            | Pending agent nudges                                     |
-| `POST`  | `/debug/towns/:townId/send-message`      | Send message to mayor (dev only)                         |
-| `GET`   | `/debug/towns/:townId/beads/:beadId`     | Full bead details + review metadata + dependencies       |
-| `POST`  | `/debug/towns/:townId/graceful-stop`     | Trigger SIGTERM on container (dev only)                  |
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/debug/towns/:townId/status` | Primary status: agents, beads, alarm, patrol, reconciler |
+| `GET` | `/debug/towns/:townId/config` | Read town config (dev only) |
+| `PATCH` | `/debug/towns/:townId/config` | Update town config (dev only, partial update) |
+| `POST` | `/debug/towns/:townId/reconcile-dry-run` | Run reconciler without applying actions |
+| `POST` | `/debug/towns/:townId/replay-events` | Replay events from time range |
+| `GET` | `/debug/towns/:townId/drain-status` | Drain flag + nonce |
+| `GET` | `/debug/towns/:townId/nudges` | Pending agent nudges |
+| `POST` | `/debug/towns/:townId/send-message` | Send message to mayor (dev only) |
+| `GET` | `/debug/towns/:townId/beads/:beadId` | Full bead details + review metadata + dependencies |
+| `POST` | `/debug/towns/:townId/graceful-stop` | Trigger SIGTERM on container (dev only) |
+| `GET` | `/debug/towns/:townId/rigs` | List rigs registered with the town (dev only) |
+| `POST` | `/debug/towns/:townId/sling-convoy` | Directly call `Town.slingConvoy()` (dev only) |
+| `GET` | `/debug/towns/:townId/convoys` | List active convoys with progress counts (dev only) |
 
 ### Inspect a Bead
 
@@ -933,11 +1130,11 @@ print(f'parent_bead_id: {bead.get(\"parent_bead_id\", \"NULL\")}')
 
 ### Summary
 
-| Scenario                         | Config                                               | Result              | PR           | Notes                                                                                      |
-| -------------------------------- | ---------------------------------------------------- | ------------------- | ------------ | ------------------------------------------------------------------------------------------ |
-| 1: No review + auto-merge        | `code_review=false`, `auto_merge=true`               | **PASS (with bug)** | #38 MERGED   | Refinery dispatched despite `code_review=false` (bug persists). PR merged after rework.    |
-| 2: Refinery review (rework mode) | `code_review=true`, `review_mode=rework`             | **FAIL**            | None created | Polecat pushed branch but never created PR. Refinery stuck in rework-request loop 35+ min. |
-| 3: Human feedback + auto-resolve | `code_review=false`, `auto_resolve_pr_feedback=true` | **FAIL**            | None created | Same as Scenario 2: polecat pushed branch but no PR. MR bead stuck at `open`.              |
+| Scenario | Config | Result | PR | Notes |
+|---|---|---|---|---|
+| 1: No review + auto-merge | `code_review=false`, `auto_merge=true` | **PASS (with bug)** | #38 MERGED | Refinery dispatched despite `code_review=false` (bug persists). PR merged after rework. |
+| 2: Refinery review (rework mode) | `code_review=true`, `review_mode=rework` | **FAIL** | None created | Polecat pushed branch but never created PR. Refinery stuck in rework-request loop 35+ min. |
+| 3: Human feedback + auto-resolve | `code_review=false`, `auto_resolve_pr_feedback=true` | **FAIL** | None created | Same as Scenario 2: polecat pushed branch but no PR. MR bead stuck at `open`. |
 
 ### Bugs Found
 
@@ -1032,20 +1229,20 @@ Task:   "Add src/utils/set-helpers.ts with union, intersection, difference,
          symmetricDifference, isSubset"
 ```
 
-| Time (UTC) | Event                                                         |
-| ---------- | ------------------------------------------------------------- |
-| 19:38:42   | Task sent to mayor                                            |
-| 19:38:47   | Issue bead created, mayor hooks it                            |
-| 19:43:51   | Mayor unhooks, polecat dispatched                             |
-| 19:43:56   | Polecat hooks bead, starts implementing                       |
-| 19:44:28   | Polecat: "Set helper file added; committing and pushing"      |
-| 19:44:43   | Polecat: "Creating pull request"                              |
-| 19:44:59   | MR bead created (`pr_url=null`). **BUG: refinery dispatched** |
-| 19:45:42   | Refinery requests rework, rework bead created                 |
-| 19:45:57   | Polecat dispatched for rework                                 |
-| 19:46:58   | Rework bead: refinery calls `gt_done`, `poll_pr` starts       |
-| 19:48:02   | **PR #38 merged** by kiloconnect-development bot              |
-| 19:48:13   | All beads closed                                              |
+| Time (UTC) | Event |
+|---|---|
+| 19:38:42 | Task sent to mayor |
+| 19:38:47 | Issue bead created, mayor hooks it |
+| 19:43:51 | Mayor unhooks, polecat dispatched |
+| 19:43:56 | Polecat hooks bead, starts implementing |
+| 19:44:28 | Polecat: "Set helper file added; committing and pushing" |
+| 19:44:43 | Polecat: "Creating pull request" |
+| 19:44:59 | MR bead created (`pr_url=null`). **BUG: refinery dispatched** |
+| 19:45:42 | Refinery requests rework, rework bead created |
+| 19:45:57 | Polecat dispatched for rework |
+| 19:46:58 | Rework bead: refinery calls `gt_done`, `poll_pr` starts |
+| 19:48:02 | **PR #38 merged** by kiloconnect-development bot |
+| 19:48:13 | All beads closed |
 
 **Duration:** ~9.5 min (would be ~5 min without unnecessary refinery rework)
 **PR:** #38 on branch `gt/toast/38cba536` — MERGED
@@ -1060,17 +1257,17 @@ Task:   "Add src/utils/promise-helpers.ts with delay, retry, timeout,
          allSettledWithErrors, race"
 ```
 
-| Time (UTC) | Event                                                            |
-| ---------- | ---------------------------------------------------------------- |
-| 19:49:20   | Task sent to mayor                                               |
-| 19:49:35   | Issue bead created, polecat dispatched                           |
-| 19:49:44   | Polecat: "Implementing promise helper utilities"                 |
-| 19:50:03   | MR bead created (`pr_url=null`). Refinery dispatched (expected). |
-| 19:51:00   | Refinery: "Code review found gaps in test coverage"              |
-| 19:51:13   | First rework request + escalation beads (2 each)                 |
-| 20:02:01   | **Second rework request** (duplicate) — refinery still working   |
-| 20:12:35   | Third rework request (scope mismatch)                            |
-| 20:25+     | **Refinery still stuck** on MR bead after 35+ min                |
+| Time (UTC) | Event |
+|---|---|
+| 19:49:20 | Task sent to mayor |
+| 19:49:35 | Issue bead created, polecat dispatched |
+| 19:49:44 | Polecat: "Implementing promise helper utilities" |
+| 19:50:03 | MR bead created (`pr_url=null`). Refinery dispatched (expected). |
+| 19:51:00 | Refinery: "Code review found gaps in test coverage" |
+| 19:51:13 | First rework request + escalation beads (2 each) |
+| 20:02:01 | **Second rework request** (duplicate) — refinery still working |
+| 20:12:35 | Third rework request (scope mismatch) |
+| 20:25+ | **Refinery still stuck** on MR bead after 35+ min |
 
 **Duration:** 35+ min (never completed)
 **PR:** None created on GitHub
@@ -1086,14 +1283,14 @@ Task:   "Add src/utils/regex-helpers.ts with escapeRegex, isValidRegex,
          matchAll, replaceAll, extractGroups"
 ```
 
-| Time (UTC) | Event                                            |
-| ---------- | ------------------------------------------------ |
-| 20:13:09   | Task sent to mayor                               |
-| 20:13:25   | Issue bead created, polecat dispatched           |
-| 20:14:01   | Polecat: "Implementing regex helper utilities"   |
-| 20:14:05   | MR bead created (`pr_url=null`), polecat unhooks |
-| 20:14:17   | MR bead status=`open`, no assignee, no dispatch  |
-| 20:25+     | **MR bead still `open`** — no one picks it up    |
+| Time (UTC) | Event |
+|---|---|
+| 20:13:09 | Task sent to mayor |
+| 20:13:25 | Issue bead created, polecat dispatched |
+| 20:14:01 | Polecat: "Implementing regex helper utilities" |
+| 20:14:05 | MR bead created (`pr_url=null`), polecat unhooks |
+| 20:14:17 | MR bead status=`open`, no assignee, no dispatch |
+| 20:25+ | **MR bead still `open`** — no one picks it up |
 
 **Duration:** 10+ min (never completed)
 **PR:** None created on GitHub

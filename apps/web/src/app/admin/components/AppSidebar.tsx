@@ -1,10 +1,12 @@
 'use client';
 
 import type React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Users,
   DollarSign,
   Building2,
+  Clock,
   Shield,
   Ban,
   Database,
@@ -24,6 +26,7 @@ import {
   Copy,
   Megaphone,
   Coins,
+  Scale,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -38,11 +41,13 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
+import { useTRPC } from '@/lib/trpc/utils';
 
 type MenuItem = {
   title: (session: Session | null) => string;
@@ -55,6 +60,8 @@ type MenuSection = {
   items: MenuItem[];
 };
 
+const DISPUTES_SUMMARY_STALE_TIME_MS = 60_000;
+
 const userManagementItems: MenuItem[] = [
   {
     title: () => 'Users',
@@ -65,6 +72,11 @@ const userManagementItems: MenuItem[] = [
     title: () => 'Organizations',
     url: '/admin/organizations',
     icon: () => <Building2 />,
+  },
+  {
+    title: () => 'Trial Organizations',
+    url: '/admin/organizations/trials',
+    icon: () => <Clock />,
   },
   {
     title: () => 'Bulk Block',
@@ -110,6 +122,16 @@ const financialItems: MenuItem[] = [
     icon: () => <Coins />,
   },
   {
+    title: () => 'Disputes',
+    url: '/admin/disputes',
+    icon: () => <Scale />,
+  },
+  {
+    title: () => 'Early Fraud Warnings',
+    url: '/admin/early-fraud-warnings',
+    icon: () => <Shield />,
+  },
+  {
     title: () => 'Revenue KPI',
     url: '/admin/revenue',
     icon: () => <DollarSign />,
@@ -128,7 +150,7 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <KiloCrabIcon className="size-4" />,
   },
   {
-    title: () => 'Community PRs',
+    title: () => 'Community Contributions',
     url: '/admin/community-prs',
     icon: () => <GitPullRequest />,
   },
@@ -172,12 +194,27 @@ const productEngineeringItems: MenuItem[] = [
     url: '/admin/gateway',
     icon: () => <Network />,
   },
+  {
+    title: () => 'Coding plans',
+    url: '/admin/coding-plans',
+    icon: () => <KeyRound />,
+  },
 ];
 
 const analyticsObservabilityItems: MenuItem[] = [
   {
     title: () => 'Model Stats',
     url: '/admin/model-stats',
+    icon: () => <BarChart />,
+  },
+  {
+    title: () => 'Model Benchmarks',
+    url: '/admin/model-eval-ingest',
+    icon: () => <FileSearch />,
+  },
+  {
+    title: () => 'Cloud Agent health',
+    url: '/admin/cloud-agent-next',
     icon: () => <BarChart />,
   },
   {
@@ -231,6 +268,12 @@ export function AppSidebar({
   ...props
 }: { children: React.ReactNode } & React.ComponentProps<typeof Sidebar>) {
   const session = useSession();
+  const trpc = useTRPC();
+  const disputesSummaryQuery = useQuery({
+    ...trpc.admin.disputes.summary.queryOptions(),
+    staleTime: DISPUTES_SUMMARY_STALE_TIME_MS,
+  });
+  const pendingDisputesCount = disputesSummaryQuery.data?.pendingCount ?? 0;
 
   return (
     <Sidebar {...props}>
@@ -260,12 +303,24 @@ export function AppSidebar({
               <SidebarMenu>
                 {section.items.map(item => (
                   <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton asChild>
+                    <SidebarMenuButton
+                      asChild
+                      className={
+                        item.url === '/admin/disputes' && pendingDisputesCount > 0
+                          ? 'pr-10'
+                          : undefined
+                      }
+                    >
                       <a href={item.url}>
                         {item.icon(session.data)}
                         <span>{item.title(session.data)}</span>
                       </a>
                     </SidebarMenuButton>
+                    {item.url === '/admin/disputes' && pendingDisputesCount > 0 ? (
+                      <SidebarMenuBadge className="bg-destructive/15 text-destructive ring-1 ring-destructive/30">
+                        {pendingDisputesCount}
+                      </SidebarMenuBadge>
+                    ) : null}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

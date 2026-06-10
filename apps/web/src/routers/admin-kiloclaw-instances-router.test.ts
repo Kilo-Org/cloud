@@ -23,12 +23,16 @@ import { UpstreamApiError } from '@/lib/trpc/init';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
+const mockGetFileTree: jest.Mock<any, any> = jest.fn();
 const mockDestroyFlyMachine: jest.Mock<any, any> = jest.fn();
+const mockDestroyOrphanVolume: jest.Mock<any, any> = jest.fn();
+const mockScanOrphanVolumes: jest.Mock<any, any> = jest.fn();
 const mockGetKiloCliRunStatus: jest.Mock<any, any> = jest.fn();
 const mockCancelKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStartKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStart: jest.Mock<any, any> = jest.fn();
 const mockUserClientRestartMachine: jest.Mock<any, any> = jest.fn();
+const mockWakeScheduledAction: jest.Mock<any, any> = jest.fn();
 const startedResponse = {
   ok: true,
   started: true,
@@ -41,22 +45,30 @@ function mockKiloClawInternalClient() {
   const { KiloClawInternalClient } = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-client');
   KiloClawInternalClient.mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
+    getFileTree: mockGetFileTree,
     destroyFlyMachine: mockDestroyFlyMachine,
+    destroyOrphanVolume: mockDestroyOrphanVolume,
+    scanOrphanVolumes: mockScanOrphanVolumes,
     getKiloCliRunStatus: mockGetKiloCliRunStatus,
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
     start: mockStart,
+    wakeScheduledAction: mockWakeScheduledAction,
   }));
 }
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
+    getFileTree: mockGetFileTree,
     destroyFlyMachine: mockDestroyFlyMachine,
+    destroyOrphanVolume: mockDestroyOrphanVolume,
+    scanOrphanVolumes: mockScanOrphanVolumes,
     getKiloCliRunStatus: mockGetKiloCliRunStatus,
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
     start: mockStart,
+    wakeScheduledAction: mockWakeScheduledAction,
   })),
   KiloClawApiError: class KiloClawApiError extends Error {
     statusCode: number;
@@ -152,7 +164,10 @@ beforeEach(async () => {
 
   cliRunId = run.id;
   mockGetDebugStatus.mockReset();
+  mockGetFileTree.mockReset();
   mockDestroyFlyMachine.mockReset();
+  mockDestroyOrphanVolume.mockReset();
+  mockScanOrphanVolumes.mockReset();
   mockGetKiloCliRunStatus.mockReset();
   mockCancelKiloCliRun.mockReset();
   mockStartKiloCliRun.mockReset();
@@ -160,6 +175,8 @@ beforeEach(async () => {
   mockStart.mockResolvedValue(startedResponse);
   mockUserClientRestartMachine.mockReset();
   mockUserClientRestartMachine.mockResolvedValue({ success: true, message: 'restarting' });
+  mockWakeScheduledAction.mockReset();
+  mockWakeScheduledAction.mockResolvedValue({ ok: true });
   mockKiloClawInternalClient();
 });
 
@@ -314,6 +331,30 @@ describe('admin.kiloclawInstances.list and stats', () => {
     expect(stats.overview.inactiveTrialStoppedInstances).toBe(
       baselineStats.overview.inactiveTrialStoppedInstances + 1
     );
+  });
+});
+
+describe('admin.kiloclawInstances.fileTree', () => {
+  it('forwards path-scoped tree requests to the resolved instance', async () => {
+    mockGetFileTree.mockResolvedValue({ tree: [] });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: regularUser.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.kiloclawInstances.fileTree({
+      userId: regularUser.id,
+      instanceId,
+      path: 'workspace/nested',
+    });
+
+    expect(mockGetFileTree).toHaveBeenCalledWith(regularUser.id, {
+      instanceId,
+      path: 'workspace/nested',
+    });
   });
 });
 
@@ -1869,6 +1910,58 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
 
 describe('admin.kiloclawInstances scheduled actions', () => {
   let testInstanceId: string;
+  const fleetCatalogTags: string[] = [];
+
+  async function insertFleetCatalogEntry(params: {
+    openclawVersion: string;
+    imageTag?: string;
+    status?: 'available' | 'disabled';
+  }) {
+    const imageTag = params.imageTag ?? `fleet-test-${crypto.randomUUID()}`;
+    fleetCatalogTags.push(imageTag);
+    await db.insert(kiloclaw_image_catalog).values({
+      openclaw_version: params.openclawVersion,
+      variant: 'default',
+      image_tag: imageTag,
+      image_digest: `sha256:${crypto.randomUUID()}`,
+      status: params.status ?? 'available',
+      published_at: new Date().toISOString(),
+    });
+    return imageTag;
+  }
+
+  async function insertFleetInstance(params: {
+    trackedImageTag: string | null;
+    userId?: string;
+    pinned?: boolean;
+    inactiveTrialStopped?: boolean;
+    suspended?: boolean;
+  }) {
+    const instanceId = crypto.randomUUID();
+    const userId = params.userId ?? regularUser.id;
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: userId,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+      tracked_image_tag: params.trackedImageTag,
+      inactive_trial_stopped_at: params.inactiveTrialStopped ? '2026-04-20T12:00:00.000Z' : null,
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: userId,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'trialing',
+      suspended_at: params.suspended ? '2026-04-20T12:00:00.000Z' : null,
+    });
+    if (params.pinned && params.trackedImageTag) {
+      await db.insert(kiloclaw_version_pins).values({
+        instance_id: instanceId,
+        image_tag: params.trackedImageTag,
+        pinned_by: userId,
+      });
+    }
+    return instanceId;
+  }
 
   beforeEach(async () => {
     const [instance] = await db
@@ -1904,6 +1997,15 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       await db
         .delete(kiloclaw_scheduled_actions)
         .where(inArray(kiloclaw_scheduled_actions.id, ids));
+    }
+    if (fleetCatalogTags.length > 0) {
+      await db
+        .delete(kiloclaw_version_pins)
+        .where(inArray(kiloclaw_version_pins.image_tag, [...fleetCatalogTags]));
+      await db
+        .delete(kiloclaw_image_catalog)
+        .where(inArray(kiloclaw_image_catalog.image_tag, [...fleetCatalogTags]));
+      fleetCatalogTags.length = 0;
     }
     await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, testInstanceId));
     /* eslint-enable drizzle/enforce-delete-with-where */
@@ -2357,6 +2459,213 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
   });
 
+  describe('fleet upgrade', () => {
+    it('throws FORBIDDEN for non-admin preview callers', async () => {
+      const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.10' });
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.admin.kiloclawInstances.previewFleetUpgrade({
+          versionBelow: '2026.2.10',
+          targetImageTag: targetTag,
+          overridePins: false,
+          startsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+          tranchePercent: 50,
+          intervalDays: 2,
+          notify: false,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('previews eligibility buckets with numeric CalVer comparison', async () => {
+      const oldTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.9' });
+      const newerTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.10' });
+      const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.3.1' });
+      const unknownTag = `fleet-missing-${crypto.randomUUID()}`;
+
+      const actionableId = await insertFleetInstance({ trackedImageTag: oldTag });
+      const pinnedId = await insertFleetInstance({ trackedImageTag: oldTag, pinned: true });
+      const conflictId = await insertFleetInstance({ trackedImageTag: oldTag });
+      await insertFleetInstance({ trackedImageTag: newerTag });
+      await insertFleetInstance({ trackedImageTag: targetTag });
+      await insertFleetInstance({ trackedImageTag: unknownTag });
+      await insertFleetInstance({ trackedImageTag: null });
+
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [conflictId],
+        scheduledAt: new Date(Date.now() + 90 * 60_000).toISOString(),
+        notify: false,
+      });
+
+      const preview = await caller.admin.kiloclawInstances.previewFleetUpgrade({
+        versionBelow: '2026.2.10',
+        targetImageTag: targetTag,
+        overridePins: false,
+        startsAt: new Date(Date.now() + 120 * 60_000).toISOString(),
+        tranchePercent: 50,
+        intervalDays: 2,
+        notify: false,
+      });
+
+      expect(preview.counts).toMatchObject({
+        eligible: 3,
+        actionable: 1,
+        pinned: 1,
+        conflicts: 1,
+        alreadyOnTarget: 1,
+        unknownVersion: 2,
+      });
+      expect(preview.actionableInstanceIds).toEqual([actionableId]);
+      expect(preview.excluded.pinnedInstanceIds).toEqual([pinnedId]);
+      expect(preview.excluded.conflictInstanceIds).toEqual([conflictId]);
+      expect(preview.stages).toHaveLength(1);
+      expect(preview.stages[0]).toMatchObject({ stageIndex: 0, targetCount: 1 });
+    });
+
+    it('creates one version-change parent split across deterministic stages', async () => {
+      const oldTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.1' });
+      const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.3.1' });
+      const instanceIds = await Promise.all(
+        Array.from({ length: 5 }, () => insertFleetInstance({ trackedImageTag: oldTag }))
+      );
+      const startsAt = new Date(Date.now() + 120 * 60_000).toISOString();
+
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.createFleetUpgrade({
+        versionBelow: '2026.2.10',
+        targetImageTag: targetTag,
+        overridePins: true,
+        startsAt,
+        tranchePercent: 40,
+        intervalDays: 3,
+        reason: 'fleet rollout test',
+        notify: true,
+        noticeLeadHours: 12,
+        noticeSubject: 'Maintenance window',
+        noticeBody: 'A version update is scheduled.',
+        noticeChannels: ['email', 'webapp'],
+      });
+
+      expect(created.targetCount).toBe(5);
+      expect(created.stageIds).toHaveLength(3);
+
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, created.id));
+      expect(parent).toMatchObject({
+        action_type: 'version_change',
+        target_image_tag: targetTag,
+        override_pins: true,
+        reason: 'fleet rollout test',
+        total_count: 5,
+        notice_lead_hours: 12,
+        notice_subject: 'Maintenance window',
+        notice_body: 'A version update is scheduled.',
+      });
+
+      const stages = await db
+        .select()
+        .from(kiloclaw_scheduled_action_stages)
+        .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, created.id));
+      expect(stages.map(s => s.stage_index).sort()).toEqual([0, 1, 2]);
+      expect(stages.map(s => new Date(s.scheduled_at).toISOString()).sort()).toEqual([
+        new Date(startsAt).toISOString(),
+        new Date(new Date(startsAt).getTime() + 3 * 86_400_000).toISOString(),
+        new Date(new Date(startsAt).getTime() + 6 * 86_400_000).toISOString(),
+      ]);
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(targets).toHaveLength(5);
+      expect(new Set(targets.map(t => t.instance_id))).toEqual(new Set(instanceIds));
+      expect(new Set(targets.map(t => t.target_image_tag))).toEqual(new Set([targetTag]));
+
+      const stageSizes = new Map(stages.map(stage => [stage.id, 0]));
+      for (const target of targets) {
+        stageSizes.set(target.stage_id ?? '', (stageSizes.get(target.stage_id ?? '') ?? 0) + 1);
+      }
+      expect(Array.from(stageSizes.values()).sort()).toEqual([1, 2, 2]);
+
+      const notices = await db
+        .select()
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(notices).toHaveLength(10);
+
+      const logs = await db
+        .select()
+        .from(kiloclaw_admin_audit_logs)
+        .where(
+          and(
+            eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+            eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.fleet_upgrade.created')
+          )
+        );
+      expect(logs).toHaveLength(1);
+      expect(logs[0].metadata).toMatchObject({
+        scheduledActionId: created.id,
+        versionBelow: '2026.2.10',
+        targetImageTag: targetTag,
+        tranchePercent: 40,
+        intervalDays: 3,
+        targetCount: 5,
+        stageSizes: [2, 2, 1],
+      });
+
+      const list = await caller.admin.kiloclawInstances.listScheduledActions({});
+      const row = list.items.find(item => item.id === created.id);
+      expect(row).toMatchObject({
+        target_count: 5,
+        stage_count: 3,
+        latest_scheduled_at: expect.any(String),
+      });
+
+      const detail = await caller.admin.kiloclawInstances.getScheduledAction({ id: created.id });
+      expect(detail.stages).toHaveLength(3);
+      expect(detail.targets.map(target => target.stage_index).sort()).toEqual([0, 0, 1, 1, 2]);
+    });
+
+    it('rejects create when an actionable target has a pending scheduled action', async () => {
+      const oldTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.1' });
+      const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.3.1' });
+      const instanceId = await insertFleetInstance({ trackedImageTag: oldTag });
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [instanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        notify: false,
+      });
+
+      await expect(
+        caller.admin.kiloclawInstances.createFleetUpgrade({
+          versionBelow: '2026.2.10',
+          targetImageTag: targetTag,
+          overridePins: false,
+          startsAt: new Date(Date.now() + 120 * 60_000).toISOString(),
+          tranchePercent: 50,
+          intervalDays: 2,
+          notify: false,
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: expect.stringContaining('pending or in-flight scheduled actions'),
+      });
+    });
+  });
+
   describe('cancelScheduledAction', () => {
     it('throws FORBIDDEN for non-admin callers', async () => {
       const caller = await createCallerForUser(regularUser.id);
@@ -2545,5 +2854,594 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       expect(otherTargetRows.length).toBeGreaterThan(0);
       expect(otherTargetRows.every(n => n.status === 'pending')).toBe(true);
     });
+  });
+});
+
+describe('admin.kiloclawInstances.findOrphanVolumes', () => {
+  it('returns a cursor for continuing older capped scan batches', async () => {
+    const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const instanceIds = Array.from(
+      { length: 501 },
+      (_, i) => `00000000-0000-4000-8000-${i.toString().padStart(12, '0')}`
+    );
+    await db.insert(kiloclaw_instances).values(
+      instanceIds.map((id, i) => ({
+        id,
+        user_id: regularUser.id,
+        sandbox_id: `ki_cursor_${i.toString().padStart(4, '0')}`,
+        destroyed_at: destroyedAt,
+      }))
+    );
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-cursor',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_cursor',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [],
+    });
+
+    const destroyedMs = Date.parse(destroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const firstBatch = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+    });
+
+    expect(firstBatch.scanned).toBe(500);
+    expect(firstBatch.capped).toBe(true);
+    expect(firstBatch.nextCursor).toEqual({
+      destroyedAt,
+      id: '00000000-0000-4000-8000-000000000001',
+    });
+    expect(mockScanOrphanVolumes).toHaveBeenCalledTimes(500);
+    const firstBatchInstanceIds = new Set(
+      mockScanOrphanVolumes.mock.calls.map(([, instanceId]) => instanceId)
+    );
+
+    mockScanOrphanVolumes.mockClear();
+    const secondBatch = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+      cursor: firstBatch.nextCursor ?? undefined,
+    });
+
+    expect(secondBatch.scanned).toBe(1);
+    expect(secondBatch.capped).toBe(false);
+    expect(secondBatch.nextCursor).toBeNull();
+    expect(mockScanOrphanVolumes).toHaveBeenCalledTimes(1);
+    expect(firstBatchInstanceIds.has(mockScanOrphanVolumes.mock.calls[0][1])).toBe(false);
+  });
+
+  it('runs the deduplicated scan query and returns classified volumes', async () => {
+    // Regression: the dedup subquery becomes a derived table, so no two
+    // projected columns may emit the same name. This exercises that query
+    // against Postgres — a duplicate column makes the outer SELECT fail.
+    const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'canceled',
+    });
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-findorphans',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_findorphans',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [
+        {
+          id: 'vol_findorphans00000',
+          name: 'kiloclaw_findorphans',
+          state: 'created',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: '2026-04-01T00:00:00.000Z',
+          nameMatchesInstance: true,
+          trackedByLiveDo: false,
+        },
+      ],
+    });
+
+    // A narrow window around this instance's destruction so the result is
+    // deterministic regardless of other rows in the test database.
+    const destroyedMs = Date.parse(destroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.scanned).toBe(1);
+    expect(result.volumes).toHaveLength(1);
+    expect(result.volumes[0]).toMatchObject({
+      instance_id: instance.id,
+      volume_id: 'vol_findorphans00000',
+      subscription_status: 'canceled',
+      classification: 'safe_destroy',
+    });
+  });
+
+  it('scans production-shaped timestamp rows inside a narrow same-day ISO window', async () => {
+    const destroyedAt = '2026-05-15 10:06:30.976+00';
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'canceled',
+    });
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-narrow-window',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_narrow_window',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [
+        {
+          id: 'vol_narrowwindow000',
+          name: 'kiloclaw_narrow_window',
+          state: 'created',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: '2026-05-11T15:22:38.841Z',
+          nameMatchesInstance: true,
+          trackedByLiveDo: false,
+        },
+      ],
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: '2026-05-15T10:00:00.000Z',
+      destroyedBefore: '2026-05-15T10:15:00.000Z',
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.scanned).toBe(1);
+    expect(mockScanOrphanVolumes).toHaveBeenCalledWith(regularUser.id, instance.id, sandboxId);
+    expect(result.volumes).toHaveLength(1);
+    expect(result.volumes[0]).toMatchObject({
+      instance_id: instance.id,
+      volume_id: 'vol_narrowwindow000',
+      classification: 'safe_destroy',
+    });
+  });
+
+  it('scans an in-window destruction even when the same sandbox was destroyed later', async () => {
+    const inWindowDestroyedAt = new Date(Date.now() - 10 * 86_400_000);
+    const laterDestroyedAt = new Date(inWindowDestroyedAt.getTime() + 60_000);
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+    const inWindowInstanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: inWindowInstanceId,
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: inWindowDestroyedAt.toISOString().replace('T', ' ').replace('Z', '+00'),
+      },
+      {
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: laterDestroyedAt.toISOString().replace('T', ' ').replace('Z', '+00'),
+      },
+    ]);
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-reprovisioned-window',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_reprovisioned_window',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [],
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(inWindowDestroyedAt.getTime() - 1_000).toISOString(),
+      destroyedBefore: new Date(inWindowDestroyedAt.getTime() + 1_000).toISOString(),
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.scanned).toBe(1);
+    expect(mockScanOrphanVolumes).toHaveBeenCalledWith(
+      regularUser.id,
+      inWindowInstanceId,
+      sandboxId
+    );
+  });
+
+  it('excludes volumes that are not confirmed orphans', async () => {
+    const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    // The volume is still attached to a machine — not an orphan.
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-attached',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_attached',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [
+        {
+          id: 'vol_attached00000000',
+          name: 'kiloclaw_attached',
+          state: 'attached',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: 'm-still-here',
+          created_at: '2026-04-01T00:00:00.000Z',
+          nameMatchesInstance: true,
+          trackedByLiveDo: false,
+        },
+      ],
+    });
+
+    const destroyedMs = Date.parse(destroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+    });
+
+    expect(result.scanned).toBe(1);
+    expect(result.errors).toEqual([]);
+    expect(result.volumes.some(v => v.instance_id === instance.id)).toBe(false);
+  });
+
+  it('reports instances whose Durable Object state could not be read', async () => {
+    const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-dofail',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_dofail',
+      doStatus: null,
+      doStatusError: 'getDebugState failed',
+      scanError: null,
+      volumes: [],
+    });
+
+    const destroyedMs = Date.parse(destroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+    });
+
+    expect(result.volumes).toEqual([]);
+    expect(result.errors.some(e => e.instance_id === instance.id)).toBe(true);
+  });
+});
+
+describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
+  const VOLUME_ID = 'vol_orphantest00000';
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+
+  async function insertDestroyedInstance(opts: {
+    destroyedAt: string;
+    subscriptionStatus?: 'active' | 'canceled' | 'trialing';
+  }): Promise<string> {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: opts.destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    if (opts.subscriptionStatus) {
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: regularUser.id,
+        instance_id: instance.id,
+        plan: 'trial',
+        status: opts.subscriptionStatus,
+      });
+    }
+    return instance.id;
+  }
+
+  it('rejects when the instance does not exist', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({
+        instanceId: crypto.randomUUID(),
+        volumeId: VOLUME_ID,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the instance is not destroyed', async () => {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({
+        instanceId: instance.id,
+        volumeId: VOLUME_ID,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('rejects while the instance is within the 7-day grace period', async () => {
+    const instanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(2) });
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('rejects when a newer destruction of the same sandbox is within grace', async () => {
+    // The submitted row was destroyed long ago, but the sandbox was
+    // reprovisioned and destroyed again recently. Grace runs from the latest
+    // destruction, so the older row must not reap the shared volume early.
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+    const [oldInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: daysAgo(30),
+      })
+      .returning({ id: kiloclaw_instances.id });
+    await db.insert(kiloclaw_instances).values({
+      id: crypto.randomUUID(),
+      user_id: regularUser.id,
+      sandbox_id: sandboxId,
+      destroyed_at: daysAgo(2),
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({
+        instanceId: oldInstance.id,
+        volumeId: VOLUME_ID,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('clears the grace gate for a long-destroyed instance stored as Postgres timestamp text', async () => {
+    // Regression: the grace check is evaluated in SQL, never by parsing the
+    // stored timestamp with the JS `Date` constructor. A row destroyed 60
+    // days ago — written in Postgres native timestamp text, not ISO 8601 —
+    // must clear the 7-day grace gate and reach the destroy handoff.
+    const destroyedAt = new Date(Date.now() - 60 * 86_400_000)
+      .toISOString()
+      .replace('T', ' ')
+      .replace('Z', '+00');
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    mockDestroyOrphanVolume.mockResolvedValue({
+      ok: true,
+      flyApp: 'inst-grace',
+      volumeId: VOLUME_ID,
+      volumeName: 'kiloclaw_grace',
+      alreadyGone: false,
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
+      instanceId: instance.id,
+      volumeId: VOLUME_ID,
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(mockDestroyOrphanVolume).toHaveBeenCalledTimes(1);
+  });
+
+  it('measures grace per (user, sandbox), not across the entire table', async () => {
+    // Regression: an earlier shape of the grace SQL used Drizzle's
+    // `${kiloclaw_instances.user_id}` interpolation inside a `sql` template,
+    // which Drizzle rendered as a BARE `"user_id"` (no table qualifier).
+    // Postgres then resolved that bare reference to the inner aliased table
+    // (most-local scope), collapsing the correlated subquery into a
+    // trivially-true predicate and computing `max(destroyed_at)` over EVERY
+    // destroyed row in the table. In production that maximum is almost
+    // always recent, so the grace gate would fail closed for every destroy
+    // regardless of the target's actual destruction time.
+    //
+    // This test seeds an unrelated user with a destroyed_at inside the last
+    // 7 days alongside a 30-day-old target row. With a properly scoped
+    // correlation the unrelated row is invisible to the target's grace
+    // check; with the bug present, the destroy throws PRECONDITION_FAILED.
+    const otherUser = await insertTestUser({
+      google_user_email: `unrelated-recent-${Math.random()}@example.com`,
+      is_admin: false,
+    });
+    // The outer afterEach only cleans `regularUser` / `adminUser` /
+    // `cliRunUser`, so this unrelated user must be cleaned up explicitly. A
+    // try/finally guarantees the cleanup runs even when an assertion in the
+    // body throws — otherwise a failing run would leave the row in the table
+    // and pollute subsequent tests.
+    try {
+      await db.insert(kiloclaw_instances).values({
+        id: crypto.randomUUID(),
+        user_id: otherUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        destroyed_at: daysAgo(1),
+      });
+      const targetInstanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
+      mockDestroyOrphanVolume.mockResolvedValue({
+        ok: true,
+        flyApp: 'inst-scoped',
+        volumeId: VOLUME_ID,
+        volumeName: 'kiloclaw_scoped',
+        alreadyGone: false,
+      });
+      const caller = await createCallerForUser(adminUser.id);
+
+      const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
+        instanceId: targetInstanceId,
+        volumeId: VOLUME_ID,
+      });
+
+      expect(result).toMatchObject({ success: true });
+      expect(mockDestroyOrphanVolume).toHaveBeenCalledTimes(1);
+    } finally {
+      await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, otherUser.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUser.id));
+    }
+  });
+
+  it('rejects when the user has an access-granting subscription', async () => {
+    const instanceId = await insertDestroyedInstance({
+      destroyedAt: daysAgo(30),
+      subscriptionStatus: 'active',
+    });
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('rejects when an access-granting successor subscription replaced the destroyed instance row', async () => {
+    const instanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
+    const [successorInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    const [successorSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: regularUser.id,
+        instance_id: successorInstance.id,
+        plan: 'trial',
+        status: 'active',
+      })
+      .returning({ id: kiloclaw_subscriptions.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'canceled',
+      transferred_to_subscription_id: successorSubscription.id,
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockDestroyOrphanVolume).not.toHaveBeenCalled();
+  });
+
+  it('destroys the volume for a long-destroyed instance with no subscription', async () => {
+    mockDestroyOrphanVolume.mockResolvedValue({
+      ok: true,
+      flyApp: 'inst-abc',
+      volumeId: VOLUME_ID,
+      volumeName: 'kiloclaw_ki_test',
+      alreadyGone: false,
+    });
+    const instanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
+      instanceId,
+      volumeId: VOLUME_ID,
+    });
+
+    expect(result).toMatchObject({ success: true, ok: true, volumeId: VOLUME_ID });
+    expect(mockDestroyOrphanVolume).toHaveBeenCalledWith(
+      regularUser.id,
+      instanceId,
+      expect.any(String),
+      VOLUME_ID
+    );
+  });
+
+  it('allows destroy when the subscription is canceled (positive guard case)', async () => {
+    mockDestroyOrphanVolume.mockResolvedValue({
+      ok: true,
+      flyApp: 'inst-abc',
+      volumeId: VOLUME_ID,
+      volumeName: 'kiloclaw_ki_test',
+      alreadyGone: false,
+    });
+    const instanceId = await insertDestroyedInstance({
+      destroyedAt: daysAgo(30),
+      subscriptionStatus: 'canceled',
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
+      instanceId,
+      volumeId: VOLUME_ID,
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(mockDestroyOrphanVolume).toHaveBeenCalledTimes(1);
   });
 });

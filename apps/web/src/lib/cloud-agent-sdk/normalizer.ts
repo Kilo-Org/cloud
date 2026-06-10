@@ -4,7 +4,7 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import type { Part, SessionStatus, QuestionInfo, Message } from '@/types/opencode.gen';
-import type { SessionInfo, CloudStatus, SuggestionAction } from './types';
+import type { SessionInfo, CloudStatus, SuggestionAction, SlashCommandInfo } from './types';
 import {
   cloudAgentEventSchema,
   kilocodePayloadSchema,
@@ -33,6 +33,11 @@ import {
   autocommitCompletedDataSchema,
   cloudStatusDataSchema,
   connectedDataSchema,
+  commandsAvailableDataSchema,
+  cloudMessageQueuedDataSchema,
+  cloudMessageSentDataSchema,
+  cloudMessageCompletedDataSchema,
+  cloudMessageFailedDataSchema,
   type CloudAgentEvent,
 } from './schemas';
 
@@ -91,7 +96,7 @@ export type ServiceEvent =
   | { type: 'suggestion.dismissed'; requestId: string }
   | {
       type: 'stopped';
-      reason: 'complete' | 'interrupted' | 'disconnected' | 'error';
+      reason: 'complete' | 'interrupted' | 'disconnected' | 'transport-disconnected' | 'error';
       branch?: string;
     }
   | { type: 'warning' }
@@ -111,6 +116,31 @@ export type ServiceEvent =
       type: 'connected';
       sessionStatus?: SessionStatus;
       cloudStatus?: CloudStatus;
+    }
+  | { type: 'commands.available'; commands: SlashCommandInfo[] }
+  | {
+      type: 'cloud.message.queued';
+      messageId: string;
+      executionId?: string;
+      content?: string;
+    }
+  | {
+      type: 'cloud.message.sent';
+      messageId: string;
+      executionId?: string;
+    }
+  | {
+      type: 'cloud.message.completed';
+      messageId: string;
+      executionId?: string;
+    }
+  | {
+      type: 'cloud.message.failed';
+      messageId: string;
+      executionId?: string;
+      error: string;
+      reason: 'interrupted' | 'exhausted' | 'execution';
+      attempts?: number;
     };
 
 export type NormalizedEvent = ChatEvent | ServiceEvent;
@@ -375,6 +405,65 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         type: 'connected',
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
+      };
+    }
+
+    case 'commands.available': {
+      const r = commandsAvailableDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return { type: 'commands.available', commands: r.data.commands };
+    }
+
+    case 'cloud.message.queued': {
+      const r = cloudMessageQueuedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'cloud.message.queued',
+        messageId: r.data.messageId,
+        executionId: r.data.executionId,
+        content: r.data.content,
+      };
+    }
+
+    case 'cloud.message.sent': {
+      const r = cloudMessageSentDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'cloud.message.sent',
+        messageId: r.data.messageId,
+        executionId: r.data.executionId,
+      };
+    }
+
+    case 'cloud.message.completed': {
+      const r = cloudMessageCompletedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'cloud.message.completed',
+        messageId: r.data.messageId,
+        executionId: r.data.executionId,
+      };
+    }
+
+    case 'cloud.message.failed': {
+      const r = cloudMessageFailedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      const { messageId, executionId, reason: rawReason, attempts } = r.data;
+      // `reason` priority: an explicit 'interrupted' tag wins; otherwise a
+      // non-null `attempts` count identifies retry exhaustion; everything else
+      // is a terminal execution failure. Not gated on `delivery` so the
+      // normalizer stays robust to server-side payload variations.
+      const reason: 'interrupted' | 'exhausted' | 'execution' =
+        rawReason === 'interrupted' ? 'interrupted' : attempts != null ? 'exhausted' : 'execution';
+      const error =
+        r.data.error !== undefined ? extractErrorMessage(r.data.error) : 'Message delivery failed';
+      return {
+        type: 'cloud.message.failed',
+        messageId,
+        executionId,
+        error,
+        reason,
+        attempts,
       };
     }
 

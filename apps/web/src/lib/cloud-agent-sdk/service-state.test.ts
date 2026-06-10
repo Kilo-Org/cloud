@@ -219,6 +219,19 @@ describe('createServiceState', () => {
       expect(onError).toHaveBeenCalledWith('Connection to agent lost');
     });
 
+    it('ignores wrapper disconnect after a completed idle session', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.setActivity({ type: 'busy' });
+
+      state.process({ type: 'stopped', reason: 'complete' });
+      state.process({ type: 'stopped', reason: 'disconnected' });
+
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(onError).not.toHaveBeenCalledWith('Connection to agent lost');
+    });
+
     it('stopped resets cloudStatus to null when it was preparing', () => {
       const state = createServiceState(makeConfig());
       state.process({
@@ -582,6 +595,12 @@ describe('createServiceState', () => {
       expect(state.getCloudStatus()).toEqual({ type: 'preparing', step: 'cloning' });
     });
 
+    it('stores bare preparing cloudStatus from connected bootstrap state', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'connected', cloudStatus: { type: 'preparing' } });
+      expect(state.getCloudStatus()).toEqual({ type: 'preparing' });
+    });
+
     it('leaves cloudStatus as null when not provided', () => {
       const state = createServiceState(makeConfig());
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
@@ -665,6 +684,39 @@ describe('createServiceState', () => {
       // session.error should fire again
       state.process({ type: 'session.error', error: 'New error' });
       expect(onError).toHaveBeenCalledWith('New error');
+    });
+
+    it('clears disconnected status on reconnect', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'stopped', reason: 'disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
+    it('preserves disconnected status on synthetic viewer reconnect without sessionStatus', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'stopped', reason: 'disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'connected' });
+
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    });
+
+    it('clears transport-disconnected status on synthetic viewer reconnect', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'connected' });
+
+      expect(state.getStatus()).toEqual({ type: 'idle' });
     });
 
     it('sets all fields in one shot', () => {
@@ -1203,6 +1255,194 @@ describe('createServiceState', () => {
       state.setActivity({ type: 'connecting' });
       state.process({ type: 'session.status', sessionId: 'child-1', status: { type: 'busy' } });
       expect(state.getActivity()).toEqual({ type: 'connecting' });
+    });
+  });
+
+  describe('cloud.message.* per-message delivery state', () => {
+    it('cloud.message.queued records the message as queued', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+    });
+
+    it('cloud.message.sent clears the pending entry', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+    });
+
+    it('cloud.message.completed clears the pending entry', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.completed', messageId: 'm1' });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+    });
+
+    it('includes pendingMessages in snapshot', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+
+      expect(state.snapshot().pendingMessages.get('m1')).toEqual({ status: 'queued' });
+    });
+
+    it('notifies subscribers on queued and sent', () => {
+      const state = createServiceState(makeConfig());
+      const cb = jest.fn();
+      state.subscribe(cb);
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+
+      expect(cb).toHaveBeenCalledTimes(2);
+    });
+
+    it('notifies subscribers on queued and completed', () => {
+      const state = createServiceState(makeConfig());
+      const cb = jest.fn();
+      state.subscribe(cb);
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.completed', messageId: 'm1' });
+
+      expect(cb).toHaveBeenCalledTimes(2);
+    });
+
+    it('cloud.message.failed with reason=exhausted clears pending entry', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'flush failed',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+    });
+
+    it('cloud.message.failed with reason=interrupted clears pending entry', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'Pending queued message interrupted by user',
+        reason: 'interrupted',
+      });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+    });
+
+    it('cloud.message.failed with reason=execution clears pending entry', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'boom',
+        reason: 'execution',
+      });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+    });
+
+    it('cloud.message.queued can repopulate an entry after a failed event', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'flush failed',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+    });
+
+    it('notifies subscribers on failed', () => {
+      const state = createServiceState(makeConfig());
+      const cb = jest.fn();
+      state.subscribe(cb);
+
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'x',
+        reason: 'execution',
+      });
+
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    it('reset clears pendingMessages', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.reset();
+
+      expect(state.getPendingMessages().size).toBe(0);
+    });
+
+    it('connected clears pendingMessages (stream replay will repopulate)', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+      expect(state.getPendingMessages().size).toBe(0);
+    });
+
+    it('fires onMessageQueued callback with messageId', () => {
+      const onMessageQueued = jest.fn();
+      const state = createServiceState(makeConfig({ onMessageQueued }));
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+
+      expect(onMessageQueued).toHaveBeenCalledWith('m1');
+    });
+
+    it('fires onMessageCompleted callback with messageId', () => {
+      const onMessageCompleted = jest.fn();
+      const state = createServiceState(makeConfig({ onMessageCompleted }));
+
+      state.process({ type: 'cloud.message.completed', messageId: 'm1' });
+
+      expect(onMessageCompleted).toHaveBeenCalledWith('m1');
+    });
+
+    it('fires onMessageFailed callback with messageId and state', () => {
+      const onMessageFailed = jest.fn();
+      const state = createServiceState(makeConfig({ onMessageFailed }));
+
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'flush failed',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+
+      expect(onMessageFailed).toHaveBeenCalledWith('m1', {
+        status: 'failed',
+        error: 'flush failed',
+        reason: 'exhausted',
+        attempts: 5,
+      });
     });
   });
 });

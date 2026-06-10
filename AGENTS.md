@@ -23,13 +23,13 @@ scripts/          CI and one-off scripts
 
 After making changes, verify your work with the narrowest relevant checks. Avoid running the full `pnpm typecheck` by default; it is slow enough to make development environments unusable. Prefer targeted package checks or `scripts/typecheck-all.sh --changes-only`, and mention in your final response when the full typecheck was skipped for this reason. Run the full suite when appropriate. **Always run `pnpm format` before committing** — CI will reject unformatted code.
 
-| Command          | What it checks                               |
-| ---------------- | -------------------------------------------- |
+| Command | What it checks |
+|---|---|
 | `pnpm typecheck` | TypeScript type checking across all packages |
-| `pnpm lint`      | Lint all source files                        |
-| `pnpm test`      | Jest test suite                              |
-| `pnpm validate`  | All three above in sequence                  |
-| `pnpm format`    | Auto-format with oxfmt                       |
+| `pnpm lint` | Lint all source files |
+| `pnpm test` | Jest test suite |
+| `pnpm validate` | All three above in sequence |
+| `pnpm format` | Auto-format with oxfmt |
 
 Target a specific test file: `pnpm test -- <path>`. Run tests for a specific service: `pnpm --filter <package> test`.
 
@@ -37,7 +37,7 @@ Target a specific test file: `pnpm test -- <path>`. Run tests for a specific ser
 
 ## apps/web UI Work
 
-Before making or reviewing UI changes under `apps/web` — components, routes/pages, layouts, styling, Storybook, visual polish, UX copy, interaction states, responsive behavior, theming, or accessibility — read `design.md` and use `.agents/skills/kilo-design/SKILL.md`. This applies even when the prompt does not explicitly mention design. Skip only for backend-only or non-visual logic changes.
+When editing UI files in `apps/web` — React components, pages, layouts, or styles (`.tsx`/`.css`) — use the `/kilo-design` skill.
 
 ## Coding Standards
 
@@ -51,6 +51,19 @@ Before making or reviewing UI changes under `apps/web` — components, routes/pa
 - Prefer clear names over comments. Only comment things not obvious in context.
 - When the linter flags an unused variable, investigate the root cause — do not blindly prefix with `_`.
 - Use existing dependencies before implementing custom solutions. Check `package.json` for what's available.
+
+## Timestamp Serialization
+
+- Drizzle/Postgres `timestamp({ withTimezone: true, mode: 'string' })` rows may surface timestamp text like `2026-04-29 01:16:12.945+00`, which strict ISO validators such as `z.string().datetime()` reject.
+- Before putting DB-backed timestamp strings into HTTP bodies, queue messages, or other strict JSON contracts, normalize them to UTC ISO with an existing domain serializer or `new Date(value).toISOString()`. Do not forward raw DB timestamp text across contract boundaries.
+- Keep strict validators unless the receiving contract intentionally accepts a broader format. Add regression fixtures using production-shape Postgres timestamp text when fixing or extending these paths.
+
+## Workers & Durable Objects
+
+- Do not cache database clients, pools, or other transport-owning/request-context-bound SDK objects in module scope for Cloudflare Workers or Durable Objects. Workers reuse isolates across requests, Durable Object classes in the same Worker can share module memory across object instances, and stale module-scope I/O state can cause cross-context runtime failures.
+- Create external database clients through approved per-use helpers such as `getWorkerDb(...)`; let Hyperdrive own pooling. Only cache pure data or context-independent values in module scope.
+- Durable Object instance fields are valid for object-local state created from constructor inputs, such as SQLite/Drizzle wrappers over `state.storage`.
+- If optimization appears to require module-scope client caching, stop and document why lifetime, transport ownership, binding freshness, and Cloudflare runtime behavior make it safe before implementing it.
 
 ## Database Migrations
 
@@ -106,13 +119,31 @@ Do not leave HTML comments from the template. Review all commits on the branch w
 
 Business-rule specs live in `.specs/`. Before making **any** changes to a domain covered by a spec — including bug fixes, new features, refactors, or reviews — you **must** first read the relevant spec.
 
-| Spec                                     | Governs                                                             |
-| ---------------------------------------- | ------------------------------------------------------------------- |
-| `.specs/kiloclaw-billing.md`             | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
-| `.specs/kiloclaw-datamodel.md`           | KiloClaw data model — instance/subscription tables, invariants      |
-| `.specs/kiloclaw-controller.md`          | KiloClaw controller/machine lifecycle, bootstrap, Docker image      |
-| `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management           |
-| `.specs/impact-affiliate-tracking.md`    | Impact.com affiliate conversion tracking                            |
+| Spec | Governs |
+|---|---|
+| `.specs/kiloclaw-billing.md` | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
+| `.specs/kiloclaw-billing-lifecycle.md` | KiloClaw billing lifecycle — credit-renewal orchestration safety |
+| `.specs/kiloclaw-composio.md` | KiloClaw Composio credential provisioning, injection, and sharing |
+| `.specs/kiloclaw-controller.md` | KiloClaw controller/machine lifecycle, bootstrap, Docker image |
+| `.specs/kiloclaw-datamodel.md` | KiloClaw data model — instance/subscription tables, invariants |
+| `.specs/model-experiments.md` | Model experiment routing, bucketing, lifecycle, prompt retention, and reporting rules |
+| `.specs/subscription-center.md` | Subscription Center ownership, states, and user-facing behavior |
+| `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management |
+| `.specs/impact-affiliate-tracking.md` | Impact.com affiliate conversion tracking |
+| `.specs/impact-referrals.md` | Impact.com Advocate referral programs for KiloClaw and Kilo Pass |
+
+## Markdown Tables
+
+Use compact, non-padded markdown tables to avoid merge conflicts. Prettier is configured to skip `*.md` files so it won't re-pad tables.
+
+**Rules:**
+- Separator rows: use `|---|---|` (no spaces around `---`, colons allowed for alignment: `:---`, `---:`, `:---:`)
+- Content rows: single space of padding only — `| value |`, not `|  value  |`
+
+**Enforcement:**
+- `script/check-md-table-padding.ts` checks all tracked `*.md` files
+- CI runs this check on every PR that touches markdown files
+- To auto-fix: `bun run script/check-md-table-padding.ts --fix`
 
 ## Stripe Subscription Schedules
 

@@ -30,6 +30,14 @@ export const GitHubSenderSchema = z.object({
   login: z.string(),
 });
 
+export const GitHubAppAuthorizationRevokedPayloadSchema = z.object({
+  action: z.literal('revoked'),
+  sender: z.object({
+    id: z.number(),
+    login: z.string(),
+  }),
+});
+
 // installation.created webhook payload
 export const InstallationCreatedPayloadSchema = z.object({
   action: z.literal('created'),
@@ -63,6 +71,17 @@ export const InstallationUnsuspendPayloadSchema = z.object({
     id: z.number(),
   }),
   sender: GitHubSenderSchema.optional(),
+});
+
+// installation_target.renamed webhook payload
+export const InstallationTargetRenamedPayloadSchema = z.object({
+  action: z.literal('renamed'),
+  installation: z.object({
+    id: z.number(),
+  }),
+  account: z.object({}).passthrough(),
+  changes: z.object({}).passthrough(),
+  target_type: z.string(),
 });
 
 // installation_repositories webhook payload
@@ -212,7 +231,10 @@ export const PullRequestReviewCommentPayloadSchema = z.object({
     body: z.string(),
     user: z.object({
       login: z.string(),
+      type: z.string().optional(),
     }),
+    in_reply_to_id: z.number().int().nullable().optional(),
+    created_at: z.string().optional(),
     html_url: z.string(),
     path: z.string(),
     line: z.number().nullable().optional(),
@@ -277,10 +299,16 @@ export const PullRequestReviewPayloadSchema = z.object({
 });
 
 // Type exports for use in the webhook handler
+export type GitHubAppAuthorizationRevokedPayload = z.infer<
+  typeof GitHubAppAuthorizationRevokedPayloadSchema
+>;
 export type InstallationCreatedPayload = z.infer<typeof InstallationCreatedPayloadSchema>;
 export type InstallationDeletedPayload = z.infer<typeof InstallationDeletedPayloadSchema>;
 export type InstallationSuspendPayload = z.infer<typeof InstallationSuspendPayloadSchema>;
 export type InstallationUnsuspendPayload = z.infer<typeof InstallationUnsuspendPayloadSchema>;
+export type InstallationTargetRenamedPayload = z.infer<
+  typeof InstallationTargetRenamedPayloadSchema
+>;
 export type InstallationRepositoriesPayload = z.infer<typeof InstallationRepositoriesPayloadSchema>;
 export type PushEventPayload = z.infer<typeof PushEventPayloadSchema>;
 export type PullRequestPayload = z.infer<typeof PullRequestPayloadSchema>;

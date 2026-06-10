@@ -22,7 +22,7 @@ const KiloPassChurnkeyCancelFlowContext =
   createContext<KiloPassChurnkeyCancelFlowContextValue | null>(null);
 
 type UseKiloPassChurnkeyCancelFlowParams = {
-  stripeSubscriptionId: string;
+  stripeSubscriptionId: string | null;
   fallbackCancelSubscription: () => void;
   onBeforeOpen?: () => void;
 };
@@ -57,37 +57,40 @@ export function useKiloPassChurnkeyCancelFlow(params: UseKiloPassChurnkeyCancelF
   const setIsOpeningCancelFlow =
     sharedCancelFlow?.setIsOpeningCancelFlow ?? setLocalIsOpeningCancelFlow;
 
-  const openCancelFlow = useCallback(
-    () =>
-      coordinator.openCancelFlow({
-        stripeSubscriptionId,
-        getChurnkeyAuthHash: () => trpcClient.kiloPass.getChurnkeyAuthHash.query(),
-        showCancelFlow,
-        cancelSubscription: () => trpcClient.kiloPass.cancelSubscription.mutate(),
-        invalidateKiloPassState: () =>
-          queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() }),
-        invalidateKiloPassScheduledChange: () =>
-          queryClient.invalidateQueries({
-            queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
-          }),
-        fallbackCancelSubscription,
-        confirmFallbackCancel: message => window.confirm(message),
-        notifyCancellationScheduled: () => toast('Cancellation scheduled'),
-        notifyError: message => toast.error(message),
-        onBeforeOpen,
-        onInFlightChange: setIsOpeningCancelFlow,
-      }),
-    [
-      coordinator,
-      fallbackCancelSubscription,
-      onBeforeOpen,
-      queryClient,
-      setIsOpeningCancelFlow,
+  const openCancelFlow = useCallback(async () => {
+    if (!stripeSubscriptionId) {
+      toast.error('Manage this Kilo Pass subscription through the mobile app store.');
+      return;
+    }
+
+    await coordinator.openCancelFlow({
       stripeSubscriptionId,
-      trpc,
-      trpcClient,
-    ]
-  );
+      getChurnkeyAuthHash: () => trpcClient.kiloPass.getChurnkeyAuthHash.query(),
+      showCancelFlow,
+      cancelSubscription: () => trpcClient.kiloPass.cancelSubscription.mutate(),
+      invalidateKiloPassState: () =>
+        queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() }),
+      invalidateKiloPassScheduledChange: () =>
+        queryClient.invalidateQueries({
+          queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
+        }),
+      fallbackCancelSubscription,
+      confirmFallbackCancel: message => window.confirm(message),
+      notifyCancellationScheduled: () => toast('Cancellation scheduled'),
+      notifyError: message => toast.error(message),
+      onBeforeOpen,
+      onInFlightChange: setIsOpeningCancelFlow,
+    });
+  }, [
+    coordinator,
+    fallbackCancelSubscription,
+    onBeforeOpen,
+    queryClient,
+    setIsOpeningCancelFlow,
+    stripeSubscriptionId,
+    trpc,
+    trpcClient,
+  ]);
 
   return { openCancelFlow, isOpeningCancelFlow };
 }

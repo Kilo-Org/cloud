@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { acceptOrganizationInvite } from '@/lib/organizations/organizations';

@@ -13,6 +13,17 @@ import { randomUUID } from 'crypto';
  * redirect points (which should be /customer-source-survey once Task 6 is done).
  */
 
+function isSignedInDestination(url: URL) {
+  return url.pathname === '/profile' || url.pathname.startsWith('/organizations/');
+}
+
+async function waitForSignedInDestination(page: import('@playwright/test').Page) {
+  await page.waitForURL(url => isSignedInDestination(url), {
+    timeout: 15000,
+  });
+  expect(isSignedInDestination(new URL(page.url()))).toBe(true);
+}
+
 /**
  * Signs in a brand-new user via fake-login with stytchpass behavior.
  * Returns the final URL after sign-in + verification completes.
@@ -27,13 +38,8 @@ async function signInFreshUser(page: import('@playwright/test').Page): Promise<s
   await page.goto(`/users/sign_in?fakeUser=${encodeURIComponent(testEmail)}`);
 
   // Wait for the full redirect chain to settle.
-  // After Task 6, new users should land on /customer-source-survey.
-  // Before Task 6, they land on /get-started.
   await page.waitForURL(
-    url =>
-      url.pathname === '/customer-source-survey' ||
-      url.pathname === '/get-started' ||
-      url.pathname === '/profile',
+    url => url.pathname === '/customer-source-survey' || isSignedInDestination(url),
     { timeout: 30000, waitUntil: 'networkidle' }
   );
 
@@ -49,7 +55,7 @@ test.describe('Customer Source Survey', () => {
     const finalUrl = await signInFreshUser(page);
 
     // After Task 6 (account-verification redirect change), new users should
-    // land on /customer-source-survey instead of /get-started.
+    // land on /customer-source-survey instead of continuing directly to their app destination.
     expect(new URL(finalUrl).pathname).toBe('/customer-source-survey');
   });
 
@@ -94,7 +100,7 @@ test.describe('Customer Source Survey', () => {
     await expect(submitButton).toBeDisabled();
   });
 
-  test('submitting a response redirects to get-started', async ({ page }) => {
+  test('submitting a response redirects to the signed-in app destination', async ({ page }) => {
     await signInFreshUser(page);
 
     const textarea = page.getByPlaceholder('Example: A YouTube video from Theo');
@@ -103,22 +109,16 @@ test.describe('Customer Source Survey', () => {
     await textarea.fill('Found it on Reddit');
     await submitButton.click();
 
-    await page.waitForURL(url => url.pathname === '/get-started', {
-      timeout: 15000,
-    });
-    expect(new URL(page.url()).pathname).toBe('/get-started');
+    await waitForSignedInDestination(page);
   });
 
-  test('skipping redirects to get-started', async ({ page }) => {
+  test('skipping redirects to the signed-in app destination', async ({ page }) => {
     await signInFreshUser(page);
 
     const skipLink = page.getByRole('button', { name: 'Skip' });
     await skipLink.click();
 
-    await page.waitForURL(url => url.pathname === '/get-started', {
-      timeout: 15000,
-    });
-    expect(new URL(page.url()).pathname).toBe('/get-started');
+    await waitForSignedInDestination(page);
   });
 
   test('already-answered user is redirected past survey', async ({ page }) => {
@@ -131,18 +131,13 @@ test.describe('Customer Source Survey', () => {
     await textarea.fill('Twitter post');
     await submitButton.click();
 
-    await page.waitForURL(url => url.pathname === '/get-started', {
-      timeout: 15000,
-    });
+    await waitForSignedInDestination(page);
 
     // Now navigate directly to the survey page. Since customer_source is set,
     // the server component should redirect past it.
     await page.goto('/customer-source-survey');
 
-    await page.waitForURL(url => url.pathname === '/get-started', {
-      timeout: 15000,
-    });
-    expect(new URL(page.url()).pathname).toBe('/get-started');
+    await waitForSignedInDestination(page);
   });
 
   test('after skipping, revisiting survey should redirect away (H2 sentinel)', async ({ page }) => {
@@ -156,9 +151,7 @@ test.describe('Customer Source Survey', () => {
     const skipLink = page.getByRole('button', { name: 'Skip' });
     await skipLink.click();
 
-    await page.waitForURL(url => url.pathname === '/get-started', {
-      timeout: 15000,
-    });
+    await waitForSignedInDestination(page);
 
     // Navigate back to the survey page directly
     await page.goto('/customer-source-survey');
@@ -166,12 +159,12 @@ test.describe('Customer Source Survey', () => {
     // If H2 is fixed (skip writes a sentinel), user should be redirected away.
     // If H2 is NOT fixed, user will see the survey form again.
     await page.waitForURL(
-      url => url.pathname === '/get-started' || url.pathname === '/customer-source-survey',
+      url => isSignedInDestination(url) || url.pathname === '/customer-source-survey',
       { timeout: 15000 }
     );
 
     // This assertion will FAIL until the H2 skip-persistence bug is fixed
-    expect(new URL(page.url()).pathname).toBe('/get-started');
+    expect(isSignedInDestination(new URL(page.url()))).toBe(true);
   });
 
   test('survey preserves callbackPath through submit', async ({ page }) => {
@@ -186,8 +179,8 @@ test.describe('Customer Source Survey', () => {
     await textarea.fill('Hacker News');
     await submitButton.click();
 
-    // Should redirect to /profile (the callbackPath), not /get-started
-    await page.waitForURL(url => url.pathname === '/profile' || url.pathname === '/get-started', {
+    // Should redirect to /profile (the callbackPath), not the default destination
+    await page.waitForURL(url => url.pathname === '/profile', {
       timeout: 15000,
     });
     expect(new URL(page.url()).pathname).toBe('/profile');
@@ -201,8 +194,8 @@ test.describe('Customer Source Survey', () => {
     const skipLink = page.getByRole('button', { name: 'Skip' });
     await skipLink.click();
 
-    // Should redirect to /profile (the callbackPath), not /get-started
-    await page.waitForURL(url => url.pathname === '/profile' || url.pathname === '/get-started', {
+    // Should redirect to /profile (the callbackPath), not the default destination
+    await page.waitForURL(url => url.pathname === '/profile', {
       timeout: 15000,
     });
     expect(new URL(page.url()).pathname).toBe('/profile');

@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { ReviewAgentPageClient } from './ReviewAgentPageClient';
 
 type ReviewAgentPageProps = {

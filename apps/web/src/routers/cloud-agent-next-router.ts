@@ -4,7 +4,9 @@ import {
   createCloudAgentNextClient,
   rethrowAsPaymentRequired,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { generateCloudAgentToken } from '@/lib/tokens';
+import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getGitLabInstanceUrlForUser,
@@ -23,11 +25,82 @@ import {
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
+  baseCreateTerminalNextSchema,
+  baseCreateTerminalNextOutputSchema,
+  baseRefreshTerminalTicketNextSchema,
+  baseRefreshTerminalTicketNextOutputSchema,
+  baseResizeTerminalNextSchema,
+  baseResizeTerminalNextOutputSchema,
+  baseCloseTerminalNextSchema,
+  baseCloseTerminalNextOutputSchema,
+  cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
 } from './cloud-agent-next-schemas';
-import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
+import {
+  generateCloudAgentAttachmentUploadUrl,
+  generateImageUploadUrl,
+} from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { db } from '@/lib/drizzle';
+import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+import { TRPCError } from '@trpc/server';
+import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
+
+function buildTerminalUrl(params: {
+  cloudAgentSessionId: string;
+  ptyId: string;
+  ticket: string;
+}): string {
+  const search = new URLSearchParams({
+    cloudAgentSessionId: params.cloudAgentSessionId,
+    ptyId: params.ptyId,
+    ticket: params.ticket,
+  });
+  return `/terminal?${search.toString()}`;
+}
+
+function createTerminalTicket(params: {
+  userId: string;
+  cloudAgentSessionId: string;
+  ptyId: string;
+}) {
+  const signed = signStreamTicket({
+    purpose: 'terminal',
+    userId: params.userId,
+    cloudAgentSessionId: params.cloudAgentSessionId,
+    ptyId: params.ptyId,
+  });
+
+  return {
+    wsUrl: buildTerminalUrl({
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      ptyId: params.ptyId,
+      ticket: signed.ticket,
+    }),
+    ticket: signed.ticket,
+    expiresAt: signed.expiresAt,
+  };
+}
+
+async function assertUserOwnsTerminalSession(
+  userId: string,
+  cloudAgentSessionId: string
+): Promise<void> {
+  const sessionOwnership = await verifyUserOwnsSessionV2ByCloudAgentId(
+    db,
+    userId,
+    cloudAgentSessionId
+  );
+
+  if (!sessionOwnership) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Session not found or access denied',
+    });
+  }
+}
 
 /**
  * Cloud Agent Next Router (Personal Context)
@@ -52,10 +125,20 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(basePrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (
+        input.devcontainer &&
+        !(await isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', ctx.user.id))
+      ) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Dev container sessions are not available',
+        });
+      }
+
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
-      const { gitlabProject, githubRepo, ...restInput } = input;
+      const { gitlabProject, githubRepo, attachments, images, ...restInput } = input;
 
       // Determine git source: GitLab uses gitUrl, GitHub uses githubRepo.
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
@@ -80,6 +163,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
+          attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
         });
       } catch (error) {
@@ -130,10 +214,84 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       try {
-        return await client.sendMessage(input);
+        const { attachments, images, ...restInput } = input;
+        return await client.sendMessage({
+          ...restInput,
+          attachments: attachments ?? images,
+          messageId: input.messageId ?? generateMessageId(),
+        });
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;
+      }
+    }),
+
+  createTerminal: baseProcedure
+    .input(baseCreateTerminalNextSchema)
+    .output(baseCreateTerminalNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+
+      try {
+        const authToken = generateCloudAgentToken(ctx.user);
+        const client = createCloudAgentNextClient(authToken);
+        const result = await client.createTerminal(input);
+        const terminalTicket = createTerminalTicket({
+          userId: ctx.user.id,
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          ptyId: result.pty.id,
+        });
+
+        return {
+          pty: result.pty,
+          ptyId: result.pty.id,
+          ...terminalTicket,
+        };
+      } catch (error) {
+        rethrowAsTerminalError(error);
+      }
+    }),
+
+  refreshTerminalTicket: baseProcedure
+    .input(baseRefreshTerminalTicketNextSchema)
+    .output(baseRefreshTerminalTicketNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+
+      return createTerminalTicket({
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        ptyId: input.ptyId,
+      });
+    }),
+
+  resizeTerminal: baseProcedure
+    .input(baseResizeTerminalNextSchema)
+    .output(baseResizeTerminalNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+
+      try {
+        const authToken = generateCloudAgentToken(ctx.user);
+        const client = createCloudAgentNextClient(authToken);
+        return await client.resizeTerminal(input);
+      } catch (error) {
+        rethrowAsTerminalError(error);
+      }
+    }),
+
+  closeTerminal: baseProcedure
+    .input(baseCloseTerminalNextSchema)
+    .output(baseCloseTerminalNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+
+      try {
+        const authToken = generateCloudAgentToken(ctx.user);
+        const client = createCloudAgentNextClient(authToken);
+        return await client.closeTerminal(input);
+      } catch (error) {
+        rethrowAsTerminalError(error);
       }
     }),
 
@@ -148,6 +306,21 @@ export const cloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,
+        contentType: input.contentType,
+        contentLength: input.contentLength,
+      });
+    }),
+
+  /**
+   * Generate a presigned URL for uploading a canonical Cloud Agent attachment.
+   */
+  getAttachmentUploadUrl: baseProcedure
+    .input(cloudAgentGetAttachmentUploadUrlSchema)
+    .mutation(async ({ ctx, input }) => {
+      return generateCloudAgentAttachmentUploadUrl({
+        userId: ctx.user.id,
+        messageUuid: input.messageUuid,
+        attachmentId: input.attachmentId,
         contentType: input.contentType,
         contentLength: input.contentLength,
       });

@@ -8,7 +8,6 @@ export const proxyErrorTypeSchema = z.enum([
   'usage_limit_exceeded',
   'data_collection_required',
   'api_kind_not_supported',
-  'stealth_model_error',
   'byok_error',
   'context_length_exceeded',
   'model_not_allowed',
@@ -22,11 +21,13 @@ export const proxyErrorTypeSchema = z.enum([
   'paid_model_auth_required',
   'promotion_limit_reached',
   'unsupported_fim_model',
+  'unsupported_edit_model',
   'insufficient_credits',
   'provider_not_allowed',
   'byok_key_required',
   'upstream_error',
   'no_free_models_available',
+  'abuse_blocked',
 ]);
 
 export type ProxyErrorType = z.infer<typeof proxyErrorTypeSchema>;

@@ -18,10 +18,18 @@
     },
     {
       "path": "/api/cron/cleanup-api-request-log",
-      "schedule": "0 12 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/kilo-pass-yearly-monthly-base",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/kilo-pass-store-subscription-reconcile",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/kilo-pass-expire-referral-rewards",
       "schedule": "0 * * * *"
     },
     {
@@ -37,6 +45,10 @@
       "schedule": "*/9 * * * *"
     },
     {
+      "path": "/api/cron/coding-plans-billing",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/db-pool-metrics",
       "schedule": "* * * * *"
     },
@@ -45,12 +57,24 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/dispatch-pending-code-reviews",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/exa-partition-maintenance",
+      "schedule": "0 0 1 * *"
+    },
+    {
+      "path": "/api/cron/model-experiment-request-partition-maintenance",
       "schedule": "0 0 1 * *"
     },
     {
       "path": "/api/cron/cleanup-free-model-usage",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-review-memory",
+      "schedule": "0 */12 * * *"
     }
   ],
   "build": {

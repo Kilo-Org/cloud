@@ -16,6 +16,41 @@ These are non-negotiable. Do not reintroduce shared/fallback paths.
 - **Env var name constraints.** User-provided `envVars` and `encryptedSecrets` keys must be valid shell identifiers (`/^[A-Za-z_][A-Za-z0-9_]*$/`) and must not use reserved prefixes `KILOCLAW_ENC_` or `KILOCLAW_ENV_`. Validated at schema level (ingest) and runtime (decrypt block).
 - **Token comparisons must be timing-safe.** Never compare auth/proxy tokens with `===`/`!==`. Use `timingSafeTokenEqual` from `controller/src/auth.ts` (or an equivalent `crypto.timingSafeEqual`-based helper) for bearer/proxy token validation.
 - **`kiloclaw_instances` write split.** The Worker is the sole inserter of rows (`insertProvisionedInstanceRecord`, enforced by `.specs/kiloclaw-datamodel.md` rule 21) — infrastructure is provisioned first, the row reflects it. The Worker also owns updates to a small set of DO-mirrored columns: destroy finalization (`markDestroyedInPostgresHelper`) and denormalized operational metadata (`tracked_image_tag`, `instance_type`, `admin_size_override`) written via `syncTrackedImageTagToPostgresHelper` / `syncInstanceTypeToPostgresHelper` / `syncAdminSizeOverrideToPostgresHelper`. The DO is the source of truth for these columns; the Postgres copy is a denormalized read cache for SQL-filterable admin tooling. `tracked_image_tag` and `instance_type` are written by the alarm reconciler when DO state changes; `admin_size_override` is written only on explicit admin RPC paths (set/clear/auto-clear-on-tier-resize) — there is no observation path. Next.js owns updates to ownership, lifecycle, and billing columns (`organization_id`, `name`, `inbound_email_enabled`, soft-delete via `markActiveInstanceDestroyed`, etc. in `apps/web/src/lib/kiloclaw/instance-registry.ts` and `instance-lifecycle.ts`). Next.js never inserts `kiloclaw_instances` rows. New Worker writes beyond the DO-mirrored carve-out require explicit justification — prefer a Next.js tRPC procedure unless the data fundamentally lives in the DO and is being denormalized for query-shape reasons.
+- **Fresh-provision admission reservations.** Fresh instance creation MUST acquire durable, non-routable context admission in `KiloClawRegistry` before invoking `KiloClawInstance.provision()` or provider allocation. A reservation is not a Postgres instance record and grants no access. Personal admission is per user; organization admission is per assigned user within `org:{orgId}`. Pending or reconciliation-required attempts fail closed and MUST NOT be exposed through routable registry entry reads. Registry admission and finalization are correctness-critical; do not treat reservation publication failure as best-effort routing metadata.
+
+### Fresh Provision Admission State
+
+```
+fresh create request
+  |
+  | beginFreshProvision (atomic unresolved-scope insert)
+  v
+in_progress
+  |\
+  | \ provider/row/bootstrap succeeds
+  |  v
+  |  completed + routable Registry entry
+  |       |
+  |       | finalized destroy
+  |       v
+  |    released + tombstone
+  |
+  \ ambiguous provider/row/bootstrap failure
+     v
+  failed_requires_reconciliation
+       |
+       | confirmed cleanup / destroy finalization
+       v
+    released + tombstone or no route
+```
+
+- `beginFreshProvision()` is the only entry to `in_progress`; the partial unique unresolved-scope index prevents a second fresh executor for the same owner/user context.
+- `completeFreshProvision()` publishes the routable entry only after canonical instance insertion and subscription bootstrap succeed. `repairCompletedProvision()` is the idempotent recovery path when that completion acknowledgement is lost.
+- `failFreshProvision()` is used only when provider side effects may exist and cleanup is not yet confirmed. `releaseFreshProvision()` is used only after confirmed cleanup or active-instance reconciliation proves the candidate is safe to abandon.
+- `finalizeDestroyedInstance()` atomically tombstones the routable entry and transitions any unresolved/completed reservation to terminal `released`, so delayed repair cannot revive a destroyed route.
+- `publishRecoveredInstance()` is limited to explicit subscription-recovery flows after bootstrap succeeds and refuses to publish if a destroy tombstone already exists.
+- `createInstance()` remains legacy/lazy routing publication and must not be used to complete a fresh reservation.
+
 - **DO restore from Postgres.** If DO SQLite is wiped, `start(userId)` reads the active instance row from Postgres and repopulates the DO state. This is the backup path for development mistakes that corrupt DO storage.
 - **Two-phase destroy.** Fly resource IDs (`pendingDestroyMachineId`, `pendingDestroyVolumeId`) are persisted before deletion attempts. DO state is only cleared when both are confirmed deleted. The alarm retries on failure.
 - **No machine recreation on transient errors.** `startExistingMachine()` only creates a new machine on 404 (confirmed gone). Transient Fly API errors (500, timeout) are re-thrown, not masked by duplicate creation.
@@ -101,14 +136,14 @@ src/
 
 ## Instance Statuses
 
-| Status        | Meaning                                                              |
-| ------------- | -------------------------------------------------------------------- |
-| `provisioned` | Config stored, volume created, no machine yet                        |
-| `starting`    | startAsync() fired; start() running in background via waitUntil      |
-| `running`     | Machine is started and healthy                                       |
-| `stopped`     | Machine is stopped, volume persists                                  |
-| `restoring`   | Snapshot restore in progress via CF Queue; all lifecycle ops blocked |
-| `destroying`  | Two-phase destroy in progress, pending resource deletion             |
+| Status | Meaning |
+|---|---|
+| `provisioned` | Config stored, volume created, no machine yet |
+| `starting` | startAsync() fired; start() running in background via waitUntil |
+| `running` | Machine is started and healthy |
+| `stopped` | Machine is stopped, volume persists |
+| `restoring` | Snapshot restore in progress via CF Queue; all lifecycle ops blocked |
+| `destroying` | Two-phase destroy in progress, pending resource deletion |
 
 The alarm runs for ALL statuses (not just `running`). `destroying` short-circuits reconciliation -- only retries pending deletes, never recreates resources. `starting` uses a 1-min alarm cadence; reconcileStarting() checks Fly machine state and transitions to `running` or `stopped`. If `startingAt` is set and more than 5 minutes have elapsed, it falls back to `stopped` automatically. `restoring` skips reconciliation entirely (the CF Queue worker owns the lifecycle); the alarm detects stuck restores (>30 min) and resets to `stopped`.
 
@@ -116,28 +151,28 @@ The alarm runs for ALL statuses (not just `running`). `destroying` short-circuit
 
 ### Required (set via `wrangler secret put`)
 
-| Variable               | Purpose                                                          |
-| ---------------------- | ---------------------------------------------------------------- |
-| `FLY_API_TOKEN`        | Bearer token for Fly Machines API (org-scoped)                   |
-| `FLY_ORG_SLUG`         | Fly org for creating per-user apps (e.g., `kilo-679`)            |
-| `FLY_REGISTRY_APP`     | Shared app for Docker image registry (e.g., `kiloclaw-machines`) |
-| `FLY_APP_NAME`         | Legacy fallback for existing instances without per-user apps     |
-| `NEXTAUTH_SECRET`      | JWT verification secret (shared with Next.js)                    |
-| `INTERNAL_API_SECRET`  | Platform API auth key                                            |
-| `GATEWAY_TOKEN_SECRET` | HMAC secret for per-user gateway tokens                          |
+| Variable | Purpose |
+|---|---|
+| `FLY_API_TOKEN` | Bearer token for Fly Machines API (org-scoped) |
+| `FLY_ORG_SLUG` | Fly org for creating per-user apps (e.g., `kilo-679`) |
+| `FLY_REGISTRY_APP` | Shared app for Docker image registry (e.g., `kiloclaw-machines`) |
+| `FLY_APP_NAME` | Legacy fallback for existing instances without per-user apps |
+| `NEXTAUTH_SECRET` | JWT verification secret (shared with Next.js) |
+| `INTERNAL_API_SECRET` | Platform API auth key |
+| `GATEWAY_TOKEN_SECRET` | HMAC secret for per-user gateway tokens |
 
 ### Optional
 
-| Variable                        | Purpose                                                                                                                                                                                                                                                                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `FLY_REGION`                    | Default region for new volumes/machines. Comma-separated priority list: `us,eu` tries US first, falls back to EU. (default: `us,eu`)                                                                                                                                                                                                 |
-| `KILOCODE_API_BASE_URL`         | Override KiloCode API URL                                                                                                                                                                                                                                                                                                            |
-| `AGENT_ENV_VARS_PRIVATE_KEY`    | RSA private key for decrypting user secrets                                                                                                                                                                                                                                                                                          |
-| `TELEGRAM_DM_POLICY`            | Telegram DM policy (passed through to machine)                                                                                                                                                                                                                                                                                       |
-| `DISCORD_DM_POLICY`             | Discord DM policy (passed through to machine)                                                                                                                                                                                                                                                                                        |
-| `OPENCLAW_ALLOWED_ORIGINS`      | Comma-separated origins for Control UI WebSocket (e.g., `http://localhost:3000,http://localhost:8795`). Production: `https://claw.kilo.ai,https://claw.kilosessions.ai`. Per-instance `<scheme>://<label><suffix>` origins are appended at machine build time from `KILOCLAW_INSTANCE_HOST_SUFFIX` + `KILOCLAW_INSTANCE_URL_SCHEME`. |
-| `KILOCLAW_INSTANCE_HOST_SUFFIX` | Host suffix for per-instance virtual hosting. Prod default in `wrangler.jsonc` is `.kiloclaw.ai`. No silent fallback — an unset value causes request-path code to throw (and `validateRequiredEnv` returns 503).                                                                                                                     |
-| `KILOCLAW_INSTANCE_URL_SCHEME`  | URL scheme paired with `KILOCLAW_INSTANCE_HOST_SUFFIX`. Prod default `https`. For dev-parity, set to `http` with a `:port`-bearing suffix like `.kiloclaw.localhost:8795`.                                                                                                                                                           |
+| Variable | Purpose |
+|---|---|
+| `FLY_REGION` | Default region for new volumes/machines. Comma-separated priority list: `us,eu` tries US first, falls back to EU. (default: `us,eu`) |
+| `KILOCODE_API_BASE_URL` | Override KiloCode API URL |
+| `AGENT_ENV_VARS_PRIVATE_KEY` | RSA private key for decrypting user secrets |
+| `TELEGRAM_DM_POLICY` | Telegram DM policy (passed through to machine) |
+| `DISCORD_DM_POLICY` | Discord DM policy (passed through to machine) |
+| `OPENCLAW_ALLOWED_ORIGINS` | Comma-separated origins for Control UI WebSocket (e.g., `http://localhost:3000,http://localhost:8795`). Production: `https://claw.kilo.ai,https://claw.kilosessions.ai`. Per-instance `<scheme>://<label><suffix>` origins are appended at machine build time from `KILOCLAW_INSTANCE_HOST_SUFFIX` + `KILOCLAW_INSTANCE_URL_SCHEME`. |
+| `KILOCLAW_INSTANCE_HOST_SUFFIX` | Host suffix for per-instance virtual hosting. Prod default in `wrangler.jsonc` is `.kiloclaw.ai`. No silent fallback — an unset value causes request-path code to throw (and `validateRequiredEnv` returns 503). |
+| `KILOCLAW_INSTANCE_URL_SCHEME` | URL scheme paired with `KILOCLAW_INSTANCE_HOST_SUFFIX`. Prod default `https`. For dev-parity, set to `http` with a `:port`-bearing suffix like `.kiloclaw.localhost:8795`. |
 
 ### Fly.io Regions
 
@@ -157,7 +192,7 @@ pnpm start            # wrangler dev
 ## Controller Smoke Scripts
 
 When working on machine-side controller behavior, use the Docker smoke scripts in
-`scripts/` (build image first: `docker build -t kiloclaw:controller .`):
+`scripts/` (build image first: `docker buildx build --build-context workspace=../.. --load -t kiloclaw:controller .`):
 
 - `scripts/controller-smoke-test.sh`
   - Fresh container (onboard path). Tests auth, env patch, version endpoints.
@@ -182,19 +217,19 @@ Before submitting any change:
 
 ## Test Targets by Change Type
 
-| What you changed                      | Test files to update                                  |
-| ------------------------------------- | ----------------------------------------------------- |
-| Auth middleware, JWT, pepper          | `src/auth/middleware.test.ts`, `src/auth/jwt.test.ts` |
-| Gateway env var building              | `src/gateway/env.test.ts`                             |
-| Fly API client                        | `src/fly/client.test.ts`                              |
-| Fly Apps / IP allocation              | `src/fly/apps.test.ts`                                |
-| Fly App Secrets                       | `src/fly/secrets.test.ts`                             |
-| App DO (per-user Fly App lifecycle)   | `src/durable-objects/kiloclaw-app.test.ts`            |
-| DO lifecycle, reconciliation, destroy | `src/durable-objects/kiloclaw-instance.test.ts`       |
-| RSA+AES envelope encryption           | `src/utils/encryption.test.ts`                        |
-| Env var encryption (AES-256-GCM)      | `src/utils/env-encryption.test.ts`                    |
-| Sandbox ID derivation                 | `src/auth/sandbox-id.test.ts`                         |
-| Gateway token derivation              | `src/auth/gateway-token.test.ts`                      |
+| What you changed | Test files to update |
+|---|---|
+| Auth middleware, JWT, pepper | `src/auth/middleware.test.ts`, `src/auth/jwt.test.ts` |
+| Gateway env var building | `src/gateway/env.test.ts` |
+| Fly API client | `src/fly/client.test.ts` |
+| Fly Apps / IP allocation | `src/fly/apps.test.ts` |
+| Fly App Secrets | `src/fly/secrets.test.ts` |
+| App DO (per-user Fly App lifecycle) | `src/durable-objects/kiloclaw-app.test.ts` |
+| DO lifecycle, reconciliation, destroy | `src/durable-objects/kiloclaw-instance.test.ts` |
+| RSA+AES envelope encryption | `src/utils/encryption.test.ts` |
+| Env var encryption (AES-256-GCM) | `src/utils/env-encryption.test.ts` |
+| Sandbox ID derivation | `src/auth/sandbox-id.test.ts` |
+| Gateway token derivation | `src/auth/gateway-token.test.ts` |
 
 ## Multi-Instance Migration (In Progress)
 
@@ -202,12 +237,12 @@ KiloClaw is transitioning from one-instance-per-user to N-instances-per-owner (p
 
 ### Identity model
 
-| Concept         | Legacy (current default)                              | Multi-instance (new path)                                                  |
-| --------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
-| **DO key**      | `idFromName(userId)`                                  | `idFromName(instanceId)` where `instanceId` = `kiloclaw_instances.id` UUID |
-| **sandboxId**   | `sandboxIdFromUserId(userId)` — base64url, reversible | `sandboxIdFromInstanceId(instanceId)` → `ki_{uuid-no-dashes}` (35 chars)   |
-| **Proxy route** | Catch-all `/*`                                        | `/i/:instanceId/*`                                                         |
-| **Ownership**   | Implicit (DO keyed by authed userId)                  | Explicit check: `status.userId === authed userId`                          |
+| Concept | Legacy (current default) | Multi-instance (new path) |
+|---|---|---|
+| **DO key** | `idFromName(userId)` | `idFromName(instanceId)` where `instanceId` = `kiloclaw_instances.id` UUID |
+| **sandboxId** | `sandboxIdFromUserId(userId)` — base64url, reversible | `sandboxIdFromInstanceId(instanceId)` → `ki_{uuid-no-dashes}` (35 chars) |
+| **Proxy route** | Catch-all `/*` | `/i/:instanceId/*` |
+| **Ownership** | Implicit (DO keyed by authed userId) | Explicit check: `status.userId === authed userId` |
 
 ### What to know when making changes
 
@@ -219,10 +254,10 @@ KiloClaw is transitioning from one-instance-per-user to N-instances-per-owner (p
 - **Postgres `kiloclaw_instances.id` IS the instanceId.** There is no separate `instance_id` column. The existing UUID primary key is the routing identity.
 - **Row creation is Worker-driven.** Provision flows call the Worker's platform route, which inserts the `kiloclaw_instances` row and returns the `id`. `ensureActiveInstance()` in Next.js is now a read-through helper that returns the existing row; it does not create rows. See `.specs/kiloclaw-datamodel.md` rule 21.
 
-### Upcoming PRs (do not implement yet)
+### Current multi-instance control plane
 
-- **KiloClawRegistry DO** — SQLite-backed DO that indexes instances per owner (`user:{userId}` or `org:{orgId}`). Will replace direct `idFromName(userId)` lookups in the catch-all proxy.
-- **Org instances** — `organization_id` column (already added to schema) links instances to orgs. Org tRPC router, org membership checks, and org member removal cleanup are pending.
+- **KiloClawRegistry DO** — SQLite-backed DO that indexes instances per owner (`user:{userId}` or `org:{orgId}`) for routing. Fresh-provision admission reservations are being added as a separate non-routable state surface; never expose pending reservations from normal route-resolution methods.
+- **Org instances** — `organization_id` links instances to org contexts. Registry entries for an organization may contain several assigned users; any current one-active-instance admission rule must be qualified by assigned user rather than treating the whole organization as one slot.
 
 ## Code Style
 
@@ -261,27 +296,27 @@ User config is transported to the machine via environment variables set in the F
 
 **Encrypted (stored as `KILOCLAW_ENC_{name}`, decrypted to `{name}` at boot):**
 
-| Env var (after decrypt)  | Source                       | Purpose                     |
-| ------------------------ | ---------------------------- | --------------------------- |
-| `KILOCODE_API_KEY`       | User config (DO)             | KiloCode API authentication |
-| `OPENCLAW_GATEWAY_TOKEN` | Derived from sandboxId       | Per-user gateway auth       |
-| `TELEGRAM_BOT_TOKEN`     | Decrypted channel token      | Telegram channel            |
-| `DISCORD_BOT_TOKEN`      | Decrypted channel token      | Discord channel             |
-| `SLACK_BOT_TOKEN`        | Decrypted channel token      | Slack channel               |
-| `SLACK_APP_TOKEN`        | Decrypted channel token      | Slack channel               |
-| User encrypted secrets   | Decrypted from RSA envelopes | User-provided credentials   |
+| Env var (after decrypt) | Source | Purpose |
+|---|---|---|
+| `KILOCODE_API_KEY` | User config (DO) | KiloCode API authentication |
+| `OPENCLAW_GATEWAY_TOKEN` | Derived from sandboxId | Per-user gateway auth |
+| `TELEGRAM_BOT_TOKEN` | Decrypted channel token | Telegram channel |
+| `DISCORD_BOT_TOKEN` | Decrypted channel token | Discord channel |
+| `SLACK_BOT_TOKEN` | Decrypted channel token | Slack channel |
+| `SLACK_APP_TOKEN` | Decrypted channel token | Slack channel |
+| User encrypted secrets | Decrypted from RSA envelopes | User-provided credentials |
 
 **Plaintext (stored as-is in config.env):**
 
-| Env var                    | Source                            | Purpose                              |
-| -------------------------- | --------------------------------- | ------------------------------------ |
-| `KILOCODE_DEFAULT_MODEL`   | User config (DO)                  | Default model for agents             |
-| `KILOCODE_MODELS_JSON`     | User config (DO), JSON-serialized | Available model list                 |
-| `KILOCODE_API_BASE_URL`    | Worker env                        | API base URL override                |
-| `AUTO_APPROVE_DEVICES`     | Hardcoded `true`                  | Skip device pairing                  |
-| `TELEGRAM_DM_POLICY`       | Worker env                        | Telegram DM policy                   |
-| `DISCORD_DM_POLICY`        | Worker env                        | Discord DM policy                    |
-| `OPENCLAW_ALLOWED_ORIGINS` | Worker env                        | Control UI WebSocket allowed origins |
+| Env var | Source | Purpose |
+|---|---|---|
+| `KILOCODE_DEFAULT_MODEL` | User config (DO) | Default model for agents |
+| `KILOCODE_MODELS_JSON` | User config (DO), JSON-serialized | Available model list |
+| `KILOCODE_API_BASE_URL` | Worker env | API base URL override |
+| `AUTO_APPROVE_DEVICES` | Hardcoded `true` | Skip device pairing |
+| `TELEGRAM_DM_POLICY` | Worker env | Telegram DM policy |
+| `DISCORD_DM_POLICY` | Worker env | Discord DM policy |
+| `OPENCLAW_ALLOWED_ORIGINS` | Worker env | Control UI WebSocket allowed origins |
 
 ### AI Provider Selection
 
@@ -317,28 +352,28 @@ These files are COPYed by the Dockerfile and hashed by CI (`deploy-kiloclaw.yml`
 produce the content-hash image tag. If you add or remove a COPY in the Dockerfile,
 update the `find` command in the workflow's "Compute source content hash" step to match.
 
-| Path                                 | Purpose                                                 |
-| ------------------------------------ | ------------------------------------------------------- |
-| `Dockerfile`                         | Base image, apt packages, npm versions                  |
-| `controller/`                        | Compiled to `kiloclaw-controller.js` (entrypoint)       |
-| `container/`                         | Runtime assets (e.g. `TOOLS.md`) staged outside `/root` |
-| `plugins/kiloclaw-customizer/`       | KiloClaw customizer plugin package installed in image   |
-| `plugins/kilo-chat/`                 | Kilo Chat channel plugin package installed in image     |
-| `plugins/kiloclaw-morning-briefing/` | Morning briefing plugin package installed in image      |
-| `openclaw-pairing-list.js`           | Helper script used at runtime by controller             |
-| `openclaw-device-pairing-list.js`    | Helper script used at runtime by controller             |
-| `skills/`                            | Custom skills copied to `/root/clawd/skills/`           |
+| Path | Purpose |
+|---|---|
+| `Dockerfile` | Base image, apt packages, npm versions |
+| `controller/` | Compiled to `kiloclaw-controller.js` (entrypoint) |
+| `container/` | Runtime assets (e.g. `TOOLS.md`) staged outside `/root` |
+| `plugins/kiloclaw-customizer/` | KiloClaw customizer plugin package installed in image |
+| `plugins/kilo-chat/` | Kilo Chat channel plugin package installed in image |
+| `plugins/kiloclaw-morning-briefing/` | Morning briefing plugin package installed in image |
+| `openclaw-pairing-list.js` | Helper script used at runtime by controller |
+| `openclaw-device-pairing-list.js` | Helper script used at runtime by controller |
+| `skills/` | Custom skills copied to `/root/clawd/skills/` |
 
 ## Fly Machine Lifecycle
 
-| Operation          | What happens                                                                                                                                                                                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Provision**      | Creates a Fly Volume in the configured region. Stores config in DO. Schedules reconciliation alarm.                                                                                                                                                                |
-| **Start**          | Ensures volume exists. Creates a Fly Machine (or starts an existing stopped one) with volume mounted at `/root`, metadata tags, and env vars. Persists machine ID immediately. Schedules health check alarm.                                                       |
-| **Stop**           | Stops the Fly Machine via API. Volume persists. Alarm continues at idle cadence.                                                                                                                                                                                   |
-| **Restart**        | Stops machine, updates config (env vars, image, metadata), starts it. Volume persists.                                                                                                                                                                             |
-| **Restore**        | Enqueues a CF Queue job, sets status to `restoring`. Queue worker: stops machine, destroys it (releases volume attachment), creates new volume from snapshot, swaps DO state, creates fresh machine. Old volume retained for revert.                               |
-| **Destroy**        | Two-phase: persists pending IDs + `status='destroying'`, attempts Fly deletions, only clears DO state when both confirmed. Alarm retries failures.                                                                                                                 |
+| Operation | What happens |
+|---|---|
+| **Provision** | Creates a Fly Volume in the configured region. Stores config in DO. Schedules reconciliation alarm. |
+| **Start** | Ensures volume exists. Creates a Fly Machine (or starts an existing stopped one) with volume mounted at `/root`, metadata tags, and env vars. Persists machine ID immediately. Schedules health check alarm. |
+| **Stop** | Stops the Fly Machine via API. Volume persists. Alarm continues at idle cadence. |
+| **Restart** | Stops machine, updates config (env vars, image, metadata), starts it. Volume persists. |
+| **Restore** | Enqueues a CF Queue job, sets status to `restoring`. Queue worker: stops machine, destroys it (releases volume attachment), creates new volume from snapshot, swaps DO state, creates fresh machine. Old volume retained for revert. |
+| **Destroy** | Two-phase: persists pending IDs + `status='destroying'`, attempts Fly deletions, only clears DO state when both confirmed. Alarm retries failures. |
 | **Reconciliation** | Alarm runs for all statuses. Running: 5 min. Destroying: 1 min. Restoring: 1 min (no-op, stuck detection only). Idle (provisioned/stopped): 30 min. Fixes status drift, missing volumes, stale machine IDs, wrong mounts, and recovers lost IDs from Fly metadata. |
 
 ## Metadata Recovery

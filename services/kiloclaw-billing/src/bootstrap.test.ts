@@ -1,21 +1,61 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as DbModule from '@kilocode/db';
 
-const { mockGetWorkerDb, mockInsertKiloClawSubscriptionChangeLog } = vi.hoisted(() => ({
+const {
+  mockFindLatestPreCutoffUserCommitSwitchQualification,
+  mockGetWorkerDb,
+  mockInsertKiloClawSubscriptionChangeLog,
+} = vi.hoisted(() => ({
+  mockFindLatestPreCutoffUserCommitSwitchQualification: vi.fn<
+    () => Promise<{
+      qualifiedAt: string;
+      qualificationSource: 'switch_requested_before_cutoff';
+    } | null>
+  >(async () => null),
   mockGetWorkerDb: vi.fn(),
   mockInsertKiloClawSubscriptionChangeLog: vi.fn(async () => undefined),
 }));
 
-vi.mock('@kilocode/db', () => ({
-  getWorkerDb: mockGetWorkerDb,
-  insertKiloClawSubscriptionChangeLog: mockInsertKiloClawSubscriptionChangeLog,
-  kiloclaw_earlybird_purchases: {},
-  kiloclaw_instances: {},
-  kiloclaw_subscriptions: {},
-  organizations: {},
-  organization_seats_purchases: {},
-}));
+vi.mock('@kilocode/db', async importOriginal => {
+  const actual = await importOriginal<typeof DbModule>();
+  const legacyPriceVersion = '2026-03-19';
+  const currentPriceVersion = '2026-05-10';
 
-import { bootstrapProvisionSubscription } from './bootstrap.js';
+  return {
+    ...actual,
+    CURRENT_KILOCLAW_PRICE_VERSION: currentPriceVersion,
+    LEGACY_KILOCLAW_PRICE_VERSION: legacyPriceVersion,
+    findLatestPreCutoffUserCommitSwitchQualification:
+      mockFindLatestPreCutoffUserCommitSwitchQualification,
+    getKiloClawPricingCatalogEntry: vi.fn((priceVersion: string) => {
+      if (priceVersion === legacyPriceVersion) {
+        return {
+          priceVersion: legacyPriceVersion,
+          trialDurationDays: 7,
+          selfServiceInstanceType: 'perf-1-3',
+        };
+      }
+      if (priceVersion === currentPriceVersion) {
+        return {
+          priceVersion: currentPriceVersion,
+          trialDurationDays: 1,
+          selfServiceInstanceType: 'perf-1-3',
+        };
+      }
+      throw new Error(`Unknown KiloClaw price version: ${priceVersion}`);
+    }),
+    getWorkerDb: mockGetWorkerDb,
+    KILOCLAW_COMMIT_SALES_CUTOFF: '2026-06-06T00:00:00.000Z',
+    insertKiloClawSubscriptionChangeLog: mockInsertKiloClawSubscriptionChangeLog,
+    kiloclaw_earlybird_purchases: {},
+    kiloclaw_instances: {},
+    kiloclaw_subscriptions: {},
+    organizations: {},
+    organization_seats_purchases: {},
+  };
+});
+
+import { bootstrapProvisionSubscription, resolveProvisionEntitlement } from './bootstrap.js';
 import type { BillingWorkerEnv } from './types.js';
 
 type SelectBuilder<T> = PromiseLike<T[]> & {
@@ -64,6 +104,7 @@ function createMockDb(params: {
     select: vi.fn(() => createSelectBuilder(topLevelSelectQueue.shift() ?? [])),
     transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
       const tx = {
+        execute: vi.fn(async () => ({ rows: [] })),
         select: vi.fn(() => createSelectBuilder(txSelectQueue.shift() ?? [])),
         insert: vi.fn(() => ({
           values: vi.fn((values: Record<string, unknown>) => {
@@ -108,18 +149,233 @@ function createEnv(): BillingWorkerEnv {
       fetch: vi.fn(),
     },
     KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
-    STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
-    STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
-    STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
-    INTERNAL_API_SECRET: 'next-internal-api-secret',
-    KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+    STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID: 'price_legacy_standard_intro',
+    STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID: 'price_legacy_standard',
+    STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID: 'price_legacy_commit',
+    STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID: 'price_current_standard',
+    STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID: 'price_current_commit',
+    INTERNAL_API_SECRET: 'internal-api-secret',
+  };
+}
+
+function createTransferSource(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'sub-source',
+    user_id: 'user-1',
+    instance_id: 'instance-old',
+    stripe_subscription_id: 'stripe-live',
+    stripe_schedule_id: 'schedule-live',
+    transferred_to_subscription_id: null,
+    access_origin: null,
+    payment_source: 'credits',
+    kiloclaw_price_version: '2026-03-19',
+    plan: 'standard',
+    scheduled_plan: null,
+    scheduled_by: null,
+    status: 'active',
+    cancel_at_period_end: false,
+    pending_conversion: false,
+    trial_started_at: null,
+    trial_ends_at: null,
+    current_period_start: '2026-05-01T00:00:00.000Z',
+    current_period_end: '2026-06-01T00:00:00.000Z',
+    credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    commit_ends_at: null,
+    past_due_since: null,
+    suspended_at: null,
+    destruction_deadline: null,
+    auto_resume_requested_at: null,
+    auto_resume_retry_after: null,
+    auto_resume_attempt_count: 0,
+    auto_top_up_triggered_for_period: null,
+    created_at: '2026-05-01T00:00:00.000Z',
+    updated_at: '2026-05-10T00:00:00.000Z',
+    ...overrides,
   };
 }
 
 describe('bootstrapProvisionSubscription successor transfer', () => {
   beforeEach(() => {
+    mockFindLatestPreCutoffUserCommitSwitchQualification.mockReset();
+    mockFindLatestPreCutoffUserCommitSwitchQualification.mockResolvedValue(null);
     mockGetWorkerDb.mockReset();
     mockInsertKiloClawSubscriptionChangeLog.mockReset();
+  });
+
+  it('preserves safe final-term operational and provider state during successor transfer', async () => {
+    const source = {
+      id: 'sub-source-unsafe',
+      user_id: 'user-1',
+      instance_id: 'instance-old',
+      stripe_subscription_id: 'stripe-live',
+      stripe_schedule_id: 'schedule-live',
+      transferred_to_subscription_id: null,
+      access_origin: null,
+      payment_source: 'credits',
+      kiloclaw_price_version: '2026-03-19',
+      plan: 'commit',
+      scheduled_plan: 'standard',
+      scheduled_by: 'user',
+      status: 'active',
+      cancel_at_period_end: false,
+      pending_conversion: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      current_period_start: '2026-06-01T00:00:00.000Z',
+      current_period_end: '2026-12-01T00:00:00.000Z',
+      credit_renewal_at: '2026-12-01T00:00:00.000Z',
+      commit_ends_at: '2026-12-01T00:00:00.000Z',
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-06-01T00:00:00.000Z',
+      updated_at: '2026-06-10T00:00:00.000Z',
+    };
+    const insertedSuccessor = { ...source, id: 'sub-successor', instance_id: 'instance-new' };
+    const predecessorAfter = {
+      ...source,
+      status: 'canceled',
+      transferred_to_subscription_id: insertedSuccessor.id,
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+    };
+    const { db, insertValues, updateSets } = createMockDb({
+      selectRows: [
+        [],
+        [source],
+        [
+          { id: 'instance-old', destroyedAt: '2026-06-11T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      txSelectRows: [[source], [{ id: 'instance-new' }], []],
+      insertReturningRows: [[insertedSuccessor]],
+      updateReturningRows: [[predecessorAfter], [insertedSuccessor], []],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await bootstrapProvisionSubscription(createEnv(), {
+      userId: source.user_id,
+      instanceId: 'instance-new',
+      orgId: null,
+    });
+
+    expect(insertValues[0]).toEqual(
+      expect.objectContaining({
+        scheduled_plan: 'standard',
+        scheduled_by: 'user',
+        commit_ends_at: '2026-12-01T00:00:00.000Z',
+      })
+    );
+    expect(updateSets).toContainEqual(
+      expect.objectContaining({
+        stripe_subscription_id: 'stripe-live',
+        stripe_schedule_id: 'schedule-live',
+      })
+    );
+  });
+
+  it('preserves a pending Commit switch with pre-cutoff change-log qualification', async () => {
+    const source = createTransferSource({
+      scheduled_plan: 'commit',
+      scheduled_by: 'user',
+    });
+    mockFindLatestPreCutoffUserCommitSwitchQualification.mockResolvedValue({
+      qualifiedAt: '2026-06-05T00:00:00.000Z',
+      qualificationSource: 'switch_requested_before_cutoff',
+    });
+    const insertedSuccessor = {
+      ...source,
+      id: 'sub-successor',
+      instance_id: 'instance-new',
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+    };
+    const predecessorAfter = {
+      ...source,
+      status: 'canceled',
+      transferred_to_subscription_id: insertedSuccessor.id,
+    };
+    const restoredSuccessor = {
+      ...insertedSuccessor,
+      stripe_subscription_id: source.stripe_subscription_id,
+      stripe_schedule_id: source.stripe_schedule_id,
+    };
+    const { db, insertValues } = createMockDb({
+      selectRows: [
+        [],
+        [source],
+        [
+          { id: 'instance-old', destroyedAt: '2026-06-07T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      txSelectRows: [[source], [{ id: 'instance-new' }], [], []],
+      insertReturningRows: [[insertedSuccessor]],
+      updateReturningRows: [[predecessorAfter], [restoredSuccessor]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await bootstrapProvisionSubscription(createEnv(), {
+      userId: source.user_id,
+      instanceId: 'instance-new',
+      orgId: null,
+    });
+
+    expect(insertValues[0]).toEqual(
+      expect.objectContaining({ scheduled_plan: 'commit', scheduled_by: 'user' })
+    );
+  });
+
+  it.each([
+    {
+      name: 'missing pending Commit qualification',
+      source: createTransferSource({ scheduled_plan: 'commit', scheduled_by: 'user' }),
+      reason: 'missing_qualification_evidence',
+    },
+    {
+      name: 'Commit final boundary mismatch',
+      source: createTransferSource({
+        plan: 'commit',
+        current_period_start: '2026-05-01T00:00:00.000Z',
+        current_period_end: '2026-11-01T00:00:00.000Z',
+        commit_ends_at: '2026-12-01T00:00:00.000Z',
+      }),
+      reason: 'boundary_mismatch',
+    },
+  ])('aborts unsafe transfer with $name before successor mutation', async ({ source, reason }) => {
+    const { db, insertValues, updateSets } = createMockDb({
+      selectRows: [
+        [],
+        [source],
+        [
+          { id: 'instance-old', destroyedAt: '2026-06-07T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      txSelectRows: [[source], [{ id: 'instance-new' }], []],
+      insertReturningRows: [],
+      updateReturningRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await expect(
+      bootstrapProvisionSubscription(createEnv(), {
+        userId: source.user_id,
+        instanceId: 'instance-new',
+        orgId: null,
+      })
+    ).rejects.toThrow(`Unsafe personal subscription transfer: ${reason}`);
+
+    expect(insertValues).toEqual([]);
+    expect(updateSets).toEqual([]);
   });
 
   it('clears predecessor Stripe ownership before restoring it on successor row', async () => {
@@ -132,6 +388,7 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
       transferred_to_subscription_id: null,
       access_origin: null,
       payment_source: 'stripe',
+      kiloclaw_price_version: '2026-03-19',
       plan: 'standard',
       scheduled_plan: null,
       scheduled_by: null,
@@ -206,124 +463,20 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
         instance_id: 'instance-new',
         stripe_subscription_id: null,
         stripe_schedule_id: null,
+        kiloclaw_price_version: '2026-03-19',
       })
     );
     expect(updateSets).toHaveLength(2);
     expect(updateSets[0]).toEqual(
       expect.objectContaining({
         transferred_to_subscription_id: insertedSuccessor.id,
-        payment_source: 'credits',
         stripe_subscription_id: null,
-        stripe_schedule_id: null,
       })
     );
     expect(updateSets[1]).toEqual(
       expect.objectContaining({
         stripe_subscription_id: source.stripe_subscription_id,
         stripe_schedule_id: source.stripe_schedule_id,
-      })
-    );
-    expect(result).toEqual(restoredSuccessor);
-    expect(mockInsertKiloClawSubscriptionChangeLog).toHaveBeenCalledTimes(2);
-    expect(mockInsertKiloClawSubscriptionChangeLog).toHaveBeenNthCalledWith(
-      2,
-      expect.anything(),
-      expect.objectContaining({
-        subscriptionId: restoredSuccessor.id,
-        after: restoredSuccessor,
-      })
-    );
-  });
-
-  it('adopts detached paid personal row onto new provisioned instance', async () => {
-    const source = {
-      id: 'sub-detached',
-      user_id: 'user-1',
-      instance_id: null,
-      stripe_subscription_id: 'stripe-detached',
-      stripe_schedule_id: null,
-      transferred_to_subscription_id: null,
-      access_origin: null,
-      payment_source: 'stripe',
-      plan: 'standard',
-      scheduled_plan: null,
-      scheduled_by: null,
-      status: 'active',
-      cancel_at_period_end: false,
-      pending_conversion: false,
-      trial_started_at: null,
-      trial_ends_at: null,
-      current_period_start: '2026-04-01T00:00:00.000Z',
-      current_period_end: '2026-05-01T00:00:00.000Z',
-      credit_renewal_at: null,
-      commit_ends_at: null,
-      past_due_since: null,
-      suspended_at: null,
-      destruction_deadline: null,
-      auto_resume_requested_at: null,
-      auto_resume_retry_after: null,
-      auto_resume_attempt_count: 0,
-      auto_top_up_triggered_for_period: null,
-      created_at: '2026-04-01T00:00:00.000Z',
-      updated_at: '2026-04-01T00:00:00.000Z',
-    };
-    const insertedSuccessor = {
-      ...source,
-      id: 'sub-attached',
-      instance_id: 'instance-new',
-      stripe_subscription_id: null,
-      created_at: '2026-04-10T00:00:00.000Z',
-      updated_at: '2026-04-10T00:00:00.000Z',
-    };
-    const predecessorAfter = {
-      ...source,
-      status: 'canceled',
-      transferred_to_subscription_id: insertedSuccessor.id,
-      stripe_subscription_id: null,
-      updated_at: '2026-04-10T00:00:01.000Z',
-    };
-    const restoredSuccessor = {
-      ...insertedSuccessor,
-      stripe_subscription_id: source.stripe_subscription_id,
-      updated_at: '2026-04-10T00:00:02.000Z',
-    };
-
-    const { db, insertValues, updateSets } = createMockDb({
-      selectRows: [
-        [],
-        [source],
-        [{ id: 'instance-new', destroyedAt: null, organizationId: null }],
-        [],
-      ],
-      txSelectRows: [[source], [{ id: 'instance-new' }], []],
-      insertReturningRows: [[insertedSuccessor]],
-      updateReturningRows: [[predecessorAfter], [restoredSuccessor]],
-    });
-    mockGetWorkerDb.mockReturnValue(db);
-
-    const result = await bootstrapProvisionSubscription(createEnv(), {
-      userId: source.user_id,
-      instanceId: 'instance-new',
-      orgId: null,
-    });
-
-    expect(insertValues).toHaveLength(1);
-    expect(insertValues[0]).toEqual(
-      expect.objectContaining({
-        instance_id: 'instance-new',
-        stripe_subscription_id: null,
-      })
-    );
-    expect(updateSets).toHaveLength(2);
-    expect(updateSets[0]).toEqual(
-      expect.objectContaining({
-        transferred_to_subscription_id: insertedSuccessor.id,
-        stripe_subscription_id: null,
-      })
-    );
-    expect(updateSets[1]).toEqual(
-      expect.objectContaining({
-        stripe_subscription_id: source.stripe_subscription_id,
       })
     );
     expect(result).toEqual(restoredSuccessor);
@@ -701,6 +854,307 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
     mockInsertKiloClawSubscriptionChangeLog.mockReset();
   });
 
+  it('resolves live legacy destroyed-lineage provisioning entitlement to perf-1-3', async () => {
+    const legacySource = {
+      id: 'sub-legacy-live',
+      user_id: 'user-1',
+      instance_id: 'instance-old',
+      plan: 'standard',
+      status: 'active',
+      kiloclaw_price_version: '2026-03-19',
+      access_origin: null,
+      payment_source: 'credits',
+      cancel_at_period_end: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      scheduled_plan: null,
+      scheduled_by: null,
+      pending_conversion: false,
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-06-01T00:00:00.000Z',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-04-01T00:00:00.000Z',
+      updated_at: '2026-05-01T00:00:00.000Z',
+    };
+    const { db } = createFreshInsertDb({
+      selectRows: [
+        [legacySource],
+        [{ id: 'instance-old', destroyedAt: '2026-05-12T00:00:00.000Z', organizationId: null }],
+        [],
+      ],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await expect(
+      resolveProvisionEntitlement(createEnv(), { userId: 'user-1', orgId: null })
+    ).resolves.toEqual({
+      priceVersion: '2026-03-19',
+      selfServiceInstanceType: 'perf-1-3',
+    });
+  });
+
+  it('resolves org provisioning entitlement for a hard-expired org with paid seat state', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    const { db } = createFreshInsertDb({
+      selectRows: [
+        [
+          {
+            created_at: '2026-04-01T00:00:00.000Z',
+            free_trial_end_at: '2026-05-01T00:00:00.000Z',
+            require_seats: true,
+            settings: {},
+          },
+        ],
+        [{ subscriptionStatus: 'past_due' }],
+      ],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      await expect(
+        resolveProvisionEntitlement(createEnv(), {
+          userId: 'user-1',
+          orgId: '22222222-2222-4222-8222-222222222222',
+        })
+      ).resolves.toEqual({
+        priceVersion: '2026-03-19',
+        selfServiceInstanceType: 'perf-1-3',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects org provisioning entitlement for a hard-expired unentitled org', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    const { db } = createFreshInsertDb({
+      selectRows: [
+        [
+          {
+            created_at: '2026-04-01T00:00:00.000Z',
+            free_trial_end_at: '2026-05-01T00:00:00.000Z',
+            require_seats: true,
+            settings: {},
+          },
+        ],
+        [],
+      ],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      await expect(
+        resolveProvisionEntitlement(createEnv(), {
+          userId: 'user-1',
+          orgId: '22222222-2222-4222-8222-222222222222',
+        })
+      ).rejects.toThrow('Organization KiloClaw entitlement has expired.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects org bootstrap when entitlement disappears before managed row creation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    const { db, insertValues } = createFreshInsertDb({
+      selectRows: [],
+      txSelectRows: [
+        [{ id: 'instance-new', destroyedAt: null }],
+        [
+          {
+            created_at: '2026-04-01T00:00:00.000Z',
+            free_trial_end_at: '2026-05-01T00:00:00.000Z',
+            require_seats: true,
+            settings: {},
+          },
+        ],
+        [],
+      ],
+      insertFirstReturningRows: [],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      await expect(
+        bootstrapProvisionSubscription(createEnv(), {
+          userId: 'user-1',
+          instanceId: 'instance-new',
+          orgId: '22222222-2222-4222-8222-222222222222',
+        })
+      ).rejects.toThrow('Organization KiloClaw entitlement has expired.');
+      expect(insertValues).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('personal fresh-insert creates a current-version one-day trial', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-12T00:00:00.000Z'));
+    const createdRow = {
+      id: 'sub-current-trial',
+      user_id: 'user-1',
+      instance_id: 'instance-new',
+      plan: 'trial',
+      status: 'trialing',
+      kiloclaw_price_version: '2026-05-10',
+      access_origin: null,
+      payment_source: null,
+      cancel_at_period_end: false,
+      trial_started_at: '2026-05-12T00:00:00.000Z',
+      trial_ends_at: '2026-05-13T00:00:00.000Z',
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      scheduled_plan: null,
+      scheduled_by: null,
+      pending_conversion: false,
+      current_period_start: null,
+      current_period_end: null,
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-05-12T00:00:00.000Z',
+      updated_at: '2026-05-12T00:00:00.000Z',
+    };
+    const { db, insertValues } = createFreshInsertDb({
+      selectRows: [[], [], [{ id: 'instance-new', destroyedAt: null, organizationId: null }], []],
+      insertFirstReturningRows: [createdRow],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      const result = await bootstrapProvisionSubscription(createEnv(), {
+        userId: 'user-1',
+        instanceId: 'instance-new',
+        orgId: null,
+      });
+
+      expect(result).toEqual(createdRow);
+      expect(insertValues[0]).toEqual(
+        expect.objectContaining({
+          kiloclaw_price_version: '2026-05-10',
+          trial_started_at: '2026-05-12T00:00:00.000Z',
+          trial_ends_at: '2026-05-13T00:00:00.000Z',
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('personal fresh-insert after canceled legacy history creates a current-version trial', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-12T00:00:00.000Z'));
+    const canceledLegacyRow = {
+      id: 'sub-canceled-legacy',
+      user_id: 'user-1',
+      instance_id: 'instance-old',
+      plan: 'standard',
+      status: 'canceled',
+      kiloclaw_price_version: '2026-03-19',
+      access_origin: null,
+      payment_source: 'credits',
+      cancel_at_period_end: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      scheduled_plan: null,
+      scheduled_by: null,
+      pending_conversion: false,
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-04-01T00:00:00.000Z',
+      updated_at: '2026-05-01T00:00:00.000Z',
+    };
+    const createdRow = {
+      ...canceledLegacyRow,
+      id: 'sub-current-trial',
+      instance_id: 'instance-new',
+      plan: 'trial',
+      status: 'trialing',
+      kiloclaw_price_version: '2026-05-10',
+      payment_source: null,
+      current_period_start: null,
+      current_period_end: null,
+      trial_started_at: '2026-05-12T00:00:00.000Z',
+      trial_ends_at: '2026-05-13T00:00:00.000Z',
+      created_at: '2026-05-12T00:00:00.000Z',
+      updated_at: '2026-05-12T00:00:00.000Z',
+    };
+    const { db, insertValues } = createFreshInsertDb({
+      selectRows: [
+        [],
+        [canceledLegacyRow],
+        [
+          { id: 'instance-old', destroyedAt: '2026-05-01T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      insertFirstReturningRows: [createdRow],
+      reselectAfterConflictRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    try {
+      const result = await bootstrapProvisionSubscription(createEnv(), {
+        userId: 'user-1',
+        instanceId: 'instance-new',
+        orgId: null,
+      });
+
+      expect(result).toEqual(createdRow);
+      expect(insertValues[0]).toEqual(
+        expect.objectContaining({
+          kiloclaw_price_version: '2026-05-10',
+          trial_ends_at: '2026-05-13T00:00:00.000Z',
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('personal fresh-insert: loser of insert race returns winner row instead of throwing', async () => {
     const winnerRow = {
       id: 'sub-winner',
@@ -801,10 +1255,13 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
         [{ id: 'instance-new', destroyedAt: null }],
         [
           {
-            createdAt: '2026-04-01T00:00:00.000Z',
-            freeTrialEndAt: null,
+            created_at: '2026-04-01T00:00:00.000Z',
+            free_trial_end_at: '2099-01-01T00:00:00.000Z',
+            require_seats: true,
+            settings: {},
           },
         ],
+        [],
         [winnerRow],
         [
           {

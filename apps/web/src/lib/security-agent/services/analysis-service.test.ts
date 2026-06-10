@@ -7,6 +7,7 @@ import type { User } from '@kilocode/db/schema';
 import type { SessionSnapshot } from '@/lib/session-ingest-client';
 import type { startSecurityAnalysis as startSecurityAnalysisType } from './analysis-service';
 import type { extractLastAssistantMessage as extractLastAssistantMessageType } from './analysis-service';
+import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 const mockGetSecurityFindingById = jest.fn() as jest.MockedFunction<
   typeof securityFindingsModule.getSecurityFindingById
@@ -26,7 +27,7 @@ const mockPrepareSession = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockInitiateFromPreparedSession = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockDeleteSession = jest.fn<any>();
+const mockCleanupSession = jest.fn<any>();
 const mockInfoLogger = jest.fn();
 const mockErrorLogger = jest.fn();
 
@@ -38,22 +39,16 @@ const mockClearAnalysisStatus = jest.fn() as jest.MockedFunction<
   typeof securityAnalysisModule.clearAnalysisStatus
 >;
 
-jest.mock('@/lib/security-agent/db/security-analysis', () => {
-  const actual: { isFindingEligibleForAutoAnalysis: unknown } = jest.requireActual(
-    '@/lib/security-agent/db/security-analysis'
-  );
-  return {
-    updateAnalysisStatus: mockUpdateAnalysisStatus,
-    clearAnalysisStatus: mockClearAnalysisStatus,
-    tryAcquireAnalysisStartLease: mockTryAcquireAnalysisStartLease,
-    isFindingEligibleForAutoAnalysis: actual.isFindingEligibleForAutoAnalysis,
-    AUTO_ANALYSIS_MAX_ATTEMPTS: 5,
-    AUTO_ANALYSIS_OWNER_CAP: 2,
-  };
-});
+jest.mock('@/lib/security-agent/db/security-analysis', () => ({
+  updateAnalysisStatus: mockUpdateAnalysisStatus,
+  clearAnalysisStatus: mockClearAnalysisStatus,
+  tryAcquireAnalysisStartLease: mockTryAcquireAnalysisStartLease,
+  AUTO_ANALYSIS_MAX_ATTEMPTS: 5,
+  AUTO_ANALYSIS_OWNER_CAP: 2,
+}));
 
 jest.mock('@/lib/config.server', () => ({
-  INTERNAL_API_SECRET: 'test-internal-secret',
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
 jest.mock('./triage-service', () => ({
@@ -68,7 +63,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     prepareSession: mockPrepareSession,
     initiateFromPreparedSession: mockInitiateFromPreparedSession,
-    deleteSession: mockDeleteSession,
+    cleanupSession: mockCleanupSession,
   })),
   InsufficientCreditsError: class InsufficientCreditsError extends Error {
     readonly httpStatus = 402;
@@ -127,6 +122,33 @@ describe('analysis-service', () => {
     expect(result).toEqual({
       started: false,
       error: "Finding status is 'fixed', analysis requires 'open' status",
+      errorCode: 'FINDING_NOT_ELIGIBLE',
+    });
+    expect(mockUpdateAnalysisStatus).not.toHaveBeenCalledWith(findingId, 'pending');
+  });
+
+  it('reports analysis in progress when lease is held for an open finding', async () => {
+    const findingId = 'finding-lease-busy';
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
+
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      status: 'open',
+      analysis_status: 'running',
+    } as Awaited<ReturnType<typeof mockGetSecurityFindingById>>);
+    mockTryAcquireAnalysisStartLease.mockResolvedValue(false);
+
+    const result = await startSecurityAnalysis({
+      findingId,
+      user,
+      githubRepo: 'acme/repo',
+      githubToken: 'gh-token',
+    });
+
+    expect(result).toEqual({
+      started: false,
+      error: 'Analysis already in progress',
+      errorCode: 'ANALYSIS_IN_PROGRESS',
     });
     expect(mockUpdateAnalysisStatus).not.toHaveBeenCalledWith(findingId, 'pending');
   });
@@ -188,6 +210,11 @@ describe('analysis-service', () => {
 
     expect(result.started).toBe(true);
     expect(result.triageOnly).toBe(false);
+    const expectedCallbackToken = await deriveCallbackToken({
+      secret: 'test-callback-token-secret',
+      scope: 'security-analysis-callback',
+      resourceParts: [findingId],
+    });
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
         kilocodeOrganizationId: organizationId,
@@ -197,7 +224,7 @@ describe('analysis-service', () => {
         model: 'anthropic/claude-opus-4.6',
         callbackTarget: expect.objectContaining({
           url: expect.stringContaining(`/api/internal/security-analysis-callback/${findingId}`),
-          headers: expect.objectContaining({ 'X-Internal-Secret': expect.any(String) }),
+          headers: { 'X-Callback-Token': expectedCallbackToken },
         }),
       })
     );
@@ -413,7 +440,7 @@ describe('analysis-service', () => {
       kiloSessionId: 'ses_kilo-xyz',
     });
     mockInitiateFromPreparedSession.mockRejectedValue(new Error('Sandbox unavailable'));
-    mockDeleteSession.mockResolvedValue({ success: true });
+    mockCleanupSession.mockResolvedValue({ success: true });
 
     const result = await startSecurityAnalysis({
       findingId,
@@ -426,7 +453,7 @@ describe('analysis-service', () => {
     expect(result.error).toBe('Sandbox analysis failed to start. Please try again.');
     expect(result.errorCode).toBe('SANDBOX_FAILED');
     // Should attempt to clean up the prepared session
-    expect(mockDeleteSession).toHaveBeenCalledWith('agent-session-xyz');
+    expect(mockCleanupSession).toHaveBeenCalledWith('agent-session-xyz');
     // Should mark finding as failed
     expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(findingId, 'failed', {
       error: 'Sandbox analysis failed to start. Please try again.',

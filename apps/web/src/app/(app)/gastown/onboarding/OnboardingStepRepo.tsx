@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
@@ -63,10 +65,22 @@ export function OnboardingStepRepo() {
   const githubAppName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
 
   const handleInstallGithub = useCallback(() => {
-    const installState = orgId ? `org_${orgId}` : `user_${user?.id}`;
-    const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${installState}`;
-    window.open(installUrl, '_blank', 'noopener');
+    const owner = orgId ? `org_${orgId}` : `user_${user?.id}`;
+    const returnPath = `/gastown/onboarding?step=repo${orgId ? `&orgId=${orgId}` : ''}`;
+    const state = `${owner}|return=${encodeURIComponent(returnPath)}`;
+    const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(state)}`;
+    window.location.href = installUrl;
   }, [orgId, user?.id, githubAppName]);
+
+  const githubInstallParam = useSearchParams().get('github_install');
+  const { refetch: refetchGithubRepos } = githubReposQuery;
+
+  useEffect(() => {
+    if (githubInstallParam === 'success') {
+      void refetchGithubRepos();
+      toast.success('GitHub app installed. Select a repo to continue.');
+    }
+  }, [githubInstallParam, refetchGithubRepos]);
 
   const handleRepoSelect = useCallback(
     (fullName: string) => {

@@ -1,17 +1,29 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { checkRateLimit } from '@vercel/firewall';
+import { createHmac } from 'node:crypto';
 import { createMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { sendMagicLinkEmail } from '@/lib/email';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import * as z from 'zod';
 import { findUserByEmail } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
-import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user.server';
+import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
+import { NEXTAUTH_SECRET } from '@/lib/config.server';
+
+const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
 
 const requestSchema = z.object({
   email: z.string().email(),
   callbackUrl: z.string().optional(),
 });
+
+function getMagicLinkEmailRateLimitKey(email: string): string {
+  const emailHash = createHmac('sha256', NEXTAUTH_SECRET)
+    .update(email.trim().toLowerCase())
+    .digest('base64url');
+  return `magic-link-email:${emailHash}`;
+}
 
 /**
  * API route to request a magic link.
@@ -35,6 +47,18 @@ export async function POST(request: NextRequest) {
   const turnstileResult = await verifyTurnstileJWT('magic-link');
   if (!turnstileResult.success) {
     return turnstileResult.response;
+  }
+
+  const { rateLimited } = await checkRateLimit(MAGIC_LINK_EMAIL_RATE_LIMIT_ID, {
+    request,
+    rateLimitKey: getMagicLinkEmailRateLimitKey(email),
+  });
+
+  if (rateLimited) {
+    return NextResponse.json(
+      { success: false, error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   if (await isEmailBlacklistedByDomainAsync(email)) {

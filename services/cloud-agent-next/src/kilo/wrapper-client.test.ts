@@ -10,15 +10,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   WrapperClient,
+  WrapperContainerClient,
   WrapperError,
+  WrapperFinalizingError,
   WrapperNotReadyError,
   WrapperNoJobError,
   WrapperJobConflictError,
   type WrapperPromptOptions,
   type WrapperHealthResponse,
   type JobStatus,
+  type SessionBinding,
+  type WrapperTransport,
 } from './wrapper-client.js';
 import type { ExecutionSession, SandboxInstance } from '../types.js';
+import type { WrapperInstanceLease } from '../agent-sandbox/protocol.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 
 vi.mock('./ports.js', () => ({
@@ -111,8 +116,46 @@ const createMockSandbox = (
 
   return {
     listProcesses: vi.fn().mockResolvedValue(processes),
+    exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '/var/run/docker.sock', stderr: '' }),
+    containerFetch: vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          healthy: true,
+          state: 'idle',
+          version: WRAPPER_VERSION,
+          sessionId: 'kilo-sess-1',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    ),
   } as unknown as SandboxInstance;
 };
+
+const defaultPromptSession: SessionBinding = {
+  ingestUrl: 'wss://worker.example.com/sessions/user1/sess1/ingest',
+  workerAuthToken: 'tok_abc123',
+  wrapperRunId: 'wr_abc123',
+  wrapperGeneration: 3,
+  wrapperConnectionId: 'conn_456',
+};
+
+const createPromptOptions = (
+  overrides: {
+    message?: Partial<WrapperPromptOptions['message']>;
+    agent?: WrapperPromptOptions['agent'];
+    finalization?: WrapperPromptOptions['finalization'];
+    session?: SessionBinding;
+  } = {}
+): WrapperPromptOptions => ({
+  message: {
+    id: 'msg_test_default',
+    prompt: 'Hello, world!',
+    ...overrides.message,
+  },
+  ...(overrides.agent ? { agent: overrides.agent } : {}),
+  ...(overrides.finalization ? { finalization: overrides.finalization } : {}),
+  session: overrides.session ?? defaultPromptSession,
+});
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -131,6 +174,119 @@ describe('WrapperClient', () => {
       const client = new WrapperClient({ session, port: defaultPort });
 
       expect(client).toBeDefined();
+    });
+  });
+
+  describe('ensureSessionReady', () => {
+    it('uses the configured transport to post readiness before prompt delivery', async () => {
+      const session = createMockSession(createSuccessResponse({}));
+      const transport: WrapperTransport = {
+        request: vi
+          .fn()
+          .mockResolvedValueOnce(
+            new Response(
+              JSON.stringify({
+                status: 'ready',
+                kiloSessionId: 'kilo_sess_1',
+                workspaceReady: {
+                  workspacePath: '/workspace/user/sessions/agent_test',
+                  sandboxId: 'usr-test',
+                  sessionHome: '/home/agent_test',
+                  branchName: 'main',
+                  kiloSessionId: 'kilo_sess_1',
+                },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          )
+          .mockResolvedValueOnce(
+            new Response(
+              JSON.stringify({
+                status: 'sent',
+                messageId: 'msg_018f1e2d3c4bTransportAAAA',
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          ),
+      };
+      const client = new WrapperClient({ session, port: defaultPort, transport });
+      const binding = {
+        ingestUrl: 'wss://worker.example.com/sessions/user_test/agent_test/ingest',
+        workerAuthToken: 'kilo-token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      };
+      const readyRequest = {
+        agentSessionId: 'agent_test',
+        userId: 'user_test',
+        sandboxId: 'usr-test',
+        kiloSessionId: 'kilo_sess_1',
+        workspace: {
+          workspacePath: '/workspace/user/sessions/agent_test',
+          sessionHome: '/home/agent_test',
+          branchName: 'main',
+        },
+        repo: {
+          kind: 'github' as const,
+          repo: 'acme/repo',
+          token: 'gh-token',
+        },
+        materialized: {
+          env: { HOME: '/home/agent_test', KILOCODE_TOKEN: 'kilo-token' },
+        },
+        session: binding,
+      };
+
+      const result = await client.ensureSessionReady(readyRequest);
+      await client.prompt(
+        createPromptOptions({
+          message: {
+            id: 'msg_018f1e2d3c4bTransportAAAA',
+            prompt: 'Hello',
+            attachments: [
+              {
+                filename: 'image.png',
+                mime: 'image/png',
+                signedUrl: 'https://r2.example.com/image.png',
+                localPath: '/tmp/image.png',
+              },
+            ],
+          },
+          finalization: {
+            autoCommit: true,
+            condenseOnComplete: false,
+          },
+          session: binding,
+        })
+      );
+
+      expect(result.kiloSessionId).toBe('kilo_sess_1');
+      expect(transport.request).toHaveBeenNthCalledWith(1, 'POST', '/session/ready', readyRequest);
+      expect(transport.request).toHaveBeenNthCalledWith(
+        2,
+        'POST',
+        '/job/prompt',
+        expect.objectContaining({
+          message: {
+            id: 'msg_018f1e2d3c4bTransportAAAA',
+            prompt: 'Hello',
+            attachments: [
+              expect.objectContaining({
+                filename: 'image.png',
+                signedUrl: 'https://r2.example.com/image.png',
+              }),
+            ],
+          },
+          finalization: {
+            autoCommit: true,
+            condenseOnComplete: false,
+          },
+          session: binding,
+        })
+      );
+      expect('executeSession' in client).toBe(false);
+      expect(session.exec).not.toHaveBeenCalled();
     });
   });
 
@@ -175,7 +331,6 @@ describe('WrapperClient', () => {
     it('returns job status', async () => {
       const statusResponse: JobStatus = {
         state: 'active',
-        executionId: 'exc_123',
         sessionId: 'kilo_456',
       };
 
@@ -207,6 +362,14 @@ describe('WrapperClient', () => {
       expect(result.lastError).toBeDefined();
       expect(result.lastError?.code).toBe('INFLIGHT_TIMEOUT');
     });
+
+    it('returns finalizing status', async () => {
+      const statusResponse: JobStatus = { state: 'finalizing', sessionId: 'kilo_456' };
+      const session = createMockSession(createSuccessResponse(statusResponse));
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(client.status()).resolves.toEqual(statusResponse);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -224,7 +387,9 @@ describe('WrapperClient', () => {
       );
       const client = new WrapperClient({ session, port: defaultPort });
 
-      const result = await client.prompt({ prompt: 'Hello, world!' });
+      const result = await client.prompt(
+        createPromptOptions({ message: { id: 'msg_test_1', prompt: 'Hello, world!' } })
+      );
 
       expect(result.messageId).toBe('msg_generated_1');
     });
@@ -233,9 +398,46 @@ describe('WrapperClient', () => {
       const session = createMockSession(createSuccessResponse({ status: 'sent' }));
       const client = new WrapperClient({ session, port: defaultPort });
 
-      const result = await client.prompt({ prompt: 'Hello, world!' });
+      const result = await client.prompt({
+        ...createPromptOptions({ message: { id: 'msg_test_1', prompt: 'Hello, world!' } }),
+      });
 
       expect(result.messageId).toBeUndefined();
+    });
+
+    it('parses finalizing responses with the wrapper run identity', async () => {
+      const session = createMockSession({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          error: 'WRAPPER_FINALIZING',
+          message: 'Wrapper batch is finalizing',
+          wrapperRunId: 'wr_old',
+        }),
+      });
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(client.prompt(createPromptOptions())).rejects.toEqual(
+        expect.objectContaining({
+          name: 'WrapperFinalizingError',
+          code: 'WRAPPER_FINALIZING',
+          wrapperRunId: 'wr_old',
+        })
+      );
+    });
+
+    it('parses legacy finalizing responses without a wrapper run identity', async () => {
+      const session = createMockSession(
+        createErrorResponse('WRAPPER_FINALIZING', 'Wrapper batch is finalizing')
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(client.prompt(createPromptOptions())).rejects.toEqual(
+        expect.objectContaining({
+          name: 'WrapperFinalizingError',
+          code: 'WRAPPER_FINALIZING',
+          wrapperRunId: undefined,
+        })
+      );
     });
 
     it('sends prompt text', async () => {
@@ -244,32 +446,37 @@ describe('WrapperClient', () => {
       );
       const client = new WrapperClient({ session, port: defaultPort });
 
-      await client.prompt({ prompt: 'Test prompt' });
+      await client.prompt(
+        createPromptOptions({ message: { id: 'msg_test_2', prompt: 'Test prompt' } })
+      );
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain('/job/prompt');
       expect(execCall).toContain('Test prompt');
     });
 
-    it('sends all options', async () => {
-      const session = createMockSession(
-        createSuccessResponse({ status: 'sent', messageId: 'msg_custom' })
-      );
+    it('sends all options with the exact provided messageId', async () => {
+      const messageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+      const session = createMockSession(createSuccessResponse({ status: 'sent', messageId }));
       const client = new WrapperClient({ session, port: defaultPort });
 
       const options: WrapperPromptOptions = {
-        prompt: 'Complex prompt',
-        model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4-20250514' },
-        agent: 'code',
-        messageId: 'msg_custom',
-        system: 'You are a helpful assistant',
-        tools: { read_file: true, write_file: false },
+        ...createPromptOptions({
+          message: { id: messageId, prompt: 'Complex prompt' },
+          agent: {
+            mode: 'code',
+            model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4-20250514' },
+            system: 'You are a helpful assistant',
+            tools: { read_file: true, write_file: false },
+          },
+        }),
       };
 
       await client.prompt(options);
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain('/job/prompt');
+      expect(execCall).toContain(`"id":"${messageId}"`);
     });
 
     it('includes variant in request body when provided', async () => {
@@ -278,10 +485,12 @@ describe('WrapperClient', () => {
       );
       const client = new WrapperClient({ session, port: defaultPort });
 
-      await client.prompt({
-        prompt: 'Test with variant',
-        variant: 'high',
-      });
+      await client.prompt(
+        createPromptOptions({
+          message: { id: 'msg_test_variant', prompt: 'Test with variant' },
+          agent: { variant: 'high' },
+        })
+      );
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain('"variant":"high"');
@@ -293,23 +502,29 @@ describe('WrapperClient', () => {
       );
       const client = new WrapperClient({ session, port: defaultPort });
 
-      await client.prompt({
-        parts: [
-          { type: 'text', text: 'Describe these images' },
-          {
-            type: 'file',
-            mime: 'image/png',
-            url: 'file:///tmp/first.png',
-            filename: 'first.png',
+      await client.prompt(
+        createPromptOptions({
+          message: {
+            id: 'msg_test_files',
+            prompt: undefined,
+            parts: [
+              { type: 'text', text: 'Describe these images' },
+              {
+                type: 'file',
+                mime: 'image/png',
+                url: 'file:///tmp/first.png',
+                filename: 'first.png',
+              },
+              {
+                type: 'file',
+                mime: 'image/jpeg',
+                url: 'file:///tmp/second.jpg',
+                filename: 'second.jpg',
+              },
+            ],
           },
-          {
-            type: 'file',
-            mime: 'image/jpeg',
-            url: 'file:///tmp/second.jpg',
-            filename: 'second.jpg',
-          },
-        ],
-      });
+        })
+      );
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain(
@@ -321,7 +536,43 @@ describe('WrapperClient', () => {
       const session = createMockSession(createErrorResponse('NO_JOB', 'Call /job/start first'));
       const client = new WrapperClient({ session, port: defaultPort });
 
-      await expect(client.prompt({ prompt: 'test' })).rejects.toThrow(WrapperNoJobError);
+      await expect(
+        client.prompt(createPromptOptions({ message: { id: 'msg_test_3', prompt: 'test' } }))
+      ).rejects.toThrow(WrapperNoJobError);
+    });
+
+    it('includes session binding in request body when provided', async () => {
+      const session = createMockSession(
+        createSuccessResponse({ status: 'sent', messageId: 'msg_session' })
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      const binding: SessionBinding = {
+        ingestUrl: 'wss://worker.example.com/sessions/user1/sess1/ingest',
+        workerAuthToken: 'tok_abc123',
+        wrapperRunId: 'wr_abc123',
+        wrapperGeneration: 3,
+        wrapperConnectionId: 'conn_456',
+        upstreamBranch: 'main',
+      };
+
+      await client.prompt(
+        createPromptOptions({
+          message: { id: 'msg_test_session', prompt: 'Test with session binding' },
+          session: binding,
+        })
+      );
+
+      const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(execCall).toContain('"session":{');
+      expect(execCall).toContain(
+        '"ingestUrl":"wss://worker.example.com/sessions/user1/sess1/ingest"'
+      );
+      expect(execCall).toContain('"workerAuthToken":"tok_abc123"');
+      expect(execCall).toContain('"wrapperRunId":"wr_abc123"');
+      expect(execCall).toContain('"wrapperGeneration":3');
+      expect(execCall).toContain('"wrapperConnectionId":"conn_456"');
+      expect(execCall).toContain('"upstreamBranch":"main"');
     });
   });
 
@@ -352,6 +603,37 @@ describe('WrapperClient', () => {
       expect(execCall).toContain('/job/command');
       expect(execCall).toContain('compact');
       expect(execCall).toContain('--aggressive');
+    });
+
+    it('sends tracked command identity, finalization, and session binding', async () => {
+      const session = createMockSession(createSuccessResponse({ status: 'sent', result: {} }));
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.command({
+        command: 'compact',
+        args: '--aggressive',
+        messageId: 'msg_018f1e2d3c4bCommandWireAAA',
+        agent: { model: { modelID: 'anthropic/claude-sonnet-4-20250514' } },
+        autoCommit: true,
+        condenseOnComplete: false,
+        session: {
+          ingestUrl: 'wss://worker.example.com/sessions/user1/sess1/ingest',
+          workerAuthToken: 'tok_command',
+          wrapperRunId: 'wr_command',
+          wrapperGeneration: 4,
+          wrapperConnectionId: 'conn_command',
+        },
+      });
+
+      const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(execCall).toContain('"messageId":"msg_018f1e2d3c4bCommandWireAAA"');
+      expect(execCall).toContain('"modelID":"anthropic/claude-sonnet-4-20250514"');
+      expect(execCall).toContain('"autoCommit":true');
+      expect(execCall).toContain('"condenseOnComplete":false');
+      expect(execCall).toContain('"workerAuthToken":"tok_command"');
+      expect(execCall).toContain('"wrapperRunId":"wr_command"');
+      expect(execCall).toContain('"wrapperGeneration":4');
+      expect(execCall).toContain('"wrapperConnectionId":"conn_command"');
     });
   });
 
@@ -395,6 +677,19 @@ describe('WrapperClient', () => {
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain('reject');
+    });
+
+    it('sends optional permission message', async () => {
+      const session = createMockSession(
+        createSuccessResponse({ status: 'answered', success: true })
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.answerPermission('perm_789', 'reject', 'continue read-only');
+
+      const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(execCall).toContain('/job/answer-permission');
+      expect(execCall).toContain('continue read-only');
     });
   });
 
@@ -501,8 +796,8 @@ describe('WrapperClient', () => {
       const client = new WrapperClient({ session, port: defaultPort });
 
       await client.ensureRunning({
-        agentSessionId,
-        userId,
+        agentSessionId: 'test-session',
+        userId: 'test-user',
         workspacePath: '/workspace/test',
       });
 
@@ -525,8 +820,8 @@ describe('WrapperClient', () => {
       const client = new WrapperClient({ session, port: defaultPort });
 
       await client.ensureRunning({
-        agentSessionId,
-        userId,
+        agentSessionId: 'test-session',
+        userId: 'test-user',
         maxWaitMs: 5000,
         workspacePath: '/workspace/test',
       });
@@ -538,6 +833,45 @@ describe('WrapperClient', () => {
         path: '/health',
         timeout: 5000,
       });
+    });
+
+    it('passes runtime env to direct sandbox wrapper startup without putting secrets in the command', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.ensureRunning({
+        agentSessionId: 'test-session',
+        userId: 'test-user',
+        workspacePath: '/workspace/test',
+        runtimeEnv: {
+          KILOCODE_TOKEN: 'secret-token',
+          KILO_SESSION_INGEST_URL: 'https://ingest.example',
+          KILO_API_URL: 'https://api.example',
+        },
+      });
+
+      const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
+      const command = startProcessCall[0] as string;
+      const options = startProcessCall[1] as { env?: Record<string, string> };
+      expect(command).not.toContain('secret-token');
+      expect(command).not.toContain('KILOCODE_TOKEN');
+      expect(options.env).toEqual(
+        expect.objectContaining({
+          KILOCODE_TOKEN: 'secret-token',
+          KILO_SESSION_INGEST_URL: 'https://ingest.example',
+          KILO_API_URL: 'https://api.example',
+          WRAPPER_PORT: '5000',
+          WORKSPACE_PATH: '/workspace/test',
+          KILO_CLOUD_AGENT: '1',
+          DOCKER_HOST: 'unix:///var/run/docker.sock',
+        })
+      );
     });
 
     it('throws WrapperNotReadyError after exhausting all retry attempts', async () => {
@@ -598,6 +932,36 @@ describe('WrapperClient', () => {
 
       // ensureRunning makes ONE attempt — no internal retry
       expect(session.startProcess).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves sandbox waitForPort failures as the not-ready cause', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      const sandboxStartupError = new Error('Process exited before ready');
+      Object.assign(sandboxStartupError, {
+        name: 'ProcessExitedBeforeReadyError',
+        httpStatus: 500,
+      });
+
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-1',
+        waitForPort: vi.fn().mockRejectedValue(sandboxStartupError),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      try {
+        await client.ensureRunning({
+          agentSessionId,
+          userId,
+          maxWaitMs: 100,
+          workspacePath: '/workspace/test',
+        });
+        expect.fail('Expected ensureRunning to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(WrapperNotReadyError);
+        expect(error).toHaveProperty('cause', sandboxStartupError);
+      }
     });
 
     it('calls getLogs on process when startup fails', async () => {
@@ -664,6 +1028,33 @@ describe('WrapperClient', () => {
       expect(startProcessCall[0]).not.toContain('KILO_SERVER_PORT');
       expect(startProcessCall[0]).toContain('--agent-session test-session');
       expect(startProcessCall[0]).toContain("--user-id 'test-user'");
+    });
+
+    it('uses backward-compatible environment physical instance markers when startup is leased', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+      const client = new WrapperClient({ session, port: defaultPort });
+      const leasedInstance: WrapperInstanceLease = {
+        instanceId: 'instance_test',
+        instanceGeneration: 6,
+      };
+
+      await client.ensureRunning({
+        agentSessionId,
+        userId,
+        workspacePath: '/workspace/test',
+        leasedInstance,
+      });
+
+      const command = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(command).toContain("WRAPPER_INSTANCE_ID='instance_test'");
+      expect(command).toContain('WRAPPER_INSTANCE_GENERATION=6');
+      expect(command).not.toContain('--wrapper-instance-id');
+      expect(command).not.toContain('--wrapper-instance-generation');
     });
 
     it('includes --session-id when provided', async () => {
@@ -910,10 +1301,143 @@ describe('WrapperClient', () => {
 
       expect(session.startProcess).toHaveBeenCalledWith(
         expect.stringMatching(
-          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log KILO_SESSION_RETRY_LIMIT=5 KILO_CLOUD_AGENT=1 bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
+          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log KILO_SESSION_RETRY_LIMIT=5 KILO_CLOUD_AGENT=1 DOCKER_HOST=unix:\/\/\/var\/run\/docker\.sock bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
         ),
         expect.objectContaining({ cwd: '/workspace' })
       );
+    });
+
+    it('does not expose Docker socket env when starting inside a devcontainer', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.ensureRunning({
+        agentSessionId: 'test-session',
+        userId: 'test-user',
+        workspacePath: '/workspace/test',
+        devcontainer: {
+          containerId: 'container-id',
+          innerWorkspaceFolder: '/workspaces/test',
+          workspacePath: '/workspace/test',
+          agentSessionId: 'test-session',
+          overrideConfigPath: '/tmp/devcontainer-override-test-session/devcontainer.json',
+          teardown: vi.fn(),
+        },
+      });
+
+      const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
+      const command = startProcessCall[0] as string;
+      expect(command).toContain('devcontainer exec');
+      expect(command).toContain(
+        "--config '/tmp/devcontainer-override-test-session/devcontainer.json'"
+      );
+      expect(command).toContain('WORKSPACE_PATH=/workspaces/test');
+      expect(command).toContain('/opt/kilo-cloud/kilocode-wrapper.js');
+      expect(command).not.toContain('DOCKER_HOST=');
+      expect(command).not.toContain('XDG_RUNTIME_DIR=');
+    });
+
+    it('passes runtime env into devcontainer startup through a sourced env file', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.ensureRunning({
+        agentSessionId: 'test-session',
+        userId: 'test-user',
+        workspacePath: '/workspace/test',
+        runtimeEnv: {
+          SESSION_HOME: '/home/agent_test',
+          KILOCODE_TOKEN: 'secret-token',
+          KILO_SESSION_INGEST_URL: 'https://ingest.example',
+          KILO_API_URL: 'https://api.example',
+          XDG_DATA_HOME: '/tmp',
+          XDG_CONFIG_HOME: '/tmp',
+          XDG_CACHE_HOME: '/tmp',
+        },
+        devcontainer: {
+          containerId: 'container-id',
+          innerWorkspaceFolder: '/workspaces/test',
+          workspacePath: '/workspace/test',
+          agentSessionId: 'test-session',
+          overrideConfigPath: '/tmp/devcontainer-override-test-session/devcontainer.json',
+          teardown: vi.fn(),
+        },
+      });
+
+      expect(session.writeFile).toHaveBeenCalledTimes(1);
+      const writeFileCall = (session.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(writeFileCall[0]).toMatch(
+        /^\/home\/agent_test\/tmp\/kilo-wrapper-env-test-session-\d+\.sh$/
+      );
+      expect(writeFileCall[1]).toContain("export KILOCODE_TOKEN='secret-token'");
+      expect(writeFileCall[1]).toContain("export KILO_SESSION_INGEST_URL='https://ingest.example'");
+      expect(writeFileCall[1]).toContain("export XDG_DATA_HOME='/home/agent_test/.local/share'");
+      expect(writeFileCall[1]).toContain("export XDG_CONFIG_HOME='/home/agent_test/.config'");
+      expect(writeFileCall[1]).toContain("export XDG_CACHE_HOME='/home/agent_test/.cache'");
+      expect(writeFileCall[1]).toContain("export WRAPPER_PORT='5000'");
+      expect(writeFileCall[1]).not.toContain('DOCKER_HOST=');
+
+      const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
+      const command = startProcessCall[0] as string;
+      expect(command).toContain(". '\\''/home/agent_test/tmp/kilo-wrapper-env-test-session-");
+      expect(command).toContain("rm -f '\\''/home/agent_test/tmp/kilo-wrapper-env-test-session-");
+      expect(command).not.toContain('secret-token');
+      expect(command).not.toContain('KILOCODE_TOKEN');
+      expect(startProcessCall[1]).toEqual(
+        expect.objectContaining({ env: { DOCKER_HOST: 'unix:///var/run/docker.sock' } })
+      );
+    });
+
+    it('cleans up devcontainer env file when startProcess fails before launch', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('devcontainer exec failed')
+      );
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(
+        client.ensureRunning({
+          agentSessionId: 'test-session',
+          userId: 'test-user',
+          workspacePath: '/workspace/test',
+          runtimeEnv: {
+            SESSION_HOME: '/home/agent_test',
+            KILOCODE_TOKEN: 'secret-token',
+          },
+          devcontainer: {
+            containerId: 'container-id',
+            innerWorkspaceFolder: '/workspaces/test',
+            workspacePath: '/workspace/test',
+            agentSessionId: 'test-session',
+            overrideConfigPath: '/tmp/devcontainer-override-test-session/devcontainer.json',
+            teardown: vi.fn(),
+          },
+        })
+      ).rejects.toThrow(WrapperNotReadyError);
+
+      const writeFileCall = (session.writeFile as ReturnType<typeof vi.fn>).mock.calls[0];
+      const envFilePath = writeFileCall[0] as string;
+      expect(envFilePath).toMatch(
+        /^\/home\/agent_test\/tmp\/kilo-wrapper-env-test-session-\d+\.sh$/
+      );
+
+      const execCommands = (session.exec as ReturnType<typeof vi.fn>).mock.calls.map(
+        ([cmd]) => cmd as string
+      );
+      expect(execCommands).toContain(`rm -f '${envFilePath}'`);
     });
   });
 
@@ -958,6 +1482,150 @@ describe('WrapperClient', () => {
       expect(session.startProcess).not.toHaveBeenCalled();
     });
 
+    it('reuses a healthy wrapper only when its physical identity matches a lease', async () => {
+      const session = createMockSession(
+        createSuccessResponse({
+          ...healthResponseData,
+          wrapperInstanceId: 'instance_current',
+          wrapperInstanceGeneration: 2,
+        })
+      );
+      const sandbox = createMockSandbox({ port: 5555, healthy: true });
+
+      await expect(
+        WrapperClient.ensureWrapper(sandbox, session, {
+          ...wrapperOptions,
+          leasedInstance: { instanceId: 'instance_current', instanceGeneration: 2 },
+        })
+      ).resolves.toMatchObject({ sessionId: 'kilo-sess-1' });
+      expect(session.startProcess).not.toHaveBeenCalled();
+    });
+
+    it('reuses an env-tagged legacy wrapper whose health does not report its lease', async () => {
+      const session = createMockSession(createSuccessResponse(healthResponseData));
+      const sandbox = createMockSandbox({ port: 5555, healthy: true });
+      (sandbox.listProcesses as ReturnType<typeof vi.fn>).mockResolvedValue([
+        {
+          id: 'legacy-wrapper-id',
+          command:
+            "WRAPPER_PORT=5555 WRAPPER_INSTANCE_ID='instance_current' WRAPPER_INSTANCE_GENERATION=2 bun run /usr/local/bin/kilocode-wrapper.js --agent-session test-session",
+          status: 'running',
+        },
+      ]);
+
+      await expect(
+        WrapperClient.ensureWrapper(sandbox, session, {
+          ...wrapperOptions,
+          leasedInstance: { instanceId: 'instance_current', instanceGeneration: 2 },
+        })
+      ).resolves.toMatchObject({ sessionId: 'kilo-sess-1' });
+      expect(session.startProcess).not.toHaveBeenCalled();
+    });
+
+    it('reuses an authorized legacy devcontainer wrapper whose health omits identity', async () => {
+      const session = createMockSession(createSuccessResponse(healthResponseData));
+      const sandbox = {
+        listProcesses: vi.fn().mockResolvedValue([]),
+        exec: vi.fn().mockImplementation((command: string) => {
+          if (command.startsWith('if [ -S')) {
+            return Promise.resolve({ exitCode: 0, stdout: '/var/run/docker.sock', stderr: '' });
+          }
+          if (command.includes('/proc/42/environ')) {
+            return Promise.resolve({
+              exitCode: 0,
+              stdout: 'WRAPPER_INSTANCE_ID=instance_current WRAPPER_INSTANCE_GENERATION=2',
+              stderr: '',
+            });
+          }
+          if (command.includes('docker exec')) {
+            return Promise.resolve({
+              exitCode: 0,
+              stdout: '42 WRAPPER_PORT=5555 kilocode-wrapper --agent-session test-session\n',
+              stderr: '',
+            });
+          }
+          return Promise.resolve({
+            exitCode: 0,
+            stdout: 'container-legacy\t0.0.0.0:5555->5555/tcp\tkilo.agentSession=test-session\n',
+            stderr: '',
+          });
+        }),
+      } as unknown as SandboxInstance;
+
+      await expect(
+        WrapperClient.ensureWrapper(sandbox, session, {
+          ...wrapperOptions,
+          leasedInstance: { instanceId: 'instance_current', instanceGeneration: 2 },
+          devcontainer: {
+            containerId: 'container-legacy',
+            innerWorkspaceFolder: '/workspaces/test',
+            workspacePath: '/workspace/test',
+            agentSessionId: 'test-session',
+            overrideConfigPath: '/tmp/devcontainer.json',
+            teardown: vi.fn(),
+          },
+        })
+      ).resolves.toMatchObject({ sessionId: 'kilo-sess-1' });
+      expect(session.startProcess).not.toHaveBeenCalled();
+    });
+
+    it('blocks a leased replacement when a healthy wrapper has a different physical identity', async () => {
+      const session = createMockSession(
+        createSuccessResponse({
+          ...healthResponseData,
+          wrapperInstanceId: 'instance_old',
+          wrapperInstanceGeneration: 1,
+        })
+      );
+      const sandbox = createMockSandbox({ port: 5555, healthy: true });
+
+      await expect(
+        WrapperClient.ensureWrapper(sandbox, session, {
+          ...wrapperOptions,
+          leasedInstance: { instanceId: 'instance_new', instanceGeneration: 2 },
+        })
+      ).rejects.toThrow(/does not match leased physical instance/);
+      expect(session.startProcess).not.toHaveBeenCalled();
+    });
+
+    it('passes Docker socket env when restarting a version-mismatched devcontainer wrapper', async () => {
+      let healthCalls = 0;
+      const session = createMockSession((cmd: string) => {
+        if (cmd.includes('/health')) {
+          healthCalls++;
+          if (healthCalls === 1) {
+            return createSuccessResponse({ ...healthResponseData, version: 'stale-wrapper' });
+          }
+          if (healthCalls === 2) {
+            return createCurlError(7, 'Connection refused');
+          }
+          return createSuccessResponse(healthResponseData);
+        }
+        return createCurlError(7, 'Connection refused');
+      });
+      const sandbox = createMockSandbox({ port: 5555, healthy: true });
+
+      await WrapperClient.ensureWrapper(sandbox, session, {
+        ...wrapperOptions,
+        devcontainer: {
+          containerId: 'container-id',
+          innerWorkspaceFolder: '/workspaces/test',
+          workspacePath: '/workspace/test',
+          agentSessionId: 'test-session',
+          overrideConfigPath: '/tmp/devcontainer-override-test-session/devcontainer.json',
+          teardown: vi.fn(),
+        },
+      });
+
+      const restartCall = (sandbox.exec as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([command]) => typeof command === 'string' && command.includes('devcontainer exec')
+      );
+      expect(restartCall).toBeDefined();
+      expect(restartCall?.[1]).toEqual({
+        env: { DOCKER_HOST: 'unix:///var/run/docker.sock' },
+      });
+    });
+
     it('starts new wrapper when none exists', async () => {
       // Health check during ensureRunning fails, but health after startup succeeds
       let healthCalls = 0;
@@ -986,6 +1654,78 @@ describe('WrapperClient', () => {
       expect(client).toBeDefined();
       expect(sessionId).toBe('kilo-sess-1');
       expect(session.startProcess).toHaveBeenCalled();
+    });
+
+    it('accepts a tagged leased launch when a legacy wrapper omits identity from health', async () => {
+      let healthCalls = 0;
+      const session = createMockSession((cmd: string) => {
+        if (cmd.includes('/health')) {
+          healthCalls++;
+          if (healthCalls === 1) return createCurlError(7, 'Connection refused');
+          return createSuccessResponse(healthResponseData);
+        }
+        return createCurlError(7, 'Connection refused');
+      });
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'legacy-wrapper-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+      const sandbox = createMockSandbox(null);
+      (sandbox.listProcesses as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: 'legacy-wrapper-id',
+            command:
+              "WRAPPER_PORT=5000 WRAPPER_INSTANCE_ID='instance_compat' WRAPPER_INSTANCE_GENERATION=3 bun run /usr/local/bin/kilocode-wrapper.js --agent-session test-session",
+            status: 'running',
+          },
+        ]);
+
+      await expect(
+        WrapperClient.ensureWrapper(sandbox, session, {
+          ...wrapperOptions,
+          leasedInstance: { instanceId: 'instance_compat', instanceGeneration: 3 },
+        })
+      ).resolves.toMatchObject({ sessionId: 'kilo-sess-1' });
+      expect(sandbox.listProcesses).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects a legacy launch whose assigned marker cannot be observed', async () => {
+      let healthCalls = 0;
+      const session = createMockSession((cmd: string) => {
+        if (cmd.includes('/health')) {
+          healthCalls++;
+          if (healthCalls === 1) return createCurlError(7, 'Connection refused');
+          return createSuccessResponse(healthResponseData);
+        }
+        return createCurlError(7, 'Connection refused');
+      });
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'unverified-wrapper-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      await expect(
+        WrapperClient.ensureWrapper(createMockSandbox(null), session, {
+          ...wrapperOptions,
+          leasedInstance: { instanceId: 'instance_compat', instanceGeneration: 3 },
+        })
+      ).rejects.toThrow(/did not report the leased physical instance/);
+    });
+
+    it('does not accept an untagged legacy listener on a selected leased port', async () => {
+      const session = createMockSession(createSuccessResponse(healthResponseData));
+
+      await expect(
+        WrapperClient.ensureWrapper(createMockSandbox(null), session, {
+          ...wrapperOptions,
+          leasedInstance: { instanceId: 'instance_compat', instanceGeneration: 3 },
+        })
+      ).rejects.toThrow(/did not report the leased physical instance/);
+      expect(session.startProcess).not.toHaveBeenCalled();
     });
 
     it('retries with new port on EADDRINUSE', async () => {
@@ -1124,6 +1864,145 @@ describe('WrapperClient', () => {
     });
   });
 
+  describe('ensureBootstrapWrapper', () => {
+    const bootstrapOptions = {
+      agentSessionId: 'test-session',
+      userId: 'test-user',
+    };
+
+    beforeEach(() => {
+      vi.mocked(randomPort).mockReset();
+      vi.mocked(randomPort).mockReturnValue(30000);
+    });
+
+    it('skips devcontainer wrapper discovery for bootstrap wrappers', async () => {
+      const session = createMockSession({ exitCode: 0, stdout: '{}' });
+      const sandbox = createMockSandbox(null) as SandboxInstance & {
+        containerFetch: ReturnType<typeof vi.fn>;
+        exec: ReturnType<typeof vi.fn>;
+        listProcesses: ReturnType<typeof vi.fn>;
+      };
+      sandbox.containerFetch.mockImplementation(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              healthy: true,
+              state: 'idle',
+              version: WRAPPER_VERSION,
+              sessionId: 'kilo-sess-bootstrap',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        )
+      );
+
+      await WrapperClient.ensureBootstrapWrapper(sandbox, session, bootstrapOptions);
+
+      expect(sandbox.listProcesses).toHaveBeenCalledTimes(1);
+      expect(sandbox.exec).not.toHaveBeenCalled();
+    });
+
+    it('accepts a tagged leased bootstrap launch when legacy health omits identity', async () => {
+      const session = createMockSession({ exitCode: 0, stdout: '{}' });
+      const sandbox = createMockSandbox(null) as SandboxInstance & {
+        containerFetch: ReturnType<typeof vi.fn>;
+        listProcesses: ReturnType<typeof vi.fn>;
+      };
+      sandbox.listProcesses.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        {
+          id: 'legacy-bootstrap-id',
+          command:
+            "WRAPPER_PORT=30000 WRAPPER_INSTANCE_ID='instance_bootstrap' WRAPPER_INSTANCE_GENERATION=4 bun run /usr/local/bin/kilocode-wrapper.js --agent-session test-session",
+          status: 'running',
+        },
+      ]);
+      let healthCalls = 0;
+      sandbox.containerFetch.mockImplementation(() => {
+        healthCalls++;
+        if (healthCalls === 1) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ error: 'NOT_READY', message: 'not ready' }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          );
+        }
+        return Promise.resolve(
+          Response.json({
+            healthy: true,
+            state: 'idle',
+            version: WRAPPER_VERSION,
+            sessionId: 'kilo-sess-bootstrap',
+          })
+        );
+      });
+
+      await expect(
+        WrapperClient.ensureBootstrapWrapper(sandbox, session, {
+          ...bootstrapOptions,
+          leasedInstance: { instanceId: 'instance_bootstrap', instanceGeneration: 4 },
+        })
+      ).resolves.toBeDefined();
+      expect(sandbox.listProcesses).toHaveBeenCalledTimes(2);
+    });
+
+    it('replaces a pre-bootstrap wrapper reporting the previous wrapper version', async () => {
+      const session = createMockSession({ exitCode: 0, stdout: '{}' });
+      const sandbox = createMockSandbox({ port: 5555, healthy: true }) as SandboxInstance & {
+        exec: ReturnType<typeof vi.fn>;
+        containerFetch: ReturnType<typeof vi.fn>;
+      };
+      let newPortHealthCalls = 0;
+      sandbox.containerFetch.mockImplementation((_request: Request, port: number) => {
+        if (port === 5555) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                healthy: true,
+                state: 'idle',
+                version: '2.1.0',
+                sessionId: 'kilo-sess-old',
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          );
+        }
+
+        newPortHealthCalls++;
+        if (newPortHealthCalls === 1) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ error: 'NOT_READY', message: 'not ready' }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          );
+        }
+
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              healthy: true,
+              state: 'idle',
+              version: WRAPPER_VERSION,
+              sessionId: 'kilo-sess-new',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        );
+      });
+
+      const { client } = await WrapperClient.ensureBootstrapWrapper(
+        sandbox,
+        session,
+        bootstrapOptions
+      );
+
+      expect(client).toBeDefined();
+      expect(sandbox.exec).toHaveBeenCalledWith("pkill -f -- '--agent-session test-session'");
+      expect(session.startProcess).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // -------------------------------------------------------------------------
   // Error Handling
   // -------------------------------------------------------------------------
@@ -1185,7 +2064,11 @@ describe('WrapperClient', () => {
       );
       const client = new WrapperClient({ session, port: defaultPort });
 
-      await client.prompt({ prompt: "It's a test with 'quotes'" });
+      await client.prompt(
+        createPromptOptions({
+          message: { id: 'msg_test_quotes', prompt: "It's a test with 'quotes'" },
+        })
+      );
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       // Single quotes should be escaped for shell
@@ -1210,7 +2093,7 @@ describe('WrapperClient', () => {
       );
       const client = new WrapperClient({ session, port: defaultPort });
 
-      await client.prompt({ prompt: 'test' });
+      await client.prompt(createPromptOptions({ message: { id: 'msg_test_3', prompt: 'test' } }));
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain('-X POST');
@@ -1235,6 +2118,11 @@ describe('WrapperClient', () => {
   // -------------------------------------------------------------------------
 
   describe('error classes', () => {
+    it('WrapperFinalizingError carries optional wrapper run identity', () => {
+      expect(new WrapperFinalizingError('finalizing', 'wr_old').wrapperRunId).toBe('wr_old');
+      expect(new WrapperFinalizingError('legacy').wrapperRunId).toBeUndefined();
+    });
+
     it('WrapperError has correct properties', () => {
       const error = new WrapperError('Test message', 'TEST_CODE', 500);
 
@@ -1273,5 +2161,65 @@ describe('WrapperClient', () => {
       expect(new WrapperNoJobError('test')).toBeInstanceOf(WrapperError);
       expect(new WrapperJobConflictError('test')).toBeInstanceOf(WrapperError);
     });
+  });
+});
+
+describe('WrapperContainerClient', () => {
+  it('creates terminal PTYs through sandbox containerFetch', async () => {
+    const containerFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'pty_123',
+          title: 'Workspace terminal',
+          command: '',
+          args: [],
+          cwd: '/workspace/repo',
+          status: 'running',
+          pid: 42,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    const sandbox = { containerFetch } as unknown as SandboxInstance;
+    const client = new WrapperContainerClient({ sandbox, port: 5000 });
+
+    const pty = await client.createTerminal({ cols: 100, rows: 30 });
+
+    expect(pty.id).toBe('pty_123');
+    expect(containerFetch).toHaveBeenCalledWith(
+      'http://container/pty',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ cols: 100, rows: 30 }),
+      }),
+      5000
+    );
+  });
+
+  it('connects terminal PTYs through the websocket-capable sandbox path', async () => {
+    const terminalResponse = new Response('proxied', { status: 200 });
+    const containerFetch = vi.fn();
+    const wsConnect = vi.fn().mockResolvedValueOnce(terminalResponse);
+    const sandbox = { containerFetch, wsConnect } as unknown as SandboxInstance;
+    const client = new WrapperContainerClient({ sandbox, port: 5000 });
+    const request = new Request('http://worker.test/terminal?cloudAgentSessionId=session-1', {
+      headers: {
+        Connection: 'Upgrade',
+        Upgrade: 'websocket',
+        'X-Test': 'preserved',
+      },
+    });
+
+    const response = await client.connectTerminal('pty_123', request);
+
+    expect(response).toBe(terminalResponse);
+    expect(containerFetch).not.toHaveBeenCalled();
+    expect(wsConnect).toHaveBeenCalledTimes(1);
+    const connectRequest = wsConnect.mock.calls[0]?.[0];
+    expect(connectRequest).toBeInstanceOf(Request);
+    expect(new URL((connectRequest as Request).url).pathname).toBe('/pty/pty_123/connect');
+    expect((connectRequest as Request).headers.get('Upgrade')).toBe('websocket');
+    expect((connectRequest as Request).headers.get('X-Test')).toBe('preserved');
+    expect(wsConnect.mock.calls[0]?.[1]).toBe(5000);
   });
 });

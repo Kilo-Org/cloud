@@ -11,6 +11,53 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-06-03',
+    description:
+      "Google Calendar now connects through KiloCode's official Google approved OAuth client. Connect it from Settings → Productivity → Google Calendar for read-only calendar access. We encourage everyone to use this instead of the legacy Google (Gog) connection. If you already have the legacy connection set up, it keeps working and nothing is removed. New legacy setups are no longer offered, so switch over when convenient.",
+    category: 'feature',
+    deployHint: null,
+  },
+  {
+    date: '2026-06-01',
+    description: 'Updated OpenClaw to 2026.5.26.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-05-28',
+    description: 'Updated OpenClaw to 2026.5.22.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-05-27',
+    description:
+      'Saving openclaw.json from the file explorer in Settings now runs OpenClaw config validation first. If validation fails, your edits are preserved so you can review the warning before choosing Save anyway.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-05-20',
+    description:
+      'Morning Briefing is now generally available to all KiloClaw users. Enable it in Settings → Morning Briefing for a daily briefing covering your calendar, open GitHub and Linear issues, news on the topics you choose, local news, and a summary of your recent KiloClaw chat activity. It is delivered each morning, or on demand with Run Now.',
+    category: 'feature',
+    deployHint: null,
+  },
+  {
+    date: '2026-05-13',
+    description:
+      'Baked bundled OpenClaw plugin runtime dependencies into the KiloClaw image so doctor and gateway startup no longer need to install them one plugin at a time. This reduces cold-start delays on shared-CPU instances and only affects bundled OpenClaw plugins; custom user-installed plugins keep their normal install behavior.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
+    date: '2026-05-13',
+    description:
+      'Optimized the KiloClaw image and startup path by cleaning npm and Bun package caches. Build-time cleanup reduces deployed image size, and runtime npm cache cleanup now runs after bootstrap finishes so it reduces persistent storage growth without delaying readiness.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
     date: '2026-05-07',
     description:
       "Stopped agents from hallucinating fixes that rely on systemd. The base container image ships systemd packages as transitive apt dependencies (so `which systemctl` finds the binary), but systemd is never PID 1 and the daemon is never running. `openclaw`, the gateway, and other background processes are managed by KiloClaw's own controller supervisor. TOOLS.md now documents this explicitly so the agent stops recommending `systemctl`, `journalctl`, or unit files. Existing instances pick up the new TOOLS.md section automatically on redeploy.",

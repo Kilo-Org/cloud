@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 
 import { CRON_SECRET } from '@/lib/config.server';
-import { dispatchQueuedAffiliateEvents } from '@/lib/affiliate-events';
-import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact-referral';
+import { dispatchQueuedAffiliateEvents } from '@/lib/impact/affiliate-events';
+import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact/referral';
 import {
   dispatchQueuedImpactAdvocateRewardRedemptions,
   dispatchQueuedImpactConversionReports,
   processQueuedKiloClawReferralRewards,
-} from '@/lib/kiloclaw-referrals';
+} from '@/lib/impact/kiloclaw-referrals';
 import { sentryLogger } from '@/lib/utils.server';
 
 if (!CRON_SECRET) {

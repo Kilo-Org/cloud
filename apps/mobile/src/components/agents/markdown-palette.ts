@@ -2,7 +2,7 @@ import { type MarkedStyles } from 'react-native-marked';
 
 import { type ThemeColors } from '@/lib/hooks/use-theme-colors';
 
-export type MarkdownVariant = 'assistant' | 'user';
+export type MarkdownVariant = 'assistant' | 'kilo-chat-user' | 'user';
 
 export type MarkdownPalette = {
   textColor: string;
@@ -32,8 +32,19 @@ function withAlpha(color: string, alpha: number): string {
 }
 
 export function getPalette(variant: MarkdownVariant, colors: ThemeColors): MarkdownPalette {
-  if (variant === 'user') {
+  if (variant === 'kilo-chat-user') {
+    // kilo-chat user bubbles sit on bg-primary; use primary-foreground ink.
     const ink = colors.primaryForeground;
+    return {
+      textColor: ink,
+      mutedTextColor: withAlpha(ink, 0.7),
+      codeBackground: withAlpha(ink, 0.1),
+      borderColor: withAlpha(ink, 0.2),
+    };
+  }
+  if (variant === 'user') {
+    // Agent chat user bubbles sit on accent-soft (lime); use ink-on-lime.
+    const ink = colors.accentSoftForeground;
     return {
       textColor: ink,
       mutedTextColor: withAlpha(ink, 0.7),

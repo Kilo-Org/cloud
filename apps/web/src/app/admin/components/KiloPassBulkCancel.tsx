@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -35,10 +36,12 @@ const MAX_EMAILS = 500;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type BulkResultStatus =
+  | 'cancelled'
   | 'cancelled_and_refunded'
   | 'skipped_no_user'
   | 'skipped_no_subscription'
   | 'skipped_already_canceled'
+  | 'skipped_store_managed'
   | 'error';
 
 type ResultRow = {
@@ -72,24 +75,30 @@ function parseEmails(raw: string): { valid: string[]; invalid: string[] } {
 }
 
 const statusLabel: Record<BulkResultStatus, string> = {
-  cancelled_and_refunded: 'Cancelled & Refunded',
+  cancelled: 'Cancelled',
+  cancelled_and_refunded: 'Cancelled and refunded',
   skipped_no_user: 'User not found',
   skipped_no_subscription: 'No Kilo Pass',
   skipped_already_canceled: 'Already cancelled',
+  skipped_store_managed: 'App Store managed',
   error: 'Error',
 };
 
 const statusBadgeClass: Record<BulkResultStatus, string> = {
-  cancelled_and_refunded: 'bg-green-900/20 text-green-400',
-  skipped_no_user: 'bg-gray-800 text-gray-300',
-  skipped_no_subscription: 'bg-gray-800 text-gray-300',
-  skipped_already_canceled: 'bg-yellow-900/20 text-yellow-400',
-  error: 'bg-red-900/20 text-red-400',
+  cancelled: 'bg-green-500/20 text-green-400 ring-1 ring-green-500/20',
+  cancelled_and_refunded: 'bg-green-500/20 text-green-400 ring-1 ring-green-500/20',
+  skipped_no_user: 'bg-zinc-500/20 text-zinc-400 ring-1 ring-zinc-500/20',
+  skipped_no_subscription: 'bg-zinc-500/20 text-zinc-400 ring-1 ring-zinc-500/20',
+  skipped_already_canceled: 'bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500/20',
+  skipped_store_managed: 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/20',
+  error: 'bg-red-500/20 text-red-400 ring-1 ring-red-500/20',
 };
 
 const statusGroupOrder: BulkResultStatus[] = [
   'cancelled_and_refunded',
+  'cancelled',
   'error',
+  'skipped_store_managed',
   'skipped_already_canceled',
   'skipped_no_subscription',
   'skipped_no_user',
@@ -103,6 +112,7 @@ export function KiloPassBulkCancel() {
   const trpc = useTRPC();
   const [rawEmails, setRawEmails] = useState('');
   const [reason, setReason] = useState('');
+  const [refundLatestPayment, setRefundLatestPayment] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { valid: emails, invalid: invalidEmails } = useMemo(
@@ -134,11 +144,15 @@ export function KiloPassBulkCancel() {
 
   function handleConfirm() {
     setConfirmOpen(false);
-    mutation.mutate({ emails, reason: reason.trim() });
+    mutation.mutate({ emails, reason: reason.trim(), refundLatestPayment });
   }
 
   const results = mutation.data?.results;
   const summary = mutation.data?.summary;
+  const actionLabel = refundLatestPayment ? 'Cancel + refund + block' : 'Cancel + block';
+  const alertRefundText = refundLatestPayment
+    ? 'refunds the latest paid invoice,'
+    : 'does not refund Stripe payments,';
 
   const groupedResults = useMemo(() => {
     if (!results) return null;
@@ -189,18 +203,37 @@ export function KiloPassBulkCancel() {
             />
           </div>
 
+          <div className="bg-muted/30 flex items-start gap-3 rounded-md border p-3">
+            <Checkbox
+              id="refund-latest-payment"
+              checked={refundLatestPayment}
+              onCheckedChange={setRefundLatestPayment}
+              disabled={mutation.isPending}
+              className="accent-primary focus:ring-ring"
+            />
+            <div className="space-y-1">
+              <Label htmlFor="refund-latest-payment" className="text-sm font-medium">
+                Refund latest paid invoice
+              </Label>
+              <p className="text-muted-foreground text-sm">
+                Leave checked to refund the latest paid Stripe invoice for each cancelled Kilo Pass.
+                Uncheck to cancel and block without refunding Stripe payments.
+              </p>
+            </div>
+          </div>
+
           <Alert>
             <AlertDescription>
-              For each email: cancels the Stripe subscription immediately, refunds the latest paid
-              invoice, resets balance to $0, blocks the account if not already blocked, and inserts
-              an admin note tagged <code>[bulk]</code>. Each user runs in its own DB transaction;
-              partial failures leave successful users committed.
+              For each email: cancels the Stripe subscription immediately, {alertRefundText} resets
+              balance to $0, blocks the account if not already blocked, and inserts an admin note
+              tagged <code>[bulk]</code>. Each user runs in its own DB transaction; partial failures
+              leave successful users committed.
             </AlertDescription>
           </Alert>
 
           <div className="flex items-center gap-3">
             <Button variant="destructive" disabled={!canSubmit} onClick={handleSubmitClick}>
-              {mutation.isPending ? 'Processing…' : 'Cancel + refund + block'}
+              {mutation.isPending ? 'Processing…' : actionLabel}
             </Button>
             {mutation.isPending && (
               <span className="text-muted-foreground text-sm">
@@ -280,7 +313,14 @@ export function KiloPassBulkCancel() {
                             <TableCell className="text-xs">
                               {row.status === 'error' ? (
                                 <span className="text-red-400">{row.error}</span>
-                              ) : row.status === 'cancelled_and_refunded' && row.alreadyBlocked ? (
+                              ) : row.status === 'skipped_store_managed' ? (
+                                <span className="text-muted-foreground">
+                                  Refund must be initiated via the App Store. The customer needs to
+                                  contact Apple Support.
+                                </span>
+                              ) : (row.status === 'cancelled' ||
+                                  row.status === 'cancelled_and_refunded') &&
+                                row.alreadyBlocked ? (
                                 <span className="text-muted-foreground">
                                   Account was already blocked
                                 </span>
@@ -305,14 +345,16 @@ export function KiloPassBulkCancel() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm bulk cancel</AlertDialogTitle>
             <AlertDialogDescription>
-              Cancel + refund Kilo Pass and block {emails.length}{' '}
-              {emails.length === 1 ? 'user' : 'users'}. This is irreversible.
+              {refundLatestPayment
+                ? 'Cancel Kilo Pass, refund the latest paid invoice, and block'
+                : 'Cancel Kilo Pass without refunding Stripe payments and block'}{' '}
+              {emails.length} {emails.length === 1 ? 'user' : 'users'}. This is irreversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={handleConfirm}>
-              Confirm
+              {actionLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

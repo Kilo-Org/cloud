@@ -13,6 +13,7 @@ import {
   services,
 } from './services';
 import { syncEnvVars } from './env-sync';
+import { getWranglerRegistryPath } from './wrangler-registry';
 import {
   getSessionName,
   sessionExists,
@@ -77,7 +78,10 @@ const CAPTURE_TIMEOUT_MS = 30_000;
 // Commands
 // ---------------------------------------------------------------------------
 
-async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
+async function cmdUp(args: string[], repoRoot: string): Promise<void> {
+  const noAttach = args.includes('--no-attach');
+  const targets = args.filter(arg => arg !== '--no-attach');
+
   // --- Preflight checks ---
   if (!isTmuxAvailable()) {
     console.error('tmux is not installed. Install it with: brew install tmux');
@@ -125,8 +129,12 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   // --- Check for existing session ---
   const sessionName = getSessionName();
   if (sessionExists(sessionName)) {
-    console.log(`Session ${sessionName} already running — attaching.`);
-    attachSession(sessionName);
+    console.log(
+      noAttach
+        ? `Session ${sessionName} already running.`
+        : `Session ${sessionName} already running — attaching.`
+    );
+    if (!noAttach) attachSession(sessionName);
     return;
   }
 
@@ -134,7 +142,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   // Always start core (always-on) groups; additional targets are merged in
   const coreServices = resolveGroups(getAlwaysOnGroupIds());
   const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
-  const serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+  let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
 
   // --- Check for socat when kiloclaw-docker-tcp is requested ---
   if (serviceNames.includes('kiloclaw-docker-tcp')) {
@@ -143,6 +151,17 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     } catch {
       console.error('socat is not installed. Install it with: brew install socat');
       process.exit(1);
+    }
+  }
+
+  // --- Skip Stripe webhook forwarding when the optional Stripe CLI is absent ---
+  if (serviceNames.includes('stripe')) {
+    try {
+      execSync('stripe --version', { stdio: 'ignore' });
+    } catch {
+      console.warn('⚠ stripe CLI not found on PATH — skipping Stripe webhook forwarder.');
+      console.warn('  Install it with: brew install stripe/stripe-cli/stripe');
+      serviceNames = serviceNames.filter(name => name !== 'stripe');
     }
   }
 
@@ -177,17 +196,50 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Create tmux session ---
-  // Pass KILO_PORT_OFFSET into the session environment so panes see it even
-  // when an existing tmux server (from a sibling worktree) is running with a
-  // different offset. Without this, new windows inherit the server env, not
-  // ours, and services bind to base ports — causing conflicts.
-  createSession(sessionName, { KILO_PORT_OFFSET: String(portOffset) });
+  // Pass critical runtime env into the session so panes see this worktree's
+  // values even when an existing tmux server is shared with sibling worktrees.
+  const wranglerRegistryPath = getWranglerRegistryPath(repoRoot);
+  const pnpmHome = process.env.PNPM_HOME;
+  const processPath = process.env.PATH ?? '';
+  const sessionPath =
+    pnpmHome !== undefined &&
+    pnpmHome !== '' &&
+    !processPath.split(path.delimiter).includes(pnpmHome)
+      ? `${pnpmHome}${path.delimiter}${processPath}`
+      : processPath;
+  const sessionEnv: Record<string, string> = {
+    KILO_PORT_OFFSET: String(portOffset),
+    PATH: sessionPath,
+    WRANGLER_REGISTRY_PATH: wranglerRegistryPath,
+  };
+  for (const key of ['PNPM_HOME', 'COREPACK_HOME', 'npm_execpath']) {
+    const value = process.env[key];
+    if (value !== undefined && value !== '') {
+      sessionEnv[key] = value;
+    }
+  }
+  if (process.env.PORT !== undefined && process.env.PORT !== '') {
+    sessionEnv.PORT = String(getService('nextjs').port);
+  }
+  if (process.env.DEBUG_SHOW_DEV_UI !== undefined && process.env.DEBUG_SHOW_DEV_UI !== '') {
+    sessionEnv.DEBUG_SHOW_DEV_UI = process.env.DEBUG_SHOW_DEV_UI;
+  }
+  if (process.env.SKIP_STRIPE_API !== undefined && process.env.SKIP_STRIPE_API !== '') {
+    sessionEnv.SKIP_STRIPE_API = process.env.SKIP_STRIPE_API;
+  }
+  if (
+    process.env.NEXT_PUBLIC_POSTHOG_KEY !== undefined &&
+    process.env.NEXT_PUBLIC_POSTHOG_KEY !== ''
+  ) {
+    sessionEnv.NEXT_PUBLIC_POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  }
+  createSession(sessionName, sessionEnv);
 
   // --- Start each service in its own tmux window ---
   const SIDEBAR_WIDTH = 40;
 
   // --- Start capture services first (tunnel, stripe) and wait for output ---
-  const captureServiceSet = new Set(['kiloclaw-tunnel', 'kiloclaw-stripe', 'app-builder-tunnel']);
+  const captureServiceSet = new Set(['kiloclaw-tunnel', 'stripe', 'app-builder-tunnel']);
   const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
   const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
   const startedServices: string[] = [];
@@ -205,7 +257,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
       oldMtimes.set('checkin', readEnvMtime(tunnelEnvPath));
       oldMtimes.set('kilochat', readEnvMtime(tunnelEnvPath));
     }
-    if (captureServices.includes('kiloclaw-stripe')) {
+    if (captureServices.includes('stripe')) {
       const stripeEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
       oldValues.set('stripe', readEnvValue(stripeEnvPath, 'STRIPE_WEBHOOK_SECRET'));
       oldMtimes.set('stripe', readEnvMtime(stripeEnvPath));
@@ -217,7 +269,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     }
 
     for (const name of captureServices) {
-      startServiceInTmux(sessionName, name);
+      startServiceInTmux(sessionName, name, sessionEnv);
       startedServices.push(name);
       await sleep(300);
     }
@@ -275,7 +327,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
       );
     }
 
-    if (captureServices.includes('kiloclaw-stripe')) {
+    if (captureServices.includes('stripe')) {
       waits.push(
         waitForEnvValueChange(
           path.join(repoRoot, 'apps/web/.env.development.local'),
@@ -287,7 +339,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           if (ready) {
             console.log('  Stripe webhook secret captured');
           } else {
-            console.warn('  Stripe secret not captured after 30s - check kiloclaw-stripe window');
+            console.warn('  Stripe secret not captured after 30s - check stripe window');
           }
         })
       );
@@ -325,7 +377,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
       continue;
     }
 
-    startServiceInTmux(sessionName, name);
+    startServiceInTmux(sessionName, name, sessionEnv);
     startedServices.push(name);
     await sleep(300);
   }
@@ -378,12 +430,12 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   selectWindow(sessionName, 0);
 
   // --- Write manifest for agents ---
-  writeManifest(repoRoot, sessionName, startedServices);
+  writeManifest(repoRoot, sessionName, wranglerRegistryPath, startedServices);
 
   console.log(
     `${GREEN}Started ${startedServices.length} services in session ${sessionName}${RESET}`
   );
-  attachSession(sessionName);
+  if (!noAttach) attachSession(sessionName);
 }
 
 type ServiceStatus = 'up' | 'down';
@@ -405,13 +457,20 @@ type ManifestEntry = {
 type Manifest = {
   session: string;
   portOffset: number;
+  wranglerRegistryPath: string;
   services: ManifestEntry[];
 };
 
-function writeManifest(repoRoot: string, sessionName: string, serviceNames: string[]): void {
+function writeManifest(
+  repoRoot: string,
+  sessionName: string,
+  wranglerRegistryPath: string,
+  serviceNames: string[]
+): void {
   const manifest: Manifest = {
     session: sessionName,
     portOffset,
+    wranglerRegistryPath,
     services: serviceNames.map(name => {
       const svc = getService(name);
       return { name, port: svc.port, group: svc.group, type: svc.type };
@@ -558,7 +617,8 @@ async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
 function printUsage(): void {
   console.log(`
 Usage:
-  dev:start [targets...]  Start services (default: core)
+  dev:start [--no-attach] [targets...]
+                          Start services (default: core)
   dev:stop [--force]      Stop all services (skips shared Docker infra if
                           other kilo-dev sessions are running; --force overrides)
   dev:status [--json]     Show running services and their ports
@@ -567,8 +627,8 @@ Usage:
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
 
-Targets: app, app-builder, agents, mobile, all, or any service/group name
-Multiple targets can be specified: dev:start kiloclaw agents`);
+Targets: app, app-builder, agents, security-agent, mobile, all, or any service/group name
+Multiple targets can be specified: dev:start kiloclaw security-agent`);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import * as z from 'zod';
 
 // API response type (never includes decrypted key)
@@ -5,6 +6,7 @@ export type BYOKApiKeyResponse = {
   id: string;
   provider_id: string;
   provider_name: string;
+  management_source: 'user' | 'coding_plan';
   is_enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -20,7 +22,7 @@ const OptionalOrganizationIdSchema = z.object({
 // Note: organizationId is optional - if provided, enforces org owner/billing access
 // If not provided, uses the authenticated user's kilo_user_id
 export const CreateBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
-  provider_id: z.string().min(1),
+  provider_id: UserByokProviderIdSchema,
   api_key: z.string().min(1),
 });
 
@@ -49,6 +51,7 @@ export const BYOKApiKeyResponseSchema = z.object({
   id: z.string().uuid(),
   provider_id: z.string(),
   provider_name: z.string(),
+  management_source: z.enum(['user', 'coding_plan']),
   is_enabled: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),

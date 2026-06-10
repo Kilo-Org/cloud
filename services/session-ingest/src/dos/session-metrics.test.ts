@@ -148,6 +148,31 @@ describe('computeSessionMetrics', () => {
     expect(result.totalCost).toBeCloseTo(0.15);
   });
 
+  it('clamps negative token and cost totals to 0', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: {
+          input: -10,
+          output: -20,
+          reasoning: -30,
+          cache: { read: -40, write: -50 },
+        },
+        cost: -0.05,
+      }),
+    ];
+    const result = computeSessionMetrics(items, 'completed');
+    expect(result.totalTokens).toEqual({
+      input: 0,
+      output: 0,
+      reasoning: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    });
+    expect(result.totalCost).toBe(0);
+  });
+
   it('counts compaction parts', () => {
     const items = [
       makeItem('part', { type: 'compaction', auto: true }),

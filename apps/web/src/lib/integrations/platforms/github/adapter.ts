@@ -444,6 +444,9 @@ export async function exchangeGitHubOAuthCode(
   };
 }
 
+const KILO_REVIEW_COMMENTS_PER_PAGE = 100;
+const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
+
 /**
  * Finds an existing Kilo review comment on a PR
  * Looks for the <!-- kilo-review --> marker in issue comments
@@ -461,13 +464,22 @@ export async function findKiloReviewComment(
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
 
-  // Fetch all issue comments (PR comments are issue comments in GitHub API)
-  const { data: comments } = await octokit.issues.listComments({
-    owner,
-    repo,
-    issue_number: prNumber,
-    per_page: 100,
-  });
+  const comments: Array<{ id: number; body?: string | null; updated_at: string }> = [];
+  let reachedScanLimit = false;
+
+  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
+    const { data: pageComments } = await octokit.issues.listComments({
+      owner,
+      repo,
+      issue_number: prNumber,
+      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
+      page,
+    });
+    comments.push(...pageComments);
+
+    if (pageComments.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
+    reachedScanLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
+  }
 
   logExceptInTest('[findKiloReviewComment] Fetched comments', {
     owner,
@@ -493,6 +505,10 @@ export async function findKiloReviewComment(
       detectionMethod: 'marker',
     });
     return { commentId: latestComment.id, body: latestComment.body || '' };
+  }
+
+  if (reachedScanLimit) {
+    throw new Error('Kilo review comment lookup exceeded the safe issue-comment scan limit');
   }
 
   logExceptInTest('[findKiloReviewComment] No existing Kilo review comment found', {
@@ -635,6 +651,196 @@ export async function getPRHeadCommit(
   return pr.head.sha;
 }
 
+type GitHubRepositoryContent = {
+  type?: string;
+  content?: string;
+  encoding?: string;
+  sha?: string;
+};
+
+export function decodeGitHubBase64Content(content: string): string {
+  return Buffer.from(content.replace(/\n/g, ''), 'base64').toString('utf8');
+}
+
+/**
+ * Fetches a root text file from a repository at a specific ref.
+ * Returns null for missing files, directories, or unsupported content responses.
+ */
+export async function fetchGitHubRootTextFileAtRef(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  path: string;
+  ref: string;
+}): Promise<string | null> {
+  const { token, owner, repo, path, ref } = params;
+  const octokit = new Octokit({ auth: token });
+
+  try {
+    const { data } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref,
+    });
+
+    if (Array.isArray(data)) return null;
+
+    const content = data as GitHubRepositoryContent;
+    if (content.type !== 'file' || content.encoding !== 'base64' || !content.content) {
+      return null;
+    }
+
+    return decodeGitHubBase64Content(content.content);
+  } catch (error) {
+    if (isHttpError(error) && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function fetchGitHubRepositoryDefaultBranch(params: {
+  token: string;
+  owner: string;
+  repo: string;
+}): Promise<string> {
+  const { token, owner, repo } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data } = await octokit.repos.get({ owner, repo });
+  return data.default_branch;
+}
+
+export async function createGitHubBranch(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  branchName: string;
+  baseBranch: string;
+}): Promise<void> {
+  const { token, owner, repo, branchName, baseBranch } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data: baseRef } = await octokit.git.getRef({
+    owner,
+    repo,
+    ref: `heads/${baseBranch}`,
+  });
+
+  try {
+    await octokit.git.createRef({
+      owner,
+      repo,
+      ref: `refs/heads/${branchName}`,
+      sha: baseRef.object.sha,
+    });
+  } catch (error) {
+    if (
+      isHttpError(error) &&
+      error.status === 422 &&
+      /reference already exists/i.test(error.message)
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
+export async function createOrUpdateGitHubRootTextFile(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  path: string;
+  branch: string;
+  message: string;
+  content: string;
+}): Promise<void> {
+  const { token, owner, repo, path, branch, message, content } = params;
+  const octokit = new Octokit({ auth: token });
+  let sha: string | undefined;
+
+  try {
+    const { data } = await octokit.repos.getContent({ owner, repo, path, ref: branch });
+    if (!Array.isArray(data)) {
+      const existing = data as GitHubRepositoryContent;
+      if (existing.type === 'file') {
+        sha = existing.sha;
+      }
+    }
+  } catch (error) {
+    if (!isHttpError(error) || error.status !== 404) {
+      throw error;
+    }
+  }
+
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path,
+    branch,
+    message,
+    content: Buffer.from(content, 'utf8').toString('base64'),
+    ...(sha ? { sha } : {}),
+  });
+}
+
+export async function createGitHubPullRequest(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  title: string;
+  body: string;
+  headBranch: string;
+  baseBranch: string;
+}): Promise<{ number: number; url: string }> {
+  const { token, owner, repo, title, body, headBranch, baseBranch } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data } = await octokit.pulls.create({
+    owner,
+    repo,
+    title,
+    body,
+    head: headBranch,
+    base: baseBranch,
+  });
+
+  return { number: data.number, url: data.html_url };
+}
+
+export async function getGitHubReviewComment(
+  installationId: string,
+  owner: string,
+  repo: string,
+  commentId: number,
+  appType: GitHubAppType = 'standard'
+): Promise<{
+  id: number;
+  body: string;
+  userLogin: string | null;
+  inReplyToId: number | null;
+} | null> {
+  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  try {
+    const { data } = await octokit.pulls.getReviewComment({
+      owner,
+      repo,
+      comment_id: commentId,
+    });
+    return {
+      id: data.id,
+      body: data.body,
+      userLogin: data.user?.login ?? null,
+      inReplyToId: data.in_reply_to_id ?? null,
+    };
+  } catch (error) {
+    if (isHttpError(error) && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 /**
  * Type guard to check if an error is an HTTP error from Octokit
  */
@@ -650,7 +856,7 @@ function isHttpError(error: unknown): error is { status: number; message: string
 export type AssociatedPullRequest = {
   number: number;
   htmlUrl: string;
-  state: 'open' | 'closed' | 'merged';
+  state: 'open' | 'closed' | 'merged' | 'draft';
   title: string;
   headSha: string;
   updatedAt: string; // ISO
@@ -761,7 +967,13 @@ export async function fetchPullRequestForBranch(params: {
     const chosen = prs.find(pr => pr.state === 'open') ?? prs[0];
 
     const state: AssociatedPullRequest['state'] =
-      chosen.merged_at != null ? 'merged' : chosen.state === 'open' ? 'open' : 'closed';
+      chosen.merged_at != null
+        ? 'merged'
+        : chosen.state === 'open' && chosen.draft
+          ? 'draft'
+          : chosen.state === 'open'
+            ? 'open'
+            : 'closed';
 
     return {
       number: chosen.number,

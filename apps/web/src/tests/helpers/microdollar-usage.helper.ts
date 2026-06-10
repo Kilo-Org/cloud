@@ -1,9 +1,12 @@
-import type { MicrodollarUsage } from '@kilocode/db/schema';
+import { randomUUID } from 'crypto';
+import { microdollar_usage, type MicrodollarUsage } from '@kilocode/db/schema';
 import {
   toInsertableDbUsageRecord,
   insertUsageRecord,
   type UsageContextInfo,
 } from '@/lib/ai-gateway/processUsage';
+import { db } from '@/lib/drizzle';
+import { sql } from 'drizzle-orm';
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import type {
   CoreUsageWithMetaData,
@@ -37,7 +40,7 @@ function defineDefaultUsageStats(): MicrodollarUsageStats {
 
 function defineDefaultContextInfo(): UsageContextInfo {
   return {
-    kilo_user_id: `test-user-${Math.random()}`,
+    kilo_user_id: `test-user-${randomUUID()}`,
     organization_id: null,
     http_x_forwarded_for: 'nobody',
     http_x_vercel_ip_city: 'Test City',
@@ -65,14 +68,16 @@ function defineDefaultContextInfo(): UsageContextInfo {
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    abuse_delay: null,
+    abuse_downgraded_from: null,
   };
 }
 
 // Returns structured type for new usage
-export function defineMicrodollarUsage(): CoreUsageWithMetaData {
+export async function defineMicrodollarUsage(): Promise<CoreUsageWithMetaData> {
   const stats = defineDefaultUsageStats();
   const context = defineDefaultContextInfo();
-  const result = toInsertableDbUsageRecord(stats, context);
+  const result = await toInsertableDbUsageRecord(stats, context);
 
   return {
     core: { ...result.core, created_at: '2025-08-15T12:00:00Z' },
@@ -84,7 +89,7 @@ export function defineMicrodollarUsage(): CoreUsageWithMetaData {
 export async function insertUsageWithOverrides(
   overrides: Partial<MicrodollarUsage>
 ): Promise<void> {
-  const { core, metadata } = defineMicrodollarUsage();
+  const { core, metadata } = await defineMicrodollarUsage();
   await insertUsageRecord({ ...core, ...overrides }, metadata);
 }
 
@@ -123,11 +128,50 @@ export function createMockUsageContext(
   };
 }
 
-export function createOrganizationUsage(
+export async function createOrganizationUsage(
   cost: number,
   kilo_user_id: string,
   organization_id: string
-): MicrodollarUsage {
-  const { core } = defineMicrodollarUsage();
+): Promise<MicrodollarUsage> {
+  const { core } = await defineMicrodollarUsage();
   return { ...core, kilo_user_id, cost, organization_id };
+}
+
+/**
+ * Insert raw microdollar_usage rows AND bump the matching microdollar_usage_daily
+ * counters in a single statement, mirroring the dual-write that production
+ * performs in insertUsageAndMetadataWithBalanceUpdate.
+ *
+ * Use this in tests that exercise queries against microdollar_usage_daily
+ * (e.g. kiloPass.getAverageMonthlyUsageLast3Months). For tests that only
+ * read microdollar_usage directly, plain db.insert(microdollar_usage) is fine.
+ */
+export async function insertMicrodollarUsageWithDailyRollup(
+  rows: (typeof microdollar_usage.$inferInsert)[]
+): Promise<void> {
+  if (rows.length === 0) return;
+  await db.transaction(async tx => {
+    await tx.insert(microdollar_usage).values(rows);
+    for (const row of rows) {
+      if (!row.cost || row.cost === 0) continue;
+      const dailyConflictTarget = row.organization_id
+        ? sql`(kilo_user_id, organization_id, usage_date) WHERE organization_id IS NOT NULL`
+        : sql`(kilo_user_id, usage_date) WHERE organization_id IS NULL`;
+      await tx.execute(sql`
+        INSERT INTO microdollar_usage_daily (
+          kilo_user_id, organization_id, usage_date, total_cost_microdollars
+        )
+        SELECT
+          ${row.kilo_user_id},
+          ${row.organization_id ?? null}::uuid,
+          date_trunc('day', ${row.created_at ?? sql`NOW()`}::timestamptz)::date,
+          ${row.cost}::bigint
+        ON CONFLICT ${dailyConflictTarget}
+        DO UPDATE SET
+          total_cost_microdollars =
+            microdollar_usage_daily.total_cost_microdollars + EXCLUDED.total_cost_microdollars,
+          updated_at = NOW()
+      `);
+    }
+  });
 }

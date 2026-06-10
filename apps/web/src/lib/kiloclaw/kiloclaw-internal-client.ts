@@ -5,7 +5,7 @@ import type {
   KiloclawStartReason,
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
-import { KILOCLAW_API_URL, KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@/lib/config.server';
 import type {
   ImageVersionEntry,
   ProvisionInput,
@@ -40,8 +40,17 @@ import type {
   GatewayReadyResponse,
   ControllerVersionResponse,
   OpenclawConfigResponse,
+  AgentConfigListResponse,
+  AgentReadResponse,
+  AgentMutationResponse,
+  AgentDefaultsMutationResponse,
+  AgentCreateResponse,
+  AgentDeleteResponse,
   MorningBriefingStatusResponse,
   MorningBriefingActionResponse,
+  OnboardingBriefingResponse,
+  MorningBriefingInterestsResponse,
+  MorningBriefingUserLocationResponse,
   MorningBriefingReadResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
@@ -50,6 +59,8 @@ import type {
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  OrphanVolumeScanResponse,
+  OrphanVolumeDestroyResponse,
   ResizeMachineResponse,
   SetAdminMachineSizeOverrideResponse,
   ClearAdminMachineSizeOverrideResponse,
@@ -64,12 +75,23 @@ import type {
 import type { InstanceTierKey } from '@kilocode/kiloclaw-instance-tiers';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
-export interface FileNode {
+export type FileNode = {
   name: string;
   path: string;
   type: 'file' | 'directory';
   children?: FileNode[];
-}
+};
+
+export type OpenclawFileWriteValidation = 'warn-before-write' | 'allow-invalid';
+
+export type FileWriteResponse =
+  | { etag: string }
+  | {
+      outcome: 'openclaw-validation-warning';
+      valid: false;
+      reason: 'invalid' | 'validation-unavailable';
+      issues: Array<{ path: string; message: string; allowedValues?: string[] }>;
+    };
 
 /**
  * Error thrown when the KiloClaw API returns a non-OK response.
@@ -102,11 +124,11 @@ export class KiloClawInternalClient {
     if (!KILOCLAW_API_URL) {
       throw new Error('KILOCLAW_API_URL is not configured');
     }
-    if (!KILOCLAW_INTERNAL_API_SECRET) {
-      throw new Error('KILOCLAW_INTERNAL_API_SECRET is not configured');
+    if (!INTERNAL_API_SECRET) {
+      throw new Error('INTERNAL_API_SECRET is not configured');
     }
     this.baseUrl = KILOCLAW_API_URL;
-    this.apiSecret = KILOCLAW_INTERNAL_API_SECRET;
+    this.apiSecret = INTERNAL_API_SECRET;
   }
 
   private async request<T>(path: string, options?: RequestInit, ctx?: RequestContext): Promise<T> {
@@ -136,19 +158,22 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/versions');
   }
 
-  async getLatestVersion(opts?: {
-    instanceId?: string;
+  async getLatestVersion(): Promise<ImageVersionEntry | null> {
+    return this.requestLatestVersion('/api/platform/versions/latest');
+  }
+
+  async getLatestVersionForInstance(opts: {
+    instanceId: string;
     currentImageTag?: string | null;
   }): Promise<ImageVersionEntry | null> {
-    // Note: Early Access is resolved server-side from the instance's owning
-    // user — callers do NOT pass it as a param. Trying to set it here would
-    // be ignored.
-    let path = '/api/platform/versions/latest';
-    if (opts?.instanceId) {
-      const params = new URLSearchParams({ instanceId: opts.instanceId });
-      if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
-      path += `?${params.toString()}`;
-    }
+    const params = new URLSearchParams({
+      instanceId: opts.instanceId,
+    });
+    if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
+    return this.requestLatestVersion(`/api/platform/versions/latest?${params.toString()}`);
+  }
+
+  private async requestLatestVersion(path: string): Promise<ImageVersionEntry | null> {
     try {
       return await this.request(path);
     } catch (err) {
@@ -279,6 +304,39 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId, ...config, ...opts }),
+      },
+      { userId }
+    );
+  }
+
+  async repairProvisionReservation(
+    userId: string,
+    instanceId: string,
+    orgId?: string
+  ): Promise<{ ok: true }> {
+    return this.request(
+      '/api/platform/provision/repair-reservation',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId, orgId }),
+      },
+      { userId }
+    );
+  }
+
+  async releaseProvisionReservation(
+    userId: string,
+    instanceId: string,
+    orgId: string | undefined,
+    acknowledgeCleanupVerified: true
+  ): Promise<{ ok: true; previousStatus: string }> {
+    return this.request(
+      '/api/platform/provision/release-reservation',
+      {
+        method: 'POST',
+        // The acknowledgement is threaded from the admin UI's break-glass
+        // confirmation through tRPC; the worker requires it to be exactly `true`.
+        body: JSON.stringify({ userId, instanceId, orgId, acknowledgeCleanupVerified }),
       },
       { userId }
     );
@@ -424,6 +482,54 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async startOnboardingBriefing(
+    userId: string,
+    settingsHref: string,
+    instanceId?: string
+  ): Promise<OnboardingBriefingResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/onboarding-briefing${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, settingsHref }),
+      },
+      { userId }
+    );
+  }
+
+  async updateBriefingInterests(
+    userId: string,
+    topics: string[],
+    instanceId?: string
+  ): Promise<MorningBriefingInterestsResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/interests${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, topics }),
+      },
+      { userId }
+    );
+  }
+
+  async updateUserLocation(
+    userId: string,
+    userLocation: string | null,
+    instanceId?: string
+  ): Promise<MorningBriefingUserLocationResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/user-location${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, userLocation }),
       },
       { userId }
     );
@@ -831,9 +937,115 @@ export class KiloClawInternalClient {
     );
   }
 
-  async getFileTree(userId: string, instanceId?: string): Promise<{ tree: FileNode[] }> {
+  // ── Agent config CRUD (→ /api/platform/agents*) ─────────────────────
+  // Write payloads are forwarded opaquely (like patchOpenclawConfig); the tRPC
+  // layer validates input with Zod and the controller re-validates.
+
+  async listAgents(userId: string, instanceId?: string): Promise<AgentConfigListResponse> {
     const params = new URLSearchParams({ userId });
     if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/agents?${params.toString()}`, undefined, { userId });
+  }
+
+  async getAgent(userId: string, agentId: string, instanceId?: string): Promise<AgentReadResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(
+      `/api/platform/agents/${encodeURIComponent(agentId)}?${params.toString()}`,
+      undefined,
+      { userId }
+    );
+  }
+
+  async createAgent(
+    userId: string,
+    agent: Record<string, unknown>,
+    instanceId?: string
+  ): Promise<AgentCreateResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/agents${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, agent }),
+      },
+      { userId }
+    );
+  }
+
+  async updateAgent(
+    userId: string,
+    agentId: string,
+    patch: Record<string, unknown>,
+    instanceId?: string
+  ): Promise<AgentMutationResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/agents/${encodeURIComponent(agentId)}${params}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, patch }),
+      },
+      { userId }
+    );
+  }
+
+  async updateAgentDefaults(
+    userId: string,
+    patch: Record<string, unknown>,
+    instanceId?: string
+  ): Promise<AgentDefaultsMutationResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/agent-defaults${params}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, patch }),
+      },
+      { userId }
+    );
+  }
+
+  async updateAgentBindings(
+    userId: string,
+    agentId: string,
+    bindings: Record<string, unknown>,
+    instanceId?: string
+  ): Promise<AgentMutationResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/agents/${encodeURIComponent(agentId)}/bindings${params}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ userId, bindings }),
+      },
+      { userId }
+    );
+  }
+
+  async deleteAgent(
+    userId: string,
+    agentId: string,
+    instanceId?: string
+  ): Promise<AgentDeleteResponse> {
+    // DELETE has no body, so userId must travel in the query string (the route
+    // reads it via setValidatedQueryUserId), like the other DELETE methods.
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(
+      `/api/platform/agents/${encodeURIComponent(agentId)}?${params.toString()}`,
+      { method: 'DELETE' },
+      { userId }
+    );
+  }
+
+  async getFileTree(
+    userId: string,
+    opts: { instanceId?: string; path?: string } = {}
+  ): Promise<{ tree: FileNode[] }> {
+    const params = new URLSearchParams({ userId });
+    if (opts.instanceId) params.set('instanceId', opts.instanceId);
+    if (opts.path !== undefined) params.set('path', opts.path);
     return this.request(`/api/platform/files/tree?${params.toString()}`);
   }
 
@@ -858,6 +1070,20 @@ export class KiloClawInternalClient {
     return this.request(`/api/platform/files/write${params}`, {
       method: 'POST',
       body: JSON.stringify({ userId, path: filePath, content, etag }),
+    });
+  }
+
+  async writeOpenclawConfigFile(
+    userId: string,
+    content: string,
+    etag: string | undefined,
+    instanceId: string | undefined,
+    mode: OpenclawFileWriteValidation
+  ): Promise<FileWriteResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(`/api/platform/files/write-openclaw-config${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, content, etag, mode }),
     });
   }
 
@@ -1003,6 +1229,42 @@ export class KiloClawInternalClient {
     });
   }
 
+  /**
+   * Scan a destroyed instance's Fly app for orphaned volumes. Read-only.
+   * The worker derives the Fly app + expected volume name from the instance
+   * identity, so callers never compute Fly resource names themselves.
+   */
+  async scanOrphanVolumes(
+    userId: string,
+    instanceId: string,
+    sandboxId: string
+  ): Promise<OrphanVolumeScanResponse> {
+    const params = new URLSearchParams({ userId, instanceId, sandboxId });
+    return this.request(`/api/platform/admin/orphan-volume-scan?${params.toString()}`, undefined, {
+      userId,
+    });
+  }
+
+  /**
+   * Destroy a single orphaned Fly volume. The worker re-verifies every
+   * Fly/DO-side invariant before deleting — see the route for the guards.
+   */
+  async destroyOrphanVolume(
+    userId: string,
+    instanceId: string,
+    sandboxId: string,
+    volumeId: string
+  ): Promise<OrphanVolumeDestroyResponse> {
+    return this.request(
+      '/api/platform/admin/orphan-volume-destroy',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId, sandboxId, volumeId }),
+      },
+      { userId }
+    );
+  }
+
   async reassociateVolume(
     userId: string,
     newVolumeId: string,
@@ -1023,6 +1285,7 @@ export class KiloClawInternalClient {
   async resizeMachine(
     userId: string,
     instanceType: InstanceTierKey,
+    actor: { actorId: string; actorEmail: string },
     instanceId?: string
   ): Promise<ResizeMachineResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -1030,7 +1293,7 @@ export class KiloClawInternalClient {
       `/api/platform/resize-machine${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, instanceType }),
+        body: JSON.stringify({ userId, instanceType, ...actor }),
       },
       { userId }
     );

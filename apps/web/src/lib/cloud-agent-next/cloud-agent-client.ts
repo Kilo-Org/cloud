@@ -3,10 +3,13 @@ import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import type { EncryptedEnvelope } from '@/lib/encryption';
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import type { SendMessagePayload } from './types.js';
+export type { SendMessagePayload } from './types.js';
 
 /**
  * Cloud Agent Next Client
@@ -90,6 +93,7 @@ export type AgentMode = string;
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = {
   prompt: string;
+  initialPayload?: SendMessagePayload;
   mode: AgentMode;
   model: string;
   variant?: string;
@@ -123,7 +127,9 @@ export type PrepareSessionInput = {
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt (required when mode is 'custom') */
   appendSystemPrompt?: string;
-  /** Image attachments for the prompt */
+  /** Canonical Cloud Agent attachments for the prompt */
+  attachments?: CloudAgentAttachments;
+  /** Legacy image attachments accepted during client migration */
   images?: Images;
   /** Callback configuration for execution completion events */
   callbackTarget?: CallbackTarget;
@@ -133,6 +139,9 @@ export type PrepareSessionInput = {
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   /** When true, return immediately and run preparation asynchronously */
   autoInitiate?: boolean;
+  /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
+  devcontainer?: boolean;
+  initialMessageId?: string | null;
 };
 
 /** Output from prepareSession procedure */
@@ -145,27 +154,64 @@ export type PrepareSessionOutput = {
 /** Input for initiating from a prepared session */
 export type InitiateFromPreparedSessionInput = {
   cloudAgentSessionId: string;
-  kilocodeOrganizationId?: string;
 };
 
 /** Input for sendMessage procedure (V2 - uses cloudAgentSessionId) */
 export type SendMessageInput = {
   cloudAgentSessionId: string;
-  prompt: string;
-  /** Built-in slug or a slug in the session's runtimeAgents. `custom` is rejected here. */
-  mode: AgentMode;
-  model: string;
-  variant?: string;
+  payload: SendMessagePayload;
   autoCommit?: boolean;
   githubToken?: string;
   gitToken?: string;
-  /** Image attachments for the message */
+  /** Canonical Cloud Agent attachments for the message */
+  attachments?: CloudAgentAttachments;
+  /** Legacy image attachments accepted during client migration */
   images?: Images;
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt */
   appendSystemPrompt?: string;
   /** Message ID for correlating the request */
-  messageId?: string;
+  messageId?: string | null;
+};
+
+export type TerminalPty = {
+  id: string;
+  title: string;
+  command: string;
+  args: string[];
+  cwd: string;
+  status: 'running' | 'exited';
+  pid: number;
+};
+
+export type CreateTerminalInput = {
+  cloudAgentSessionId: string;
+  cols?: number;
+  rows?: number;
+};
+
+export type CreateTerminalOutput = {
+  pty: TerminalPty;
+};
+
+export type ResizeTerminalInput = {
+  cloudAgentSessionId: string;
+  ptyId: string;
+  cols: number;
+  rows: number;
+};
+
+export type ResizeTerminalOutput = {
+  pty: TerminalPty;
+};
+
+export type CloseTerminalInput = {
+  cloudAgentSessionId: string;
+  ptyId: string;
+};
+
+export type CloseTerminalOutput = {
+  success: boolean;
 };
 
 /** Output from V2 mutation procedures (WebSocket-based) */
@@ -174,6 +220,8 @@ export type InitiateSessionOutput = {
   executionId: string;
   status: 'started';
   streamUrl: string;
+  messageId: string;
+  delivery: 'sent' | 'queued';
 };
 
 /** Input for getSession procedure */
@@ -231,8 +279,10 @@ export type GetSessionOutput = {
   preparedAt?: number;
   initiatedAt?: number;
 
-  // Callback configuration (debug-friendly, URL + headers)
-  callbackTarget?: CallbackTarget;
+  // Callback configuration is intentionally NOT exposed: the stored target
+  // may carry service-to-service auth headers (e.g. X-Internal-Secret used
+  // by Worker callback ingresses), and getSession is reachable by the
+  // session's owning user.
 
   // Initial message ID for correlation
   initialMessageId?: string;
@@ -376,6 +426,9 @@ type CloudAgentNextTRPCClient = {
   deleteSession: {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
+  cleanupSession: {
+    mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
+  };
   interruptSession: {
     mutate: (input: { sessionId: string }) => Promise<InterruptResult>;
   };
@@ -394,6 +447,15 @@ type CloudAgentNextTRPCClient = {
   };
   sendMessageV2: {
     mutate: (input: SendMessageInput) => Promise<InitiateSessionOutput>;
+  };
+  createTerminal: {
+    mutate: (input: CreateTerminalInput) => Promise<CreateTerminalOutput>;
+  };
+  resizeTerminal: {
+    mutate: (input: ResizeTerminalInput) => Promise<ResizeTerminalOutput>;
+  };
+  closeTerminal: {
+    mutate: (input: CloseTerminalInput) => Promise<CloseTerminalOutput>;
   };
   answerQuestion: {
     mutate: (input: AnswerQuestionInput) => Promise<{ success: boolean }>;
@@ -486,6 +548,23 @@ export class CloudAgentNextClient {
       console.error(`Error deleting session ${sessionId}:`, error);
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'deleteSession' },
+        extra: { sessionId },
+      });
+      return { success: false };
+    }
+  }
+
+  /**
+   * Clean up a caller-created session and classify its runtime deletion as caller cleanup.
+   */
+  async cleanupSession(sessionId: string): Promise<{ success: boolean }> {
+    try {
+      const result = await this.client.cleanupSession.mutate({ sessionId });
+      return { success: result.success };
+    } catch (error) {
+      console.error(`Error cleaning up session ${sessionId}:`, error);
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'cleanupSession' },
         extra: { sessionId },
       });
       return { success: false };
@@ -634,6 +713,42 @@ export class CloudAgentNextClient {
         extra: { input },
       });
       throw normalizedError;
+    }
+  }
+
+  async createTerminal(input: CreateTerminalInput): Promise<CreateTerminalOutput> {
+    try {
+      return await this.client.createTerminal.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'createTerminal' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
+  async resizeTerminal(input: ResizeTerminalInput): Promise<ResizeTerminalOutput> {
+    try {
+      return await this.client.resizeTerminal.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'resizeTerminal' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId, ptyId: input.ptyId },
+      });
+      throw error;
+    }
+  }
+
+  async closeTerminal(input: CloseTerminalInput): Promise<CloseTerminalOutput> {
+    try {
+      return await this.client.closeTerminal.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'closeTerminal' },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId, ptyId: input.ptyId },
+      });
+      throw error;
     }
   }
 

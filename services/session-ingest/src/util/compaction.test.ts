@@ -1,10 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import type { SessionDataItem } from '../types/session-sync';
-import { getItemIdentity } from './compaction';
+import { getItemIdentity, getPartItemIdentityRange } from './compaction';
 
 function item(type: string, data: Record<string, unknown> = {}): SessionDataItem {
   return { type, data } as SessionDataItem;
 }
+
+describe('getPartItemIdentityRange', () => {
+  it('returns the exact binary prefix range for message parts', () => {
+    expect(getPartItemIdentityRange('msg_parent')).toEqual({
+      start: 'msg_parent/',
+      end: 'msg_parent0',
+    });
+  });
+});
 
 describe('getItemIdentity', () => {
   it('returns fixed id for session item', () => {

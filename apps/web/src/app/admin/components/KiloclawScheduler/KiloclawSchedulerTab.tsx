@@ -48,6 +48,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 import { formatRelativeTime } from '../KiloclawInstances/shared';
 import {
   defaultScheduledAt,
@@ -66,6 +67,25 @@ const statusBadgeClass: Record<string, string> = {
   completed: 'border-transparent bg-green-500/20 text-green-400 ring-1 ring-green-500/20',
   cancelled: 'border-transparent bg-zinc-500/20 text-zinc-400 ring-1 ring-zinc-500/20',
   failed: 'border-transparent bg-red-500/20 text-red-400 ring-1 ring-red-500/20',
+};
+
+type FleetPreview = {
+  counts: {
+    eligible: number;
+    actionable: number;
+    pinned: number;
+    conflicts: number;
+    alreadyOnTarget: number;
+    unknownVersion: number;
+  };
+  stages: Array<{ stageIndex: number; scheduledAt: string; targetCount: number }>;
+  actionableInstanceIds: string[];
+  excluded: {
+    pinnedInstanceIds: string[];
+    conflictInstanceIds: string[];
+    alreadyOnTargetInstanceIds: string[];
+    unknownVersionInstanceIds: string[];
+  };
 };
 
 // defaultScheduledAt is shared with the Change Version dialogs (bulk
@@ -88,6 +108,22 @@ export function KiloclawSchedulerTab() {
   const [vcScheduledAt, setVcScheduledAt] = useState(defaultScheduledAt);
   const [vcReason, setVcReason] = useState('');
   const [vcNotify, setVcNotify] = useState<NotifyFormState>(defaultNotifyFormState);
+
+  // Fleet-upgrade form state
+  const [fleetVersionBelow, setFleetVersionBelow] = useState('');
+  const [fleetTargetImageTag, setFleetTargetImageTag] = useState('');
+  const [fleetOverridePins, setFleetOverridePins] = useState(false);
+  const [fleetStartsAt, setFleetStartsAt] = useState(defaultScheduledAt);
+  const [fleetTranchePercent, setFleetTranchePercent] = useState(20);
+  const [fleetIntervalDays, setFleetIntervalDays] = useState(2);
+  const [fleetReason, setFleetReason] = useState('');
+  const [fleetNotify, setFleetNotify] = useState<NotifyFormState>(defaultNotifyFormState);
+  const [fleetConfirmation, setFleetConfirmation] = useState('');
+  const [fleetPreview, setFleetPreview] = useState<{ key: string; data: FleetPreview } | null>(
+    null
+  );
+  const [fleetPreviewError, setFleetPreviewError] = useState<string | null>(null);
+  const [isFleetPreviewing, setIsFleetPreviewing] = useState(false);
 
   // Client-side sort over the current page of listScheduledActions.
   // The list is paginated server-side (limit 50) and ordered by
@@ -161,12 +197,57 @@ export function KiloclawSchedulerTab() {
     })
   );
 
+  const fleetFormKey = useMemo(
+    () =>
+      JSON.stringify({
+        versionBelow: fleetVersionBelow,
+        targetImageTag: fleetTargetImageTag,
+        overridePins: fleetOverridePins,
+        startsAt: fleetStartsAt,
+        tranchePercent: fleetTranchePercent,
+        intervalDays: fleetIntervalDays,
+      }),
+    [
+      fleetVersionBelow,
+      fleetTargetImageTag,
+      fleetOverridePins,
+      fleetStartsAt,
+      fleetTranchePercent,
+      fleetIntervalDays,
+    ]
+  );
+
+  const currentFleetPreview = fleetPreview?.key === fleetFormKey ? fleetPreview.data : null;
+  const fleetConfirmationRequired =
+    (currentFleetPreview?.counts.actionable ?? 0) > 10 || fleetOverridePins;
+  const fleetCreateDisabled =
+    !currentFleetPreview ||
+    currentFleetPreview.counts.actionable === 0 ||
+    currentFleetPreview.counts.conflicts > 0 ||
+    (fleetConfirmationRequired && fleetConfirmation.trim().toLowerCase() !== 'upgrade');
+
   const schedule = useMutation(
     trpc.admin.kiloclawInstances.scheduleAction.mutationOptions({
       onSuccess: () => {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
         });
+      },
+    })
+  );
+
+  const createFleet = useMutation(
+    trpc.admin.kiloclawInstances.createFleetUpgrade.mutationOptions({
+      onSuccess: data => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
+        });
+        setViewingActionId(data.id);
+        setFleetConfirmation('');
+        toast.success('Fleet upgrade scheduled');
+      },
+      onError: error => {
+        toast.error(error.message || 'Failed to schedule fleet upgrade');
       },
     })
   );
@@ -238,6 +319,44 @@ export function KiloclawSchedulerTab() {
         },
       }
     );
+  };
+
+  const buildFleetInput = () => ({
+    versionBelow: fleetVersionBelow,
+    targetImageTag: fleetTargetImageTag,
+    overridePins: fleetOverridePins,
+    startsAt: new Date(fleetStartsAt).toISOString(),
+    tranchePercent: fleetTranchePercent,
+    intervalDays: fleetIntervalDays,
+    reason: fleetReason.trim() || undefined,
+    notify: fleetNotify.notify,
+    noticeLeadHours: fleetNotify.noticeLeadHours,
+    noticeSubject: fleetNotify.noticeSubject,
+    noticeBody: fleetNotify.noticeBody,
+    noticeChannels: fleetNotify.noticeChannels,
+  });
+
+  const onPreviewFleet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const input = buildFleetInput();
+    setIsFleetPreviewing(true);
+    setFleetPreviewError(null);
+    try {
+      const data = await queryClient.fetchQuery(
+        trpc.admin.kiloclawInstances.previewFleetUpgrade.queryOptions(input)
+      );
+      setFleetPreview({ key: fleetFormKey, data });
+      setFleetConfirmation('');
+    } catch (err) {
+      setFleetPreview(null);
+      setFleetPreviewError(err instanceof Error ? err.message : 'Failed to preview fleet upgrade');
+    } finally {
+      setIsFleetPreviewing(false);
+    }
+  };
+
+  const onCreateFleet = () => {
+    createFleet.mutate(buildFleetInput());
   };
 
   return (
@@ -400,6 +519,211 @@ export function KiloclawSchedulerTab() {
                 {schedule.isPending ? 'Scheduling…' : 'Schedule version change'}
               </Button>
             </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Fleet upgrade</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onPreviewFleet} className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="fleet-version-below">Current version below</Label>
+                <Select value={fleetVersionBelow} onValueChange={setFleetVersionBelow}>
+                  <SelectTrigger id="fleet-version-below">
+                    <SelectValue placeholder="Select cutoff…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(
+                      new Set((versions.data?.items ?? []).map(version => version.openclaw_version))
+                    ).map(version => (
+                      <SelectItem key={version} value={version}>
+                        {version}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fleet-target-image-tag">Target version</Label>
+                <Select value={fleetTargetImageTag} onValueChange={setFleetTargetImageTag}>
+                  <SelectTrigger id="fleet-target-image-tag">
+                    <SelectValue placeholder="Select target…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(versions.data?.items ?? []).map(v => (
+                      <SelectItem key={v.image_tag} value={v.image_tag}>
+                        <span>
+                          <span className="font-medium">{v.openclaw_version}</span>
+                          <span className="text-muted-foreground ml-2 font-mono text-xs">
+                            {v.image_tag}
+                          </span>
+                          {v.is_latest ? (
+                            <span className="text-muted-foreground ml-2 text-xs">(latest)</span>
+                          ) : null}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fleet-starts-at">Start at (local time)</Label>
+                <Input
+                  id="fleet-starts-at"
+                  type="datetime-local"
+                  value={fleetStartsAt}
+                  onChange={e => setFleetStartsAt(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fleet-tranche-percent">Tranche size percent</Label>
+                <Input
+                  id="fleet-tranche-percent"
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={fleetTranchePercent}
+                  onChange={e =>
+                    setFleetTranchePercent(Math.max(1, Math.min(100, Number(e.target.value) || 1)))
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fleet-interval-days">Every N days</Label>
+                <Input
+                  id="fleet-interval-days"
+                  type="number"
+                  min={1}
+                  max={30}
+                  step={1}
+                  value={fleetIntervalDays}
+                  onChange={e =>
+                    setFleetIntervalDays(Math.max(1, Math.min(30, Number(e.target.value) || 1)))
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fleet-reason">Reason (optional)</Label>
+                <Input
+                  id="fleet-reason"
+                  value={fleetReason}
+                  onChange={e => setFleetReason(e.target.value)}
+                  maxLength={256}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="fleet-override-pins"
+                checked={fleetOverridePins}
+                onCheckedChange={checked => setFleetOverridePins(checked === true)}
+              />
+              <Label htmlFor="fleet-override-pins" className="cursor-pointer text-sm font-normal">
+                Override existing pins at apply time
+              </Label>
+            </div>
+
+            <ScheduleNotifyFields
+              idPrefix="fleet"
+              state={fleetNotify}
+              onChange={setFleetNotify}
+              disabled={isFleetPreviewing || createFleet.isPending}
+            />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={
+                  isFleetPreviewing ||
+                  createFleet.isPending ||
+                  !fleetVersionBelow ||
+                  !fleetTargetImageTag
+                }
+              >
+                {isFleetPreviewing ? 'Previewing…' : 'Preview fleet'}
+              </Button>
+              <Button
+                type="button"
+                onClick={onCreateFleet}
+                disabled={fleetCreateDisabled || createFleet.isPending}
+              >
+                {createFleet.isPending ? 'Scheduling…' : 'Schedule fleet upgrade'}
+              </Button>
+            </div>
+
+            {fleetPreviewError && (
+              <Alert variant="destructive">
+                <AlertTitle>Fleet preview failed</AlertTitle>
+                <AlertDescription>{fleetPreviewError}</AlertDescription>
+              </Alert>
+            )}
+
+            {currentFleetPreview && (
+              <div className="space-y-3 rounded-md border border-border/50 bg-muted/20 p-3">
+                <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-6">
+                  <FleetPreviewStat
+                    label="Actionable"
+                    value={currentFleetPreview.counts.actionable}
+                  />
+                  <FleetPreviewStat label="Eligible" value={currentFleetPreview.counts.eligible} />
+                  <FleetPreviewStat label="Pinned" value={currentFleetPreview.counts.pinned} />
+                  <FleetPreviewStat
+                    label="Conflicts"
+                    value={currentFleetPreview.counts.conflicts}
+                  />
+                  <FleetPreviewStat
+                    label="Already target"
+                    value={currentFleetPreview.counts.alreadyOnTarget}
+                  />
+                  <FleetPreviewStat
+                    label="Unknown"
+                    value={currentFleetPreview.counts.unknownVersion}
+                  />
+                </div>
+                {currentFleetPreview.stages.length > 0 ? (
+                  <div className="text-muted-foreground text-xs">
+                    {currentFleetPreview.stages.length} tranche
+                    {currentFleetPreview.stages.length === 1 ? '' : 's'} from{' '}
+                    {new Date(currentFleetPreview.stages[0].scheduledAt).toLocaleString()} to{' '}
+                    {new Date(
+                      currentFleetPreview.stages[currentFleetPreview.stages.length - 1].scheduledAt
+                    ).toLocaleString()}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground text-xs">
+                    No actionable targets match the selected filters.
+                  </div>
+                )}
+                {currentFleetPreview.counts.conflicts > 0 && (
+                  <p className="text-xs text-yellow-400">
+                    Cancel conflicting scheduled actions before creating this fleet upgrade.
+                  </p>
+                )}
+                {fleetConfirmationRequired && (
+                  <div className="max-w-sm space-y-1">
+                    <Label htmlFor="fleet-confirmation" className="text-xs">
+                      Type upgrade to confirm
+                    </Label>
+                    <Input
+                      id="fleet-confirmation"
+                      value={fleetConfirmation}
+                      onChange={e => setFleetConfirmation(e.target.value)}
+                      disabled={createFleet.isPending}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
@@ -586,7 +910,15 @@ export function KiloclawSchedulerTab() {
                         }
                       >
                         {action.scheduled_at ? (
-                          <span>{new Date(action.scheduled_at).toLocaleString()}</span>
+                          <span className="flex flex-col">
+                            <span>{new Date(action.scheduled_at).toLocaleString()}</span>
+                            {action.stage_count > 1 && action.latest_scheduled_at ? (
+                              <span className="text-muted-foreground">
+                                {action.stage_count} tranches, last{' '}
+                                {new Date(action.latest_scheduled_at).toLocaleString()}
+                              </span>
+                            ) : null}
+                          </span>
                         ) : (
                           <span>—</span>
                         )}
@@ -637,7 +969,7 @@ export function KiloclawSchedulerTab() {
           if (!open) setViewingActionId(null);
         }}
       >
-        <DialogContent className="max-h-[80vh] sm:max-w-3xl">
+        <DialogContent className="grid max-h-[calc(100vh-3rem)] w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-6xl">
           <DialogHeader>
             <DialogTitle>Scheduled action detail</DialogTitle>
             <DialogDescription>
@@ -654,7 +986,7 @@ export function KiloclawSchedulerTab() {
           )}
 
           {detail.data && (
-            <div className="space-y-4 overflow-y-auto">
+            <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
               <div className="bg-muted/30 rounded-md border p-3 text-sm">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1">
                   <div>
@@ -693,11 +1025,33 @@ export function KiloclawSchedulerTab() {
                 </div>
               </div>
 
+              {detail.data.stages.length > 1 && (
+                <div className="rounded-md border p-3 text-xs">
+                  <div className="mb-2 text-sm font-medium">Tranches</div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    {detail.data.stages.map(stage => (
+                      <div
+                        key={stage.id}
+                        className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2 py-1.5"
+                      >
+                        <span className="text-muted-foreground">
+                          Tranche {stage.stage_index + 1}
+                        </span>
+                        <span className="font-mono">
+                          {new Date(stage.scheduled_at).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="text-sm font-medium">Targets ({detail.data.targets.length})</div>
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
+              <div className="max-h-[42vh] overflow-auto rounded-lg border">
+                <Table className="min-w-[920px]">
+                  <TableHeader className="bg-card sticky top-0 z-10">
                     <TableRow>
+                      <TableHead>Tranche</TableHead>
                       <TableHead>Instance</TableHead>
                       <TableHead>User</TableHead>
                       <TableHead>From → To</TableHead>
@@ -706,51 +1060,60 @@ export function KiloclawSchedulerTab() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {detail.data.targets.map(t => (
-                      <TableRow key={t.id}>
-                        <TableCell className="font-mono text-xs">
-                          {t.instance_sandbox_id ? (
-                            <span title={t.instance_id}>{t.instance_sandbox_id}</span>
-                          ) : (
-                            <span title={t.instance_id}>{t.instance_id}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          <span className="text-muted-foreground">{t.user_email ?? t.user_id}</span>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {t.target_image_tag ? (
-                            <span>
+                    {[...detail.data.targets]
+                      .sort((a, b) => (a.stage_index ?? 0) - (b.stage_index ?? 0))
+                      .map(t => (
+                        <TableRow key={t.id}>
+                          <TableCell className="text-muted-foreground font-mono text-xs">
+                            {t.stage_index === null || t.stage_index === undefined
+                              ? '—'
+                              : t.stage_index + 1}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {t.instance_sandbox_id ? (
+                              <span title={t.instance_id}>{t.instance_sandbox_id}</span>
+                            ) : (
+                              <span title={t.instance_id}>{t.instance_id}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <span className="text-muted-foreground">
+                              {t.user_email ?? t.user_id}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {t.target_image_tag ? (
+                              <span>
+                                <span className="text-muted-foreground">
+                                  {t.source_image_tag ?? '—'}
+                                </span>
+                                <span className="text-muted-foreground mx-1">→</span>
+                                <span>{t.target_image_tag}</span>
+                              </span>
+                            ) : (
+                              // scheduled_restart targets have no target tag.
                               <span className="text-muted-foreground">
                                 {t.source_image_tag ?? '—'}
                               </span>
-                              <span className="text-muted-foreground mx-1">→</span>
-                              <span>{t.target_image_tag}</span>
-                            </span>
-                          ) : (
-                            // scheduled_restart targets have no target tag.
-                            <span className="text-muted-foreground">
-                              {t.source_image_tag ?? '—'}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={statusBadgeClass[t.status] ?? ''}>
-                            {t.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-xs">
-                          {t.skip_reason && <span>skip: {t.skip_reason}</span>}
-                          {t.error_message && (
-                            <span className="text-red-400" title={t.error_message}>
-                              {t.error_message.length > 80
-                                ? t.error_message.slice(0, 80) + '…'
-                                : t.error_message}
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={statusBadgeClass[t.status] ?? ''}>
+                              {t.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-xs">
+                            {t.skip_reason && <span>skip: {t.skip_reason}</span>}
+                            {t.error_message && (
+                              <span className="text-red-400" title={t.error_message}>
+                                {t.error_message.length > 80
+                                  ? t.error_message.slice(0, 80) + '…'
+                                  : t.error_message}
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               </div>
@@ -758,6 +1121,15 @@ export function KiloclawSchedulerTab() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function FleetPreviewStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="text-muted-foreground text-xs">{label}</div>
+      <div className="font-mono text-sm tabular-nums">{value}</div>
     </div>
   );
 }

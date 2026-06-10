@@ -85,39 +85,39 @@ function buildCreditsSection(monthlyCreditsUsd: number): string {
 
 Customer.io stores subjects in the remote template. Mailgun needs them passed explicitly. Rather than adding a subject argument to every `send*Email` call site, subjects are stored in a `subjects` map in `email.ts` keyed by `TemplateName`. The Mailgun branch of `send()` looks up `subjects[templateName]` internally — call sites are unchanged.
 
-| Template name               | Subject                                       |
-| --------------------------- | --------------------------------------------- |
-| `orgSubscription`           | "Welcome to Kilo for Teams!"                  |
-| `orgRenewed`                | "Kilo: Your Teams Subscription Renewal"       |
-| `orgCancelled`              | "Kilo: Your Teams Subscription is Cancelled"  |
-| `orgSSOUserJoined`          | "Kilo: New SSO User Joined Your Organization" |
-| `orgInvitation`             | "Kilo: Teams Invitation"                      |
-| `magicLink`                 | "Sign in to Kilo Code"                        |
-| `balanceAlert`              | "Kilo: Low Balance Alert"                     |
-| `autoTopUpFailed`           | "Kilo: Auto Top-Up Failed"                    |
-| `ossInviteNewUser`          | "Kilo: OSS Sponsorship Offer"                 |
-| `ossInviteExistingUser`     | "Kilo: OSS Sponsorship Offer"                 |
-| `ossExistingOrgProvisioned` | "Kilo: OSS Sponsorship Offer"                 |
-| `deployFailed`              | "Kilo: Your Deployment Failed"                |
+| Template name | Subject |
+|---|---|
+| `orgSubscription` | "Welcome to Kilo for Teams!" |
+| `orgRenewed` | "Kilo: Your Teams Subscription Renewal" |
+| `orgCancelled` | "Kilo: Your Teams Subscription is Cancelled" |
+| `orgSSOUserJoined` | "Kilo: New SSO User Joined Your Organization" |
+| `orgInvitation` | "Kilo: Teams Invitation" |
+| `magicLink` | "Sign in to Kilo Code" |
+| `balanceAlert` | "Kilo: Low Balance Alert" |
+| `autoTopUpFailed` | "Kilo: Auto Top-Up Failed" |
+| `ossInviteNewUser` | "Kilo: OSS Sponsorship Offer" |
+| `ossInviteExistingUser` | "Kilo: OSS Sponsorship Offer" |
+| `ossExistingOrgProvisioned` | "Kilo: OSS Sponsorship Offer" |
+| `deployFailed` | "Kilo: Your Deployment Failed" |
 
 ### Template Variables
 
 All templates use `{{ variable }}` interpolation. `year` is always `String(new Date().getFullYear())`. `credits_section` is built in JS (HTML snippet or empty string).
 
-| Template file                    | Variables                                                                                                                  |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `orgSubscription.html`           | `seats`, `organization_url`, `invoices_url`, `year`                                                                        |
-| `orgRenewed.html`                | `seats`, `invoices_url`, `year`                                                                                            |
-| `orgCancelled.html`              | `invoices_url`, `year`                                                                                                     |
-| `orgSSOUserJoined.html`          | `new_user_email`, `organization_url`, `year`                                                                               |
-| `orgInvitation.html`             | `organization_name`, `inviter_name`, `accept_invite_url`, `year`                                                           |
-| `magicLink.html`                 | `magic_link_url`, `email`, `expires_in`, `year`                                                                            |
-| `balanceAlert.html`              | `minimum_balance`, `organization_url`, `year`                                                                              |
-| `autoTopUpFailed.html`           | `reason`, `credits_url`, `year`                                                                                            |
-| `ossInviteNewUser.html`          | `tier_name`, `seats`, `seat_value`, `credits_section`, `accept_invite_url`, `integrations_url`, `code_reviews_url`, `year` |
-| `ossInviteExistingUser.html`     | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year`  |
-| `ossExistingOrgProvisioned.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year`  |
-| `deployFailed.html`              | `deployment_name`, `deployment_url`, `repository`, `year`                                                                  |
+| Template file | Variables |
+|---|---|
+| `orgSubscription.html` | `seats`, `organization_url`, `invoices_url`, `year` |
+| `orgRenewed.html` | `seats`, `invoices_url`, `year` |
+| `orgCancelled.html` | `invoices_url`, `year` |
+| `orgSSOUserJoined.html` | `new_user_email`, `organization_url`, `year` |
+| `orgInvitation.html` | `organization_name`, `inviter_name`, `accept_invite_url`, `year` |
+| `magicLink.html` | `magic_link_url`, `email`, `expires_in`, `year` |
+| `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` |
+| `autoTopUpFailed.html` | `reason`, `credits_url`, `year` |
+| `ossInviteNewUser.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `accept_invite_url`, `integrations_url`, `code_reviews_url`, `year` |
+| `ossInviteExistingUser.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year` |
+| `ossExistingOrgProvisioned.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year` |
+| `deployFailed.html` | `deployment_name`, `deployment_url`, `repository`, `year` |
 
 ### Admin Email Testing Page
 
@@ -199,16 +199,16 @@ After the provider switch is confirmed stable:
 
 ## Files Changed
 
-| File                                                        | PR  | Change                                                                                              |
-| ----------------------------------------------------------- | --- | --------------------------------------------------------------------------------------------------- |
-| `src/lib/email.ts`                                          | 1   | Routing via `send({ templateName, templateVars })`; exports `templates`, `subjects`, `TemplateName` |
-| `src/lib/email-customerio.ts`                               | 1   | Extracted `sendViaCustomerIo()`; minimal PII-free logging                                           |
-| `src/lib/email-mailgun.ts`                                  | 1→2 | Stub in PR 1 (throws); full `sendViaMailgun({ to, subject, html })` implementation in PR 2          |
-| `src/lib/config.server.ts`                                  | 1   | Add `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `EMAIL_PROVIDER` with runtime validation guard             |
-| `src/routers/admin/email-testing-router.ts`                 | 1   | New tRPC router with `getTemplates`, `getProviders`, `getPreview`, `sendTest`                       |
-| `src/app/admin/email-testing/page.tsx`                      | 1   | New admin page; Customer.io variable preview; mailgun iframe preview added in PR 2                  |
-| `src/app/admin/components/AppSidebar.tsx`                   | 1   | Add Email Testing nav link                                                                          |
-| `src/routers/admin-router.ts`                               | 1   | Register `emailTestingRouter`                                                                       |
-| `.env.local`, `.env.test`, `.env.development.local.example` | 1   | Add `EMAIL_PROVIDER=customerio`                                                                     |
-| `src/emails/*.html`                                         | 2   | OSS templates: replace Liquid credits conditional with `{{ credits_section }}`                      |
-| `package.json`                                              | 2   | Add `mailgun.js` + `form-data` (keep `customerio-node` until PR 4)                                  |
+| File | PR | Change |
+|---|---|---|
+| `src/lib/email.ts` | 1 | Routing via `send({ templateName, templateVars })`; exports `templates`, `subjects`, `TemplateName` |
+| `src/lib/email-customerio.ts` | 1 | Extracted `sendViaCustomerIo()`; minimal PII-free logging |
+| `src/lib/email-mailgun.ts` | 1→2 | Stub in PR 1 (throws); full `sendViaMailgun({ to, subject, html })` implementation in PR 2 |
+| `src/lib/config.server.ts` | 1 | Add `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `EMAIL_PROVIDER` with runtime validation guard |
+| `src/routers/admin/email-testing-router.ts` | 1 | New tRPC router with `getTemplates`, `getProviders`, `getPreview`, `sendTest` |
+| `src/app/admin/email-testing/page.tsx` | 1 | New admin page; Customer.io variable preview; mailgun iframe preview added in PR 2 |
+| `src/app/admin/components/AppSidebar.tsx` | 1 | Add Email Testing nav link |
+| `src/routers/admin-router.ts` | 1 | Register `emailTestingRouter` |
+| `.env.local`, `.env.test`, `.env.development.local.example` | 1 | Add `EMAIL_PROVIDER=customerio` |
+| `src/emails/*.html` | 2 | OSS templates: replace Liquid credits conditional with `{{ credits_section }}` |
+| `package.json` | 2 | Add `mailgun.js` + `form-data` (keep `customerio-node` until PR 4) |

@@ -72,7 +72,12 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
 
   // Transform models to ModelOption format
   const modelOptions = useMemo<ModelOption[]>(
-    () => (modelsData?.data || []).map(model => ({ id: model.id, name: model.name })),
+    () =>
+      (modelsData?.data || []).map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+      })),
     [modelsData?.data]
   );
 

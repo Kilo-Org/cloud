@@ -6,6 +6,15 @@
   "compatibility_date": "2026-02-24",
   "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
 
+  "containers": [
+    {
+      "class_name": "TownContainerDO",
+      "image": "./container/Dockerfile.dev",
+      "instance_type": "lite",
+      "max_instances": 10,
+    },
+  ],
+
   "durable_objects": {
     "bindings": [
       { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },

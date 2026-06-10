@@ -7,7 +7,6 @@ import { conversationsKey, registerConversationListCacheHandlers } from '@kiloco
 
 import { useCurrentUserId } from './use-current-user-id';
 import { useEventServiceClient, useKiloChatClient } from './use-kilo-chat-client';
-import { debugKiloChat } from '../debug';
 
 export function useInstanceEventSubscription(
   sandboxId: string | undefined,
@@ -25,18 +24,11 @@ export function useInstanceEventSubscription(
       if (!ctx) {
         return undefined;
       }
-      debugKiloChat('instance event subscribe', {
-        context: ctx,
-        connected:
-          typeof eventService.isConnected === 'function' ? eventService.isConnected() : null,
-        hasActiveConversation: activeConversationId !== null && activeConversationId !== undefined,
-      });
       eventService.subscribe([ctx]);
       return () => {
-        debugKiloChat('instance event unsubscribe', { context: ctx });
         eventService.unsubscribe([ctx]);
       };
-    }, [activeConversationId, ctx, eventService])
+    }, [ctx, eventService])
   );
 
   useFocusEffect(

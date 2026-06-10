@@ -22,7 +22,7 @@ export async function getFeatureFlagPayload<T>(
     const flagPayload = await posthogClient
       .getFeatureFlagPayload(flagName, 'server-config-fetch')
       .catch(error => {
-        console.error(`Error fetching feature flag '${flagName}':`, error);
+        console.error('Error fetching feature flag:', flagName, error);
         captureException(error, {
           tags: { source: 'posthog_feature_flag_payload' },
           extra: { flagName },
@@ -38,7 +38,7 @@ export async function getFeatureFlagPayload<T>(
       const parsedPayload = typeof flagPayload === 'string' ? JSON.parse(flagPayload) : flagPayload;
       return schema.safeParse(parsedPayload).data;
     } catch (parseError) {
-      console.error(`Failed to parse feature flag payload for '${flagName}':`, parseError);
+      console.error('Failed to parse feature flag payload:', { flagName }, parseError);
       captureException(parseError, {
         tags: { source: 'posthog_feature_flag_parse' },
         extra: { flagName, flagPayload },
@@ -65,13 +65,22 @@ export async function isFeatureFlagEnabled(
     });
     return Boolean(isEnabled);
   } catch (error) {
-    console.error(`Error checking feature flag '${flagName}':`, error);
+    console.error("Error checking feature flag '%s':", flagName, error);
     captureException(error, {
       tags: { source: 'posthog_feature_flag_enabled' },
       extra: { flagName, distinctId },
     });
     return false;
   }
+}
+
+export async function isFeatureFlagEnabledOrDevelopment(
+  flagName: string,
+  distinctId: string = 'server-config-fetch'
+): Promise<boolean> {
+  return (
+    process.env.NODE_ENV === 'development' || (await isFeatureFlagEnabled(flagName, distinctId))
+  );
 }
 
 /**
@@ -94,7 +103,7 @@ export async function isReleaseToggleEnabled(
     );
     return flagValue === true;
   } catch (error) {
-    console.error(`Error checking boolean feature flag '${flagName}':`, error);
+    console.error('Error checking boolean feature flag:', flagName, error);
     captureException(error, {
       tags: { source: 'posthog_feature_flag_boolean_enabled' },
       extra: { flagName, distinctId },

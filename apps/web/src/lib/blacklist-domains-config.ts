@@ -1,6 +1,6 @@
 import 'server-only';
 import * as z from 'zod';
-import { redisGet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { BLACKLIST_DOMAINS_REDIS_KEY } from '@/lib/redis-keys';
@@ -42,7 +42,7 @@ function getEnvFallbackDomains(): string[] {
  */
 export const getBlacklistedDomains = createCachedFetch(
   async (): Promise<string[]> => {
-    const raw = await redisGet(BLACKLIST_DOMAINS_REDIS_KEY);
+    const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
     if (raw) {
       const parsed = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
       if (parsed.domains.length > 0) {

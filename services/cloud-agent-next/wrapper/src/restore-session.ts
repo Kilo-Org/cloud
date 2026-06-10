@@ -1,5 +1,7 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { logToFile, runProcess } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,16 +18,26 @@ export type RestoreResult =
 
 type SnapshotDiff = {
   file: string;
-  after: string;
+  after?: string;
+  patch?: string;
   status: string;
 };
+
+export type RestoreSessionOptions = {
+  importTimeoutMs?: number;
+  importTerminationGraceMs?: number;
+};
+
+const KILO_IMPORT_TIMEOUT_MS = 120_000;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function log(msg: string): void {
-  console.error(`restore-session: ${msg}`);
+  const message = `restore-session: ${msg}`;
+  console.error(message);
+  logToFile(message);
 }
 
 function fail(
@@ -45,35 +57,386 @@ function tryUnlink(filePath: string): void {
   }
 }
 
+function resolveKilocodeToken(): string | undefined {
+  if (process.env.KILOCODE_TOKEN) {
+    return process.env.KILOCODE_TOKEN;
+  }
+
+  const tokenFile = process.env.KILOCODE_TOKEN_FILE;
+  if (!tokenFile) {
+    return undefined;
+  }
+
+  return fs.readFileSync(tokenFile, 'utf8').replace(/[\r\n]+$/, '');
+}
+
+type SnapshotInfoValidation = 'valid' | 'missing' | 'invalid';
+type SnapshotInfoValidationResult = {
+  validation: SnapshotInfoValidation;
+  infoId?: string;
+};
+
+type JsonCharReader = {
+  next: () => Promise<string | null>;
+  unread: (char: string) => void;
+  close: () => void;
+};
+
+type StreamChunkResult = {
+  done?: boolean;
+  value?: unknown;
+};
+
+function isStreamChunkResult(value: unknown): value is StreamChunkResult {
+  return typeof value === 'object' && value !== null;
+}
+
+function createJsonCharReader(snapshotPath: string): JsonCharReader {
+  const stream = fs.createReadStream(snapshotPath, { encoding: 'utf8' });
+  const iterator = stream[Symbol.asyncIterator]();
+  let buffer = '';
+  let offset = 0;
+  let unreadChar: string | undefined;
+
+  return {
+    async next(): Promise<string | null> {
+      if (unreadChar !== undefined) {
+        const char = unreadChar;
+        unreadChar = undefined;
+        return char;
+      }
+
+      while (offset >= buffer.length) {
+        const chunk: unknown = await iterator.next();
+        if (!isStreamChunkResult(chunk) || chunk.done === true) return null;
+        if (typeof chunk.value !== 'string') return null;
+        buffer = chunk.value;
+        offset = 0;
+      }
+
+      const char = buffer[offset];
+      offset += 1;
+      return char ?? null;
+    },
+    unread(char: string): void {
+      unreadChar = char;
+    },
+    close(): void {
+      stream.destroy();
+    },
+  };
+}
+
+function isJsonWhitespace(char: string): boolean {
+  return char === ' ' || char === '\n' || char === '\r' || char === '\t';
+}
+
+async function nextNonWhitespace(reader: JsonCharReader): Promise<string | null> {
+  while (true) {
+    const char = await reader.next();
+    if (char === null || !isJsonWhitespace(char)) return char;
+  }
+}
+
+async function readJsonString(
+  reader: JsonCharReader,
+  options: { collect: boolean }
+): Promise<string | null> {
+  let raw = '';
+
+  while (true) {
+    const char = await reader.next();
+    if (char === null || char.charCodeAt(0) < 0x20) return null;
+    if (char === '"') {
+      if (!options.collect) return '';
+      try {
+        const value: unknown = JSON.parse(`"${raw}"`);
+        return typeof value === 'string' ? value : null;
+      } catch {
+        return null;
+      }
+    }
+    if (char === '\\') {
+      const escaped = await reader.next();
+      if (escaped === null) return null;
+      if ('"\\/bfnrt'.includes(escaped)) {
+        if (options.collect) raw += `${char}${escaped}`;
+        continue;
+      }
+      if (escaped !== 'u') return null;
+
+      let unicodeEscape = `${char}${escaped}`;
+      for (let digitIndex = 0; digitIndex < 4; digitIndex++) {
+        const digit = await reader.next();
+        if (digit === null || !/^[0-9A-Fa-f]$/.test(digit)) return null;
+        unicodeEscape += digit;
+      }
+      if (options.collect) raw += unicodeEscape;
+      continue;
+    }
+    if (options.collect) raw += char;
+  }
+}
+
+async function skipJsonScalar(reader: JsonCharReader, firstChar: string): Promise<boolean> {
+  let scalar = firstChar;
+  while (true) {
+    const char = await reader.next();
+    if (char === null || isJsonWhitespace(char)) break;
+    if (char === ',' || char === '}' || char === ']') {
+      reader.unread(char);
+      break;
+    }
+    scalar += char;
+  }
+
+  return (
+    scalar === 'true' ||
+    scalar === 'false' ||
+    scalar === 'null' ||
+    /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(scalar)
+  );
+}
+
+async function skipJsonObject(reader: JsonCharReader): Promise<boolean> {
+  const firstChar = await nextNonWhitespace(reader);
+  if (firstChar === null) return false;
+  if (firstChar === '}') return true;
+  reader.unread(firstChar);
+
+  while (true) {
+    if ((await nextNonWhitespace(reader)) !== '"') return false;
+    if ((await readJsonString(reader, { collect: false })) === null) return false;
+    if ((await nextNonWhitespace(reader)) !== ':') return false;
+    if (!(await skipJsonValue(reader))) return false;
+
+    const separator = await nextNonWhitespace(reader);
+    if (separator === '}') return true;
+    if (separator !== ',') return false;
+
+    const nextMember = await nextNonWhitespace(reader);
+    if (nextMember === null || nextMember === '}') return false;
+    reader.unread(nextMember);
+  }
+}
+
+async function skipJsonArray(reader: JsonCharReader): Promise<boolean> {
+  const firstChar = await nextNonWhitespace(reader);
+  if (firstChar === null) return false;
+  if (firstChar === ']') return true;
+  reader.unread(firstChar);
+
+  while (true) {
+    if (!(await skipJsonValue(reader))) return false;
+
+    const separator = await nextNonWhitespace(reader);
+    if (separator === ']') return true;
+    if (separator !== ',') return false;
+
+    const nextValue = await nextNonWhitespace(reader);
+    if (nextValue === null || nextValue === ']') return false;
+    reader.unread(nextValue);
+  }
+}
+
+async function skipJsonValue(reader: JsonCharReader): Promise<boolean> {
+  const firstChar = await nextNonWhitespace(reader);
+  if (firstChar === null) return false;
+  if (firstChar === '"') {
+    return (await readJsonString(reader, { collect: false })) !== null;
+  }
+  if (firstChar === '{') return skipJsonObject(reader);
+  if (firstChar === '[') return skipJsonArray(reader);
+  return skipJsonScalar(reader, firstChar);
+}
+
+type InfoObjectValidation = { ok: true; infoId?: string } | { ok: false };
+
+async function validateInfoObject(reader: JsonCharReader): Promise<InfoObjectValidation> {
+  let infoId: string | undefined;
+  const firstChar = await nextNonWhitespace(reader);
+  if (firstChar === null) return { ok: false };
+  if (firstChar === '}') return { ok: true };
+  reader.unread(firstChar);
+
+  while (true) {
+    if ((await nextNonWhitespace(reader)) !== '"') return { ok: false };
+    const key = await readJsonString(reader, { collect: true });
+    if (key === null || (await nextNonWhitespace(reader)) !== ':') return { ok: false };
+
+    if (key === 'id') {
+      const idValueStart = await nextNonWhitespace(reader);
+      if (idValueStart === null) return { ok: false };
+      if (idValueStart === '"') {
+        const nextInfoId = await readJsonString(reader, { collect: true });
+        if (nextInfoId === null) return { ok: false };
+        infoId = nextInfoId;
+      } else {
+        reader.unread(idValueStart);
+        if (!(await skipJsonValue(reader))) return { ok: false };
+        infoId = undefined;
+      }
+    } else if (!(await skipJsonValue(reader))) {
+      return { ok: false };
+    }
+
+    const separator = await nextNonWhitespace(reader);
+    if (separator === '}') return infoId === undefined ? { ok: true } : { ok: true, infoId };
+    if (separator !== ',') return { ok: false };
+
+    const nextMember = await nextNonWhitespace(reader);
+    if (nextMember === null || nextMember === '}') return { ok: false };
+    reader.unread(nextMember);
+  }
+}
+
+async function validateSnapshotInfoId(snapshotPath: string): Promise<SnapshotInfoValidationResult> {
+  const reader = createJsonCharReader(snapshotPath);
+  try {
+    if ((await nextNonWhitespace(reader)) !== '{') return { validation: 'invalid' };
+
+    let infoId: string | undefined;
+    const firstChar = await nextNonWhitespace(reader);
+    if (firstChar === null) return { validation: 'invalid' };
+    if (firstChar !== '}') {
+      reader.unread(firstChar);
+
+      while (true) {
+        if ((await nextNonWhitespace(reader)) !== '"') return { validation: 'invalid' };
+        const key = await readJsonString(reader, { collect: true });
+        if (key === null || (await nextNonWhitespace(reader)) !== ':') {
+          return { validation: 'invalid' };
+        }
+
+        if (key === 'info') {
+          const infoStart = await nextNonWhitespace(reader);
+          if (infoStart === null) return { validation: 'invalid' };
+          if (infoStart === '{') {
+            const infoValidation = await validateInfoObject(reader);
+            if (!infoValidation.ok) return { validation: 'invalid' };
+            infoId = infoValidation.infoId;
+          } else {
+            reader.unread(infoStart);
+            if (!(await skipJsonValue(reader))) return { validation: 'invalid' };
+            infoId = undefined;
+          }
+        } else if (!(await skipJsonValue(reader))) {
+          return { validation: 'invalid' };
+        }
+
+        const separator = await nextNonWhitespace(reader);
+        if (separator === '}') break;
+        if (separator !== ',') return { validation: 'invalid' };
+
+        const nextMember = await nextNonWhitespace(reader);
+        if (nextMember === null || nextMember === '}') return { validation: 'invalid' };
+        reader.unread(nextMember);
+      }
+    }
+
+    if ((await nextNonWhitespace(reader)) !== null) return { validation: 'invalid' };
+    return infoId === undefined ? { validation: 'missing' } : { validation: 'valid', infoId };
+  } finally {
+    reader.close();
+  }
+}
+
 // jq filter that extracts diffs from the snapshot JSON using last-write-wins
 // deduplication by file path. Runs as a subprocess so the full parsed snapshot
 // is never loaded into the main process's heap — jq's C-native parser uses
 // ~half the memory of a V8 heap.
 // `objects` filters out non-object .summary values (e.g. compaction messages set summary=true)
 const JQ_EXTRACT_DIFFS_FILTER =
-  'reduce (.messages[]?.info.summary | objects | .diffs[]? // empty) as $d ({}; .[$d.file] = $d) | [.[]]';
+  'reduce (if ((.sessionDiff? // []) | length) > 0 then .sessionDiff[] else (.messages[]?.info.summary | objects | .diffs[]? // empty) end) as $d ({}; if (($d.file? | type) == "string") then .[$d.file] = $d else . end) | [.[]]';
 
 /**
- * Extract last-write-wins diffs from a snapshot file via a jq subprocess so the
- * full snapshot JSON is never loaded into the main process's heap.
+ * Extract last-write-wins diffs from a snapshot file. Prefers a jq subprocess
+ * (memory-efficient — the parsed snapshot stays in C-native heap) and falls
+ * back to bun-native parsing when jq isn't on PATH. The fallback matters for
+ * the devcontainer flow: the user's image is only required to ship `node` +
+ * `bun`, so `jq` may be missing.
  */
 export async function extractDiffs(snapshotPath: string): Promise<SnapshotDiff[] | null> {
-  const proc = Bun.spawn(['jq', '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
+  try {
+    const proc = Bun.spawn(['jq', '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const exitCode = await proc.exited;
+    if (exitCode === 0) {
+      const stdout = await new Response(proc.stdout).text();
+      try {
+        return JSON.parse(stdout) as SnapshotDiff[];
+      } catch (err) {
+        log(`jq output parse failed: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      }
+    }
     const stderr = await new Response(proc.stderr).text();
-    log(`jq failed exitCode=${exitCode} stderr=${stderr.trim()}`);
+    log(`jq failed exitCode=${exitCode} stderr=${stderr.trim()}; falling back to bun parser`);
+  } catch (err) {
+    // `Bun.spawn` rejects with ENOENT when jq isn't installed.
+    log(`jq not available (${err instanceof Error ? err.message : String(err)}); using bun parser`);
+  }
+
+  return extractDiffsWithBun(snapshotPath);
+}
+
+/**
+ * In-process fallback for environments without `jq`. Loads the whole snapshot
+ * into the V8 heap and applies the same last-write-wins dedup the jq filter
+ * does. Higher peak memory than jq but avoids a hard dependency.
+ */
+async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[] | null> {
+  type SnapshotShape = {
+    sessionDiff?: SnapshotDiff[];
+    messages?: Array<{
+      info?: {
+        summary?: { diffs?: SnapshotDiff[] };
+      };
+    }>;
+  };
+  let parsed: SnapshotShape;
+  try {
+    parsed = (await Bun.file(snapshotPath).json()) as SnapshotShape;
+  } catch (err) {
+    log(`bun snapshot parse failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
-  const stdout = await new Response(proc.stdout).text();
+  const dedup = new Map<string, SnapshotDiff>();
+  if (Array.isArray(parsed.sessionDiff) && parsed.sessionDiff.length > 0) {
+    for (const diff of parsed.sessionDiff) {
+      if (diff && typeof diff.file === 'string') dedup.set(diff.file, diff);
+    }
+    return Array.from(dedup.values());
+  }
+  for (const message of parsed.messages ?? []) {
+    const summary = message?.info?.summary;
+    if (!summary || typeof summary !== 'object') continue;
+    for (const diff of summary.diffs ?? []) {
+      if (diff && typeof diff.file === 'string') dedup.set(diff.file, diff);
+    }
+  }
+  return Array.from(dedup.values());
+}
+
+function applyPatch(workspacePath: string, diff: SnapshotDiff): boolean {
+  if (!diff.patch) return false;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-session-diff-'));
+  const file = path.join(dir, 'change.patch');
   try {
-    return JSON.parse(stdout) as SnapshotDiff[];
-  } catch (err) {
-    log(`jq output parse failed: ${err instanceof Error ? err.message : String(err)}`);
-    return null;
+    fs.writeFileSync(file, diff.patch);
+    const proc = Bun.spawnSync(['git', 'apply', '--3way', '--whitespace=nowarn', file], {
+      cwd: workspacePath,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    if (proc.exitCode === 0) return true;
+    const stderr = new TextDecoder().decode(proc.stderr).trim();
+    log(`git apply failed file=${diff.file} stderr=${stderr}`);
+    return false;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 
@@ -84,16 +447,26 @@ export async function extractDiffs(snapshotPath: string): Promise<SnapshotDiff[]
 export async function restoreSession(
   kiloSessionId: string,
   workspacePath: string,
-  filePath?: string
+  filePath?: string,
+  options: RestoreSessionOptions = {}
 ): Promise<RestoreResult> {
   const tmpPath = filePath ?? `/tmp/kilo-session-export-${kiloSessionId}.json`;
   const downloaded = !filePath;
+  const importTimeoutMs = options.importTimeoutMs ?? KILO_IMPORT_TIMEOUT_MS;
 
-  log(`starting kiloSessionId=${kiloSessionId} workspace=${workspacePath}`);
+  log(
+    `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${process.env.HOME ?? '(unset)'}`
+  );
 
   if (!filePath) {
     const ingestUrl = process.env.KILO_SESSION_INGEST_URL;
-    const token = process.env.KILOCODE_TOKEN;
+    let token: string | undefined;
+    try {
+      token = resolveKilocodeToken();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return fail(`failed to read KILOCODE_TOKEN_FILE: ${message}`, null, 'download');
+    }
 
     if (!ingestUrl || !token) {
       const missing = [!ingestUrl && 'KILO_SESSION_INGEST_URL', !token && 'KILOCODE_TOKEN']
@@ -124,6 +497,28 @@ export async function restoreSession(
 
       const bytesWritten = await Bun.write(tmpPath, res);
       log(`snapshot downloaded bytes=${bytesWritten}`);
+
+      // Validate before handing off to `kilo import`: an upstream error
+      // surface (e.g. a JSON `{"detail":"..."}` body served as 200) crashes
+      // kilo with a cryptic `undefined is not an object (evaluating 'info2.id')`
+      // and exit 1. Stream only the top-level metadata guardrail instead of
+      // materializing the full export in the wrapper heap.
+      const snapshotInfoValidation = await validateSnapshotInfoId(tmpPath);
+      log(
+        `snapshot metadata validated status=${snapshotInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${snapshotInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${snapshotInfoValidation.infoId === kiloSessionId} bytes=${bytesWritten}`
+      );
+      if (snapshotInfoValidation.validation === 'invalid') {
+        log('snapshot is not valid JSON before info.id metadata');
+        return fail(`snapshot is not valid JSON (${bytesWritten} bytes)`, null, 'download');
+      }
+      if (snapshotInfoValidation.validation === 'missing') {
+        log('snapshot missing info.id — likely an error response');
+        return fail(
+          `snapshot missing info.id (${bytesWritten} bytes); session-ingest may have returned an error body`,
+          null,
+          'download'
+        );
+      }
     } catch (err) {
       tryUnlink(tmpPath);
       const message = err instanceof Error ? err.message : String(err);
@@ -131,24 +526,47 @@ export async function restoreSession(
     }
   } else {
     log(`using provided file=${filePath}`);
+    try {
+      const providedInfoValidation = await validateSnapshotInfoId(tmpPath);
+      log(
+        `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
+      );
+    } catch (err) {
+      log(
+        `provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId} error=${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   try {
     // ---- Step 2: Run kilo import ----
-    log('running kilo import');
-    const importProc = Bun.spawn(['kilo', 'import', tmpPath], {
-      stdout: 'pipe',
-      stderr: 'pipe',
+    const importStartedAt = Date.now();
+    log(
+      `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
+    );
+    const importResult = await runProcess('kilo', ['import', tmpPath], {
       cwd: workspacePath,
-      env: process.env,
+      timeoutMs: importTimeoutMs,
+      terminationGraceMs: options.importTerminationGraceMs,
     });
-    const exitCode = await importProc.exited;
+    const importElapsedMs = Date.now() - importStartedAt;
 
-    if (exitCode !== 0) {
-      log(`kilo import failed exitCode=${exitCode}`);
-      return fail(`kilo import failed exitCode=${exitCode}`, null, 'import');
+    if (importResult.terminationReason === 'timeout') {
+      log(
+        `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
+      );
+      return fail(`kilo import timed out after ${importTimeoutMs}ms`, null, 'import');
     }
-    log('kilo import succeeded');
+
+    if (importResult.exitCode !== 0) {
+      log(
+        `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+      );
+      return fail(`kilo import failed exitCode=${importResult.exitCode}`, null, 'import');
+    }
+    log(
+      `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+    );
 
     // ---- Step 3: Apply diffs ----
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded
@@ -176,6 +594,15 @@ export async function restoreSession(
     let skipped = 0;
 
     for (const diff of uniqueDiffs) {
+      if (diff.patch) {
+        if (applyPatch(workspacePath, diff)) {
+          applied++;
+        } else {
+          skipped++;
+        }
+        continue;
+      }
+
       const fp = path.resolve(resolvedWorkspace, diff.file);
 
       if (!fp.startsWith(resolvedWorkspace + '/')) {

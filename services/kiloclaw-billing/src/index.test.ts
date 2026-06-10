@@ -14,6 +14,12 @@ vi.mock('cloudflare:workers', () => ({
 vi.mock('./lifecycle.js', () => ({
   runSweep: vi.fn(),
   processTrialInactivityStopCandidate: vi.fn(),
+  processCommitRetirementGuardPage: vi.fn(),
+  processCreditRenewalDiscovery: vi.fn(),
+  processCreditRenewalItem: vi.fn(),
+  processOrganizationTrialExpiryPage: vi.fn(),
+  processTrialExpiryPage: vi.fn(),
+  recordCreditRenewalTerminalFailure: vi.fn(),
 }));
 
 vi.mock('./bootstrap.js', () => ({
@@ -22,7 +28,16 @@ vi.mock('./bootstrap.js', () => ({
 
 import { handler, KiloClawBillingService } from './index.js';
 import { bootstrapProvisionSubscription } from './bootstrap.js';
-import { processTrialInactivityStopCandidate, runSweep } from './lifecycle.js';
+import {
+  processCommitRetirementGuardPage,
+  processCreditRenewalDiscovery,
+  processCreditRenewalItem,
+  processOrganizationTrialExpiryPage,
+  processTrialExpiryPage,
+  processTrialInactivityStopCandidate,
+  recordCreditRenewalTerminalFailure,
+  runSweep,
+} from './lifecycle.js';
 import type { BillingQueueMessage, BillingWorkerEnv } from './types.js';
 
 let loggedValues: unknown[] = [];
@@ -62,11 +77,12 @@ function createEnv(): {
         fetch: vi.fn(),
       },
       KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
-      STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
-      STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
-      STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
-      INTERNAL_API_SECRET: 'next-internal-api-secret',
-      KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+      STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID: 'price_legacy_standard_intro',
+      STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID: 'price_legacy_standard',
+      STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID: 'price_legacy_commit',
+      STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID: 'price_current_standard',
+      STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID: 'price_current_commit',
+      INTERNAL_API_SECRET: 'internal-api-secret',
       TRIAL_INACTIVITY_STOP_ENABLED: 'false',
       TRIAL_INACTIVITY_STOP_DRY_RUN: 'true',
     },
@@ -97,6 +113,8 @@ describe('kiloclaw billing worker handler', () => {
       credit_renewals_past_due: 0,
       credit_renewals_auto_top_up: 0,
       credit_renewals_skipped_duplicate: 0,
+      commit_retirement_guard_candidates: 0,
+      commit_retirement_guard_requests: 0,
       interrupted_auto_resume_requests: 0,
       trial_inactivity_candidates: 0,
       trial_inactivity_batches: 0,
@@ -107,9 +125,13 @@ describe('kiloclaw billing worker handler', () => {
       trial_warnings: 0,
       earlybird_warnings: 0,
       sweep1_trial_expiry: 0,
+      organization_trial_expiry_suspensions: 0,
+      organization_trial_entitlement_recoveries: 0,
       sweep2_subscription_expiry: 0,
       destruction_warnings: 0,
+      organization_destruction_warnings: 0,
       sweep3_instance_destruction: 0,
+      organization_instance_destructions: 0,
       sweep4_past_due_cleanup: 0,
       sweep5_intro_schedules_repaired: 0,
       complementary_inference_ended_emails: 0,
@@ -119,6 +141,21 @@ describe('kiloclaw billing worker handler', () => {
     };
     vi.mocked(runSweep).mockResolvedValue(emptySummary);
     vi.mocked(processTrialInactivityStopCandidate).mockResolvedValue(emptySummary);
+    vi.mocked(processCreditRenewalDiscovery).mockResolvedValue(emptySummary);
+    vi.mocked(processCreditRenewalItem).mockResolvedValue(emptySummary);
+    vi.mocked(processCommitRetirementGuardPage).mockResolvedValue({
+      summary: emptySummary,
+      continuationEnqueued: false,
+    });
+    vi.mocked(processTrialExpiryPage).mockResolvedValue({
+      summary: emptySummary,
+      continuationEnqueued: false,
+    });
+    vi.mocked(processOrganizationTrialExpiryPage).mockResolvedValue({
+      summary: emptySummary,
+      continuationEnqueued: false,
+    });
+    vi.mocked(recordCreditRenewalTerminalFailure).mockResolvedValue(undefined);
   });
 
   it('enqueues the first lifecycle sweep on the hourly cron', async () => {
@@ -135,6 +172,39 @@ describe('kiloclaw billing worker handler', () => {
       expect.objectContaining({ kind: 'lifecycle', sweep: 'credit_renewal' })
     );
     expect(trialInactivitySend).not.toHaveBeenCalled();
+  });
+
+  it('enqueues standalone instance destruction on the quarter-hourly cron', async () => {
+    const { env, lifecycleSend, trialInactivitySend } = createEnv();
+
+    await handler.scheduled?.(
+      { cron: '5,20,35,50 * * * *' } as ScheduledController,
+      env,
+      {} as ExecutionContext
+    );
+
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'standalone_instance_destruction',
+        sweep: 'instance_destruction',
+      })
+    );
+    expect(trialInactivitySend).not.toHaveBeenCalled();
+
+    const record = findLogRecord('Enqueued standalone instance destruction sweep');
+    expect(record).toMatchObject({
+      event: 'run_started',
+      outcome: 'started',
+      cron: '5,20,35,50 * * * *',
+    });
+    expect(record?.tags).toEqual(
+      expect.objectContaining({
+        billingFlow: 'kiloclaw_lifecycle',
+        billingComponent: 'worker',
+        billingSweep: 'instance_destruction',
+      })
+    );
   });
 
   it('enqueues the daily trial inactivity run on the daily cron when enabled', async () => {
@@ -179,6 +249,24 @@ describe('kiloclaw billing worker handler', () => {
     });
   });
 
+  it('logs and ignores unknown cron triggers', async () => {
+    const { env, lifecycleSend, trialInactivitySend } = createEnv();
+
+    await handler.scheduled?.(
+      { cron: '5 * * * *' } as ScheduledController,
+      env,
+      {} as ExecutionContext
+    );
+
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(trialInactivitySend).not.toHaveBeenCalled();
+    expect(findLogRecord('Ignoring unknown billing cron trigger')).toMatchObject({
+      event: 'run_skipped',
+      outcome: 'discarded',
+      cron: '5 * * * *',
+    });
+  });
+
   it('acks invalid queue messages', async () => {
     const { env } = createEnv();
     const message = {
@@ -195,7 +283,7 @@ describe('kiloclaw billing worker handler', () => {
     expect(runSweep).not.toHaveBeenCalled();
   });
 
-  it('chains the next sweep after a successful queue run', async () => {
+  it('fans out credit renewal discovery before continuing the lifecycle run', async () => {
     const { env, lifecycleSend } = createEnv();
     const runId = '11111111-1111-4111-8111-111111111111';
     const message = {
@@ -207,20 +295,386 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(runSweep).toHaveBeenCalledWith(
-      env,
-      { kind: 'lifecycle', runId, sweep: 'credit_renewal' },
-      1
-    );
-    expect(lifecycleSend).toHaveBeenLastCalledWith({
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(lifecycleSend).toHaveBeenNthCalledWith(1, {
+      kind: 'credit_renewal_discovery',
+      runId,
+      sweep: 'credit_renewal_discovery',
+    });
+    expect(lifecycleSend).toHaveBeenNthCalledWith(2, {
       kind: 'lifecycle',
       runId,
-      sweep: 'interrupted_auto_resume',
+      sweep: 'commit_retirement_guard',
     });
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();
   });
 
+  it('starts paginated Commit retirement guard without advancing lifecycle', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '12121212-1212-4212-8212-121212121212';
+    const message = {
+      body: { kind: 'lifecycle', runId, sweep: 'commit_retirement_guard' },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'commit_retirement_guard_page',
+      runId,
+      sweep: 'commit_retirement_guard',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+  });
+
+  it('advances lifecycle only after final Commit retirement guard page', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '13131313-1313-4313-8313-131313131313';
+    const message = {
+      body: {
+        kind: 'commit_retirement_guard_continuation',
+        runId,
+        sweep: 'commit_retirement_guard',
+        cutoffTime: '2026-06-06T00:00:00.000Z',
+        cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+        cursorFinalBoundary: '2026-07-01T00:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCommitRetirementGuardPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'lifecycle',
+      runId,
+      sweep: 'interrupted_auto_resume',
+    });
+  });
+
+  it('does not advance lifecycle while Commit retirement guard continuation remains', async () => {
+    const { env, lifecycleSend } = createEnv();
+    vi.mocked(processCommitRetirementGuardPage).mockResolvedValueOnce({
+      summary: {} as never,
+      continuationEnqueued: true,
+    });
+    const message = {
+      body: {
+        kind: 'commit_retirement_guard_page',
+        runId: '14141414-1414-4414-8414-141414141414',
+        sweep: 'commit_retirement_guard',
+        pageBudget: 3,
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCommitRetirementGuardPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).not.toHaveBeenCalled();
+  });
+
+  it('runs standalone instance destruction without chaining later lifecycle sweeps', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '22222222-2222-4222-8222-222222222222';
+    const message = {
+      body: {
+        kind: 'standalone_instance_destruction',
+        runId,
+        sweep: 'instance_destruction',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+
+    const record = findLogRecord('Completed standalone instance destruction run');
+    expect(record).toMatchObject({
+      event: 'run_completed',
+      outcome: 'completed',
+    });
+    expect(record?.tags).toEqual(
+      expect.objectContaining({
+        billingFlow: 'kiloclaw_lifecycle',
+        billingComponent: 'worker',
+        billingRunId: runId,
+        billingSweep: 'instance_destruction',
+        billingAttempt: 1,
+      })
+    );
+  });
+
+  it('starts paginated trial-expiry processing without advancing to subscription expiry', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '21212121-2121-4212-8212-212121212121';
+    const message = {
+      body: { kind: 'lifecycle', runId, sweep: 'trial_expiry' },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(processTrialExpiryPage).not.toHaveBeenCalled();
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'trial_expiry_page',
+      runId,
+      sweep: 'trial_expiry',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('enqueues organization trial expiry only after a final trial-expiry page completes', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '31313131-3131-4313-8313-313131313131';
+    const message = {
+      body: {
+        kind: 'trial_expiry_continuation',
+        runId,
+        sweep: 'trial_expiry',
+        cutoffTime: '2026-04-20T00:00:00.000Z',
+        cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+        cursorTrialEndsAt: '2026-04-17T00:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'lifecycle',
+      runId,
+      sweep: 'organization_trial_expiry',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('does not enqueue organization trial expiry while trial-expiry continuation remains', async () => {
+    const { env, lifecycleSend } = createEnv();
+    vi.mocked(processTrialExpiryPage).mockResolvedValueOnce({
+      summary: {
+        credit_renewals: 0,
+        credit_renewals_canceled: 0,
+        credit_renewals_past_due: 0,
+        credit_renewals_auto_top_up: 0,
+        credit_renewals_skipped_duplicate: 0,
+        commit_retirement_guard_candidates: 0,
+        commit_retirement_guard_requests: 0,
+        interrupted_auto_resume_requests: 0,
+        trial_inactivity_candidates: 0,
+        trial_inactivity_batches: 0,
+        trial_inactivity_batch_fallbacks: 0,
+        trial_inactivity_stop_messages_enqueued: 0,
+        trial_inactivity_stops: 0,
+        trial_inactivity_dry_run_candidates: 0,
+        trial_warnings: 0,
+        earlybird_warnings: 0,
+        sweep1_trial_expiry: 0,
+        organization_trial_expiry_suspensions: 0,
+        organization_trial_entitlement_recoveries: 0,
+        sweep2_subscription_expiry: 0,
+        destruction_warnings: 0,
+        organization_destruction_warnings: 0,
+        sweep3_instance_destruction: 0,
+        organization_instance_destructions: 0,
+        sweep4_past_due_cleanup: 0,
+        sweep5_intro_schedules_repaired: 0,
+        complementary_inference_ended_emails: 0,
+        emails_sent: 0,
+        emails_skipped: 0,
+        errors: 0,
+      },
+      continuationEnqueued: true,
+    });
+    const message = {
+      body: {
+        kind: 'trial_expiry_page',
+        runId: '41414141-4141-4414-8414-414141414141',
+        sweep: 'trial_expiry',
+        pageBudget: 1,
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('starts paginated organization trial-expiry processing without advancing to subscription expiry', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '51515151-5151-4515-8515-515151515151';
+    const message = {
+      body: { kind: 'lifecycle', runId, sweep: 'organization_trial_expiry' },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(processOrganizationTrialExpiryPage).not.toHaveBeenCalled();
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'organization_trial_expiry_page',
+      runId,
+      sweep: 'organization_trial_expiry',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('enqueues subscription expiry only after a final organization-trial-expiry page completes', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '61616161-6161-4616-8616-616161616161';
+    const message = {
+      body: {
+        kind: 'organization_trial_expiry_continuation',
+        runId,
+        sweep: 'organization_trial_expiry',
+        cutoffTime: '2026-05-18T00:00:00.000Z',
+        cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+        cursorHardExpiryBoundary: '2026-05-17T00:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processOrganizationTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'lifecycle',
+      runId,
+      sweep: 'subscription_expiry',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(findLogRecord('Completed organization-trial-expiry page message')).toMatchObject({
+      event: 'run_completed',
+      outcome: 'completed',
+      continuationEnqueued: false,
+      summary: expect.objectContaining({
+        organization_trial_expiry_suspensions: 0,
+      }),
+    });
+  });
+
+  it('does not enqueue subscription expiry while organization-trial-expiry continuation remains', async () => {
+    const { env, lifecycleSend } = createEnv();
+    vi.mocked(processOrganizationTrialExpiryPage).mockResolvedValueOnce({
+      summary: {
+        credit_renewals: 0,
+        credit_renewals_canceled: 0,
+        credit_renewals_past_due: 0,
+        credit_renewals_auto_top_up: 0,
+        credit_renewals_skipped_duplicate: 0,
+        commit_retirement_guard_candidates: 0,
+        commit_retirement_guard_requests: 0,
+        interrupted_auto_resume_requests: 0,
+        trial_inactivity_candidates: 0,
+        trial_inactivity_batches: 0,
+        trial_inactivity_batch_fallbacks: 0,
+        trial_inactivity_stop_messages_enqueued: 0,
+        trial_inactivity_stops: 0,
+        trial_inactivity_dry_run_candidates: 0,
+        trial_warnings: 0,
+        earlybird_warnings: 0,
+        sweep1_trial_expiry: 0,
+        organization_trial_expiry_suspensions: 0,
+        organization_trial_entitlement_recoveries: 0,
+        sweep2_subscription_expiry: 0,
+        destruction_warnings: 0,
+        organization_destruction_warnings: 0,
+        sweep3_instance_destruction: 0,
+        organization_instance_destructions: 0,
+        sweep4_past_due_cleanup: 0,
+        sweep5_intro_schedules_repaired: 0,
+        complementary_inference_ended_emails: 0,
+        emails_sent: 0,
+        emails_skipped: 0,
+        errors: 0,
+      },
+      continuationEnqueued: true,
+    });
+    const message = {
+      body: {
+        kind: 'organization_trial_expiry_page',
+        runId: '71717171-7171-4717-8717-717171717171',
+        sweep: 'organization_trial_expiry',
+        pageBudget: 1,
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processOrganizationTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('continues hourly lifecycle instance destruction into past-due cleanup', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const runId = '33333333-3333-4333-8333-333333333333';
+    const message = {
+      body: {
+        kind: 'lifecycle',
+        runId,
+        sweep: 'instance_destruction',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'lifecycle',
+      runId,
+      sweep: 'past_due_cleanup',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
   it('retries queue messages when sweep execution throws', async () => {
     const { env } = createEnv();
     vi.mocked(runSweep).mockRejectedValueOnce(new Error('boom'));
@@ -228,7 +682,7 @@ describe('kiloclaw billing worker handler', () => {
       body: {
         kind: 'lifecycle',
         runId: '11111111-1111-4111-8111-111111111111',
-        sweep: 'credit_renewal',
+        sweep: 'interrupted_auto_resume',
       },
       attempts: 2,
       ack: vi.fn(),
@@ -354,6 +808,186 @@ describe('kiloclaw billing worker handler', () => {
     });
   });
 
+  it('processes credit-renewal discovery queue messages', async () => {
+    const { env, lifecycleSend } = createEnv();
+    const message = {
+      body: {
+        kind: 'credit_renewal_discovery',
+        runId: '66666666-6666-4666-8666-666666666666',
+        sweep: 'credit_renewal_discovery',
+        pageBudget: 25,
+        wallClockBudgetMs: 1000,
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCreditRenewalDiscovery).toHaveBeenCalledWith(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: '66666666-6666-4666-8666-666666666666',
+        sweep: 'credit_renewal_discovery',
+        pageBudget: 25,
+        wallClockBudgetMs: 1000,
+      },
+      1
+    );
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('processes one credit-renewal item queue message', async () => {
+    const { env } = createEnv();
+    const message = {
+      body: {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCreditRenewalItem).toHaveBeenCalledWith(
+      env,
+      {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      1
+    );
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('discards invalid credit-renewal queue messages with structured logs', async () => {
+    const { env } = createEnv();
+    const message = {
+      body: {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processCreditRenewalItem).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+    expect(findLogRecord('Discarding invalid billing queue message')).toMatchObject({
+      event: 'invalid_message_discarded',
+      outcome: 'discarded',
+      attempts: 1,
+    });
+  });
+
+  it('retries unexpected credit-renewal item failures and records terminal failure on the last retry', async () => {
+    const { env } = createEnv();
+    vi.mocked(processCreditRenewalItem).mockRejectedValueOnce(new Error('db unavailable'));
+    const message = {
+      body: {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      attempts: 3,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(recordCreditRenewalTerminalFailure).toHaveBeenCalledWith(env, {
+      kind: 'credit_renewal_terminal_failure',
+      runId: '77777777-7777-4777-8777-777777777777',
+      sweep: 'credit_renewal_terminal_failure',
+      subscriptionId: '88888888-8888-4888-8888-888888888888',
+      renewalBoundary: '2026-06-01T00:00:00.000Z',
+      attempts: 3,
+      failureMessage: 'db unavailable',
+    });
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('retries the last credit-renewal item attempt when terminal failure recording fails', async () => {
+    const { env } = createEnv();
+    vi.mocked(processCreditRenewalItem).mockRejectedValueOnce(new Error('db unavailable'));
+    vi.mocked(recordCreditRenewalTerminalFailure).mockRejectedValueOnce(
+      new Error('terminal repository unavailable')
+    );
+    const message = {
+      body: {
+        kind: 'credit_renewal_item',
+        runId: '77777777-7777-4777-8777-777777777777',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      attempts: 3,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(recordCreditRenewalTerminalFailure).toHaveBeenCalledTimes(1);
+    expect(message.retry).toHaveBeenCalledTimes(1);
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(
+      findLogRecord('Failed to record credit-renewal terminal failure before DLQ')
+    ).toMatchObject({
+      event: 'terminal_failure_record_failed',
+      outcome: 'failed',
+      attempts: 3,
+    });
+  });
+
+  it('processes explicit terminal-failure queue messages', async () => {
+    const { env } = createEnv();
+    const message = {
+      body: {
+        kind: 'credit_renewal_terminal_failure',
+        runId: '99999999-9999-4999-8999-999999999999',
+        sweep: 'credit_renewal_terminal_failure',
+        subscriptionId: '88888888-8888-4888-8888-888888888888',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+        attempts: 3,
+        failureMessage: 'dead-lettered',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(recordCreditRenewalTerminalFailure).toHaveBeenCalledWith(env, message.body);
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
   it('bootstrapProvisionSubscription RPC delegates to bootstrap module and returns subscriptionId', async () => {
     vi.mocked(bootstrapProvisionSubscription).mockResolvedValueOnce({
       id: 'sub-bootstrap',
@@ -399,7 +1033,7 @@ describe('kiloclaw billing worker handler', () => {
       body: {
         kind: 'lifecycle',
         runId: '11111111-1111-4111-8111-111111111111',
-        sweep: 'credit_renewal',
+        sweep: 'interrupted_auto_resume',
       },
       attempts: 3,
       ack: vi.fn(),
@@ -421,7 +1055,7 @@ describe('kiloclaw billing worker handler', () => {
         billingFlow: 'kiloclaw_lifecycle',
         billingComponent: 'worker',
         billingRunId: '11111111-1111-4111-8111-111111111111',
-        billingSweep: 'credit_renewal',
+        billingSweep: 'interrupted_auto_resume',
         billingAttempt: 3,
       })
     );

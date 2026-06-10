@@ -35,7 +35,15 @@ export function ProvisioningStep({
   totalSteps: number;
   onboardingSavesReady: boolean;
   instanceRunning: boolean;
-  onComplete: () => void;
+  /**
+   * Fire-and-forget callback. Allowed to be async — callers can `await`
+   * additional work (e.g. ClawOnboardingFlow flushes deferred interest
+   * topics and auto-enables the briefing before transitioning to the
+   * `done` step). The returned Promise is intentionally not awaited
+   * here; callers are responsible for ordering the work that must
+   * happen before they advance the wizard state.
+   */
+  onComplete: () => void | Promise<void>;
 }) {
   // Bot identity, exec preset, and channel token saves start from
   // `ClawOnboardingFlow` as soon as the instance row exists. This component
@@ -76,11 +84,13 @@ export function ProvisioningStep({
   }, [gatewayReady]);
 
   // Advance to the next step when required onboarding saves have succeeded,
-  // the gateway reports ready, and boot CPU pressure has subsided.
+  // the gateway reports ready, and boot CPU pressure has subsided. The
+  // explicit `void` documents that we intentionally don't await whatever
+  // async work the callback does — ordering is the caller's responsibility.
   useEffect(() => {
     if (onboardingSavesReady && isGatewaySettled) {
       playChime();
-      onCompleteRef.current();
+      void onCompleteRef.current();
     }
   }, [onboardingSavesReady, isGatewaySettled]);
 

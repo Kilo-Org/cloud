@@ -201,7 +201,7 @@ function SessionRow({
           <>
             <span className="line-clamp-1 min-w-0 flex-1 leading-snug">{session.prompt}</span>
             <SessionPrIndicator session={session} />
-            <span className="relative shrink-0">
+            <span className="relative flex w-6 shrink-0 justify-end">
               {shouldReplaceTime ? (
                 <span
                   className={cn(
@@ -217,7 +217,12 @@ function SessionRow({
                   ) : null}
                 </span>
               ) : (
-                <span className={cn('text-muted-foreground text-xs', showActions && 'invisible')}>
+                <span
+                  className={cn(
+                    'text-muted-foreground w-full text-right text-xs tabular-nums',
+                    showActions && 'invisible'
+                  )}
+                >
                   <TimeAgo timestamp={session.updatedAt} compact />
                 </span>
               )}

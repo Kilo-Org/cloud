@@ -1,5 +1,8 @@
 import * as z from 'zod';
 import {
+  CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES,
+  CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
+  CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
   CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
   CLOUD_AGENT_IMAGE_MAX_COUNT,
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
@@ -31,12 +34,38 @@ export const cloudAgentGetImageUploadUrlSchema = z.object({
   contentLength: z.number().int().positive().max(CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES),
 });
 
+const cloudAgentAttachmentFilenameSchema = z
+  .string()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/
+  );
+
+export const cloudAgentAttachmentsSchema = z.object({
+  path: z.uuid(),
+  files: z.array(cloudAgentAttachmentFilenameSchema).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
+});
+
+export const cloudAgentGetAttachmentUploadUrlSchema = z.object({
+  messageUuid: z.uuid(),
+  attachmentId: z.uuid(),
+  contentType: z.enum(CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES),
+  contentLength: z.number().int().positive().max(CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES),
+});
+
+function hasOnlyOneAttachmentField(data: { images?: unknown; attachments?: unknown }): boolean {
+  return data.images === undefined || data.attachments === undefined;
+}
+
 /**
  * Agent mode enum - all supported modes.
  * - code, plan, debug, orchestrator, ask: CLI agent modes
  * - build, architect: Backward-compatible aliases (build → code, architect → plan)
  * - custom: Custom mode (requires appendSystemPrompt)
  */
+const messageIdNextSchema = z
+  .string()
+  .regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/, 'Invalid message ID format');
+
 export const agentModeNextSchema = z.enum([
   'code',
   'plan',
@@ -157,6 +186,44 @@ export const mcpServerConfigNextSchema = z.discriminatedUnion('type', [
   mcpRemoteServerConfigSchema,
 ]);
 
+/**
+ * Mode field for sendMessage. Built-in enum slugs plus any custom slug —
+ * cloud-agent-next cross-validates against the session's stored runtimeAgents.
+ * The reserved slug `custom` is still rejected here (requires prepare).
+ */
+export const agentModeSendMessageSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug')
+  .refine(mode => mode !== 'custom', {
+    message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
+  });
+
+/**
+ * Discriminated execution payload for follow-up messages and prepared-session
+ * initialization. Mirrors the worker's SendMessageV2Payload schema; both
+ * variants ride the same execution pipeline on the cloud-agent-next side.
+ */
+export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string().min(1),
+    mode: agentModeSendMessageSchema,
+    model: z.string().min(1),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    command: z.string().min(1),
+    arguments: z.string().default(''),
+  }),
+]);
+
 // Schema for preparing a session
 export const basePrepareSessionNextSchema = z
   .object({
@@ -199,8 +266,11 @@ export const basePrepareSessionNextSchema = z
     upstreamBranch: z.string().optional(),
     autoCommit: z.boolean().optional(),
     autoInitiate: z.boolean().optional(),
-    initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+    initialMessageId: messageIdNextSchema.optional(),
+    initialPayload: sendMessageNextPayloadSchema.optional(),
+    attachments: cloudAgentAttachmentsSchema.optional(),
     images: cloudAgentImagesSchema,
+    devcontainer: z.boolean().optional(),
   })
   .refine(
     data => (data.githubRepo || data.gitlabProject) && !(data.githubRepo && data.gitlabProject),
@@ -208,7 +278,11 @@ export const basePrepareSessionNextSchema = z
       message: 'Must provide either githubRepo or gitlabProject, but not both',
       path: ['githubRepo'],
     }
-  );
+  )
+  .refine(hasOnlyOneAttachmentField, {
+    message: 'Must not provide both attachments and images',
+    path: ['attachments'],
+  });
 
 // Output schema for prepareSession
 export const basePrepareSessionNextOutputSchema = z.object({
@@ -217,39 +291,26 @@ export const basePrepareSessionNextOutputSchema = z.object({
 });
 
 // Schema for initiating from a prepared session
-export const baseInitiateFromPreparedSessionNextSchema = z.object({
-  cloudAgentSessionId: z.string(),
-});
-
-/**
- * Mode field for sendMessage. Built-in enum slugs plus any custom slug —
- * cloud-agent-next cross-validates against the session's stored runtimeAgents.
- * The reserved slug `custom` is still rejected here (requires prepare).
- */
-export const agentModeSendMessageSchema = z
-  .string()
-  .min(1)
-  .max(50)
-  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug')
-  .refine(mode => mode !== 'custom', {
-    message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
-  });
+export const baseInitiateFromPreparedSessionNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+  })
+  .strict();
 
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
-export const baseSendMessageNextSchema = z.object({
-  cloudAgentSessionId: z.string(),
-  prompt: z.string().min(1),
-  mode: agentModeSendMessageSchema,
-  model: z.string().min(1),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
-  autoCommit: z.boolean().optional(),
-  messageId: z.string().startsWith('msg_').length(30).optional(),
-  images: cloudAgentImagesSchema,
-});
+export const baseSendMessageNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+    payload: sendMessageNextPayloadSchema,
+    autoCommit: z.boolean().optional(),
+    messageId: messageIdNextSchema.nullish(),
+    attachments: cloudAgentAttachmentsSchema.optional(),
+    images: cloudAgentImagesSchema,
+  })
+  .refine(hasOnlyOneAttachmentField, {
+    message: 'Must not provide both attachments and images',
+    path: ['attachments'],
+  });
 
 // Schema for interrupting a session
 export const baseInterruptSessionNextSchema = z.object({
@@ -259,6 +320,75 @@ export const baseInterruptSessionNextSchema = z.object({
 // Schema for getting session state
 export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
+});
+
+export const cloudAgentTerminalSizeSchema = z.object({
+  cols: z.number().int().min(2).max(500),
+  rows: z.number().int().min(2).max(200),
+});
+
+export const cloudAgentTerminalPtyIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9_-]+$/);
+
+export const cloudAgentTerminalPtySchema = z.object({
+  id: cloudAgentTerminalPtyIdSchema,
+  title: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  status: z.enum(['running', 'exited']),
+  pid: z.number().int(),
+});
+
+export const baseCreateTerminalNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+  })
+  .extend(cloudAgentTerminalSizeSchema.partial().shape)
+  .refine(data => (data.cols === undefined) === (data.rows === undefined), {
+    message: 'cols and rows must be provided together',
+  });
+
+export const baseResizeTerminalNextSchema = z
+  .object({
+    cloudAgentSessionId: z.string(),
+    ptyId: cloudAgentTerminalPtyIdSchema,
+  })
+  .extend(cloudAgentTerminalSizeSchema.shape);
+
+export const baseCloseTerminalNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  ptyId: cloudAgentTerminalPtyIdSchema,
+});
+
+export const baseCreateTerminalNextOutputSchema = z.object({
+  pty: cloudAgentTerminalPtySchema,
+  ptyId: cloudAgentTerminalPtyIdSchema,
+  wsUrl: z.string().min(1),
+  ticket: z.string().min(1),
+  expiresAt: z.number().int().positive(),
+});
+
+export const baseRefreshTerminalTicketNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  ptyId: cloudAgentTerminalPtyIdSchema,
+});
+
+export const baseRefreshTerminalTicketNextOutputSchema = z.object({
+  wsUrl: z.string().min(1),
+  ticket: z.string().min(1),
+  expiresAt: z.number().int().positive(),
+});
+
+export const baseResizeTerminalNextOutputSchema = z.object({
+  pty: cloudAgentTerminalPtySchema,
+});
+
+export const baseCloseTerminalNextOutputSchema = z.object({
+  success: z.boolean(),
 });
 
 // Execution status schema for getSession response
@@ -273,12 +403,6 @@ export const executionStatusNextSchema = z
     health: z.enum(['healthy', 'stale', 'unknown']),
   })
   .nullable();
-
-// Callback target configuration
-export const callbackTargetNextSchema = z.object({
-  url: z.string().url(),
-  headers: z.record(z.string(), z.string()).optional(),
-});
 
 // Output schema for getSession (sanitized, no secrets)
 export const baseGetSessionNextOutputSchema = z.object({
@@ -323,11 +447,13 @@ export const baseGetSessionNextOutputSchema = z.object({
   preparedAt: z.number().optional(),
   initiatedAt: z.number().optional(),
 
-  // Callback configuration
-  callbackTarget: callbackTargetNextSchema.optional(),
+  // Callback configuration is intentionally NOT exposed: the stored target
+  // may carry service-to-service auth headers (e.g. X-Internal-Secret used
+  // by Worker callback ingresses), and `getSession` is reachable by the
+  // session's owning user. Mirrors cloud-agent-next/router/schemas.ts.
 
   // Initial message ID for correlation
-  initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+  initialMessageId: messageIdNextSchema.optional(),
 
   // Versioning
   timestamp: z.number(),
@@ -357,7 +483,9 @@ export const baseAnswerPermissionNextSchema = z.object({
 // Output schema for V2 initiation/message procedures
 export const baseInitiateSessionNextOutputSchema = z.object({
   cloudAgentSessionId: z.string(),
-  executionId: z.string(),
+  executionId: z.string().optional(),
   status: z.literal('started'),
   streamUrl: z.string().min(1), // Can be relative path or full URL
+  messageId: messageIdNextSchema,
+  delivery: z.enum(['sent', 'queued']),
 });

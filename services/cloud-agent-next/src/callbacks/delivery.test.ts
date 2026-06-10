@@ -5,7 +5,7 @@ import type { CallbackTarget, ExecutionCallbackPayload } from './types.js';
 const mockPayload: ExecutionCallbackPayload = {
   sessionId: 'test-session',
   cloudAgentSessionId: 'test-session',
-  executionId: 'test-execution',
+  messageId: 'msg_test123',
   status: 'completed',
 };
 
@@ -117,6 +117,26 @@ describe('deliverCallbackJob', () => {
   });
 
   describe('successful delivery', () => {
+    it('delivers Security Agent callbacks through the configured HTTP target', async () => {
+      const callbackFetch = vi.fn().mockResolvedValue(new Response('', { status: 202 }));
+      globalThis.fetch = callbackFetch;
+      const target: CallbackTarget = {
+        url: 'https://security-analysis.test/internal/security-analysis-callback/finding-123',
+        headers: { 'X-Internal-Secret': 'secret' },
+      };
+
+      const result = await deliverCallbackJob(target, mockPayload, 1);
+
+      expect(result.type).toBe('success');
+      expect(callbackFetch).toHaveBeenCalledWith(
+        'https://security-analysis.test/internal/security-analysis-callback/finding-123',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(mockPayload),
+        })
+      );
+    });
+
     it('should succeed on 200 response', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
@@ -156,6 +176,25 @@ describe('deliverCallbackJob', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify(mockPayload),
+        })
+      );
+    });
+
+    it('should preserve messageId and include idempotencyKey in request payload', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+      globalThis.fetch = mockFetch;
+      const target: CallbackTarget = { url: 'https://example.com/callback' };
+      const payload: ExecutionCallbackPayload = {
+        ...mockPayload,
+        messageId: 'msg_018f1e2d3c4bCallbackMsgId',
+      };
+
+      await deliverCallbackJob(target, payload, 1);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://example.com/callback',
+        expect.objectContaining({
+          body: JSON.stringify(payload),
         })
       );
     });

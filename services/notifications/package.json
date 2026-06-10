@@ -12,12 +12,12 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/notifications/src"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
-    "@types/node": "^25.5.0",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",
-    "vitest": "~3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   },
   "dependencies": {
@@ -26,7 +26,7 @@
     "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
-    "expo-server-sdk": "^6.1.0",
+    "expo-server-sdk": "6.1.0",
     "hono": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"

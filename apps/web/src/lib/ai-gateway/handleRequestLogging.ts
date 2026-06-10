@@ -9,6 +9,7 @@ import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-e
 const users = [
   '992891e9fe987b8960a05ed0bc9cc456979d1d71410d467f212e6233dbc0a523', // christiaan
   'a8cd59cc6df67645c2f509948ee9a579582a7593db43fbad9bcf37cce38f2d87', // https://kilo-code.slack.com/archives/C09H2GDAJ75/p1776149178143169
+  'de30ace080f1ea4d269c0d37b68fd41f3e6895751ce032a713fe6e07eb314dfb', // https://kilo-code.slack.com/archives/C090U1NLQUC/p1778487038443649?thread_ts=1778480356.436739&cid=C090U1NLQUC
 ];
 
 const organizations = [
@@ -30,11 +31,12 @@ export async function handleRequestLogging(params: {
   clonedResponse: Response;
   user: User | null;
   organization_id: string | null;
+  session_id: string | null;
   provider: string;
   model: string;
   request: GatewayRequest;
 }) {
-  const { clonedResponse, user, organization_id, provider, model, request } = params;
+  const { clonedResponse, user, organization_id, session_id, provider, model, request } = params;
   if (!(await isLoggingEnabledForUser(user, organization_id))) {
     return;
   }
@@ -48,6 +50,7 @@ export async function handleRequestLogging(params: {
         .values({
           kilo_user_id: user?.id,
           organization_id: organization_id,
+          session_id,
           status_code: clonedResponse.status,
           model,
           provider,

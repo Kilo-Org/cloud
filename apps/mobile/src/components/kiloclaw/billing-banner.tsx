@@ -7,6 +7,7 @@ import {
   type ClawBillingStatus,
   deriveBannerState,
   formatBillingDate,
+  formatRemainingDays,
 } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -68,15 +69,8 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
     case 'trial_ending_very_soon': {
       return {
         icon: Clock,
-        message: `Trial ending soon: ${String(billing.trial?.daysRemaining ?? 0)} day${billing.trial?.daysRemaining === 1 ? '' : 's'} left`,
+        message: `Trial ending soon: ${formatRemainingDays(billing.trial?.daysRemaining ?? 0)}`,
         severity: 'warn',
-      };
-    }
-    case 'trial_expires_today': {
-      return {
-        icon: AlertTriangle,
-        message: 'Trial expires today',
-        severity: 'danger',
       };
     }
     case 'earlybird_active': {

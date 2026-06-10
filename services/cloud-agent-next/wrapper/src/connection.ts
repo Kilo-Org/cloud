@@ -13,10 +13,118 @@ import type { WrapperState } from './state.js';
 import type { IngestEvent, WrapperCommand } from '../../src/shared/protocol.js';
 import { trimPayload } from '../../src/shared/trim-payload.js';
 import { logToFile } from './utils.js';
-import type { WrapperKiloClient } from './kilo-api.js';
+import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isCodeReviewJob(state: WrapperState): boolean {
+  return state.currentSession?.platform === 'code-review';
+}
+
+function gateResultFromProperties(
+  properties: Record<string, unknown>
+): 'pass' | 'fail' | undefined {
+  const gateResult = properties.gateResult;
+  return gateResult === 'pass' || gateResult === 'fail' ? gateResult : undefined;
+}
+
+function statusTypeFromProperties(properties: Record<string, unknown>): string | undefined {
+  const status = properties.status;
+  return isRecord(status) && typeof status.type === 'string' ? status.type : undefined;
+}
+
+function isInteractiveStatusType(statusType: string | undefined): boolean {
+  return statusType === 'question' || statusType === 'permission';
+}
+
+function permissionCategoryFromProperties(properties: Record<string, unknown>): string {
+  const permission = properties.permission;
+  if (isRecord(permission)) {
+    const type = permission.type;
+    if (typeof type === 'string') return type;
+    const tool = permission.tool;
+    if (typeof tool === 'string') return tool;
+  }
+
+  if (typeof permission !== 'string') return 'unknown';
+  const normalized = permission.toLowerCase();
+  if (normalized.includes('glab')) return 'bash:glab';
+  if (normalized === 'gh' || normalized.includes('gh ')) return 'bash:gh';
+  if (normalized.includes('git ')) return 'bash:git';
+  if (normalized.includes('bash')) return 'bash';
+  if (normalized.includes('edit')) return 'edit';
+  if (normalized.includes('web')) return 'web';
+  return 'unknown';
+}
+
+function getActivitySessionID(
+  eventType: string,
+  properties: Record<string, unknown>
+): string | undefined {
+  if (eventType === 'message.updated') {
+    const info = properties.info;
+    return isRecord(info) && typeof info.sessionID === 'string' ? info.sessionID : undefined;
+  }
+
+  if (eventType === 'message.part.updated') {
+    const part = properties.part;
+    return isRecord(part) && typeof part.sessionID === 'string' ? part.sessionID : undefined;
+  }
+
+  return typeof properties.sessionID === 'string' ? properties.sessionID : undefined;
+}
+
+function isRootSessionActivity(
+  eventType: string,
+  properties: Record<string, unknown>,
+  rootSessionID: string | undefined
+): boolean {
+  if (!rootSessionID || getActivitySessionID(eventType, properties) !== rootSessionID) return false;
+  if (eventType === 'session.turn.open') return true;
+  return eventType === 'session.status' && statusTypeFromProperties(properties) === 'busy';
+}
+
+export const CODE_REVIEW_PERMISSION_REJECTION_MESSAGE =
+  'Permission rejected for code-review non-interactive mode. Continue using another read-only, non-interactive method if available.';
+
+function rejectCodeReviewQuestion(
+  questionId: string | undefined,
+  kiloClient: WrapperKiloClient
+): void {
+  if (!questionId) return;
+  kiloClient.rejectQuestion(questionId).catch(err => {
+    logToFile(
+      `failed to reject code-review question ${questionId}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  });
+}
+
+function rejectCodeReviewPermission(
+  permissionId: string | undefined,
+  properties: Record<string, unknown>,
+  state: WrapperState,
+  kiloClient: WrapperKiloClient
+): void {
+  if (!permissionId) return;
+  logToFile(
+    JSON.stringify({
+      message: 'code_review_permission_rejected',
+      agentSessionId: state.currentSession?.agentSessionId,
+      kiloSessionId: state.currentSession?.kiloSessionId,
+      permissionCategory: permissionCategoryFromProperties(properties),
+      policy: 'code-review-read-only',
+      reason: 'non-interactive-unapproved',
+    })
+  );
+  kiloClient
+    .answerPermission(permissionId, 'reject', CODE_REVIEW_PERMISSION_REJECTION_MESSAGE)
+    .catch(err => {
+      logToFile(
+        `failed to reject code-review permission ${permissionId}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    });
 }
 
 export function trimIngestEvent(event: IngestEvent): IngestEvent {
@@ -40,6 +148,12 @@ export function isSessionIdleEvent(
   return isRecord(props) && typeof props.sessionID === 'string';
 }
 
+function isAssistantCompletionSignal(info: unknown): boolean {
+  if (!isRecord(info) || info.role !== 'assistant') return false;
+  const time = isRecord(info.time) ? info.time : undefined;
+  return typeof time?.completed === 'number' || (info.error !== undefined && info.error !== null);
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -49,8 +163,6 @@ export type ConnectionConfig = {
 };
 
 export type ConnectionCallbacks = {
-  /** Called when a completion event is detected for a message */
-  onMessageComplete: (messageId: string) => void;
   /** Called when a terminal error is detected */
   onTerminalError: (reason: string) => void;
   /** Called when a command is received from DO */
@@ -59,6 +171,10 @@ export type ConnectionCallbacks = {
   onDisconnect: (reason: string) => void;
   /** Called on any completion event to signal post-processing waiters */
   onCompletionSignal: () => void;
+  /** Called when the root session reports idle. */
+  onSessionIdle?: () => void;
+  /** Called when a non-idle event belongs to the root Kilo session. */
+  onRootSessionActivity?: () => void;
   /** Called on any SSE event to reset transport health timer */
   onSseEvent?: () => void;
   /** Called when the ingest WS starts reconnecting */
@@ -72,11 +188,176 @@ type WebSocketCtor = new (
   options?: { headers?: Record<string, string> } | string | string[]
 ) => WebSocket;
 
+export type IngestConnectionFailureReason = 'websocket_error' | 'closed_before_open' | 'timeout';
+
+export type IngestConnectionFailureDetails = {
+  reason: IngestConnectionFailureReason;
+  wsUrl: string;
+  closeCode?: number;
+  closeReason?: string;
+};
+
+const INGEST_CONNECTION_FAILURE_HINTS: Record<IngestConnectionFailureReason, string> = {
+  websocket_error:
+    'WebSocket error before open; Bun does not expose the HTTP status. If the Worker logs no /ingest request, check WORKER_URL and sandbox-to-host networking; if it logs a 4xx, inspect the DO rejection reason.',
+  closed_before_open:
+    'WebSocket closed before open. If the Worker logs a 4xx for /ingest, inspect the DO rejection reason; if it logs no request, check WORKER_URL and sandbox-to-host networking.',
+  timeout:
+    'Timed out before open; check WORKER_URL and whether the sandbox can reach the local cloud-agent Worker.',
+};
+
+export function buildIngestConnectionFailureMessage(
+  details: IngestConnectionFailureDetails
+): string {
+  const closeDetails =
+    details.closeCode !== undefined
+      ? ` closeCode=${details.closeCode} closeReason=${details.closeReason || '(none)'}`
+      : '';
+  return `Failed to connect to ingest: ${details.wsUrl} (${INGEST_CONNECTION_FAILURE_HINTS[details.reason]}${closeDetails})`;
+}
+
 /** Maximum number of reconnection attempts before giving up.
  *  3 attempts ≈ 7s total (1+2+4), fitting within the DO's 10s grace period. */
 const MAX_RECONNECT_ATTEMPTS = 3;
 /** Base delay for exponential backoff (1 second) */
 const RECONNECT_BASE_DELAY_MS = 1_000;
+/** Maximum time to wait for the SDK SSE `/event` handshake before aborting.
+ *  The wrapper talks to kilo on loopback, so handshakes typically complete in
+ *  <5ms; a 5s budget covers kilo startup hiccups without blocking `open()` on
+ *  a silently stuck HTTP stream. */
+const SUBSCRIBE_HANDSHAKE_TIMEOUT_MS = 5_000;
+const INGEST_INITIAL_CONNECT_TIMEOUT_MS = 10_000;
+
+function buildIngestWebSocketUrl(session: NonNullable<WrapperState['currentSession']>): string {
+  const url = new URL(session.ingestUrl);
+  if (session.wrapperRunId) {
+    url.searchParams.set('wrapperRunId', session.wrapperRunId);
+  }
+  url.searchParams.set('kiloSessionId', session.kiloSessionId);
+  url.searchParams.set('sessionId', session.agentSessionId ?? '');
+  if (session.wrapperGeneration !== undefined) {
+    url.searchParams.set('wrapperGeneration', String(session.wrapperGeneration));
+  }
+  if (session.wrapperConnectionId) {
+    url.searchParams.set('wrapperConnectionId', session.wrapperConnectionId);
+  }
+  return url.toString();
+}
+
+export type IngestProgressChannel = {
+  close(): void;
+};
+
+export async function openIngestProgressChannel(
+  state: WrapperState
+): Promise<IngestProgressChannel> {
+  const session = state.currentSession;
+  if (!session) {
+    throw new Error('Cannot open ingest progress channel: no session context');
+  }
+
+  const wsUrl = buildIngestWebSocketUrl(session);
+  logToFile(`ingest progress WS connecting to: ${wsUrl}`);
+
+  return new Promise<IngestProgressChannel>((resolve, reject) => {
+    let settled = false;
+    let active = false;
+    let initialConnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const clearInitialConnectTimer = () => {
+      if (initialConnectTimer !== undefined) {
+        clearTimeout(initialConnectTimer);
+        initialConnectTimer = undefined;
+      }
+    };
+
+    const rejectInitialConnect = (details: IngestConnectionFailureDetails) => {
+      if (settled) return;
+      settled = true;
+      clearInitialConnectTimer();
+      reject(new Error(buildIngestConnectionFailureMessage(details)));
+    };
+
+    const WebSocketWithHeaders = WebSocket as unknown as WebSocketCtor;
+    const ws = new WebSocketWithHeaders(wsUrl, {
+      headers: {
+        Authorization: `Bearer ${session.workerAuthToken}`,
+      },
+    });
+
+    const sendProgressEvent = (event: IngestEvent): void => {
+      if (active && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(event));
+      }
+    };
+
+    const close = () => {
+      active = false;
+      state.setSendToIngestFn(null);
+      try {
+        ws.close();
+      } catch {
+        // Ignore close errors.
+      }
+    };
+
+    ws.onopen = () => {
+      if (settled) {
+        try {
+          ws.close();
+        } catch {
+          // Ignore close errors.
+        }
+        return;
+      }
+
+      logToFile(`ingest progress WS connected to: ${wsUrl}`);
+      settled = true;
+      active = true;
+      clearInitialConnectTimer();
+      state.setSendToIngestFn(sendProgressEvent);
+      resolve({ close });
+    };
+
+    ws.onclose = (event: CloseEvent) => {
+      logToFile(
+        `ingest progress WS closed: code=${event.code} reason=${event.reason || '(none)'} url=${wsUrl}`
+      );
+      if (!settled) {
+        rejectInitialConnect({
+          reason: 'closed_before_open',
+          wsUrl,
+          closeCode: event.code,
+          closeReason: event.reason,
+        });
+        return;
+      }
+      if (active) {
+        active = false;
+        state.setSendToIngestFn(null);
+      }
+    };
+
+    ws.onerror = () => {
+      logToFile(`ingest progress WS error connecting to: ${wsUrl}`);
+      if (!settled) {
+        rejectInitialConnect({ reason: 'websocket_error', wsUrl });
+      }
+    };
+
+    initialConnectTimer = setTimeout(() => {
+      if (!settled) {
+        logToFile(`ingest progress WS connection timed out: ${wsUrl}`);
+        rejectInitialConnect({ reason: 'timeout', wsUrl });
+        try {
+          ws.close();
+        } catch {
+          // Ignore close errors.
+        }
+      }
+    }, INGEST_INITIAL_CONNECT_TIMEOUT_MS);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Connection Manager
@@ -144,6 +425,11 @@ export function createConnectionManager(
   /**
    * Flush buffered events after reconnection.
    */
+  function clearBuffer(): void {
+    eventBuffer.length = 0;
+    bufferOverflowed = false;
+  }
+
   function flushBuffer(): void {
     if (!ingestWs || ingestWs.readyState !== WebSocket.OPEN) return;
 
@@ -162,8 +448,33 @@ export function createConnectionManager(
     for (const event of eventBuffer) {
       ingestWs.send(JSON.stringify(event));
     }
-    eventBuffer.length = 0;
-    bufferOverflowed = false;
+    clearBuffer();
+  }
+
+  async function resumeNetworkWait(requestID: string): Promise<void> {
+    try {
+      await config.kiloClient.resumeNetworkWait(requestID);
+      logToFile(`resumed network wait ${requestID}`);
+    } catch (err) {
+      logToFile(
+        `failed to resume network wait ${requestID}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  async function resumeRestoredNetworkWaits(): Promise<void> {
+    const kiloSessionId = state.currentSession?.kiloSessionId;
+    if (!kiloSessionId) {
+      logToFile('skipping restored network resume: no kiloSessionId');
+      return;
+    }
+
+    const networkWaits = await config.kiloClient.getNetworkWaits();
+    await Promise.all(
+      networkWaits
+        .filter(wait => wait.sessionID === kiloSessionId && wait.restored)
+        .map(wait => resumeNetworkWait(wait.id))
+    );
   }
 
   /**
@@ -173,16 +484,17 @@ export function createConnectionManager(
    */
   async function sendKiloSnapshot(): Promise<void> {
     try {
-      const kiloSessionId = state.currentJob?.kiloSessionId;
+      const kiloSessionId = state.currentSession?.kiloSessionId;
       if (!kiloSessionId) {
         logToFile('skipping kilo snapshot: no kiloSessionId');
         return;
       }
 
-      const [statuses, questions, permissions] = await Promise.all([
+      const [statuses, questions, permissions, networkWaits] = await Promise.all([
         config.kiloClient.getSessionStatuses(),
         config.kiloClient.getQuestions(),
         config.kiloClient.getPermissions(),
+        config.kiloClient.getNetworkWaits(),
       ]);
 
       const statusEntry = statuses[kiloSessionId];
@@ -193,23 +505,28 @@ export function createConnectionManager(
 
       const pendingQuestion = questions.find(q => q.sessionID === kiloSessionId);
       const pendingPermission = permissions.find(p => p.sessionID === kiloSessionId);
+      const pendingNetworkWaits = networkWaits.filter(wait => wait.sessionID === kiloSessionId);
+      const codeReviewJob = isCodeReviewJob(state);
+      const skipStatusForCodeReview = codeReviewJob && isInteractiveStatusType(sessionStatus.type);
 
       // Send session status as a regular kilocode event
-      const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
-      sendToIngest({
-        streamEventType: 'kilocode',
-        data: {
-          ...statusProperties,
-          event: 'session.status',
-          type: 'session.status',
-          properties: statusProperties,
-        },
-        timestamp: new Date().toISOString(),
-      });
+      if (!skipStatusForCodeReview) {
+        const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
+        sendToIngest({
+          streamEventType: 'kilocode',
+          data: {
+            ...statusProperties,
+            event: 'session.status',
+            type: 'session.status',
+            properties: statusProperties,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
 
       // Replay pending questions/permissions as regular events
-      // (same format as real-time delivery — matches CLI behavior)
-      if (pendingQuestion) {
+      // (same format as real-time delivery - matches CLI behavior)
+      if (pendingQuestion && !codeReviewJob) {
         sendToIngest({
           streamEventType: 'kilocode',
           data: {
@@ -220,7 +537,7 @@ export function createConnectionManager(
           timestamp: new Date().toISOString(),
         });
       }
-      if (pendingPermission) {
+      if (pendingPermission && !codeReviewJob) {
         sendToIngest({
           streamEventType: 'kilocode',
           data: {
@@ -231,13 +548,47 @@ export function createConnectionManager(
           timestamp: new Date().toISOString(),
         });
       }
+      for (const wait of pendingNetworkWaits) {
+        if (wait.restored) continue;
+        sendToIngest({
+          streamEventType: 'kilocode',
+          data: {
+            event: 'session.network.asked',
+            type: 'session.network.asked',
+            properties: wait,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
 
       logToFile(
-        `kilo state sent: status=${sessionStatus.type}, question=${pendingQuestion?.id ?? 'none'}, permission=${pendingPermission?.id ?? 'none'}`
+        `kilo state sent: status=${sessionStatus.type}${skipStatusForCodeReview ? ' (suppressed)' : ''}, question=${pendingQuestion?.id ?? 'none'}${codeReviewJob && pendingQuestion ? ' (suppressed)' : ''}, permission=${pendingPermission?.id ?? 'none'}${codeReviewJob && pendingPermission ? ' (suppressed)' : ''}, networkWaits=${pendingNetworkWaits.length}`
       );
     } catch (err) {
       logToFile(
         `failed to send kilo snapshot: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  /**
+   * Fetch the kilo slash-command catalog and send it to the DO as a
+   * `commands.available` event. Called after the ingest WS opens (initial
+   * connect and reconnect) so the DO's cache is always fresh for clients.
+   * Best-effort: failures are logged but don't block the connection.
+   */
+  async function sendCommandsAvailable(): Promise<void> {
+    try {
+      const commands = await config.kiloClient.listCommands();
+      sendToIngest({
+        streamEventType: 'commands.available',
+        data: { commands },
+        timestamp: new Date().toISOString(),
+      });
+      logToFile(`commands.available sent: count=${commands.length}`);
+    } catch (err) {
+      logToFile(
+        `failed to send commands.available: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
@@ -249,35 +600,67 @@ export function createConnectionManager(
    *   `ingestWs` and flushing buffered events after `close()` was called.
    */
   async function openIngestWs(expectedGeneration?: number): Promise<void> {
-    const job = state.currentJob;
-    if (!job) {
-      throw new Error('Cannot open ingest WS: no job context');
+    const session = state.currentSession;
+    if (!session) {
+      throw new Error('Cannot open ingest WS: no session context');
     }
 
-    const url = new URL(job.ingestUrl);
-    url.searchParams.set('executionId', job.executionId);
-
-    const wsUrl = url.toString();
+    const wsUrl = buildIngestWebSocketUrl(session);
     logToFile(`ingest WS connecting to: ${wsUrl}`);
 
     return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      let initialConnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const clearInitialConnectTimer = () => {
+        if (initialConnectTimer !== undefined) {
+          clearTimeout(initialConnectTimer);
+          initialConnectTimer = undefined;
+        }
+      };
+
+      const rejectInitialConnect = (details: IngestConnectionFailureDetails) => {
+        if (settled) return;
+        settled = true;
+        clearInitialConnectTimer();
+        reject(new Error(buildIngestConnectionFailureMessage(details)));
+      };
+
+      const resolveInitialConnect = () => {
+        if (settled) return;
+        settled = true;
+        clearInitialConnectTimer();
+        resolve();
+      };
+
       // Bun's WebSocket supports headers parameter
       const WebSocketWithHeaders = WebSocket as unknown as WebSocketCtor;
 
-      // Use workerAuthToken (user JWT) for auth - ingestToken is just executionId for DO validation
       const ws = new WebSocketWithHeaders(wsUrl, {
         headers: {
-          Authorization: `Bearer ${job.workerAuthToken}`,
+          Authorization: `Bearer ${session.workerAuthToken}`,
         },
       });
 
       ws.onopen = () => {
+        if (settled) {
+          logToFile(`ingest WS opened after initial connection was already settled: ${wsUrl}`);
+          try {
+            ws.close();
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+
         logToFile(`ingest WS connected to: ${wsUrl}`);
         // Guard against stale reconnect: if close() was called while we were
         // connecting, generation will have advanced and we must not adopt
         // this socket or flush buffered events through it.
         if (expectedGeneration !== undefined && expectedGeneration !== generation) {
           logToFile('stale reconnect detected in onopen — discarding socket');
+          settled = true;
+          clearInitialConnectTimer();
           try {
             ws.close();
           } catch {
@@ -288,13 +671,22 @@ export function createConnectionManager(
         }
         ingestWs = ws;
         flushBuffer();
-        resolve();
+        resolveInitialConnect();
       };
 
       ws.onclose = (event: CloseEvent) => {
         logToFile(
           `ingest WS closed: code=${event.code} reason=${event.reason || '(none)'} url=${wsUrl}`
         );
+        if (!settled) {
+          rejectInitialConnect({
+            reason: 'closed_before_open',
+            wsUrl,
+            closeCode: event.code,
+            closeReason: event.reason,
+          });
+          return;
+        }
         if (ingestWs !== ws) return; // Stale socket — ignore
 
         ingestWs = null;
@@ -312,8 +704,8 @@ export function createConnectionManager(
 
       ws.onerror = () => {
         logToFile(`ingest WS error connecting to: ${wsUrl}`);
-        if (!ingestWs) {
-          reject(new Error(`Failed to connect to ingest: ${wsUrl}`));
+        if (!settled) {
+          rejectInitialConnect({ reason: 'websocket_error', wsUrl });
         }
       };
 
@@ -327,17 +719,22 @@ export function createConnectionManager(
       };
 
       // Timeout for initial connection
-      setTimeout(() => {
-        if (!ingestWs) {
-          ws.close();
-          reject(new Error('Ingest connection timeout'));
+      initialConnectTimer = setTimeout(() => {
+        if (!settled) {
+          logToFile(`ingest WS connection timed out: ${wsUrl}`);
+          rejectInitialConnect({ reason: 'timeout', wsUrl });
+          try {
+            ws.close();
+          } catch {
+            /* ignore */
+          }
         }
-      }, 10_000);
+      }, INGEST_INITIAL_CONNECT_TIMEOUT_MS);
     });
   }
 
   /**
-   * Check if an event represents a terminal error (payment/billing/quota).
+   * Check if an event represents a terminal error (payment/billing/quota/model resolution).
    */
   function isTerminalError(eventType: string, properties: Record<string, unknown>): boolean {
     if (eventType === 'payment_required' || eventType === 'insufficient_funds') {
@@ -346,11 +743,13 @@ export function createConnectionManager(
     const error = properties.error;
     if (error) {
       const errorStr = typeof error === 'string' ? error : JSON.stringify(error);
+      const normalizedError = errorStr.toLowerCase();
       if (
-        errorStr.includes('payment') ||
-        errorStr.includes('credit') ||
-        errorStr.includes('balance') ||
-        errorStr.includes('quota')
+        normalizedError.includes('payment') ||
+        normalizedError.includes('credit') ||
+        normalizedError.includes('balance') ||
+        normalizedError.includes('quota') ||
+        (eventType === 'session.error' && normalizedError.includes('model not found'))
       ) {
         return true;
       }
@@ -380,47 +779,115 @@ export function createConnectionManager(
     return `Insufficient credits: ${eventType}`;
   }
 
+  function maybeResumeNetworkWait(eventType: string, properties: Record<string, unknown>): void {
+    if (eventType !== 'session.network.restored') return;
+
+    const currentSessionId = state.currentSession?.kiloSessionId;
+    const sessionID = typeof properties.sessionID === 'string' ? properties.sessionID : undefined;
+    if (!currentSessionId || sessionID !== currentSessionId) return;
+
+    const requestID = typeof properties.requestID === 'string' ? properties.requestID : undefined;
+    if (!requestID) {
+      logToFile('session.network.restored without requestID — ignoring');
+      return;
+    }
+
+    // Keep forwarding the restored event to ingest; this only unblocks the local Kilo wait.
+    void resumeNetworkWait(requestID);
+  }
+
   /**
-   * Start the SDK event subscription. Runs in the background.
-   * Replaces the old SSE consumer with a typed event stream from the SDK.
+   * Attach an SDK event subscription: perform the HTTP handshake and, on
+   * success, launch the background stream consumer.
+   *
+   * Resolves only after `subscribeEvents` returns and the returned stream is
+   * being consumed — i.e. subsequent events from kilo will flow into the
+   * wrapper. Rejects if the handshake fails or returns no stream, so
+   * `open()` can propagate the failure to its caller.
+   *
+   * If a newer attach starts while this one is mid-handshake, the newer
+   * attach aborts this attach's controller and takes ownership of state;
+   * this attach silently returns in that case.
    */
-  function startEventSubscription(): void {
+  async function attachEventSubscription(): Promise<void> {
     // Abort the previous subscription's HTTP stream (if any) before starting
     // a new one.  This ensures the old `for await` loop unblocks immediately
     // instead of lingering until the next server-sent event arrives.
     eventSubscriptionAbort?.abort();
 
     const myGeneration = ++eventSubscriptionGeneration;
-    eventSubscriptionActive = true;
     const abortController = new AbortController();
     eventSubscriptionAbort = abortController;
-
-    // Store connections in state for external reference
+    // Publish connection references before awaiting the handshake so
+    // DO-initiated commands arriving on the ingest WS during the handshake
+    // window can still send events through the ingest socket. This matches
+    // the pre-split behavior. `eventSubscriptionActive` does NOT flip yet —
+    // `isConnected()` must stay false until the SSE stream is live.
     if (ingestWs) {
       state.setConnections(ingestWs, abortController);
       state.setSendToIngestFn(sendToIngest);
     }
 
+    // Cap the handshake on a stuck kilo server. Firing the abort on timeout
+    // propagates to the underlying fetch, so subscribeEvents() rejects and
+    // open() can roll back cleanly instead of hanging. The timer is cleared
+    // either on success or on any rejection below.
+    const handshakeTimeoutError = new Error(
+      `SSE subscribe handshake timed out after ${SUBSCRIBE_HANDSHAKE_TIMEOUT_MS}ms`
+    );
+    const handshakeTimer = setTimeout(() => {
+      abortController.abort(handshakeTimeoutError);
+    }, SUBSCRIBE_HANDSHAKE_TIMEOUT_MS);
+
+    let result: Awaited<ReturnType<WrapperKiloClient['subscribeEvents']>>;
+    try {
+      result = await config.kiloClient.subscribeEvents({
+        signal: abortController.signal,
+      });
+    } catch (err) {
+      clearTimeout(handshakeTimer);
+      // Superseded by a newer attach — silently yield to it.
+      if (myGeneration !== eventSubscriptionGeneration) return;
+      // If our own timeout fired, surface the timeout message rather than the
+      // generic AbortError the SDK throws.
+      if (abortController.signal.reason === handshakeTimeoutError) {
+        throw handshakeTimeoutError;
+      }
+      throw err;
+    }
+    clearTimeout(handshakeTimer);
+
+    // Superseded by a newer attach while we were awaiting — don't touch
+    // shared state; the newer attach owns it now.
+    if (myGeneration !== eventSubscriptionGeneration) return;
+
+    if (!result.stream) {
+      logToFile('No event stream returned from SDK');
+      callbacks.onDisconnect('No event stream from SDK');
+      throw new Error('No event stream from SDK');
+    }
+
+    logToFile('SDK event subscription started');
+
+    // Handshake succeeded — SSE stream is live, `isConnected()` may now
+    // return true. Start the background consumer.
+    eventSubscriptionActive = true;
+    consumeEventStream(myGeneration, abortController, result.stream);
+  }
+
+  /**
+   * Background consumer for an attached SDK event stream. Runs until the
+   * stream ends, the abort controller fires, or a newer subscription
+   * supersedes this one.
+   */
+  function consumeEventStream(
+    myGeneration: number,
+    abortController: AbortController,
+    stream: AsyncIterable<KiloEvent>
+  ): void {
     void (async () => {
       try {
-        // Arm the transport timer before subscribe() so a hung HTTP
-        // request (or a stalled initial SSE handshake) is detected
-        // within SSE_TRANSPORT_TIMEOUT_MS.
-        callbacks.onSseEvent?.();
-
-        const result = await config.kiloClient.sdkClient.event.subscribe({
-          signal: abortController.signal,
-        });
-        if (!result.stream) {
-          logToFile('No event stream returned from SDK');
-          eventSubscriptionActive = false;
-          callbacks.onDisconnect('No event stream from SDK');
-          return;
-        }
-
-        logToFile('SDK event subscription started');
-
-        for await (const event of result.stream) {
+        for await (const event of stream) {
           if (abortController.signal.aborted || myGeneration !== eventSubscriptionGeneration) break;
 
           // eventType is `string` so we can match untyped events like server.heartbeat
@@ -428,22 +895,27 @@ export function createConnectionManager(
           const properties: Record<string, unknown> = isRecord(event.properties)
             ? event.properties
             : {};
+          const gateResult = gateResultFromProperties(properties);
+          if (gateResult !== undefined) {
+            state.observeGateResult(gateResult);
+          }
 
           // Track activity
           state.updateActivity();
 
           if (eventType === 'server.connected') {
+            logToFile('SDK event subscription connected');
             callbacks.onSseEvent?.();
             continue;
           }
 
           // Forward kilo's heartbeat as ingest heartbeat (replaces wrapper's custom heartbeat)
           if (eventType === 'server.heartbeat') {
-            const job = state.currentJob;
-            if (job) {
+            const session = state.currentSession;
+            if (session) {
               sendToIngest({
                 streamEventType: 'heartbeat',
-                data: { executionId: job.executionId },
+                data: { kiloSessionId: session.kiloSessionId },
                 timestamp: new Date().toISOString(),
               });
             }
@@ -451,10 +923,20 @@ export function createConnectionManager(
             continue;
           }
 
+          if (isRootSessionActivity(eventType, properties, state.currentSession?.kiloSessionId)) {
+            callbacks.onRootSessionActivity?.();
+          }
+
           // Auto-approve permission requests so the kilo server never stalls
           // waiting for a human response that will never come.
           if (eventType === 'permission.asked') {
             const permId = typeof properties.id === 'string' ? properties.id : undefined;
+            if (isCodeReviewJob(state)) {
+              rejectCodeReviewPermission(permId, properties, state, config.kiloClient);
+              callbacks.onSseEvent?.();
+              continue;
+            }
+
             if (permId) {
               logToFile(`auto-approving permission ${permId} (${String(properties.permission)})`);
               config.kiloClient.answerPermission(permId, 'always').catch(err => {
@@ -466,6 +948,25 @@ export function createConnectionManager(
             callbacks.onSseEvent?.();
             continue;
           }
+
+          if (isCodeReviewJob(state)) {
+            if (eventType === 'question.asked') {
+              const questionId = typeof properties.id === 'string' ? properties.id : undefined;
+              rejectCodeReviewQuestion(questionId, config.kiloClient);
+              callbacks.onSseEvent?.();
+              continue;
+            }
+
+            if (
+              eventType === 'session.status' &&
+              isInteractiveStatusType(statusTypeFromProperties(properties))
+            ) {
+              callbacks.onSseEvent?.();
+              continue;
+            }
+          }
+
+          maybeResumeNetworkWait(eventType, properties);
 
           // Build and forward ingest event
           const untrimmedIngestEvent: IngestEvent = {
@@ -480,13 +981,21 @@ export function createConnectionManager(
 
           // Track the last root-session assistant message ID for autocommit association
           if (eventType === 'message.updated') {
-            const info = properties.info;
-            if (isRecord(info) && info.role === 'assistant' && typeof info.id === 'string') {
-              const msgSessionId = typeof info.sessionID === 'string' ? info.sessionID : undefined;
-              const currentSessionId = state.currentJob?.kiloSessionId;
+            const messageInfo = properties.info;
+            if (
+              isRecord(messageInfo) &&
+              messageInfo.role === 'assistant' &&
+              typeof messageInfo.id === 'string'
+            ) {
+              const msgSessionId =
+                typeof messageInfo.sessionID === 'string' ? messageInfo.sessionID : undefined;
+              const currentSessionId = state.currentSession?.kiloSessionId;
               if (!currentSessionId || msgSessionId === currentSessionId) {
-                state.setLastAssistantMessageId(info.id);
+                state.setLastAssistantMessageId(messageInfo.id);
               }
+            }
+            if (isAssistantCompletionSignal(messageInfo)) {
+              callbacks.onCompletionSignal();
             }
           }
 
@@ -507,16 +1016,18 @@ export function createConnectionManager(
               logToFile('session.idle without sessionID — ignoring');
               continue;
             }
-            const currentSessionId = state.currentJob?.kiloSessionId;
+            const currentSessionId = state.currentSession?.kiloSessionId;
             if (currentSessionId && sessionID !== currentSessionId) {
               logToFile(
                 `ignoring session.idle for child session: event=${sessionID} current=${currentSessionId}`
               );
               continue;
             }
-            logToFile('session.idle received - marking as complete');
-            callbacks.onMessageComplete('session.idle');
+            logToFile('session.idle received');
             callbacks.onCompletionSignal();
+            callbacks.onSessionIdle?.();
+            // For new path, forward the idle event to DO (already done via normal ingest)
+            // and let the DO schedule idle reconciliation.
           }
         }
 
@@ -556,6 +1067,11 @@ export function createConnectionManager(
     }
     // Send fresh kilo state snapshot after reconnecting
     void sendKiloSnapshot();
+    if (eventSubscriptionActive) {
+      void resumeRestoredNetworkWaits();
+    }
+    // Re-push command catalog — DO cache may have been evicted in the interim.
+    void sendCommandsAvailable();
     callbacks.onReconnected?.();
   }
 
@@ -621,11 +1137,43 @@ export function createConnectionManager(
       // Open ingest WS first
       await openIngestWs();
 
-      // Send initial kilo state snapshot before starting event subscription
+      // Send initial kilo state snapshot
       await sendKiloSnapshot();
 
-      // Start SDK event subscription (runs in background)
-      startEventSubscription();
+      // Push the slash-command catalog so the DO can hydrate connected clients.
+      // Best-effort: fire-and-forget, doesn't block readiness.
+      void sendCommandsAvailable();
+
+      // Wait for the SDK event subscription handshake to complete before
+      // returning. The caller (createPromptHandler) immediately POSTs
+      // /prompt_async after this resolves — if the subscription is not yet
+      // attached when the POST fires, fast kilo turns (hot session) publish
+      // session.idle to an empty subscriber list and the wrapper hangs.
+      try {
+        await attachEventSubscription();
+        void resumeRestoredNetworkWaits();
+      } catch (err) {
+        // Roll back the ingest WS + published state refs so open() is atomic.
+        // Callers rely on `isConnected()` returning false when open() rejects,
+        // and leaving a half-open WS or dangling state.sendToIngestFn behind
+        // would misrepresent the wrapper as connected.
+        eventSubscriptionAbort?.abort();
+        eventSubscriptionAbort = null;
+        eventSubscriptionActive = false;
+        if (ingestWs) {
+          closedByUs = true;
+          try {
+            ingestWs.close();
+          } catch {
+            // Ignore close errors
+          }
+          ingestWs = null;
+          closedByUs = false;
+        }
+        state.clearConnectionRefs();
+        state.setSendToIngestFn(null);
+        throw err;
+      }
 
       logToFile('connections opened');
     },
@@ -634,11 +1182,13 @@ export function createConnectionManager(
       logToFile('closing connections');
       generation++;
       cancelReconnect();
+      clearBuffer();
 
       // Stop event subscription — abort the HTTP stream so the for-await
       // loop unblocks immediately instead of waiting for the next SSE event.
       eventSubscriptionAbort?.abort();
       eventSubscriptionAbort = null;
+      eventSubscriptionActive = false;
 
       // Close ingest WS
       if (ingestWs) {
@@ -667,9 +1217,19 @@ export function createConnectionManager(
 
     reconnectEventSubscription: () => {
       logToFile('reconnecting SDK event subscription');
-      // startEventSubscription() aborts the previous controller internally,
-      // so no separate abort call is needed here.
-      startEventSubscription();
+      // attachEventSubscription() aborts the previous controller internally,
+      // so no separate abort call is needed here. Callers of this method
+      // (the SSE watchdog) do not await it; route failures through
+      // onDisconnect so the lifecycle manager can act.
+      void attachEventSubscription()
+        .then(() => {
+          if (eventSubscriptionActive) void resumeRestoredNetworkWaits();
+        })
+        .catch(err => {
+          const msg = err instanceof Error ? err.message : String(err);
+          logToFile(`reconnect event subscription failed: ${msg}`);
+          callbacks.onDisconnect(`reconnect event subscription failed: ${msg}`);
+        });
     },
 
     sendKiloSnapshot,

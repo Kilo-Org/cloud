@@ -283,15 +283,17 @@ function CustomModelPicker({
               {roleRows.map(([label, value, setValue]) => (
                 <div key={label} className="flex items-center gap-2">
                   <span className="w-16 shrink-0 text-xs text-white/40">{label}</span>
-                  <ModelCombobox
-                    label=""
-                    models={modelOptions}
-                    value={value}
-                    onValueChange={setValue}
-                    isLoading={isLoadingModels}
-                    placeholder="Use default"
-                    className="flex-1 border-white/[0.08] bg-white/[0.03] text-sm text-white/85"
-                  />
+                  <div className="min-w-0 flex-1">
+                    <ModelCombobox
+                      label=""
+                      models={modelOptions}
+                      value={value}
+                      onValueChange={setValue}
+                      isLoading={isLoadingModels}
+                      placeholder="Use default"
+                      className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85"
+                    />
+                  </div>
                   {value && (
                     <button
                       type="button"
@@ -327,7 +329,12 @@ export function OnboardingStepModel() {
   } = useModelSelectorList(undefined);
 
   const modelOptions = useMemo<ModelOption[]>(
-    () => modelsData?.data.map(model => ({ id: model.id, name: model.name })) ?? [],
+    () =>
+      modelsData?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+      })) ?? [],
     [modelsData]
   );
 

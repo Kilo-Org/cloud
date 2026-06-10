@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import {
   Settings,
@@ -24,12 +23,14 @@ import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect, type Repository } from './RepositoryMultiSelect';
+import { CodeReviewActionRequiredAlert } from './CodeReviewActionRequiredAlert';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import {
   getAvailableThinkingEfforts,
@@ -105,6 +106,9 @@ export function ReviewConfigForm({
   const isGitLab = platform === 'gitlab';
   const platformLabel = isGitLab ? 'GitLab' : 'GitHub';
   const prLabel = isGitLab ? 'merge requests' : 'pull requests';
+  const reviewMdGuideHref = organizationId
+    ? `/organizations/${organizationId}/code-reviews/review-md`
+    : '/code-reviews/review-md';
 
   // Fetch current config
   const {
@@ -201,12 +205,12 @@ export function ReviewConfigForm({
   );
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [customInstructions, setCustomInstructions] = useState('');
-  const [maxReviewTime, setMaxReviewTime] = useState([10]);
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
   const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>('all');
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
+  const [useReviewMd, setUseReviewMd] = useState(true);
   // Repositories added from search results (for GitLab where pagination limits initial results)
   const [searchAddedRepos, setSearchAddedRepos] = useState<Repository[]>([]);
   // GitLab-specific: auto-configure webhooks
@@ -300,7 +304,6 @@ export function ReviewConfigForm({
       setReviewStyle(configData.reviewStyle);
       setFocusAreas(configData.focusAreas);
       setCustomInstructions(configData.customInstructions || '');
-      setMaxReviewTime([configData.maxReviewTimeMinutes]);
       setSelectedModel(configData.modelSlug);
       setThinkingEffort(configData.thinkingEffort ?? null);
       setGateThreshold(configData.gateThreshold ?? 'off');
@@ -308,6 +311,7 @@ export function ReviewConfigForm({
       const repoMode = configData.repositorySelectionMode || 'all';
       setRepositorySelectionMode(isGitLab ? 'selected' : repoMode);
       setSelectedRepositoryIds(configData.selectedRepositoryIds || []);
+      setUseReviewMd(!(configData.disableReviewMd ?? false));
       // Load repositories that were added from search results
       if (configData.manuallyAddedRepositories) {
         setSearchAddedRepos(
@@ -451,13 +455,13 @@ export function ReviewConfigForm({
         reviewStyle,
         focusAreas,
         customInstructions: customInstructions.trim() || undefined,
-        maxReviewTimeMinutes: maxReviewTime[0],
         modelSlug: selectedModel,
         thinkingEffort,
         gateThreshold,
         repositorySelectionMode,
         selectedRepositoryIds,
         manuallyAddedRepositories,
+        disableReviewMd: !useReviewMd,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -467,13 +471,13 @@ export function ReviewConfigForm({
         reviewStyle,
         focusAreas,
         customInstructions: customInstructions.trim() || undefined,
-        maxReviewTimeMinutes: maxReviewTime[0],
         modelSlug: selectedModel,
         thinkingEffort,
         gateThreshold,
         repositorySelectionMode,
         selectedRepositoryIds,
         manuallyAddedRepositories,
+        disableReviewMd: !useReviewMd,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
       });
@@ -519,6 +523,14 @@ export function ReviewConfigForm({
       </CardHeader>
       <CardContent>
         <div className="space-y-8">
+          {configData?.actionRequired && (
+            <CodeReviewActionRequiredAlert
+              actionRequired={configData.actionRequired}
+              organizationId={organizationId}
+              compact
+            />
+          )}
+
           {/* Enable/Disable Toggle */}
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div className="space-y-0.5">
@@ -617,6 +629,30 @@ export function ReviewConfigForm({
                   </div>
                 ))}
               </RadioGroup>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="use-review-md" className="text-base font-semibold">
+                  Use REVIEW.md
+                </Label>
+                <p className="text-muted-foreground text-sm">
+                  Load REVIEW.md from the base branch when present and use it for
+                  repository-specific review guidance.
+                </p>
+                <Link
+                  href={reviewMdGuideHref}
+                  className="inline-flex text-sm text-blue-400 hover:text-blue-300"
+                >
+                  Learn about REVIEW.md
+                </Link>
+              </div>
+              <Switch
+                id="use-review-md"
+                checked={useReviewMd}
+                onCheckedChange={setUseReviewMd}
+                disabled={orgSaveMutation.isPending || personalSaveMutation.isPending || !isEnabled}
+              />
             </div>
 
             {/* Repository Selection */}
@@ -1007,22 +1043,6 @@ export function ReviewConfigForm({
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Max Review Time */}
-            <div className="space-y-3">
-              <Label>Maximum Review Time: {maxReviewTime[0]} minutes</Label>
-              <Slider
-                value={maxReviewTime}
-                onValueChange={setMaxReviewTime}
-                min={5}
-                max={30}
-                step={1}
-                className="w-full"
-              />
-              <p className="text-muted-foreground text-sm">
-                Timeout for the code review workflow (5-30 minutes)
-              </p>
             </div>
 
             {/* Custom Instructions */}

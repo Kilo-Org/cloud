@@ -25,6 +25,7 @@ describe('isUserRateLimitedFeature', () => {
     expect(isUserRateLimitedFeature('cloud-agent')).toBe(true);
     expect(isUserRateLimitedFeature('code-review')).toBe(true);
     expect(isUserRateLimitedFeature('app-builder')).toBe(true);
+    expect(isUserRateLimitedFeature('gastown')).toBe(true);
   });
 
   test('returns false for client-side products', () => {

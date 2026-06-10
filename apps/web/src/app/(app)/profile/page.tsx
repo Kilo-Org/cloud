@@ -6,7 +6,7 @@ import ProfileExpiringCredits from '@/components/profile/ProfileExpiringCredits'
 import { getCustomerInfo } from '@/lib/customerInfo';
 import { DevNukeAccountButton } from '@/components/dev/DevNukeAccountButton';
 import { DevConsumeCreditsButton } from '@/components/dev/DevConsumeCreditsButton';
-import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { getOAuthDisplayNames } from '@/lib/user';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
 import { cookies } from 'next/headers';

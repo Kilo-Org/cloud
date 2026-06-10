@@ -77,19 +77,19 @@ Deploys to: `cloudflare-webhook-agent-ingest`
 
 ### Quick Reference
 
-| Endpoint                                             | Method | Auth         | Description             |
-| ---------------------------------------------------- | ------ | ------------ | ----------------------- |
-| `/health`                                            | GET    | None         | Health check            |
-| `/inbound/user/:userId/:triggerId`                   | ANY    | None         | Personal webhook ingest |
-| `/inbound/org/:orgId/:triggerId`                     | ANY    | None         | Org webhook ingest      |
-| `/api/triggers/user/:userId/:triggerId`              | POST   | Internal API | Create personal trigger |
-| `/api/triggers/user/:userId/:triggerId`              | DELETE | Internal API | Delete personal trigger |
-| `/api/triggers/user/:userId/:triggerId/requests`     | GET    | Internal API | List personal requests  |
-| `/api/triggers/user/:userId/:triggerId/requests/:id` | GET    | Internal API | Get personal request    |
-| `/api/triggers/org/:orgId/:triggerId`                | POST   | Internal API | Create org trigger      |
-| `/api/triggers/org/:orgId/:triggerId`                | DELETE | Internal API | Delete org trigger      |
-| `/api/triggers/org/:orgId/:triggerId/requests`       | GET    | Internal API | List org requests       |
-| `/api/triggers/org/:orgId/:triggerId/requests/:id`   | GET    | Internal API | Get org request         |
+| Endpoint | Method | Auth | Description |
+|---|---|---|---|
+| `/health` | GET | None | Health check |
+| `/inbound/user/:userId/:triggerId` | ANY | None | Personal webhook ingest |
+| `/inbound/org/:orgId/:triggerId` | ANY | None | Org webhook ingest |
+| `/api/triggers/user/:userId/:triggerId` | POST | Internal API | Create personal trigger |
+| `/api/triggers/user/:userId/:triggerId` | DELETE | Internal API | Delete personal trigger |
+| `/api/triggers/user/:userId/:triggerId/requests` | GET | Internal API | List personal requests |
+| `/api/triggers/user/:userId/:triggerId/requests/:id` | GET | Internal API | Get personal request |
+| `/api/triggers/org/:orgId/:triggerId` | POST | Internal API | Create org trigger |
+| `/api/triggers/org/:orgId/:triggerId` | DELETE | Internal API | Delete org trigger |
+| `/api/triggers/org/:orgId/:triggerId/requests` | GET | Internal API | List org requests |
+| `/api/triggers/org/:orgId/:triggerId/requests/:id` | GET | Internal API | Get org request |
 
 ### Webhook URL Format
 
@@ -218,24 +218,24 @@ curl -X DELETE "https://localhost:8793/api/triggers/org/org_xyz789/my-github-web
 
 Captured requests go through the following status lifecycle:
 
-| Status       | Description                         |
-| ------------ | ----------------------------------- |
-| `captured`   | Request received and stored         |
+| Status | Description |
+|---|---|
+| `captured` | Request received and stored |
 | `inprogress` | Being processed by cloud-agent-next |
-| `success`    | Successfully processed              |
-| `failed`     | Processing failed                   |
+| `success` | Successfully processed |
+| `failed` | Processing failed |
 
 ## Environment Variables
 
-| Variable                    | Description                   |
-| --------------------------- | ----------------------------- |
-| `ENVIRONMENT`               | `production` or `development` |
-| `KILOCODE_BACKEND_BASE_URL` | Backend API URL               |
+| Variable | Description |
+|---|---|
+| `ENVIRONMENT` | `production` or `development` |
+| `KILOCODE_BACKEND_BASE_URL` | Backend API URL |
 
 ## Secrets (via Secrets Store)
 
-| Secret                | Description                                            |
-| --------------------- | ------------------------------------------------------ |
+| Secret | Description |
+|---|---|
 | `INTERNAL_API_SECRET` | Internal API key for backend-to-backend authentication |
 
 ## Authentication
@@ -259,16 +259,16 @@ The following resources are already configured:
 
 ### Queues
 
-| Queue                  | Environment |
-| ---------------------- | ----------- |
-| `webhook-delivery`     | Production  |
+| Queue | Environment |
+|---|---|
+| `webhook-delivery` | Production |
 | `webhook-delivery-dev` | Development |
 
 ### Service Bindings
 
-| Binding       | Target Worker          | Environment |
-| ------------- | ---------------------- | ----------- |
-| `CLOUD_AGENT` | `cloud-agent-next`     | Production  |
+| Binding | Target Worker | Environment |
+|---|---|---|
+| `CLOUD_AGENT` | `cloud-agent-next` | Production |
 | `CLOUD_AGENT` | `cloud-agent-next-dev` | Development |
 
 ### KV Namespaces
@@ -313,9 +313,9 @@ Copy the generated `id` and update `wrangler.jsonc` in the dev environment's `kv
 ]
 ```
 
-| KV Namespace          | Purpose                                 | Environment |
-| --------------------- | --------------------------------------- | ----------- |
-| `WEBHOOK_TOKEN_CACHE` | Cache API tokens (30m TTL, 1h validity) | Production  |
+| KV Namespace | Purpose | Environment |
+|---|---|---|
+| `WEBHOOK_TOKEN_CACHE` | Cache API tokens (30m TTL, 1h validity) | Production |
 | `WEBHOOK_TOKEN_CACHE` | Cache API tokens (30m TTL, 1h validity) | Development |
 
 ## Queue Consumer
@@ -332,8 +332,8 @@ The worker includes a queue consumer that processes webhook delivery messages fr
 
 ### Queue Configuration
 
-| Setting             | Value | Description                           |
-| ------------------- | ----- | ------------------------------------- |
-| `max_batch_size`    | 10    | Maximum messages per batch            |
-| `max_batch_timeout` | 30    | Seconds to wait before processing     |
-| `max_retries`       | 3     | Maximum retry attempts before failing |
+| Setting | Value | Description |
+|---|---|---|
+| `max_batch_size` | 10 | Maximum messages per batch |
+| `max_batch_timeout` | 30 | Seconds to wait before processing |
+| `max_retries` | 3 | Maximum retry attempts before failing |

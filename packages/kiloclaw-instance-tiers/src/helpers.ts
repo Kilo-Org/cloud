@@ -83,8 +83,15 @@ export function canUpgradeTo(args: {
   const currentCpus = args.currentSize?.cpus ?? baseline.machineSize.cpus;
   const currentMemoryMb = args.currentSize?.memory_mb ?? baseline.machineSize.memory_mb;
   const currentVolumeSizeGb = args.currentVolumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB;
+  const currentCpuKind = args.currentSize ? normalizedCpuKind(args.currentSize) : 'performance';
+  const targetCpuKind = normalizedCpuKind(target.machineSize);
+  // A performance CPU is strictly stronger than a shared CPU, so a shared →
+  // performance move is allowed regardless of CPU count.
+  const cpusOk =
+    (currentCpuKind === 'shared' && targetCpuKind === 'performance') ||
+    target.machineSize.cpus >= currentCpus;
   return (
-    target.machineSize.cpus >= currentCpus &&
+    cpusOk &&
     target.machineSize.memory_mb >= currentMemoryMb &&
     target.volumeSizeGb >= currentVolumeSizeGb
   );

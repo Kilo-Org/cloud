@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { OrganizationUsageDetailsPage } from '@/components/organizations/usage-details/OrganizationUsageDetails';
+import { UsageAnalyticsDashboard } from '@/components/usage-analytics/UsageAnalyticsDashboard';
 
 export default async function OrganizationUsageStatsPage({
   params,
@@ -9,8 +9,15 @@ export default async function OrganizationUsageStatsPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => (
-        <OrganizationUsageDetailsPage organizationId={organization.id} />
+      fullBleed
+      render={({ organization, role }) => (
+        <UsageAnalyticsDashboard
+          context="organization"
+          organizationId={organization.id}
+          organizationName={organization.name}
+          callerRole={role}
+          title={`Usage — ${organization.name}`}
+        />
       )}
     />
   );

@@ -19,8 +19,12 @@ import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { db } from '@/lib/drizzle';
-import { microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/schema';
-import { eq, getTableColumns } from 'drizzle-orm';
+import {
+  microdollar_usage,
+  microdollar_usage_daily,
+  microdollar_usage_metadata,
+} from '@kilocode/db/schema';
+import { and, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
 import { findUserById } from '../user';
 import { Readable } from 'node:stream';
 import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
@@ -244,13 +248,7 @@ describe('mapToUsageStats approval tests', () => {
   test(claudeSonnetGeneration, async () => {
     const inputFile = join(sampleDir, claudeSonnetGeneration);
     const generationData = JSON.parse(await readFile(inputFile, 'utf-8')) as OpenRouterGeneration;
-    const result = mapToUsageStats(
-      generationData,
-      'nonsense',
-      'fake-user-id',
-      'fake-model',
-      'openrouter'
-    );
+    const result = mapToUsageStats(generationData, 'nonsense', 'fake-user-id', 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.mapToUsageStats.approved.json';
     await verifyApproval(resultString, approvalFilePath);
@@ -288,13 +286,7 @@ describe('mapToUsageStats', () => {
     };
 
     // Call mapToUsageStats with the BYOK generation
-    const result = mapToUsageStats(
-      byokGeneration,
-      'test response',
-      'fake-user-id',
-      'fake-model',
-      'openrouter'
-    );
+    const result = mapToUsageStats(byokGeneration, 'test response', 'fake-user-id', 'openrouter');
 
     // Verify that the cost is multiplied by OPENROUTER_BYOK_COST_MULTIPLIER
     expect(result.cost_mUsd).toBe(toMicrodollars(0.1 * 20.0)); // 0.1 * 20 = 2, then convert to microdollars
@@ -322,7 +314,6 @@ describe('mapToUsageStats', () => {
       nonByokGeneration,
       'test response',
       ' fake-user-id',
-      'fake-model',
       'openrouter'
     );
 
@@ -455,6 +446,34 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.session_id).toBe('task-abc123');
   });
 
+  test('stores abuse delay and original model when a request is quarantined', async () => {
+    const user = await insertTestUser({
+      id: 'test-log-user-abuse',
+      microdollars_used: 0,
+      google_user_email: 'abuse-test@example.com',
+    });
+
+    const usageStats: MicrodollarUsageStats = {
+      ...BASE_USAGE_STATS,
+      messageId: 'test-msg-abuse',
+      model: 'nvidia/nemotron-3-super-120b-a12b:free',
+    };
+    const usageContext: MicrodollarUsageContext = {
+      ...createBaseUsageContext(user),
+      requested_model: 'nvidia/nemotron-3-super-120b-a12b:free',
+      abuse_delay: 6000,
+      abuse_downgraded_from: 'openai/gpt-4o',
+    };
+
+    await logMicrodollarUsage(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, 'test-msg-abuse'),
+    });
+    expect(metadataRecord?.abuse_delay).toBe(6000);
+    expect(metadataRecord?.abuse_downgraded_from).toBe('openai/gpt-4o');
+  });
+
   test('stores usage data without incrementing user microdollars for zero cost', async () => {
     const user = await insertTestUser({
       id: 'test-log-user-2',
@@ -467,6 +486,7 @@ describe('logMicrodollarUsage', () => {
       messageId: 'test-msg-456',
       hasError: true,
       cost_mUsd: 0, // Zero cost
+      market_cost: 500,
       model: 'openai/gpt-4.1',
     };
 
@@ -482,7 +502,7 @@ describe('logMicrodollarUsage', () => {
       },
     };
 
-    await logMicrodollarUsage(usageStats, usageContext);
+    const usageIdentity = await logMicrodollarUsage(usageStats, usageContext);
 
     // Verify user microdollars were NOT incremented
     const updatedUser = await findUserById('test-log-user-2');
@@ -497,8 +517,11 @@ describe('logMicrodollarUsage', () => {
       where: eq(microdollar_usage.id, metadataRecord!.id),
     });
     expect(usageRecord).toBeTruthy();
+    expect(usageIdentity?.usageId).toBe(usageRecord?.id);
+    expect(usageIdentity?.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(usageRecord?.kilo_user_id).toBe('test-log-user-2');
     expect(usageRecord?.cost).toBe(0);
+    expect(metadataRecord?.market_cost).toBe(500);
     expect(usageRecord?.has_error).toBe(true);
     expect(usageRecord?.model).toBe('openai/gpt-4.1');
     expect(metadataRecord?.has_middle_out_transform).toBe(false);
@@ -740,6 +763,115 @@ describe('logMicrodollarUsage', () => {
     const updatedUser = await findUserById('test-insert-org-user');
     expect(updatedUser?.microdollars_used).toBe(4000); // unchanged
   });
+
+  test('insertUsageRecord populates microdollar_usage_daily for personal usage', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-personal-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-personal@example.com',
+    });
+
+    await insertUsageWithOverrides({
+      kilo_user_id: user.id,
+      cost: 1500,
+    });
+
+    const dailyRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(
+        and(
+          eq(microdollar_usage_daily.kilo_user_id, user.id),
+          isNull(microdollar_usage_daily.organization_id)
+        )
+      );
+
+    expect(dailyRows).toHaveLength(1);
+    expect(dailyRows[0].total_cost_microdollars).toBe(1500);
+    expect(dailyRows[0].organization_id).toBeNull();
+  });
+
+  test('insertUsageRecord increments microdollar_usage_daily on subsequent inserts on the same day', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-increment-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-increment@example.com',
+    });
+
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 1000 });
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 2500 });
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 700 });
+
+    const [row] = await db
+      .select({
+        total: sql<number>`coalesce(sum(${microdollar_usage_daily.total_cost_microdollars}), 0)::int`,
+      })
+      .from(microdollar_usage_daily)
+      .where(
+        and(
+          eq(microdollar_usage_daily.kilo_user_id, user.id),
+          isNull(microdollar_usage_daily.organization_id)
+        )
+      );
+
+    expect(row.total).toBe(4200);
+  });
+
+  test('insertUsageRecord writes org-scoped rollup separately from personal rollup', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-org-scope-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-org-scope@example.com',
+    });
+    const orgId = '11111111-1111-1111-1111-111111111111';
+
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 500 });
+    await insertUsageWithOverrides({
+      kilo_user_id: user.id,
+      organization_id: orgId,
+      cost: 9000,
+    });
+
+    const personalRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(
+        and(
+          eq(microdollar_usage_daily.kilo_user_id, user.id),
+          isNull(microdollar_usage_daily.organization_id)
+        )
+      );
+    expect(personalRows).toHaveLength(1);
+    expect(personalRows[0].total_cost_microdollars).toBe(500);
+
+    const orgRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(
+        and(
+          eq(microdollar_usage_daily.kilo_user_id, user.id),
+          eq(microdollar_usage_daily.organization_id, orgId)
+        )
+      );
+    expect(orgRows).toHaveLength(1);
+    expect(orgRows[0].total_cost_microdollars).toBe(9000);
+  });
+
+  test('insertUsageRecord skips microdollar_usage_daily for zero-cost rows', async () => {
+    const user = await insertTestUser({
+      id: 'test-daily-zero-cost-user',
+      microdollars_used: 0,
+      google_user_email: 'daily-zero@example.com',
+    });
+
+    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 0 });
+
+    const dailyRows = await db
+      .select()
+      .from(microdollar_usage_daily)
+      .where(eq(microdollar_usage_daily.kilo_user_id, user.id));
+    expect(dailyRows).toHaveLength(0);
+  });
 });
 
 describe('stripNulBytesInPlace', () => {
@@ -835,7 +967,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       ...overrides,
     }) satisfies MicrodollarUsageContext;
 
-  test('strips NUL bytes from body- and upstream-sourced string fields', () => {
+  test('strips NUL bytes from body- and upstream-sourced string fields', async () => {
     // Fields whose values cross the CTE insert as individual SQL parameters.
     // A NUL byte in any of them crashes the insert with Postgres 22021 --
     // see KILOCODE-WEB-1G3Z.
@@ -856,7 +988,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       },
     });
 
-    const { core, metadata } = toInsertableDbUsageRecord(
+    const { core, metadata } = await toInsertableDbUsageRecord(
       usageStats,
       extractUsageContextInfo(usageContext)
     );
@@ -882,7 +1014,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     }
   });
 
-  test('strips NUL bytes from a directly-constructed fraudHeaders object', () => {
+  test('strips NUL bytes from a directly-constructed fraudHeaders object', async () => {
     // Bypass Node's Headers validation to exercise the defensive coverage of
     // HTTP-header-sourced fields. This documents that IF a NUL byte ever
     // reaches these fields (e.g. through a future upstream change), the
@@ -899,7 +1031,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       },
     });
 
-    const { metadata } = toInsertableDbUsageRecord(
+    const { metadata } = await toInsertableDbUsageRecord(
       baseUsageStats,
       extractUsageContextInfo(usageContext)
     );
@@ -911,8 +1043,8 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(metadata.http_x_vercel_ja4_digest).toBe('abc');
   });
 
-  test('is a no-op on records without NUL bytes', () => {
-    const { core, metadata } = toInsertableDbUsageRecord(
+  test('is a no-op on records without NUL bytes', async () => {
+    const { core, metadata } = await toInsertableDbUsageRecord(
       baseUsageStats,
       extractUsageContextInfo(makeUsageContext())
     );
@@ -926,5 +1058,14 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(metadata.upstream_id).toBe('up');
     expect(metadata.finish_reason).toBe('stop');
     expect(metadata.message_id).toBe('msg-id');
+  });
+
+  test('stores audio transcription api kind metadata', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      baseUsageStats,
+      extractUsageContextInfo(makeUsageContext({ api_kind: 'audio_transcriptions' }))
+    );
+
+    expect(metadata.api_kind).toBe('audio_transcriptions');
   });
 });

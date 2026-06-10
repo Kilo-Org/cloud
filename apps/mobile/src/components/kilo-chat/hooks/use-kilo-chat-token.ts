@@ -58,11 +58,11 @@ export function useKiloChatTokenResponseGetter(): () => Promise<KiloChatTokenRes
       throw new Error('Cannot fetch kilo-chat token: not authenticated');
     }
 
-    if (cache && cache.authToken === authToken && cache.expiresAtMs - Date.now() > 60_000) {
+    if (cache?.authToken === authToken && cache.expiresAtMs - Date.now() > 60_000) {
       return cache.response;
     }
 
-    if (inFlight && inFlight.authToken === authToken) {
+    if (inFlight?.authToken === authToken) {
       return inFlight.promise;
     }
 

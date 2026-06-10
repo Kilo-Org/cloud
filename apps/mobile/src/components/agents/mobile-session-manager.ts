@@ -9,6 +9,8 @@ import {
   type ResolvedSession,
   type SessionManager,
   type SessionSnapshot,
+  type TransportSendPayload,
+  type UserWebConnection,
 } from 'cloud-agent-sdk';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import {
@@ -16,16 +18,14 @@ import {
   withCloudAgentDiagnostics,
 } from '@/components/agents/mobile-session-diagnostics';
 import { trpcClient } from '@/lib/trpc';
-import {
-  API_BASE_URL,
-  CLOUD_AGENT_WS_URL,
-  SESSION_INGEST_WS_URL,
-  WEB_BASE_URL,
-} from '@/lib/config';
+import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import { type SendMessagePayload } from '@/lib/cloud-agent-next/types';
+import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 
 type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
+  userWebConnection: UserWebConnection;
   organizationId?: string;
 };
 
@@ -33,15 +33,39 @@ type AgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
 
 const skipBatchOptions = { context: { skipBatch: true } };
 
+function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePayload {
+  if (payload.type === 'prompt') {
+    if (!payload.model) {
+      throw new Error('Model is required');
+    }
+
+    return {
+      type: 'prompt',
+      prompt: payload.prompt,
+      mode: normalizeAgentMode(payload.mode),
+      model: payload.model,
+      variant: payload.variant,
+    };
+  }
+
+  return {
+    type: 'command',
+    command: payload.command,
+    arguments: payload.arguments,
+  };
+}
+
 export function createMobileAgentSessionManager({
   store,
+  userWebConnection,
   organizationId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
   return createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
     websocketHeaders: { Origin: WEB_BASE_URL },
-    cliWebsocketUrl: `${SESSION_INGEST_WS_URL}/api/user/web`,
+    lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
+    userWebConnection,
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
       try {
         const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
@@ -109,33 +133,24 @@ export function createMobileAgentSessionManager({
         messages: messagesResult.messages as SessionSnapshot['messages'],
       };
     },
-    getAuthToken: async () => {
-      const result = await trpcClient.activeSessions.getToken.query();
-      return result.token;
-    },
     api: {
-      send: async payload => {
+      send: async input => {
         await withCloudAgentDiagnostics('send', organizationId, async () => {
-          if (!payload.model) {
-            throw new Error('Model is required');
-          }
-          const input = {
-            cloudAgentSessionId: payload.sessionId as string,
-            prompt: payload.prompt,
-            mode: normalizeAgentMode(payload.mode),
-            model: payload.model,
-            variant: payload.variant,
+          const payload = normalizeTransportPayload(input.payload);
+          const baseInput = {
+            cloudAgentSessionId: input.sessionId as string,
+            payload,
             autoCommit: true,
-            messageId: payload.messageId,
+            messageId: input.messageId,
           };
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
-              { ...input, organizationId },
+              { ...baseInput, organizationId },
               skipBatchOptions
             );
             return;
           }
-          await trpcClient.cloudAgentNext.sendMessage.mutate(input, skipBatchOptions);
+          await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
         });
       },
       interrupt: async payload => {
@@ -208,6 +223,9 @@ export function createMobileAgentSessionManager({
       const prepared = await withCloudAgentDiagnostics('prepare', organizationId, async () => {
         const castInput = {
           ...input,
+          initialPayload: input.initialPayload
+            ? normalizeTransportPayload(input.initialPayload)
+            : undefined,
           mode: input.mode as AgentMode,
         };
         const result = organizationId
@@ -267,6 +285,7 @@ export function createMobileAgentSessionManager({
         prompt: rs?.prompt ?? null,
         initialMessageId: rs?.initialMessageId ?? null,
         associatedPr: sessionResult.associatedPr,
+        runtimeAgents: rs?.runtimeAgents,
       };
     },
   });

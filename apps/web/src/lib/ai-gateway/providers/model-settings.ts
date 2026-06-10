@@ -1,21 +1,28 @@
-import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  isClaudeModel,
+  isFableModel,
+  isOpusModel,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { isAlibabaDirectModel } from '@/lib/ai-gateway/providers/qwen';
+import { isAlibabaDirectModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrokModel, isGrokToggleableReasoningModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
-  OpenClawModelSettings,
+  OpenCodePrompt,
   OpenCodeSettings,
 } from '@kilocode/db/schema-types';
+import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
+import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
+import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
-  thinking: { reasoning: { enabled: true, effort: 'medium' } },
+  thinking: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
 export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
@@ -34,25 +41,46 @@ export const REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH = {
   ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
 } as const;
 
+export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
+  none: { reasoning: { enabled: false, effort: 'none' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+} as const;
+
+const REASONING_VARIANTS_CLAUDE_BASE = {
+  none: { reasoning: { enabled: false, effort: 'none' } },
+  low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+  medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+  high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+} as const;
+
+export const REASONING_VARIANTS_CLAUDE = {
+  ...REASONING_VARIANTS_CLAUDE_BASE,
+  max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
+} as const;
+
+export const REASONING_VARIANTS_OPUS = {
+  ...REASONING_VARIANTS_CLAUDE_BASE,
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
+  max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
+} as const;
+
+export const REASONING_VARIANTS_SEED = {
+  none: { reasoning: { enabled: false, effort: 'minimal' } },
+  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+} as const;
+
+export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
+  instant: REASONING_VARIANTS_BINARY.instant,
+  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+} as const;
+
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  if (isOpusModel(model) && model.includes('4.7')) {
-    return {
-      none: { reasoning: { enabled: false, effort: 'none' } },
-      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
-      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-      xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
-      max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
-    };
+  if (isOpusModel(model) || isFableModel(model)) {
+    return REASONING_VARIANTS_OPUS;
   }
   if (isClaudeModel(model)) {
-    return {
-      none: { reasoning: { enabled: false, effort: 'none' } },
-      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
-      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-      max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
-    };
+    return REASONING_VARIANTS_CLAUDE;
   }
   if (model.includes('codex') || isGemini3Model(model)) {
     return Object.fromEntries(
@@ -68,35 +96,38 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
+  if (model.includes('mistral-medium-3-5')) {
+    return REASONING_VARIANTS_BINARY;
+  }
   if (
+    isMinimaxModel(model) ||
     isKimiModel(model) ||
     isGlmModel(model) ||
     isGrokToggleableReasoningModel(model) ||
-    isAlibabaDirectModel(model) ||
-    isGemmaModel(model)
+    isQwenModel(model) ||
+    isGemmaModel(model) ||
+    model.includes('mimo')
   ) {
     return REASONING_VARIANTS_BINARY;
   }
   if (model === seed_20_code_free_model.public_id) {
-    return {
-      none: { reasoning: { enabled: false, effort: 'minimal' } },
-      low: { reasoning: { enabled: true, effort: 'low' } },
-      medium: { reasoning: { enabled: true, effort: 'medium' } },
-      high: { reasoning: { enabled: true, effort: 'high' } },
-    };
+    return REASONING_VARIANTS_SEED;
   }
   if (model.startsWith('inception/mercury-2')) {
-    return {
-      instant: { reasoning: { enabled: false, effort: 'none' } },
-      low: { reasoning: { enabled: true, effort: 'low' } },
-      medium: { reasoning: { enabled: true, effort: 'medium' } },
-      high: { reasoning: { enabled: true, effort: 'high' } },
-    };
+    return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
+  }
+  if (isStepModel(model)) {
+    return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
+  }
+  if (isDeepseekModel(model)) {
+    return REASONING_VARIANTS_NONE_HIGH_XHIGH;
   }
   return undefined;
 }
 
-function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
+export function getAiSdkProvider(
+  model: string
+): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
   if (isAlibabaDirectModel(model)) {
     // with 'openai' (Responses) prompt caching doesn't work
     // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
@@ -118,19 +149,16 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
   return undefined;
 }
 
+function getOpenCodePrompt(model: string): OpenCodePrompt | undefined {
+  if (model.includes('gpt-5.5')) {
+    return 'gpt55';
+  }
+  return undefined;
+}
+
 export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined {
   const ai_sdk_provider = getAiSdkProvider(model);
   const variants = getModelVariants(model);
-  return { ai_sdk_provider, variants };
-}
-
-export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {
-  // 2026-04-28: this is aspirational, the OpenClaw Kilo provider does not respect this
-  if (isClaudeModel(model)) {
-    return { api_adapter: 'anthropic-messages' };
-  }
-  if (isOpenAiModel(model) || isGrokModel(model)) {
-    return { api_adapter: 'openai-responses' };
-  }
-  return undefined;
+  const prompt = getOpenCodePrompt(model);
+  return { ai_sdk_provider, variants, prompt };
 }

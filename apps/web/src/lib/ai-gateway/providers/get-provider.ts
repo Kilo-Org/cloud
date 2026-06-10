@@ -1,6 +1,7 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { isKiloExclusiveModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel, isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
@@ -11,47 +12,56 @@ import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
-import type { BYOKResult, GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
+import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import { CustomLlmDefinitionSchema } from '@kilocode/db';
+import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
+import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import {
-  CustomLlmDefinitionSchema,
-  type OpenClawApiAdapter,
-  type CustomLlmProvider,
-} from '@kilocode/db';
-import {
-  addCacheBreakpoints,
-  injectReasoningIntoContent,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+  pickModelExperimentVariant,
+  type AllocationSubject,
+} from '@/lib/ai-gateway/experiments/pick-variant';
 
-function inferSupportedChatApis(
-  aiSdkProvider: CustomLlmProvider | undefined,
-  openClawApiAdapter: OpenClawApiAdapter | undefined
-): ReadonlyArray<GatewayChatApiKind> {
-  const result = new Array<GatewayChatApiKind>();
-  if (aiSdkProvider === 'openai' || openClawApiAdapter === 'openai-responses') {
-    result.push('responses');
-  }
-  if (aiSdkProvider === 'anthropic' || openClawApiAdapter === 'anthropic-messages') {
-    result.push('messages');
-  }
-  if (
-    aiSdkProvider === 'openai-compatible' ||
-    aiSdkProvider === 'alibaba' ||
-    aiSdkProvider === 'openrouter' ||
-    openClawApiAdapter === 'openai-completions' ||
-    result.length === 0
-  ) {
-    result.push('chat_completions');
-  }
-  return result;
-}
+/**
+ * Metadata about the experiment that resolved this provider, attached when
+ * routing chose a model_experiment_variant_version. Persisted in the
+ * `model_experiment_request` row by Phase 4 attribution.
+ */
+export type ExperimentRouting = {
+  experimentId: string;
+  variantId: string;
+  variantVersionId: string;
+  allocationSubject: AllocationSubject;
+};
+
+export type GetProviderProviderResult = {
+  kind: 'provider';
+  provider: Provider;
+  userByok: BYOKResult[] | null;
+  /** Skip balance, paid-auth, and organization policy checks entirely. Used
+   *  by direct-byok and custom_llm2 because both already require explicit
+   *  admin opt-in. */
+  bypassAccessCheck: boolean;
+  /** Present when this provider was resolved through a model experiment. */
+  experiment?: ExperimentRouting;
+};
+
+/**
+ * Discriminated routing result. `not-found` maps to the local
+ * model-unavailable response (used by paused experiments); `unavailable`
+ * maps to a 503 temporarily-unavailable response (cache/DB/config failure).
+ */
+export type GetProviderResult =
+  | GetProviderProviderResult
+  | { kind: 'not-found' }
+  | { kind: 'unavailable' };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
-) {
+): Promise<GetProviderProviderResult | null> {
   const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
   if (!directByok || !directByokModel) {
     return null;
@@ -63,11 +73,12 @@ async function checkDirectBYOK(
     return null;
   }
   return {
+    kind: 'provider',
     provider: {
       id: 'direct-byok',
       apiUrl: directByok.base_url,
       apiKey: userByok[0].decryptedAPIKey,
-      supportedChatApis: inferSupportedChatApis(directByok.ai_sdk_provider, undefined),
+      supportedChatApis: directByok.supported_chat_apis,
       transformRequest(context) {
         context.request.body.model = directByokModel.id;
         directByok.transformRequest(context);
@@ -81,7 +92,7 @@ async function checkDirectBYOK(
 async function checkCustomLlm(
   requestedModel: string,
   organizationId: string
-): Promise<{ provider: Provider; userByok: null; bypassAccessCheck: true } | null> {
+): Promise<GetProviderProviderResult | null> {
   const [row] = await db
     .select()
     .from(custom_llm2)
@@ -95,32 +106,21 @@ async function checkCustomLlm(
     return null;
   }
   return {
-    provider: {
-      id: 'custom',
-      apiUrl: customLlm.base_url,
-      apiKey: customLlm.api_key,
-      supportedChatApis: inferSupportedChatApis(
-        customLlm.opencode_settings?.ai_sdk_provider,
-        customLlm.openclaw_settings?.api_adapter
-      ),
-      transformRequest(context) {
-        if (customLlm.remove_from_body) {
-          const body = context.request.body as Record<string, unknown>;
-          for (const key of customLlm.remove_from_body ?? []) {
-            delete body[key];
-          }
-        }
-        Object.assign(context.request.body, customLlm.extra_body ?? {});
-        Object.assign(context.extraHeaders, customLlm.extra_headers ?? {});
-        context.request.body.model = customLlm.internal_id;
-        if (customLlm.add_cache_breakpoints) {
-          addCacheBreakpoints(context.request);
-        }
-        if (customLlm.inject_reasoning_into_content) {
-          injectReasoningIntoContent(context.request);
-        }
-      },
-    },
+    kind: 'provider',
+    provider: buildDirectProvider('custom', {
+      internal_id: customLlm.internal_id,
+      base_url: customLlm.base_url,
+      api_key: customLlm.api_key,
+      opencode_settings: customLlm.opencode_settings
+        ? { ai_sdk_provider: customLlm.opencode_settings.ai_sdk_provider }
+        : undefined,
+      extra_body: customLlm.extra_body,
+      extra_headers: customLlm.extra_headers,
+      remove_from_body: customLlm.remove_from_body,
+      add_cache_breakpoints: customLlm.add_cache_breakpoints,
+      remove_cache_breakpoints: customLlm.remove_cache_breakpoints,
+      inject_reasoning_into_content: customLlm.inject_reasoning_into_content,
+    }),
     userByok: null,
     bypassAccessCheck: true,
   };
@@ -146,13 +146,24 @@ async function checkVercelBYOK(
     : getBYOKforUser(db, user.id, modelProviders);
 }
 
-export async function getProvider(
-  requestedModel: string,
-  request: GatewayRequest,
-  user: User | AnonymousUserContext,
-  organizationId: string | undefined,
-  taskId: string | undefined
-): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
+export type GetProviderInput = {
+  requestedModel: string;
+  request: GatewayRequest;
+  user: User | AnonymousUserContext;
+  organizationId: string | undefined;
+  taskId: string | undefined;
+  /** Resolved client IP from the route handler. Used as the IP-cohort
+   *  allocation subject for experiment routing when no userId/machineId
+   *  is available. */
+  clientIp: string | null;
+  /** Machine identifier from `x-kilocode-machineid`. Used as the machine-
+   *  cohort allocation subject for experiment routing. */
+  machineId: string | null;
+};
+
+export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
+  const { requestedModel, request, user, organizationId, taskId, clientIp, machineId } = input;
+
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
     return directByokByok;
@@ -161,20 +172,63 @@ export async function getProvider(
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
   if (vercelByok) {
     return {
+      kind: 'provider',
       provider: PROVIDERS.VERCEL_AI_GATEWAY,
       userByok: vercelByok,
       bypassAccessCheck: false,
     };
   }
 
-  if (requestedModel.startsWith('kilo-internal/') && organizationId) {
+  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
+
+  // Model experiment routing for dedicated preview public ids. Runs before
+  // the custom-LLM (`kilo-internal/...`) and the `kiloExclusiveModels` lookup
+  // so an experimented public id never falls through to OpenRouter/Vercel.
+  const experimented = await isPublicIdExperimented(requestedModel);
+  if (experimented === true) {
+    if (kiloExclusiveModel) {
+      throw new Error(
+        `Configuration error: ${requestedModel} cannot be both an experiment and a Kilo-exclusive model`
+      );
+    }
+    const userId = isAnonymousContext(user) ? null : user.id;
+    const selection = await pickModelExperimentVariant({
+      publicModelId: requestedModel,
+      userId,
+      machineId,
+      clientIp,
+    });
+    if (selection?.status === 'not-found') {
+      return { kind: 'not-found' };
+    }
+    if (selection?.status === 'unavailable') {
+      return { kind: 'unavailable' };
+    }
+    if (selection?.status === 'active') {
+      return {
+        kind: 'provider',
+        provider: buildDirectProvider('experiment', selection.upstream),
+        userByok: null,
+        bypassAccessCheck: false,
+        experiment: {
+          experimentId: selection.experimentId,
+          variantId: selection.variantId,
+          variantVersionId: selection.variantVersionId,
+          allocationSubject: selection.allocationSubject,
+        },
+      };
+    }
+    // selection === null: cache+DB say no routing-relevant experiment for
+    // this id. Fall through to non-experiment routing.
+  }
+
+  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId) {
     const customLlmResult = await checkCustomLlm(requestedModel, organizationId);
     if (customLlmResult) {
       return customLlmResult;
     }
   }
 
-  const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
 
@@ -182,10 +236,16 @@ export async function getProvider(
     eligibleForVercelRouting &&
     (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
   ) {
-    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };
+    return {
+      kind: 'provider',
+      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      userByok: null,
+      bypassAccessCheck: false,
+    };
   }
 
   return {
+    kind: 'provider',
     provider:
       Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
       PROVIDERS.OPENROUTER,
@@ -206,5 +266,12 @@ export async function getEmbeddingProvider(
   }
 
   // 2. All non-BYOK embedding requests go through OpenRouter
+  return { provider: PROVIDERS.OPENROUTER, userByok: null };
+}
+
+export async function getTranscriptionProvider(): Promise<{
+  provider: Provider;
+  userByok: BYOKResult[] | null;
+}> {
   return { provider: PROVIDERS.OPENROUTER, userByok: null };
 }

@@ -95,6 +95,8 @@ vi.mock('../lib/user-flags', () => ({
 vi.mock('../db', () => ({
   getWorkerDb: vi.fn(() => ({})),
   getActivePersonalInstance: vi.fn().mockResolvedValue(null),
+  getInstanceById: vi.fn().mockResolvedValue(null),
+  getInstanceByIdIncludingDestroyed: vi.fn().mockResolvedValue(null),
   findPepperByUserId: vi.fn().mockResolvedValue({
     id: 'user-1',
     api_token_pepper: 'pepper-1',
@@ -206,10 +208,16 @@ function createFakeStorage() {
       }
       return result;
     },
+    list(): Map<string, unknown> {
+      return new Map(store);
+    },
     put(entries: Record<string, unknown>): void {
       for (const [k, v] of Object.entries(entries)) {
         store.set(k, v);
       }
+    },
+    delete(key: string): void {
+      store.delete(key);
     },
     deleteAll(): void {
       store.clear();
@@ -223,6 +231,22 @@ function createFakeStorage() {
     },
     deleteAlarm(): void {
       alarmTime = null;
+    },
+    async transaction(callback: (txn: unknown) => Promise<unknown>): Promise<unknown> {
+      return await callback({
+        put(entries: Record<string, unknown>): void {
+          for (const [k, v] of Object.entries(entries)) store.set(k, v);
+        },
+        delete(keys: string | string[]): void {
+          for (const key of Array.isArray(keys) ? keys : [keys]) store.delete(key);
+        },
+        setAlarm(time: number): void {
+          alarmTime = time;
+        },
+        deleteAlarm(): void {
+          alarmTime = null;
+        },
+      });
     },
     // Test helpers
     _store: store,
@@ -255,6 +279,15 @@ function createFakeEnv(opts: { includeNorthflank?: boolean } = {}) {
     KILOCLAW_APP: {
       idFromName: vi.fn().mockReturnValue('fake-do-id'),
       get: vi.fn().mockReturnValue(appStub),
+    } as unknown,
+    KILOCLAW_REGISTRY: {
+      idFromName: vi.fn((key: string) => key),
+      get: vi.fn().mockReturnValue({
+        destroyInstance: vi.fn().mockResolvedValue(undefined),
+        finalizeDestroyedInstance: vi.fn().mockResolvedValue(undefined),
+        releaseFreshProvision: vi.fn().mockResolvedValue(undefined),
+        listInstances: vi.fn().mockResolvedValue([]),
+      }),
     } as unknown,
     HYPERDRIVE: { connectionString: 'postgresql://fake' } as unknown,
     AGENT_ENV_VARS_PRIVATE_KEY: 'test-private-key',
@@ -496,6 +529,14 @@ beforeEach(() => {
           })
         );
       }
+      if (typeof url === 'string' && url.includes('/_kilo/morning-briefing/user-location')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, userLocation: null }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
       // Root path probe — return non-502
       return Promise.resolve({ ok: true, status: 200 });
     })
@@ -552,6 +593,36 @@ describe('two-phase destroy', () => {
     expect(destroyEvents[0]?.blobs).toEqual(expect.arrayContaining(['manual_user_request']));
   });
 
+  it('does not release an admission reservation during bootstrap cleanup destruction', async () => {
+    const env = createFakeEnv();
+    const registryStub = (env.KILOCLAW_REGISTRY as unknown as { get: Mock }).get('user:user-1') as {
+      finalizeDestroyedInstance: Mock;
+    };
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage, { sandboxId: 'ki_11111111111141118111111111111111' });
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.destroy({ reason: 'bootstrap_cleanup_failure' });
+
+    expect(registryStub.finalizeDestroyedInstance).not.toHaveBeenCalled();
+    expect(storage._store.get('pendingRegistryCleanup')).toEqual(
+      expect.objectContaining({ releaseProvisionReservation: false })
+    );
+
+    await instance.allowProvisionReservationReleaseOnFinalize();
+
+    expect(registryStub.finalizeDestroyedInstance).toHaveBeenCalledWith(
+      'user:user-1',
+      'user-1',
+      '11111111-1111-4111-8111-111111111111',
+      '11111111-1111-4111-8111-111111111111',
+      'instance_destroyed'
+    );
+    expect(storage._store.has('pendingRegistryCleanup')).toBe(false);
+  });
+
   it('keeps pendingDestroyMachineId when machine delete fails', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage);
@@ -561,14 +632,43 @@ describe('two-phase destroy', () => {
     );
     (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
 
-    await instance.destroy();
+    const result = await instance.destroy();
 
     // Storage NOT cleared — pending machine ID preserved
+    expect(result).toEqual(
+      expect.objectContaining({
+        finalized: false,
+        pendingMachineId: 'machine-1',
+        pendingVolumeId: null,
+        lastDestroyErrorOp: 'machine',
+        lastDestroyErrorStatus: 500,
+      })
+    );
+    expect(result.lastDestroyErrorAt).toEqual(expect.any(Number));
     expect(storage._store.get('pendingDestroyMachineId')).toBe('machine-1');
     expect(storage._store.get('pendingDestroyVolumeId')).toBeNull();
+    expect(storage._store.get('destroyStartedAt')).toBeTypeOf('number');
     expect(storage._store.get('status')).toBe('destroying');
     // Alarm scheduled for retry
     expect(storage._getAlarm()).not.toBeNull();
+  });
+
+  it('emits destroy_pending telemetry when inline destroy does not finalize', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage);
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockRejectedValue(
+      new FlyApiError('server error', 500, 'fail')
+    );
+
+    await instance.destroy();
+
+    const pendingEvents = analyticsEventsByName(env, 'reconcile.destroy_pending');
+    expect(pendingEvents).toHaveLength(1);
+    expect(pendingEvents[0]?.blobs).toEqual(expect.arrayContaining(['volume']));
+    expect(pendingEvents[0]?.doubles).toEqual(expect.arrayContaining([expect.any(Number)]));
   });
 
   it('keeps pendingDestroyVolumeId when volume delete fails', async () => {
@@ -631,9 +731,11 @@ describe('two-phase destroy', () => {
     await expect(instance.destroy()).resolves.toBeDefined();
   });
 
-  it('alarm retries pending destroy to completion', async () => {
-    const { instance, storage } = createInstance();
+  it('alarm retries pending destroy to completion and releases its provision reservation', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(createFakeStorage(), env);
     await seedProvisioned(storage, {
+      sandboxId: 'ki_11111111111141118111111111111111',
       status: 'destroying',
       flyMachineId: 'machine-1',
       flyVolumeId: 'vol-1',
@@ -669,12 +771,96 @@ describe('two-phase destroy', () => {
     (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
 
     // Need a fresh instance to re-loadState from storage
-    const { instance: inst2 } = createInstance(storage);
+    const { instance: inst2 } = createInstance(storage, env);
     await inst2.alarm();
 
     // Now fully cleaned up
     expect(storage._store.size).toBe(0);
     expect(storage._getAlarm()).toBeNull();
+    const registryStub = (env.KILOCLAW_REGISTRY as unknown as { get: Mock }).get.mock.results[0]
+      ?.value as { finalizeDestroyedInstance: Mock };
+    expect(registryStub.finalizeDestroyedInstance).toHaveBeenCalledWith(
+      'user:user-1',
+      'user-1',
+      '11111111-1111-4111-8111-111111111111',
+      '11111111-1111-4111-8111-111111111111',
+      'instance_destroyed'
+    );
+  });
+
+  it('releases a pending reservation after alarm sees canonical Postgres destroy confirmation', async () => {
+    const env = createFakeEnv();
+    const registryStub = (env.KILOCLAW_REGISTRY as unknown as { get: Mock }).get('user:user-1') as {
+      finalizeDestroyedInstance: Mock;
+    };
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    storage._store.set('pendingRegistryCleanup', {
+      userId: 'user-1',
+      orgId: null,
+      sandboxId: 'ki_11111111111141118111111111111111',
+      releaseProvisionReservation: false,
+    });
+    const getWorkerDbSpy = vi.spyOn(db, 'getWorkerDb').mockReturnValue({} as never);
+    const getInstanceByIdSpy = vi.spyOn(db, 'getInstanceById').mockResolvedValue(null as never);
+    const getInstanceByIdIncludingDestroyedSpy = vi
+      .spyOn(db, 'getInstanceByIdIncludingDestroyed')
+      .mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111' } as never);
+
+    await instance.alarm();
+
+    expect(registryStub.finalizeDestroyedInstance).toHaveBeenCalledWith(
+      'user:user-1',
+      'user-1',
+      '11111111-1111-4111-8111-111111111111',
+      '11111111-1111-4111-8111-111111111111',
+      'instance_destroyed'
+    );
+    expect(storage._store.has('pendingRegistryCleanup')).toBe(false);
+    getWorkerDbSpy.mockRestore();
+    getInstanceByIdSpy.mockRestore();
+    getInstanceByIdIncludingDestroyedSpy.mockRestore();
+  });
+
+  it('retries reservation release after alarm-completed destruction if Registry is unavailable', async () => {
+    const env = createFakeEnv();
+    const registryStub = (env.KILOCLAW_REGISTRY as unknown as { get: Mock }).get('user:user-1') as {
+      finalizeDestroyedInstance: Mock;
+    };
+    registryStub.finalizeDestroyedInstance.mockRejectedValueOnce(new Error('registry unavailable'));
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      sandboxId: 'ki_11111111111141118111111111111111',
+      status: 'destroying',
+      flyMachineId: 'machine-1',
+      flyVolumeId: 'vol-1',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-test',
+        machineId: 'machine-1',
+        volumeId: 'vol-1',
+        region: 'iad',
+      },
+      pendingDestroyMachineId: 'machine-1',
+      pendingDestroyVolumeId: 'vol-1',
+    });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.alarm();
+
+    expect(storage._store.get('pendingRegistryCleanup')).toEqual({
+      userId: 'user-1',
+      orgId: null,
+      sandboxId: 'ki_11111111111141118111111111111111',
+      releaseProvisionReservation: true,
+    });
+    expect(storage._getAlarm()).not.toBeNull();
+
+    const { instance: retryInstance } = createInstance(storage, env);
+    await retryInstance.alarm();
+
+    expect(storage._store.has('pendingRegistryCleanup')).toBe(false);
+    expect(registryStub.finalizeDestroyedInstance).toHaveBeenCalledTimes(2);
   });
 
   it('fully destroys docker-local instances when container and volume deletes succeed', async () => {
@@ -771,6 +957,95 @@ describe('two-phase destroy', () => {
 
     expect(storage._store.size).toBe(0);
     expect(storage._getAlarm()).toBeNull();
+  });
+
+  it('emits throttled destroy_stuck telemetry for aged docker-local pending destroys', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+    };
+    const { storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      provider: 'docker-local',
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
+      providerState: {
+        provider: 'docker-local',
+        containerName: null,
+        volumeName: 'kiloclaw-root-sandbox-1',
+        hostPort: null,
+      },
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'kiloclaw-root-sandbox-1',
+      destroyStartedAt: Date.now() - 16 * 60 * 1000,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response('volume busy', { status: 409 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    const stuckEvents = analyticsEventsByName(env, 'reconcile.destroy_stuck');
+    expect(stuckEvents).toHaveLength(1);
+    expect(stuckEvents[0]?.blobs).toEqual(expect.arrayContaining(['volume']));
+    expect(storage._store.get('lastDestroyPendingEventAt')).toBeTypeOf('number');
+
+    const { instance: retryInstance } = createInstance(storage, env);
+    await retryInstance.alarm();
+
+    expect(analyticsEventsByName(env, 'reconcile.destroy_stuck')).toHaveLength(1);
+  });
+
+  it('preserves docker-local runtime destroy errors when storage delete succeeds', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+    };
+    const { storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      provider: 'docker-local',
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
+      providerState: {
+        provider: 'docker-local',
+        containerName: 'kiloclaw-sandbox-1',
+        volumeName: 'kiloclaw-root-sandbox-1',
+        hostPort: 45001,
+      },
+      pendingDestroyMachineId: 'kiloclaw-sandbox-1',
+      pendingDestroyVolumeId: 'kiloclaw-root-sandbox-1',
+      destroyStartedAt: Date.now() - 16 * 60 * 1000,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/containers/kiloclaw-sandbox-1?force=true')) {
+        return new Response('container busy', { status: 409 });
+      }
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    expect(storage._store.get('pendingDestroyMachineId')).toBe('kiloclaw-sandbox-1');
+    expect(storage._store.get('pendingDestroyVolumeId')).toBeNull();
+    expect(storage._store.get('lastDestroyErrorOp')).toBe('machine');
+    expect(storage._store.get('lastDestroyErrorStatus')).toBe(409);
+    expect(analyticsEventsByName(env, 'reconcile.destroy_stuck')).toHaveLength(1);
   });
 });
 
@@ -1057,6 +1332,39 @@ describe('destroy error tracking', () => {
     expect(storage._store.get('lastDestroyErrorAt')).toBeTypeOf('number');
   });
 
+  it('emits throttled destroy_stuck telemetry for aged pending destroys', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyStartedAt: Date.now() - 16 * 60 * 1000,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockRejectedValue(new FlyApiError('server error', 500, '{}'));
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    const stuckEvents = analyticsEventsByName(env, 'reconcile.destroy_stuck');
+    expect(stuckEvents).toHaveLength(1);
+    expect(stuckEvents[0]?.blobs).toEqual(expect.arrayContaining(['volume']));
+    expect(storage._store.get('lastDestroyPendingEventAt')).toBeTypeOf('number');
+
+    const { instance: retryInstance } = createInstance(storage, env);
+    await retryInstance.alarm();
+
+    expect(analyticsEventsByName(env, 'reconcile.destroy_stuck')).toHaveLength(1);
+  });
+
   it('clears destroy error on successful delete', async () => {
     const { storage } = createInstance();
     await seedProvisioned(storage, {
@@ -1083,6 +1391,412 @@ describe('destroy error tracking', () => {
 
     // Error fields cleared after successful volume delete
     expect(storage._store.has('lastDestroyErrorOp')).toBe(false);
+  });
+});
+
+describe('destroy volume: max-retry abandon', () => {
+  // vi.clearAllMocks() in the global beforeEach clears call history but not
+  // implementations. Without this reset, a previous test in the file that
+  // used `.mockResolvedValue([volumes...])` on listVolumes would leak its
+  // mocked volumes into other tests, where the new orphan sweep would then
+  // pick them up and (e.g.) promote one into the pending pointers, preventing
+  // finalize from running.
+  beforeEach(() => {
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
+  });
+
+  it('increments destroyVolumeAttempts on each failure and keeps pending state', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockRejectedValue(
+      new FlyApiError(
+        'failed_precondition: volume is currently bound to machine: abc123',
+        412,
+        '{}'
+      )
+    );
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(1);
+    expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-1');
+
+    // Second alarm bumps the counter again.
+    const { instance: inst2 } = createInstance(storage, env);
+    await inst2.alarm();
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(2);
+    expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-1');
+  });
+
+  it('emits destroy_volume_abandoned_after_max_retries and clears state at the cap', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    // Seed at the cap-minus-one so the next failed alarm triggers abandon.
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 49,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockRejectedValue(
+      new FlyApiError('persistent failure', 502, '{}')
+    );
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Pending state cleared so the destroy loop can finalize.
+    expect(storage._store.has('pendingDestroyVolumeId')).toBe(false);
+    // Destroy finalizes and the storage is wiped.
+    expect(storage._store.size).toBe(0);
+
+    // The escalation event was emitted to Analytics Engine, scoped to the
+    // right sandbox so alerts can attribute the abandoned volume.
+    const abandoned = analyticsEventsByName(
+      env,
+      'reconcile.destroy_volume_abandoned_after_max_retries'
+    );
+    expect(abandoned).toHaveLength(1);
+    expect(abandoned[0]?.blobs).toEqual(expect.arrayContaining(['user-1', 'sandbox-1']));
+  });
+
+  it('orphan sweep runs on the same alarm as abandon and may complete the cleanup', async () => {
+    // When the abandon branch fires, it clears pendingDestroyVolumeId and the
+    // reconcile loop continues into tryDeleteOrphanVolumes on the same alarm.
+    // If the stuck volume still exists on Fly and matches the sandbox name,
+    // the sweep gets one final best-effort attempt — and in that attempt the
+    // underlying transient condition may have resolved (e.g. a phantom bound
+    // machine has finally been reaped on Fly's side). This test pins that
+    // interaction so consumers of the abandoned event understand the volume
+    // can occasionally be cleaned up immediately after.
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 49,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    // First delete (pending-destroy path) fails → triggers abandon. Second
+    // delete (orphan sweep) succeeds — same alarm.
+    (flyClient.deleteVolume as Mock)
+      .mockRejectedValueOnce(new FlyApiError('persistent failure', 502, '{}'))
+      .mockResolvedValueOnce(undefined);
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      {
+        id: 'vol-1',
+        name: 'kiloclaw_sandbox_1',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+    ]);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Both events fired on the same alarm: the abandon (for alerting) and the
+    // sweep's success (the actual cleanup).
+    expect(
+      analyticsEventsByName(env, 'reconcile.destroy_volume_abandoned_after_max_retries')
+    ).toHaveLength(1);
+    expect(analyticsEventsByName(env, 'reconcile.destroy_orphan_volume_ok')).toHaveLength(1);
+
+    // deleteVolume was called twice: once from the pending-destroy path, once
+    // from the orphan sweep.
+    expect(flyClient.deleteVolume).toHaveBeenCalledTimes(2);
+
+    // Destroy finalizes cleanly — storage wiped.
+    expect(storage._store.size).toBe(0);
+  });
+
+  it('resets destroyVolumeAttempts on successful delete', async () => {
+    const { storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 17,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    const { instance } = createInstance(storage);
+    await instance.alarm();
+
+    // Destroy finalized; storage cleared.
+    expect(storage._store.size).toBe(0);
+  });
+
+  it('destroy() resets destroyVolumeAttempts so a previous cycles count does not bleed into a new destroy', async () => {
+    // Counter semantics are "consecutive failures on the current
+    // pendingDestroyVolumeId". A fresh destroy() invocation must start at 0
+    // even if the previous cycle's failures left the counter non-zero.
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage, {
+      // Simulate a stale counter from a previous (resolved) destroy cycle.
+      destroyVolumeAttempts: 42,
+    });
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    // First delete attempt fails so we can observe the post-destroy counter.
+    (flyClient.deleteVolume as Mock).mockRejectedValueOnce(
+      new FlyApiError('transient', 503, 'try again')
+    );
+
+    const { instance } = createInstance(storage, env);
+    await instance.destroy();
+
+    // Counter restarted at 0 for the new cycle and bumped to 1 by the single
+    // failed delete attempt — *not* 43.
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(1);
+  });
+
+  it('resets destroyVolumeAttempts when volume returns 404 (already gone)', async () => {
+    const { storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 10,
+    });
+
+    (flyClient.getVolume as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+    (flyClient.deleteVolume as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+
+    const { instance } = createInstance(storage);
+    await instance.alarm();
+
+    // 404 path treats the volume as gone — destroy finalizes cleanly.
+    expect(storage._store.size).toBe(0);
+  });
+});
+
+describe('orphan volume sweep', () => {
+  // Reset listVolumes so we never bleed into later tests outside this block;
+  // see the matching note in the abandon describe.
+  beforeEach(() => {
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
+  });
+
+  it('destroys volumes that match the sandbox name when pendingDestroyVolumeId is clear', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: null,
+    });
+
+    // sandboxId 'sandbox-1' -> volumeName 'kiloclaw_sandbox_1'.
+    // The first volume matches, the second has a different name (different sandbox on a shared app).
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      {
+        id: 'vol-orphan',
+        name: 'kiloclaw_sandbox_1',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+      {
+        id: 'vol-other-sandbox',
+        name: 'kiloclaw_other_sandbox',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+    ]);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Only the matching volume was destroyed.
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-orphan');
+    expect(flyClient.deleteVolume).not.toHaveBeenCalledWith(expect.anything(), 'vol-other-sandbox');
+
+    // Destroy finalizes once the sweep is clean.
+    expect(storage._store.size).toBe(0);
+  });
+
+  it('skips volumes already in pending_destroy / destroying / destroyed states', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: null,
+    });
+
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      {
+        id: 'vol-fly-reaping',
+        name: 'kiloclaw_sandbox_1',
+        state: 'pending_destroy',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+      {
+        id: 'vol-fly-destroying',
+        name: 'kiloclaw_sandbox_1',
+        state: 'destroying',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+    ]);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Fly is already tearing both down — no client-side delete needed.
+    expect(flyClient.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('promotes the first attached orphan into pendingDestroy* so finalize does not skip it', async () => {
+    // This pins the fix for the gap where attached orphans (volumes that
+    // share our name but are bound to a machine the DO never tracked) were
+    // silently skipped, then finalize wiped DO state and the orphans leaked
+    // permanently. The sweep now promotes attached orphans into the primary
+    // pending pointers so the existing tryDeleteMachine + tryDeleteVolume
+    // flow handles them on the next alarm.
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: null,
+    });
+
+    (flyClient.listVolumes as Mock).mockResolvedValue([
+      // Unattached orphan: destroyed inline on this alarm.
+      {
+        id: 'vol-orphan-unattached',
+        name: 'kiloclaw_sandbox_1',
+        state: 'created',
+        attached_machine_id: null,
+        region: 'iad',
+      },
+      // Attached orphan: promoted to pending* for next alarm.
+      {
+        id: 'vol-orphan-attached',
+        name: 'kiloclaw_sandbox_1',
+        state: 'attached',
+        attached_machine_id: 'machine-orphan',
+        region: 'iad',
+      },
+      // Second attached orphan: not yet promoted (only one fits in the
+      // pending pointers); picked up after the first is resolved.
+      {
+        id: 'vol-orphan-attached-2',
+        name: 'kiloclaw_sandbox_1',
+        state: 'attached',
+        attached_machine_id: 'machine-orphan-2',
+        region: 'iad',
+      },
+    ]);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // Unattached orphan was destroyed inline.
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-orphan-unattached');
+    // Attached orphans were NOT destroyed directly (the existing pending
+    // destroy flow will handle them on subsequent alarms).
+    expect(flyClient.deleteVolume).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'vol-orphan-attached'
+    );
+
+    // The first attached orphan was promoted into the pending pointers.
+    // This is what prevents finalize from running and wiping state.
+    expect(storage._store.get('pendingDestroyMachineId')).toBe('machine-orphan');
+    expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-orphan-attached');
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(0);
+
+    // Storage was NOT wiped (destroy did not finalize this alarm).
+    expect(storage._store.size).toBeGreaterThan(0);
+
+    // The promotion event was emitted with both ids attached.
+    const promoted = analyticsEventsByName(
+      env,
+      'reconcile.destroy_orphan_volume_promoted_to_pending'
+    );
+    expect(promoted).toHaveLength(1);
+  });
+
+  it('does not run when pendingDestroyVolumeId is still set', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-pending',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-pending',
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-pending',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockRejectedValue(
+      new FlyApiError('transient', 503, 'try again')
+    );
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    // listVolumes never called — main pending destroy path took precedence.
+    expect(flyClient.listVolumes).not.toHaveBeenCalled();
   });
 });
 
@@ -1779,6 +2493,14 @@ describe('status guards', () => {
     await expect(instance.provision('user-1', {})).rejects.toThrow(
       'Cannot provision: instance is being destroyed'
     );
+  });
+
+  it('provision() rejects a wiped explicit instance without fresh admission', async () => {
+    const { instance } = createInstance();
+
+    await expect(
+      instance.provision('user-1', {}, { instanceId: '11111111-1111-4111-8111-111111111111' })
+    ).rejects.toThrow('Instance not provisioned');
   });
 
   it('stop() is a no-op when destroying', async () => {
@@ -4298,6 +5020,57 @@ describe('start: volume region validation', () => {
     expect(storage._store.get('status')).toBe('running');
   });
 
+  it('handles volume gone during createMachine by clearing stale volume and retrying once', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      flyVolumeId: 'vol-stale',
+      flyRegion: 'iad',
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-stale', region: 'iad' });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'dfw',
+    });
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError(
+          'Fly API createMachine failed (400): {"error":"volume not found"}',
+          400,
+          '{"error":"volume not found"}'
+        )
+      )
+      .mockResolvedValueOnce({ id: 'machine-1', region: 'dfw' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(flyClient.createMachine).toHaveBeenCalledTimes(2);
+    expect(flyClient.createVolumeWithFallback).toHaveBeenCalledTimes(1);
+    expect((flyClient.createMachine as Mock).mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        mounts: [{ volume: 'vol-stale', path: '/root' }],
+      })
+    );
+    expect((flyClient.createMachine as Mock).mock.calls[1][1]).toEqual(
+      expect.objectContaining({
+        mounts: [{ volume: 'vol-new', path: '/root' }],
+      })
+    );
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+    expect(storage._store.get('flyRegion')).toBe('dfw');
+    expect(storage._store.get('flyMachineId')).toBe('machine-1');
+    expect(storage._store.get('status')).toBe('running');
+
+    const warnCall = (console.warn as Mock).mock.calls.find(
+      call =>
+        typeof call[0] === 'string' &&
+        call[0].includes('Volume not found during machine creation, clearing')
+    );
+    expect(warnCall).toBeDefined();
+  });
+
   it('performs region check even when machine already exists', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { status: 'stopped' });
@@ -6264,6 +7037,50 @@ describe('provision: auto-start after fresh provision', () => {
     );
   });
 
+  it('does not fail provision when the morning-briefing user-location sync errors', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {
+      userTimezone: 'Europe/Amsterdam',
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+    });
+    await Promise.all(waitUntilPromises);
+
+    vi.mocked(fetch).mockImplementation((url: unknown) => {
+      if (typeof url === 'string' && url.includes('/_kilo/morning-briefing/user-location')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'Gateway not running' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, path: 'workspace/USER.md' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    });
+
+    await expect(
+      instance.provision('user-1', { userLocation: 'Paris, France' })
+    ).resolves.toBeDefined();
+
+    expect(storage._store.get('userLocation')).toBe('Paris, France');
+  });
+
   it('leaves user location absent when weather setup is skipped', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 
@@ -6865,11 +7682,12 @@ describe('provision: instance feature flags', () => {
 });
 
 describe('auto-destroy stale provisioned instances', () => {
-  // Reset listMachines to return [] for each test in this block, since
-  // earlier metadata-recovery tests may have set it to return machines
-  // and vi.clearAllMocks() does not reset implementations.
+  // Reset listMachines + listVolumes to return [] for each test in this
+  // block, since earlier tests may have set them to return values and
+  // vi.clearAllMocks() does not reset implementations.
   beforeEach(() => {
     (flyClient.listMachines as Mock).mockResolvedValue([]);
+    (flyClient.listVolumes as Mock).mockResolvedValue([]);
   });
 
   function createInstanceWithPostgres(markImpl: () => Promise<void> = () => Promise.resolve()): {
@@ -7160,10 +7978,40 @@ describe('restartMachine image tag override', () => {
     const result = await instance.restartMachine({ imageTag: 'latest' });
 
     expect(result.success).toBe(true);
-    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({ rolloutSubject: 'user-1' })
+    );
     expect(storage._store.get('trackedImageTag')).toBe('new-tag-from-kv');
     expect(storage._store.get('openclawVersion')).toBe('2.0.0');
     expect(storage._store.get('imageVariant')).toBe('default');
+  });
+
+  it('resolves latest with the instance UUID for instance-keyed sandboxes', async () => {
+    const { instance, storage } = createInstance();
+    const instanceId = '123e4567-e89b-12d3-a456-426614174000';
+    await seedRunning(storage, {
+      sandboxId: 'ki_123e4567e89b12d3a456426614174000',
+      trackedImageTag: 'old-tag',
+      openclawVersion: '1.0.0',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2.0.0',
+      variant: 'default',
+      imageTag: 'new-tag-from-kv',
+      imageDigest: null,
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 0,
+      isLatest: true,
+    });
+
+    const result = await instance.restartMachine({ imageTag: 'latest' });
+
+    expect(result.success).toBe(true);
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({ rolloutSubject: instanceId })
+    );
   });
 
   it('falls back gracefully when "latest" but selector returns null', async () => {
@@ -7344,6 +8192,36 @@ describe('applyPinnedVersion', () => {
     expect(selectImageVersionForInstance).toHaveBeenCalledWith(
       expect.objectContaining({ currentImageTag: null })
     );
+  });
+
+  it('when cleared through an instance-id-aware route, uses legacy sandbox rollout subject for legacy instances', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      sandboxId: 'sandbox-1',
+      trackedImageTag: 'candidate-tag',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.23',
+      variant: 'default',
+      imageTag: 'latest-tag',
+      imageDigest: 'sha256:latest',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 100,
+      isLatest: true,
+    });
+
+    await instance.applyPinnedVersion(null);
+
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rolloutSubject: 'user-1',
+        currentImageTag: null,
+      })
+    );
+    expect(storage._store.get('trackedImageTag')).toBe('latest-tag');
   });
 
   it('when cleared and no rollout target, leaves existing tracked image alone', async () => {
@@ -9012,34 +9890,52 @@ describe('getDebugState live-check dispatch', () => {
 describe('resizeMachine', () => {
   it('rejects when instance is not provisioned', async () => {
     const { instance } = createInstance();
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow('Instance is not provisioned');
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Instance is not provisioned');
   });
 
   it('rejects when instance is being destroyed', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'destroying' });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Cannot resize: instance is being destroyed'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Cannot resize: instance is being destroyed');
   });
 
   it('rejects when instance is restoring', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'restoring' });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Cannot resize: instance is restoring from snapshot'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Cannot resize: instance is restoring from snapshot');
   });
 
   it('rejects when instance is recovering', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'recovering' });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Cannot resize: instance is recovering'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Cannot resize: instance is recovering');
   });
 
   it('persists new tier and returns previous tier', async () => {
@@ -9051,7 +9947,11 @@ describe('resizeMachine', () => {
       status: 'stopped',
     });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.previousTier).toBe('shared-2-3');
     expect(result.newTier).toBe('perf-4-8');
@@ -9064,7 +9964,11 @@ describe('resizeMachine', () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'stopped' });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.previousTier).toBeNull();
     expect(result.machineSize).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
@@ -9077,9 +9981,13 @@ describe('resizeMachine', () => {
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
     });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Instance must be stopped before resizing machine tier'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Instance must be stopped before resizing machine tier');
   });
 
   it('allows resize when instance is stopped', async () => {
@@ -9091,7 +9999,11 @@ describe('resizeMachine', () => {
       volumeSizeGb: 10,
     });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.newTier).toBe('perf-4-8');
     expect(result.machineSize).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
@@ -9106,9 +10018,13 @@ describe('resizeMachine', () => {
       volumeSizeGb: 20,
     });
 
-    await expect(instance.resizeMachine('perf-1-3')).rejects.toThrow(
-      'downgrades and sidegrades are not allowed'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-1-3',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('downgrades and sidegrades are not allowed');
   });
 
   it('rejects offered-tier sidegrades', async () => {
@@ -9120,18 +10036,26 @@ describe('resizeMachine', () => {
       volumeSizeGb: 10,
     });
 
-    await expect(instance.resizeMachine('perf-1-3')).rejects.toThrow(
-      'downgrades and sidegrades are not allowed'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-1-3',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('downgrades and sidegrades are not allowed');
   });
 
   it('rejects legacy tiers as resize targets', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'stopped' });
 
-    await expect(instance.resizeMachine('shared-2-3')).rejects.toThrow(
-      'is not an offerable resize target'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'shared-2-3',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('is not an offerable resize target');
   });
 
   it('extends volume and persists volume size before tier state', async () => {
@@ -9144,7 +10068,11 @@ describe('resizeMachine', () => {
       flyVolumeId: 'vol-1',
     });
 
-    const result = await instance.resizeMachine('perf-4-16');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-16',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(flyClient.extendVolume).toHaveBeenCalledWith(
       { apiToken: 'test-token', appName: 'test-app' },
@@ -9167,7 +10095,13 @@ describe('resizeMachine', () => {
     });
     (flyClient.extendVolume as Mock).mockRejectedValueOnce(new Error('extend failed'));
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow('extend failed');
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('extend failed');
 
     expect(storage._store.get('volumeSizeGb')).toBe(10);
     expect(storage._store.get('instanceType')).toBe('perf-1-3');
@@ -9190,7 +10124,11 @@ describe('resizeMachine', () => {
     const db = await import('../db');
     (db.syncInstanceType as Mock).mockRejectedValueOnce(new Error('postgres down'));
 
-    await instance.resizeMachine('perf-4-8');
+    await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
     await Promise.allSettled(waitUntilPromises);
 
     expect(storage._store.get('instanceType')).toBe('perf-4-8');
@@ -9214,7 +10152,11 @@ describe('resizeMachine', () => {
       flyMachineId: null,
     });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.newTier).toBe('perf-4-8');
     expect(flyClient.extendVolume).not.toHaveBeenCalled();
@@ -9248,7 +10190,11 @@ describe('resizeMachine', () => {
       throw new Error(`Unhandled Northflank API request: ${url}`);
     });
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
 
     expect(result.newTier).toBe('perf-4-8');
     expect(storage._store.get('instanceType')).toBe('perf-4-8');
@@ -9288,9 +10234,13 @@ describe('resizeMachine', () => {
       throw new Error(`Unhandled Northflank API request: ${url}`);
     });
 
-    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Northflank API patchDeploymentService failed (500)'
-    );
+    await expect(
+      instance.resizeMachine({
+        targetTierKey: 'perf-4-8',
+        actorId: 'test-admin',
+        actorEmail: 'alice@example.com',
+      })
+    ).rejects.toThrow('Northflank API patchDeploymentService failed (500)');
 
     expect(storage._store.get('instanceType')).toBe('perf-1-3');
     expect(storage._store.get('machineSize')).toEqual({
@@ -9320,7 +10270,11 @@ describe('resizeMachine', () => {
     const dbModule = await import('../db');
     (dbModule.syncAdminSizeOverride as Mock).mockClear();
 
-    const result = await instance.resizeMachine('perf-4-8');
+    const result = await instance.resizeMachine({
+      targetTierKey: 'perf-4-8',
+      actorId: 'test-admin',
+      actorEmail: 'alice@example.com',
+    });
     await Promise.allSettled(waitUntilPromises);
 
     expect(result.clearedOverride).toEqual({
@@ -10587,5 +11541,124 @@ describe('non-Fly lifecycle push dispatch', () => {
     expect(calls[0].event).toBe('start_failed');
     expect(calls[0].errorMessage).toBe('Start failed.');
     expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+});
+
+describe('updateUserLocation', () => {
+  it('throws "Instance is not running" when the instance is stopped', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped', userLocation: null });
+    vi.mocked(fetch).mockClear();
+
+    await expect(instance.updateUserLocation({ userLocation: 'Paris, France' })).rejects.toThrow(
+      'Instance is not running'
+    );
+
+    expect(storage._store.get('userLocation') ?? null).toBeNull();
+    const gatewayCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(
+        call =>
+          typeof call[0] === 'string' &&
+          (call[0].includes('/_kilo/user-profile') ||
+            call[0].includes('/_kilo/morning-briefing/user-location'))
+      );
+    expect(gatewayCalls).toHaveLength(0);
+  });
+
+  it('throws "Instance is not running" when the instance is starting', async () => {
+    const { instance, storage } = createInstance();
+    await seedStarting(storage, { userLocation: 'Old, NY' });
+    vi.mocked(fetch).mockClear();
+
+    await expect(instance.updateUserLocation({ userLocation: 'Paris, France' })).rejects.toThrow(
+      'Instance is not running'
+    );
+
+    expect(storage._store.get('userLocation')).toBe('Old, NY');
+  });
+
+  it('throws "Instance is not running" when the instance is restarting', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, { userLocation: 'Old, NY' });
+    vi.mocked(fetch).mockClear();
+
+    await expect(instance.updateUserLocation({ userLocation: 'Paris, France' })).rejects.toThrow(
+      'Instance is not running'
+    );
+
+    expect(storage._store.get('userLocation')).toBe('Old, NY');
+  });
+
+  it('does not persist DO state when the required writeUserProfile call fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { userLocation: 'Old, NY' });
+
+    vi.mocked(fetch).mockImplementation((url: unknown) => {
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'boom' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    });
+
+    await expect(
+      instance.updateUserLocation({ userLocation: 'Paris, France' })
+    ).rejects.toBeDefined();
+
+    expect(storage._store.get('userLocation')).toBe('Old, NY');
+  });
+
+  it('returns success and persists DO state when the best-effort plugin sync fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { userLocation: null });
+
+    vi.mocked(fetch).mockImplementation((url: unknown) => {
+      if (typeof url === 'string' && url.includes('/_kilo/morning-briefing/user-location')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'Gateway not running' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, path: 'workspace/USER.md' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    });
+
+    const result = await instance.updateUserLocation({ userLocation: 'Paris, France' });
+
+    expect(result).toEqual({ ok: true, userLocation: 'Paris, France' });
+    expect(storage._store.get('userLocation')).toBe('Paris, France');
+  });
+
+  it('short-circuits when the input matches the current location', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { userLocation: 'Same, NY' });
+    vi.mocked(fetch).mockClear();
+
+    const result = await instance.updateUserLocation({ userLocation: 'Same, NY' });
+
+    expect(result).toEqual({ ok: true, userLocation: 'Same, NY' });
+    const gatewayCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(
+        call =>
+          typeof call[0] === 'string' &&
+          (call[0].includes('/_kilo/user-profile') ||
+            call[0].includes('/_kilo/morning-briefing/user-location'))
+      );
+    expect(gatewayCalls).toHaveLength(0);
   });
 });

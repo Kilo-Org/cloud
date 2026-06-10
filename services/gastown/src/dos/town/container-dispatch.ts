@@ -3,6 +3,7 @@
  * All container communication goes through the TownContainerDO stub.
  */
 
+import { z } from 'zod';
 import { getTownContainerStub } from '../TownContainer.do';
 import { signAgentJWT, signContainerJWT } from '../../util/jwt.util';
 import { buildPolecatSystemPrompt } from '../../prompts/polecat-system.prompt';
@@ -10,8 +11,17 @@ import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
 import type { TownConfig, RigOverrideConfig } from '../../types';
 import { buildContainerConfig, resolveModel, resolveSmallModel, resolveRigConfig } from './config';
 import { writeEvent } from '../../util/analytics.util';
+import { resolveGitHubTokenString } from './town-scm';
 
 const TOWN_LOG = '[Town.do]';
+
+const ContainerStartError = z.object({
+  error: z.string(),
+  phase: z.string().optional(),
+  status: z.number().optional(),
+  error_type: z.string().optional(),
+  action: z.string().optional(),
+});
 
 // Allowlist of git push flags that are safe to pass from rig config.
 // Flags that bypass hooks (--no-verify), rewrite history (--force,
@@ -57,6 +67,26 @@ function filterGitPushFlags(raw: string): string | undefined {
 let lastStartError: string | null = null;
 export function getLastStartError(): string | null {
   return lastStartError;
+}
+
+function formatContainerStartError(status: number, bodyText: string): string {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(bodyText);
+  } catch {
+    return `(${status}) ${bodyText.slice(0, 300)}`;
+  }
+  const parsed = ContainerStartError.safeParse(parsedJson);
+  if (!parsed.success) return `(${status}) ${bodyText.slice(0, 300)}`;
+
+  const failure = parsed.data;
+  const details = [
+    failure.phase ? `${failure.phase} failed` : 'container start failed',
+    failure.error_type ?? null,
+    failure.status ? `upstream ${failure.status}` : null,
+  ].filter(value => value !== null);
+  const action = failure.action ? ` Action: ${failure.action}` : '';
+  return `(${status}) ${details.join(': ')}: ${failure.error}${action}`.slice(0, 500);
 }
 
 /**
@@ -409,9 +439,20 @@ export async function startAgentInContainer(
     // Build env vars from town config
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
 
-    // Map git_auth tokens
-    if (params.townConfig.git_auth?.github_token) {
-      envVars.GIT_TOKEN = params.townConfig.git_auth.github_token;
+    // Map git_auth tokens. Resolve GitHub token through resolveGitHubTokenString so
+    // we mint a fresh installation token when a platform integration is
+    // configured; otherwise we'd hand the agent a `git_auth.github_token`
+    // value that may have been written hours ago and is well past its 1h
+    // installation-token TTL. The resolved value is also what the agent's
+    // `gh` CLI sees as `GH_TOKEN`.
+    const githubToken = await resolveGitHubTokenString({
+      env,
+      townId: params.townId,
+      getTownConfig: () => Promise.resolve(params.townConfig),
+      platformIntegrationId: params.platformIntegrationId,
+    });
+    if (githubToken) {
+      envVars.GIT_TOKEN = githubToken;
     }
     if (params.townConfig.git_auth?.gitlab_token) {
       envVars.GITLAB_TOKEN = params.townConfig.git_auth.gitlab_token;
@@ -449,7 +490,7 @@ export async function startAgentInContainer(
       `${TOWN_LOG} startAgentInContainer: envVars built: keys=[${Object.keys(envVars).join(',')}] hasGitToken=${!!envVars.GIT_TOKEN} hasGitlabToken=${!!envVars.GITLAB_TOKEN} hasContainerToken=${!!containerToken} hasAgentJwt=${!!agentToken} hasKilocodeToken=${!!kilocodeToken} git_auth_keys=[${Object.keys(params.townConfig.git_auth ?? {}).join(',')}]`
     );
 
-    const containerConfig = await buildContainerConfig(storage, env);
+    const containerConfig = await buildContainerConfig(storage, env, params.townId);
     const container = getTownContainerStub(env, params.townId);
 
     const rigOverride = params.rigOverride ?? null;
@@ -541,7 +582,7 @@ export async function startAgentInContainer(
         });
         return { started: true, containerFetchMs: durationMs };
       }
-      const errorMsg = `(${response.status}) ${text.slice(0, 300)}`;
+      const errorMsg = formatContainerStartError(response.status, text);
       console.error(
         `${TOWN_LOG} startAgentInContainer: error response for ` +
           `agent=${params.agentId} role=${params.role}: ${errorMsg}`
@@ -596,6 +637,12 @@ export async function startMergeInContainer(
 ): Promise<boolean> {
   try {
     const userId = params.townConfig.owner_user_id ?? params.townId;
+    if (!params.townConfig.owner_user_id) {
+      console.warn(
+        `${TOWN_LOG} startMergeInContainer: owner_user_id missing from town config for town ${params.townId}. ` +
+          'Falling back to townId — this breaks session-ingest authorization and should not happen for properly provisioned towns.'
+      );
+    }
     const containerToken = await ensureContainerToken(env, params.townId, userId);
     const agentToken = await mintAgentToken(env, {
       agentId: params.agentId,
@@ -613,8 +660,16 @@ export async function startMergeInContainer(
     }
 
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
-    if (params.townConfig.git_auth?.github_token) {
-      envVars.GIT_TOKEN = params.townConfig.git_auth.github_token;
+    // Resolve GitHub token through resolveGitHubTokenString so a configured
+    // platform integration mints a fresh installation token for the
+    // merge process. See startAgentInContainer for the rationale.
+    const mergeGithubToken = await resolveGitHubTokenString({
+      env,
+      townId: params.townId,
+      getTownConfig: () => Promise.resolve(params.townConfig),
+    });
+    if (mergeGithubToken) {
+      envVars.GIT_TOKEN = mergeGithubToken;
     }
     if (params.townConfig.git_auth?.gitlab_token) {
       envVars.GITLAB_TOKEN = params.townConfig.git_auth.gitlab_token;
@@ -628,7 +683,7 @@ export async function startMergeInContainer(
     const mergeKilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;
     if (mergeKilocodeToken) envVars.KILOCODE_TOKEN = mergeKilocodeToken;
 
-    const containerConfig = await buildContainerConfig(storage, env);
+    const containerConfig = await buildContainerConfig(storage, env, params.townId);
     const container = getTownContainerStub(env, params.townId);
 
     const response = await container.fetch('http://container/git/merge', {
@@ -669,7 +724,7 @@ export async function checkAgentContainerStatus(
   env: Env,
   townId: string,
   agentId: string
-): Promise<{ status: string; exitReason?: string }> {
+): Promise<{ status: string; exitReason?: string; serverPort?: number; sessionId?: string }> {
   try {
     const container = getTownContainerStub(env, townId);
     const response = await container.fetch(`http://container/agents/${agentId}/status`, {
@@ -689,9 +744,15 @@ export async function checkAgentContainerStatus(
       const status = (data as { status: unknown }).status;
       const exitReason =
         'exitReason' in data ? (data as { exitReason: unknown }).exitReason : undefined;
+      const serverPort =
+        'serverPort' in data ? (data as { serverPort: unknown }).serverPort : undefined;
+      const sessionId =
+        'sessionId' in data ? (data as { sessionId: unknown }).sessionId : undefined;
       return {
         status: typeof status === 'string' ? status : 'unknown',
         exitReason: typeof exitReason === 'string' ? exitReason : undefined,
+        serverPort: typeof serverPort === 'number' ? serverPort : undefined,
+        sessionId: typeof sessionId === 'string' && sessionId.length > 0 ? sessionId : undefined,
       };
     }
     return { status: 'unknown' };

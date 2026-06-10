@@ -1,14 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { APP_URL } from '@/lib/constants';
 import { createGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { verifyGitHubLinkToken } from '@/lib/bot/github-link-token';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
-import { botPlatforms } from '@/lib/bot/platforms';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
-import { PLATFORM } from '@/lib/integrations/core/constants';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_CALLBACK_PATH = '/api/integrations/github/callback';
@@ -59,14 +57,6 @@ export async function GET(request: NextRequest) {
 
   if (!integration) {
     return errorPage('Link Failed', 'No matching GitHub integration was found.', 404);
-  }
-
-  if (!botPlatforms.require(PLATFORM.GITHUB).isEnabledForBot(integration)) {
-    return errorPage(
-      'Link Unavailable',
-      'GitHub linking is not enabled for this integration.',
-      404
-    );
   }
 
   if (integration.owned_by_organization_id) {

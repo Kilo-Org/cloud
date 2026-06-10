@@ -6,8 +6,8 @@
   "description": "Kilo plugin exposing Gastown tools to agents",
   "main": "index.ts",
   "dependencies": {
-    "@kilocode/plugin": "7.2.14",
+    "@kilocode/plugin": "7.2.52",
     "@kilocode/sdk": "7.2.14",
-    "zod": "^4.3.5"
+    "zod": "4.3.5"
   }
 }

@@ -2,12 +2,14 @@
 
 import type { KeyboardEvent } from 'react';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { toast } from 'sonner';
 import { Button as UIButton } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover';
 import { Command, CommandList, CommandItem, CommandEmpty } from '@/components/ui/command';
 import { Send, Square, Paperclip, Upload } from 'lucide-react';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import { cn } from '@/lib/utils';
+import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -17,24 +19,45 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { Brain } from 'lucide-react';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
-import { ImagePreviewStrip } from '@/components/shared/ImagePreviewStrip';
-import { useImageUpload, type UseImageUploadOptions } from '@/hooks/useImageUpload';
+import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 import {
-  CLOUD_AGENT_IMAGE_MAX_COUNT,
+  useCloudAgentAttachmentUpload,
+  type UseCloudAgentAttachmentUploadOptions,
+} from '@/hooks/useCloudAgentAttachmentUpload';
+import {
+  CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
+  type CloudAgentAttachments,
 } from '@/lib/cloud-agent/constants';
-import type { Images } from '@/lib/images-schema';
 import type { AgentMode } from './types';
+import {
+  acceptedSubmissionAttachmentIdsToRemove,
+  hasSubmissionAttachmentPayload,
+  shouldRejectAttachedSlashCommand,
+} from './chat-input-attachments';
 
 type ChatInputProps = {
-  onSend: (message: string, images?: Images) => Promise<boolean>;
+  onSend: (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>;
+  /**
+   * Invoked when the user submits a slash command (input starts with `/<name>`
+   * and `<name>` matches a known entry in `slashCommands`). When omitted or
+   * the input doesn't match a known command, the input is forwarded to
+   * `onSend` as plain text instead.
+   */
+  onSendCommand?: (
+    command: string,
+    args: string,
+    attachments?: CloudAgentAttachments
+  ) => Promise<boolean>;
   onStop?: () => void;
   disabled?: boolean;
   isStreaming?: boolean;
   placeholder?: string;
   slashCommands?: SlashCommand[];
-  /** Options passed to useImageUpload. */
-  imageUploadOptions: UseImageUploadOptions;
+  /** Options passed to the Cloud Agent attachment uploader. */
+  attachmentUploadOptions: UseCloudAgentAttachmentUploadOptions;
+  /** Whether this composer can submit file attachments through its active transport. */
+  attachmentsEnabled?: boolean;
   /** Current mode for the toolbar */
   mode?: AgentMode;
   /** Current model for the toolbar */
@@ -71,6 +94,7 @@ type ChatInputProps = {
 
 export function ChatInput({
   onSend,
+  onSendCommand,
   onStop,
   disabled = false,
   isStreaming = false,
@@ -87,7 +111,8 @@ export function ChatInput({
   availableVariants = [],
   showToolbar = false,
   initialValue,
-  imageUploadOptions,
+  attachmentUploadOptions,
+  attachmentsEnabled = true,
   customModeOptions,
   modelPickerDisabled,
   modelPickerTooltip,
@@ -95,20 +120,27 @@ export function ChatInput({
   variantPickerTooltip,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isAttachmentSubmissionPending, setIsAttachmentSubmissionPending] = useState(false);
   const valueRef = useRef('');
+  const attachmentSubmissionPendingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const commandListRef = useRef<HTMLDivElement>(null);
 
   const setInputValue = useCallback((nextValue: string) => {
     valueRef.current = nextValue;
     setValue(nextValue);
   }, []);
 
-  const imageUpload = useImageUpload(imageUploadOptions);
-  const maxImages = imageUploadOptions.maxImages ?? CLOUD_AGENT_IMAGE_MAX_COUNT;
-  const isImageLimitReached = imageUpload.images.length >= maxImages;
+  const attachmentUpload = useCloudAgentAttachmentUpload(attachmentUploadOptions);
+  const isAttachmentLimitReached =
+    attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
+
+  useEffect(() => {
+    if (!attachmentsEnabled) {
+      attachmentUpload.clearAttachments();
+    }
+  }, [attachmentUpload.clearAttachments, attachmentsEnabled]);
 
   // Restore text into the textarea when initialValue changes (e.g. after a failed send).
   // Treats undefined as "no opinion" (skip), but empty string actively clears the field.
@@ -132,34 +164,6 @@ export function ChatInput({
     ? formatShortModelDisplayName(lockedModelOption.name)
     : model;
 
-  // Filter commands based on current input
-  const filteredCommands = useMemo(() => {
-    if (!slashCommands || slashCommands.length === 0) return [];
-    if (!value.startsWith('/')) return [];
-
-    const query = value.slice(1).toLowerCase();
-    return slashCommands.filter(cmd => cmd.trigger.toLowerCase().startsWith(query));
-  }, [value, slashCommands]);
-
-  // Determine if autocomplete should be shown
-  const shouldShowAutocomplete = useMemo(() => {
-    return (
-      value.startsWith('/') &&
-      filteredCommands.length > 0 &&
-      slashCommands &&
-      slashCommands.length > 0
-    );
-  }, [value, filteredCommands.length, slashCommands]);
-
-  // Update showAutocomplete state when conditions change
-  useEffect(() => {
-    setShowAutocomplete(shouldShowAutocomplete);
-    // Reset selected index when filtering changes
-    if (shouldShowAutocomplete) {
-      setSelectedIndex(0);
-    }
-  }, [shouldShowAutocomplete]);
-
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -173,31 +177,80 @@ export function ChatInput({
       const trimmed = message.trim();
       if (!trimmed || disabled) return false;
       if (trimmed.length > CLOUD_AGENT_PROMPT_MAX_LENGTH) return false;
-      if (imageUpload.hasUploadingImages) return false;
+      if (attachmentSubmissionPendingRef.current) return false;
+      if (attachmentsEnabled && attachmentUpload.hasUploadingAttachments) return false;
 
-      const imagesData = imageUpload.getImagesData();
-      const submittedImageIds = imageUpload.images.map(image => image.id);
+      const attachmentsData = attachmentsEnabled
+        ? attachmentUpload.getAttachmentsData()
+        : undefined;
+      const submittedAttachments = attachmentsEnabled ? attachmentUpload.attachments : [];
+      const submitsAttachments = hasSubmissionAttachmentPayload(attachmentsData);
 
+      // Re-match against the trimmed value at submit time
+      let accepted = false;
+      const slashMatch = onSendCommand
+        ? /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed)
+        : null;
+      const slashCommand =
+        slashMatch && slashCommands?.some(c => c.trigger === slashMatch[1])
+          ? { command: slashMatch[1], args: slashMatch[2]?.trim() ?? '' }
+          : null;
+
+      if (
+        shouldRejectAttachedSlashCommand(
+          trimmed,
+          slashCommands,
+          attachmentsEnabled && attachmentUpload.attachments.length > 0
+        )
+      ) {
+        toast.error('Files cannot be attached to slash commands', {
+          description: 'Remove the files or type a plain prompt instead.',
+        });
+        return false;
+      }
+
+      if (submitsAttachments) {
+        attachmentSubmissionPendingRef.current = true;
+        setIsAttachmentSubmissionPending(true);
+      }
       setInputValue('');
-      submittedImageIds.forEach(imageUpload.removeImage);
-      setShowAutocomplete(false);
-
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
 
-      const accepted = await onSend(trimmed, imagesData);
-      if (!accepted) {
-        if (valueRef.current === '') {
+      try {
+        if (slashCommand && onSendCommand) {
+          accepted = await onSendCommand(slashCommand.command, slashCommand.args, attachmentsData);
+        } else {
+          accepted = await onSend(trimmed, attachmentsData);
+        }
+
+        if (!accepted) return false;
+
+        acceptedSubmissionAttachmentIdsToRemove(submittedAttachments, accepted).forEach(
+          attachmentUpload.removeAttachment
+        );
+        return true;
+      } finally {
+        if (submitsAttachments) {
+          attachmentSubmissionPendingRef.current = false;
+          setIsAttachmentSubmissionPending(false);
+        }
+        if (!accepted && valueRef.current === '') {
           setInputValue(trimmed);
           textareaRef.current?.focus();
         }
-        return false;
       }
-
-      return true;
     },
-    [disabled, imageUpload, onSend, setInputValue]
+    [
+      attachmentUpload,
+      attachmentsEnabled,
+      disabled,
+      onSend,
+      onSendCommand,
+      setInputValue,
+      slashCommands,
+    ]
   );
 
   const handleSend = () => {
@@ -210,63 +263,44 @@ export function ChatInput({
     }
   };
 
-  const handleSelectCommand = (command: SlashCommand, autoSend = false) => {
-    const expansion = command.expansion;
-    setShowAutocomplete(false);
-    setSelectedIndex(0);
-
-    if (autoSend) {
-      void sendMessage(expansion);
-    } else {
-      // Just fill the input for editing
-      setInputValue(expansion);
-      // Force height recalculation for expanded text
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+  const handleSelectCommand = useCallback(
+    (command: SlashCommand, autoSend = false) => {
+      if (autoSend) {
+        void sendMessage(`/${command.trigger}`);
+      } else {
+        const inserted = `/${command.trigger} `;
+        setInputValue(inserted);
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+          const end = inserted.length;
+          textareaRef.current.setSelectionRange(end, end);
+        }
       }
-    }
 
-    // Keep focus on textarea
-    textareaRef.current?.focus();
-  };
+      textareaRef.current?.focus();
+    },
+    [sendMessage, setInputValue]
+  );
+
+  const {
+    showAutocomplete,
+    selectedIndex,
+    setSelectedIndex,
+    filteredCommands,
+    handleKeyDown: handleAutocompleteKeyDown,
+    setShowAutocomplete,
+  } = useSlashCommandAutocomplete({
+    value,
+    slashCommands,
+    onSelect: handleSelectCommand,
+    listRef: commandListRef,
+  });
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Ignore keyboard events during IME composition (Chinese, Japanese, Korean input)
     if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
 
-    if (showAutocomplete && filteredCommands.length > 0) {
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          setSelectedIndex(prev => (prev + 1) % filteredCommands.length);
-          return;
-        case 'ArrowUp':
-          e.preventDefault();
-          setSelectedIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
-          return;
-        case 'Enter':
-          e.preventDefault();
-          // Bounds check to prevent race condition
-          if (selectedIndex >= 0 && selectedIndex < filteredCommands.length) {
-            // Enter = select and send; Shift+Enter = select and expand only
-            handleSelectCommand(filteredCommands[selectedIndex], !e.shiftKey);
-          }
-          return;
-        case 'Tab':
-          e.preventDefault();
-          // Bounds check to prevent race condition
-          if (selectedIndex >= 0 && selectedIndex < filteredCommands.length) {
-            // Tab = select and expand only (don't send)
-            handleSelectCommand(filteredCommands[selectedIndex], false);
-          }
-          return;
-        case 'Escape':
-          e.preventDefault();
-          setShowAutocomplete(false);
-          return;
-      }
-    }
+    if (handleAutocompleteKeyDown(e)) return;
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -283,16 +317,48 @@ export function ChatInput({
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
+      if (!attachmentsEnabled || attachmentSubmissionPendingRef.current) return;
+
       const files = Array.from(e.clipboardData.items)
         .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
         .map(item => item.getAsFile())
         .filter((f): f is File => f !== null);
       if (files.length > 0) {
-        imageUpload.addFiles(files);
+        attachmentUpload.addFiles(files);
       }
     },
-    [imageUpload]
+    [attachmentUpload, attachmentsEnabled]
   );
+
+  const dragHandlers = attachmentsEnabled
+    ? {
+        onDragEnter: (event: React.DragEvent) => {
+          if (attachmentSubmissionPendingRef.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          attachmentUpload.dragHandlers.onDragEnter(event);
+        },
+        onDragOver: (event: React.DragEvent) => {
+          if (attachmentSubmissionPendingRef.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          attachmentUpload.dragHandlers.onDragOver(event);
+        },
+        onDragLeave: attachmentUpload.dragHandlers.onDragLeave,
+        onDrop: (event: React.DragEvent) => {
+          if (attachmentSubmissionPendingRef.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          attachmentUpload.dragHandlers.onDrop(event);
+        },
+      }
+    : undefined;
 
   // Check if toolbar should be rendered (has callbacks and options)
   const hasToolbar = showToolbar && onModeChange && onModelChange && modelOptions.length > 0;
@@ -303,15 +369,18 @@ export function ChatInput({
         className={cn(
           'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
           disabled && !isStreaming && 'opacity-60',
-          imageUpload.isDragging && 'border-transparent focus-within:ring-0'
+          attachmentsEnabled &&
+            !isAttachmentSubmissionPending &&
+            attachmentUpload.isDragging &&
+            'border-transparent focus-within:ring-0'
         )}
-        {...imageUpload.dragHandlers}
+        {...dragHandlers}
       >
-        {imageUpload.isDragging && (
+        {attachmentsEnabled && !isAttachmentSubmissionPending && attachmentUpload.isDragging && (
           <div
             className={cn(
               'absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed backdrop-blur-[2px]',
-              isImageLimitReached
+              isAttachmentLimitReached
                 ? 'border-amber-500/60 bg-amber-500/10'
                 : 'border-primary/60 bg-primary/5'
             )}
@@ -319,28 +388,31 @@ export function ChatInput({
             <div
               className={cn(
                 'flex items-center gap-2 text-sm font-medium',
-                isImageLimitReached ? 'text-amber-400' : 'text-primary'
+                isAttachmentLimitReached ? 'text-amber-400' : 'text-primary'
               )}
             >
               <Upload className="h-4 w-4" />
-              {isImageLimitReached ? `Maximum ${maxImages} images attached` : 'Drop images here'}
+              {isAttachmentLimitReached
+                ? `Maximum ${CLOUD_AGENT_ATTACHMENT_MAX_COUNT} files attached`
+                : 'Drop files here'}
             </div>
           </div>
         )}
-        {/* Hidden file input for image selection */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          multiple
-          className="hidden"
-          onChange={e => {
-            if (e.target.files) {
-              imageUpload.addFiles(e.target.files);
+        {attachmentsEnabled && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.txt,.md,.csv"
+            multiple
+            className="hidden"
+            onChange={e => {
+              if (e.target.files && !attachmentSubmissionPendingRef.current) {
+                attachmentUpload.addFiles(e.target.files);
+              }
               e.target.value = '';
-            }
-          }}
-        />
+            }}
+          />
+        )}
         {/* Textarea with slash command autocomplete */}
         <Popover open={showAutocomplete} onOpenChange={handleOpenChange}>
           <PopoverAnchor asChild>
@@ -368,8 +440,9 @@ export function ChatInput({
             sideOffset={4}
             onOpenAutoFocus={e => e.preventDefault()}
           >
-            <Command>
+            <Command shouldFilter={false} value={filteredCommands[selectedIndex]?.trigger ?? ''}>
               <CommandList
+                ref={commandListRef}
                 id="slash-command-list"
                 role="listbox"
                 className="max-h-64 overflow-auto"
@@ -380,13 +453,8 @@ export function ChatInput({
                     key={cmd.trigger}
                     value={cmd.trigger}
                     onSelect={() => handleSelectCommand(cmd)}
-                    className={cn(
-                      'flex cursor-pointer flex-col items-start gap-1 px-3 py-2',
-                      index === selectedIndex && 'bg-accent'
-                    )}
+                    className="flex cursor-pointer flex-col items-start gap-1 px-3 py-2"
                     onMouseEnter={() => setSelectedIndex(index)}
-                    role="option"
-                    aria-selected={index === selectedIndex}
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm font-medium text-blue-400">
@@ -416,12 +484,11 @@ export function ChatInput({
           </p>
         )}
 
-        {imageUpload.images.length > 0 && (
+        {attachmentsEnabled && attachmentUpload.attachments.length > 0 && (
           <div className="px-3 pb-1">
-            <ImagePreviewStrip
-              images={imageUpload.images}
-              onRemove={imageUpload.removeImage}
-              size="compact"
+            <AttachmentPreviewStrip
+              attachments={attachmentUpload.attachments}
+              onRemove={attachmentUpload.removeAttachment}
             />
           </div>
         )}
@@ -521,47 +588,54 @@ export function ChatInput({
             </div>
           )}
           <div className="flex-1" />
-          {!isStreaming && (
+          {!isStreaming && attachmentsEnabled && (
             <UIButton
               type="button"
               variant="ghost"
               size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
-              className="h-8 w-8 rounded-lg"
-              title="Attach images"
+              onClick={() => {
+                if (!attachmentSubmissionPendingRef.current) {
+                  fileInputRef.current?.click();
+                }
+              }}
+              disabled={disabled || isAttachmentSubmissionPending}
+              className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
+              title="Attach files"
+              aria-label="Attach files"
             >
               <Paperclip className="h-4 w-4" />
             </UIButton>
           )}
-          {isStreaming ? (
+          {isStreaming && (
             <UIButton
               type="button"
               variant="destructive"
               size="icon"
               onClick={handleStop}
               disabled={!onStop}
-              className="h-8 w-8 rounded-lg"
+              className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
+              aria-label="Stop response"
             >
               <Square className="h-4 w-4" />
             </UIButton>
-          ) : (
-            <UIButton
-              type="button"
-              variant="primary"
-              size="icon"
-              onClick={handleSend}
-              disabled={
-                disabled ||
-                !value.trim() ||
-                value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH ||
-                imageUpload.hasUploadingImages
-              }
-              className="h-8 w-8 rounded-lg"
-            >
-              <Send className="h-4 w-4" />
-            </UIButton>
           )}
+          <UIButton
+            type="button"
+            variant="primary"
+            size="icon"
+            onClick={handleSend}
+            disabled={
+              disabled ||
+              isAttachmentSubmissionPending ||
+              !value.trim() ||
+              value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH ||
+              (attachmentsEnabled && attachmentUpload.hasUploadingAttachments)
+            }
+            className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
+            aria-label="Send message"
+          >
+            <Send className="h-4 w-4" />
+          </UIButton>
         </div>
       </div>
     </div>

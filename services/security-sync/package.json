@@ -8,17 +8,20 @@
     "deploy:dev": "wrangler deploy --env dev",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/security-sync/src",
-    "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts"
+    "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "wrangler": "^4.73.0"
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

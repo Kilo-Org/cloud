@@ -193,9 +193,6 @@ async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: 'discord',
     },
-    initiateInput: {
-      kilocodeOrganizationId,
-    },
     ticketPayload: {
       userId: ticketUserId,
       organizationId: owner.type === 'org' ? owner.id : undefined,

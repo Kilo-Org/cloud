@@ -6,4 +6,4 @@ Custom LLM models ([`custom-llm/`](./custom-llm)) and direct BYOK models ([`prov
 
 ## Forbidden free models
 
-When a free Kilo-exclusive model is removed, add its public ID to `forbiddenFreeModelIds` in [`forbidden-free-models.ts`](./forbidden-free-models.ts) so stale clients cannot keep invoking it directly.
+When a free Kilo-exclusive model is removed from the code base (not just disabled), add its public ID to `forbiddenFreeModelIds` in [`forbidden-free-models.ts`](./forbidden-free-models.ts) so stale clients get an appropriate error message.

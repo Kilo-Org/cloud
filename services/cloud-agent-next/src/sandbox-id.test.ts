@@ -53,6 +53,45 @@ describe('generateSandboxId', () => {
       const id2 = await generateSandboxId(undefined, 'org-id', 'user-id', 'session-b');
       expect(id1).toBe(id2);
     });
+
+    it.each([
+      [
+        'org',
+        'org-id',
+        undefined,
+        'org-7d891a9e4905bb0d5ff8dffcb99ba76973039c70340665b0',
+        'org-aa6ba1f356e062c430f121b97b5fd9cfd64c51487e5f28c5',
+      ],
+      [
+        'usr',
+        undefined,
+        undefined,
+        'usr-e4da69a737a38f1fc3283e8159b965e9d88f13d84c23cab1',
+        'usr-3c060fe2d53dd0b6e7a7e03084b290b64c8e0f67a8988161',
+      ],
+      [
+        'bot',
+        'org-id',
+        'reviewer',
+        'bot-b7b5ae452e738ff4c3e88238a0bd903edb1039b22314e3dc',
+        'bot-4415e0ae1dcbda7236e3bf04b66f13344682f349eac4500d',
+      ],
+      [
+        'ubt',
+        undefined,
+        'reviewer',
+        'ubt-5714320d8e828e8d428046c7f8601c126755f3e04d55b0d6',
+        'ubt-fb0f08bd868516e812f84fc34ddc327364046281c8e4c978',
+      ],
+    ])(
+      'should use the second shared sandbox ID generation for %s IDs',
+      async (_prefix, orgId, botId, expectedId, legacyId) => {
+        const id = await generateSandboxId(undefined, orgId, 'user-id', 'session', botId);
+
+        expect(id).toBe(expectedId);
+        expect(id).not.toBe(legacyId);
+      }
+    );
   });
 
   describe('prefix correctness', () => {
@@ -134,9 +173,9 @@ describe('generateSandboxId', () => {
   });
 
   describe('per-session sandbox', () => {
-    it('should produce a ses- prefixed ID for a per-session org', async () => {
+    it('should preserve the existing per-session ID generation', async () => {
       const id = await generateSandboxId('my-org', 'my-org', 'user-id', 'agent_abc123');
-      expect(id).toMatch(/^ses-[0-9a-f]{48}$/);
+      expect(id).toBe('ses-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
     });
 
     it('should be exactly 52 characters', async () => {
@@ -197,15 +236,79 @@ describe('generateSandboxId', () => {
       expect(id).toMatch(/^ses-/);
     });
   });
+
+  describe('devcontainer sandbox', () => {
+    it('should preserve the existing devcontainer ID generation', async () => {
+      const id = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        'agent_abc123',
+        undefined,
+        true
+      );
+      expect(id).toBe('dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
+    });
+
+    it('should be exactly 53 characters', async () => {
+      const id = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        'agent_abc123',
+        undefined,
+        true
+      );
+      expect(id.length).toBe(53);
+    });
+
+    it('should be deterministic for the same session ID', async () => {
+      const id1 = await generateSandboxId(undefined, 'org', 'user', 'session', undefined, true);
+      const id2 = await generateSandboxId(undefined, 'org', 'user', 'session', undefined, true);
+      expect(id1).toBe(id2);
+    });
+
+    it('should take precedence over per-session routing', async () => {
+      const id = await generateSandboxId('*', 'org', 'user', 'session', undefined, true);
+      expect(id).toMatch(/^dind-/);
+    });
+
+    it('should not produce dind- prefix when devcontainer is false', async () => {
+      const id = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        'session',
+        undefined,
+        false
+      );
+      expect(id).toMatch(/^org-/);
+    });
+
+    it('should not produce dind- prefix when devcontainer is undefined', async () => {
+      const id = await generateSandboxId(undefined, 'org-id', 'user-id', 'session');
+      expect(id).toMatch(/^org-/);
+    });
+  });
 });
 
 describe('getSandboxNamespace', () => {
   const mockSandbox = {} as DurableObjectNamespace<Sandbox>;
   const mockSandboxSmall = {} as DurableObjectNamespace<Sandbox>;
+  const mockSandboxDIND = {} as DurableObjectNamespace<Sandbox>;
   const mockEnv = {
     Sandbox: mockSandbox,
     SandboxSmall: mockSandboxSmall,
+    SandboxDIND: mockSandboxDIND,
   } as unknown as Env;
+
+  it('should return SandboxDIND for dind- prefixed IDs', () => {
+    const ns = getSandboxNamespace(
+      mockEnv,
+      'dind-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6'
+    );
+    expect(ns).toBe(mockSandboxDIND);
+  });
 
   it('should return SandboxSmall for ses- prefixed IDs', () => {
     const ns = getSandboxNamespace(mockEnv, 'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');

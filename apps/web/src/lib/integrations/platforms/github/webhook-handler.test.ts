@@ -8,6 +8,9 @@ const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
 const mockHandlePRReviewComment = jest.fn();
+const mockHandleGitHubReviewCommentReply = jest.fn();
+const mockHandleInstallationTargetRenamed = jest.fn();
+const mockRevokeStoredGitHubUserAuthorization = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -25,12 +28,19 @@ jest.mock('@/lib/integrations/db/webhook-events', () => ({
     mockUpdateWebhookEvent(eventId, updates),
 }));
 
+jest.mock('@/lib/integrations/platforms/github/user-authorization', () => ({
+  revokeStoredGitHubUserAuthorization: (githubUserId: string, appType: string, reason: string) =>
+    mockRevokeStoredGitHubUserAuthorization(githubUserId, appType, reason),
+}));
+
 jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handleInstallationCreated: jest.fn(),
   handleInstallationDeleted: jest.fn(),
   handleInstallationRepositories: jest.fn(),
   handleInstallationSuspend: jest.fn(),
   handleInstallationUnsuspend: jest.fn(),
+  handleInstallationTargetRenamed: (payload: unknown, integrationId: string, appType: string) =>
+    mockHandleInstallationTargetRenamed(payload, integrationId, appType),
   handleIssue: jest.fn(),
   handlePRReviewComment: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePRReviewComment(payload, platformIntegration),
@@ -39,6 +49,10 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handlePushEvent: jest.fn(),
   upsertCliSessionPullRequestsFromWebhook: jest.fn(),
   upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
+}));
+
+jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
+  handleGitHubReviewCommentReply: (input: unknown) => mockHandleGitHubReviewCommentReply(input),
 }));
 
 jest.mock('next/server', () => {
@@ -156,6 +170,10 @@ function issueCommentPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+async function waitForAfterTask() {
+  await new Promise(resolve => setTimeout(resolve, 0));
+}
+
 describe('handleGitHubWebhook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -165,6 +183,103 @@ describe('handleGitHubWebhook', () => {
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
     mockHandlePRReviewComment.mockResolvedValue(undefined);
+    mockHandleGitHubReviewCommentReply.mockResolvedValue({
+      recorded: false,
+      reason: 'not-review-comment-reply',
+    });
+    mockHandleInstallationTargetRenamed.mockResolvedValue(
+      Response.json({ message: 'Installation target updated' })
+    );
+    mockRevokeStoredGitHubUserAuthorization.mockResolvedValue({ kiloUserId: 'user_1' });
+  });
+
+  it('routes installation_target renamed events through authoritative login synchronization', async () => {
+    const payload = {
+      action: 'renamed',
+      installation: { id: 98765 },
+      account: { id: 123, login: 'renamed-owner' },
+      changes: { login: { from: 'old-owner' } },
+      target_type: 'User',
+    };
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation_target', payload),
+      'lite'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockHandleInstallationTargetRenamed).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      integration.id,
+      'lite'
+    );
+    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
+      'we_1',
+      expect.objectContaining({ handlers_triggered: ['installation_target_renamed'] })
+    );
+  });
+
+  it('retries installation_target synchronization after a transient handler failure', async () => {
+    const payload = {
+      action: 'renamed',
+      installation: { id: 98765 },
+      account: { id: 123, login: 'renamed-owner' },
+      changes: { login: { from: 'old-owner' } },
+      target_type: 'User',
+    };
+    mockHandleInstallationTargetRenamed
+      .mockRejectedValueOnce(new Error('temporary GitHub failure'))
+      .mockResolvedValueOnce(Response.json({ message: 'Installation target updated' }));
+
+    const firstResponse = await handleGitHubWebhook(
+      signedGitHubRequest('installation_target', payload),
+      'standard'
+    );
+    const retriedResponse = await handleGitHubWebhook(
+      signedGitHubRequest('installation_target', payload),
+      'standard'
+    );
+
+    expect(firstResponse.status).toBe(500);
+    expect(retriedResponse.status).toBe(200);
+    expect(mockHandleInstallationTargetRenamed).toHaveBeenCalledTimes(2);
+    expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('safely revalidates identity before acknowledging duplicate rename deliveries', async () => {
+    mockLogWebhookEvent.mockResolvedValue({ isDuplicate: true });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation_target', {
+        action: 'renamed',
+        installation: { id: 98765 },
+        account: { id: 123, login: 'renamed-owner' },
+        changes: { login: { from: 'old-owner' } },
+        target_type: 'User',
+      }),
+      'standard'
+    );
+
+    expect(await response.json()).toEqual({ message: 'Duplicate event' });
+    expect(mockHandleInstallationTargetRenamed).toHaveBeenCalledTimes(1);
+  });
+
+  it('revokes user authorization without requiring an installation payload', async () => {
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('github_app_authorization', {
+        action: 'revoked',
+        sender: { id: 123, login: 'octocat' },
+      }),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockRevokeStoredGitHubUserAuthorization).toHaveBeenCalledWith(
+      '123',
+      'standard',
+      'revoked'
+    );
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
   });
 
   it('keeps pull_request webhooks on the code review path', async () => {
@@ -193,6 +308,7 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
+    await waitForAfterTask();
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
     expect(mockHandlePRReviewComment).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'created' }),
@@ -201,6 +317,24 @@ describe('handleGitHubWebhook', () => {
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({ handlers_triggered: ['pr_review_comment_fix'] })
+    );
+  });
+
+  it('logs review memory feedback only when it records feedback', async () => {
+    mockHandleGitHubReviewCommentReply.mockResolvedValueOnce({ recorded: true, eventId: 'evt_1' });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
+      'we_1',
+      expect.objectContaining({
+        handlers_triggered: ['pr_review_comment_fix', 'review_memory_feedback'],
+      })
     );
   });
 

@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "cloud-agent-test",
   "main": "test/test-worker.ts",
-  "compatibility_date": "2025-09-15",
+  "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "durable_objects": {
@@ -11,6 +11,10 @@
         "class_name": "CloudAgentSession",
         "name": "CLOUD_AGENT_SESSION",
       },
+      {
+        "class_name": "UserKiloFacade",
+        "name": "USER_KILO_FACADE",
+      },
     ],
   },
   "migrations": [
@@ -18,9 +22,16 @@
       "new_sqlite_classes": ["CloudAgentSession"],
       "tag": "v2",
     },
+    {
+      "new_sqlite_classes": ["UserKiloFacade"],
+      "tag": "v5",
+    },
   ],
   "queues": {
-    "producers": [{ "binding": "EXECUTION_QUEUE", "queue": "cloud-agent-executions" }],
+    "producers": [
+      { "binding": "EXECUTION_QUEUE", "queue": "cloud-agent-executions" },
+      { "binding": "CLOUD_AGENT_REPORT_QUEUE", "queue": "cloud-agent-next-report-queue-test" },
+    ],
     "consumers": [
       {
         "queue": "cloud-agent-executions",

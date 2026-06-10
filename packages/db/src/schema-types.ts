@@ -17,8 +17,16 @@ export enum KiloPassCadence {
   Yearly = 'yearly',
 }
 
+export enum KiloPassPaymentProvider {
+  Stripe = 'stripe',
+  AppStore = 'app_store',
+  GooglePlay = 'google_play',
+}
+
 export enum KiloPassIssuanceSource {
   StripeInvoice = 'stripe_invoice',
+  AppStoreTransaction = 'app_store_transaction',
+  GooglePlayTransaction = 'google_play_transaction',
   Cron = 'cron',
 }
 
@@ -26,11 +34,35 @@ export enum KiloPassIssuanceItemKind {
   Base = 'base',
   Bonus = 'bonus',
   PromoFirstMonth50Pct = 'promo_first_month_50pct',
+  ReferralBonus = 'referral_bonus',
+}
+
+export enum KiloPassWelcomePromoPaymentFingerprintType {
+  Card = 'card',
+  SepaDebit = 'sepa_debit',
+  UsBankAccount = 'us_bank_account',
+  BacsDebit = 'bacs_debit',
+  AuBecsDebit = 'au_becs_debit',
+}
+
+export enum KiloPassWelcomePromoEligibilityReason {
+  FirstPaymentFingerprintClaim = 'first_payment_fingerprint_claim',
+  FingerprintPreviouslyClaimed = 'fingerprint_previously_claimed',
+  MissingFingerprint = 'missing_fingerprint',
+  NoSupportedFingerprint = 'no_supported_fingerprint',
+  NoPositiveSettlement = 'no_positive_settlement',
+  SettlementUnresolved = 'settlement_unresolved',
 }
 
 export enum KiloPassAuditLogAction {
   StripeWebhookReceived = 'stripe_webhook_received',
   KiloPassInvoicePaidHandled = 'kilo_pass_invoice_paid_handled',
+  StorePurchaseCompleted = 'store_purchase_completed',
+  StoreNotificationReceived = 'store_notification_received',
+  StoreSubscriptionRenewed = 'store_subscription_renewed',
+  StoreSubscriptionCanceled = 'store_subscription_canceled',
+  StoreSubscriptionExpired = 'store_subscription_expired',
+  StoreSubscriptionRefunded = 'store_subscription_refunded',
   BaseCreditsIssued = 'base_credits_issued',
   BonusCreditsIssued = 'bonus_credits_issued',
   BonusCreditsSkippedIdempotent = 'bonus_credits_skipped_idempotent',
@@ -38,6 +70,7 @@ export enum KiloPassAuditLogAction {
   YearlyMonthlyBaseCronStarted = 'yearly_monthly_base_cron_started',
   YearlyMonthlyBaseCronCompleted = 'yearly_monthly_base_cron_completed',
   IssueYearlyRemainingCredits = 'issue_yearly_remaining_credits',
+  DuplicateCardSubscriptionCanceled = 'duplicate_card_subscription_canceled',
 
   /* Not removed because I didn't want to deal with the migration. */
   /**
@@ -179,6 +212,41 @@ export const KiloClawSubscriptionChangeActorType = {
 export type KiloClawSubscriptionChangeActorType =
   (typeof KiloClawSubscriptionChangeActorType)[keyof typeof KiloClawSubscriptionChangeActorType];
 
+export const KiloClawTerminalRenewalFailureStatus = {
+  Unresolved: 'unresolved',
+  Resolved: 'resolved',
+  Waived: 'waived',
+  Superseded: 'superseded',
+} as const;
+
+export type KiloClawTerminalRenewalFailureStatus =
+  (typeof KiloClawTerminalRenewalFailureStatus)[keyof typeof KiloClawTerminalRenewalFailureStatus];
+
+// System failure codes for credit-renewal terminal failures. These are
+// recorded only after automatic retry is exhausted for a particular
+// (subscription, renewal_boundary). Expected business outcomes
+// (e.g. insufficient credits past-due, cancel-at-period-end, stale skip)
+// MUST NOT be recorded as terminal failures and so are not part of this set.
+export const KiloClawTerminalRenewalFailureCode = {
+  CreditBalanceReadFailed: 'credit_balance_read_failed',
+  RenewalTransactionFailed: 'renewal_transaction_failed',
+  AutoTopUpMarkerWriteFailed: 'auto_top_up_marker_write_failed',
+  WorkerTimeout: 'worker_timeout',
+  PoisonPayload: 'poison_payload',
+  QueueDeliveryExhausted: 'queue_delivery_exhausted',
+} as const;
+
+export type KiloClawTerminalRenewalFailureCode =
+  (typeof KiloClawTerminalRenewalFailureCode)[keyof typeof KiloClawTerminalRenewalFailureCode];
+
+export const KiloClawTerminalRenewalFailureResolutionActorType = {
+  Operator: 'operator',
+  System: 'system',
+} as const;
+
+export type KiloClawTerminalRenewalFailureResolutionActorType =
+  (typeof KiloClawTerminalRenewalFailureResolutionActorType)[keyof typeof KiloClawTerminalRenewalFailureResolutionActorType];
+
 export const KiloClawSubscriptionChangeAction = {
   Created: 'created',
   StatusChanged: 'status_changed',
@@ -197,6 +265,104 @@ export const KiloClawSubscriptionChangeAction = {
 
 export type KiloClawSubscriptionChangeAction =
   (typeof KiloClawSubscriptionChangeAction)[keyof typeof KiloClawSubscriptionChangeAction];
+
+export const StripeEarlyFraudWarningOwnerClassification = {
+  Personal: 'personal',
+  Organization: 'organization',
+  Ambiguous: 'ambiguous',
+  Unmatched: 'unmatched',
+} as const;
+
+export type StripeEarlyFraudWarningOwnerClassification =
+  (typeof StripeEarlyFraudWarningOwnerClassification)[keyof typeof StripeEarlyFraudWarningOwnerClassification];
+
+export const StripeEarlyFraudWarningCaseStatus = {
+  Queued: 'queued',
+  Contained: 'contained',
+  Processing: 'processing',
+  Completed: 'completed',
+  ReviewRequired: 'review_required',
+  Failed: 'failed',
+  Remediated: 'remediated',
+  Dismissed: 'dismissed',
+} as const;
+
+export type StripeEarlyFraudWarningCaseStatus =
+  (typeof StripeEarlyFraudWarningCaseStatus)[keyof typeof StripeEarlyFraudWarningCaseStatus];
+
+export const StripeEarlyFraudWarningActionType = {
+  Containment: 'containment',
+  Refund: 'refund',
+  PaymentValueClawback: 'payment_value_clawback',
+  SubscriptionTermination: 'subscription_termination',
+  AccessTermination: 'access_termination',
+  KiloClawSuspension: 'kiloclaw_suspension',
+  AffiliatePayoutReversal: 'affiliate_payout_reversal',
+  ReferralRewardReversal: 'referral_reward_reversal',
+  UserNotice: 'user_notice',
+} as const;
+
+export type StripeEarlyFraudWarningActionType =
+  (typeof StripeEarlyFraudWarningActionType)[keyof typeof StripeEarlyFraudWarningActionType];
+
+export const StripeEarlyFraudWarningActionStatus = {
+  Queued: 'queued',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed',
+  ReviewRequired: 'review_required',
+  Dismissed: 'dismissed',
+} as const;
+
+export type StripeEarlyFraudWarningActionStatus =
+  (typeof StripeEarlyFraudWarningActionStatus)[keyof typeof StripeEarlyFraudWarningActionStatus];
+
+export const StripeDisputeOwnerClassification = {
+  Personal: 'personal',
+  Organization: 'organization',
+  Ambiguous: 'ambiguous',
+  Unmatched: 'unmatched',
+} as const;
+
+export type StripeDisputeOwnerClassification =
+  (typeof StripeDisputeOwnerClassification)[keyof typeof StripeDisputeOwnerClassification];
+
+export const StripeDisputeCaseStatus = {
+  NeedsAction: 'needs_action',
+  Processing: 'processing',
+  Accepted: 'accepted',
+  AcceptanceFailed: 'acceptance_failed',
+  EnforcementFailed: 'enforcement_failed',
+  ReviewRequired: 'review_required',
+  Closed: 'closed',
+} as const;
+
+export type StripeDisputeCaseStatus =
+  (typeof StripeDisputeCaseStatus)[keyof typeof StripeDisputeCaseStatus];
+
+export const StripeDisputeActionType = {
+  StripeAcceptance: 'stripe_acceptance',
+  UserBlock: 'user_block',
+  AutoTopUpDisable: 'auto_top_up_disable',
+  CreditBalanceReset: 'credit_balance_reset',
+  SubscriptionCancellation: 'subscription_cancellation',
+  AccessTermination: 'access_termination',
+  KiloClawSuspension: 'kiloclaw_suspension',
+} as const;
+
+export type StripeDisputeActionType =
+  (typeof StripeDisputeActionType)[keyof typeof StripeDisputeActionType];
+
+export const StripeDisputeActionStatus = {
+  Queued: 'queued',
+  Processing: 'processing',
+  Completed: 'completed',
+  Failed: 'failed',
+  Skipped: 'skipped',
+} as const;
+
+export type StripeDisputeActionStatus =
+  (typeof StripeDisputeActionStatus)[keyof typeof StripeDisputeActionStatus];
 
 export const AffiliateProvider = {
   Impact: 'impact',
@@ -225,21 +391,37 @@ export const AffiliateEventDeliveryState = {
 export type AffiliateEventDeliveryState =
   (typeof AffiliateEventDeliveryState)[keyof typeof AffiliateEventDeliveryState];
 
-export const KiloClawAttributionTouchType = {
+export const ImpactReferralProduct = {
+  KiloClaw: 'kiloclaw',
+  KiloPass: 'kilo_pass',
+} as const;
+
+export type ImpactReferralProduct =
+  (typeof ImpactReferralProduct)[keyof typeof ImpactReferralProduct];
+
+export const ImpactAdvocateProgramKey = {
+  KiloClaw: 'kiloclaw',
+  KiloPass: 'kilo_pass',
+} as const;
+
+export type ImpactAdvocateProgramKey =
+  (typeof ImpactAdvocateProgramKey)[keyof typeof ImpactAdvocateProgramKey];
+
+export const ImpactAttributionTouchType = {
   Affiliate: 'affiliate',
   Referral: 'referral',
 } as const;
 
-export type KiloClawAttributionTouchType =
-  (typeof KiloClawAttributionTouchType)[keyof typeof KiloClawAttributionTouchType];
+export type ImpactAttributionTouchType =
+  (typeof ImpactAttributionTouchType)[keyof typeof ImpactAttributionTouchType];
 
-export const KiloClawAttributionTouchProvider = {
+export const ImpactAttributionTouchProvider = {
   ImpactPerformance: 'impact_performance',
   ImpactAdvocate: 'impact_advocate',
 } as const;
 
-export type KiloClawAttributionTouchProvider =
-  (typeof KiloClawAttributionTouchProvider)[keyof typeof KiloClawAttributionTouchProvider];
+export type ImpactAttributionTouchProvider =
+  (typeof ImpactAttributionTouchProvider)[keyof typeof ImpactAttributionTouchProvider];
 
 export const ImpactAdvocateRegistrationState = {
   Pending: 'pending',
@@ -261,33 +443,33 @@ export const ImpactAdvocateAttemptDeliveryState = {
 export type ImpactAdvocateAttemptDeliveryState =
   (typeof ImpactAdvocateAttemptDeliveryState)[keyof typeof ImpactAdvocateAttemptDeliveryState];
 
-export const KiloClawReferralBeneficiaryRole = {
+export const ImpactReferralBeneficiaryRole = {
   Referrer: 'referrer',
   Referee: 'referee',
 } as const;
 
-export type KiloClawReferralBeneficiaryRole =
-  (typeof KiloClawReferralBeneficiaryRole)[keyof typeof KiloClawReferralBeneficiaryRole];
+export type ImpactReferralBeneficiaryRole =
+  (typeof ImpactReferralBeneficiaryRole)[keyof typeof ImpactReferralBeneficiaryRole];
 
-export const KiloClawReferralWinningTouchType = {
+export const ImpactReferralWinningTouchType = {
   Referral: 'referral',
   Affiliate: 'affiliate',
   None: 'none',
 } as const;
 
-export type KiloClawReferralWinningTouchType =
-  (typeof KiloClawReferralWinningTouchType)[keyof typeof KiloClawReferralWinningTouchType];
+export type ImpactReferralWinningTouchType =
+  (typeof ImpactReferralWinningTouchType)[keyof typeof ImpactReferralWinningTouchType];
 
-export const KiloClawReferralDecisionOutcome = {
+export const ImpactReferralDecisionOutcome = {
   Granted: 'granted',
   CapLimited: 'cap_limited',
   Disqualified: 'disqualified',
 } as const;
 
-export type KiloClawReferralDecisionOutcome =
-  (typeof KiloClawReferralDecisionOutcome)[keyof typeof KiloClawReferralDecisionOutcome];
+export type ImpactReferralDecisionOutcome =
+  (typeof ImpactReferralDecisionOutcome)[keyof typeof ImpactReferralDecisionOutcome];
 
-export const KiloClawReferralRewardStatus = {
+export const ImpactReferralRewardStatus = {
   Pending: 'pending',
   Earned: 'earned',
   Applied: 'applied',
@@ -297,8 +479,38 @@ export const KiloClawReferralRewardStatus = {
   ReviewRequired: 'review_required',
 } as const;
 
-export type KiloClawReferralRewardStatus =
-  (typeof KiloClawReferralRewardStatus)[keyof typeof KiloClawReferralRewardStatus];
+export type ImpactReferralRewardStatus =
+  (typeof ImpactReferralRewardStatus)[keyof typeof ImpactReferralRewardStatus];
+
+export const ImpactReferralRewardKind = {
+  KiloClawFreeMonth: 'kiloclaw_free_month',
+  KiloPassBonus: 'kilo_pass_bonus',
+} as const;
+
+export type ImpactReferralRewardKind =
+  (typeof ImpactReferralRewardKind)[keyof typeof ImpactReferralRewardKind];
+
+export const ImpactReferralPaymentProvider = {
+  Stripe: 'stripe',
+  Credits: 'credits',
+  AppStore: 'app_store',
+  GooglePlay: 'google_play',
+} as const;
+
+export type ImpactReferralPaymentProvider =
+  (typeof ImpactReferralPaymentProvider)[keyof typeof ImpactReferralPaymentProvider];
+
+export const KiloClawReferralBeneficiaryRole = ImpactReferralBeneficiaryRole;
+export type KiloClawReferralBeneficiaryRole = ImpactReferralBeneficiaryRole;
+
+export const KiloClawReferralWinningTouchType = ImpactReferralWinningTouchType;
+export type KiloClawReferralWinningTouchType = ImpactReferralWinningTouchType;
+
+export const KiloClawReferralDecisionOutcome = ImpactReferralDecisionOutcome;
+export type KiloClawReferralDecisionOutcome = ImpactReferralDecisionOutcome;
+
+export const KiloClawReferralRewardStatus = ImpactReferralRewardStatus;
+export type KiloClawReferralRewardStatus = ImpactReferralRewardStatus;
 
 export const ImpactConversionReportState = {
   Queued: 'queued',
@@ -319,6 +531,43 @@ export const ImpactAdvocateRewardRedemptionState = {
 
 export type ImpactAdvocateRewardRedemptionState =
   (typeof ImpactAdvocateRewardRedemptionState)[keyof typeof ImpactAdvocateRewardRedemptionState];
+
+// --- Coding Plan enums ---
+
+export const BYOKManagementSource = {
+  User: 'user',
+  CodingPlan: 'coding_plan',
+} as const;
+
+export type BYOKManagementSource = (typeof BYOKManagementSource)[keyof typeof BYOKManagementSource];
+
+export const CodingPlanCredentialStatus = {
+  Available: 'available',
+  Assigned: 'assigned',
+  RevocationPending: 'revocation_pending',
+  Revoked: 'revoked',
+  RevocationFailed: 'revocation_failed',
+} as const;
+
+export type CodingPlanCredentialStatus =
+  (typeof CodingPlanCredentialStatus)[keyof typeof CodingPlanCredentialStatus];
+
+export const CodingPlanSubscriptionStatus = {
+  Active: 'active',
+  PastDue: 'past_due',
+  Canceled: 'canceled',
+} as const;
+
+export type CodingPlanSubscriptionStatus =
+  (typeof CodingPlanSubscriptionStatus)[keyof typeof CodingPlanSubscriptionStatus];
+
+export const CodingPlanTermKind = {
+  Activation: 'activation',
+  Extension: 'extension',
+  Renewal: 'renewal',
+} as const;
+
+export type CodingPlanTermKind = (typeof CodingPlanTermKind)[keyof typeof CodingPlanTermKind];
 
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
@@ -347,9 +596,12 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.cli_run.start',
   'kiloclaw.cli_run.cancel',
   'kiloclaw.orphan.destroy',
+  'kiloclaw.orphan_volume.destroy',
   'kiloclaw.instances.bulk_change_version',
   'kiloclaw.scheduled_action.created',
+  'kiloclaw.fleet_upgrade.created',
   'kiloclaw.scheduled_action.cancelled',
+  'kiloclaw.provision_reservation.release',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
@@ -677,8 +929,10 @@ export const GatewayApiKindSchema = z.enum([
   'chat_completions',
   'embeddings',
   'fim_completions',
+  'edit_completions',
   'messages',
   'responses',
+  'audio_transcriptions',
 ]);
 
 export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
@@ -693,6 +947,22 @@ export type PlatformRepository = {
   full_name: string;
   private: boolean;
 };
+
+export const REVIEW_MEMORY_PLATFORMS = ['github'] as const;
+export type ReviewMemoryPlatform = (typeof REVIEW_MEMORY_PLATFORMS)[number];
+
+export const REVIEW_MEMORY_PROPOSAL_STATUSES = [
+  'open',
+  'edited',
+  'rejected',
+  'opening_change_request',
+  'change_request_opened',
+  'change_request_failed',
+  'superseded',
+] as const;
+export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES)[number];
+
+export type ReviewMemoryEvidenceItem = { excerpt: string; prNumber: number | null };
 
 // --- Deployment types ---
 
@@ -727,7 +997,6 @@ export const CodeReviewAgentConfigSchema = z.object({
   focus_areas: z.array(z.string()),
   auto_approve_minor: z.boolean().optional(),
   custom_instructions: z.string().nullable().optional(),
-  max_review_time_minutes: z.number().int().positive(),
   model_slug: z.string(),
   // Thinking effort variant name (e.g. "high", "max", "thinking") — null means model default
   thinking_effort: z
@@ -740,6 +1009,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   selected_repository_ids: z.array(z.number()).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
+  disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
   //   'off'      — gate only fails on system errors (timeout, crash)
@@ -747,6 +1017,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   //   'warning'  — gate fails on warnings and above
   //   'critical' — gate fails only on critical issues
   gate_threshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  review_memory_enabled: z.boolean().optional(),
 });
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;
@@ -963,6 +1234,7 @@ export const OpenCodePromptSchema = z.enum([
   'anthropic',
   'trinity',
   'anthropic_without_todo',
+  'ling',
   'gpt55',
 ]);
 
@@ -986,6 +1258,7 @@ export const CustomLlmProviderSchema = z.enum([
   'openai-compatible', // uses Chat Completions API with reasoning_content
   'openrouter', // uses Chat Completions API with reasoning_details
   'alibaba', // identical to openai-compatible, but reports cache write tokens that alibaba bills separately
+  'mistral', // uses Chat Completions API with possibly complex content objects for e.g. thinking
 ]);
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;
@@ -1011,24 +1284,6 @@ export const OpenCodeSettingsSchema = z.object({
 
 export type OpenCodeSettings = z.infer<typeof OpenCodeSettingsSchema>;
 
-export const OpenClawApiAdapterSchema = z.enum([
-  'openai-completions',
-  'openai-responses',
-  'anthropic-messages',
-]);
-
-export type OpenClawApiAdapter = z.infer<typeof OpenClawApiAdapterSchema>;
-
-export const OpenClawModelSettingsSchema = z.object({
-  api_adapter: OpenClawApiAdapterSchema.optional(),
-});
-
-export type OpenClawModelSettings = z.infer<typeof OpenClawModelSettingsSchema>;
-
-export const InterleavedFormatSchema = z.enum(['reasoning_content', 'think']);
-
-export type InterleavedFormat = z.infer<typeof InterleavedFormatSchema>;
-
 export const CustomLlmExtraBodySchema = z.record(z.string(), z.any());
 
 export type CustomLlmExtraBody = z.infer<typeof CustomLlmExtraBodySchema>;
@@ -1048,24 +1303,31 @@ export const CustomLlmPricingSchema = z.object({
 
 export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
 
-export const CustomLlmDefinitionSchema = z.object({
-  internal_id: z.string(),
-  display_name: z.string(),
+export const CustomLlmMetadataSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  base_url: z.string(),
-  api_key: z.string(),
-  organization_ids: z.array(z.string()),
   supports_image_input: z.boolean().optional(),
-  add_cache_breakpoints: z.boolean().optional(),
-  inject_reasoning_into_content: z.boolean().optional(),
-  extra_headers: CustomLlmExtraHeadersSchema.optional(),
-  extra_body: CustomLlmExtraBodySchema.optional(),
-  remove_from_body: z.array(z.string()).optional(),
   opencode_settings: OpenCodeSettingsSchema.optional(),
-  openclaw_settings: OpenClawModelSettingsSchema.optional(),
-  pricing: CustomLlmPricingSchema.optional(),
 });
+
+export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
+
+export const CustomLlmDefinitionSchema = z
+  .object({
+    internal_id: z.string(),
+    display_name: z.string(),
+    base_url: z.url(),
+    api_key: z.string(),
+    organization_ids: z.array(z.string()),
+    add_cache_breakpoints: z.boolean().optional(),
+    remove_cache_breakpoints: z.boolean().optional(),
+    inject_reasoning_into_content: z.boolean().optional(),
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+    extra_body: CustomLlmExtraBodySchema.optional(),
+    remove_from_body: z.array(z.string()).optional(),
+    pricing: CustomLlmPricingSchema.optional(),
+  })
+  .and(CustomLlmMetadataSchema);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
@@ -1080,9 +1342,25 @@ export const ModelSchema = z.object({
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
 export const EndpointSchema = z.object({
-  tag: z.string(),
+  tag: z.string().optional(),
+  provider_name: z.string().optional(),
   context_length: z.number(),
+  pricing: z
+    .object({
+      prompt: z.string(),
+      completion: z.string(),
+      image: z.string().optional(),
+      request: z.string().optional(),
+      input_cache_read: z.string().optional(),
+      input_cache_write: z.string().optional(),
+      web_search: z.string().optional(),
+      internal_reasoning: z.string().optional(),
+      discount: z.number().optional(),
+    })
+    .optional(),
 });
+
+export type Endpoint = z.infer<typeof EndpointSchema>;
 
 export const EndpointsSchema = z.object({
   data: z.object({ endpoints: z.array(EndpointSchema) }),
@@ -1120,12 +1398,148 @@ export type StripeSubscriptionStatus =
  */
 export const CODE_REVIEW_TERMINAL_REASONS = [
   'billing',
+  'model_not_found',
+  'github_installation_required',
+  'github_ip_allow_list',
+  'gitlab_project_access_required',
+  'byok_invalid_key',
+  'selected_model_unavailable',
   'user_cancelled',
   'superseded',
   'interrupted',
   'timeout',
   'upstream_error',
+  'sandbox_error',
   'unknown',
 ] as const;
 
 export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[number];
+
+/**
+ * Subset of CODE_REVIEW_TERMINAL_REASONS that represent expected, non-system
+ * outcomes (user/billing-driven cancellations or supersession). Alerting
+ * detectors exclude these so they are not counted as system failures.
+ *
+ * KEEP IN SYNC with CODE_REVIEW_TERMINAL_REASONS — when adding a new reason
+ * above, decide whether it is a system failure or a benign outcome and
+ * include it here when it is the latter.
+ */
+export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
+  'billing',
+  'model_not_found',
+  'github_installation_required',
+  'github_ip_allow_list',
+  'gitlab_project_access_required',
+  'byok_invalid_key',
+  'selected_model_unavailable',
+  'user_cancelled',
+  'superseded',
+] as const satisfies readonly CodeReviewTerminalReason[];
+
+export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];
+
+// --- MCP Gateway enums ---
+
+export const MCPGatewayOwnerScope = {
+  Personal: 'personal',
+  Organization: 'organization',
+} as const;
+
+export type MCPGatewayOwnerScope = (typeof MCPGatewayOwnerScope)[keyof typeof MCPGatewayOwnerScope];
+
+export const MCPGatewayAuthMode = {
+  None: 'none',
+  StaticHeaders: 'static_headers',
+  OAuthDynamic: 'oauth_dynamic',
+  OAuthStatic: 'oauth_static',
+} as const;
+
+export type MCPGatewayAuthMode = (typeof MCPGatewayAuthMode)[keyof typeof MCPGatewayAuthMode];
+
+export const MCPGatewaySharingMode = {
+  SingleUser: 'single_user',
+  MultiUser: 'multi_user',
+} as const;
+
+export type MCPGatewaySharingMode =
+  (typeof MCPGatewaySharingMode)[keyof typeof MCPGatewaySharingMode];
+
+export const MCPGatewayProviderScopeSource = {
+  None: 'none',
+  Discovered: 'discovered',
+  Override: 'override',
+} as const;
+
+export type MCPGatewayProviderScopeSource =
+  (typeof MCPGatewayProviderScopeSource)[keyof typeof MCPGatewayProviderScopeSource];
+
+export const MCPGatewayRouteStatus = {
+  Active: 'active',
+  Rotated: 'rotated',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayRouteStatus =
+  (typeof MCPGatewayRouteStatus)[keyof typeof MCPGatewayRouteStatus];
+
+export const MCPGatewayInstanceStatus = {
+  Active: 'active',
+  NeedsReauth: 'needs_reauth',
+  Revoked: 'revoked',
+  Removed: 'removed',
+} as const;
+
+export type MCPGatewayInstanceStatus =
+  (typeof MCPGatewayInstanceStatus)[keyof typeof MCPGatewayInstanceStatus];
+
+export const MCPGatewayProviderGrantStatus = {
+  Active: 'active',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayProviderGrantStatus =
+  (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
+
+export const MCPGatewaySecretKind = {
+  StaticProviderCredentials: 'static_provider_credentials',
+  DynamicRegistration: 'dynamic_registration',
+  StaticHeaders: 'static_headers',
+} as const;
+
+export type MCPGatewaySecretKind = (typeof MCPGatewaySecretKind)[keyof typeof MCPGatewaySecretKind];
+
+export const MCPGatewayOAuthClientAuthMethod = {
+  None: 'none',
+  ClientSecretPost: 'client_secret_post',
+  ClientSecretBasic: 'client_secret_basic',
+} as const;
+
+export type MCPGatewayOAuthClientAuthMethod =
+  (typeof MCPGatewayOAuthClientAuthMethod)[keyof typeof MCPGatewayOAuthClientAuthMethod];
+
+export const MCPGatewayAuthorizationRequestStatus = {
+  Pending: 'pending',
+  Completed: 'completed',
+  Error: 'error',
+} as const;
+
+export type MCPGatewayAuthorizationRequestStatus =
+  (typeof MCPGatewayAuthorizationRequestStatus)[keyof typeof MCPGatewayAuthorizationRequestStatus];
+
+export const MCPGatewayPendingProviderAuthorizationStatus = {
+  Pending: 'pending',
+  Completed: 'completed',
+  Error: 'error',
+} as const;
+
+export type MCPGatewayPendingProviderAuthorizationStatus =
+  (typeof MCPGatewayPendingProviderAuthorizationStatus)[keyof typeof MCPGatewayPendingProviderAuthorizationStatus];
+
+export const MCPGatewayAuditOutcome = {
+  Success: 'success',
+  Failure: 'failure',
+  Blocked: 'blocked',
+} as const;
+
+export type MCPGatewayAuditOutcome =
+  (typeof MCPGatewayAuditOutcome)[keyof typeof MCPGatewayAuditOutcome];

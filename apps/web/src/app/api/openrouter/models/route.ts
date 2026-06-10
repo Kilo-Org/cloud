@@ -3,11 +3,12 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/ai-gateway/models';
+import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 
 async function tryGetUserFromAuth() {
   try {
@@ -43,7 +44,10 @@ export async function GET(
       return NextResponse.json(data);
     }
     const byokModels = auth?.user ? await getDirectByokModelsForUser(auth.user.id) : [];
-    return NextResponse.json({ data: filterByFeature(data.data.concat(byokModels), feature) });
+    const experimentModels = await listAvailableExperimentModels();
+    return NextResponse.json({
+      data: filterByFeature(data.data.concat(byokModels, experimentModels), feature),
+    });
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/models' },

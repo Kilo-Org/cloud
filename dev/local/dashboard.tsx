@@ -130,13 +130,7 @@ function doShowGroup(
 ): void {
   if (runningServiceNames.length === 0) return;
   const current = viewedRef.current;
-  const currentIsGroup = isGroupView(current);
-  const result = showGroupInTmux(
-    sessionName,
-    runningServiceNames,
-    currentViewedEncoded(current),
-    currentIsGroup
-  );
+  const result = showGroupInTmux(sessionName, runningServiceNames, currentViewedEncoded(current));
   if (result !== currentViewedEncoded(current)) {
     viewedRef.current = { kind: 'group', groupId, serviceNames: runningServiceNames };
   }
@@ -373,7 +367,9 @@ function Dashboard({
         return new Map(entries);
       });
     };
-    refresh();
+    void refresh().catch(error => {
+      console.error('Failed to refresh service statuses:', error);
+    });
     const timer = setInterval(refresh, REFRESH_MS);
     return () => clearInterval(timer);
   }, [runningServices]);
@@ -691,7 +687,7 @@ function Dashboard({
 
     const handleStdin = (data: Buffer) => {
       const str = data.toString('utf-8');
-      const re = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/g;
+      const re = new RegExp(`${String.fromCharCode(27)}\\[<(\\d+);(\\d+);(\\d+)([Mm])`, 'g');
       let m;
       while ((m = re.exec(str)) !== null) {
         const button = parseInt(m[1], 10);
@@ -894,6 +890,11 @@ const { waitUntilExit } = render(
   />
 );
 
-waitUntilExit().then(() => {
-  process.exit(0);
-});
+waitUntilExit()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('Dashboard exited with an error:', error);
+    process.exit(1);
+  });

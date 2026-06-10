@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { findUserById } from '@/lib/user';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { insertUsageRecord } from '@/lib/ai-gateway/processUsage';
@@ -97,6 +97,8 @@ export async function POST(
     auto_model: null,
     market_cost: cost_mUsd,
     is_free: false,
+    abuse_delay: null,
+    abuse_downgraded_from: null,
   };
 
   await insertUsageRecord(coreUsageFields, metadataFields);

@@ -3,11 +3,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 
-export function useKiloClawStatus() {
+export function useKiloClawStatus(options?: { enabled?: boolean }) {
   const trpc = useTRPC();
+  const enabled = options?.enabled ?? true;
   return useQuery(
     trpc.kiloclaw.getStatus.queryOptions(undefined, {
-      refetchInterval: 10_000,
+      enabled,
+      refetchInterval: enabled ? 10_000 : false,
+    })
+  );
+}
+
+export function useKiloClawNavState() {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getNavState.queryOptions(undefined, {
+      staleTime: 60_000,
     })
   );
 }
@@ -129,10 +140,13 @@ export function useKiloClawMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const invalidateStatus = async () => {
-    await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() });
-    await queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.controllerVersion.queryKey(),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getNavState.queryKey() }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.controllerVersion.queryKey(),
+      }),
+    ]);
   };
 
   const invalidateStatusAndBilling = async () => {
@@ -323,7 +337,8 @@ export function useKiloClawMutations() {
     ),
     writeFile: useMutation(
       trpc.kiloclaw.writeFile.mutationOptions({
-        onSuccess: async () => {
+        onSuccess: async result => {
+          if ('outcome' in result) return;
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.fileTree.queryKey(),
           });
@@ -396,6 +411,21 @@ export function useKiloClawMutations() {
         },
       })
     ),
+    startOnboardingBriefing: useMutation(trpc.kiloclaw.startOnboardingBriefing.mutationOptions()),
+    updateBriefingInterests: useMutation(
+      trpc.kiloclaw.updateBriefingInterests.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+        },
+      })
+    ),
+    updateUserLocation: useMutation(
+      trpc.kiloclaw.updateUserLocation.mutationOptions({
+        onSuccess: invalidateStatus,
+      })
+    ),
     rename: useMutation(
       trpc.kiloclaw.renameInstance.mutationOptions({ onSuccess: invalidateStatus })
     ),
@@ -446,10 +476,10 @@ export function useKiloClawLatestVersion() {
   );
 }
 
-export function useFileTree(enabled: boolean) {
+export function useFileTree(enabled: boolean, path?: string) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.kiloclaw.fileTree.queryOptions(undefined, {
+    trpc.kiloclaw.fileTree.queryOptions(path === undefined ? undefined : { path }, {
       enabled,
       refetchOnWindowFocus: false,
     })

@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { Switch } from '@/components/ui/switch';
 
 export function TerminalToggle({
@@ -11,10 +12,12 @@ export function TerminalToggle({
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }) {
+  const id = useId();
+
   return (
-    <div className="flex items-center gap-3 text-sm">
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    <label htmlFor={id} className="flex items-center gap-3 text-sm">
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
       <span>{label}</span>
-    </div>
+    </label>
   );
 }

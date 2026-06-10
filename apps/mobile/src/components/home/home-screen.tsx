@@ -8,7 +8,7 @@ import { badgeBucketForInstance } from '@kilocode/notifications';
 
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
 import { AgentsPromoCard } from '@/components/home/agents-promo-card';
-import { buildTimedGreeting, Greeting } from '@/components/home/greeting';
+import { buildTimedGreeting } from '@/components/home/greeting';
 import { KiloClawPromoCard } from '@/components/home/kiloclaw-promo-card';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { SectionHeader } from '@/components/home/section-header';
@@ -93,9 +93,6 @@ export function HomeScreen() {
   const isLoading = instancesPending || sessionsLoading;
 
   const hasAnySession = storedSessions.length > 0 || activeSessions.length > 0;
-  const hasInstance = (instances?.length ?? 0) > 0;
-  const isFirstTime = !hasInstance && !hasAnySession && !instancesError;
-
   const headerTitle = buildTimedGreeting(null);
 
   const handleRefresh = useCallback(() => {
@@ -124,8 +121,6 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
-        {isFirstTime ? <Greeting title="Welcome to Kilo" /> : null}
-
         {isLoading ? (
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4">
             <Skeleton className="h-20 w-full rounded-2xl" />

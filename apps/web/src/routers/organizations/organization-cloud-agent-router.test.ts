@@ -1,7 +1,9 @@
 import { describe, expect, it, jest, beforeEach, beforeAll } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { User, Organization } from '@kilocode/db/schema';
+import { db } from '@/lib/drizzle';
+import { cli_sessions_v2, type User, type Organization } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import * as cloudAgentModule from '@/lib/cloud-agent/cloud-agent-client';
 
@@ -138,5 +140,106 @@ describe('organizationCloudAgentRouter.deleteSession', () => {
     });
 
     expect(result).toEqual({ success: false });
+  });
+});
+
+describe('organizationCloudAgentNextRouter.refreshTerminalTicket', () => {
+  const organizationSessionId = 'ses_terminal_ticket_org_owned';
+  const personalSessionId = 'ses_terminal_ticket_org_personal';
+  const organizationCloudAgentSessionId = 'agent_terminal_ticket_org_owned';
+  const personalCloudAgentSessionId = 'agent_terminal_ticket_org_personal';
+  let testUser: User;
+  let testOrganization: Organization;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser({
+      google_user_email: 'terminal-ticket-org-owner@example.com',
+      google_user_name: 'Terminal Ticket Org Owner',
+      is_admin: false,
+    });
+    testOrganization = await createOrganization('Terminal Ticket Organization', testUser.id);
+
+    await db.insert(cli_sessions_v2).values([
+      {
+        session_id: organizationSessionId,
+        kilo_user_id: testUser.id,
+        organization_id: testOrganization.id,
+        cloud_agent_session_id: organizationCloudAgentSessionId,
+        created_on_platform: 'cloud-agent-web',
+      },
+      {
+        session_id: personalSessionId,
+        kilo_user_id: testUser.id,
+        cloud_agent_session_id: personalCloudAgentSessionId,
+        created_on_platform: 'cloud-agent-web',
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, organizationSessionId));
+    await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, personalSessionId));
+  });
+
+  it('issues a terminal ticket for a session owned by the organization', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.organizations.cloudAgentNext.refreshTerminalTicket({
+      organizationId: testOrganization.id,
+      cloudAgentSessionId: organizationCloudAgentSessionId,
+      ptyId: 'pty_org_owned',
+    });
+
+    expect(result.ticket).toEqual(expect.any(String));
+    expect(result.wsUrl).toContain(`cloudAgentSessionId=${organizationCloudAgentSessionId}`);
+  });
+
+  it('rejects terminal ticket refresh for a session outside the organization', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(
+      caller.organizations.cloudAgentNext.refreshTerminalTicket({
+        organizationId: testOrganization.id,
+        cloudAgentSessionId: personalCloudAgentSessionId,
+        ptyId: 'pty_org_other',
+      })
+    ).rejects.toThrow('Organization does not own this session');
+  });
+
+  it('rejects terminal creation for a session outside the organization', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(
+      caller.organizations.cloudAgentNext.createTerminal({
+        organizationId: testOrganization.id,
+        cloudAgentSessionId: personalCloudAgentSessionId,
+      })
+    ).rejects.toThrow('Organization does not own this session');
+  });
+
+  it('rejects terminal resizing for a session outside the organization', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(
+      caller.organizations.cloudAgentNext.resizeTerminal({
+        organizationId: testOrganization.id,
+        cloudAgentSessionId: personalCloudAgentSessionId,
+        ptyId: 'pty_org_other',
+        cols: 120,
+        rows: 32,
+      })
+    ).rejects.toThrow('Organization does not own this session');
+  });
+
+  it('rejects terminal closure for a session outside the organization', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(
+      caller.organizations.cloudAgentNext.closeTerminal({
+        organizationId: testOrganization.id,
+        cloudAgentSessionId: personalCloudAgentSessionId,
+        ptyId: 'pty_org_other',
+      })
+    ).rejects.toThrow('Organization does not own this session');
   });
 });

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import { createGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
@@ -8,10 +8,19 @@ import type * as OAuthStateModule from '@/lib/integrations/google/oauth-state';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@/lib/maybe-result';
 
-jest.mock('@/lib/user.server');
+jest.mock('@/lib/user/server');
 const mockedEnsureOrganizationAccess = jest.fn();
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: mockedEnsureOrganizationAccess,
+}));
+const mockedRequireKiloClawAccess = jest.fn();
+jest.mock('@/lib/kiloclaw/access-gate', () => ({
+  requireKiloClawAccess: mockedRequireKiloClawAccess,
+}));
+const mockedRequireOrganizationKiloClawComputeEntitlement = jest.fn();
+jest.mock('@/lib/organizations/trial-middleware', () => ({
+  requireOrganizationKiloClawComputeEntitlement:
+    mockedRequireOrganizationKiloClawComputeEntitlement,
 }));
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/integrations/google-service');
@@ -91,9 +100,10 @@ describe('GET /api/integrations/google/connect', () => {
     expect(response.headers.get('location')).toBe(
       'https://accounts.google.com/o/oauth2/v2/auth?x=1'
     );
+    expect(mockedRequireKiloClawAccess).toHaveBeenCalledWith(USER_ID);
     expect(mockedGetActiveInstance).toHaveBeenCalledWith(USER_ID);
     expect(mockedGetActiveOrgInstance).not.toHaveBeenCalled();
-    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: false });
     expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
       {
         owner: { type: 'user', id: USER_ID },
@@ -104,7 +114,20 @@ describe('GET /api/integrations/google/connect', () => {
     );
   });
 
-  test('redirects org flow to Google OAuth URL', async () => {
+  test('does not initiate personal OAuth without active KiloClaw access', async () => {
+    mockedRequireKiloClawAccess.mockRejectedValue(new Error('access denied'));
+
+    const { GET } = await import('./route');
+    const response = await GET(makeRequest('/api/integrations/google/connect') as never);
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/claw/settings?error=oauth_init_failed');
+    expect(mockedGetActiveInstance).not.toHaveBeenCalled();
+    expect(mockedBuildGoogleOAuthUrl).not.toHaveBeenCalled();
+    expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
+  });
+
+  test('redirects entitled org flow to Google OAuth URL', async () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(`/api/integrations/google/connect?organizationId=${ORG_ID}`) as never
@@ -115,6 +138,8 @@ describe('GET /api/integrations/google/connect', () => {
       'https://accounts.google.com/o/oauth2/v2/auth?x=1'
     );
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedRequireOrganizationKiloClawComputeEntitlement).toHaveBeenCalledWith(ORG_ID);
+    expect(mockedRequireKiloClawAccess).not.toHaveBeenCalled();
     expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
     expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
       {

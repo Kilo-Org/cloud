@@ -32,6 +32,7 @@ export declare class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
         direct?: boolean;
     }): Promise<WastelandRpcResult<{
         success: true;
+        pr_url: string | null;
     }>>;
     unclaimWantedItem(params: {
         wastelandId: string;

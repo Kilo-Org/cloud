@@ -15,6 +15,7 @@ type ApiMetricsParams = z.infer<typeof ApiMetricsParamsSchema>;
  *   blob4   = "1" if error (statusCode >= 400), "0" otherwise
  *   blob5   = inferenceProvider (best-effort)
  *   blob6   = "1" if userByok, "0" otherwise
+ *   blob7   = kiloUserId
  *   double1 = ttfbMs
  *   double2 = completeRequestMs
  *   double3 = statusCode
@@ -36,6 +37,7 @@ export function writeApiMetricsDataPoint(
       isError ? '1' : '0',
       params.inferenceProvider,
       params.userByok ? '1' : '0',
+      params.kiloUserId,
     ],
     doubles: [params.ttfbMs, params.completeRequestMs, params.statusCode],
   });
@@ -52,6 +54,7 @@ export function writeApiMetricsDataPoint(
         is_error: isError,
         inference_provider: params.inferenceProvider,
         user_byok: params.userByok,
+        kilo_user_id: params.kiloUserId,
         ttfb_ms: params.ttfbMs,
         complete_request_ms: params.completeRequestMs,
         status_code: params.statusCode,

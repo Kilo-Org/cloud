@@ -1,5 +1,5 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { redisGet, redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { posthogQueryRedisKey } from '@/lib/redis-keys';
 import * as z from 'zod';
 
@@ -81,7 +81,7 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
 
     const key = posthogQueryRedisKey(name);
 
-    const cached = await redisGet(key);
+    const cached = await redisClient.get<string>(key);
     if (cached !== null) {
       const data = parse(name, JSON.parse(cached));
       memoryCache.set(name, { value: data, at: Date.now() });
@@ -98,7 +98,7 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
       `[cachedPosthogQuery] ${name} returned ${data.length} rows in ${performance.now() - startTime}ms`
     );
 
-    await redisSet(key, JSON.stringify(response.body.results), CACHE_TTL_SECONDS);
+    await redisClient.set(key, JSON.stringify(response.body.results), { ex: CACHE_TTL_SECONDS });
     memoryCache.set(name, { value: data, at: Date.now() });
 
     return data;

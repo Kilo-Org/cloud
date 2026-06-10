@@ -190,7 +190,7 @@ describe('Stytch Fingerprint Functions', () => {
       expect(savedFingerprint?.kilo_free_tier_allowed).toBe(false);
     });
 
-    test('should automatically grant welcome credits and set default model when validation passes', async () => {
+    test('should not grant any credits when validation passes without a signupSource', async () => {
       const user = await insertTestUser({ google_user_email: 'fp-credits-test@example.com' });
       const fingerprintData = createMockFingerprintData();
       const headers = createMockHeaders();
@@ -200,13 +200,11 @@ describe('Stytch Fingerprint Functions', () => {
 
       await handleSignupPromotion(user, kilo_free_tier_allowed);
 
-      // Check if credit was granted
       const creditTransaction = await db.query.credit_transactions.findFirst({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
 
-      expect(creditTransaction?.credit_category).toBe('automatic-welcome-credits');
-      expect(creditTransaction?.amount_microdollars).toBe(1250000); // $1.25 in microdollars
+      expect(creditTransaction).toBeUndefined();
     });
 
     test('should set kilo_free_tier_allowed to false when email local part has too many digits', async () => {
@@ -311,7 +309,7 @@ describe('Stytch Fingerprint Functions', () => {
   });
 
   describe('handleSignupPromotion with signupSource', () => {
-    test('grants both welcome and openclaw-security-advisor bonus when passed + source matches', async () => {
+    test('grants openclaw-security-advisor bonus when passed + source matches', async () => {
       const user = await insertTestUser({
         google_user_email: 'osa-bonus-pass@example.com',
       });
@@ -323,7 +321,9 @@ describe('Stytch Fingerprint Functions', () => {
       });
 
       const byCategory = new Map(grants.map(g => [g.credit_category, g]));
-      expect(byCategory.get('automatic-welcome-credits')?.amount_microdollars).toBe(1_250_000);
+      // The automatic welcome credit was removed; only the source-specific
+      // bonus should be granted.
+      expect(byCategory.has('automatic-welcome-credits')).toBe(false);
 
       const bonus = byCategory.get('openclaw-security-advisor-signup-bonus');
       expect(bonus?.amount_microdollars).toBe(7_130_000);
@@ -335,7 +335,7 @@ describe('Stytch Fingerprint Functions', () => {
       expect(Math.abs(expiryMs - expectedMs)).toBeLessThan(2 * 60 * 1000);
     });
 
-    test('grants only welcome credit when signupSource is null', async () => {
+    test('grants nothing when signupSource is null', async () => {
       const user = await insertTestUser({
         google_user_email: 'osa-bonus-nosource@example.com',
       });
@@ -346,7 +346,7 @@ describe('Stytch Fingerprint Functions', () => {
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
 
-      expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
+      expect(grants).toHaveLength(0);
     });
 
     test('grants nothing when Stytch validation fails even with source set', async () => {
@@ -414,7 +414,7 @@ describe('Stytch Fingerprint Functions', () => {
       return row;
     }
 
-    test('grants welcome + campaign bonus when campaign is active', async () => {
+    test('grants only the campaign bonus when campaign is active', async () => {
       const slug = `cc-active-${Date.now()}`;
       await insertCampaign({ slug, amount_microdollars: 5_000_000, credit_expiry_hours: 48 });
       const user = await insertTestUser({
@@ -427,11 +427,9 @@ describe('Stytch Fingerprint Functions', () => {
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
       const byCategory = new Map(grants.map(g => [g.credit_category, g]));
-      // Welcome subsidy was reduced from $2.50 to $1.25 on main (commit
-      // 0f43aeb92, merged into this branch). Campaign grant amount is
-      // independent of the welcome amount and is set per-campaign in the
-      // admin UI.
-      expect(byCategory.get('automatic-welcome-credits')?.amount_microdollars).toBe(1_250_000);
+      // The automatic welcome credit was removed; only the campaign bonus
+      // should be granted.
+      expect(byCategory.has('automatic-welcome-credits')).toBe(false);
 
       const campaignGrant = byCategory.get(`c-${slug}`);
       expect(campaignGrant?.amount_microdollars).toBe(5_000_000);
@@ -442,7 +440,7 @@ describe('Stytch Fingerprint Functions', () => {
       expect(Math.abs(expiryMs - expectedMs)).toBeLessThan(2 * 60 * 1000);
     });
 
-    test('grants welcome only when campaign slug is not in DB', async () => {
+    test('grants nothing when campaign slug is not in DB', async () => {
       const user = await insertTestUser({
         google_user_email: `cc-missing-${Date.now()}@example.com`,
       });
@@ -455,10 +453,10 @@ describe('Stytch Fingerprint Functions', () => {
       const grants = await db.query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
-      expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
+      expect(grants).toHaveLength(0);
     });
 
-    test('grants welcome only when campaign is inactive', async () => {
+    test('grants nothing when campaign is inactive', async () => {
       const slug = `cc-inactive-${Date.now()}`;
       await insertCampaign({ slug, amount_microdollars: 5_000_000, active: false });
       const user = await insertTestUser({
@@ -470,10 +468,10 @@ describe('Stytch Fingerprint Functions', () => {
       const grants = await db.query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
-      expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
+      expect(grants).toHaveLength(0);
     });
 
-    test('grants welcome only when campaign end date has passed', async () => {
+    test('grants nothing when campaign end date has passed', async () => {
       const slug = `cc-ended-${Date.now()}`;
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       await insertCampaign({
@@ -490,10 +488,10 @@ describe('Stytch Fingerprint Functions', () => {
       const grants = await db.query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
-      expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
+      expect(grants).toHaveLength(0);
     });
 
-    test('grants welcome only when redemption cap is reached', async () => {
+    test('grants nothing when redemption cap is reached', async () => {
       const slug = `cc-capped-${Date.now()}`;
       await insertCampaign({
         slug,
@@ -514,9 +512,7 @@ describe('Stytch Fingerprint Functions', () => {
       const secondGrants = await db.query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, secondUser.id),
       });
-      expect(secondGrants.map(g => g.credit_category).sort()).toEqual([
-        'automatic-welcome-credits',
-      ]);
+      expect(secondGrants).toHaveLength(0);
     });
 
     test('credit-campaign bonus is idempotent per user', async () => {

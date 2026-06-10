@@ -8,6 +8,7 @@ export type {
   StandalonePermission,
   StandaloneQuestion,
   StandaloneSuggestion,
+  ChildSessionHydrationState,
   StoredMessage,
   FetchedSessionData,
   AssociatedPrData,
@@ -58,6 +59,17 @@ export type { CliHistoricalTransportConfig } from './cli-historical-transport';
 export { createCliLiveTransport } from './cli-live-transport';
 export type { CliLiveTransportConfig } from './cli-live-transport';
 
+export { createUserWebConnection } from './user-web-connection';
+export type {
+  UserWebConnection,
+  UserWebConnectionConfig,
+  UserWebSessionEventName,
+  UserWebSessionEventData,
+  SessionEventPayload,
+  UserWebCliEvent,
+  UserWebSystemEvent,
+} from './user-web-connection';
+
 export type {
   CloudAgentApi,
   CloudAgentStreamTicket,
@@ -65,6 +77,9 @@ export type {
   TransportFactory,
   TransportSink,
   Transport,
+  TransportSendPayload,
+  SendPromptPayload,
+  SendCommandPayload,
 } from './transport';
 
 export { createConnection } from './cloud-agent-connection';
@@ -87,8 +102,10 @@ export type {
   CloudStatus,
   QuestionState,
   PermissionState,
+  SlashCommandInfo,
   SuggestionAction,
   SuggestionState,
+  MessageDeliveryState,
   ServiceStateSnapshot,
   SessionInfo,
   KiloSessionId,

@@ -8,7 +8,6 @@ import {
   FIRST_TOPUP_BONUS_AMOUNT,
   REFERRAL_BONUS_AMOUNT,
   PROMO_CREDIT_EXPIRY_HRS,
-  WELCOME_CREDIT_EXPIRY_HRS,
   OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS,
 } from '@/lib/constants';
 import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
@@ -173,13 +172,6 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     description: 'temp fix for stytch 1usd bug',
   },
   {
-    credit_category: 'automatic-welcome-credits',
-    description: 'Free credits for new users who pass both Turnstile and Stytch validation',
-    amount_usd: 1.25,
-    is_idempotent: true,
-    expiry_hours: WELCOME_CREDIT_EXPIRY_HRS,
-  },
-  {
     credit_category: 'openclaw-security-advisor-signup-bonus',
     description: 'Bonus for new users signing up via the OpenClaw Security Advisor plugin',
     amount_usd: 7.13,
@@ -320,6 +312,12 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
   {
     credit_category: 'admin-cancel-refund-kilo-pass',
     description: 'Balance zeroed by admin during Kilo Pass cancellation and refund',
+    is_idempotent: false,
+    expect_negative_amount: true,
+  },
+  {
+    credit_category: 'admin-cancel-kilo-pass-no-refund',
+    description: 'Balance zeroed by admin during Kilo Pass cancellation without refund',
     is_idempotent: false,
     expect_negative_amount: true,
   },

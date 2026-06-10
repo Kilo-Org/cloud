@@ -5,7 +5,7 @@ import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
-import type { getUserFromAuth } from '@/lib/user.server';
+import type { getUserFromAuth } from '@/lib/user/server';
 import { failureResult } from '@/lib/maybe-result';
 
 describe('getAuthorizedOrgContext', () => {

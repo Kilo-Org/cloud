@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { send as sendEmail } from '@/lib/email';
 import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
-import { enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
-import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
+import { enqueueAffiliateEventForUser } from '@/lib/impact/affiliate-events';
+import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
+import { enforceKiloClawCommitRetirementGuard } from '@/lib/kiloclaw/commit-retirement';
 
 jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
@@ -32,11 +33,11 @@ jest.mock('@/lib/stripe-client', () => ({
   },
 }));
 
-jest.mock('@/lib/affiliate-events', () => ({
+jest.mock('@/lib/impact/affiliate-events', () => ({
   enqueueAffiliateEventForUser: jest.fn(),
 }));
 
-jest.mock('@/lib/kiloclaw-referrals', () => ({
+jest.mock('@/lib/impact/kiloclaw-referrals', () => ({
   processPersonalKiloClawPaidConversion: jest.fn(),
 }));
 
@@ -48,6 +49,10 @@ jest.mock('@/lib/kilo-pass/usage-triggered-bonus', () => ({
   maybeIssueKiloPassBonusFromUsageThreshold: jest.fn(),
 }));
 
+jest.mock('@/lib/kiloclaw/commit-retirement', () => ({
+  enforceKiloClawCommitRetirementGuard: jest.fn(),
+}));
+
 import { POST } from './route';
 
 const mockSendEmail = jest.mocked(sendEmail);
@@ -56,6 +61,7 @@ const mockEnqueueAffiliateEventForUser = jest.mocked(enqueueAffiliateEventForUse
 const mockProcessPersonalKiloClawPaidConversion = jest.mocked(
   processPersonalKiloClawPaidConversion
 );
+const mockEnforceKiloClawCommitRetirementGuard = jest.mocked(enforceKiloClawCommitRetirementGuard);
 
 type ConsoleSpy = jest.SpiedFunction<typeof console.log> | jest.SpiedFunction<typeof console.error>;
 
@@ -90,6 +96,7 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
 
     mockSendEmail.mockResolvedValue({ sent: true });
     mockMaybePerformAutoTopUp.mockResolvedValue(undefined);
+    mockEnforceKiloClawCommitRetirementGuard.mockResolvedValue({ guarded: true });
     mockProcessPersonalKiloClawPaidConversion.mockResolvedValue({
       shouldEnqueueAffiliateSale: true,
       winningTouchType: 'affiliate',
@@ -156,6 +163,93 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
     expect(JSON.stringify(consoleLogSpy.mock.calls)).not.toContain('user@example.com');
   });
 
+  it('accepts organization trial suspension emails with billing-authority context', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'send_email',
+        input: {
+          to: 'owner@example.com',
+          templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+          templateVars: {
+            organization_name: 'Acme Corp',
+            instance_label: 'Research Claw',
+            destruction_date: 'May 25, 2026',
+            organization_billing_url: 'https://app.kilo.ai/organizations/org-123/payment-details',
+          },
+          userId: 'owner-123',
+          instanceId: 'instance-456',
+          organizationId: 'org-123',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+        userId: 'owner-123',
+        instanceId: 'instance-456',
+        organizationId: 'org-123',
+      })
+    );
+    expect(findJsonLog(consoleLogSpy, 'Starting billing side effect request')).toEqual(
+      expect.objectContaining({
+        userId: 'owner-123',
+        instanceId: 'instance-456',
+        organizationId: 'org-123',
+        templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+      })
+    );
+    expect(JSON.stringify(consoleLogSpy.mock.calls)).not.toContain('owner@example.com');
+  });
+
+  it('rejects organization lifecycle email CTAs that point at personal KiloClaw', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'send_email',
+        input: {
+          to: 'member@example.com',
+          templateName: 'clawOrganizationTrialSuspendedUser',
+          templateVars: {
+            organization_name: 'Acme Corp',
+            instance_label: 'Research Claw',
+            destruction_date: 'May 25, 2026',
+            organization_claw_url: 'https://app.kilo.ai/claw',
+          },
+          userId: 'member-123',
+          instanceId: 'instance-456',
+          organizationId: 'org-123',
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects organization lifecycle emails without dedupe-compatible identifiers', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'send_email',
+        input: {
+          to: 'owner@example.com',
+          templateName: 'clawOrganizationInstanceDestroyedBillingAuthority',
+          templateVars: {
+            organization_name: 'Acme Corp',
+            instance_label: 'Research Claw',
+            organization_billing_url: 'https://app.kilo.ai/organizations/org-123/payment-details',
+          },
+          organizationId: 'org-123',
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
   it('logs failed side effects with safe identifiers', async () => {
     mockMaybePerformAutoTopUp.mockRejectedValueOnce(new Error('auto top-up unavailable'));
 
@@ -201,6 +295,107 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
         error: 'auto top-up unavailable',
       })
     );
+  });
+
+  it('runs authenticated Commit retirement guard side effects', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'commit_retirement_guard',
+        input: {
+          subscriptionId: '11111111-1111-4111-8111-111111111111',
+          expectedFinalBoundary: '2026-07-06T00:00:00.000Z',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEnforceKiloClawCommitRetirementGuard).toHaveBeenCalledWith({
+      subscriptionId: '11111111-1111-4111-8111-111111111111',
+      expectedFinalBoundary: '2026-07-06T00:00:00.000Z',
+    });
+    await expect(response.json()).resolves.toEqual({ guarded: true });
+  });
+
+  it('rejects malformed Commit retirement guard boundaries', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'commit_retirement_guard',
+        input: {
+          subscriptionId: '11111111-1111-4111-8111-111111111111',
+          expectedFinalBoundary: '2026-07-06 00:00:00+00',
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockEnforceKiloClawCommitRetirementGuard).not.toHaveBeenCalled();
+  });
+
+  it('rejects Postgres timestamp text in paid conversion event dates', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'process_paid_conversion',
+        input: {
+          userId: 'user-123',
+          dedupeKey: 'affiliate:impact:sale:period-123',
+          eventDateIso: '2026-04-29 01:16:12.945+00',
+          orderId: 'period-123',
+          amount: 9,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'price_standard',
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockProcessPersonalKiloClawPaidConversion).not.toHaveBeenCalled();
+  });
+
+  it('rejects Postgres timestamp text in auto top-up user update timestamps', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'trigger_user_auto_top_up',
+        input: {
+          user: {
+            id: 'user-123',
+            total_microdollars_acquired: 100,
+            microdollars_used: 50,
+            next_credit_expiration_at: null,
+            updated_at: '2026-04-29 01:16:12.945+00',
+            auto_top_up_enabled: true,
+          },
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockMaybePerformAutoTopUp).not.toHaveBeenCalled();
+  });
+
+  it('rejects Postgres timestamp text in auto top-up credit expiration timestamps', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'trigger_user_auto_top_up',
+        input: {
+          user: {
+            id: 'user-123',
+            total_microdollars_acquired: 100,
+            microdollars_used: 50,
+            next_credit_expiration_at: '2026-04-29 01:16:12.945+00',
+            updated_at: '2026-04-07T00:00:00.000Z',
+            auto_top_up_enabled: true,
+          },
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+    expect(mockMaybePerformAutoTopUp).not.toHaveBeenCalled();
   });
 
   it('forwards sale affiliate enqueue requests with monetized fields', async () => {

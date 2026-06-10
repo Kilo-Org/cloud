@@ -2,7 +2,7 @@
  * Client module for communicating with the Kilo Abuse Detection Service
  */
 
-import { type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import {
   ABUSE_SERVICE_CF_ACCESS_CLIENT_ID,
   ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET,
@@ -24,6 +24,35 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { ProxyErrorType } from '@/lib/proxy-error-types';
+import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
+import { redisClient } from '@/lib/redis';
+import { abuseRulesClassificationRedisKey } from '@/lib/redis-keys';
+import type { FraudDetectionHeaders } from '@/lib/utils';
+import { z } from 'zod';
+
+const CLASSIFY_ABUSE_TIMEOUT_MS = 2000;
+const QUARANTINE_1_LATENCY_MS = 2000;
+const QUARANTINE_2_LATENCY_MS = 6000;
+
+const AbuseRuleActionSchema = z.enum([
+  'nothing',
+  'log',
+  'rate-limit',
+  'quarantine-1',
+  'quarantine-2',
+  'quarantine-3',
+  'block',
+]);
+
+const RulesEngineClassificationResultSchema = z.object({
+  matches: z.array(z.unknown()),
+  sus_score: z.number(),
+  resolved_action: AbuseRuleActionSchema.nullable(),
+  matched_abuse_rule_ids: z.array(z.string()),
+});
+
+const CachedRulesEngineActionSchema = z.union([AbuseRuleActionSchema, z.literal('none')]);
 
 /**
  * Extract full prompts from a GatewayRequest (chat completions, responses, or messages API).
@@ -189,7 +218,187 @@ export type AbuseClassificationResponse = {
   context: ClassificationContext;
   /** Request ID for correlating with cost updates. 0 indicates an error during classification. */
   request_id: number;
+  /** Rules-engine result used by cloud for enforcement decisions. */
+  rules_engine?: RulesEngineClassificationResult;
 };
+
+export type AbuseRuleAction = z.infer<typeof AbuseRuleActionSchema>;
+
+export type RulesEngineClassificationResult = z.infer<typeof RulesEngineClassificationResultSchema>;
+
+export type CachedRulesEngineAction = {
+  identityKey: string;
+  action: AbuseRuleAction | null;
+};
+
+export type RulesEngineActionDecision = {
+  action: AbuseRuleAction | null;
+  delayMs: number;
+  modelOverride: string | null;
+  response: NextResponse<unknown> | null;
+};
+
+export function sleepForRulesEngineAction(ms: number): Promise<void> {
+  console.warn(`SECURITY: Abuse delay of ${ms} ms applied`);
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function rulesEngineBlockResponse() {
+  const error = 'Request blocked by abuse prevention rules.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.abuse_blocked, message: error },
+    { status: 403 }
+  );
+}
+
+function rulesEngineRateLimitResponse() {
+  const error = 'Rate limit exceeded. Please try again later.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.rate_limit_exceeded, message: error },
+    { status: 429 }
+  );
+}
+
+export async function awaitClassifyAbuse(
+  classifyPromise: Promise<AbuseClassificationResponse | null>
+): Promise<AbuseClassificationResponse | null> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  return await Promise.race([
+    classifyPromise.finally(() => timeoutId && clearTimeout(timeoutId)),
+    new Promise<null>(resolve => {
+      timeoutId = setTimeout(() => resolve(null), CLASSIFY_ABUSE_TIMEOUT_MS);
+    }),
+  ]);
+}
+
+function isAnonymousUserId(kiloUserId: string | null | undefined): boolean {
+  return kiloUserId?.startsWith('anon:') === true;
+}
+
+async function sha256(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export async function resolveAbuseClassificationCacheIdentityKey(args: {
+  kiloUserId: string | null | undefined;
+  fraudHeaders: FraudDetectionHeaders;
+}): Promise<string> {
+  const kiloUserId = args.kiloUserId?.trim();
+  if (kiloUserId && !isAnonymousUserId(kiloUserId)) {
+    return `user:${kiloUserId}`;
+  }
+
+  const compositeParams = [
+    args.fraudHeaders.http_x_forwarded_for || 'unknown_ip',
+    args.fraudHeaders.http_x_vercel_ja4_digest || 'no_ja4',
+    args.fraudHeaders.http_user_agent || 'no_ua',
+  ].join('|');
+
+  return `fingerprint:${await sha256(compositeParams)}`;
+}
+
+function parseCachedRulesEngineAction(raw: string): AbuseRuleAction | null | undefined {
+  try {
+    const action = CachedRulesEngineActionSchema.parse(raw);
+    return action === 'none' ? null : action;
+  } catch (error) {
+    console.warn('Failed to parse cached rules-engine action', { error });
+    return undefined;
+  }
+}
+
+export async function getCachedRulesEngineAction(
+  identityKey: string
+): Promise<CachedRulesEngineAction | null> {
+  try {
+    const raw = await redisClient.get<string>(abuseRulesClassificationRedisKey(identityKey));
+    if (!raw) return null;
+    const action = parseCachedRulesEngineAction(raw);
+    return action !== undefined ? { identityKey, action } : null;
+  } catch (error) {
+    console.warn('Failed to read cached rules-engine action', { identityKey, error });
+    return null;
+  }
+}
+
+export async function cacheRulesEngineAction(args: {
+  identityKey: string;
+  rulesEngine: RulesEngineClassificationResult | undefined;
+}): Promise<void> {
+  if (!args.rulesEngine) return;
+  try {
+    await redisClient.set(
+      abuseRulesClassificationRedisKey(args.identityKey),
+      args.rulesEngine.resolved_action ?? 'none'
+    );
+  } catch (error) {
+    console.warn('Failed to write cached rules-engine action', {
+      identityKey: args.identityKey,
+      error,
+    });
+  }
+}
+
+/**
+ * Returns true when a cached action is severe enough that the gateway should
+ * wait for a fresh abuse classification before contacting the upstream model.
+ */
+export function isRulesEngineBlockingAction(action: AbuseRuleAction | null | undefined): boolean {
+  return (
+    action === 'block' ||
+    action === 'rate-limit' ||
+    action === 'quarantine-1' ||
+    action === 'quarantine-2' ||
+    action === 'quarantine-3'
+  );
+}
+
+export async function getQuarantineFreeModel(
+  apiKind: GatewayRequest['kind']
+): Promise<string | null> {
+  const candidates = await getAutoFreeCandidates(apiKind);
+  const candidate = candidates[0] ?? null;
+  if (!candidate) {
+    console.warn('No quarantine free model candidate available', { apiKind });
+  }
+  return candidate;
+}
+
+export function getRulesEngineActionDecision(args: {
+  action: AbuseRuleAction | null | undefined;
+  userByok: boolean;
+  quarantineFreeModel: string | null;
+}): RulesEngineActionDecision {
+  const action = args.action ?? null;
+  switch (action) {
+    case null:
+    case 'nothing':
+    case 'log':
+      return { action, delayMs: 0, modelOverride: null, response: null };
+    case 'block':
+      return { action, delayMs: 0, modelOverride: null, response: rulesEngineBlockResponse() };
+    case 'rate-limit':
+      return { action, delayMs: 0, modelOverride: null, response: rulesEngineRateLimitResponse() };
+    case 'quarantine-1':
+      return { action, delayMs: QUARANTINE_1_LATENCY_MS, modelOverride: null, response: null };
+    case 'quarantine-2':
+      return { action, delayMs: QUARANTINE_2_LATENCY_MS, modelOverride: null, response: null };
+    case 'quarantine-3':
+      return {
+        action,
+        delayMs: QUARANTINE_2_LATENCY_MS,
+        modelOverride: args.userByok ? null : args.quarantineFreeModel,
+        response: null,
+      };
+    default:
+      console.warn('Ignoring unknown rules-engine action', { action });
+      return { action: null, delayMs: 0, modelOverride: null, response: null };
+  }
+}
 
 /**
  * Request payload matching the microdollar_usage_view schema
@@ -371,18 +580,51 @@ export async function reportCost(payload: CostUpdatePayload): Promise<CostUpdate
  * Tracks signup/signin patterns for abuse detection.
  */
 export type AuthEventPayload = {
+  // --- existing fields (unchanged) ---
   kilo_user_id: string;
   event_type: 'signup' | 'signin';
   email: string;
-  account_created_at: string; // ISO 8601
+  account_created_at?: string; // ISO 8601
   ip_address?: string | null;
   geo_city?: string | null;
   geo_country?: string | null;
   ja4_digest?: string | null;
   user_agent?: string | null;
-  auth_method: AuthProviderId;
-  /** Reserved for future Stytch integration — not populated yet */
+  auth_method?: AuthProviderId | null;
   stytch_session_id?: string | null;
+
+  // --- NEW: user.* metadata ---
+  hosted_domain?: string | null;
+  signup_ip?: string | null;
+  signup_ja4_digest?: string | null;
+  signup_geo_country?: string | null;
+  customer_source?: string | null;
+  is_bot?: boolean | null;
+  is_admin?: boolean | null;
+  is_blocked?: boolean | null;
+  completed_welcome_form?: boolean | null;
+  has_linkedin_url?: boolean | null;
+  has_github_url?: boolean | null;
+  has_discord_verified?: boolean | null;
+  cohorts?: string[] | null;
+
+  // --- NEW: auth.* metadata ---
+  has_validation_stytch?: boolean | null;
+  has_validation_novel_card_with_hold?: boolean | null;
+  stytch_verdict_action?: string | null;
+  stytch_is_authentic_device?: boolean | null;
+  stytch_device_type?: string | null;
+  stytch_hardware_fingerprint?: string | null;
+  auth_providers?: string[] | null;
+
+  // --- NEW: org.* metadata ---
+  org_memberships?: Array<{
+    organization_id: string;
+    role?: string | null;
+    plan?: string | null;
+    has_sso?: boolean | null;
+    in_free_trial?: boolean | null;
+  }> | null;
 };
 
 /**
@@ -391,6 +633,91 @@ export type AuthEventPayload = {
  */
 export async function reportAuthEvent(payload: AuthEventPayload): Promise<void> {
   await fetchAbuseService('/api/auth-event', payload, 'auth event');
+}
+
+// ---------------------------------------------------------------------------
+// Generic event batch endpoint — POST /api/events
+// ---------------------------------------------------------------------------
+
+type UserEventData = {
+  kilo_user_id: string;
+  reason?: string | null;
+  actor_email?: string | null;
+};
+
+type UserEmailChangedData = {
+  kilo_user_id: string;
+  previous_email?: string | null;
+  email: string;
+};
+
+type OrgEventData = {
+  kilo_user_id: string;
+  organization_id: string;
+  role?: string | null;
+  plan?: string | null;
+  has_sso?: boolean;
+  in_free_trial?: boolean;
+};
+
+type BillingCreditPurchasedData = {
+  kilo_user_id: string;
+  microdollars_acquired: number;
+  total_microdollars_acquired?: number;
+};
+
+type BillingKiloPassChangedData = {
+  kilo_user_id: string;
+  tier?: string | null;
+  status?: string | null;
+  streak_months?: number;
+};
+
+type StripeEventData = {
+  id?: string;
+  type?: string;
+  customer?: string | { id: string } | null;
+  data?: {
+    object?: { amount?: number; customer?: unknown; decline_code?: string; [k: string]: unknown };
+  };
+  decline_code?: string;
+  amount?: number;
+  [k: string]: unknown;
+};
+
+export type CloudEvent =
+  | { type: 'user.blocked'; occurred_at?: number; data: UserEventData }
+  | { type: 'user.unblocked'; occurred_at?: number; data: UserEventData }
+  | { type: 'user.deleted'; occurred_at?: number; data: { kilo_user_id: string } }
+  | { type: 'user.email_changed'; occurred_at?: number; data: UserEmailChangedData }
+  | { type: 'org.member_added'; occurred_at?: number; data: OrgEventData }
+  | { type: 'org.member_removed'; occurred_at?: number; data: OrgEventData }
+  | { type: 'org.created'; occurred_at?: number; data: OrgEventData }
+  | { type: 'org.deleted'; occurred_at?: number; data: OrgEventData }
+  | { type: 'billing.credit_purchased'; occurred_at?: number; data: BillingCreditPurchasedData }
+  | { type: 'billing.kilo_pass_changed'; occurred_at?: number; data: BillingKiloPassChangedData }
+  | { type: 'stripe.payment_method.attached'; occurred_at?: number; data: StripeEventData }
+  | { type: 'stripe.payment_method.detached'; occurred_at?: number; data: StripeEventData }
+  | { type: 'stripe.charge.dispute.created'; occurred_at?: number; data: StripeEventData }
+  | { type: 'stripe.charge.dispute.funds_withdrawn'; occurred_at?: number; data: StripeEventData }
+  | {
+      type: 'stripe.radar.early_fraud_warning.created';
+      occurred_at?: number;
+      data: StripeEventData;
+    }
+  | { type: 'stripe.charge.failed'; occurred_at?: number; data: StripeEventData }
+  | { type: 'stripe.payment_intent.succeeded'; occurred_at?: number; data: StripeEventData };
+
+type EventsBatchPayload = {
+  events: CloudEvent[];
+};
+
+/**
+ * Report one or more cloud events to the abuse service.
+ * Fire-and-forget: catches all errors, never throws, never blocks the caller.
+ */
+export async function reportEvents(payload: EventsBatchPayload): Promise<void> {
+  await fetchAbuseService('/api/events', payload, 'events');
 }
 
 /**

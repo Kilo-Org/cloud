@@ -1,11 +1,11 @@
 'use client';
 
-import { Calendar, Coins, Info, Settings } from 'lucide-react';
+import { Calendar, Coins, ExternalLink, Info, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { SubscriptionStatusBadge } from '@/components/subscriptions/SubscriptionStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { useTRPC } from '@/lib/trpc/utils';
 import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
+
+import { KiloPassReferralButton } from '@/components/referrals/KiloPassReferralButton';
 
 import { KiloPassSubscriptionSettingsModal } from './KiloPassSubscriptionSettingsModal';
 import type { KiloPassSubscription } from './kiloPassSubscription';
@@ -27,6 +29,7 @@ import {
   computeRenewInfoRowModel,
   computeUsageProgressModel,
 } from './KiloPassActiveSubscriptionCard.logic';
+import { getKiloPassProviderManagementModel } from './kiloPassManagementAction';
 
 export function KiloPassActiveSubscriptionCard(props: { subscription: KiloPassSubscription }) {
   return (
@@ -51,7 +54,11 @@ export function KiloPassActiveSubscriptionCard(props: { subscription: KiloPassSu
 function RenewInfoRow() {
   const { subscription, view } = useKiloPassSubscriptionInfo();
   const trpc = useTRPC();
-  const scheduledChangeQuery = useQuery(trpc.kiloPass.getScheduledChange.queryOptions());
+  const providerManagement = getKiloPassProviderManagementModel(subscription.paymentProvider);
+  const scheduledChangeQuery = useQuery({
+    ...trpc.kiloPass.getScheduledChange.queryOptions(),
+    enabled: providerManagement.canUseScheduledChanges,
+  });
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange;
 
   const rows = computeRenewInfoRowModel({
@@ -124,8 +131,9 @@ function RenewInfoRow() {
 }
 
 function HeaderRow() {
-  const { view } = useKiloPassSubscriptionInfo();
+  const { subscription, view } = useKiloPassSubscriptionInfo();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const providerManagement = getKiloPassProviderManagementModel(subscription.paymentProvider);
 
   return (
     <div className="flex items-start justify-between gap-3">
@@ -134,29 +142,52 @@ function HeaderRow() {
           <Coins className="h-5 w-5 text-amber-300" />
         </span>
         <span className="leading-none">
-          <span className="block text-base">Kilo Pass</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="block text-base">Kilo Pass</span>
+            <SubscriptionStatusBadge status={view.status.kind} />
+          </span>
           <span className="text-muted-foreground block text-sm font-normal">
             {view.header.tierLabel} • {view.header.cadenceLabel}
           </span>
         </span>
       </CardTitle>
 
-      <div className="flex items-center gap-2">
-        <Badge variant={view.status.badgeVariant}>{view.status.label}</Badge>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-9 w-9"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <Settings className="h-4 w-4" />
-        </Button>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <KiloPassReferralButton />
+        {providerManagement.externalManagementAction ? (
+          <Button asChild variant="outline" size="icon" className="h-9 w-9">
+            <a
+              href={providerManagement.externalManagementAction.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={providerManagement.externalManagementAction.label}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </Button>
+        ) : providerManagement.canUseWebControls ? (
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            aria-label="Manage Kilo Pass subscription"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        ) : providerManagement.providerManagedCopy ? (
+          <span className="text-muted-foreground hidden text-xs sm:inline">
+            {providerManagement.providerManagedCopy}
+          </span>
+        ) : null}
       </div>
 
-      <KiloPassSubscriptionSettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
+      {providerManagement.canUseWebControls ? (
+        <KiloPassSubscriptionSettingsModal
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -269,7 +300,11 @@ function UsageProgressOrBonusUnlocked() {
 function NextBillingDateRow() {
   const { subscription, view } = useKiloPassSubscriptionInfo();
   const trpc = useTRPC();
-  const scheduledChangeQuery = useQuery(trpc.kiloPass.getScheduledChange.queryOptions());
+  const providerManagement = getKiloPassProviderManagementModel(subscription.paymentProvider);
+  const scheduledChangeQuery = useQuery({
+    ...trpc.kiloPass.getScheduledChange.queryOptions(),
+    enabled: providerManagement.canUseScheduledChanges,
+  });
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange;
   const nextBillingDateLabel = view.dates.nextBillingDateLabel;
 
@@ -337,17 +372,16 @@ function BottomClarification() {
   if (subscription.status === 'paused') {
     return (
       <div className="text-muted-foreground text-xs">
-        Unused paid credits never expire. Free bonus credits are not renewed while your subscription
-        is paused; monthly credits resume when the subscription resumes.
+        Free bonus credits are not renewed while your subscription is paused; monthly credits resume
+        when the subscription resumes.
       </div>
     );
   }
 
   return (
     <div className="text-muted-foreground text-xs">
-      Unused paid credits never expire and roll over every month into your total. Free bonus credits
-      are earned after using the month&apos;s paid credits. Unused free bonus credits do not roll
-      over and will expire{expiresAtLabel ? ` on ${expiresAtLabel}.` : '.'}
+      Free bonus credits are earned after using the month&apos;s paid credits. Unused free bonus
+      credits do not roll over and will expire{expiresAtLabel ? ` on ${expiresAtLabel}.` : '.'}
     </div>
   );
 }

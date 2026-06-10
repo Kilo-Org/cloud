@@ -24,6 +24,11 @@ import {
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@/lib/utils.server';
+import {
+  clearCodeReviewActionRequiredState,
+  getCodeReviewActionRequiredState,
+} from '@/lib/code-reviews/action-required';
+import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -39,7 +44,6 @@ const SaveReviewConfigInputSchema = z.object({
   reviewStyle: z.enum(['strict', 'balanced', 'lenient', 'roast']),
   focusAreas: z.array(z.string()),
   customInstructions: z.string().optional(),
-  maxReviewTimeMinutes: z.number().min(5).max(30),
   modelSlug: z.string(),
   thinkingEffort: z
     .string()
@@ -50,6 +54,7 @@ const SaveReviewConfigInputSchema = z.object({
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
+  disableReviewMd: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks
   autoConfigureWebhooks: z.boolean().optional().default(true),
@@ -157,13 +162,15 @@ export const personalReviewAgentRouter = createTRPCRouter({
           reviewStyle: 'balanced' as const,
           focusAreas: [],
           customInstructions: null,
-          maxReviewTimeMinutes: 10,
           modelSlug: PRIMARY_DEFAULT_MODEL,
           thinkingEffort: null satisfies string | null,
           gateThreshold: 'off' as const,
           repositorySelectionMode: 'all' as const,
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
+          disableReviewMd: true,
+          reviewMemoryEnabled: false,
+          actionRequired: null,
         };
       }
 
@@ -173,13 +180,15 @@ export const personalReviewAgentRouter = createTRPCRouter({
         reviewStyle: cfg.review_style || 'balanced',
         focusAreas: cfg.focus_areas || [],
         customInstructions: cfg.custom_instructions || null,
-        maxReviewTimeMinutes: cfg.max_review_time_minutes || 10,
         modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
         thinkingEffort: cfg.thinking_effort ?? null,
         gateThreshold: cfg.gate_threshold ?? 'off',
         repositorySelectionMode: cfg.repository_selection_mode || 'all',
         selectedRepositoryIds: cfg.selected_repository_ids || [],
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
+        disableReviewMd: cfg.disable_review_md ?? true,
+        reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
+        actionRequired: getCodeReviewActionRequiredState(config),
       };
     }),
 
@@ -199,6 +208,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const previousRepoIds =
           (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
           [];
+        const reviewMemoryEnabled = getReviewMemoryEnabledFromConfig(previousConfig?.config);
 
         // Save the agent config
         await upsertAgentConfigForOwner({
@@ -209,13 +219,14 @@ export const personalReviewAgentRouter = createTRPCRouter({
             review_style: input.reviewStyle,
             focus_areas: input.focusAreas,
             custom_instructions: input.customInstructions || null,
-            max_review_time_minutes: input.maxReviewTimeMinutes,
             model_slug: input.modelSlug,
             thinking_effort: input.thinkingEffort ?? null,
             gate_threshold: input.gateThreshold ?? 'off',
             repository_selection_mode: input.repositorySelectionMode || 'all',
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
+            disable_review_md: input.disableReviewMd ?? true,
+            review_memory_enabled: reviewMemoryEnabled,
           },
           createdBy: ctx.user.id,
         });
@@ -315,6 +326,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const platform = input.platform ?? 'github';
 
         await setAgentEnabledForOwner(owner, 'code_review', platform, input.isEnabled);
+        await clearCodeReviewActionRequiredState({ owner, platform });
 
         return { success: true, isEnabled: input.isEnabled };
       } catch (error) {

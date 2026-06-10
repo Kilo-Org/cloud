@@ -1,11 +1,11 @@
 import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
-import { REASONING_VARIANTS_LOW_MEDIUM_HIGH } from '@/lib/ai-gateway/providers/model-settings';
 
 export default {
   id: 'chutes-byok',
   base_url: 'https://llm.chutes.ai/v1',
-  ai_sdk_provider: 'openai-compatible',
+  supported_chat_apis: ['chat_completions'],
+  default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {
     const { request } = context;
     if (request.kind !== 'chat_completions') {
@@ -24,6 +24,5 @@ export default {
         max_completion_tokens: 65535,
       },
     ],
-    variants: REASONING_VARIANTS_LOW_MEDIUM_HIGH,
   }),
 } satisfies DirectByokProvider;

@@ -8,7 +8,7 @@ import {
   hasActiveModelRestrictions,
 } from '@/lib/model-allow.server';
 import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 type DefaultsResponse = {

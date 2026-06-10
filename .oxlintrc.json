@@ -22,7 +22,8 @@
     "**/.wrangler/**",
     "supabase/functions/**",
     "**/types/opencode.gen.ts",
-    "**/gastown/types/**"
+    "**/gastown/types/**",
+    "**/wasteland/types/**"
   ],
   "rules": {
     "constructor-super": "off",
@@ -155,12 +156,6 @@
       }
     },
     {
-      "files": ["**/*.test.ts", "**/*.test.tsx"],
-      "rules": {
-        "@typescript-eslint/no-non-null-assertion": "off"
-      }
-    },
-    {
       "files": ["services/**/*.ts", "packages/**/*.ts"],
       "rules": {
         "@typescript-eslint/no-empty-object-type": "error",
@@ -188,11 +183,26 @@
         "services/cloud-agent/src/session/queries/*.ts",
         "services/cloud-agent-next/src/session/queries/*.ts",
         "services/gastown/**/*.ts",
+        "services/wasteland/**/*.ts",
         "services/webhook-agent-ingest/**/*.ts",
         "services/kiloclaw/**/*.ts"
       ],
       "rules": {
         "@typescript-eslint/restrict-template-expressions": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*.ts", "**/__tests__/**/*.tsx"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/no-redundant-type-constituents": "off",
+        "@typescript-eslint/no-unnecessary-type-assertion": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-return": "off"
       }
     },
     {

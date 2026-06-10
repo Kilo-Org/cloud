@@ -37,6 +37,8 @@ import {
   registerKiloChatConversationStatusRoute,
   registerKiloChatMessageDeliveryFailedRoute,
   registerKiloChatActionDeliveryFailedRoute,
+  registerKiloChatAttachmentInitRoute,
+  registerKiloChatAttachmentUrlRoute,
 } from './routes/kilo-chat';
 import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
@@ -45,11 +47,12 @@ import { registerDoctorRoutes } from './routes/doctor';
 import { registerMorningBriefingRoutes } from './routes/morning-briefing';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
+import { clearComposioCliEnv, loginComposioCli } from './composio-cli-config';
 import { writeGogCredentials } from './gog-credentials';
 import { installGogShim } from './gog-shim';
 import { migrateLegacyGoogleCredentialsToBroker } from './legacy-google-migration';
 import { startWatchRenewal, stopWatchRenewal } from './gmail-watch-renewal';
-import { bootstrapCritical, bootstrapNonCritical } from './bootstrap';
+import { bootstrapCritical, bootstrapNonCritical, cleanNpmCache } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
 import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
@@ -419,8 +422,10 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   // kilo-chat channel: the controller forwards its own per-sandbox gateway
   // token directly to the kilo-chat Worker. No kiloclaw Worker middleman.
   let kiloChatHealthProbe: KiloChatHealthProbe | undefined;
+  let includeKiloChatCapabilities = false;
   const kiloChatBaseUrl = env.KILOCHAT_BASE_URL || undefined;
   if (env.KILOCLAW_SANDBOX_ID && kiloChatBaseUrl) {
+    includeKiloChatCapabilities = true;
     kiloChatHealthProbe = startKiloChatHealthProbe({ kiloChatBaseUrl });
     const kiloChatOpts = {
       expectedToken: config.expectedToken,
@@ -442,6 +447,8 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     registerKiloChatConversationStatusRoute(honoApp, kiloChatOpts);
     registerKiloChatMessageDeliveryFailedRoute(honoApp, kiloChatOpts);
     registerKiloChatActionDeliveryFailedRoute(honoApp, kiloChatOpts);
+    registerKiloChatAttachmentInitRoute(honoApp, kiloChatOpts);
+    registerKiloChatAttachmentUrlRoute(honoApp, kiloChatOpts);
   } else {
     console.warn(
       '[kilo-chat] Routes not registered:',
@@ -454,7 +461,8 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     supervisor,
     config.expectedToken,
     controllerState,
-    kiloChatHealthProbe
+    kiloChatHealthProbe,
+    { includeKiloChatCapabilities }
   );
   registerGatewayRoutes(honoApp, supervisor, config.expectedToken);
   registerMorningBriefingRoutes(honoApp, supervisor, config.expectedToken);
@@ -506,11 +514,21 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     return;
   }
 
+  cleanNpmCache(env);
+
   // ── Phase 6: Best-effort pre-gateway setup ──────────────────────────
   try {
     writeKiloCliConfig(env as Record<string, string | undefined>);
   } catch (err) {
     console.error('[kilo-cli] Failed to write config:', err);
+  }
+
+  try {
+    loginComposioCli(env as Record<string, string | undefined>);
+  } catch {
+    console.error('[composio] CLI login failed');
+  } finally {
+    clearComposioCliEnv(env as Record<string, string | undefined>);
   }
 
   try {

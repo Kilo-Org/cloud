@@ -2,8 +2,11 @@ import { getEnvVariable } from '@/lib/dotenvx';
 import 'tsconfig-paths/register';
 
 import { cleanupDbForTest, closeAllDrizzleConnections, Pool, Client } from '@/lib/drizzle';
+import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import { kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { provisionExaUsageLogPartitions } from '@/lib/exa-usage-partitions';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { shutdownPosthog } from '@/lib/posthog';
@@ -18,6 +21,12 @@ const markSetupCompleted = (workerId: string) => {
   mkdirSync(join(process.cwd(), '.tmp'), { recursive: true });
   writeFileSync(flagPath, 'completed');
 };
+
+// Existing tests use direct Drizzle inserts as fixtures. Default those fixtures to
+// legacy pricing while keeping the database column default-free, so raw SQL and
+// production writers still fail unless they set the price version explicitly.
+(kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
+  LEGACY_KILOCLAW_PRICE_VERSION;
 
 beforeAll(async () => {
   const workerId = getEnvVariable('JEST_WORKER_ID');
@@ -43,6 +52,17 @@ beforeAll(async () => {
   try {
     const testDb = drizzle(testPool);
     await migrate(testDb, { migrationsFolder: '../../packages/db/src/migrations' });
+
+    // Production keeps this rolling window current via cron. Each Jest worker
+    // starts from the static migration snapshot, so it needs the same window
+    // before tests insert rows whose created_at defaults to now().
+    const { errors: partitionErrors } = await provisionExaUsageLogPartitions(testDb);
+    if (partitionErrors.length > 0) {
+      const [{ name, error }] = partitionErrors;
+      throw new Error(
+        `Failed to create Exa usage log partition ${name}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   } finally {
     await testPool.end();
   }

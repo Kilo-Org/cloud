@@ -29,7 +29,7 @@ import {
 } from '@/lib/session-ingest-client';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
-import { KNOWN_PLATFORMS, sanitizeGitUrl } from '@/routers/cli-sessions-router';
+import { KNOWN_PLATFORMS } from '@/routers/cli-sessions-router';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
@@ -378,7 +378,7 @@ function addGitUrlConditions(whereConditions: SQL[], gitUrl: string | string[] |
     return;
   }
 
-  const urls = (Array.isArray(gitUrl) ? gitUrl : [gitUrl]).map(sanitizeGitUrl);
+  const urls = (Array.isArray(gitUrl) ? gitUrl : [gitUrl]).map(normalizeGitUrl);
   if (urls.length === 1) {
     const [url] = urls;
     if (url === undefined) {

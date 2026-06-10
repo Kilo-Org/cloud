@@ -26,6 +26,7 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { failureResult, successResult } from '@/lib/maybe-result';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -185,11 +186,11 @@ export async function createOrganization(
   company_domain?: string,
   plan?: 'teams' | 'enterprise'
 ): Promise<Organization> {
-  return await db.transaction(async tx => {
+  const organization = await db.transaction(async tx => {
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
 
-    const [organization] = await tx
+    const [org] = await tx
       .insert(organizations)
       .values({
         name,
@@ -209,15 +210,34 @@ export async function createOrganization(
 
     if (!userId || !addUserAsOwner) {
       // If no user ID is provided or addUserAsOwner is false, return the organization without adding a member
-      return organization;
+      return org;
     }
     await tx.insert(organization_memberships).values({
-      organization_id: organization.id,
+      organization_id: org.id,
       kilo_user_id: userId,
       role: 'owner',
     });
-    return organization;
+    return org;
   });
+
+  if (userId) {
+    void reportEvents({
+      events: [
+        {
+          type: 'org.created',
+          data: {
+            kilo_user_id: userId,
+            organization_id: organization.id,
+            role: 'owner',
+            plan: organization.plan ?? null,
+            in_free_trial: organization.free_trial_end_at != null,
+          },
+        },
+      ],
+    });
+  }
+
+  return organization;
 }
 
 export async function addUserToOrganization(
@@ -235,7 +255,18 @@ export async function addUserToOrganization(
     })
     .onConflictDoNothing();
 
-  return (result.rowCount ?? 0) > 0;
+  const added = (result.rowCount ?? 0) > 0;
+  if (added) {
+    void reportEvents({
+      events: [
+        {
+          type: 'org.member_added',
+          data: { kilo_user_id: userId, organization_id: organizationId, role },
+        },
+      ],
+    });
+  }
+  return added;
 }
 
 export async function removeUserFromOrganization(
@@ -285,6 +316,19 @@ export async function removeUserFromOrganization(
             previous_role: membership.role,
           },
         });
+
+      void reportEvents({
+        events: [
+          {
+            type: 'org.member_removed',
+            data: {
+              kilo_user_id: userId,
+              organization_id: organizationId,
+              role: membership.role,
+            },
+          },
+        ],
+      });
     }
 
     return result;
@@ -496,7 +540,7 @@ export async function acceptOrganizationInvite(
   inviteToken: string
 ): Promise<AcceptInviteResult> {
   try {
-    return await db.transaction(async tx => {
+    const result = await db.transaction(async tx => {
       // Find and lock the invitation to prevent race conditions
       const [invitation] = await tx
         .select()
@@ -551,6 +595,7 @@ export async function acceptOrganizationInvite(
           invitation: updatedInvitation,
           organizationId: invitation.organization_id,
           role: invitation.role,
+          membershipInserted: false,
         });
       }
 
@@ -595,8 +640,26 @@ export async function acceptOrganizationInvite(
         invitation: updatedInvitation,
         organizationId: invitation.organization_id,
         role: invitation.role,
+        membershipInserted: true,
       });
     });
+
+    if (result.success && result.membershipInserted) {
+      void reportEvents({
+        events: [
+          {
+            type: 'org.member_added',
+            data: {
+              kilo_user_id: userId,
+              organization_id: result.organizationId,
+              role: result.role,
+            },
+          },
+        ],
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error('Error accepting organization invite:', error);
     return failureResult('An unexpected error occurred');

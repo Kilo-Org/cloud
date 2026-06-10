@@ -2,15 +2,15 @@
 
 ## Prerequisites
 
-| Requirement             | Details                                                                                                                          |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **Environment**         | Local dev (`localhost:3000`) with Stripe test mode                                                                               |
-| **Billing enforcement** | `KILOCLAW_BILLING_ENFORCEMENT=true`                                                                                              |
-| **Stripe price IDs**    | `STRIPE_KILOCLAW_COMMIT_PRICE_ID`, `STRIPE_KILOCLAW_STANDARD_PRICE_ID`, `STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID` all configured |
-| **Test card**           | Stripe test card `4242 4242 4242 4242` (success), `4000 0000 0000 0341` (decline)                                                |
-| **Fake users**          | Create via `/users/sign_in?fakeUser=...` per the dev login flow                                                                  |
-| **DB access**           | Direct DB access to inspect `kiloclaw_subscriptions`, `credit_transactions`, `kiloclaw_email_log` tables                         |
-| **Cron endpoint**       | Ability to manually trigger the billing lifecycle cron (POST to the cron endpoint with the auth secret)                          |
+| Requirement | Details |
+|---|---|
+| **Environment** | Local dev (`localhost:3000`) with Stripe test mode |
+| **Billing enforcement** | `KILOCLAW_BILLING_ENFORCEMENT=true` |
+| **Stripe price IDs** | `STRIPE_KILOCLAW_COMMIT_PRICE_ID`, `STRIPE_KILOCLAW_STANDARD_PRICE_ID`, `STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID` all configured |
+| **Test card** | Stripe test card `4242 4242 4242 4242` (success), `4000 0000 0000 0341` (decline) |
+| **Fake users** | Create via `/users/sign_in?fakeUser=...` per the dev login flow |
+| **DB access** | Direct DB access to inspect `kiloclaw_subscriptions`, `credit_transactions`, `kiloclaw_email_log` tables |
+| **Cron endpoint** | Ability to manually trigger the billing lifecycle cron (POST to the cron endpoint with the auth secret) |
 
 For each test, use a fresh fake user unless noted. Name users descriptively (e.g., `kilo-trial-test-...@example.com`).
 
@@ -190,17 +190,17 @@ For each test, use a fresh fake user unless noted. Name users descriptively (e.g
 
 For each user state, verify `getBillingStatus` includes the correct fields:
 
-| State                                   | Expected                                                                                                                                                                                  |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Trial active**                        | `hasAccess: true`, `accessReason: 'trial'`, trial data present                                                                                                                            |
-| **Trial expired**                       | `hasAccess: false`, `trial.expired: true`                                                                                                                                                 |
-| **Active subscription (pure credit)**   | `hasAccess: true`, `accessReason: 'subscription'`, subscription data includes `paymentSource: 'credits'`, `hasStripeFunding: false`, `creditRenewalAt` set, `renewalCostMicrodollars` set |
-| **Active subscription (hybrid)**        | `hasStripeFunding: true`, `paymentSource: 'credits'`                                                                                                                                      |
-| **Active subscription (legacy Stripe)** | `hasStripeFunding: true`, `paymentSource: 'stripe'`                                                                                                                                       |
-| **Past-due**                            | `hasAccess: true` (within 14 days), subscription `status: 'past_due'`                                                                                                                     |
-| **Canceled**                            | `hasAccess: false`, subscription `status: 'canceled'`                                                                                                                                     |
-| **Earlybird**                           | `hasAccess: true`, `accessReason: 'earlybird'`, earlybird data present                                                                                                                    |
-| **No access**                           | `hasAccess: false`, `accessReason: null`                                                                                                                                                  |
+| State | Expected |
+|---|---|
+| **Trial active** | `hasAccess: true`, `accessReason: 'trial'`, trial data present |
+| **Trial expired** | `hasAccess: false`, `trial.expired: true` |
+| **Active subscription (pure credit)** | `hasAccess: true`, `accessReason: 'subscription'`, subscription data includes `paymentSource: 'credits'`, `hasStripeFunding: false`, `creditRenewalAt` set, `renewalCostMicrodollars` set |
+| **Active subscription (hybrid)** | `hasStripeFunding: true`, `paymentSource: 'credits'` |
+| **Active subscription (legacy Stripe)** | `hasStripeFunding: true`, `paymentSource: 'stripe'` |
+| **Past-due** | `hasAccess: true` (within 14 days), subscription `status: 'past_due'` |
+| **Canceled** | `hasAccess: false`, subscription `status: 'canceled'` |
+| **Earlybird** | `hasAccess: true`, `accessReason: 'earlybird'`, earlybird data present |
+| **No access** | `hasAccess: false`, `accessReason: null` |
 
 ### 5.2 — Stripe-funding indicator
 
@@ -459,16 +459,16 @@ For each user state, verify `getBillingStatus` includes the correct fields:
 
 ### 12.1 — Access gate hierarchy
 
-| User State                          | Expected                                                 |
-| ----------------------------------- | -------------------------------------------------------- |
-| Active subscription                 | ✅ Access                                                |
-| Past-due (< 14 days, not suspended) | ✅ Access                                                |
-| Trialing (not expired)              | ✅ Access                                                |
-| Earlybird (not expired)             | ✅ Access                                                |
-| Expired trial                       | ❌ Forbidden — "Your Trial Has Ended"                    |
-| Expired earlybird                   | ❌ Forbidden — "Earlybird Hosting Expired"               |
-| Canceled subscription               | ❌ Forbidden — "Subscription Ended"                      |
-| Past-due + suspended                | ❌ Forbidden — "Payment Issue" or "Insufficient Credits" |
+| User State | Expected |
+|---|---|
+| Active subscription | ✅ Access |
+| Past-due (< 14 days, not suspended) | ✅ Access |
+| Trialing (not expired) | ✅ Access |
+| Earlybird (not expired) | ✅ Access |
+| Expired trial | ❌ Forbidden — "Your Trial Has Ended" |
+| Expired earlybird | ❌ Forbidden — "Earlybird Hosting Expired" |
+| Canceled subscription | ❌ Forbidden — "Subscription Ended" |
+| Past-due + suspended | ❌ Forbidden — "Payment Issue" or "Insufficient Credits" |
 
 ### 12.2 — AccessLockedDialog shows correct remediation
 

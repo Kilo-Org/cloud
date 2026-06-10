@@ -330,6 +330,8 @@ async function createCloudAgentNextSession(
     executionId: result.executionId,
     status: result.status,
     streamUrl: result.streamUrl,
+    messageId: result.messageId,
+    delivery: result.delivery,
   };
 }
 
@@ -359,9 +361,12 @@ async function sendToExistingCloudAgentNextSession(
   const client = createAppBuilderCloudAgentNextClient(authToken);
   const result = await client.sendMessage({
     cloudAgentSessionId: sessionId,
-    prompt: message + imageContext,
-    mode: 'code',
-    model,
+    payload: {
+      type: 'prompt',
+      prompt: message + imageContext,
+      mode: 'code',
+      model,
+    },
     autoCommit: true,
     gitToken,
     images,
@@ -372,6 +377,8 @@ async function sendToExistingCloudAgentNextSession(
     executionId: result.executionId,
     status: result.status,
     streamUrl: result.streamUrl,
+    messageId: result.messageId,
+    delivery: result.delivery,
   };
 }
 
@@ -851,6 +858,8 @@ export async function startSessionForProject(
     executionId: result.executionId,
     status: result.status,
     streamUrl: result.streamUrl,
+    messageId: result.messageId,
+    delivery: result.delivery,
   };
 }
 

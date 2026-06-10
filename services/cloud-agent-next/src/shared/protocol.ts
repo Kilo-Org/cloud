@@ -1,12 +1,15 @@
+import type { SlashCommandInfo } from './slash-commands.js';
+
 /**
  * Event types that flow through the streaming system.
  *
  * From wrapper -> DO:
  *   started, kilocode, output, status, heartbeat, pong, error, interrupted, complete, wrapper_resumed,
- *   autocommit_started, autocommit_completed
+ *   wrapper_finalizing, autocommit_started, autocommit_completed, cloud.message.completed
  *
  * From DO -> /stream clients:
- *   All of the above, plus wrapper_disconnected, wrapper_reconnected, preparing
+ *   All of the above, plus wrapper_disconnected, wrapper_reconnected, preparing,
+ *   cloud.message.queued, cloud.message.sent, cloud.message.completed, cloud.message.failed
  */
 export type StreamEventType =
   // Wrapper -> DO (execution lifecycle)
@@ -18,7 +21,8 @@ export type StreamEventType =
   | 'pong' // Response to ping command from DO
   | 'error' // Error occurred { error: string, fatal: boolean }
   | 'interrupted' // User/signal interrupt
-  | 'complete' // Execution finished { exitCode, currentBranch? }
+  | 'complete' // Execution finished { exitCode, currentBranch?, messageIds }
+  | 'wrapper_finalizing' // Wrapper sealed the current run batch before post-processing
   | 'wrapper_resumed' // Wrapper reconnected after disconnect (may have lost events)
   | 'autocommit_started' // Auto-commit process began
   | 'autocommit_completed' // Auto-commit finished (success, skip, or failure)
@@ -26,10 +30,17 @@ export type StreamEventType =
   | 'wrapper_disconnected' // Wrapper WebSocket closed unexpectedly
   | 'wrapper_reconnected' // Wrapper reconnected successfully
   // DO -> /stream clients (async preparation progress)
-  | 'preparing' // Async preparation step progress (autoInitiate flow)
+  | 'preparing' // Lazy workspace preparation step progress
   // DO -> /stream clients (cloud infrastructure lifecycle)
   | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
-  | 'connected'; // Sent on WebSocket connect with current service state
+  // DO -> /stream clients (session message queue)
+  | 'cloud.message.queued' // User message accepted into the pending queue
+  | 'cloud.message.sent' // Queued user message delivered to Kilo
+  | 'cloud.message.completed' // Accepted user message completed execution
+  | 'cloud.message.failed' // User message delivery failed or was canceled before completion
+  | 'connected' // Sent on WebSocket connect with current service state
+  // Wrapper -> DO -> /stream clients (slash command catalog)
+  | 'commands.available'; // Catalog of kilo slash commands available in this session
 
 /**
  * Event envelope sent by wrapper to DO via /ingest WebSocket.
@@ -55,6 +66,7 @@ export type CompleteEventData = {
   exitCode: number;
   currentBranch?: string; // Omitted if detached HEAD
   gateResult?: 'pass' | 'fail';
+  messageIds?: string[];
 };
 
 /**
@@ -94,6 +106,7 @@ export type PreparingStep =
   | 'workspace_setup'
   | 'cloning'
   | 'branch'
+  | 'devcontainer_setup'
   | 'setup_commands'
   | 'kilo_server'
   | 'kilo_session'
@@ -101,8 +114,7 @@ export type PreparingStep =
   | 'failed';
 
 /**
- * Data included in 'preparing' events (async preparation progress).
- * Emitted by the DO during startPreparationAsync to report progress to /stream clients.
+ * Data included in 'preparing' events (workspace preparation progress).
  */
 export type PreparingEventData = {
   step: PreparingStep;
@@ -127,12 +139,22 @@ export type CloudStatusData = {
 export type SessionStatus =
   | { type: 'busy' }
   | { type: 'idle' }
-  | { type: 'retry'; attempt: number; message: string; next: number };
+  | { type: 'retry'; attempt: number; message: string; next: number }
+  | { type: 'offline'; requestID: string; message: string };
 
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
+};
+
+/**
+ * Data included in 'commands.available' events.
+ * The catalog of kilo slash commands the user can invoke in this session.
+ * `template` is intentionally stripped — kilo handles substitution server-side.
+ */
+export type CommandsAvailableData = {
+  commands: SlashCommandInfo[];
 };
 
 /**

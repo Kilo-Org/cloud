@@ -36,6 +36,11 @@ pnpm-lock.yaml
 .kilocode/
 .kilo
 
+# Markdown is excluded because prettier re-pads markdown table cells for column
+# alignment, which creates large spurious diffs on any unrelated content change.
+# See AGENTS.md "Markdown Tables" and script/check-md-table-padding.ts.
+*.md
+
 # Misc
 .DS_Store
 .env*

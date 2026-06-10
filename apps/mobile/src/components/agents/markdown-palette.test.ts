@@ -31,12 +31,15 @@ const colors = {
 } satisfies ThemeColors;
 
 describe('markdown palette', () => {
-  it('uses the primary foreground for user-authored chat bubbles', () => {
-    const palette = getPalette('user', {
-      ...colors,
-      primaryForeground: '#1A1A10',
-    });
+  it('uses accent-soft-foreground for agent chat user bubbles (bg-accent-soft)', () => {
+    const palette = getPalette('user', colors);
 
-    expect(palette.textColor).toBe('#1A1A10');
+    expect(palette.textColor).toBe(colors.accentSoftForeground);
+  });
+
+  it('uses primary-foreground for kilo-chat user bubbles (bg-primary)', () => {
+    const palette = getPalette('kilo-chat-user', colors);
+
+    expect(palette.textColor).toBe(colors.primaryForeground);
   });
 });

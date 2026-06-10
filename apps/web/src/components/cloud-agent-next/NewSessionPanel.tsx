@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 import {
   AlertCircle,
   Brain,
@@ -25,9 +27,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
+import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 
 import { useProfiles, useCombinedProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
+import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
+import { commandsOrDefault } from '@cloud-agent-shared';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import {
@@ -45,9 +50,9 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/components/ui/popover';
 import {
-  Command,
+  Command as UICommand,
   CommandEmpty,
   CommandGroup,
   CommandInput,
@@ -57,31 +62,41 @@ import {
 import { Button as UIButton } from '@/components/ui/button';
 import { LinkButton } from '@/components/Button';
 import { cn } from '@/lib/utils';
+import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import {
   extractRepoFromGitUrl,
   findAllGitPlatformUrls,
   detectGitPlatform,
 } from '@/components/cloud-agent-next/utils/git-utils';
 import type { AgentMode } from './types';
+import { formatSessionError } from '@/lib/cloud-agent-sdk';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
-import { useImageUpload } from '@/hooks/useImageUpload';
-import { ImagePreviewStrip } from '@/components/shared/ImagePreviewStrip';
+import { useCloudAgentAttachmentUpload } from '@/hooks/useCloudAgentAttachmentUpload';
+import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 import {
-  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-  CLOUD_AGENT_IMAGE_MAX_COUNT,
-  CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
-  CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+  CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 import {
+  appendCloudAgentNextLocalTestModel,
+  getDevcontainerEnabled,
   getLastUsedModel,
+  getLastUsedRepo,
   getLastUsedVariant,
   getPreferredInitialModel,
+  getPreferredInitialRepo,
   getPreferredInitialVariant,
+  setDevcontainerEnabled,
   setLastUsedModel,
+  setLastUsedRepo,
   setLastUsedVariant,
 } from '@/components/cloud-agent-next/model-preferences';
+import {
+  GITHUB_IDENTITY_HINT_DISMISSED_STORAGE_KEY,
+  getGitHubIdentityHint,
+  getGitHubIdentityHintDismissed,
+  markGitHubIdentityHintDismissed,
+} from '@/components/cloud-agent-next/github-identity-hint';
 
 type Repository = {
   id: number;
@@ -92,20 +107,33 @@ type Repository = {
 
 type NewSessionPanelProps = {
   organizationId?: string;
+  isDevcontainerAvailable: boolean;
 };
 
-export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
+type ContextualTipProps = {
+  body: string;
+  linkLabel: string;
+  href: string;
+  onDismiss: () => void;
+};
+
+export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: NewSessionPanelProps) {
   const router = useRouter();
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const commandListRef = useRef<HTMLDivElement>(null);
+  const [devcontainer, setDevcontainer] = useState(false);
+  const [isGitHubIdentityHintDismissed, setIsGitHubIdentityHintDismissed] = useState<
+    boolean | null
+  >(null);
   const { mutateAsync: personalUploadUrl } = useMutation(
-    trpc.cloudAgentNext.getImageUploadUrl.mutationOptions()
+    trpc.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
   const { mutateAsync: orgUploadUrl } = useMutation(
-    trpc.organizations.cloudAgentNext.getImageUploadUrl.mutationOptions()
+    trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
 
   // ---------------------------------------------------------------------------
@@ -138,11 +166,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
   const modelOptions = useMemo<ModelOption[]>(
     () =>
-      allModels.map(model => ({
-        id: model.id,
-        name: model.name,
-        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
-      })),
+      appendCloudAgentNextLocalTestModel(
+        allModels.map(model => ({
+          id: model.id,
+          name: model.name,
+          isFree: model.isFree,
+          variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
+        }))
+      ),
     [allModels]
   );
 
@@ -157,23 +188,35 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const [variant, setVariant] = useState<string | undefined>(undefined);
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
+  const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
-  const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
+  const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
 
-  const imageUpload = useImageUpload({
-    messageUuid: imageMessageUuid,
+  // ---------------------------------------------------------------------------
+  // GitHub identity awareness
+  // ---------------------------------------------------------------------------
+  const {
+    data: githubUserAuthorization,
+    isLoading: isGitHubUserAuthorizationLoading,
+    isError: isGitHubUserAuthorizationError,
+  } = useQuery({
+    ...trpc.githubApps.getUserAuthorization.queryOptions(),
+    enabled:
+      isGitHubIdentityHintDismissed === false &&
+      selectedRepo.length > 0 &&
+      selectedPlatform === 'github',
+  });
+
+  const attachmentUpload = useCloudAgentAttachmentUpload({
+    messageUuid: attachmentMessageUuid,
     organizationId,
-    maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
-    maxOriginalFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-    maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
-    allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-    resizeImages: { maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX },
     getUploadUrl: {
       personal: personalUploadUrl,
       organization: orgUploadUrl,
     },
   });
-  const isImageLimitReached = imageUpload.images.length >= CLOUD_AGENT_IMAGE_MAX_COUNT;
+  const isAttachmentLimitReached =
+    attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
 
   // ---------------------------------------------------------------------------
   // Session form atoms (profile override)
@@ -186,6 +229,25 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     resetSessionForm();
   }, [resetSessionForm]);
 
+  useEffect(() => {
+    setDevcontainer(getDevcontainerEnabled());
+    setIsGitHubIdentityHintDismissed(getGitHubIdentityHintDismissed());
+
+    const handleGitHubIdentityHintStorage = (event: StorageEvent) => {
+      if (event.key === GITHUB_IDENTITY_HINT_DISMISSED_STORAGE_KEY && event.newValue === 'true') {
+        setIsGitHubIdentityHintDismissed(true);
+      }
+    };
+    window.addEventListener('storage', handleGitHubIdentityHintStorage);
+    return () => window.removeEventListener('storage', handleGitHubIdentityHintStorage);
+  }, []);
+
+  const handleDevcontainerChange = useCallback((enabled: boolean) => {
+    setDevcontainer(enabled);
+    setDevcontainerEnabled(enabled);
+  }, []);
+
+  const effectiveDevcontainer = isDevcontainerAvailable && devcontainer;
   const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
 
   // ---------------------------------------------------------------------------
@@ -413,26 +475,56 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const hasMultiplePlatforms = githubRepositories.length > 0 && gitlabRepositories.length > 0;
 
   const handleRepoSelect = useCallback(
-    (repoFullName: string, userInitiated = true) => {
-      setSelectedRepo(repoFullName);
+    (repo: RepositoryOption, userInitiated = true) => {
+      setSelectedRepo(repo.fullName);
+      setShowRepositoryRequiredMessage(false);
       if (userInitiated) setIsRepoUserSelected(true);
-      const repo = unifiedRepositories.find(r => r.fullName === repoFullName);
-      if (repo?.platform) {
+      if (repo.platform) {
         setSelectedPlatform(repo.platform);
+        if (userInitiated) setLastUsedRepo(repo.fullName, repo.platform, organizationId);
       }
     },
-    [unifiedRepositories]
+    [organizationId]
   );
 
   // ---------------------------------------------------------------------------
-  // Auto-select repo from last session (most recently used)
+  // Auto-select repo from saved preference, recent session, or the only
+  // available repository, in that priority order.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (selectedRepo || isRepoUserSelected || recentRepos.length === 0) return;
-    const firstRecent = recentRepos[0];
-    if (!firstRecent) return;
-    handleRepoSelect(firstRecent.fullName, false);
-  }, [recentRepos, selectedRepo, isRepoUserSelected, handleRepoSelect]);
+    if (selectedRepo || isRepoUserSelected || unifiedRepositories.length === 0) return;
+
+    const onlyAvailableRepo =
+      !isLoadingGitHubRepos &&
+      !isLoadingGitLabRepos &&
+      !githubRepoError &&
+      !gitlabRepoError &&
+      unifiedRepositories.length === 1
+        ? unifiedRepositories[0]
+        : undefined;
+    const preferredRepo = getPreferredInitialRepo({
+      availableRepos: unifiedRepositories,
+      recentRepos,
+      onlyAvailableRepo,
+      lastUsedRepo: getLastUsedRepo(organizationId),
+      isLoadingGitHubRepos,
+      isLoadingGitLabRepos,
+    });
+    if (!preferredRepo) return;
+
+    handleRepoSelect(preferredRepo, false);
+  }, [
+    recentRepos,
+    selectedRepo,
+    isRepoUserSelected,
+    handleRepoSelect,
+    unifiedRepositories,
+    organizationId,
+    isLoadingGitHubRepos,
+    isLoadingGitLabRepos,
+    githubRepoError,
+    gitlabRepoError,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Auto-select repo from pasted GitHub/GitLab URLs
@@ -450,6 +542,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       if (!match) continue;
 
       setSelectedRepo(match.fullName);
+      setShowRepositoryRequiredMessage(false);
       const platform = detectGitPlatform(url);
       if (platform) {
         setSelectedPlatform(platform);
@@ -558,12 +651,63 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const filteredUnifiedRepos = unifiedRepositories.filter(r => !recentFullNames.has(r.fullName));
 
   const handleRepoPillSelect = useCallback(
-    (fullName: string) => {
-      handleRepoSelect(fullName);
+    (repo: RepositoryOption) => {
+      handleRepoSelect(repo);
       setRepoPopoverOpen(false);
     },
     [handleRepoSelect]
   );
+
+  // ---------------------------------------------------------------------------
+  // Slash commands
+  // ---------------------------------------------------------------------------
+  const slashCommands = useMemo<SlashCommand[]>(() => {
+    const defaults = commandsOrDefault(undefined).map(cmd => ({
+      trigger: cmd.name,
+      label: cmd.name,
+      description: cmd.description ?? '',
+      expansion: '',
+    }));
+    const profileCommands = (selectedProfileDetails?.kiloCommands ?? [])
+      .filter(cmd => cmd.enabled)
+      .map(cmd => ({
+        trigger: cmd.name,
+        label: cmd.name,
+        description: cmd.description ?? '',
+        expansion: '',
+      }));
+    return [...defaults, ...profileCommands];
+  }, [selectedProfileDetails?.kiloCommands]);
+
+  const handleSelectCommand = useCallback((command: SlashCommand, autoSend = false) => {
+    if (autoSend) {
+      setPrompt(`/${command.trigger}`);
+    } else {
+      const inserted = `/${command.trigger} `;
+      setPrompt(inserted);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, window.innerHeight * 0.5)}px`;
+        const end = inserted.length;
+        textareaRef.current.setSelectionRange(end, end);
+      }
+    }
+    textareaRef.current?.focus();
+  }, []);
+
+  const {
+    showAutocomplete,
+    selectedIndex,
+    setSelectedIndex,
+    filteredCommands,
+    handleKeyDown: handleAutocompleteKeyDown,
+    setShowAutocomplete,
+  } = useSlashCommandAutocomplete({
+    value: prompt,
+    slashCommands,
+    onSelect: handleSelectCommand,
+    listRef: commandListRef,
+  });
 
   // ---------------------------------------------------------------------------
   // Submit
@@ -576,12 +720,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     model.length > 0 &&
     !isPreparing &&
     !hasInsufficientBalance &&
-    !imageUpload.hasUploadingImages;
+    !attachmentUpload.hasUploadingAttachments;
 
   const handleStartSession = useCallback(async () => {
-    if (!prompt.trim() || imageUpload.hasUploadingImages) return;
+    if (!prompt.trim() || attachmentUpload.hasUploadingAttachments) return;
     if (!selectedRepo) {
-      toast.error('Please select a repository');
+      setShowRepositoryRequiredMessage(true);
       return;
     }
 
@@ -589,8 +733,27 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
     try {
       const initialMessageId = generateMessageId();
+      const trimmed = prompt.trim();
+
+      // Parse slash command: if the input matches a known command, send a
+      // structured initialPayload so the backend dispatches a command rather
+      // than treating the text as a free-text prompt.
+      const slashMatch = /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed);
+      const slashCommand =
+        slashMatch && slashCommands.some(c => c.trigger === slashMatch[1])
+          ? { command: slashMatch[1], args: slashMatch[2]?.trim() ?? '' }
+          : null;
+
+      if (slashCommand && attachmentUpload.attachments.length > 0) {
+        toast.error('Files cannot be attached to slash commands', {
+          description: 'Remove the files or type a plain prompt instead.',
+        });
+        setIsPreparing(false);
+        return;
+      }
+
       const baseInput = {
-        prompt: prompt.trim(),
+        prompt: trimmed,
         mode,
         model: displayModel,
         variant: displayVariant,
@@ -598,7 +761,17 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         autoCommit: true,
         autoInitiate: true,
         initialMessageId,
-        images: imageUpload.getImagesData(),
+        attachments: attachmentUpload.getAttachmentsData(),
+        ...(slashCommand
+          ? {
+              initialPayload: {
+                type: 'command' as const,
+                command: slashCommand.command,
+                arguments: slashCommand.args,
+              },
+            }
+          : {}),
+        ...(effectiveDevcontainer ? { devcontainer: true } : {}),
       };
       let result: { kiloSessionId: string; cloudAgentSessionId: string };
 
@@ -646,19 +819,22 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         }),
       });
 
-      imageUpload.clearImages();
-      setImageMessageUuid(crypto.randomUUID());
+      attachmentUpload.clearAttachments();
+      setAttachmentMessageUuid(uuidv4());
 
       const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
     } catch (error) {
       console.error('Failed to prepare session:', error);
-      toast.error('Failed to create session. Please try again.');
+      toast.error('Failed to create session', {
+        description: formatSessionError(error),
+      });
     } finally {
       setIsPreparing(false);
     }
   }, [
-    imageUpload,
+    effectiveDevcontainer,
+    attachmentUpload,
     displayModel,
     // `displayVariant` is what we actually submit; raw `variant` is only read
     // inside the `!hasAgentModelOverride` branch for last-used persistence, so
@@ -677,6 +853,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     selectedPlatform,
     selectedProfileId,
     selectedRepo,
+    slashCommands,
     trpc.cliSessionsV2.list,
     trpcClient,
   ]);
@@ -709,14 +886,18 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         .map(item => item.getAsFile())
         .filter((file): file is File => file !== null);
       if (files.length > 0) {
-        imageUpload.addFiles(files);
+        attachmentUpload.addFiles(files);
       }
     },
-    [imageUpload]
+    [attachmentUpload]
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+
+      if (handleAutocompleteKeyDown(e)) return;
+
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         if (isFormValid) {
@@ -724,8 +905,22 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         }
       }
     },
-    [isFormValid, handleStartSession]
+    [handleAutocompleteKeyDown, isFormValid, handleStartSession]
   );
+
+  const githubIdentityHint = getGitHubIdentityHint({
+    selectedRepo,
+    selectedPlatform,
+    authorization: githubUserAuthorization,
+    isLoading: isGitHubUserAuthorizationLoading,
+    isError: isGitHubUserAuthorizationError,
+    isDismissed: isGitHubIdentityHintDismissed !== false,
+  });
+
+  const handleDismissGitHubIdentityHint = useCallback(() => {
+    markGitHubIdentityHintDismissed();
+    setIsGitHubIdentityHintDismissed(true);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Integration missing view
@@ -788,15 +983,15 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           className={cn(
             'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
             isPreparing && 'pointer-events-none opacity-60',
-            imageUpload.isDragging && 'border-transparent focus-within:ring-0'
+            attachmentUpload.isDragging && 'border-transparent focus-within:ring-0'
           )}
-          {...imageUpload.dragHandlers}
+          {...attachmentUpload.dragHandlers}
         >
-          {imageUpload.isDragging && (
+          {attachmentUpload.isDragging && (
             <div
               className={cn(
                 'absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed backdrop-blur-[2px]',
-                isImageLimitReached
+                isAttachmentLimitReached
                   ? 'border-amber-500/60 bg-amber-500/10'
                   : 'border-primary/60 bg-primary/5'
               )}
@@ -804,41 +999,83 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               <div
                 className={cn(
                   'flex items-center gap-2 text-sm font-medium',
-                  isImageLimitReached ? 'text-amber-400' : 'text-primary'
+                  isAttachmentLimitReached ? 'text-amber-400' : 'text-primary'
                 )}
               >
                 <Upload className="h-4 w-4" />
-                {isImageLimitReached
-                  ? `Maximum ${CLOUD_AGENT_IMAGE_MAX_COUNT} images attached`
-                  : 'Drop images here'}
+                {isAttachmentLimitReached
+                  ? `Maximum ${CLOUD_AGENT_ATTACHMENT_MAX_COUNT} files attached`
+                  : 'Drop files here'}
               </div>
             </div>
           )}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
+            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.txt,.md,.csv"
             multiple
             className="hidden"
             onChange={e => {
               if (e.target.files) {
-                imageUpload.addFiles(e.target.files);
+                attachmentUpload.addFiles(e.target.files);
                 e.target.value = '';
               }
             }}
           />
-          <textarea
-            ref={textareaRef}
-            className="max-h-[50dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
-            placeholder="What would you like to do?"
-            rows={5}
-            value={prompt}
-            onChange={handlePromptChange}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            disabled={isPreparing}
-            maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
-          />
+          <Popover
+            open={showAutocomplete}
+            onOpenChange={open => {
+              if (!open) setShowAutocomplete(false);
+            }}
+          >
+            <PopoverAnchor asChild>
+              <textarea
+                ref={textareaRef}
+                className="max-h-[50dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
+                placeholder="What would you like to do?"
+                rows={5}
+                value={prompt}
+                onChange={handlePromptChange}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                disabled={isPreparing}
+                maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
+              />
+            </PopoverAnchor>
+            <PopoverContent
+              className="w-[var(--radix-popover-trigger-width)] min-w-[min(300px,calc(100vw-2rem))] p-0"
+              side="top"
+              align="start"
+              sideOffset={4}
+              onOpenAutoFocus={e => e.preventDefault()}
+            >
+              <UICommand
+                shouldFilter={false}
+                value={filteredCommands[selectedIndex]?.trigger ?? ''}
+              >
+                <CommandList ref={commandListRef} className="max-h-64 overflow-auto">
+                  <CommandEmpty>No matching commands</CommandEmpty>
+                  {filteredCommands.map((cmd, index) => (
+                    <CommandItem
+                      key={cmd.trigger}
+                      value={cmd.trigger}
+                      onSelect={() => handleSelectCommand(cmd, false)}
+                      className="flex cursor-pointer flex-col items-start gap-1 px-3 py-2"
+                      onMouseEnter={() => setSelectedIndex(index)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-medium text-blue-400">
+                          /{cmd.trigger}
+                        </span>
+                        <span className="text-muted-foreground text-sm">{cmd.label}</span>
+                      </div>
+                      <span className="text-muted-foreground text-xs">{cmd.description}</span>
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </UICommand>
+            </PopoverContent>
+          </Popover>
           {prompt.length >= CLOUD_AGENT_PROMPT_MAX_LENGTH * 0.9 && (
             <p
               className={cn(
@@ -850,12 +1087,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               characters
             </p>
           )}
-          {imageUpload.images.length > 0 && (
+          {attachmentUpload.attachments.length > 0 && (
             <div className="px-4 pb-1">
-              <ImagePreviewStrip
-                images={imageUpload.images}
-                onRemove={imageUpload.removeImage}
-                size="compact"
+              <AttachmentPreviewStrip
+                attachments={attachmentUpload.attachments}
+                onRemove={attachmentUpload.removeAttachment}
               />
             </div>
           )}
@@ -943,6 +1179,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                   )}
             </div>
 
+            {slashCommands.length > 0 && (
+              <div className="hidden xl:block">
+                <BrowseCommandsDialog />
+              </div>
+            )}
+
             <div className="flex-1" />
 
             {isPreparing && <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />}
@@ -952,18 +1194,33 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               size="icon"
               onClick={() => fileInputRef.current?.click()}
               disabled={isPreparing}
-              className="h-8 w-8 rounded-lg"
-              title="Attach images"
+              className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
+              title="Attach files"
+              aria-label="Attach files"
             >
               <Paperclip className="h-4 w-4" />
             </UIButton>
+            {showRepositoryRequiredMessage && (
+              <p
+                id="new-session-repository-required"
+                className="flex shrink-0 items-center gap-1 text-xs text-amber-400"
+                role="alert"
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                Select a repository
+              </p>
+            )}
             <UIButton
               type="button"
               variant="primary"
               size="icon"
               onClick={() => void handleStartSession()}
-              disabled={!isFormValid || isPreparing || imageUpload.hasUploadingImages}
-              className="h-8 w-8 rounded-lg"
+              disabled={!isFormValid || isPreparing || attachmentUpload.hasUploadingAttachments}
+              className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
+              aria-describedby={
+                showRepositoryRequiredMessage ? 'new-session-repository-required' : undefined
+              }
+              aria-label="Start session"
             >
               <Send className="h-4 w-4" />
             </UIButton>
@@ -971,20 +1228,22 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         </div>
 
         {/* Repo + Settings row (outside prompt box) */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           {/* Repo — bottom left */}
           <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
             <PopoverTrigger asChild>
               <button
                 type="button"
                 className={cn(
-                  'text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center gap-1 text-sm',
+                  'text-muted-foreground hover:text-foreground inline-flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-sm',
                   selectedRepo && 'text-foreground'
                 )}
                 disabled={isPreparing}
               >
                 <FolderGit2 className="h-3.5 w-3.5" />
-                <span className="max-w-[16rem] truncate">{selectedRepo || 'Repository'}</span>
+                <span className="max-w-[min(16rem,50vw)] truncate">
+                  {selectedRepo || 'Repository'}
+                </span>
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="start">
@@ -1001,7 +1260,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                   No repositories found
                 </div>
               ) : (
-                <Command>
+                <UICommand>
                   <div className="flex items-center border-b pr-2 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-b-0">
                     <CommandInput placeholder="Search repositories..." />
                     <button
@@ -1024,7 +1283,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                           <RepoCommandItem
                             key={`recent-${repo.id}`}
                             repo={repo}
-                            isSelected={repo.fullName === selectedRepo}
+                            isSelected={
+                              repo.fullName === selectedRepo && repo.platform === selectedPlatform
+                            }
                             onSelect={handleRepoPillSelect}
                           />
                         ))}
@@ -1038,7 +1299,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                               <RepoCommandItem
                                 key={repo.id}
                                 repo={repo}
-                                isSelected={repo.fullName === selectedRepo}
+                                isSelected={
+                                  repo.fullName === selectedRepo &&
+                                  repo.platform === selectedPlatform
+                                }
                                 onSelect={handleRepoPillSelect}
                               />
                             ))}
@@ -1050,7 +1314,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                               <RepoCommandItem
                                 key={repo.id}
                                 repo={repo}
-                                isSelected={repo.fullName === selectedRepo}
+                                isSelected={
+                                  repo.fullName === selectedRepo &&
+                                  repo.platform === selectedPlatform
+                                }
                                 onSelect={handleRepoPillSelect}
                               />
                             ))}
@@ -1062,7 +1329,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                               <RepoCommandItem
                                 key={repo.id}
                                 repo={repo}
-                                isSelected={repo.fullName === selectedRepo}
+                                isSelected={
+                                  repo.fullName === selectedRepo &&
+                                  repo.platform === selectedPlatform
+                                }
                                 onSelect={handleRepoPillSelect}
                               />
                             ))}
@@ -1075,27 +1345,80 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                           <RepoCommandItem
                             key={repo.id}
                             repo={repo}
-                            isSelected={repo.fullName === selectedRepo}
+                            isSelected={
+                              repo.fullName === selectedRepo && repo.platform === selectedPlatform
+                            }
                             onSelect={handleRepoPillSelect}
                           />
                         ))}
                       </CommandGroup>
                     )}
                   </CommandList>
-                </Command>
+                </UICommand>
               )}
             </PopoverContent>
           </Popover>
 
-          {/* Profile chip — bottom right */}
-          <ProfilePickerPopover
-            organizationId={organizationId}
-            selectedOverrideProfileId={selectedProfileId}
-            onOverrideProfileSelect={setSelectedProfileId}
-            repoFullName={selectedRepo || undefined}
-            platform={selectedPlatform}
-          />
+          <div className="flex shrink-0 items-center gap-2">
+            {effectiveDevcontainer && (
+              <span className="text-muted-foreground inline-flex shrink-0 items-center rounded-md border border-border/50 bg-muted/30 px-2 py-1 text-xs">
+                Dev container on
+              </span>
+            )}
+            <ProfilePickerPopover
+              organizationId={organizationId}
+              selectedOverrideProfileId={selectedProfileId}
+              onOverrideProfileSelect={setSelectedProfileId}
+              repoFullName={selectedRepo || undefined}
+              platform={selectedPlatform}
+              devcontainerToggle={
+                isDevcontainerAvailable
+                  ? {
+                      checked: effectiveDevcontainer,
+                      disabled: isPreparing,
+                      onCheckedChange: handleDevcontainerChange,
+                    }
+                  : undefined
+              }
+            />
+          </div>
         </div>
+
+        {githubIdentityHint && (
+          <ContextualTip {...githubIdentityHint} onDismiss={handleDismissGitHubIdentityHint} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ContextualTip({ body, linkLabel, href, onDismiss }: ContextualTipProps) {
+  return (
+    <div className="group/tip flex max-w-full justify-center text-center" role="status">
+      <div className="text-muted-foreground inline-flex max-w-full items-start justify-center gap-1 text-xs">
+        <span aria-hidden="true" className="invisible mr-1 shrink-0 px-1">
+          Dismiss
+        </span>
+        <span className="text-foreground font-medium">Tip:</span>
+        <span aria-hidden="true" className="text-border">
+          &middot;
+        </span>
+        <span className="min-w-0">
+          {body}{' '}
+          <Link
+            href={href}
+            className="text-blue-400 hover:text-blue-300 hover:underline focus-visible:underline"
+          >
+            {linkLabel}
+          </Link>
+        </span>
+        <button
+          type="button"
+          className="text-muted-foreground/70 hover:text-foreground focus-visible:text-foreground focus-visible:ring-ring pointer-events-none -my-4 ml-1 shrink-0 cursor-pointer rounded-sm px-1 py-4 underline decoration-border underline-offset-4 opacity-0 transition-opacity group-focus-within/tip:pointer-events-auto group-focus-within/tip:opacity-100 group-hover/tip:pointer-events-auto group-hover/tip:opacity-100 focus-visible:ring-1 focus-visible:outline-none [@media(any-pointer:coarse)]:pointer-events-auto [@media(any-pointer:coarse)]:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
+          onClick={onDismiss}
+        >
+          Dismiss
+        </button>
       </div>
     </div>
   );
@@ -1104,7 +1427,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 // ---------------------------------------------------------------------------
 // Internal sub-component for repo items in the Command list
 // ---------------------------------------------------------------------------
-
 function RepoCommandItem({
   repo,
   isSelected,
@@ -1112,10 +1434,14 @@ function RepoCommandItem({
 }: {
   repo: RepositoryOption;
   isSelected: boolean;
-  onSelect: (fullName: string) => void;
+  onSelect: (repo: RepositoryOption) => void;
 }) {
   return (
-    <CommandItem value={repo.fullName} onSelect={onSelect} className="flex items-center gap-2">
+    <CommandItem
+      value={repo.fullName}
+      onSelect={() => onSelect(repo)}
+      className="flex items-center gap-2"
+    >
       {repo.private ? (
         <Lock className="size-3.5 text-yellow-500" />
       ) : (

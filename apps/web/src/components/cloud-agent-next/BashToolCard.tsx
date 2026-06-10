@@ -13,9 +13,18 @@ type BashInput = {
   timeout?: number;
 };
 
+// Replace agent workspace paths like /workspace/<uuid>/<session>/sessions/<agent-id>
+// with "." so truncated command previews show the actual command content.
+const WORKSPACE_PATH_PATTERN = /\/workspace\/[^/\s]+\/[^/\s]+\/sessions\/[^/\s]+/g;
+
+function normalizeCommandForDisplay(command: string): string {
+  return command.replace(WORKSPACE_PATH_PATTERN, '.');
+}
+
 function getCommandPreview(command: string): string {
   // Get first line or first 60 chars, whichever is shorter
-  const firstLine = command.split('\n')[0] || command;
+  const firstLine =
+    normalizeCommandForDisplay(command).split('\n')[0] || normalizeCommandForDisplay(command);
   if (firstLine.length > 60) {
     return firstLine.slice(0, 57) + '...';
   }

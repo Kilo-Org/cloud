@@ -12,6 +12,8 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 
 type LinearIntegrationDetailsProps = {
   organizationId?: string;
@@ -43,15 +45,17 @@ export function LinearIntegrationDetails({
     refetch,
   } = useQuery(trpc.linear.getInstallation.queryOptions(input));
 
-  const { refetch: refetchOAuthUrl, isFetching: isFetchingOAuthUrl } = useQuery(
-    trpc.linear.getOAuthUrl.queryOptions(input, { enabled: false })
-  );
-
   const { data: openRouterModels, isLoading: isLoadingModels } =
     useModelSelectorList(organizationId);
 
   const modelOptions = useMemo<ModelOption[]>(() => {
-    return openRouterModels?.data.map(model => ({ id: model.id, name: model.name })) ?? [];
+    return (
+      openRouterModels?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+      })) ?? []
+    );
   }, [openRouterModels]);
 
   const [selectedModel, setSelectedModel] = useState<string>('');
@@ -102,19 +106,9 @@ export function LinearIntegrationDetails({
     }
   }, [success, error]);
 
-  const handleInstall = async () => {
+  const handleInstall = () => {
     setIsStartingLinearConnection(true);
-    const result = await refetchOAuthUrl();
-    if (result.data?.url) {
-      window.location.href = result.data.url;
-    } else if (result.error) {
-      setIsStartingLinearConnection(false);
-      toast.error('Failed to start Linear connection', {
-        description: result.error.message,
-      });
-    } else {
-      setIsStartingLinearConnection(false);
-    }
+    window.location.href = getPlatformOAuthConnectPath(PLATFORM.LINEAR, organizationId);
   };
 
   const handleUninstall = () => {
@@ -212,13 +206,11 @@ export function LinearIntegrationDetails({
             </p>
             <Button
               onClick={handleInstall}
-              disabled={isStartingLinearConnection || isFetchingOAuthUrl}
+              disabled={isStartingLinearConnection}
               className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              {isStartingLinearConnection || isFetchingOAuthUrl
-                ? 'Loading...'
-                : 'Re-install Linear'}
+              {isStartingLinearConnection ? 'Loading...' : 'Re-install Linear'}
             </Button>
           </AlertDescription>
         </Alert>
@@ -302,11 +294,11 @@ export function LinearIntegrationDetails({
                   <Button
                     variant="outline"
                     onClick={handleInstall}
-                    disabled={isStartingLinearConnection || isFetchingOAuthUrl}
+                    disabled={isStartingLinearConnection}
                     title="Re-run the Linear OAuth flow to refresh scopes and permissions"
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    {isStartingLinearConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install'}
+                    {isStartingLinearConnection ? 'Loading...' : 'Re-install'}
                   </Button>
                   <Button
                     variant="destructive"
@@ -350,10 +342,10 @@ export function LinearIntegrationDetails({
                 onClick={handleInstall}
                 size="lg"
                 className="w-full"
-                disabled={isStartingLinearConnection || isFetchingOAuthUrl}
+                disabled={isStartingLinearConnection}
               >
                 <Zap className="mr-2 h-4 w-4" />
-                {isStartingLinearConnection || isFetchingOAuthUrl ? 'Loading...' : 'Connect Linear'}
+                {isStartingLinearConnection ? 'Loading...' : 'Connect Linear'}
               </Button>
             </>
           )}

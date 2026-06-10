@@ -33,5 +33,26 @@ export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${
 
 export const requestLogRedisKey = (hash: string) => redisKey(`ai-gateway.request-log:${hash}`);
 
+export const abuseRulesClassificationRedisKey = (identityKey: string) =>
+  redisKey(`ai-gateway.abuse-rules:last-classification:${identityKey}`);
+
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
+
+/**
+ * Set of public_model_ids that have a routing-relevant model_experiment row
+ * (status IN 'active' | 'paused'). Used by `getProvider` as a fast pre-check
+ * before fetching the per-public-id experiment payload.
+ *
+ * Stored as a JSON array string. Recomputed and rewritten on every status
+ * transition into or out of (active, paused).
+ */
+export const EXPERIMENTED_PUBLIC_IDS_REDIS_KEY = redisKey(
+  'ai-gateway.model-experiments:experimented-public-ids'
+);
+
+export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
+  redisKey(`auth-credentials:gitlab:${credentialRef}`);
+
+export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
+  redisKey(`auth-pkce:github-user:${verifierRef}`);

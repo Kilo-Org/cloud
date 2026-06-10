@@ -68,6 +68,7 @@ function createMessage(params: { id: string; text: string; author?: string }): M
     },
     attachments: [],
     links: [],
+    subject: Promise.resolve(null),
     toJSON: () => {
       throw new Error('not implemented');
     },
@@ -116,6 +117,8 @@ function createIntegration(overrides: Partial<PlatformIntegration> = {}): Platfo
     repository_access: 'all',
     repositories: null,
     repositories_synced_at: null,
+    auth_invalid_at: null,
+    auth_invalid_reason: null,
     metadata: null,
     kilo_requester_user_id: null,
     platform_requester_account_id: null,
@@ -131,32 +134,11 @@ function createIntegration(overrides: Partial<PlatformIntegration> = {}): Platfo
 }
 
 describe('createGitHubBotPlatform.isEnabledForBot', () => {
-  function integrationWithMetadata(metadata: PlatformIntegration['metadata']): PlatformIntegration {
-    return { metadata } as PlatformIntegration;
-  }
-
-  it('returns true only when metadata.bot_enabled is the boolean true', () => {
-    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({ bot_enabled: true }))).toBe(
-      true
-    );
-  });
-
-  it('returns false when metadata is missing the flag', () => {
-    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({}))).toBe(false);
-    expect(githubPlatform.isEnabledForBot(integrationWithMetadata(null))).toBe(false);
-  });
-
-  it('returns false for truthy non-boolean values to avoid accidental enables', () => {
-    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({ bot_enabled: 'true' }))).toBe(
-      false
-    );
-    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({ bot_enabled: 1 }))).toBe(false);
-  });
-
-  it('returns false when explicitly disabled', () => {
-    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({ bot_enabled: false }))).toBe(
-      false
-    );
+  it('is enabled for every GitHub integration', () => {
+    expect(githubPlatform.isEnabledForBot(createIntegration({ metadata: null }))).toBe(true);
+    expect(
+      githubPlatform.isEnabledForBot(createIntegration({ metadata: { bot_enabled: false } }))
+    ).toBe(true);
   });
 });
 

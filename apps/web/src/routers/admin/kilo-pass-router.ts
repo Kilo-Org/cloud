@@ -13,13 +13,16 @@ import {
 const BulkCancelSchema = z.object({
   emails: z.array(z.string().email()).min(1).max(500),
   reason: z.string().min(1).trim(),
+  refundLatestPayment: z.boolean().default(true),
 });
 
 type BulkResultStatus =
+  | 'cancelled'
   | 'cancelled_and_refunded'
   | 'skipped_no_user'
   | 'skipped_no_subscription'
   | 'skipped_already_canceled'
+  | 'skipped_store_managed'
   | 'error';
 
 type BulkResultRow = {
@@ -50,11 +53,13 @@ export async function runBulkCancelAndRefundKiloPass({
   reason,
   adminKiloUserId,
   stripe,
+  refundLatestPayment,
 }: {
   emails: readonly string[];
   reason: string;
   adminKiloUserId: string;
   stripe: CancelAndRefundKiloPassStripeClient;
+  refundLatestPayment: boolean;
 }): Promise<{
   results: BulkResultRow[];
   summary: {
@@ -114,17 +119,22 @@ export async function runBulkCancelAndRefundKiloPass({
         userId: user.id,
         reason,
         adminKiloUserId,
+        refundLatestPayment,
         noteSuffix: '[bulk]',
       });
 
       if (result.status === 'skipped') {
+        const reasonKind = result.reason.kind;
+        const status: BulkResultStatus =
+          reasonKind === 'no_subscription'
+            ? 'skipped_no_subscription'
+            : reasonKind === 'already_canceled'
+              ? 'skipped_already_canceled'
+              : 'skipped_store_managed';
         results.push({
           email,
           userId: user.id,
-          status:
-            result.reason.kind === 'no_subscription'
-              ? 'skipped_no_subscription'
-              : 'skipped_already_canceled',
+          status,
           refundedAmountCents: null,
           balanceResetAmountUsd: null,
           alreadyBlocked: false,
@@ -136,7 +146,7 @@ export async function runBulkCancelAndRefundKiloPass({
       results.push({
         email,
         userId: user.id,
-        status: 'cancelled_and_refunded',
+        status: result.status,
         refundedAmountCents: result.refundedAmountCents,
         balanceResetAmountUsd: result.balanceResetAmountUsd,
         alreadyBlocked: result.alreadyBlocked,
@@ -162,7 +172,7 @@ export async function runBulkCancelAndRefundKiloPass({
   const summary = results.reduce(
     (acc, row) => {
       acc.total += 1;
-      if (row.status === 'cancelled_and_refunded') {
+      if (row.status === 'cancelled' || row.status === 'cancelled_and_refunded') {
         acc.cancelled += 1;
         acc.totalRefundedCents += row.refundedAmountCents ?? 0;
       } else if (row.status === 'error') {
@@ -187,10 +197,11 @@ export const adminKiloPassRouter = createTRPCRouter({
         reason: input.reason,
         adminKiloUserId: ctx.user.id,
         stripe: stripeClient,
+        refundLatestPayment: input.refundLatestPayment,
       });
 
       console.log(
-        `[admin.kiloPass.cancelAndRefundKiloPassBulk] admin=${ctx.user.id} total=${outcome.summary.total} cancelled=${outcome.summary.cancelled} skipped=${outcome.summary.skipped} errored=${outcome.summary.errored} refundedCents=${outcome.summary.totalRefundedCents}`
+        `[admin.kiloPass.cancelAndRefundKiloPassBulk] admin=${ctx.user.id} total=${outcome.summary.total} cancelled=${outcome.summary.cancelled} skipped=${outcome.summary.skipped} errored=${outcome.summary.errored} refundLatestPayment=${input.refundLatestPayment} refundedCents=${outcome.summary.totalRefundedCents}`
       );
 
       return outcome;

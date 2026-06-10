@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
+import { WastelandOriginLink } from './WastelandOriginLink';
 
 import { format, formatDistanceToNow } from 'date-fns';
 import {
@@ -57,6 +59,15 @@ const PRIORITY_STYLES: Record<string, string> = {
   low: 'text-white/50',
 };
 
+function isGitHubUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === 'github.com' || hostname.endsWith('.github.com');
+  } catch {
+    return false;
+  }
+}
+
 type EditState = {
   title: string;
   body: string;
@@ -79,6 +90,7 @@ export function BeadPanel({
 }) {
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
+  const pathname = usePathname();
   const beadsQuery = useQuery(trpc.gastown.listBeads.queryOptions({ rigId }));
   const agentsQuery = useQuery(trpc.gastown.listAgents.queryOptions({ rigId }));
   const rigQuery = useQuery(trpc.gastown.getRig.queryOptions({ rigId }));
@@ -509,10 +521,14 @@ export function BeadPanel({
             className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-[color:oklch(95%_0.15_108)] transition-colors hover:bg-white/[0.06]"
           >
             <ExternalLink className="size-3" />
-            {prUrl.includes('github.com') ? 'View Pull Request' : 'View Merge Request'}
+            {isGitHubUrl(prUrl) ? 'View Pull Request' : 'View Merge Request'}
           </a>
         </div>
       )}
+
+      {/* Wasteland origin link — present when this bead was created in
+          response to a wasteland event (e.g. a wanted-item claim). */}
+      <WastelandOriginLink metadata={bead.metadata} pathname={pathname} />
 
       {/* Related Beads DAG */}
       {relatedBeads.length > 0 && (

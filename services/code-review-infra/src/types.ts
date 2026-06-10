@@ -44,12 +44,14 @@ export interface CodeReviewEvent {
 
 export interface CodeReview {
   reviewId: string;
+  attemptId?: string;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
   cliSessionId?: string; // CLI session UUID (from session_created event or prepareSession)
+  sandboxId?: string;
   errorMessage?: string;
   terminalReason?: CloudAgentTerminalReason;
   startedAt?: string;
@@ -74,6 +76,7 @@ export interface CodeReview {
 
 export interface CodeReviewStatusResponse {
   reviewId: string;
+  attemptId?: string;
   status: CodeReviewStatus;
   sessionId?: string; // Cloud agent session ID (agent_xxx)
   cliSessionId?: string; // CLI session UUID
@@ -93,10 +96,32 @@ export interface CodeReviewStatusResponse {
 
 export type CodeReviewStatusResult = CodeReviewStatusResponse | null;
 
+const InternalStatusTerminalReasonSchema = z
+  .enum([
+    'billing',
+    'model_not_found',
+    'github_installation_required',
+    'github_ip_allow_list',
+    'gitlab_project_access_required',
+    'byok_invalid_key',
+    'selected_model_unavailable',
+    'user_cancelled',
+    'superseded',
+    'interrupted',
+    'timeout',
+    'upstream_error',
+    'sandbox_error',
+    'unknown',
+  ])
+  .nullable()
+  .optional()
+  .catch(undefined);
+
 export const InternalStatusResponseSchema = z.object({
   success: z.boolean().optional(),
   message: z.string().optional(),
   currentStatus: z.enum(['completed', 'failed', 'cancelled']).optional(),
+  terminalReason: InternalStatusTerminalReasonSchema,
   error: z.string().optional(),
 });
 
@@ -104,6 +129,7 @@ export type InternalStatusResponse = z.infer<typeof InternalStatusResponseSchema
 
 export interface CodeReviewRequest {
   reviewId: string;
+  attemptId?: string;
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
@@ -116,6 +142,7 @@ export interface CodeReviewRequest {
 
 export interface CodeReviewResponse {
   reviewId: string;
+  attemptId?: string;
   status: CodeReviewStatus;
 }
 
@@ -129,6 +156,7 @@ export interface Env {
   // Environment variables
   API_URL: string;
   INTERNAL_API_SECRET: string;
+  CALLBACK_TOKEN_SECRET: string;
   CLOUD_AGENT_URL: string;
   /** cloud-agent-next URL (used when useCloudAgentNext feature flag is enabled) */
   CLOUD_AGENT_NEXT_URL: string;

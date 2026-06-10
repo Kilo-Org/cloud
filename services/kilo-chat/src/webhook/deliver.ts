@@ -42,6 +42,14 @@ function buildPayload(msg: WebhookMessage): MessageCreatedPayload {
     .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
     .map(b => b.text)
     .join('');
+  const attachments = msg.content
+    .filter((b): b is Extract<ContentBlock, { type: 'attachment' }> => b.type === 'attachment')
+    .map(b => ({
+      attachmentId: b.attachmentId,
+      mimeType: b.mimeType,
+      size: b.size,
+      filename: b.filename,
+    }));
   return {
     type: 'message.created',
     conversationId: msg.conversationId,
@@ -52,8 +60,11 @@ function buildPayload(msg: WebhookMessage): MessageCreatedPayload {
     ...(msg.inReplyToMessageId !== undefined && { inReplyToMessageId: msg.inReplyToMessageId }),
     ...(msg.inReplyToBody !== undefined && { inReplyToBody: msg.inReplyToBody }),
     ...(msg.inReplyToSender !== undefined && { inReplyToSender: msg.inReplyToSender }),
+    ...(attachments.length > 0 && { attachments }),
   };
 }
+
+export const __testables = { buildPayload };
 
 const MAX_RETRIES = 2;
 
@@ -74,7 +85,7 @@ export async function deliverToBot(
     });
 
     const payload = buildPayload(msg);
-    if (payload.text.length === 0) return;
+    if (payload.text.length === 0 && (payload.attachments?.length ?? 0) === 0) return;
 
     // Payload fields are already validated; skip redundant Zod parse.
     const rpcPayload = {

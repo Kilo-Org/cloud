@@ -10,7 +10,7 @@ import {
   createConnectionManager,
   type ConnectionCallbacks,
 } from '../../../wrapper/src/connection.js';
-import { WrapperState, type JobContext } from '../../../wrapper/src/state.js';
+import { WrapperState, type SessionContext } from '../../../wrapper/src/state.js';
 import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 
 // ---------------------------------------------------------------------------
@@ -103,16 +103,18 @@ class MockWebSocket {
 // Test helpers
 // ---------------------------------------------------------------------------
 
-const createJobContext = (): JobContext => ({
-  executionId: 'exec_test',
+const createSessionContext = (overrides: Partial<SessionContext> = {}): SessionContext => ({
   kiloSessionId: 'kilo_sess_456',
   ingestUrl: 'wss://ingest.example.com/ingest',
   ingestToken: 'token_secret',
   workerAuthToken: 'kilo_token_789',
+  ...overrides,
 });
 
+const createCodeReviewSessionContext = (): SessionContext =>
+  createSessionContext({ platform: 'code-review' });
+
 const createCallbacks = (): ConnectionCallbacks => ({
-  onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
@@ -127,6 +129,7 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
     sendPromptAsync: vi.fn().mockResolvedValue(undefined),
     abortSession: vi.fn().mockResolvedValue(true),
+    summarizeSession: vi.fn().mockResolvedValue(true),
     sendCommand: vi.fn().mockResolvedValue(undefined),
     answerPermission: vi.fn().mockResolvedValue(true),
     answerQuestion: vi.fn().mockResolvedValue(true),
@@ -135,15 +138,13 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getSessionStatuses: vi.fn().mockResolvedValue({}),
     getQuestions: vi.fn().mockResolvedValue([]),
     getPermissions: vi.fn().mockResolvedValue([]),
-    sdkClient: {
-      event: {
-        subscribe: vi.fn().mockResolvedValue({
-          stream: (async function* () {
-            await new Promise(() => {});
-          })(),
-        }),
-      },
-    } as unknown as WrapperKiloClient['sdkClient'],
+    getNetworkWaits: vi.fn().mockResolvedValue([]),
+    resumeNetworkWait: vi.fn().mockResolvedValue(true),
+    subscribeEvents: vi.fn().mockResolvedValue({
+      stream: (async function* () {
+        await new Promise(() => {});
+      })(),
+    }),
     serverUrl: 'http://127.0.0.1:0',
     ...overrides,
   };
@@ -154,9 +155,7 @@ function stubFetch(): void {
     'fetch',
     vi.fn().mockImplementation(() => {
       const stream = new ReadableStream({
-        start() {
-          // Never push data — keeps SSE consumer alive without events
-        },
+        start() {},
       });
       return Promise.resolve(
         new Response(stream, {
@@ -180,7 +179,6 @@ async function openConnection(
 
 type ParsedEvent = { streamEventType: string; data: Record<string, unknown>; timestamp: string };
 
-/** Parse all messages sent through the WS and return them typed. */
 function parseSentMessages(ws: MockWebSocket): ParsedEvent[] {
   return ws.sent.map(msg => JSON.parse(msg) as ParsedEvent);
 }
@@ -219,17 +217,15 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       }),
     });
 
-    state.startJob(createJobContext());
+    state.bindSession(createSessionContext());
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
     const ws = await openConnection(manager);
 
     const messages = parseSentMessages(ws);
 
-    // Must NOT contain a kilo_snapshot event
     const snapshotEvents = messages.filter(m => m.streamEventType === 'kilo_snapshot');
     expect(snapshotEvents).toHaveLength(0);
 
-    // Must contain a kilocode event with event: 'session.status'
     const statusEvents = messages.filter(
       m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
     );
@@ -252,7 +248,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       }),
     });
 
-    state.startJob(createJobContext());
+    state.bindSession(createSessionContext());
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
     const ws = await openConnection(manager);
 
@@ -278,7 +274,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       getSessionStatuses: vi.fn().mockResolvedValue({}),
     });
 
-    state.startJob(createJobContext());
+    state.bindSession(createSessionContext());
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
     const ws = await openConnection(manager);
 
@@ -296,10 +292,10 @@ describe('sendKiloSnapshot → sendKiloState', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 4. replays pending question as kilocode event
+  // 4. replays pending question as kilocode event for interactive sessions
   // -----------------------------------------------------------------------
 
-  it('replays pending question as kilocode event', async () => {
+  it('replays pending question as kilocode event for interactive sessions', async () => {
     const pendingQuestion = {
       id: 'q_123',
       sessionID: 'kilo_sess_456',
@@ -313,7 +309,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       getQuestions: vi.fn().mockResolvedValue([pendingQuestion]),
     });
 
-    state.startJob(createJobContext());
+    state.bindSession(createSessionContext());
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
     const ws = await openConnection(manager);
 
@@ -327,6 +323,107 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       event: 'question.asked',
       properties: pendingQuestion,
     });
+  });
+
+  it('suppresses pending questions for code-review snapshots without rejecting them', async () => {
+    const pendingQuestion = {
+      id: 'q_123',
+      sessionID: 'kilo_sess_456',
+      tool: { messageID: 'msg_1', callID: 'call_1' },
+      questions: [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ],
+    };
+    const rejectQuestion = vi.fn().mockResolvedValue(true);
+
+    const kiloClient = createMockKiloClient({
+      getQuestions: vi.fn().mockResolvedValue([pendingQuestion]),
+      rejectQuestion,
+    });
+
+    state.bindSession(createCodeReviewSessionContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const questionEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'question.asked'
+    );
+
+    expect(questionEvents).toHaveLength(0);
+    expect(rejectQuestion).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('suppresses pending permissions for code-review snapshots without rejecting them', async () => {
+    const pendingPermission = {
+      id: 'p_456',
+      sessionID: 'kilo_sess_456',
+      permission: 'file_write',
+      patterns: ['**/*.ts'],
+      metadata: {},
+      always: [],
+      tool: { messageID: 'msg_2', callID: 'call_2' },
+    };
+    const answerPermission = vi.fn().mockResolvedValue(true);
+
+    const kiloClient = createMockKiloClient({
+      getPermissions: vi.fn().mockResolvedValue([pendingPermission]),
+      answerPermission,
+    });
+
+    state.bindSession(createCodeReviewSessionContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const permissionEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'permission.asked'
+    );
+
+    expect(permissionEvents).toHaveLength(0);
+    expect(answerPermission).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('suppresses code-review question status snapshots', async () => {
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'question' },
+      }),
+    });
+
+    state.bindSession(createCodeReviewSessionContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const statusEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
+    );
+
+    expect(statusEvents).toHaveLength(0);
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('suppresses code-review permission status snapshots', async () => {
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'permission' },
+      }),
+    });
+
+    state.bindSession(createCodeReviewSessionContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+    const statusEvents = messages.filter(
+      m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
+    );
+
+    expect(statusEvents).toHaveLength(0);
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------
@@ -348,7 +445,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       getPermissions: vi.fn().mockResolvedValue([pendingPermission]),
     });
 
-    state.startJob(createJobContext());
+    state.bindSession(createSessionContext());
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
     const ws = await openConnection(manager);
 
@@ -364,6 +461,56 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     });
   });
 
+  it('replays non-network snapshot state when no network waits are pending', async () => {
+    const pendingQuestion = {
+      id: 'q_123',
+      sessionID: 'kilo_sess_456',
+      tool: { messageID: 'msg_1', callID: 'call_1' },
+      questions: [
+        { question: 'Pick a color', header: 'Color', options: [{ label: 'Red', description: '' }] },
+      ],
+    };
+    const pendingPermission = {
+      id: 'p_456',
+      sessionID: 'kilo_sess_456',
+      permission: 'file_write',
+      patterns: ['**/*.ts'],
+      metadata: {},
+      always: [],
+      tool: { messageID: 'msg_2', callID: 'call_2' },
+    };
+
+    const kiloClient = createMockKiloClient({
+      getSessionStatuses: vi.fn().mockResolvedValue({
+        kilo_sess_456: { type: 'busy' },
+      }),
+      getQuestions: vi.fn().mockResolvedValue([pendingQuestion]),
+      getPermissions: vi.fn().mockResolvedValue([pendingPermission]),
+      getNetworkWaits: vi.fn().mockResolvedValue([]),
+    });
+
+    state.bindSession(createSessionContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    const ws = await openConnection(manager);
+
+    const messages = parseSentMessages(ws);
+
+    expect(
+      messages.filter(m => m.streamEventType === 'kilocode' && m.data.event === 'session.status')
+    ).toHaveLength(1);
+    expect(
+      messages.filter(m => m.streamEventType === 'kilocode' && m.data.event === 'question.asked')
+    ).toHaveLength(1);
+    expect(
+      messages.filter(m => m.streamEventType === 'kilocode' && m.data.event === 'permission.asked')
+    ).toHaveLength(1);
+    expect(
+      messages.filter(
+        m => m.streamEventType === 'kilocode' && m.data.event === 'session.network.asked'
+      )
+    ).toHaveLength(0);
+  });
+
   // -----------------------------------------------------------------------
   // 6. does not send question event when no question is pending
   // -----------------------------------------------------------------------
@@ -373,7 +520,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       getQuestions: vi.fn().mockResolvedValue([]),
     });
 
-    state.startJob(createJobContext());
+    state.bindSession(createSessionContext());
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
     const ws = await openConnection(manager);
 
@@ -394,7 +541,7 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       getPermissions: vi.fn().mockResolvedValue([]),
     });
 
-    state.startJob(createJobContext());
+    state.bindSession(createSessionContext());
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
     const ws = await openConnection(manager);
 
@@ -406,6 +553,27 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     expect(permissionEvents).toHaveLength(0);
   });
 
+  it('does not resume restored network waits while sending a snapshot', async () => {
+    const resumeNetworkWait = vi.fn().mockResolvedValue(true);
+    const kiloClient = createMockKiloClient({
+      getNetworkWaits: vi.fn().mockResolvedValue([
+        {
+          id: 'net_req_restored',
+          sessionID: 'kilo_sess_456',
+          message: 'Network restored',
+          restored: true,
+        },
+      ]),
+      resumeNetworkWait,
+    });
+
+    state.bindSession(createSessionContext());
+    const manager = createConnectionManager(state, { kiloClient }, callbacks);
+    await manager.sendKiloSnapshot();
+
+    expect(resumeNetworkWait).not.toHaveBeenCalled();
+  });
+
   // -----------------------------------------------------------------------
   // 8. skips when no kiloSessionId is available
   // -----------------------------------------------------------------------
@@ -413,27 +581,14 @@ describe('sendKiloSnapshot → sendKiloState', () => {
   it('skips when no kiloSessionId is available', async () => {
     const kiloClient = createMockKiloClient();
 
-    // Don't start a job — no kiloSessionId will be available
     state = new WrapperState();
-    // Start a job without kiloSessionId by providing an empty string
-    // Actually, we need ingestUrl/token for the WS to open, so start a job
-    // but with no kiloSessionId set. The simplest way: don't call startJob
-    // at all, but then openIngestWs will throw "no job context".
-    // Instead, set a job with empty kiloSessionId.
-    state.startJob({
-      executionId: 'exec_test',
-      kiloSessionId: '',
-      ingestUrl: 'wss://ingest.example.com/ingest',
-      ingestToken: 'token_secret',
-      workerAuthToken: 'kilo_token_789',
-    });
+    state.bindSession(createSessionContext({ kiloSessionId: '' }));
 
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
     const ws = await openConnection(manager);
 
     const messages = parseSentMessages(ws);
 
-    // No kilo_snapshot or kilocode session.status events should be sent
     const snapshotEvents = messages.filter(m => m.streamEventType === 'kilo_snapshot');
     const statusEvents = messages.filter(
       m => m.streamEventType === 'kilocode' && m.data.event === 'session.status'
@@ -442,7 +597,6 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     expect(snapshotEvents).toHaveLength(0);
     expect(statusEvents).toHaveLength(0);
 
-    // API methods should not have been called
     expect(kiloClient.getSessionStatuses).not.toHaveBeenCalled();
     expect(kiloClient.getQuestions).not.toHaveBeenCalled();
     expect(kiloClient.getPermissions).not.toHaveBeenCalled();

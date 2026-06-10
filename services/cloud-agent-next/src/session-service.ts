@@ -5,10 +5,16 @@ import type {
   SandboxId,
   SessionContext,
   SessionId,
-  InterruptResult,
+  GitAuthorConfig,
+  ManagedGitHubFallbackReason,
 } from './types.js';
-import type { ExecutionParams as _ExecutionParams } from './schema.js';
 import { generateSandboxId } from './sandbox-id.js';
+import { normalizeKilocodeModel } from './persistence/model-utils.js';
+import {
+  resolveCloudAgentGitHubAuthForRepo,
+  resolveManagedGitLabToken,
+} from './services/git-token-service-client.js';
+import { ExecutionError } from './execution/errors.js';
 import {
   checkDiskAndCleanBeforeSetup,
   cloneGitHubRepo,
@@ -18,8 +24,9 @@ import {
   getSessionWorkspacePath,
   GIT_COMMAND_TIMEOUT_MS,
   manageBranch,
-  restoreWorkspace,
   setupWorkspace,
+  updateGitAuthor,
+  updateGitRemoteToken,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
 import { timedExec } from './sandbox-timeout-logging.js';
@@ -30,24 +37,79 @@ import type {
   RuntimeSkill,
   RuntimeAgent,
 } from './persistence/types.js';
-import { MetadataSchema } from './persistence/schemas.js';
+import { parseSessionMetadata } from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
 import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import type { MCPSecretValue } from './router/schemas.js';
 import type { SessionProfileBundle } from './session-profile.js';
 import { readProfileBundle } from './session-profile.js';
-import { destroySandboxAfterInternalServerError } from './sandbox-recovery.js';
+import {
+  bringUpDevContainer,
+  buildRestoreCommand,
+  detectDevContainer,
+  KILO_AGENT_SESSION_LABEL,
+  KILO_CLI_VERSION,
+  type DevContainerHandle,
+} from './kilo/devcontainer.js';
+import { randomPort } from './kilo/ports.js';
+import {
+  buildKiloSessionXdgEnv,
+  dockerSocketEnv,
+  resolveDockerSocketPath,
+} from './kilo/sandbox-runtime.js';
+import { shellQuote, validShellEnvEntries } from './kilo/utils.js';
+import { buildSignedPromptAttachments } from './execution/attachment-prompt-parts.js';
+import {
+  type WrapperBootstrapRepoSource,
+  type WrapperCommandRequest,
+  type WrapperPromptRequest,
+  type WrapperSessionReadyRequest,
+  type WrapperWorkspaceReady,
+} from './shared/wrapper-bootstrap.js';
+import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
+import type {
+  FencedLegacyExecutionRequest,
+  FencedWrapperDispatchRequest,
+} from './execution/types.js';
+import { normalizeAgentMode } from './schema.js';
+import {
+  isSandboxFilesystemUnusableError,
+  SandboxCapacityInspectionError,
+} from './workspace-errors.js';
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
-const SANDBOX_RETRY_DEFAULTS = {
-  maxAttempts: 3,
-  baseBackoffMs: 100,
-  maxBackoffMs: 5000,
-};
-
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
 
-// Keep in sync with: cloud-agent/src/workspace.ts, cloudflare-code-review-infra/src/code-review-orchestrator.ts
+function gitLabTokenLookupFailureMessage(reason: string): string {
+  switch (reason) {
+    case 'no_integration_found':
+    case 'invalid_org_id':
+      return `No GitLab integration found (${reason}). Please connect your GitLab account first.`;
+    case 'no_token':
+    case 'token_refresh_failed':
+    case 'token_expired_no_refresh':
+      return `GitLab token lookup failed (${reason}). Please reconnect your GitLab account.`;
+    case 'repository_url_required':
+    case 'invalid_repository_url':
+      return `GitLab token lookup failed (${reason}). Repository metadata is missing or invalid for this GitLab code-review session.`;
+    case 'no_matching_integration':
+      return `GitLab token lookup failed (${reason}). No authorized GitLab integration matches this repository. Connect the GitLab account or organization that has access to the repository.`;
+    case 'ambiguous_integration':
+      return `GitLab token lookup failed (${reason}). Multiple GitLab integrations or project tokens match this repository. Remove duplicate GitLab integrations or reconfigure the GitLab code-review integration.`;
+    case 'project_lookup_failed':
+      return `GitLab token lookup failed (${reason}). The connected GitLab integration cannot read this project. Grant repository access, then reconnect GitLab if required.`;
+    case 'no_project_token':
+      return `GitLab token lookup failed (${reason}). No GitLab project access token is configured for this repository. Reconfigure or reinstall the GitLab code-review bot for the project.`;
+    case 'database_not_configured':
+    case 'service_not_configured':
+    case 'rpc_error':
+      return `GitLab token lookup failed (${reason}). Git token service is unavailable; contact support.`;
+    default:
+      return `GitLab token lookup failed (${reason}). Please reconnect your GitLab account.`;
+  }
+}
+
+// Keep in sync with: cloudflare-code-review-infra/src/code-review-orchestrator.ts
 // mkdir and touch are intentionally allowed for agent scratch space during analysis
 const CODE_REVIEW_ALLOWED_COMMANDS = [
   'ls',
@@ -56,21 +118,94 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'pwd',
   'find',
   'grep',
+  'wc',
+  'sort',
+  'uniq',
+  'cut',
+  'tr',
+  'nl',
+  'jq',
   'git',
-  'gh',
+  'git fetch',
+  'git pull',
+  'gh pr diff',
+  'gh pr view',
+  'gh api repos/*/pulls/*/reviews',
+  'gh api repos/*/pulls/*/comments',
+  'gh api repos/*/issues/*/comments',
+  'gh api repos/*/issues/*/comments --input*',
+  'gh api repos/*/issues/comments/* -X PATCH*',
+  'gh api repos/*/pulls/*/reviews --input*',
+  'glab mr diff',
+  'glab mr view',
+  'glab api --method POST *merge_requests/*/notes*',
+  'glab api --method PUT *merge_requests/*/notes/*',
+  'glab api --method POST *merge_requests/*/discussions*',
   'whoami',
   'date',
+  'stat',
+  'file',
   'head',
   'tail',
+  'sed',
   'cd',
   'mkdir',
   'touch',
 ];
 
 const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
+  'bash',
+  'sh',
+  'zsh',
+  'fish',
+  'sed -i',
+  'sed -*i',
+  'sed --in-place',
+  'sed --in-place*',
+  'sed * -i',
+  'sed * -*i',
+  'sed * --in-place',
+  'sed * --in-place*',
+  'sort -o',
+  'sort -o*',
+  'sort -*o',
+  'sort --output',
+  'sort --output*',
+  'sort * -o',
+  'sort * -o*',
+  'sort * -*o',
+  'sort * --output',
+  'sort * --output*',
+  'uniq * *',
+  'python',
+  'python3',
+  'node',
+  'irb',
+  'php -a',
+  'rails console',
+  'vi',
+  'vim',
+  'nvim',
+  'nano',
+  'emacs',
+  'less',
+  'more',
+  'top',
+  'htop',
+  'watch',
+  'tail -f',
+  'ssh',
+  'tmux',
+  'screen',
   'git add',
+  'git branch',
+  'git clean',
   'git commit',
+  'git config',
+  'git mv',
   'git push',
+  'git restore',
+  'git rm',
   'git merge',
   'git rebase',
   'git cherry-pick',
@@ -79,6 +214,7 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'git switch',
   'git stash',
   'git tag',
+  'git worktree',
   'git am',
   'git apply',
   'git remote set-url',
@@ -87,9 +223,44 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'gh pr create',
   'gh pr close',
   'gh pr edit',
+  'gh pr checkout',
+  'gh auth login',
+  'gh auth refresh',
   'gh issue',
   'gh repo create',
   'gh repo fork',
+  'gh api repos/*/pulls/*/reviews --method*',
+  'gh api repos/*/pulls/*/reviews -X*',
+  'gh api repos/*/pulls/*/reviews -f*',
+  'gh api repos/*/pulls/*/reviews -F*',
+  'gh api repos/*/pulls/*/reviews --field*',
+  'gh api repos/*/pulls/*/reviews --raw-field*',
+  'gh api repos/*/pulls/*/comments --method*',
+  'gh api repos/*/pulls/*/comments -X*',
+  'gh api repos/*/pulls/*/comments -f*',
+  'gh api repos/*/pulls/*/comments -F*',
+  'gh api repos/*/pulls/*/comments --field*',
+  'gh api repos/*/pulls/*/comments --raw-field*',
+  'gh api repos/*/pulls/*/comments --input*',
+  'gh api repos/*/issues/*/comments --method*',
+  'gh api repos/*/issues/*/comments -X*',
+  'gh api repos/*/issues/*/comments -f*',
+  'gh api repos/*/issues/*/comments -F*',
+  'gh api repos/*/issues/*/comments --field*',
+  'gh api repos/*/issues/*/comments --raw-field*',
+  'glab auth',
+  'glab mr approve',
+  'glab mr close',
+  'glab mr create',
+  'glab mr delete',
+  'glab mr merge',
+  'glab mr reopen',
+  'glab mr update',
+  'glab repo',
+  'glab issue',
+  'glab pipeline',
+  'glab release',
+  'glab variable',
   'npm test',
   'pnpm test',
   'bun test',
@@ -98,13 +269,13 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'vitest',
 ];
 
-type CommandGuardPolicy = {
+export type CommandGuardPolicy = {
   policyName: string;
   allowed: string[];
   denied: string[];
 };
 
-function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy | null {
+export function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy | null {
   if (createdOnPlatform !== 'code-review') {
     return null;
   }
@@ -114,6 +285,23 @@ function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy |
     allowed: CODE_REVIEW_ALLOWED_COMMANDS,
     denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
   };
+}
+
+export function buildCommandGuardBashPermissions(
+  commandGuardPolicy: CommandGuardPolicy
+): Record<string, string> {
+  // Denies are inserted after allows so exact duplicates still fail closed;
+  // more-specific denied sub-commands also override broader allowed commands in the CLI matcher.
+  const bashPermissions: Record<string, string> = {};
+  for (const cmd of commandGuardPolicy.allowed) {
+    bashPermissions[cmd] = 'allow';
+    bashPermissions[`${cmd} *`] = 'allow';
+  }
+  for (const cmd of commandGuardPolicy.denied) {
+    bashPermissions[cmd] = 'deny';
+    bashPermissions[`${cmd} *`] = 'deny';
+  }
+  return bashPermissions;
 }
 
 class SessionSnapshotRestoreError extends Error {
@@ -130,134 +318,26 @@ export function determineBranchName(sessionId: string, upstreamBranch?: string):
   return upstreamBranch ?? `session/${sessionId}`;
 }
 
-type SandboxRetryConfig = {
-  maxAttempts: number;
-  baseBackoffMs: number;
-  maxBackoffMs: number;
-};
-
-type RetryableSandboxError = Error & { retryable?: boolean; overloaded?: boolean };
-
-function isRetryableSandboxError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const sandboxError = error as RetryableSandboxError;
-  if (sandboxError.overloaded === true) return false;
-  return sandboxError.retryable === true;
-}
-
-function getSandboxErrorFlags(error: unknown): {
-  retryable?: boolean;
-  overloaded?: boolean;
-} {
-  if (!(error instanceof Error)) {
-    return {};
-  }
-  const sandboxError = error as RetryableSandboxError;
-  return {
-    retryable: sandboxError.retryable,
-    overloaded: sandboxError.overloaded,
-  };
-}
-
-function calculateSandboxBackoff(attempt: number, config: SandboxRetryConfig): number {
-  const exponentialBackoff = config.baseBackoffMs * Math.pow(2, attempt);
-  const jitteredBackoff = exponentialBackoff * Math.random();
-  return Math.min(config.maxBackoffMs, jitteredBackoff);
-}
-
-async function cleanupSandboxAttempt(
-  getSandbox: () => Promise<SandboxInstance>,
-  sessionId: string,
-  workspacePath: string,
-  sessionHome: string
-): Promise<void> {
+export function backendUrlForSandbox(workerBackendUrl: string): string {
   try {
-    const sandbox = await getSandbox();
-    const session = await sandbox.getSession(sessionId);
-    await cleanupWorkspace(session, workspacePath, sessionHome);
-    await sandbox.deleteSession(sessionId);
-  } catch (error) {
-    logger
-      .withFields({ error: error instanceof Error ? error.message : String(error), sessionId })
-      .warn('Failed to cleanup sandbox after retryable error');
-  }
-}
-
-async function withSandboxRetry<T>(
-  getSandbox: () => Promise<SandboxInstance>,
-  operation: (sandbox: SandboxInstance) => Promise<T>,
-  operationName: string,
-  cleanup: () => Promise<void>,
-  config: SandboxRetryConfig = SANDBOX_RETRY_DEFAULTS
-): Promise<T> {
-  let lastError: Error | undefined;
-
-  for (let attempt = 0; attempt < config.maxAttempts; attempt++) {
-    try {
-      const sandbox = await getSandbox();
-      return await operation(sandbox);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      const errorFlags = getSandboxErrorFlags(error);
-
-      if (!isRetryableSandboxError(error)) {
-        logger
-          .withFields({
-            operation: operationName,
-            attempt: attempt + 1,
-            error: lastError.message,
-            retryable: false,
-            retryableFlag: errorFlags.retryable,
-            overloadedFlag: errorFlags.overloaded,
-          })
-          .warn('Sandbox operation failed with non-retryable error');
-        throw lastError;
-      }
-
-      if (attempt + 1 >= config.maxAttempts) {
-        logger
-          .withFields({
-            operation: operationName,
-            attempts: attempt + 1,
-            error: lastError.message,
-          })
-          .error('Sandbox operation failed after all retry attempts');
-        throw lastError;
-      }
-
-      await cleanup();
-
-      const backoffMs = calculateSandboxBackoff(attempt, config);
-      logger
-        .withFields({
-          operation: operationName,
-          attempt: attempt + 1,
-          backoffMs: Math.round(backoffMs),
-          error: lastError.message,
-          retryableFlag: errorFlags.retryable,
-          overloadedFlag: errorFlags.overloaded,
-        })
-        .warn('Sandbox operation failed, retrying');
-
-      await scheduler.wait(backoffMs);
+    const url = new URL(workerBackendUrl);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      url.hostname = 'host.docker.internal';
+      return url.toString().replace(/\/$/, '');
     }
+  } catch {
+    // Non-URL value: leave untouched.
   }
-
-  throw lastError ?? new Error('Unexpected sandbox retry loop exit');
+  return workerBackendUrl;
 }
 
 export class SetupCommandFailedError extends Error {
   constructor(
     public readonly command: string,
     public readonly exitCode: number,
-    public readonly stderr: string,
-    public readonly stdout: string = ''
+    public readonly stderr: string
   ) {
-    const details = [
-      `exit code ${exitCode}`,
-      ...(stderr ? [`stderr: ${stderr.trim()}`] : []),
-      ...(stdout ? [`stdout: ${stdout.trim()}`] : []),
-    ].join(': ');
+    const details = [`exit code ${exitCode}`, ...(stderr ? [stderr.trim()] : [])].join(': ');
     super(`Setup command failed: ${command} (${details})`);
     this.name = 'SetupCommandFailedError';
   }
@@ -274,6 +354,55 @@ export class InvalidSessionMetadataError extends Error {
   }
 }
 
+export type ResolvedWorkspaceTokens = {
+  githubToken?: string;
+  githubInstallationId?: string;
+  githubAppType?: 'standard' | 'lite';
+  githubSource?: 'user' | 'installation';
+  githubGitAuthor?: GitAuthorConfig;
+  githubCommitCoAuthor?: GitAuthorConfig;
+  githubFallbackReason?: ManagedGitHubFallbackReason;
+  gitToken?: string;
+  gitlabTokenManaged?: boolean;
+  glabIsOAuth2?: boolean;
+};
+
+function installationGitAuthorFromEnv(
+  env: PersistenceEnv,
+  githubAppType: 'standard' | 'lite'
+): GitAuthorConfig | undefined {
+  const slug =
+    githubAppType === 'lite'
+      ? env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG
+      : env.GITHUB_APP_SLUG;
+  const userId =
+    githubAppType === 'lite'
+      ? env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID
+      : env.GITHUB_APP_BOT_USER_ID;
+  if (!slug || !userId) return undefined;
+  return {
+    name: `${slug}[bot]`,
+    email: `${userId}+${slug}[bot]@users.noreply.github.com`,
+  };
+}
+
+function parseRestoreScriptOutput(stdout: string | undefined): {
+  code?: number;
+  step?: string;
+  error?: string;
+} | null {
+  try {
+    const parsed = JSON.parse(stdout?.trim() ?? '{}') as Record<string, unknown>;
+    return {
+      code: typeof parsed.code === 'number' ? parsed.code : undefined,
+      step: typeof parsed.step === 'string' ? parsed.step : undefined,
+      error: typeof parsed.error === 'string' ? parsed.error : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Execute setup commands in the sandbox session.
  * Commands run in the workspace directory with access to env vars.
@@ -283,58 +412,125 @@ export class InvalidSessionMetadataError extends Error {
  * @param setupCommands - Array of setup commands to execute
  * @param failFast - Whether to stop on first failure (default: false)
  */
+type RunSetupCommandsOptions = {
+  devcontainer?: DevContainerHandle;
+  dockerEnv?: Record<string, string>;
+  runtimeEnv?: Record<string, string | undefined>;
+};
+
+function buildSetupEnvFileContent(env: Record<string, string | undefined>): string {
+  return `${validShellEnvEntries(env)
+    .map(([key, value]) => `export ${key}=${shellQuote(value)}`)
+    .join('\n')}\n`;
+}
+
+function buildDevContainerSetupCommand(
+  devcontainer: DevContainerHandle,
+  command: string,
+  envFilePath: string | undefined
+): string {
+  const workspaceCommand = `cd ${shellQuote(devcontainer.innerWorkspaceFolder)} && ${command}`;
+  const innerCommand = envFilePath
+    ? `. ${shellQuote(envFilePath)} && ${workspaceCommand}`
+    : workspaceCommand;
+  return [
+    'devcontainer exec',
+    `--workspace-folder ${shellQuote(devcontainer.workspacePath)}`,
+    `--config ${shellQuote(devcontainer.overrideConfigPath)}`,
+    `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${devcontainer.agentSessionId}`)}`,
+    '--',
+    'sh -c',
+    shellQuote(innerCommand),
+  ].join(' ');
+}
+
 export async function runSetupCommands(
   session: ExecutionSession,
   context: SessionContext,
   setupCommands: string[],
-  failFast: boolean = false
+  failFast: boolean = false,
+  options: RunSetupCommandsOptions = {}
 ): Promise<void> {
   if (!setupCommands || setupCommands.length === 0) {
     return;
   }
 
+  const dockerEnv = options.devcontainer
+    ? (options.dockerEnv ?? dockerSocketEnv(await resolveDockerSocketPath(session)))
+    : undefined;
+  const setupEnvFilePath =
+    options.devcontainer && options.runtimeEnv
+      ? `${context.sessionHome}/tmp/kilo-setup-env-${options.devcontainer.agentSessionId}-${Date.now()}.sh`
+      : undefined;
+
+  if (setupEnvFilePath && options.runtimeEnv) {
+    await session.writeFile(setupEnvFilePath, buildSetupEnvFileContent(options.runtimeEnv));
+  }
+
   logger.setTags({ setupCommandsCount: setupCommands.length });
   logger.info('Running setup commands');
 
-  for (const command of setupCommands) {
-    try {
-      // Run command in workspace directory
-      const result = await timedExec(session, command, 'session.runSetupCommand', {
-        timeoutMs: SETUP_COMMAND_TIMEOUT_SECONDS * 1000,
-        cwd: context.workspacePath,
-      });
+  try {
+    for (const command of setupCommands) {
+      try {
+        const setupCommand = options.devcontainer
+          ? buildDevContainerSetupCommand(options.devcontainer, command, setupEnvFilePath)
+          : command;
+        const result = await timedExec(session, setupCommand, 'session.runSetupCommand', {
+          timeoutMs: SETUP_COMMAND_TIMEOUT_SECONDS * 1000,
+          cwd: context.workspacePath,
+          env: dockerEnv,
+        });
 
-      if (result.exitCode !== 0) {
+        if (result.exitCode !== 0) {
+          logger
+            .withFields({
+              command,
+              exitCode: result.exitCode,
+              stdout: result.stdout,
+              stderr: result.stderr,
+            })
+            .warn('Setup command failed');
+
+          if (failFast) {
+            throw new SetupCommandFailedError(command, result.exitCode, result.stderr);
+          }
+        }
+      } catch (error) {
         logger
           .withFields({
             command,
-            exitCode: result.exitCode,
-            stdout: result.stdout,
-            stderr: result.stderr,
+            error: error instanceof Error ? error.message : String(error),
           })
-          .warn('Setup command failed');
+          .error('Error executing setup command');
 
         if (failFast) {
-          throw new SetupCommandFailedError(command, result.exitCode, result.stderr, result.stdout);
+          if (error instanceof SetupCommandFailedError) {
+            throw error;
+          }
+          throw new SetupCommandFailedError(
+            command,
+            -1,
+            error instanceof Error ? error.message : String(error)
+          );
         }
       }
-    } catch (error) {
-      logger
-        .withFields({
-          command,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        .error('Error executing setup command');
-
-      if (failFast) {
-        if (error instanceof SetupCommandFailedError) {
-          throw error;
-        }
-        throw new SetupCommandFailedError(
-          command,
-          -1,
-          error instanceof Error ? error.message : String(error)
+    }
+  } finally {
+    if (setupEnvFilePath) {
+      try {
+        await timedExec(
+          session,
+          `rm -f ${shellQuote(setupEnvFilePath)}`,
+          'session.runSetupCommand.cleanup'
         );
+      } catch (error) {
+        logger
+          .withFields({
+            setupEnvFilePath,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn('Failed to clean up setup command env file');
       }
     }
   }
@@ -342,11 +538,9 @@ export async function runSetupCommands(
   logger.info('Setup commands completed');
 }
 
-// Write Kilo auth file so the CLI's KiloSessions can call session ingest.
-// The CLI reads ~/.local/share/kilo/auth.json via Auth.get("kilo") but we
-// never run `kilo auth login` — credentials are injected purely via env vars
-// for config (KILO_CONFIG_CONTENT). The session ingest code path ignores the
-// provider config and only reads the auth file.
+// Persist Kilo auth for workspace preparation paths that do not receive the
+// wrapper process environment; wrapper-launched Kilo receives the same auth
+// shape through KILO_AUTH_CONTENT.
 export async function writeAuthFile(
   sandbox: SandboxInstance,
   sessionHome: string,
@@ -361,6 +555,59 @@ export async function writeAuthFile(
   await sandbox.writeFile(authPath, authContent);
 
   logger.info('Wrote kilo auth file for session ingest');
+}
+
+function getRestoreTokenFilePath(sessionHome: string): string {
+  return `${sessionHome}/.local/share/kilo/session-restore-token`;
+}
+
+async function writeRestoreTokenFile(
+  sandbox: SandboxInstance,
+  session: ExecutionSession,
+  sessionHome: string,
+  kilocodeToken: string
+): Promise<string> {
+  const tokenPath = getRestoreTokenFilePath(sessionHome);
+  const tokenDir = dirname(tokenPath);
+
+  await timedExec(session, `mkdir -p ${shellQuote(tokenDir)}`, 'session.restoreTokenFile.mkdir');
+  await sandbox.writeFile(tokenPath, kilocodeToken);
+  await timedExec(session, `chmod 600 ${shellQuote(tokenPath)}`, 'session.restoreTokenFile.chmod');
+
+  return tokenPath;
+}
+
+async function cleanupRestoreTokenFile(
+  session: ExecutionSession,
+  tokenPath: string,
+  sessionId: string
+): Promise<void> {
+  try {
+    await timedExec(session, `rm -f ${shellQuote(tokenPath)}`, 'session.restoreTokenFile.cleanup');
+  } catch (error) {
+    logger
+      .withFields({
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      .warn('Failed to clean up restore token file');
+  }
+}
+
+// Write global rules file so the CLI injects cloud-agent-specific instructions.
+// The CLI's RulesMigrator discovers ~/.kilocode/rules/*.md and appends them
+// to the system prompt automatically.
+export async function writeGlobalRules(
+  sandbox: SandboxInstance,
+  sessionHome: string,
+  sessionId: string
+): Promise<void> {
+  const rulesDir = `${sessionHome}/.kilocode/rules`;
+  const rulesPath = `${rulesDir}/cloud-agent.md`;
+
+  await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
+
+  await sandbox.writeFile(rulesPath, buildCloudAgentRules(sessionId));
 }
 
 /**
@@ -383,13 +630,29 @@ type CliMcpServer =
       timeout?: number;
     };
 
-/**
- * Materialize each MCP env/header value into its plaintext form for the CLI.
- * Plain strings pass through verbatim; encrypted envelopes are decrypted
- * per key. Throws only if at least one envelope is present and
- * AGENT_ENV_VARS_PRIVATE_KEY is missing — records of pure plain strings
- * never require the key.
- */
+function materializeSecretValueRecord(
+  values: Record<string, MCPSecretValue> | undefined,
+  privateKey: string | undefined,
+  label: string
+): Record<string, string> | undefined {
+  if (!values || Object.keys(values).length === 0) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (typeof value === 'string') {
+      out[key] = value;
+      continue;
+    }
+    if (!privateKey) {
+      throw new Error(
+        `${label} contains encrypted values but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker`
+      );
+    }
+    out[key] = decryptWithPrivateKey(value, privateKey);
+  }
+  return out;
+}
+
+/** Materialize each MCP env/header value into its plaintext form for the CLI. */
 function materializeMcpServers(
   mcpServers: Record<string, MCPServerConfig>,
   privateKey: string | undefined
@@ -427,62 +690,6 @@ function materializeMcpServers(
   return out;
 }
 
-function materializeSecretValueRecord(
-  values: Record<string, MCPSecretValue> | undefined,
-  privateKey: string | undefined,
-  label: string
-): Record<string, string> | undefined {
-  if (!values || Object.keys(values).length === 0) return undefined;
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(values)) {
-    if (typeof value === 'string') {
-      out[key] = value;
-      continue;
-    }
-    if (!privateKey) {
-      throw new Error(
-        `${label} contains encrypted values but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker`
-      );
-    }
-    out[key] = decryptWithPrivateKey(value, privateKey);
-  }
-  return out;
-}
-
-// Write global rules file so the CLI injects cloud-agent-specific instructions.
-// The CLI's RulesMigrator discovers ~/.kilocode/rules/*.md and appends them
-// to the system prompt automatically.
-export async function writeGlobalRules(
-  sandbox: SandboxInstance,
-  sessionHome: string,
-  sessionId: string
-): Promise<void> {
-  const rulesDir = `${sessionHome}/.kilocode/rules`;
-  const rulesPath = `${rulesDir}/cloud-agent.md`;
-
-  await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
-
-  const content = [
-    '# Cloud Agent Environment',
-    '',
-    "You are running inside a sandboxed cloud container, not on the user's local machine.",
-    'The filesystem is ephemeral and will not persist after the session ends.',
-    "Do not assume access to the user's local files, browsers, or desktop environment.",
-    '',
-    '## Temporary Files',
-    '',
-    `When you need to create temporary or scratch files, use \`/tmp/${sessionId}/\` as your scratch directory.`,
-    'This path is pre-approved for file access and will not trigger permission prompts.',
-    '',
-  ].join('\n');
-
-  await sandbox.writeFile(rulesPath, content);
-}
-
-/**
- * Simple djb2 hash for logging a short, non-reversible fingerprint of skill
- * content without exposing the content itself.
- */
 function shortHash(input: string): string {
   let hash = 5381;
   for (let i = 0; i < input.length; i++) {
@@ -491,20 +698,6 @@ function shortHash(input: string): string {
   return (hash >>> 0).toString(16);
 }
 
-/**
- * Write each runtime skill to `${sessionHome}/.kilocode/skills/<name>/SKILL.md`.
- * The CLI auto-discovers skills under `~/.kilocode/skills/<name>/SKILL.md`; `HOME`
- * is set to `sessionHome` when the execution session is created so the default
- * discovery path resolves here.
- *
- * Logs name, size, and a short content hash — never the raw content.
- */
-/**
- * Build the `KILO_CONFIG_CONTENT.agent.<slug>` entry for a profile agent.
- * The stored `config` already matches the CLI's AgentConfig shape, so this
- * is essentially a pass-through with a default `mode: 'primary'` when the
- * user didn't specify one.
- */
 export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgent): Record<string, unknown> {
   const { config } = agent;
   const entry: Record<string, unknown> = {
@@ -512,7 +705,7 @@ export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgent): Record<str
   };
   if (config.prompt !== undefined) entry.prompt = config.prompt;
   if (config.description !== undefined) entry.description = config.description;
-  if (config.model !== undefined) entry.model = config.model;
+  if (config.model != null) entry.model = normalizeKilocodeModel(config.model);
   if (config.variant !== undefined) entry.variant = config.variant;
   if (config.temperature !== undefined) entry.temperature = config.temperature;
   if (config.top_p !== undefined) entry.top_p = config.top_p;
@@ -525,11 +718,6 @@ export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgent): Record<str
   return entry;
 }
 
-/**
- * Defensive check on a companion file path before we exec `mkdir -p`/`writeFile`.
- * Schema-level validation already enforces these rules, but re-check at the
- * sandbox boundary to prevent any stray input from escaping the skill dir.
- */
 function isSafeSkillFilePath(relativePath: string): boolean {
   if (relativePath.length === 0 || relativePath.length > 200) return false;
   if (relativePath.startsWith('/')) return false;
@@ -539,6 +727,7 @@ function isSafeSkillFilePath(relativePath: string): boolean {
   return /^[a-zA-Z0-9._\-/]+$/.test(relativePath);
 }
 
+/** Write each runtime skill to `${sessionHome}/.kilocode/skills/<name>/SKILL.md`. */
 export async function writeRuntimeSkills(
   sandbox: SandboxInstance,
   sessionHome: string,
@@ -560,9 +749,7 @@ export async function writeRuntimeSkills(
     if (skill.files) {
       for (const [relativePath, content] of Object.entries(skill.files)) {
         if (!isSafeSkillFilePath(relativePath)) {
-          logger
-            .withFields({ skill: skill.name, relativePath })
-            .warn('Rejected unsafe skill companion file path');
+          logger.withFields({ skill: skill.name, relativePath }).warn('Rejected unsafe skill file');
           continue;
         }
         const filePath = `${skillDir}/${relativePath}`;
@@ -610,9 +797,10 @@ export async function fetchSessionMetadata(
     return null;
   }
 
-  const parsed = MetadataSchema.safeParse(metadata);
-  if (!parsed.success) {
-    const reason = JSON.stringify(parsed.error.format());
+  try {
+    return parseSessionMetadata(metadata);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     logger
       .withFields({
         userId,
@@ -622,8 +810,6 @@ export async function fetchSessionMetadata(
       .error('Invalid session metadata shape');
     throw new InvalidSessionMetadataError(userId, sessionId, reason);
   }
-
-  return parsed.data;
 }
 
 /**
@@ -631,6 +817,28 @@ export async function fetchSessionMetadata(
  */
 export function generateSessionId(): SessionId {
   return `agent_${crypto.randomUUID()}`;
+}
+
+function githubRepository(metadata: CloudAgentSessionState) {
+  return metadata.repository?.type === 'github' ? metadata.repository : undefined;
+}
+
+function gitRepository(metadata: CloudAgentSessionState) {
+  const repository = metadata.repository;
+  return repository?.type === 'git' || repository?.type === 'gitlab' ? repository : undefined;
+}
+
+function repositoryPlatform(metadata: CloudAgentSessionState): 'github' | 'gitlab' | undefined {
+  const repository = metadata.repository;
+  if (!repository) return undefined;
+  if (repository.platform) return repository.platform;
+  if (repository.type === 'github') return 'github';
+  if (repository.type === 'gitlab') return 'gitlab';
+  return undefined;
+}
+
+function repositoryShallow(metadata: CloudAgentSessionState): boolean | undefined {
+  return metadata.workspace?.shallow;
 }
 
 /**
@@ -674,13 +882,13 @@ export class SessionService {
     // Fall back to generating from orgId/userId/botId for old sessions that
     // predate sandboxId storage.
     const sandboxId: SandboxId =
-      this._metadata.sandboxId ??
+      this._metadata.workspace?.sandboxId ??
       (await generateSandboxId(
         env.PER_SESSION_SANDBOX_ORG_IDS,
-        this._metadata.orgId,
+        this._metadata.identity.orgId,
         userId,
         sessionId,
-        this._metadata.botId
+        this._metadata.identity.botId
       ));
 
     return sandboxId;
@@ -688,6 +896,11 @@ export class SessionService {
 
   /**
    * Derive a SessionContext from the provided metadata.
+   *
+   * `branchName` defaults to the upstream branch (or a generated
+   * `session/<sessionId>` name) via {@link determineBranchName}; callers that
+   * have a previously-recorded session branch (e.g. cold-evicted resume) may
+   * pass it through explicitly.
    */
   buildContext(options: {
     sandboxId: SessionContext['sandboxId'];
@@ -700,7 +913,11 @@ export class SessionService {
     githubToken?: string;
     gitUrl?: string;
     gitToken?: string;
+    gitlabTokenManaged?: boolean;
+    glabIsOAuth2?: boolean;
     upstreamBranch?: string;
+    branchName?: string;
+    envVars?: Record<string, string>;
     botId?: string;
     platform?: 'github' | 'gitlab';
   }): SessionContext {
@@ -709,7 +926,8 @@ export class SessionService {
       options.workspacePath ??
       getSessionWorkspacePath(options.orgId, options.userId, options.sessionId);
 
-    const branchName = determineBranchName(options.sessionId, options.upstreamBranch);
+    const branchName =
+      options.branchName ?? determineBranchName(options.sessionId, options.upstreamBranch);
 
     return {
       sandboxId: options.sandboxId,
@@ -725,8 +943,40 @@ export class SessionService {
       githubToken: options.githubToken,
       gitUrl: options.gitUrl,
       gitToken: options.gitToken,
+      gitlabTokenManaged: options.gitlabTokenManaged,
+      glabIsOAuth2: options.glabIsOAuth2,
       platform: options.platform,
+      envVars: options.envVars,
     };
+  }
+
+  buildRuntimeEnv(opts: BuildRuntimeEnvOptions): Record<string, string> {
+    const { context, profile } = opts;
+    const { sessionId, sessionHome, workspacePath, envVars: contextEnvVars } = context;
+
+    const effectiveProfile: SessionProfileBundle | undefined =
+      profile === undefined && contextEnvVars === undefined
+        ? undefined
+        : { ...profile, envVars: profile?.envVars ?? contextEnvVars };
+
+    return this.getSaferEnvVars({
+      sessionHome,
+      sessionId,
+      workspacePath,
+      env: opts.env,
+      originalToken: opts.originalToken,
+      kilocodeModel: opts.kilocodeModel,
+      originalOrgId: opts.originalOrgId,
+      githubToken: context.githubToken,
+      githubRepo: context.githubRepo,
+      createdOnPlatform: opts.createdOnPlatform,
+      appendSystemPrompt: opts.appendSystemPrompt,
+      gitUrl: context.gitUrl,
+      gitToken: context.gitToken,
+      glabIsOAuth2: context.glabIsOAuth2,
+      platform: context.platform,
+      profile: effectiveProfile,
+    });
   }
 
   private getSaferEnvVars(opts: GetSaferEnvVarsOptions): Record<string, string> {
@@ -744,6 +994,7 @@ export class SessionService {
       appendSystemPrompt,
       gitUrl,
       gitToken,
+      glabIsOAuth2,
       platform,
       profile,
     } = opts;
@@ -751,6 +1002,7 @@ export class SessionService {
     const encryptedSecrets = profile?.encryptedSecrets;
     const mcpServers = profile?.mcpServers;
     const runtimeAgents = profile?.runtimeAgents;
+    const kiloCommands = profile?.kiloCommands;
 
     // Use override if available, otherwise use original values from API
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
@@ -782,6 +1034,7 @@ export class SessionService {
       SESSION_HOME: sessionHome,
       // Inject Kilocode credentials (with override support)
       KILOCODE_TOKEN: kilocodeToken,
+      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: originalToken } }),
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',
@@ -797,15 +1050,27 @@ export class SessionService {
       providerOptions.kilocodeOrganizationId = kilocodeOrganizationId;
     }
     if (env.KILO_OPENROUTER_BASE) {
-      providerOptions.baseURL = env.KILO_OPENROUTER_BASE;
+      providerOptions.baseURL = backendUrlForSandbox(env.KILO_OPENROUTER_BASE);
     }
     const isInteractive = createdOnPlatform == 'cloud-agent-web';
     const commandGuardPolicy = getCommandGuardPolicy(createdOnPlatform);
+
+    if (commandGuardPolicy) {
+      Object.assign(envVars, {
+        CI: 'true',
+        GIT_TERMINAL_PROMPT: '0',
+        GH_PROMPT_DISABLED: '1',
+        PAGER: 'cat',
+        GIT_PAGER: 'cat',
+        TERM: 'dumb',
+      });
+    }
 
     const permission: Record<string, unknown> = {
       external_directory: {
         '*': 'deny',
         [`/tmp/${sessionId}/**`]: 'allow',
+        [`/tmp/attachments/${sessionId}/**`]: 'allow',
         [`${workspacePath}/**`]: 'allow',
         [`${sessionHome}/.kilocode/skills/**`]: 'allow',
       },
@@ -824,20 +1089,11 @@ export class SessionService {
       skill: 'allow',
       todowrite: 'allow',
       todoread: 'allow',
+      suggest: 'deny',
     };
 
     if (commandGuardPolicy) {
-      // Build bash permission rules from guard policy.
-      // Denied patterns (e.g. "git add *") are more specific than allowed patterns
-      // (e.g. "git *"); the CLI resolves overlapping globs most-specific-first,
-      // so denied sub-commands correctly override broader allows.
-      const bashPermissions: Record<string, string> = {};
-      for (const cmd of commandGuardPolicy.denied) {
-        bashPermissions[`${cmd} *`] = 'deny';
-      }
-      for (const cmd of commandGuardPolicy.allowed) {
-        bashPermissions[`${cmd} *`] = 'allow';
-      }
+      const bashPermissions = buildCommandGuardBashPermissions(commandGuardPolicy);
 
       // Parity with old autoApproval config:
       //   read: allow  (was read.enabled: true)
@@ -873,9 +1129,8 @@ export class SessionService {
         },
       },
       autoupdate: false,
+      snapshot: createdOnPlatform === 'cloud-agent-web',
     };
-    // Decrypt each env/header envelope into its plaintext value and emit the
-    // CLI-native shape the runtime consumes under `KILO_CONFIG_CONTENT.mcp`.
     if (mcpServers && Object.keys(mcpServers).length > 0) {
       const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);
       configContent.mcp = materialized;
@@ -885,14 +1140,8 @@ export class SessionService {
       });
     }
     if (kilocodeModel && kilocodeModel.trim()) {
-      const normalizedModel = kilocodeModel.startsWith('kilo/')
-        ? kilocodeModel
-        : `kilo/${kilocodeModel}`;
-      configContent.model = normalizedModel;
+      configContent.model = normalizeKilocodeModel(kilocodeModel);
     }
-    // Merge custom-prompt (appendSystemPrompt) and profile-provided runtimeAgents
-    // under a single `agent` map keyed by slug. The CLI looks up the mode by
-    // slug and applies its prompt + per-tool permission map.
     const agentConfig: Record<string, unknown> = {};
     if (appendSystemPrompt && appendSystemPrompt.trim()) {
       agentConfig.custom = { prompt: appendSystemPrompt };
@@ -909,6 +1158,24 @@ export class SessionService {
     if (Object.keys(agentConfig).length > 0) {
       configContent.agent = agentConfig;
     }
+    if (kiloCommands && kiloCommands.length > 0) {
+      configContent.command = Object.fromEntries(
+        kiloCommands.map(cmd => [
+          cmd.name,
+          {
+            template: cmd.template,
+            ...(cmd.description && { description: cmd.description }),
+            ...(cmd.agent && { agent: cmd.agent }),
+            ...(cmd.model && { model: normalizeKilocodeModel(cmd.model) }),
+            subtask: cmd.subtask ?? false,
+          },
+        ])
+      );
+      logger.info('Kilo commands merged into KILO_CONFIG_CONTENT', {
+        kiloCommandNames: kiloCommands.map(c => c.name),
+        kiloCommandCount: kiloCommands.length,
+      });
+    }
     const configJson = JSON.stringify(configContent);
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
     envVars.KILO_CONFIG_CONTENT = configJson;
@@ -920,19 +1187,21 @@ export class SessionService {
     // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
     const effectivePlatform = platform ?? (gitUrl?.includes('gitlab') ? 'gitlab' : undefined);
 
-    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides.
-    //
-    // We also set GLAB_IS_OAUTH2=true unconditionally so that `glab` (>=1.82.0)
-    // sends `Authorization: Bearer $token` instead of `PRIVATE-TOKEN: $token`.
-    // This is required for OAuth access tokens (which GitLab rejects with 401
-    // when sent via PRIVATE-TOKEN) and is also valid for PATs — per GitLab
-    // REST API docs, personal/project/group access tokens accept OAuth-compliant
-    // headers (https://docs.gitlab.com/api/rest/authentication/). Treating both
-    // token types uniformly avoids threading the auth type through the session
-    // request/DO/metadata stack.
-    if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
+    const requiresResolvedGitLabTokenMode = glabIsOAuth2 === false;
+    // A token-mode credential must be materialized consistently with its resolver instruction.
+    if (
+      gitToken &&
+      effectivePlatform === 'gitlab' &&
+      (!baseEnvVars.GITLAB_TOKEN || requiresResolvedGitLabTokenMode)
+    ) {
       envVars.GITLAB_TOKEN = gitToken;
-      if (!baseEnvVars.GITLAB_HOST) {
+      if (
+        glabIsOAuth2 !== undefined &&
+        (baseEnvVars.GLAB_IS_OAUTH2 === undefined || requiresResolvedGitLabTokenMode)
+      ) {
+        envVars.GLAB_IS_OAUTH2 = glabIsOAuth2 ? 'true' : 'false';
+      }
+      if (!baseEnvVars.GITLAB_HOST || requiresResolvedGitLabTokenMode) {
         if (gitUrl) {
           try {
             const url = new URL(gitUrl);
@@ -944,16 +1213,13 @@ export class SessionService {
           envVars.GITLAB_HOST = 'gitlab.com';
         }
       }
-      if (!baseEnvVars.GLAB_IS_OAUTH2) {
-        envVars.GLAB_IS_OAUTH2 = 'true';
-      }
       logger
         .withFields({
           gitUrl,
           gitlabHost: envVars.GITLAB_HOST,
-          gitTokenLength: gitToken.length,
+          glabOAuthMode: envVars.GLAB_IS_OAUTH2 === 'true',
         })
-        .info('[GITLAB] Setting GITLAB_TOKEN, GITLAB_HOST, and GLAB_IS_OAUTH2 for GitLab session');
+        .info('[GITLAB] Configured GitLab CLI environment for GitLab session');
     }
 
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)
@@ -962,9 +1228,10 @@ export class SessionService {
     }
 
     if (env.KILOCODE_BACKEND_BASE_URL) {
-      envVars.KILOCODE_BACKEND_BASE_URL = env.KILOCODE_BACKEND_BASE_URL;
+      const sandboxUrl = backendUrlForSandbox(env.KILOCODE_BACKEND_BASE_URL);
+      envVars.KILOCODE_BACKEND_BASE_URL = sandboxUrl;
       // Used by kilo server to check user auth to send to ingest
-      envVars.KILO_API_URL = env.KILOCODE_BACKEND_BASE_URL;
+      envVars.KILO_API_URL = sandboxUrl;
     }
 
     if (env.KILO_SESSION_INGEST_URL) {
@@ -979,11 +1246,6 @@ export class SessionService {
    *
    * Sessions within a sandbox maintain isolated shell state (environment variables,
    * working directory) but share the filesystem.
-   *
-   * Profile-derived configuration (envVars, encryptedSecrets, MCP servers,
-   * runtime skills/agents) comes through as a single `profile` bundle so
-   * adding a new profile field is one-line change here instead of threading
-   * yet another positional argument through every caller.
    */
   async getOrCreateSession(opts: GetOrCreateSessionOptions) {
     const {
@@ -999,31 +1261,19 @@ export class SessionService {
     } = opts;
     const { sessionId, sessionHome, workspacePath, envVars: contextEnvVars } = context;
 
-    // The pre-refactor code threaded `context.envVars` into `getSaferEnvVars`
-    // (set by callers from metadata on resume, profile on prepare). Merge
-    // with the profile bundle's envVars — profile wins when both are set
-    // since the bundle is the authoritative snapshot during prepare/initiate.
     const effectiveProfile: SessionProfileBundle | undefined =
       profile === undefined && contextEnvVars === undefined
         ? undefined
         : { ...profile, envVars: profile?.envVars ?? contextEnvVars };
 
-    // Decrypt secrets and merge with env vars (just-in-time decryption)
-    const saferEnvVars = this.getSaferEnvVars({
-      sessionHome,
-      sessionId,
-      workspacePath,
+    const saferEnvVars = this.buildRuntimeEnv({
+      context,
       env,
       originalToken,
       kilocodeModel,
       originalOrgId,
-      githubToken: context.githubToken,
-      githubRepo: context.githubRepo,
       createdOnPlatform,
       appendSystemPrompt,
-      gitUrl: context.gitUrl,
-      gitToken: context.gitToken,
-      platform: context.platform,
       profile: effectiveProfile,
     });
 
@@ -1033,10 +1283,7 @@ export class SessionService {
       cwd: workspacePath,
     });
 
-    // Materialize runtime skills on disk so the CLI picks them up from its
-    // default discovery path under HOME/.kilocode/skills. Done once per
-    // session creation — for idempotent re-runs we overwrite files in place.
-    const runtimeSkills = profile?.runtimeSkills;
+    const runtimeSkills = effectiveProfile?.runtimeSkills;
     if (runtimeSkills && runtimeSkills.length > 0) {
       await writeRuntimeSkills(sandbox, sessionHome, runtimeSkills);
     }
@@ -1044,428 +1291,353 @@ export class SessionService {
     return session;
   }
 
-  async initiateWithRetry(
-    options: Omit<InitiateOptions, 'sandbox'> & {
-      getSandbox: () => Promise<SandboxInstance>;
-      retryConfig?: SandboxRetryConfig;
-    }
-  ): Promise<PreparedSession> {
-    const { getSandbox, retryConfig, ...rest } = options;
-    const workspacePath = getSessionWorkspacePath(rest.orgId, rest.userId, rest.sessionId);
-    const sessionHome = getSessionHomePath(rest.sessionId);
+  async resolveWorkspaceTokens(
+    env: PersistenceEnv,
+    metadata: CloudAgentSessionState
+  ): Promise<ResolvedWorkspaceTokens> {
+    const github = githubRepository(metadata);
+    const git = gitRepository(metadata);
+    let githubToken: string | undefined;
+    let githubInstallationId = github?.githubInstallationId;
+    let githubAppType = github?.githubAppType;
+    let githubSource: 'user' | 'installation' | undefined;
+    let githubGitAuthor: GitAuthorConfig | undefined;
+    let githubCommitCoAuthor: GitAuthorConfig | undefined;
+    let githubFallbackReason: ManagedGitHubFallbackReason | undefined;
 
-    return withSandboxRetry(
-      getSandbox,
-      sandbox => this.initiate({ ...rest, sandbox }),
-      'initiateSession',
-      () => cleanupSandboxAttempt(getSandbox, rest.sessionId, workspacePath, sessionHome),
-      retryConfig
-    );
-  }
-
-  /** Initialize a net-new session with the given options */
-  @WithLogTags('SessionService.initiate')
-  async initiate(options: InitiateOptions): Promise<PreparedSession> {
-    const {
-      sandbox,
-      sandboxId,
-      orgId,
-      userId,
-      sessionId,
-      kilocodeToken,
-      kilocodeModel,
-      githubRepo,
-      githubToken,
-      gitUrl,
-      gitToken,
-      env,
-      profile,
-      upstreamBranch,
-      botId,
-      githubAppType,
-      createdOnPlatform,
-      shallow,
-    } = options;
-    const setupCommands = profile?.setupCommands;
-
-    logger.setTags({
-      sessionId,
-      sandboxId,
-      orgId,
-      userId,
-      botId,
-      githubRepo,
-      gitUrl,
-    });
-
-    logger.info('Initiating session');
-
-    // Check disk space before creating any directories; clean stale workspaces if low
-    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId);
-
-    const { workspacePath, sessionHome } = await setupWorkspace(sandbox, userId, orgId, sessionId);
-
-    const context = this.buildContext({
-      sandboxId,
-      orgId,
-      userId,
-      sessionId,
-      workspacePath,
-      sessionHome,
-      githubRepo,
-      githubToken,
-      gitUrl,
-      gitToken,
-      upstreamBranch,
-      botId,
-      platform: options.platform,
-    });
-
-    // Inject env vars into context for session creation (profile snapshot
-    // is the source of truth on initiate). Consumers also read this off the
-    // returned `context`, so keep it populated — the tests rely on it.
-    if (profile?.envVars) {
-      context.envVars = profile.envVars;
-    }
-
-    const session = await this.getOrCreateSession({
-      sandbox,
-      context,
-      env,
-      originalToken: kilocodeToken,
-      kilocodeModel,
-      originalOrgId: orgId,
-      createdOnPlatform,
-      profile,
-    });
-
-    // Clone repository using appropriate method
-    // Shallow clone (depth: 1) can be enabled for faster checkout and reduced disk usage
-    const cloneOptions = shallow ? { shallow: true } : undefined;
-    if (gitUrl) {
-      await cloneGitRepo(session, workspacePath, gitUrl, gitToken, undefined, {
-        ...cloneOptions,
-        platform: context.platform,
+    if (github) {
+      const result = await resolveCloudAgentGitHubAuthForRepo(env, {
+        githubRepo: github.repo,
+        userId: metadata.identity.userId,
+        orgId: metadata.identity.orgId,
+        allowUserAuthorization:
+          metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
+          metadata.identity.createdOnPlatform === 'slack',
       });
-    } else if (githubRepo) {
-      await cloneGitHubRepo(
-        session,
-        workspacePath,
-        githubRepo,
-        githubToken,
-        getGitAuthorEnv(env, githubAppType),
-        cloneOptions
-      );
-    }
-
-    // Checkout branch before running setup commands
-    if (upstreamBranch) {
-      // For upstream branches, use manageBranch (need to verify exists remotely)
-      await manageBranch(session, context.workspacePath, context.branchName, true);
-    } else {
-      // For session branches on initiate, create directly (can't exist remotely with UUID-based name)
-      logger.withTags({ branchName: context.branchName }).info('Creating session branch');
-      const result = await timedExec(
-        session,
-        `cd ${context.workspacePath} && git checkout -b '${context.branchName}'`,
-        'session.initiate.createBranch'
-      );
-      if (result.exitCode !== 0) {
-        throw new Error(
-          `Failed to create session branch ${context.branchName}: ${result.stderr || result.stdout}`
-        );
-      }
-      logger.withTags({ branchName: context.branchName }).info('Successfully created branch');
-    }
-
-    // Run setup commands after branch checkout
-    if (setupCommands && setupCommands.length > 0) {
-      await runSetupCommands(session, context, setupCommands, true); // fail-fast
-    }
-
-    // Write auth file for session ingest
-    await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
-    await writeGlobalRules(sandbox, context.sessionHome, context.sessionId);
-
-    // Save metadata to Durable Object
-    const existingMetadata = await this.loadSessionMetadata(env, context);
-    await this.saveSessionMetadata(
-      env,
-      context,
-      {
-        githubRepo,
-        githubToken,
-        gitUrl,
-        gitToken,
-        profile,
-        upstreamBranch,
-      },
-      existingMetadata ?? undefined
-    );
-
-    return {
-      context,
-      session,
-    };
-  }
-
-  /**
-   * Initialize a cloud-agent session by resuming an existing kilo session.
-   *
-   * Client provides both kiloSessionId and githubRepo (parsed from git_url).
-   *
-   * Branch management strategy:
-   * - Clone repo (any branch, default is fine)
-   * - Kilo session handles its own branch state (knows which branch it was on)
-   * - After execution, we observe and capture the branch via `git branch --show-current`
-   * - Store captured branch in metadata for future warm starts
-   *
-   * @param options.existingMetadata - Optional existing metadata to merge with new values.
-   *   When provided, skips the DO fetch and uses this directly for preserving fields like
-   *   preparedAt, initiatedAt, prompt, mode, model, autoCommit. If not provided, metadata
-   *   is fetched from the DO automatically to ensure no fields are lost. Passing this is
-   *   an optimization when the caller already has the metadata.
-   */
-  @WithLogTags('SessionService.initiateFromKiloSession')
-  async initiateFromKiloSession(options: InitiateFromKiloSessionOptions): Promise<PreparedSession> {
-    const {
-      sandbox,
-      sandboxId,
-      orgId,
-      userId,
-      sessionId,
-      kilocodeToken,
-      kilocodeModel,
-      kiloSessionId,
-      githubRepo,
-      githubToken,
-      gitUrl,
-      gitToken,
-      env,
-      profile,
-      botId,
-      githubAppType,
-      existingMetadata,
-    } = options;
-    const setupCommands = profile?.setupCommands;
-
-    logger.setTags({
-      sessionId,
-      sandboxId,
-      orgId,
-      userId,
-      botId,
-      kiloSessionId,
-      githubRepo,
-      gitUrl,
-    });
-
-    logger.info('Initiating session from existing kilo session');
-
-    // Check disk space before creating any directories; clean stale workspaces if low
-    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId);
-
-    // Setup workspace (same as initiate)
-    const { workspacePath, sessionHome } = await setupWorkspace(sandbox, userId, orgId, sessionId);
-
-    // For prepared sessions, we may have an upstreamBranch to use
-    // For legacy CLI resumes, the CLI manages its own branch state
-    const isPreparedSession = existingMetadata?.preparedAt !== undefined;
-
-    const context = this.buildContext({
-      sandboxId,
-      orgId,
-      userId,
-      sessionId,
-      workspacePath,
-      sessionHome,
-      githubRepo,
-      githubToken,
-      gitUrl,
-      gitToken,
-      // For prepared sessions, use the upstreamBranch from metadata if provided
-      // For legacy CLI resumes, let the CLI manage its own branch state (undefined)
-      upstreamBranch: isPreparedSession ? existingMetadata?.upstreamBranch : undefined,
-      botId,
-      platform: existingMetadata?.platform,
-    });
-
-    if (profile?.envVars) {
-      context.envVars = profile.envVars;
-    }
-
-    // Merge caller-provided bundle with fallbacks from existingMetadata: for
-    // fields the caller didn't resupply (skills/agents on a resume), reuse
-    // the snapshot captured at prepare time. `readProfileBundle` handles the
-    // nested-vs-legacy-flat lookup and copies arrays into mutable form.
-    const existingProfile = existingMetadata ? readProfileBundle(existingMetadata) : undefined;
-    const mergedProfile: SessionProfileBundle = {
-      envVars: profile?.envVars,
-      encryptedSecrets: profile?.encryptedSecrets,
-      setupCommands,
-      mcpServers: profile?.mcpServers,
-      runtimeSkills: profile?.runtimeSkills ?? existingProfile?.runtimeSkills,
-      runtimeAgents: profile?.runtimeAgents ?? existingProfile?.runtimeAgents,
-    };
-
-    const session = await this.getOrCreateSession({
-      sandbox,
-      context,
-      env,
-      originalToken: kilocodeToken,
-      kilocodeModel,
-      originalOrgId: orgId,
-      createdOnPlatform: options.createdOnPlatform ?? existingMetadata?.createdOnPlatform,
-      appendSystemPrompt: existingMetadata?.appendSystemPrompt,
-      profile: mergedProfile,
-    });
-
-    // Clone repository using appropriate method
-    if (gitUrl) {
-      await cloneGitRepo(session, workspacePath, gitUrl, gitToken, undefined, {
-        platform: context.platform,
-      });
-    } else if (githubRepo) {
-      await cloneGitHubRepo(
-        session,
-        workspacePath,
-        githubRepo,
-        githubToken,
-        getGitAuthorEnv(env, githubAppType)
-      );
-    } else {
-      throw new Error('Either githubRepo or gitUrl must be provided');
-    }
-
-    // Branch management depends on whether this is a prepared session or CLI resume:
-    // - Prepared sessions (existingMetadata.preparedAt exists): Checkout branch (like initiateSessionStream)
-    // - CLI resumes (no preparedAt): Skip branch ops (CLI manages its own branch state)
-    if (isPreparedSession) {
-      // Use the upstreamBranch from prepared session metadata if present
-      const upstreamBranch = existingMetadata?.upstreamBranch;
-
-      if (upstreamBranch) {
-        // For upstream branches, use manageBranch (need to verify exists remotely)
-        await manageBranch(session, context.workspacePath, context.branchName, true);
+      if (result.success) {
+        githubToken = result.value.githubToken;
+        githubInstallationId = result.value.installationId;
+        githubAppType = result.value.appType;
+        githubSource = result.value.source;
+        githubGitAuthor =
+          result.value.gitAuthor ?? installationGitAuthorFromEnv(env, result.value.appType);
+        githubCommitCoAuthor = result.value.commitCoAuthor;
+        githubFallbackReason = result.value.fallbackReason;
       } else {
-        // For session branches on initiate, create directly (can't exist remotely with UUID-based name)
-        logger.withTags({ branchName: context.branchName }).info('Creating session branch');
-        const result = await timedExec(
-          session,
-          `cd ${context.workspacePath} && git checkout -b '${context.branchName}'`,
-          'session.initiateFromKiloSession.createBranch'
+        throw ExecutionError.invalidRequest(
+          `GitHub token or active app installation required for this repository (${result.error.reason})`
         );
-        if (result.exitCode !== 0) {
-          throw new Error(
-            `Failed to create session branch ${context.branchName}: ${result.stderr || result.stdout}`
-          );
-        }
-        logger.withTags({ branchName: context.branchName }).info('Successfully created branch');
       }
-    } else {
-      logger.info('Skipping branch operations - CLI session will manage its own branch state');
     }
 
-    // Run setup commands (lenient mode since resuming)
-    if (setupCommands && setupCommands.length > 0) {
-      await runSetupCommands(session, context, setupCommands, false);
+    if (github && !githubToken) {
+      throw ExecutionError.invalidRequest('GitHub authentication required for this repository');
     }
 
-    // Write auth file for session ingest
-    await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
-    await writeGlobalRules(sandbox, context.sessionHome, sessionId);
+    let gitToken = repositoryPlatform(metadata) === 'gitlab' ? undefined : git?.token;
+    let gitlabTokenManaged = git?.type === 'gitlab' ? git.gitlabTokenManaged : undefined;
+    let glabIsOAuth2: boolean | undefined;
+    if (git?.url && repositoryPlatform(metadata) === 'gitlab') {
+      if (!env.GIT_TOKEN_SERVICE) {
+        throw ExecutionError.invalidRequest('Git token service is not configured');
+      }
 
-    // Fetch metadata from DO if not provided, to ensure we preserve existing fields
-    const metadataToPreserve =
-      existingMetadata ?? (await this.loadSessionMetadata(env, context)) ?? undefined;
+      const result = await resolveManagedGitLabToken(env, {
+        userId: metadata.identity.userId,
+        orgId: metadata.identity.orgId,
+        repositoryUrl: git.url,
+        createdOnPlatform: metadata.identity.createdOnPlatform,
+      });
+      if (result.success) {
+        gitToken = result.token;
+        gitlabTokenManaged = true;
+        glabIsOAuth2 = result.glabIsOAuth2;
+      } else {
+        throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
+      }
+    }
 
-    // Save metadata with kiloSessionId, preserving existing prepared session fields
-    await this.saveSessionMetadata(
-      env,
-      context,
-      {
-        githubRepo,
-        githubToken,
-        gitUrl,
-        gitToken,
-        profile: mergedProfile,
-        kiloSessionId,
-      },
-      metadataToPreserve
-    );
+    if (git?.url && repositoryPlatform(metadata) === 'gitlab' && !gitToken) {
+      throw ExecutionError.invalidRequest(
+        'No GitLab integration found. Please connect your GitLab account first.'
+      );
+    }
 
     return {
-      context,
-      session,
+      githubToken,
+      githubInstallationId,
+      githubAppType,
+      githubSource,
+      githubGitAuthor,
+      githubCommitCoAuthor,
+      githubFallbackReason,
+      gitToken,
+      gitlabTokenManaged,
+      glabIsOAuth2,
     };
   }
 
-  async initiateFromKiloSessionWithRetry<T extends InitiateFromKiloSessionOptions>(
-    options: Omit<T, 'sandbox'> & {
-      getSandbox: () => Promise<SandboxInstance>;
-      retryConfig?: SandboxRetryConfig;
+  async buildWrapperSessionReadyAndPromptRequests(
+    options: BuildWrapperSessionReadyAndPromptRequestsOptions
+  ): Promise<
+    {
+      readyRequest: WrapperSessionReadyRequest;
+      ready: WrapperWorkspaceReady;
+      context: SessionContext;
+    } & (
+      | { type: 'prompt'; promptRequest: WrapperPromptRequest }
+      | { type: 'command'; commandRequest: WrapperCommandRequest }
+    )
+  > {
+    const { env, plan } = options;
+    const { scope, turn, agent, finalization, workspace, wrapper } = plan;
+    const { sessionId, userId, orgId } = scope;
+    const { sandboxId, metadata } = workspace;
+
+    if (!metadata.auth.kilocodeToken) {
+      throw ExecutionError.invalidRequest('Missing kilocodeToken in session metadata');
     }
-  ): Promise<PreparedSession> {
-    const { getSandbox, retryConfig, ...rest } = options;
-    const initiateOptions = rest as unknown as Omit<T, 'sandbox'>;
-    const workspacePath = getSessionWorkspacePath(
-      initiateOptions.orgId,
-      initiateOptions.userId,
-      initiateOptions.sessionId
-    );
-    const sessionHome = getSessionHomePath(initiateOptions.sessionId);
+    if (!metadata.auth.kiloSessionId) {
+      throw ExecutionError.invalidRequest('Missing kiloSessionId in session metadata');
+    }
 
-    return withSandboxRetry(
-      getSandbox,
-      sandbox => this.initiateFromKiloSession({ ...initiateOptions, sandbox } as T),
-      'initiateFromKiloSession',
-      () =>
-        cleanupSandboxAttempt(getSandbox, initiateOptions.sessionId, workspacePath, sessionHome),
-      retryConfig
-    );
-  }
-
-  /** Resume an existing session with the given options */
-  @WithLogTags('SessionService.resume')
-  async resume(options: ResumeOptions): Promise<PreparedSession> {
-    const {
-      sandbox,
-      sandboxId,
+    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata);
+    const workspacePath = getSessionWorkspacePath(orgId, userId, sessionId);
+    const sessionHome = getSessionHomePath(sessionId);
+    const branchName =
+      metadata.workspace?.branchName ??
+      determineBranchName(sessionId, metadata.repository?.upstreamBranch);
+    const profile = readProfileBundle(metadata);
+    const github = githubRepository(metadata);
+    const git = gitRepository(metadata);
+    const platform = repositoryPlatform(metadata);
+    const devcontainerRequested =
+      metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
+    const context = this.buildContext({
+      sandboxId: sandboxId as SandboxId,
       orgId,
       userId,
-      sessionId,
-      kilocodeToken,
-      kilocodeModel,
-      env,
-      githubToken: freshGithubToken,
-      gitToken: freshGitToken,
-    } = options;
-
-    logger.setTags({
-      sessionId,
-      sandboxId,
-      orgId,
-      userId,
+      sessionId: sessionId as SessionId,
+      workspacePath,
+      sessionHome,
+      githubRepo: github?.repo,
+      githubToken: resolvedTokens.githubToken,
+      gitUrl: git?.url,
+      gitToken: resolvedTokens.gitToken,
+      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
+      upstreamBranch: metadata.repository?.upstreamBranch,
+      branchName,
+      envVars: profile.envVars,
+      botId: metadata.identity.botId,
+      platform,
     });
 
-    logger.info('Resuming session');
+    const materializedEnv = this.getSaferEnvVars({
+      sessionHome,
+      sessionId,
+      workspacePath,
+      env,
+      originalToken: metadata.auth.kilocodeToken,
+      kilocodeModel: agent.model,
+      originalOrgId: orgId,
+      githubToken: resolvedTokens.githubToken,
+      githubRepo: github?.repo,
+      createdOnPlatform: metadata.identity.createdOnPlatform,
+      appendSystemPrompt: metadata.agent?.appendSystemPrompt,
+      gitUrl: git?.url,
+      gitToken: resolvedTokens.gitToken,
+      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
+      platform,
+      profile,
+    });
 
-    // Check disk space before creating any directories; clean stale workspaces if low
-    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId);
+    const ready = {
+      workspacePath,
+      sandboxId,
+      sessionHome,
+      branchName,
+      kiloSessionId: metadata.auth.kiloSessionId,
+      githubInstallationId: resolvedTokens.githubInstallationId,
+      githubAppType: resolvedTokens.githubAppType,
+      gitToken: resolvedTokens.gitToken,
+      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      ...(metadata.devcontainer ? { devcontainer: metadata.devcontainer } : {}),
+    } satisfies WrapperWorkspaceReady;
+
+    const repo = this.buildWrapperRepoSource(metadata, resolvedTokens);
+    const session = buildWrapperSessionBinding({
+      workerUrl: env.WORKER_URL,
+      kilocodeToken: metadata.auth.kilocodeToken,
+      userId,
+      sessionId,
+      wrapper,
+      upstreamBranch: metadata.repository?.upstreamBranch,
+    });
+
+    const attachments =
+      turn.type === 'prompt'
+        ? await buildSignedPromptAttachments({
+            env,
+            userId,
+            sessionId,
+            attachments: turn.attachments,
+            createdOnPlatform: metadata.identity.createdOnPlatform,
+          })
+        : [];
+
+    const promptAgent = normalizeAgentMode(agent.mode);
+    const readyRequest: WrapperSessionReadyRequest = {
+      agentSessionId: sessionId,
+      userId,
+      ...(orgId ? { orgId } : {}),
+      sandboxId,
+      kiloSessionId: metadata.auth.kiloSessionId,
+      workspace: {
+        workspacePath,
+        sessionHome,
+        branchName,
+        ...(metadata.repository?.upstreamBranch
+          ? { upstreamBranch: metadata.repository.upstreamBranch }
+          : {}),
+        strictBranch: Boolean(
+          metadata.repository?.upstreamBranch && !metadata.lifecycle.preparedAt
+        ),
+        preferSnapshot: metadata.lifecycle.preparedAt !== undefined,
+      },
+      ...(repo ? { repo } : {}),
+      ...(devcontainerRequested
+        ? {
+            devcontainer: {
+              requested: true,
+              ...(metadata.devcontainer ? { resolved: metadata.devcontainer } : {}),
+            },
+          }
+        : {}),
+      materialized: {
+        env: materializedEnv,
+        ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
+        ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
+      },
+      session,
+    };
+
+    if (turn.type === 'command') {
+      const commandRequest: WrapperCommandRequest = {
+        command: turn.command,
+        ...(turn.arguments.length > 0 ? { args: turn.arguments } : {}),
+        messageId: turn.messageId,
+        agent: {
+          mode: promptAgent,
+          model: { modelID: agent.model },
+          ...(agent.variant ? { variant: agent.variant } : {}),
+        },
+        ...(finalization?.autoCommit !== undefined ? { autoCommit: finalization.autoCommit } : {}),
+        ...(finalization?.condenseOnComplete !== undefined
+          ? { condenseOnComplete: finalization.condenseOnComplete }
+          : {}),
+        ...(resolvedTokens.githubCommitCoAuthor
+          ? { commitCoAuthor: resolvedTokens.githubCommitCoAuthor }
+          : {}),
+        session,
+      };
+      return { type: 'command', readyRequest, commandRequest, ready, context };
+    }
+
+    const promptRequest: WrapperPromptRequest = {
+      message: {
+        id: turn.messageId,
+        prompt: turn.prompt,
+        ...(attachments.length > 0 ? { attachments } : {}),
+      },
+      agent: {
+        mode: promptAgent,
+        model: { modelID: agent.model },
+        ...(agent.variant ? { variant: agent.variant } : {}),
+      },
+      ...(finalization?.autoCommit !== undefined ||
+      finalization?.condenseOnComplete !== undefined ||
+      resolvedTokens.githubCommitCoAuthor
+        ? {
+            finalization: {
+              ...(finalization?.autoCommit !== undefined
+                ? { autoCommit: finalization.autoCommit }
+                : {}),
+              ...(finalization?.condenseOnComplete !== undefined
+                ? { condenseOnComplete: finalization.condenseOnComplete }
+                : {}),
+              ...(resolvedTokens.githubCommitCoAuthor
+                ? { commitCoAuthor: resolvedTokens.githubCommitCoAuthor }
+                : {}),
+            },
+          }
+        : {}),
+      session,
+    };
+
+    return { type: 'prompt', readyRequest, promptRequest, ready, context };
+  }
+
+  private buildWrapperRepoSource(
+    metadata: CloudAgentSessionState,
+    tokens: ResolvedWorkspaceTokens
+  ): WrapperBootstrapRepoSource | undefined {
+    const git = gitRepository(metadata);
+    if (git) {
+      return {
+        kind: 'git',
+        url: git.url,
+        ...(tokens.gitToken ? { token: tokens.gitToken } : {}),
+        ...(repositoryPlatform(metadata) ? { platform: repositoryPlatform(metadata) } : {}),
+        ...(repositoryShallow(metadata) !== undefined
+          ? { shallow: repositoryShallow(metadata) }
+          : {}),
+        refreshRemote: tokens.gitlabTokenManaged === true,
+      };
+    }
+
+    const github = githubRepository(metadata);
+    if (github) {
+      return {
+        kind: 'github',
+        repo: github.repo,
+        ...(tokens.githubToken ? { token: tokens.githubToken } : {}),
+        ...(repositoryShallow(metadata) !== undefined
+          ? { shallow: repositoryShallow(metadata) }
+          : {}),
+        ...(tokens.githubGitAuthor ? { gitAuthor: tokens.githubGitAuthor } : {}),
+        refreshRemote: tokens.githubInstallationId !== undefined,
+      };
+    }
+
+    return undefined;
+  }
+
+  @WithLogTags('SessionService.prepareWorkspace')
+  async prepareWorkspace(options: PrepareWorkspaceOptions): Promise<PreparedWorkspace> {
+    const { sandbox, sandboxId, userId, sessionId, env, metadata, onProgress } = options;
+    const orgId = options.orgId;
+
+    if (!metadata.auth.kilocodeToken) {
+      throw ExecutionError.invalidRequest('Missing kilocodeToken in session metadata');
+    }
+    if (!metadata.auth.kiloSessionId) {
+      throw ExecutionError.invalidRequest('Missing kiloSessionId in session metadata');
+    }
+
+    const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata);
+    const github = githubRepository(metadata);
+    const git = gitRepository(metadata);
+    const platform = repositoryPlatform(metadata);
+
+    logger.setTags({ sessionId, sandboxId, orgId, userId, botId: metadata.identity.botId });
+    logger.info('Preparing workspace');
 
     const workspacePath = getSessionWorkspacePath(orgId, userId, sessionId);
     const sessionHome = getSessionHomePath(sessionId);
-
-    // Ensure workspace directories exist before creating session
-    await sandbox.mkdir(workspacePath, { recursive: true });
-    await sandbox.mkdir(sessionHome, { recursive: true });
-
-    // Session home directory
-
-    const metadata = await this.loadSessionMetadata(env, { userId, sessionId } as SessionContext);
-    const githubToken = freshGithubToken ?? metadata?.githubToken;
-    const gitToken = freshGitToken ?? metadata?.gitToken;
-
+    const branchName =
+      metadata.workspace?.branchName ??
+      determineBranchName(sessionId, metadata.repository?.upstreamBranch);
     const context = this.buildContext({
       sandboxId,
       orgId,
@@ -1473,532 +1645,552 @@ export class SessionService {
       sessionId,
       workspacePath,
       sessionHome,
-      upstreamBranch: metadata?.upstreamBranch,
-      botId: metadata?.botId,
-      githubRepo: metadata?.githubRepo,
-      githubToken,
-      gitUrl: metadata?.gitUrl,
-      gitToken,
-      platform: metadata?.platform,
+      githubRepo: github?.repo,
+      githubToken: resolvedTokens.githubToken,
+      gitUrl: git?.url,
+      gitToken: resolvedTokens.gitToken,
+      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
+      upstreamBranch: metadata.repository?.upstreamBranch,
+      branchName,
+      envVars: readProfileBundle(metadata).envVars,
+      botId: metadata.identity.botId,
+      platform,
     });
 
-    const resumeProfile = metadata ? readProfileBundle(metadata) : undefined;
+    const ready = {
+      workspacePath,
+      sandboxId,
+      sessionHome,
+      branchName,
+      kiloSessionId: metadata.auth.kiloSessionId,
+      githubInstallationId: resolvedTokens.githubInstallationId,
+      githubAppType: resolvedTokens.githubAppType,
+      gitToken: resolvedTokens.gitToken,
+      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      devcontainer: metadata.devcontainer,
+    } satisfies PreparedWorkspace['ready'];
+    const runtimeEnv = this.buildRuntimeEnv({
+      context,
+      env,
+      originalToken: metadata.auth.kilocodeToken,
+      kilocodeModel: options.kilocodeModel,
+      originalOrgId: orgId,
+      createdOnPlatform: metadata.identity.createdOnPlatform,
+      appendSystemPrompt: metadata.agent?.appendSystemPrompt,
+      profile: readProfileBundle(metadata),
+    });
 
-    // Inject env vars from metadata into context (before creating session)
-    if (resumeProfile?.envVars) {
-      context.envVars = resumeProfile.envVars;
+    // Warm fast path: probe for an existing .git before touching disk. The
+    // probe uses the sandbox-wide executor because the per-session shell
+    // hasn't been created yet — shells need a valid cwd, and that directory
+    // may not exist on a cold sandbox. Once we know the workspace is warm,
+    // mkdir-idempotent setup + createSession is still required to hand back a
+    // usable ExecutionSession to the caller.
+    if (await this.workspaceHasGit(sandbox, workspacePath)) {
+      await setupWorkspace(sandbox, userId, orgId, sessionId);
+      const session = await this.buildSessionForContext(
+        sandbox,
+        context,
+        env,
+        metadata,
+        options.kilocodeModel,
+        orgId
+      );
+      await this.refreshGitRemoteToken(session, context, metadata, resolvedTokens);
+
+      const detectedDevcontainer =
+        metadata.workspace?.devcontainerRequested && !metadata.devcontainer
+          ? await detectDevContainer(session, workspacePath)
+          : null;
+      if (
+        metadata.workspace?.devcontainerRequested &&
+        !metadata.devcontainer &&
+        !detectedDevcontainer
+      ) {
+        throw ExecutionError.invalidRequest(
+          'Devcontainer runtime was requested, but the repository has no devcontainer config'
+        );
+      }
+      const devcontainerPlan =
+        metadata.devcontainer ??
+        (detectedDevcontainer
+          ? {
+              workspacePath,
+              wrapperPort: randomPort(),
+              configPath: detectedDevcontainer.configPath,
+            }
+          : undefined);
+      if (!devcontainerPlan) {
+        return { context, session, runtimeEnv, ready };
+      }
+
+      const devcontainer = await bringUpDevContainer(session, {
+        workspacePath: devcontainerPlan.workspacePath,
+        sessionHome,
+        agentSessionId: sessionId,
+        wrapperPort: devcontainerPlan.wrapperPort,
+        kiloCliVersion: KILO_CLI_VERSION,
+        configPath: devcontainerPlan.configPath,
+        onProgress: message => onProgress?.('devcontainer_setup', message),
+      });
+      ready.devcontainer = {
+        workspacePath: devcontainerPlan.workspacePath,
+        innerWorkspaceFolder: devcontainer.innerWorkspaceFolder,
+        wrapperPort: devcontainerPlan.wrapperPort,
+        configPath: devcontainerPlan.configPath,
+      };
+      return { context, session, runtimeEnv, devcontainer, ready };
     }
 
-    // Create session first so we can use it for all operations
-    // Note: encryptedSecrets come from metadata for resume - they were stored during prepare/initiate
-    const session = await this.getOrCreateSession({
+    onProgress?.('disk_check', 'Checking disk space…');
+    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId, {
+      inspectContainers:
+        sandboxId.startsWith('dind-') ||
+        metadata.workspace?.devcontainerRequested === true ||
+        metadata.devcontainer !== undefined,
+    });
+
+    onProgress?.('workspace_setup', 'Setting up workspace…');
+    await setupWorkspace(sandbox, userId, orgId, sessionId);
+
+    const session = await this.buildSessionForContext(
       sandbox,
       context,
       env,
-      originalToken: kilocodeToken,
+      metadata,
+      options.kilocodeModel,
+      orgId
+    );
+
+    let devcontainer: DevContainerHandle | undefined;
+    let dockerEnv: Record<string, string> | undefined;
+    try {
+      onProgress?.('cloning', 'Cloning repository…');
+      await this.cloneRepository(session, workspacePath, metadata, resolvedTokens);
+
+      onProgress?.('branch', 'Setting up branch…');
+      await this.prepareBranch(session, workspacePath, branchName, metadata);
+
+      await writeAuthFile(sandbox, sessionHome, metadata.auth.kilocodeToken);
+      await writeGlobalRules(sandbox, sessionHome, sessionId);
+
+      const detectedDevcontainer = metadata.workspace?.devcontainerRequested
+        ? await detectDevContainer(session, workspacePath)
+        : null;
+      if (
+        metadata.workspace?.devcontainerRequested &&
+        !metadata.devcontainer &&
+        !detectedDevcontainer
+      ) {
+        throw ExecutionError.invalidRequest(
+          'Devcontainer runtime was requested, but the repository has no devcontainer config'
+        );
+      }
+      const devcontainerPlan =
+        metadata.devcontainer ??
+        (detectedDevcontainer
+          ? {
+              workspacePath,
+              wrapperPort: randomPort(),
+              configPath: detectedDevcontainer.configPath,
+            }
+          : undefined);
+      if (devcontainerPlan) {
+        dockerEnv = dockerSocketEnv(await resolveDockerSocketPath(session));
+        devcontainer = await bringUpDevContainer(session, {
+          workspacePath: devcontainerPlan.workspacePath,
+          sessionHome,
+          agentSessionId: sessionId,
+          wrapperPort: devcontainerPlan.wrapperPort,
+          kiloCliVersion: KILO_CLI_VERSION,
+          configPath: devcontainerPlan.configPath,
+          onProgress: message => onProgress?.('devcontainer_setup', message),
+        });
+        ready.devcontainer = {
+          workspacePath: devcontainerPlan.workspacePath,
+          innerWorkspaceFolder: devcontainer.innerWorkspaceFolder,
+          wrapperPort: devcontainerPlan.wrapperPort,
+          configPath: devcontainerPlan.configPath,
+        };
+      }
+
+      const preferSnapshot = metadata.lifecycle.preparedAt !== undefined;
+      onProgress?.('kilo_session', preferSnapshot ? 'Restoring session…' : 'Importing session…');
+      await this.restoreOrBootstrapKiloSession(
+        sandbox,
+        session,
+        metadata.auth.kiloSessionId,
+        workspacePath,
+        preferSnapshot,
+        {
+          devcontainer,
+          dockerEnv,
+          env,
+          kilocodeToken: metadata.auth.kilocodeToken,
+          runtimeEnv,
+          sessionHome,
+        }
+      );
+
+      const setupCommands = readProfileBundle(metadata).setupCommands;
+      if (setupCommands && setupCommands.length > 0) {
+        onProgress?.('setup_commands', 'Running setup commands…');
+        await runSetupCommands(session, context, setupCommands, false, {
+          devcontainer,
+          dockerEnv,
+          runtimeEnv,
+        });
+      }
+
+      onProgress?.('kilo_server', 'Starting Kilo…');
+      return { context, session, runtimeEnv, devcontainer, ready };
+    } catch (error) {
+      if (devcontainer) {
+        await devcontainer.teardown().catch(teardownError => {
+          logger
+            .withFields({
+              sessionId,
+              error: teardownError instanceof Error ? teardownError.message : String(teardownError),
+            })
+            .warn('Failed to tear down devcontainer after workspace preparation failure');
+        });
+      }
+      logger
+        .withFields({ sessionId, error: error instanceof Error ? error.message : String(error) })
+        .warn('Workspace preparation step failed; removing workspace for clean retry');
+      await cleanupWorkspace(session, workspacePath, sessionHome);
+      throw error;
+    }
+  }
+
+  private async buildSessionForContext(
+    sandbox: SandboxInstance,
+    context: SessionContext,
+    env: PersistenceEnv,
+    metadata: CloudAgentSessionState,
+    kilocodeModel: string | undefined,
+    orgId: string | undefined
+  ): Promise<ExecutionSession> {
+    if (!metadata.auth.kilocodeToken) {
+      throw ExecutionError.invalidRequest('Missing kilocodeToken in session metadata');
+    }
+    return this.getOrCreateSession({
+      sandbox,
+      context,
+      env,
+      originalToken: metadata.auth.kilocodeToken,
       kilocodeModel,
       originalOrgId: orgId,
-      createdOnPlatform: metadata?.createdOnPlatform,
-      appendSystemPrompt: metadata?.appendSystemPrompt,
-      profile: resumeProfile,
+      createdOnPlatform: metadata.identity.createdOnPlatform,
+      appendSystemPrompt: metadata.agent?.appendSystemPrompt,
+      profile: readProfileBundle(metadata),
     });
+  }
 
-    // Check if workspace repo exists - if not, we may need to reclone
-    const repoCheck = await timedExec(
-      session,
-      `test -d ${workspacePath}/.git && echo exists`,
-      'session.resume.repoExists'
-    );
-    const repoExists = repoCheck.stdout?.includes('exists') ?? false;
-    const isColdStart = !repoExists;
+  private async workspaceHasGit(
+    executor: SandboxInstance | ExecutionSession,
+    workspacePath: string
+  ): Promise<boolean> {
+    try {
+      const result = await timedExec(
+        executor,
+        `test -d '${workspacePath}/.git' && echo exists`,
+        'session.prepareWorkspace.repoExists'
+      );
+      if (result.exitCode !== 0 && isSandboxFilesystemUnusableError(result.stderr)) {
+        throw new SandboxCapacityInspectionError(
+          'Workspace admission probe cannot run because the sandbox filesystem is unusable',
+          new Error(result.stderr)
+        );
+      }
+      return result.stdout?.includes('exists') ?? false;
+    } catch (error) {
+      if (isSandboxFilesystemUnusableError(error)) {
+        throw new SandboxCapacityInspectionError(
+          'Workspace admission probe cannot run because the sandbox filesystem is unusable',
+          error
+        );
+      }
+      throw error;
+    }
+  }
 
-    // Only re-run setup if we had to reclone (cold start)
-    if (isColdStart) {
-      await this.handleColdStartResume({
-        session,
-        sessionId,
-        userId,
-        sandbox,
-        context,
-        metadata,
-        env,
-        kilocodeToken,
-        freshGithubToken,
-        freshGitToken,
-        onProgress: options.onProgress,
+  private async cloneRepository(
+    session: ExecutionSession,
+    workspacePath: string,
+    metadata: CloudAgentSessionState,
+    tokens: ResolvedWorkspaceTokens
+  ): Promise<void> {
+    const cloneOptions = repositoryShallow(metadata) ? { shallow: true } : undefined;
+    const git = gitRepository(metadata);
+    if (git) {
+      await cloneGitRepo(session, workspacePath, git.url, tokens.gitToken, undefined, {
+        ...cloneOptions,
+        platform: repositoryPlatform(metadata),
       });
+      return;
+    }
+    const github = githubRepository(metadata);
+    if (github) {
+      await cloneGitHubRepo(
+        session,
+        workspacePath,
+        github.repo,
+        tokens.githubToken,
+        tokens.githubGitAuthor,
+        cloneOptions
+      );
+      return;
+    }
+    throw ExecutionError.invalidRequest('Session metadata is missing a repository source');
+  }
+
+  private async prepareBranch(
+    session: ExecutionSession,
+    workspacePath: string,
+    branchName: string,
+    metadata: CloudAgentSessionState
+  ): Promise<void> {
+    // First-run with an upstream branch: enforce strict remote existence —
+    // if the upstream is missing, the session can't meaningfully start and
+    // we want to fail loudly.
+    //
+    // Cold-evicted resume (preparedAt set, workspace gone): relax the strict
+    // check. The upstream branch may have been merged or deleted since the
+    // session was first prepared, but the recorded session branch is the
+    // source of truth now, so `manageBranch(..., strict=false)` falls back to
+    // creating the branch locally if needed.
+    if (metadata.repository?.upstreamBranch && !metadata.lifecycle.preparedAt) {
+      await manageBranch(session, workspacePath, branchName, true);
+      return;
     }
 
-    return {
-      context,
+    if (metadata.repository?.upstreamBranch || metadata.workspace?.branchName) {
+      await manageBranch(session, workspacePath, branchName, false);
+      return;
+    }
+
+    logger.withTags({ branchName }).info('Creating session branch');
+    const result = await timedExec(
       session,
+      `cd '${workspacePath}' && git checkout -b '${branchName}'`,
+      'session.prepareWorkspace.createBranch'
+    );
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Failed to create session branch ${branchName}: ${result.stderr || result.stdout}`
+      );
+    }
+  }
+
+  /**
+   * Refresh the embedded credentials in the workspace's git remote URL on the
+   * warm fast path.
+   *
+   * GitHub App installation tokens expire after ~1h, and server-resolved GitLab
+   * credentials can rotate independently of a warm workspace. The URL-embedded
+   * credentials from the original clone go stale quickly. `GH_TOKEN` /
+   * `GITLAB_TOKEN` env vars don't rescue `git` itself (they only affect the
+   * provider CLIs / GitLab HTTP integrations), so we rewrite `origin` whenever
+   * the token is resolved by us.
+   */
+  private async refreshGitRemoteToken(
+    session: ExecutionSession,
+    context: SessionContext,
+    metadata: CloudAgentSessionState,
+    tokens: ResolvedWorkspaceTokens
+  ): Promise<void> {
+    const github = githubRepository(metadata);
+    if (github) {
+      if (tokens.githubToken !== undefined && tokens.githubInstallationId !== undefined) {
+        await updateGitRemoteToken(
+          session,
+          context.workspacePath,
+          `https://github.com/${github.repo}.git`,
+          tokens.githubToken
+        );
+        if (tokens.githubGitAuthor) {
+          await updateGitAuthor(session, context.workspacePath, tokens.githubGitAuthor);
+        }
+      }
+    }
+
+    const git = gitRepository(metadata);
+    if (git) {
+      if (tokens.gitToken !== undefined && tokens.gitlabTokenManaged === true) {
+        await updateGitRemoteToken(
+          session,
+          context.workspacePath,
+          git.url,
+          tokens.gitToken,
+          repositoryPlatform(metadata)
+        );
+      }
+    }
+  }
+
+  private async restoreOrBootstrapKiloSession(
+    sandbox: SandboxInstance,
+    session: ExecutionSession,
+    kiloSessionId: string,
+    workspacePath: string,
+    preferSnapshot: boolean,
+    options: RestoreRuntimeOptions
+  ): Promise<void> {
+    if (preferSnapshot) {
+      const restored = await this.tryRestoreKiloSessionFromSnapshot(
+        sandbox,
+        session,
+        kiloSessionId,
+        workspacePath,
+        options
+      );
+      if (restored) return;
+    }
+
+    await this.bootstrapKiloSession(sandbox, session, kiloSessionId, workspacePath, options);
+  }
+
+  private getDevContainerRestoreEnv(
+    options: RestoreRuntimeOptions,
+    restoreTokenFilePath: string | undefined
+  ): Record<string, string | undefined> {
+    const backendUrl = options.env.KILOCODE_BACKEND_BASE_URL
+      ? backendUrlForSandbox(options.env.KILOCODE_BACKEND_BASE_URL)
+      : undefined;
+    return {
+      KILOCODE_TOKEN_FILE: restoreTokenFilePath,
+      KILO_SESSION_INGEST_URL: options.env.KILO_SESSION_INGEST_URL,
+      ...buildKiloSessionXdgEnv(options.sessionHome),
+      ...(backendUrl ? { KILOCODE_BACKEND_BASE_URL: backendUrl, KILO_API_URL: backendUrl } : {}),
     };
   }
 
-  private async handleColdStartResume({
-    session,
-    sessionId,
-    userId,
-    sandbox,
-    context,
-    metadata,
-    env,
-    kilocodeToken,
-    freshGithubToken,
-    freshGitToken,
-    onProgress,
-  }: {
-    session: ExecutionSession;
-    sessionId: string;
-    userId: string;
-    sandbox: SandboxInstance;
-    context: SessionContext;
-    metadata: CloudAgentSessionState | null;
-    env: PersistenceEnv;
-    kilocodeToken: string;
-    freshGithubToken?: string;
-    freshGitToken?: string;
-    onProgress?: (step: string, message: string) => void;
-  }): Promise<void> {
-    if (!metadata) {
-      throw new Error(
-        `Session ${sessionId} workspace is missing and metadata could not be retrieved. Please re-initiate the session.`
-      );
-    }
-
-    // Cold-start resume must restore snapshot or fail.
-    if (!metadata.kiloSessionId) {
-      throw new Error(
-        `Session ${sessionId} has no kiloSessionId in metadata. Cannot restore snapshot.`
-      );
-    }
-    // Wrap clone and all post-clone steps so that any failure removes the
-    // workspace directory. Without this, `.git` survives and the next retry
-    // sees `isColdStart = false`, skipping the full restore flow — leaving
-    // the session in a broken half-initialized state.
-    try {
-      // Clone first so .git exists when `kilo import` runs — the CLI derives
-      // the project ID from the repo's root commit hash; without a repo the
-      // FK on session.project_id fails.
-      onProgress?.('cloning', 'Cloning repository…');
-      await restoreWorkspace(session, context.workspacePath, context.branchName, {
-        githubRepo: metadata.githubRepo,
-        githubToken: freshGithubToken ?? metadata.githubToken,
-        gitUrl: metadata.gitUrl,
-        gitToken: freshGitToken ?? metadata.gitToken,
-        gitAuthorEnv: getGitAuthorEnv(env, metadata.githubAppType),
-        lastSeenBranch: metadata.upstreamBranch,
-        platform: context.platform,
-      });
-      // Write auth file BEFORE kilo import so KiloSessions.bootstrap() can authenticate
-      onProgress?.('workspace_setup', 'Setting up workspace…');
-      await writeAuthFile(sandbox, context.sessionHome, kilocodeToken);
-      await writeGlobalRules(sandbox, context.sessionHome, sessionId);
-
-      // Single restore script handles download, import, and diff application inside
-      // the sandbox — the snapshot never enters worker memory.
-      onProgress?.('kilo_session', 'Restoring session…');
-      logger.info('Starting cold-start session restore');
-
-      const escapedId = metadata.kiloSessionId.replaceAll("'", "'\\''");
-      const escapedWorkspace = context.workspacePath.replaceAll("'", "'\\''");
-      const restoreResult = await timedExec(
-        session,
-        `bun /usr/local/bin/kilo-restore-session.js '${escapedId}' '${escapedWorkspace}'`,
-        'session.coldStart.restore',
-        { timeoutMs: GIT_COMMAND_TIMEOUT_MS, cwd: dirname(context.workspacePath) }
-      );
-
-      if (restoreResult.exitCode !== 0) {
-        logger
-          .withFields({
-            sessionId,
-            userId,
-            exitCode: restoreResult.exitCode,
-            stderr: restoreResult.stderr,
-            stdout: restoreResult.stdout,
-          })
-          .error('Cold-start session restore failed');
-
-        // Parse stdout JSON for structured error info
-        let code: number | undefined;
-        let step: string | undefined;
-        let restoreError: string | undefined;
-        try {
-          const parsed = JSON.parse(restoreResult.stdout?.trim() ?? '{}') as Record<
-            string,
-            unknown
-          >;
-          if (typeof parsed.code === 'number') {
-            code = parsed.code;
-          }
-          if (typeof parsed.step === 'string') {
-            step = parsed.step;
-          }
-          if (typeof parsed.error === 'string') {
-            restoreError = parsed.error;
-          }
-        } catch {
-          // non-JSON stdout, ignore
-        }
-
-        if (code === 404) {
-          throw new SessionSnapshotRestoreError(
-            'Session snapshot restore failed: session not found',
-            404
+  private async tryRestoreKiloSessionFromSnapshot(
+    sandbox: SandboxInstance,
+    session: ExecutionSession,
+    kiloSessionId: string,
+    workspacePath: string,
+    options: RestoreRuntimeOptions
+  ): Promise<boolean> {
+    const restoreTokenFilePath = options.devcontainer
+      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kilocodeToken)
+      : undefined;
+    const restoreCommand = buildRestoreCommand({
+      kiloSessionId,
+      runtimeWorkspacePath: options.devcontainer?.innerWorkspaceFolder ?? workspacePath,
+      runtimeEnv: options.devcontainer
+        ? this.getDevContainerRestoreEnv(options, restoreTokenFilePath)
+        : undefined,
+      devContainer: options.devcontainer,
+    });
+    const restoreResult = await (async () => {
+      try {
+        return await timedExec(session, restoreCommand, 'session.prepareWorkspace.restore', {
+          timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+          cwd: dirname(workspacePath),
+          env: options.devcontainer ? options.dockerEnv : undefined,
+        });
+      } finally {
+        if (restoreTokenFilePath) {
+          await cleanupRestoreTokenFile(
+            session,
+            restoreTokenFilePath,
+            options.devcontainer?.agentSessionId ?? ''
           );
         }
-
-        const detail = [
-          `exit ${restoreResult.exitCode}`,
-          step && `step=${step}`,
-          restoreError && `error=${restoreError}`,
-        ]
-          .filter(Boolean)
-          .join(', ');
-        throw new SessionSnapshotRestoreError(`Cold-start session restore failed: ${detail}`, code);
       }
+    })();
 
-      // Log structured summary from restore script
-      try {
-        const summary = JSON.parse(restoreResult.stdout?.trim() ?? '{}') as Record<string, unknown>;
-        logger
-          .withFields({ sessionId, userId, ...summary })
-          .info('Cold-start session restore completed');
-      } catch {
-        // non-JSON stdout, non-fatal
-      }
-
-      // Re-run setup commands (fresh clone, need to reinstall)
-      const coldStartSetupCommands = readProfileBundle(metadata).setupCommands;
-      if (coldStartSetupCommands && coldStartSetupCommands.length > 0) {
-        onProgress?.('setup_commands', 'Running setup commands…');
-        logger.info('Re-running setup commands after fresh clone');
-        await runSetupCommands(session, context, coldStartSetupCommands, false); // lenient
-      }
-
-      // Wrapper will be (re)started by the orchestrator after we return
-      onProgress?.('kilo_server', 'Starting Kilo…');
-    } catch (error) {
-      const sandboxDestroyed = await destroySandboxAfterInternalServerError(
-        {
-          sandbox,
-          sandboxId: context.sandboxId,
-          sessionId,
-          phase: 'coldStartResume',
-        },
-        error
-      );
-
-      // If we destroyed the sandbox, the workspace is gone with it and the next
-      // retry will start from a fresh container. Otherwise, remove the workspace
-      // and sessionHome so the next retry sees a true cold start and re-runs the
-      // full restore from scratch.
-      if (!sandboxDestroyed) {
-        logger
-          .withFields({
-            sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-          .warn('Cold-start resume step failed; removing workspace for clean retry');
-        await cleanupWorkspace(session, context.workspacePath, context.sessionHome);
-      }
-
-      throw error;
-    }
-  }
-
-  /**
-   * Identifies and kills all kilocode processes running in a specific session's workspace.
-   * This allows clients to stop running executions in a session without deleting the session itself.
-   *
-   * @param usePkill - If true, uses `pkill -f` with sessionId pattern instead of sandbox.listProcesses/killProcess.
-   *                   This is a temporary workaround for environments where sandbox process APIs are unreliable.
-   */
-  static async interrupt(
-    sandbox: SandboxInstance,
-    session: ExecutionSession,
-    sessionContext: SessionContext,
-    usePkill: boolean = false,
-    executionId?: string
-  ): Promise<InterruptResult> {
-    if (usePkill) {
-      return SessionService.interruptWithPkill(session, sessionContext, executionId);
-    }
-    return SessionService.interruptWithSandboxApi(sandbox, session, sessionContext);
-  }
-
-  /**
-   * Interrupt using pkill -f with the sessionId as the pattern.
-   * This kills any process whose command line contains the sessionId.
-   */
-  private static async interruptWithPkill(
-    session: ExecutionSession,
-    sessionContext: SessionContext,
-    executionId?: string
-  ): Promise<InterruptResult> {
-    const startTime = Date.now();
-    const { sessionId } = sessionContext;
-
-    try {
-      const attemptPkill = async (pattern: string, label: string) => {
-        logger.info('Interrupting session using pkill', {
-          sessionId,
-          label,
-          pattern,
-        });
-        return session.exec(`pkill -f -- '${pattern}'`);
-      };
-
-      let execIdError: string | null = null;
-
-      if (executionId) {
-        // Prefer the wrapper execution ID for v2 sessions.
-        // pkill -f matches against the full command line.
-        const execResult = await attemptPkill(`--execution-id=${executionId}`, 'executionId');
-        if (execResult.exitCode === 0) {
-          return {
-            success: true,
-            message: 'Interrupted execution using pkill (executionId)',
-            processesFound: true,
-          };
-        }
-        if (execResult.exitCode !== 1) {
-          execIdError = `pkill failed with exit code ${execResult.exitCode}: ${execResult.stderr}`;
-          logger.error('pkill command failed for executionId', {
-            sessionId,
-            executionId,
-            exitCode: execResult.exitCode,
-            stderr: execResult.stderr,
-          });
-        }
-      }
-
-      // Fall back to sessionId for legacy sessions.
-      const sessionResult = await attemptPkill(sessionId, 'sessionId');
-      const elapsed = Date.now() - startTime;
-
-      if (sessionResult.exitCode === 0) {
-        logger.info('pkill successfully killed processes', {
-          sessionId,
-          elapsedMs: elapsed,
-        });
-
-        return {
-          success: true,
-          message: execIdError
-            ? `Interrupted execution using pkill (sessionId fallback). ${execIdError}`
-            : 'Interrupted execution using pkill',
-          processesFound: true,
-        };
-      }
-      if (sessionResult.exitCode === 1) {
-        logger.info('No matching processes found for pkill', {
-          sessionId,
-          elapsedMs: elapsed,
-        });
-
-        return {
-          success: true,
-          message: execIdError
-            ? `No running processes found for this session. ${execIdError}`
-            : 'No running processes found for this session',
-          processesFound: false,
-        };
-      }
-
-      logger.error('pkill command failed for sessionId', {
-        sessionId,
-        exitCode: sessionResult.exitCode,
-        stderr: sessionResult.stderr,
-        elapsedMs: elapsed,
-      });
-
-      return {
-        success: false,
-        message: execIdError
-          ? `${execIdError}; sessionId pkill failed with exit code ${sessionResult.exitCode}: ${sessionResult.stderr}`
-          : `pkill failed with exit code ${sessionResult.exitCode}: ${sessionResult.stderr}`,
-        processesFound: false,
-      };
-    } catch (error) {
-      logger.error('Interrupt with pkill failed', {
-        sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Interrupt using sandbox.listProcesses and session.killProcess APIs.
-   * This is the original implementation that enumerates and kills processes individually.
-   */
-  private static async interruptWithSandboxApi(
-    sandbox: SandboxInstance,
-    session: ExecutionSession,
-    sessionContext: SessionContext
-  ): Promise<InterruptResult> {
-    type ProcessInfo = {
-      id: string;
-      status: string;
-      command: string;
-    };
-
-    const startTime = Date.now();
-
-    try {
-      // List all processes in the sandbox
-      const processes = await sandbox.listProcesses();
-
-      // Filter for kilocode processes in this session's workspace
-      const targetProcesses = processes.filter((proc: ProcessInfo) => {
-        const isRunning = proc.status === 'running';
-        const isKilocode = proc.command.includes('kilocode');
-        const isInWorkspace = proc.command.includes(`--workspace=${sessionContext.workspacePath}`);
-
-        return isRunning && isKilocode && isInWorkspace;
-      });
-
-      if (targetProcesses.length === 0) {
-        logger.info('No matching kilocode processes found to interrupt', {
-          sessionId: sessionContext.sessionId,
-          workspacePath: sessionContext.workspacePath,
-        });
-
-        return {
-          success: true,
-          message: 'No running kilocode processes found for this session',
-          processesFound: false,
-        };
-      }
-
-      // Kill each target process
-      const killed: string[] = [];
-      const failed: string[] = [];
-
-      for (const proc of targetProcesses) {
-        try {
-          // Send SIGTERM for graceful termination (exit code 143)
-          // This allows the SSE stream to properly close with an expected exit code
-          await session.killProcess(proc.id, 'SIGTERM');
-          killed.push(proc.id);
-          logger.info('Successfully killed process', {
-            processId: proc.id,
-            command: proc.command,
-          });
-        } catch (error) {
-          failed.push(proc.id);
-          logger.error('Failed to kill process', {
-            processId: proc.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-
-      const elapsed = Date.now() - startTime;
-      logger.info('Interrupt operation completed', {
-        sessionId: sessionContext.sessionId,
-        killedCount: killed.length,
-        failedCount: failed.length,
-        elapsedMs: elapsed,
-      });
-
-      return {
-        success: killed.length > 0,
-        message:
-          killed.length > 0
-            ? `Interrupted execution: killed ${killed.length} process(es)${failed.length > 0 ? `, ${failed.length} failed` : ''}`
-            : `Failed to kill any processes (${failed.length} attempts failed)`,
-        processesFound: true,
-      };
-    } catch (error) {
-      logger.error('Interrupt operation failed', {
-        sessionId: sessionContext.sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Save session metadata to Durable Object.
-   *
-   * When `existing` is provided (e.g., from prepared session flow), merges with it
-   * to preserve fields like preparedAt, initiatedAt, prompt, mode, model, autoCommit.
-   * This avoids an extra DO read and prevents data loss.
-   */
-  private async saveSessionMetadata(
-    env: PersistenceEnv,
-    context: SessionContext,
-    data: {
-      githubRepo?: string;
-      githubToken?: string;
-      gitUrl?: string;
-      gitToken?: string;
-      profile?: SessionProfileBundle;
-      upstreamBranch?: string;
-      kiloSessionId?: string;
-    },
-    existing?: CloudAgentSessionState
-  ): Promise<void> {
-    const { orgId, userId, sessionId, botId, platform, sandboxId } = context;
-    const doKey = `${userId}:${sessionId}`;
-
-    // Legacy flat profile fields on `existing` are harmless leftovers —
-    // `readProfileBundle` always prefers `profile` so they are never read.
-    // They are left in place and will be dropped naturally when `profile`
-    // is removed alongside the fallback branch.
-    const metadata: CloudAgentSessionState = {
-      // Preserves preparedAt, initiatedAt, prompt, mode, model, autoCommit, etc.
-      ...(existing ?? {}),
-      version: Date.now(),
-      sessionId,
-      orgId,
-      userId,
-      botId,
-      platform,
-      sandboxId,
-      timestamp: Date.now(),
-      githubRepo: data.githubRepo,
-      githubToken: data.githubToken,
-      gitUrl: data.gitUrl,
-      gitToken: data.gitToken,
-      profile: data.profile,
-      upstreamBranch: data.upstreamBranch,
-      kiloSessionId: data.kiloSessionId,
-    };
-
-    // Validate before writing
-    const parseResult = MetadataSchema.safeParse(metadata);
-    if (!parseResult.success) {
-      logger
-        .withFields({ errors: parseResult.error.format() })
-        .error('Invalid metadata in saveSessionMetadata');
-      throw new Error(`Invalid metadata: ${JSON.stringify(parseResult.error.format())}`);
+    if (restoreResult.exitCode === 0) {
+      logger.info('Session snapshot restore completed');
+      return true;
     }
 
-    await withDORetry(
-      () => env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey)),
-      stub => stub.updateMetadata(parseResult.data),
-      'updateMetadata'
+    const parsed = parseRestoreScriptOutput(restoreResult.stdout);
+    if (parsed?.code === 404) {
+      logger.info('Session snapshot not found; bootstrapping empty Kilo session');
+      return false;
+    }
+
+    const detail = [
+      `exit ${restoreResult.exitCode}`,
+      parsed?.step && `step=${parsed.step}`,
+      parsed?.error && `error=${parsed.error}`,
+    ]
+      .filter(Boolean)
+      .join(', ');
+    throw new SessionSnapshotRestoreError(
+      `Session snapshot restore failed: ${detail}`,
+      parsed?.code
     );
   }
 
-  private async loadSessionMetadata(
-    env: PersistenceEnv,
-    context: SessionContext
-  ): Promise<CloudAgentSessionState | null> {
-    const { userId, sessionId } = context;
-    const metadata = await fetchSessionMetadata(env, userId, sessionId);
-    if (!metadata) {
-      logger.info('No metadata found');
-      return null;
+  private async bootstrapKiloSession(
+    sandbox: SandboxInstance,
+    session: ExecutionSession,
+    kiloSessionId: string,
+    workspacePath: string,
+    options: RestoreRuntimeOptions
+  ): Promise<void> {
+    const now = Date.now();
+    const minimalSessionJson = JSON.stringify({
+      info: {
+        id: kiloSessionId,
+        slug: '',
+        projectID: '',
+        directory: '',
+        title: 'New session - ' + new Date(now).toISOString(),
+        version: '2',
+        time: { created: now, updated: now },
+      },
+      messages: [],
+    });
+    const importFilePath = options.devcontainer
+      ? `${options.sessionHome}/tmp/kilo-empty-session-${kiloSessionId}.json`
+      : `/tmp/kilo-empty-session-${kiloSessionId}.json`;
+    await sandbox.writeFile(importFilePath, minimalSessionJson);
+    const restoreTokenFilePath = options.devcontainer
+      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kilocodeToken)
+      : undefined;
+    const restoreCommand = buildRestoreCommand({
+      kiloSessionId,
+      importFilePath,
+      runtimeWorkspacePath: options.devcontainer?.innerWorkspaceFolder ?? workspacePath,
+      runtimeEnv: options.devcontainer
+        ? this.getDevContainerRestoreEnv(options, restoreTokenFilePath)
+        : undefined,
+      devContainer: options.devcontainer,
+    });
+    const restoreResult = await (async () => {
+      try {
+        return await timedExec(session, restoreCommand, 'session.prepareWorkspace.bootstrap', {
+          timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+          cwd: dirname(workspacePath),
+          env: options.devcontainer ? options.dockerEnv : undefined,
+        });
+      } finally {
+        if (restoreTokenFilePath) {
+          await cleanupRestoreTokenFile(
+            session,
+            restoreTokenFilePath,
+            options.devcontainer?.agentSessionId ?? ''
+          );
+        }
+      }
+    })();
+    if (restoreResult.exitCode !== 0) {
+      const parsed = parseRestoreScriptOutput(restoreResult.stdout);
+      const detail = [
+        `exit ${restoreResult.exitCode}`,
+        parsed?.step && `step=${parsed.step}`,
+        parsed?.error && `error=${parsed.error}`,
+      ]
+        .filter(Boolean)
+        .join(', ');
+      throw new SessionSnapshotRestoreError(`Session bootstrap failed: ${detail}`, parsed?.code);
     }
-
-    return metadata;
   }
 
   /**
@@ -2063,88 +2255,19 @@ export class SessionService {
       throw error;
     }
   }
-
-  /**
-   * Capture the current git branch after kilo execution and update metadata.
-   */
-  private async captureAndStoreBranch(
-    session: ExecutionSession,
-    context: SessionContext,
-    env: PersistenceEnv
-  ): Promise<void> {
-    try {
-      const branchResult = await session.exec(
-        `cd ${context.workspacePath} && git branch --show-current`
-      );
-
-      if (branchResult.exitCode !== 0) {
-        logger.warn('git branch --show-current failed, branch not captured');
-        return;
-      }
-
-      const currentBranch = branchResult.stdout.trim();
-      if (!currentBranch) {
-        logger.warn('No branch name returned from git, branch not captured');
-        return;
-      }
-
-      logger.withTags({ currentBranch }).info('Captured branch after kilo execution');
-
-      // Update only the upstreamBranch field using dedicated DO method
-      // This is atomic and preserves all other metadata fields
-      const doKey = `${context.userId}:${context.sessionId}`;
-      await withDORetry(
-        () => env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey)),
-        stub => stub.updateUpstreamBranch(currentBranch),
-        'updateUpstreamBranch'
-      );
-
-      logger.withTags({ currentBranch }).info('Stored branch in metadata for future warm starts');
-    } catch (error) {
-      // Non-critical - log but don't fail
-      logger
-        .withFields({ error: error instanceof Error ? error.message : String(error) })
-        .warn('Failed to capture current branch after execution');
-    }
-  }
 }
 
-/**
- * Returns the correct GitHub App slug and bot user ID for git author attribution,
- * based on whether this is a standard or lite app session.
- */
-function getGitAuthorEnv(
-  env: PersistenceEnv,
-  githubAppType?: 'standard' | 'lite'
-): { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string } {
-  if (githubAppType === 'lite') {
-    return {
-      GITHUB_APP_SLUG: env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG,
-      GITHUB_APP_BOT_USER_ID: env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID,
-    };
-  }
-  return {
-    GITHUB_APP_SLUG: env.GITHUB_APP_SLUG,
-    GITHUB_APP_BOT_USER_ID: env.GITHUB_APP_BOT_USER_ID,
-  };
-}
-
-export interface PreparedSession {
+export type PreparedSession = {
   context: SessionContext;
   session: Awaited<ReturnType<SessionService['getOrCreateSession']>>;
-}
+  runtimeEnv: Record<string, string>;
+  devcontainer?: DevContainerHandle;
+};
 
-/**
- * Options for `SessionService.getOrCreateSession`.
- *
- * Profile-derived fields live inside `profile` so adding a new field is a
- * single-line change here plus the corresponding entry in `SessionProfileBundle`.
- */
 export type GetOrCreateSessionOptions = {
   sandbox: SandboxInstance;
   context: SessionContext;
   env: PersistenceEnv;
-  /** Kilocode token used for API calls (overridden by KILOCODE_TOKEN_OVERRIDE). */
   originalToken: string;
   kilocodeModel?: string;
   originalOrgId?: string;
@@ -2153,11 +2276,17 @@ export type GetOrCreateSessionOptions = {
   profile?: SessionProfileBundle;
 };
 
-/**
- * Options for the private `getSaferEnvVars` helper. Kept as a named type so
- * the grouping mirrors `GetOrCreateSessionOptions` and call-site params stay
- * discoverable.
- */
+export type BuildRuntimeEnvOptions = Omit<GetOrCreateSessionOptions, 'sandbox'>;
+
+type RestoreRuntimeOptions = {
+  devcontainer?: DevContainerHandle;
+  dockerEnv?: Record<string, string>;
+  env: PersistenceEnv;
+  kilocodeToken: string;
+  runtimeEnv: Record<string, string>;
+  sessionHome: string;
+};
+
 type GetSaferEnvVarsOptions = {
   sessionHome: string;
   sessionId: string;
@@ -2172,115 +2301,68 @@ type GetSaferEnvVarsOptions = {
   appendSystemPrompt?: string;
   gitUrl?: string;
   gitToken?: string;
+  glabIsOAuth2?: boolean;
   platform?: 'github' | 'gitlab';
   profile?: SessionProfileBundle;
 };
 
-export interface InitiateOptions {
-  sandbox: SandboxInstance;
-  sandboxId: SessionContext['sandboxId'];
-  orgId?: string;
-  userId: string;
-  sessionId: SessionId;
-  kilocodeToken: string;
-  kilocodeModel: string;
-  githubRepo?: string;
-  githubToken?: string;
-  gitUrl?: string;
-  gitToken?: string;
-  env: PersistenceEnv;
-  /**
-   * Profile-derived configuration snapshot. Contains envVars, encryptedSecrets,
-   * setupCommands, mcpServers, runtimeSkills, runtimeAgents. Adding a new
-   * profile field means extending `SessionProfileBundle`, not this interface.
-   */
-  profile?: SessionProfileBundle;
-  upstreamBranch?: string;
-  botId?: string;
-  /** GitHub App type for selecting correct slug/bot identity */
-  githubAppType?: 'standard' | 'lite';
-  /**
-   * Platform identifier for session creation (e.g., "slack", "cloud-agent").
-   * Used to set KILO_PLATFORM env var and ultimately the session's created_on_platform.
-   * Defaults to "cloud-agent" if not specified.
-   */
-  createdOnPlatform?: string;
-  /**
-   * Whether to perform a shallow clone (depth: 1) for faster checkout and reduced disk usage.
-   * Useful for fire-and-forget scenarios like code reviews where full history isn't needed.
-   */
-  shallow?: boolean;
-  /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
-}
-
-export interface ResumeOptions {
-  sandbox: SandboxInstance;
-  sandboxId: SessionContext['sandboxId'];
-  orgId?: string;
-  userId: string;
-  sessionId: SessionId;
-  kilocodeToken: string;
-  kilocodeModel: string;
-  env: PersistenceEnv;
-  githubToken?: string;
-  gitToken?: string;
-  onProgress?: (step: string, message: string) => void;
-}
-
-/**
- * Base options for initiateFromKiloSession (without git source).
- */
-type InitiateFromKiloSessionBaseOptions = {
-  sandbox: SandboxInstance;
-  sandboxId: SessionContext['sandboxId'];
-  orgId?: string;
-  userId: string;
-  sessionId: SessionId;
-  kilocodeToken: string;
-  kilocodeModel: string;
+export type WorkspaceReadyMetadata = {
+  workspacePath: string;
+  sandboxId: string;
+  sessionHome: string;
+  branchName: string;
   kiloSessionId: string;
-  env: PersistenceEnv;
-  /** Profile-derived configuration snapshot — see {@link SessionProfileBundle}. */
-  profile?: SessionProfileBundle;
-  botId?: string;
-  /** GitHub App type for selecting correct slug/bot identity */
+  githubInstallationId?: string;
   githubAppType?: 'standard' | 'lite';
-  createdOnPlatform?: string;
-  /**
-   * Existing metadata from prepared session flow.
-   * When provided, saveSessionMetadata will merge with it to preserve
-   * preparedAt, initiatedAt, prompt, mode, model, autoCommit fields.
-   */
-  existingMetadata?: CloudAgentSessionState;
-};
-
-/**
- * GitHub repository source - requires githubRepo, optional githubToken.
- * Explicitly excludes gitUrl/gitToken to enforce mutual exclusivity.
- */
-type GitHubSource = {
-  githubRepo: string;
-  githubToken?: string;
-  gitUrl?: undefined;
-  gitToken?: undefined;
-};
-
-/**
- * Generic Git URL source - requires gitUrl, optional gitToken.
- * Explicitly excludes githubRepo/githubToken to enforce mutual exclusivity.
- */
-type GitUrlSource = {
-  gitUrl: string;
   gitToken?: string;
-  githubRepo?: undefined;
-  githubToken?: undefined;
+  gitlabTokenManaged?: boolean;
+  devcontainer?: CloudAgentSessionState['devcontainer'];
 };
 
-/**
- * Options for initiateFromKiloSession.
- * Requires exactly one of: GitHub repo (with optional token) OR Git URL (with optional token).
- * TypeScript enforces this at compile time via the union type.
- */
-export type InitiateFromKiloSessionOptions = InitiateFromKiloSessionBaseOptions &
-  (GitHubSource | GitUrlSource);
+export type PreparedWorkspace = PreparedSession & {
+  ready: WorkspaceReadyMetadata;
+};
+
+export type PrepareWorkspaceOptions = {
+  sandbox: SandboxInstance;
+  sandboxId: SessionContext['sandboxId'];
+  orgId?: string;
+  userId: string;
+  sessionId: SessionId;
+  kilocodeModel?: string;
+  env: PersistenceEnv;
+  metadata: CloudAgentSessionState;
+  onProgress?: (step: string, message: string) => void;
+};
+
+export type BuildWrapperSessionReadyAndPromptRequestsOptions = {
+  env: PersistenceEnv;
+  plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest;
+};
+
+function buildWrapperSessionBinding(options: {
+  workerUrl?: string;
+  kilocodeToken: string;
+  userId: string;
+  sessionId: string;
+  wrapper: FencedWrapperDispatchRequest['wrapper'];
+  upstreamBranch?: string;
+}): WrapperSessionReadyRequest['session'] {
+  const { workerUrl, kilocodeToken, userId, sessionId, wrapper, upstreamBranch } = options;
+  if (!workerUrl) {
+    throw ExecutionError.invalidRequest('WORKER_URL is required for wrapper bootstrap');
+  }
+
+  const wsUrl = new URL(workerUrl);
+  wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+  wsUrl.pathname = `/sessions/${encodeURIComponent(userId)}/${sessionId}/ingest`;
+
+  return {
+    ingestUrl: wsUrl.toString(),
+    workerAuthToken: kilocodeToken,
+    wrapperRunId: wrapper.fence.wrapperRunId,
+    wrapperGeneration: wrapper.fence.wrapperGeneration,
+    wrapperConnectionId: wrapper.fence.wrapperConnectionId,
+    ...(upstreamBranch ? { upstreamBranch } : {}),
+  };
+}

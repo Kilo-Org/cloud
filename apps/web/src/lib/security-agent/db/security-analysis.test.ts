@@ -16,11 +16,9 @@ jest.mock('@/lib/drizzle', () => ({
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 let cleanupStaleAnalyses: typeof analysisDbModule.cleanupStaleAnalyses;
-let isFindingEligibleForAutoAnalysis: typeof analysisDbModule.isFindingEligibleForAutoAnalysis;
 
 beforeAll(async () => {
-  ({ cleanupStaleAnalyses, isFindingEligibleForAutoAnalysis } =
-    await import('./security-analysis'));
+  ({ cleanupStaleAnalyses } = await import('./security-analysis'));
 });
 
 beforeEach(() => {
@@ -41,97 +39,13 @@ describe('cleanupStaleAnalyses', () => {
   });
 });
 
-describe('isFindingEligibleForAutoAnalysis', () => {
-  const baseParams = {
-    findingCreatedAt: '2025-06-01T00:00:00Z',
-    findingStatus: 'open',
-    severity: 'high',
-    ownerAutoAnalysisEnabledAt: '2025-07-01T00:00:00Z',
-    isAgentEnabled: true,
-    autoAnalysisEnabled: true,
-    autoAnalysisMinSeverity: 'high' as const,
-  };
+describe('retired web sync queue policy surface', () => {
+  it('does not expose obsolete sync queue policy helpers', async () => {
+    const analysisDb = await import('./security-analysis');
 
-  it('rejects findings created before auto_analysis_enabled_at by default', () => {
-    const result = isFindingEligibleForAutoAnalysis(baseParams);
-    expect(result.eligible).toBe(false);
-  });
-
-  it('accepts findings created after auto_analysis_enabled_at', () => {
-    const result = isFindingEligibleForAutoAnalysis({
-      ...baseParams,
-      findingCreatedAt: '2025-08-01T00:00:00Z',
-    });
-    expect(result.eligible).toBe(true);
-  });
-
-  it('accepts pre-existing findings when autoAnalysisIncludeExisting is true', () => {
-    const result = isFindingEligibleForAutoAnalysis({
-      ...baseParams,
-      autoAnalysisIncludeExisting: true,
-    });
-    expect(result.eligible).toBe(true);
-  });
-
-  it('still rejects non-open findings even with autoAnalysisIncludeExisting', () => {
-    const result = isFindingEligibleForAutoAnalysis({
-      ...baseParams,
-      findingStatus: 'fixed',
-      autoAnalysisIncludeExisting: true,
-    });
-    expect(result.eligible).toBe(false);
-  });
-
-  it('still respects severity threshold with autoAnalysisIncludeExisting', () => {
-    const result = isFindingEligibleForAutoAnalysis({
-      ...baseParams,
-      severity: 'low',
-      autoAnalysisMinSeverity: 'high',
-      autoAnalysisIncludeExisting: true,
-    });
-    expect(result.eligible).toBe(false);
-  });
-
-  it('rejects when agent is not enabled even with autoAnalysisIncludeExisting', () => {
-    const result = isFindingEligibleForAutoAnalysis({
-      ...baseParams,
-      isAgentEnabled: false,
-      autoAnalysisIncludeExisting: true,
-    });
-    expect(result.eligible).toBe(false);
-  });
-
-  it('treats null severity as eligible with low rank when threshold is "all"', () => {
-    const result = isFindingEligibleForAutoAnalysis({
-      ...baseParams,
-      severity: null,
-      autoAnalysisMinSeverity: 'all',
-      findingCreatedAt: '2025-08-01T00:00:00Z',
-    });
-    expect(result.eligible).toBe(true);
-    expect(result.severityRank).toBe(3);
-  });
-
-  it('rejects null severity when threshold is stricter than "all"', () => {
-    const result = isFindingEligibleForAutoAnalysis({
-      ...baseParams,
-      severity: null,
-      autoAnalysisMinSeverity: 'high',
-      findingCreatedAt: '2025-08-01T00:00:00Z',
-    });
-    expect(result.eligible).toBe(false);
-    expect(result.severityRank).toBe(3);
-  });
-
-  it('treats null severity as eligible when threshold is medium', () => {
-    const result = isFindingEligibleForAutoAnalysis({
-      ...baseParams,
-      severity: null,
-      autoAnalysisMinSeverity: 'medium',
-      findingCreatedAt: '2025-08-01T00:00:00Z',
-    });
-    // low rank (3) > medium max rank (2), so not eligible
-    expect(result.eligible).toBe(false);
-    expect(result.severityRank).toBe(3);
+    expect('getOwnerAutoAnalysisEnabledAt' in analysisDb).toBe(false);
+    expect('isFindingEligibleForAutoAnalysis' in analysisDb).toBe(false);
+    expect('syncAutoAnalysisQueueForFinding' in analysisDb).toBe(false);
+    expect('dequeueSupersededFindings' in analysisDb).toBe(false);
   });
 });

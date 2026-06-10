@@ -1,6 +1,14 @@
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import type { PlatformIntegrationSetupStatus } from '@/lib/integrations/platform-integration-setup-status';
 
-export type PlatformType = 'github' | 'gitlab' | 'bitbucket' | 'slack' | 'discord' | 'linear';
+export type PlatformType =
+  | 'github'
+  | 'gitlab'
+  | 'bitbucket'
+  | 'slack'
+  | 'discord'
+  | 'linear'
+  | 'dolthub';
 
 export type PlatformStatus = 'installed' | 'not_installed' | 'coming_soon';
 
@@ -70,6 +78,14 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/linear`,
   },
   {
+    id: PLATFORM.DOLTHUB,
+    name: 'DoltHub',
+    description: 'Query Dolt-versioned data directly from your workspace',
+    enabled: true,
+    personalRoute: '/integrations/dolthub',
+    orgRoute: organizationId => `/organizations/${organizationId}/integrations/dolthub`,
+  },
+  {
     id: 'bitbucket',
     name: 'Bitbucket',
     description: 'Integrate Bitbucket repositories for intelligent code analysis and automation',
@@ -77,13 +93,15 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
   },
 ];
 
-type InstallationStatus = {
-  github?: { installed: boolean };
-  slack?: { installed: boolean };
-  gitlab?: { installed: boolean };
-  discord?: { installed: boolean };
-  linear?: { installed: boolean };
-};
+type InstallationStatus = Partial<Record<PlatformType, { installed: boolean }>>;
+
+function buildInstallationStatusMap(
+  installationStatuses: readonly PlatformIntegrationSetupStatus[]
+): InstallationStatus {
+  return Object.fromEntries(
+    installationStatuses.map(status => [status.platform, { installed: status.installed }])
+  );
+}
 
 function getStatus(id: PlatformType, installations: InstallationStatus): PlatformStatus {
   const def = PLATFORM_DEFINITIONS.find(p => p.id === id);
@@ -92,9 +110,11 @@ function getStatus(id: PlatformType, installations: InstallationStatus): Platfor
 }
 
 export function buildPlatforms(
-  installations: InstallationStatus,
+  installationStatuses: readonly PlatformIntegrationSetupStatus[],
   organizationId?: string
 ): Platform[] {
+  const installations = buildInstallationStatusMap(installationStatuses);
+
   return PLATFORM_DEFINITIONS.filter(def => {
     if (def.hiddenUnlessInstalled) {
       return installations[def.id as keyof InstallationStatus]?.installed === true;

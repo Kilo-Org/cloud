@@ -116,6 +116,7 @@ beforeEach(() => {
   (appsClient.getApp as Mock).mockResolvedValue(null);
   (appsClient.createApp as Mock).mockResolvedValue({ id: 'app-id', created_at: 1234567890 });
   (appsClient.allocateIP as Mock).mockResolvedValue({ address: '::1', type: 'v6' });
+  (secretsClient.setAppSecret as Mock).mockResolvedValue({ version: 1 });
 });
 
 describe('ensureApp', () => {
@@ -222,6 +223,22 @@ describe('ensureApp', () => {
     expect(storage._store.get('ipv6Allocated')).toBe(true);
     expect(storage._store.get('ipv4Allocated')).not.toBe(true);
     // Retry alarm armed
+    expect(storage._getAlarm()).not.toBeNull();
+  });
+
+  it('keeps env key setup pending and arms retry alarm when Fly secret sync fails', async () => {
+    (secretsClient.setAppSecret as Mock).mockRejectedValueOnce(
+      new FlyApiError('Fly API setAppSecret failed (520): error code: 520', 520, 'error code: 520')
+    );
+
+    const { appDO, storage } = createAppDO();
+
+    await expect(appDO.ensureApp('user-1')).rejects.toThrow('setAppSecret failed');
+
+    expect(storage._store.get('ipv6Allocated')).toBe(true);
+    expect(storage._store.get('ipv4Allocated')).toBe(true);
+    expect(storage._store.get('envKey')).toBeTruthy();
+    expect(storage._store.get('envKeySet')).toBe(false);
     expect(storage._getAlarm()).not.toBeNull();
   });
 

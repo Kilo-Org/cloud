@@ -11,19 +11,22 @@
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
     "./schema-types": "./src/schema-types.ts",
+    "./kiloclaw-pricing-catalog": "./src/kiloclaw-pricing-catalog.ts",
+    "./kiloclaw-commit-retirement": "./src/kiloclaw-commit-retirement.ts",
+    "./kiloclaw-organization-trial-expiry-candidates": "./src/kiloclaw-organization-trial-expiry-candidates.ts",
     "./client": "./src/client.ts"
   },
   "dependencies": {
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "drizzle-orm": "catalog:",
-    "pg": "^8.20.0",
+    "pg": "8.20.0",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@jest/globals": "^30.3.0",
-    "@types/pg": "^8.18.0",
+    "@jest/globals": "30.3.0",
+    "@types/pg": "8.18.0",
     "@typescript/native-preview": "catalog:",
-    "dotenv": "^17.3.1",
+    "dotenv": "17.3.1",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:"
   }

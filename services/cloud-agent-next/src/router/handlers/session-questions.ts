@@ -1,63 +1,29 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { getSandbox } from '@cloudflare/sandbox';
+import { createAgentSandbox } from '../../agent-sandbox/factory.js';
 import { logger, withLogTags } from '../../logger.js';
-import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
-import type { SessionId, SandboxId, Env } from '../../types.js';
-import { SessionService, fetchSessionMetadata } from '../../session-service.js';
+import type { SessionId, Env } from '../../types.js';
+import { fetchSessionMetadata } from '../../session-service.js';
 import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
-import { findWrapperForSession } from '../../kilo/wrapper-manager.js';
-import { WrapperClient } from '../../kilo/wrapper-client.js';
+import type { WrapperClient } from '../../kilo/wrapper-client.js';
 
 async function resolveWrapperClient(opts: {
   sessionId: SessionId;
   userId: string;
   env: Env;
-  authToken: string;
 }): Promise<WrapperClient> {
-  const { sessionId, userId, env, authToken } = opts;
-
+  const { sessionId, userId, env } = opts;
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }
 
-  const sandboxId: SandboxId =
-    metadata.sandboxId ??
-    (await generateSandboxId(
-      env.PER_SESSION_SANDBOX_ORG_IDS,
-      metadata.orgId,
-      userId,
-      metadata.sessionId,
-      metadata.botId
-    ));
-  const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
-
-  const wrapperInfo = await findWrapperForSession(sandbox, sessionId);
-  if (!wrapperInfo) {
+  const wrapperClient = await createAgentSandbox(env, metadata).getRunningWrapper();
+  if (!wrapperClient) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'No wrapper found for session' });
   }
-
-  const sessionService = new SessionService();
-  const context = sessionService.buildContext({
-    sandboxId,
-    orgId: metadata.orgId,
-    userId,
-    sessionId,
-    upstreamBranch: metadata.upstreamBranch,
-    botId: metadata.botId,
-  });
-
-  const session = await sessionService.getOrCreateSession({
-    sandbox,
-    context,
-    env,
-    originalToken: authToken,
-    originalOrgId: metadata.orgId,
-  });
-
-  return new WrapperClient({ session, port: wrapperInfo.port });
+  return wrapperClient;
 }
 
 export function createSessionQuestionHandlers() {
@@ -76,16 +42,12 @@ export function createSessionQuestionHandlers() {
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
-          logger.info('Answering question', { questionId: input.questionId });
-
           try {
-            const wrapperClient = await resolveWrapperClient({
-              sessionId,
-              userId,
-              env,
-              authToken: ctx.authToken,
-            });
+            const wrapperClient = await resolveWrapperClient({ sessionId, userId, env });
             const result = await wrapperClient.answerQuestion(input.questionId, input.answers);
+            logger
+              .withFields({ questionId: input.questionId, success: result.success })
+              .info('Question answer forwarded to wrapper');
             return { success: result.success };
           } catch (error) {
             if (error instanceof TRPCError) throw error;
@@ -112,16 +74,12 @@ export function createSessionQuestionHandlers() {
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
-          logger.info('Rejecting question', { questionId: input.questionId });
-
           try {
-            const wrapperClient = await resolveWrapperClient({
-              sessionId,
-              userId,
-              env,
-              authToken: ctx.authToken,
-            });
+            const wrapperClient = await resolveWrapperClient({ sessionId, userId, env });
             const result = await wrapperClient.rejectQuestion(input.questionId);
+            logger
+              .withFields({ questionId: input.questionId, success: result.success })
+              .info('Question rejection forwarded to wrapper');
             return { success: result.success };
           } catch (error) {
             if (error instanceof TRPCError) throw error;
@@ -150,16 +108,12 @@ export function createSessionQuestionHandlers() {
           const { userId, env } = ctx;
 
           logger.setTags({ userId, sessionId });
-          logger.info('Answering permission', { permissionId: input.permissionId });
-
           try {
-            const wrapperClient = await resolveWrapperClient({
-              sessionId,
-              userId,
-              env,
-              authToken: ctx.authToken,
-            });
+            const wrapperClient = await resolveWrapperClient({ sessionId, userId, env });
             const result = await wrapperClient.answerPermission(input.permissionId, input.response);
+            logger
+              .withFields({ permissionId: input.permissionId, success: result.success })
+              .info('Permission answer forwarded to wrapper');
             return { success: result.success };
           } catch (error) {
             if (error instanceof TRPCError) throw error;

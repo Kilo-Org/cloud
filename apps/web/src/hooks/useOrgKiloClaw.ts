@@ -17,6 +17,17 @@ export function useOrgKiloClawStatus(organizationId?: string) {
   );
 }
 
+export function useOrgKiloClawNavState(organizationId?: string) {
+  const trpc = useTRPC();
+  const resolvedOrganizationId = organizationId ?? NIL_UUID;
+  return useQuery(
+    trpc.organizations.kiloclaw.getNavState.queryOptions(
+      { organizationId: resolvedOrganizationId },
+      { enabled: !!organizationId, staleTime: 60_000 }
+    )
+  );
+}
+
 export function useOrgKiloClawConfig(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.kiloclaw.getConfig.queryOptions({ organizationId }));
@@ -157,11 +168,11 @@ export function useOrgKiloClawMyPin(organizationId: string, opts: { enabled?: bo
   );
 }
 
-export function useOrgFileTree(organizationId: string, enabled: boolean) {
+export function useOrgFileTree(organizationId: string, enabled: boolean, path?: string) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.kiloclaw.fileTree.queryOptions(
-      { organizationId },
+      { organizationId, ...(path === undefined ? {} : { path }) },
       { enabled, refetchOnWindowFocus: false }
     )
   );
@@ -198,12 +209,17 @@ export function useOrgKiloClawMutations(
   const queryClient = useQueryClient();
 
   const invalidateStatus = async () => {
-    await queryClient.invalidateQueries({
-      queryKey: trpc.organizations.kiloclaw.getStatus.queryKey({ organizationId }),
-    });
-    await queryClient.invalidateQueries({
-      queryKey: trpc.organizations.kiloclaw.controllerVersion.queryKey({ organizationId }),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.kiloclaw.getStatus.queryKey({ organizationId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.kiloclaw.getNavState.queryKey({ organizationId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.kiloclaw.controllerVersion.queryKey({ organizationId }),
+      }),
+    ]);
   };
 
   const resetAllInstanceState = async () => {
@@ -393,7 +409,8 @@ export function useOrgKiloClawMutations(
   );
   const rawWriteFile = useMutation(
     trpc.organizations.kiloclaw.writeFile.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async result => {
+        if ('outcome' in result) return;
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.fileTree.queryKey(),
         });
@@ -497,6 +514,25 @@ export function useOrgKiloClawMutations(
       },
     })
   );
+  const rawStartOnboardingBriefing = useMutation(
+    trpc.organizations.kiloclaw.startOnboardingBriefing.mutationOptions()
+  );
+  const rawUpdateBriefingInterests = useMutation(
+    trpc.organizations.kiloclaw.updateBriefingInterests.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+  const rawUpdateUserLocation = useMutation(
+    trpc.organizations.kiloclaw.updateUserLocation.mutationOptions({
+      onSuccess: invalidateStatus,
+    })
+  );
 
   const mutations = {
     start: bindVoid(rawStart),
@@ -528,6 +564,9 @@ export function useOrgKiloClawMutations(
     enableMorningBriefing: bind(rawEnableMorningBriefing),
     disableMorningBriefing: bindVoid(rawDisableMorningBriefing),
     runMorningBriefing: bindVoid(rawRunMorningBriefing),
+    startOnboardingBriefing: bindVoid(rawStartOnboardingBriefing),
+    updateBriefingInterests: bind(rawUpdateBriefingInterests),
+    updateUserLocation: bind(rawUpdateUserLocation),
     startKiloCliRun: bind(rawStartKiloCliRun),
     cancelKiloCliRun: bind(rawCancelKiloCliRun),
     rename: bind(rawRename),

@@ -301,12 +301,12 @@ The existing test file's setup and mocks must be updated for the new exports, or
 
 ## Files Changed
 
-| File                                                         | Change                                                                                                                                                                                                                |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/config.server.ts`                                   | Add intro price env var, remove coupon env var                                                                                                                                                                        |
-| `src/lib/kiloclaw/stripe-price-ids.server.ts`                | Add intro price to metadata map, new `getStripePriceIdForClawPlanIntro`, new `isIntroPriceId`                                                                                                                         |
-| `src/routers/kiloclaw-router.ts`                             | Checkout: intro price + `allow_promotion_codes`. switchPlan: handle auto schedule with stale-schedule defense. cancelPlanSwitch: restore auto schedule on intro price. reactivateSubscription: recreate auto schedule |
-| `src/lib/kiloclaw/stripe-handlers.ts`                        | New `ensureAutoIntroSchedule` shared idempotent helper (DB + live Stripe fetch guard). Called from `handleKiloClawSubscriptionCreated`, `reactivateSubscription`, and `cancelPlanSwitch`. Update comments             |
-| `src/lib/kiloclaw/billing-lifecycle-cron.ts`                 | New sweep: detect and repair stranded intro-price subscriptions with no attached schedule                                                                                                                             |
-| `src/app/(app)/claw/components/billing/SubscriptionCard.tsx` | Gate switch button on `scheduledBy === 'user'` not `scheduledPlan` presence                                                                                                                                           |
-| `src/routers/kiloclaw-billing-router.test.ts`                | Update checkout assertions, add lifecycle tests for auto-schedule, cancel/reactivate, switchPlan, cancelPlanSwitch, invoice classification, reconciliation sweep                                                      |
+| File | Change |
+|---|---|
+| `src/lib/config.server.ts` | Add intro price env var, remove coupon env var |
+| `src/lib/kiloclaw/stripe-price-ids.server.ts` | Add intro price to metadata map, new `getStripePriceIdForClawPlanIntro`, new `isIntroPriceId` |
+| `src/routers/kiloclaw-router.ts` | Checkout: intro price + `allow_promotion_codes`. switchPlan: handle auto schedule with stale-schedule defense. cancelPlanSwitch: restore auto schedule on intro price. reactivateSubscription: recreate auto schedule |
+| `src/lib/kiloclaw/stripe-handlers.ts` | New `ensureAutoIntroSchedule` shared idempotent helper (DB + live Stripe fetch guard). Called from `handleKiloClawSubscriptionCreated`, `reactivateSubscription`, and `cancelPlanSwitch`. Update comments |
+| `src/lib/kiloclaw/billing-lifecycle-cron.ts` | New sweep: detect and repair stranded intro-price subscriptions with no attached schedule |
+| `src/app/(app)/claw/components/billing/SubscriptionCard.tsx` | Gate switch button on `scheduledBy === 'user'` not `scheduledPlan` presence |
+| `src/routers/kiloclaw-billing-router.test.ts` | Update checkout assertions, add lifecycle tests for auto-schedule, cancel/reactivate, switchPlan, cancelPlanSwitch, invoice classification, reconciliation sweep |

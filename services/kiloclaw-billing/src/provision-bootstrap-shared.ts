@@ -1,23 +1,44 @@
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import {
+  CURRENT_KILOCLAW_PRICE_VERSION,
+  LEGACY_KILOCLAW_PRICE_VERSION,
+  classifyKiloClawCommitTerm,
+  findLatestPreCutoffUserCommitSwitchQualification,
+  getKiloClawPricingCatalogEntry,
   insertKiloClawSubscriptionChangeLog,
   kiloclaw_earlybird_purchases,
   kiloclaw_instances,
   kiloclaw_subscriptions,
+  organization_seats_purchases,
   organizations,
+  type KiloClawPriceVersion,
+  type KiloClawPricingCatalogEntry,
   type KiloClawSubscription,
   type KiloClawSubscriptionChangeActor,
   type NewKiloClawSubscription,
+  type Organization,
+  type OrganizationSeatsPurchase,
   type WorkerDb,
 } from '@kilocode/db';
+import { classifyOrganizationEntitlement } from '@kilocode/organization-entitlement';
 
-const PERSONAL_TRIAL_DURATION_DAYS = 7;
 const ORGANIZATION_TRIAL_DURATION_DAYS = 14;
+
+export class OrganizationKiloClawProvisionEntitlementError extends Error {
+  readonly status = 403;
+  readonly code = 'organization_kiloclaw_entitlement_expired';
+
+  constructor() {
+    super('Organization KiloClaw entitlement has expired.');
+    this.name = 'OrganizationKiloClawProvisionEntitlementError';
+  }
+}
 
 export type BootstrapProvisionInput = {
   userId: string;
   instanceId: string;
   orgId: string | null;
+  expectedPriceVersion?: KiloClawPriceVersion;
 };
 
 type ChangeLogErrorParams = {
@@ -107,10 +128,96 @@ function isAccessGrantingSubscription(
   return false;
 }
 
-function getTrialEndsAt(startedAt: Date): string {
-  return new Date(
-    startedAt.getTime() + PERSONAL_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
-  ).toISOString();
+function getTrialEndsAt(startedAt: Date, trialDurationDays: number): string {
+  return new Date(startedAt.getTime() + trialDurationDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
+type ProvisionEntitlement = {
+  priceVersion: KiloClawPriceVersion;
+  selfServiceInstanceType: KiloClawPricingCatalogEntry['selfServiceInstanceType'];
+};
+
+function getProvisionEntitlementForPriceVersion(priceVersion: KiloClawPriceVersion) {
+  const entry = getKiloClawPricingCatalogEntry(priceVersion);
+  return {
+    priceVersion: entry.priceVersion,
+    selfServiceInstanceType: entry.selfServiceInstanceType,
+  } satisfies ProvisionEntitlement;
+}
+
+function assertExpectedPriceVersion(params: {
+  actual: KiloClawPriceVersion;
+  expected: KiloClawPriceVersion | undefined;
+  context: string;
+}) {
+  if (params.expected && params.expected !== params.actual) {
+    throw new Error(
+      `KiloClaw price-version drift during ${params.context}: expected ${params.expected}, got ${params.actual}`
+    );
+  }
+}
+
+type OrganizationEntitlementReader = Pick<WorkerDb, 'select'>;
+
+type OrganizationProvisionEntitlementContext = {
+  organization: Pick<
+    Organization,
+    'created_at' | 'free_trial_end_at' | 'require_seats' | 'settings'
+  >;
+  latestSeatPurchaseStatus: OrganizationSeatsPurchase['subscription_status'] | null;
+};
+
+async function loadOrganizationProvisionEntitlementContext(params: {
+  executor: OrganizationEntitlementReader;
+  missingOrganizationMessage: string;
+  orgId: string;
+}): Promise<OrganizationProvisionEntitlementContext> {
+  const [organization] = await params.executor
+    .select({
+      created_at: organizations.created_at,
+      free_trial_end_at: organizations.free_trial_end_at,
+      require_seats: organizations.require_seats,
+      settings: organizations.settings,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, params.orgId))
+    .limit(1);
+
+  if (!organization) {
+    throw new Error(params.missingOrganizationMessage);
+  }
+
+  const [latestSeatPurchase] = await params.executor
+    .select({ subscriptionStatus: organization_seats_purchases.subscription_status })
+    .from(organization_seats_purchases)
+    .where(eq(organization_seats_purchases.organization_id, params.orgId))
+    .orderBy(desc(organization_seats_purchases.created_at))
+    .limit(1);
+
+  return {
+    organization,
+    latestSeatPurchaseStatus: latestSeatPurchase?.subscriptionStatus ?? null,
+  };
+}
+
+async function requireOrganizationProvisionEntitlement(params: {
+  executor: OrganizationEntitlementReader;
+  missingOrganizationMessage: string;
+  now: Date;
+  orgId: string;
+}): Promise<OrganizationProvisionEntitlementContext> {
+  const context = await loadOrganizationProvisionEntitlementContext(params);
+  const classification = classifyOrganizationEntitlement({
+    organization: context.organization,
+    latestSeatPurchaseStatus: context.latestSeatPurchaseStatus,
+    now: params.now,
+  });
+
+  if (!classification.hasEntitlement) {
+    throw new OrganizationKiloClawProvisionEntitlementError();
+  }
+
+  return context;
 }
 
 type OrgBootstrapWriter = Pick<WorkerDb, 'insert' | 'select' | 'update'>;
@@ -315,24 +422,18 @@ async function bootstrapOrganizationSubscription(params: BootstrapProvisionWithD
       throw new Error('Cannot bootstrap organization subscription on destroyed instance');
     }
 
-    const [organization] = await tx
-      .select({
-        createdAt: organizations.created_at,
-        freeTrialEndAt: organizations.free_trial_end_at,
-      })
-      .from(organizations)
-      .where(eq(organizations.id, orgId))
-      .limit(1);
-
-    if (!organization) {
-      throw new Error('Organization not found during subscription bootstrap');
-    }
+    const { organization } = await requireOrganizationProvisionEntitlement({
+      executor: tx,
+      missingOrganizationMessage: 'Organization not found during subscription bootstrap',
+      now,
+      orgId,
+    });
 
     const hasManagedActiveAccess = true;
     const trialEndsAt =
-      organization.freeTrialEndAt ??
+      organization.free_trial_end_at ??
       new Date(
-        new Date(organization.createdAt).getTime() +
+        new Date(organization.created_at).getTime() +
           ORGANIZATION_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
       ).toISOString();
 
@@ -345,6 +446,7 @@ async function bootstrapOrganizationSubscription(params: BootstrapProvisionWithD
             plan: 'standard',
             status: 'active',
             payment_source: 'credits',
+            kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
             cancel_at_period_end: false,
           }
         : {
@@ -352,13 +454,19 @@ async function bootstrapOrganizationSubscription(params: BootstrapProvisionWithD
             instance_id: input.instanceId,
             plan: 'trial',
             status: new Date(trialEndsAt).getTime() > now.getTime() ? 'trialing' : 'canceled',
+            kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
             access_origin: null,
             payment_source: null,
             cancel_at_period_end: false,
-            trial_started_at: organization.createdAt,
+            trial_started_at: organization.created_at,
             trial_ends_at: trialEndsAt,
           }
     );
+    assertExpectedPriceVersion({
+      actual: created.kiloclaw_price_version,
+      expected: input.expectedPriceVersion,
+      context: 'organization provision bootstrap',
+    });
 
     if (wasInserted) {
       await insertKiloClawSubscriptionChangeLog(tx, {
@@ -416,6 +524,76 @@ function currentSubscriptionRecency(subscription: KiloClawSubscription): number 
   );
 }
 
+type PersonalTransferSafety =
+  | { safe: true }
+  | {
+      safe: false;
+      reason:
+        | 'provider_state_mismatch'
+        | 'missing_qualification_evidence'
+        | 'boundary_mismatch'
+        | 'conflicting_qualification_evidence';
+    };
+
+async function assessPersonalTransferSafety(
+  tx: Pick<WorkerDb, 'execute' | 'insert' | 'select' | 'update'>,
+  subscription: KiloClawSubscription
+): Promise<PersonalTransferSafety> {
+  const providerOwnershipConsistent =
+    (subscription.payment_source !== 'stripe' || subscription.stripe_subscription_id !== null) &&
+    (subscription.stripe_schedule_id === null || subscription.stripe_subscription_id !== null) &&
+    (subscription.payment_source !== null ||
+      (subscription.stripe_subscription_id === null && subscription.stripe_schedule_id === null));
+  if (!providerOwnershipConsistent) {
+    return { safe: false, reason: 'provider_state_mismatch' };
+  }
+
+  if (subscription.scheduled_plan === 'standard' && subscription.scheduled_by !== 'user') {
+    return { safe: false, reason: 'provider_state_mismatch' };
+  }
+
+  const switchQualification =
+    subscription.scheduled_plan === 'commit'
+      ? await findLatestPreCutoffUserCommitSwitchQualification(tx, subscription.id)
+      : null;
+  let classification: ReturnType<typeof classifyKiloClawCommitTerm>;
+  try {
+    classification = classifyKiloClawCommitTerm({
+      plan: subscription.plan,
+      scheduledPlan: subscription.scheduled_plan,
+      scheduledBy: subscription.scheduled_by,
+      currentPeriodStart: subscription.current_period_start,
+      currentPeriodEnd: subscription.current_period_end,
+      commitEndsAt: subscription.commit_ends_at,
+      qualifiedAt: switchQualification?.qualifiedAt,
+      qualificationSource: switchQualification?.qualificationSource,
+    });
+  } catch {
+    classification = 'ambiguous';
+  }
+
+  if (classification === 'ambiguous') {
+    const missingSwitchQualification =
+      subscription.scheduled_plan === 'commit' && switchQualification === null;
+    const boundaryMismatch =
+      subscription.plan === 'commit' &&
+      subscription.commit_ends_at !== null &&
+      subscription.current_period_end !== null &&
+      parseSubscriptionTimestamp(subscription.commit_ends_at) !==
+        parseSubscriptionTimestamp(subscription.current_period_end);
+    return {
+      safe: false,
+      reason: missingSwitchQualification
+        ? 'missing_qualification_evidence'
+        : boundaryMismatch
+          ? 'boundary_mismatch'
+          : 'conflicting_qualification_evidence',
+    };
+  }
+
+  return { safe: true };
+}
+
 async function createSuccessorPersonalSubscription(
   params: BootstrapProvisionWithDbParams & {
     source: KiloClawSubscription;
@@ -467,6 +645,16 @@ async function createSuccessorPersonalSubscription(
       throw new Error('Target instance already has a subscription row');
     }
 
+    const safety = await assessPersonalTransferSafety(tx, before);
+    if (!safety.safe) {
+      console.error('[kiloclaw-billing/bootstrap] Aborting unsafe personal subscription transfer', {
+        subscriptionId: before.id,
+        targetInstanceId: input.instanceId,
+        reason: safety.reason,
+      });
+      throw new Error(`Unsafe personal subscription transfer: ${safety.reason}`);
+    }
+
     const [insertedSuccessor] = await tx
       .insert(kiloclaw_subscriptions)
       .values({
@@ -476,6 +664,7 @@ async function createSuccessorPersonalSubscription(
         stripe_schedule_id: null,
         access_origin: before.access_origin,
         payment_source: before.payment_source,
+        kiloclaw_price_version: before.kiloclaw_price_version,
         plan: before.plan,
         scheduled_plan: before.scheduled_plan,
         scheduled_by: before.scheduled_by,
@@ -528,18 +717,17 @@ async function createSuccessorPersonalSubscription(
       throw new Error('Failed to update predecessor personal subscription row');
     }
 
-    const successor =
-      before.stripe_subscription_id || before.stripe_schedule_id
-        ? await tx
-            .update(kiloclaw_subscriptions)
-            .set({
-              stripe_subscription_id: before.stripe_subscription_id,
-              stripe_schedule_id: before.stripe_schedule_id,
-            })
-            .where(eq(kiloclaw_subscriptions.id, insertedSuccessor.id))
-            .returning()
-            .then(rows => rows[0] ?? null)
-        : insertedSuccessor;
+    const successor = before.stripe_subscription_id
+      ? await tx
+          .update(kiloclaw_subscriptions)
+          .set({
+            stripe_subscription_id: before.stripe_subscription_id,
+            stripe_schedule_id: before.stripe_schedule_id,
+          })
+          .where(eq(kiloclaw_subscriptions.id, insertedSuccessor.id))
+          .returning()
+          .then(rows => rows[0] ?? null)
+      : insertedSuccessor;
 
     if (!successor) {
       throw new Error('Failed to restore successor Stripe ownership');
@@ -624,41 +812,42 @@ function resolveDetachedAccessGrantingPersonalSubscription(
   return detachedRows[0] ?? null;
 }
 
-async function bootstrapPersonalSubscription(params: BootstrapProvisionWithDbParams) {
-  const { db, input } = params;
-  const now = new Date();
+async function loadPersonalBootstrapContext(params: {
+  db: WorkerDb;
+  userId: string;
+  instanceId?: string;
+}) {
+  const existingForInstancePromise = params.instanceId
+    ? params.db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.instance_id, params.instanceId))
+        .limit(1)
+        .then(rows => rows[0] ?? null)
+    : Promise.resolve(null);
 
   const [existingForInstance, subscriptions, instances, legacyEarlybirdPurchase] =
     await Promise.all([
-      db
+      existingForInstancePromise,
+      params.db
         .select()
         .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.instance_id, input.instanceId))
-        .limit(1)
-        .then(rows => rows[0] ?? null),
-      db
-        .select()
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.user_id, input.userId)),
-      db
+        .where(eq(kiloclaw_subscriptions.user_id, params.userId)),
+      params.db
         .select({
           id: kiloclaw_instances.id,
           destroyedAt: kiloclaw_instances.destroyed_at,
           organizationId: kiloclaw_instances.organization_id,
         })
         .from(kiloclaw_instances)
-        .where(eq(kiloclaw_instances.user_id, input.userId)),
-      db
+        .where(eq(kiloclaw_instances.user_id, params.userId)),
+      params.db
         .select({ id: kiloclaw_earlybird_purchases.id })
         .from(kiloclaw_earlybird_purchases)
-        .where(eq(kiloclaw_earlybird_purchases.user_id, input.userId))
+        .where(eq(kiloclaw_earlybird_purchases.user_id, params.userId))
         .limit(1)
         .then(rows => rows[0] ?? null),
     ]);
-
-  if (existingForInstance) {
-    return existingForInstance;
-  }
 
   const instancesById = new Map(
     instances.map(instance => [
@@ -678,9 +867,111 @@ async function bootstrapPersonalSubscription(params: BootstrapProvisionWithDbPar
     return !instance || instance.organizationId === null;
   });
 
-  const currentPersonalSubscription = resolveExactCurrentPersonalSubscription(
-    personalSubscriptions,
+  return {
+    existingForInstance,
     instancesById,
+    legacyEarlybirdPurchase,
+    personalSubscriptions,
+  };
+}
+
+function resolvePersonalProvisionEntitlementFromContext(params: {
+  instancesById: Map<string, { destroyedAt: string | null; organizationId: string | null }>;
+  legacyEarlybirdPurchase: { id: string } | null;
+  now: Date;
+  personalSubscriptions: KiloClawSubscription[];
+}): ProvisionEntitlement {
+  const currentPersonalSubscription = resolveExactCurrentPersonalSubscription(
+    params.personalSubscriptions,
+    params.instancesById,
+    params.now
+  );
+  if (currentPersonalSubscription) {
+    const currentInstance = currentPersonalSubscription.instance_id
+      ? params.instancesById.get(currentPersonalSubscription.instance_id)
+      : null;
+    if (
+      currentInstance?.destroyedAt &&
+      isAccessGrantingSubscription(currentPersonalSubscription, params.now)
+    ) {
+      return getProvisionEntitlementForPriceVersion(
+        currentPersonalSubscription.kiloclaw_price_version
+      );
+    }
+    if (
+      !currentInstance?.destroyedAt &&
+      isAccessGrantingSubscription(currentPersonalSubscription, params.now)
+    ) {
+      throw new Error('Cannot provision fresh personal instance with existing live subscription');
+    }
+  }
+
+  const detachedAccessGrantingSubscription = resolveDetachedAccessGrantingPersonalSubscription(
+    params.personalSubscriptions,
+    params.now
+  );
+  if (detachedAccessGrantingSubscription) {
+    return getProvisionEntitlementForPriceVersion(
+      detachedAccessGrantingSubscription.kiloclaw_price_version
+    );
+  }
+
+  if (params.legacyEarlybirdPurchase) {
+    throw new Error(
+      'Cannot bootstrap personal subscription for legacy earlybird purchase without canonical row'
+    );
+  }
+
+  return getProvisionEntitlementForPriceVersion(CURRENT_KILOCLAW_PRICE_VERSION);
+}
+
+export async function resolveProvisionEntitlementWithDb(params: {
+  db: WorkerDb;
+  input: { userId: string; orgId: string | null };
+}): Promise<ProvisionEntitlement> {
+  if (params.input.orgId) {
+    await requireOrganizationProvisionEntitlement({
+      executor: params.db,
+      missingOrganizationMessage: 'Organization not found during provision entitlement resolution',
+      now: new Date(),
+      orgId: params.input.orgId,
+    });
+    return getProvisionEntitlementForPriceVersion(LEGACY_KILOCLAW_PRICE_VERSION);
+  }
+
+  const context = await loadPersonalBootstrapContext({
+    db: params.db,
+    userId: params.input.userId,
+  });
+  return resolvePersonalProvisionEntitlementFromContext({
+    instancesById: context.instancesById,
+    legacyEarlybirdPurchase: context.legacyEarlybirdPurchase,
+    now: new Date(),
+    personalSubscriptions: context.personalSubscriptions,
+  });
+}
+
+async function bootstrapPersonalSubscription(params: BootstrapProvisionWithDbParams) {
+  const { db, input } = params;
+  const now = new Date();
+  const context = await loadPersonalBootstrapContext({
+    db,
+    userId: input.userId,
+    instanceId: input.instanceId,
+  });
+
+  if (context.existingForInstance) {
+    assertExpectedPriceVersion({
+      actual: context.existingForInstance.kiloclaw_price_version,
+      expected: input.expectedPriceVersion,
+      context: 'personal provision bootstrap idempotency',
+    });
+    return context.existingForInstance;
+  }
+
+  const currentPersonalSubscription = resolveExactCurrentPersonalSubscription(
+    context.personalSubscriptions,
+    context.instancesById,
     now
   );
   if (currentPersonalSubscription) {
@@ -688,16 +979,26 @@ async function bootstrapPersonalSubscription(params: BootstrapProvisionWithDbPar
       currentPersonalSubscription.instance_id &&
       currentPersonalSubscription.instance_id === input.instanceId
     ) {
+      assertExpectedPriceVersion({
+        actual: currentPersonalSubscription.kiloclaw_price_version,
+        expected: input.expectedPriceVersion,
+        context: 'personal provision bootstrap current row',
+      });
       return currentPersonalSubscription;
     }
 
     const currentInstance = currentPersonalSubscription.instance_id
-      ? instancesById.get(currentPersonalSubscription.instance_id)
+      ? context.instancesById.get(currentPersonalSubscription.instance_id)
       : null;
     if (
       currentInstance?.destroyedAt &&
       isAccessGrantingSubscription(currentPersonalSubscription, now)
     ) {
+      assertExpectedPriceVersion({
+        actual: currentPersonalSubscription.kiloclaw_price_version,
+        expected: input.expectedPriceVersion,
+        context: 'personal successor transfer',
+      });
       return await createSuccessorPersonalSubscription({
         ...params,
         source: currentPersonalSubscription,
@@ -706,38 +1007,44 @@ async function bootstrapPersonalSubscription(params: BootstrapProvisionWithDbPar
   }
 
   const detachedAccessGrantingSubscription = resolveDetachedAccessGrantingPersonalSubscription(
-    personalSubscriptions,
+    context.personalSubscriptions,
     now
   );
   if (detachedAccessGrantingSubscription) {
+    assertExpectedPriceVersion({
+      actual: detachedAccessGrantingSubscription.kiloclaw_price_version,
+      expected: input.expectedPriceVersion,
+      context: 'detached personal successor transfer',
+    });
     return await createSuccessorPersonalSubscription({
       ...params,
       source: detachedAccessGrantingSubscription,
     });
   }
 
-  if (personalSubscriptions.length > 0) {
-    throw new Error(
-      'Cannot bootstrap personal subscription with existing non-access-granting rows'
-    );
-  }
-
-  if (legacyEarlybirdPurchase) {
+  if (context.legacyEarlybirdPurchase) {
     throw new Error(
       'Cannot bootstrap personal subscription for legacy earlybird purchase without canonical row'
     );
   }
 
+  const currentCatalogEntry = getKiloClawPricingCatalogEntry(CURRENT_KILOCLAW_PRICE_VERSION);
+  assertExpectedPriceVersion({
+    actual: currentCatalogEntry.priceVersion,
+    expected: input.expectedPriceVersion,
+    context: 'personal fresh trial bootstrap',
+  });
   const { row: created, created: wasInserted } = await insertSubscriptionIdempotent(db, {
     user_id: input.userId,
     instance_id: input.instanceId,
     plan: 'trial',
     status: 'trialing',
+    kiloclaw_price_version: currentCatalogEntry.priceVersion,
     access_origin: null,
     payment_source: null,
     cancel_at_period_end: false,
     trial_started_at: now.toISOString(),
-    trial_ends_at: getTrialEndsAt(now),
+    trial_ends_at: getTrialEndsAt(now, currentCatalogEntry.trialDurationDays),
   });
 
   if (!wasInserted) {

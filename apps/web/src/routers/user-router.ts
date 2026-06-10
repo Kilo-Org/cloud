@@ -35,7 +35,7 @@ import {
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
-import { getBalanceForUser } from '@/lib/user.balance';
+import { getBalanceForUser } from '@/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
 
@@ -256,6 +256,10 @@ async function enrichDeductionsWithInstanceNames(
 
 export const userRouter = createTRPCRouter({
   // Account linking routes
+  getMe: baseProcedure.query(async ({ ctx }) => {
+    return successResult({ id: ctx.user.id });
+  }),
+
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {
     const providers = await getUserAuthProviders(ctx.user.id);
 

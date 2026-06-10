@@ -20,17 +20,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { OpenclawImportCard } from './OpenclawImportCard';
 
 import { usePostHog } from 'posthog-js/react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
-import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
-import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
+import { morningBriefingStatusOk } from '@/lib/kiloclaw/types';
+import { calverAtLeast, cleanVersion, controllerCalverSupports } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
   useClawConfig,
   useClawMyPin,
-  useClawGoogleSetupCommand,
   useClawGatewayReady,
   useClawMorningBriefingStatus,
   useClawReadMorningBriefing,
@@ -67,6 +67,12 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DetailTile } from './DetailTile';
 import { EMBEDDING_MODELS, DEFAULT_EMBEDDING_MODEL } from './embeddingModels';
+import {
+  INTEREST_TOPIC_PRESETS,
+  MORNING_BRIEFING_INTERESTS_MAX_TOPICS,
+  MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH,
+  MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION,
+} from '@/lib/kiloclaw/morning-briefing-interests';
 import { deriveMorningBriefingCardState } from './morning-briefing-card-state';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
@@ -321,33 +327,202 @@ function GoogleGIcon({ className }: { className?: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Google Calendar (official Kilo OAuth client, credential_profile=kilo_owned)
+// ---------------------------------------------------------------------------
+
+// Read-only capability summary, mirrored from the onboarding calendar step
+// (CalendarConnectStep.tsx) so the settings copy stays consistent.
+const GOOGLE_CALENDAR_FEATURES: Array<{ included: boolean; label: string }> = [
+  { included: true, label: 'Read your calendar events (titles, times, attendees, locations)' },
+  { included: true, label: 'Read calendars you own and subscribe to' },
+  { included: false, label: 'Create, modify, or delete events (we never request write access)' },
+];
+
+/**
+ * Settings card for the officially-approved Kilo OAuth client. This is the
+ * preferred Google Calendar connection and the successor to the legacy Gog
+ * flow (GoogleAccountCard). Connect/disconnect reuse the existing
+ * /api/integrations/google/{connect,disconnect} routes; disconnect is a native
+ * same-origin form POST so the route's Origin check passes and the 303 redirect
+ * lands back on settings with a success/error param.
+ */
+function GoogleCalendarCard({
+  connected,
+  oauthStatus,
+  accountEmail,
+  organizationId,
+}: {
+  connected: boolean;
+  oauthStatus: 'active' | 'action_required' | 'disconnected';
+  accountEmail: string | null;
+  organizationId: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const disconnectFormRef = useRef<HTMLFormElement>(null);
+
+  const settingsPath = organizationId
+    ? `/organizations/${organizationId}/claw/settings`
+    : '/claw/settings';
+  const connectParams = new URLSearchParams({ returnTo: settingsPath });
+  if (organizationId) {
+    connectParams.set('organizationId', organizationId);
+  }
+  const connectUrl = `/api/integrations/google/connect?${connectParams.toString()}`;
+  const disconnectAction = organizationId
+    ? `/api/integrations/google/disconnect?organizationId=${encodeURIComponent(organizationId)}`
+    : '/api/integrations/google/disconnect';
+
+  const needsReconnect = oauthStatus === 'action_required';
+  const isHealthyConnected = connected && !needsReconnect;
+
+  return (
+    <>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="rounded-lg border">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-colors"
+            >
+              <GoogleGIcon className="h-5 w-5 shrink-0" />
+              <div className="flex min-w-0 flex-1 flex-col items-start">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Google Calendar</span>
+                  <Badge
+                    variant={isHealthyConnected ? 'default' : 'secondary'}
+                    className="px-1.5 py-0 text-[10px] leading-4"
+                  >
+                    {connected ? (needsReconnect ? 'Reconnect' : 'Connected') : 'Not connected'}
+                  </Badge>
+                </div>
+                <span className="text-muted-foreground text-xs">
+                  Read-only calendar access · via Kilo OAuth
+                </span>
+              </div>
+              <ChevronDown
+                className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+              />
+            </button>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <Separator />
+            <div className="space-y-4 px-4 py-3">
+              {isHealthyConnected ? (
+                <>
+                  <p className="text-muted-foreground text-xs">
+                    {accountEmail ? `Connected as ${accountEmail}` : 'Connected'} · read-only access
+                    to your calendar events.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isDisconnecting}
+                    onClick={() => setConfirmDisconnect(true)}
+                  >
+                    <X className="h-4 w-4" />
+                    {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {needsReconnect && (
+                    <p className="text-xs text-amber-500">
+                      Your calendar connection needs to be re-authorized. Reconnect to resume
+                      access.
+                    </p>
+                  )}
+                  <ul className="space-y-2">
+                    {GOOGLE_CALENDAR_FEATURES.map(feature => (
+                      <li key={feature.label} className="flex items-start gap-2">
+                        {feature.included ? (
+                          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                        ) : (
+                          <X className="text-muted-foreground/60 mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        )}
+                        <span
+                          className={
+                            feature.included
+                              ? 'text-muted-foreground text-xs'
+                              : 'text-muted-foreground/70 text-xs'
+                          }
+                        >
+                          {feature.label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button asChild size="sm">
+                    <Link href={connectUrl}>
+                      {needsReconnect ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
+                    </Link>
+                  </Button>
+                </>
+              )}
+            </div>
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+
+      {/* Native form POST so the disconnect route's same-origin Origin check
+          passes; the 303 redirect navigates back to settings. */}
+      <form ref={disconnectFormRef} method="POST" action={disconnectAction} className="hidden" />
+
+      <ConfirmActionDialog
+        open={confirmDisconnect}
+        onOpenChange={setConfirmDisconnect}
+        title="Disconnect Google Calendar"
+        description="This removes Kilo's read-only access to your Google Calendar. You can reconnect anytime."
+        confirmLabel="Disconnect"
+        confirmIcon={<X className="mr-1 h-4 w-4" />}
+        isPending={isDisconnecting}
+        pendingLabel="Disconnecting..."
+        onConfirm={() => {
+          const form = disconnectFormRef.current;
+          if (!form) {
+            toast.error('Could not disconnect Google Calendar. Please try again.');
+            return;
+          }
+          // The disconnect route always 303-redirects, so once we submit the
+          // page navigates away; isDisconnecting intentionally stays true until
+          // then. Only set it after confirming the form exists so a missing ref
+          // can't leave the button permanently disabled.
+          setIsDisconnecting(true);
+          form.submit();
+        }}
+      />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Google Account (collapsible card, matches SecretEntrySection card style)
 // ---------------------------------------------------------------------------
 
 function GoogleAccountCard({
   connected,
   gmailNotificationsEnabled,
+  inboundEmailAddress,
+  inboundEmailEnabled,
   mutations,
   onRedeploy,
 }: {
   connected: boolean;
   gmailNotificationsEnabled: boolean;
+  inboundEmailAddress: string | null;
+  inboundEmailEnabled: boolean;
   mutations: ClawMutations;
   onRedeploy?: () => void;
 }) {
-  const { data: setupData } = useClawGoogleSetupCommand(!connected);
+  // This card is rendered only for users who already have the legacy Gog
+  // connection (status.googleConnected). The self-service setup-command flow
+  // is intentionally not surfaced; Gog is being retired in favor of the
+  // official Google Calendar OAuth card above, so we only offer disconnect.
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const isDisconnecting = mutations.disconnectGoogle.isPending;
-  const command = setupData?.command;
-
-  function handleCopy() {
-    if (!command) return;
-    void navigator.clipboard.writeText(command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   return (
     <>
@@ -368,9 +543,12 @@ function GoogleAccountCard({
                   >
                     {connected ? 'Connected' : 'Not connected'}
                   </Badge>
+                  <Badge variant="outline" className="px-1.5 py-0 text-[10px] leading-4">
+                    Legacy
+                  </Badge>
                 </div>
                 <span className="text-muted-foreground text-xs">
-                  Access Gmail, Calendar, and Docs
+                  Legacy Google connection, being retired
                 </span>
               </div>
               <ChevronDown
@@ -382,86 +560,89 @@ function GoogleAccountCard({
           <CollapsibleContent>
             <Separator />
             <div className="space-y-4 px-4 py-3">
-              {!connected && command && (
-                <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs">
-                    Run this command in a terminal on your local machine to connect your Google
-                    account:
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                <div className="space-y-2 text-xs">
+                  <p className="text-muted-foreground">
+                    {
+                      "This integration is being retired. We recommend disconnecting your current integration and switching to KiloCode's official Google approved OAuth client."
+                    }
                   </p>
-                  <div className="relative">
-                    <pre className="bg-muted overflow-x-auto rounded-md p-3 pr-10 text-xs">
-                      <code>{command}</code>
-                    </pre>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-1 right-1 h-7 w-7 p-0"
-                      onClick={handleCopy}
-                    >
-                      {copied ? (
-                        <Check className="h-3.5 w-3.5 text-green-500" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </div>
+                  <p className="text-muted-foreground">
+                    {'To reconnect, use the '}
+                    <span className="text-foreground font-medium">Google Calendar</span>
+                    {
+                      " integration listed above. This integration uses KiloCode's official OAuth application and is fully supported going forward."
+                    }
+                  </p>
+                  <p className="text-muted-foreground">
+                    {"For email functionality, use your bot's automatically provisioned "}
+                    <span className="text-foreground font-medium">Inbound Email</span>
+                    {' address:'}
+                  </p>
+                  {/* Only present the alias as usable when delivery is actually
+                      enabled — the backend rejects disabled aliases (410), so
+                      showing a disabled one would send users to a dead path. */}
+                  {inboundEmailAddress && inboundEmailEnabled ? (
+                    <code className="bg-muted text-foreground inline-block max-w-full truncate rounded px-2 py-1 text-xs">
+                      {inboundEmailAddress}
+                    </code>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      {inboundEmailAddress
+                        ? 'Inbound Email is currently disabled for this instance. Enable it in the Inbound Email section on this page before relying on it.'
+                        : 'See the Inbound Email section on this page to set it up.'}
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {connected && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isDisconnecting}
-                      onClick={() => setConfirmDisconnect(true)}
-                    >
-                      <X className="h-4 w-4" />
-                      {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-                    </Button>
-                  </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isDisconnecting}
+                  onClick={() => setConfirmDisconnect(true)}
+                >
+                  <X className="h-4 w-4" />
+                  {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                </Button>
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-foreground text-sm font-medium">Gmail Notifications</h4>
-                      <p className="text-muted-foreground text-xs">
-                        Notify your bot when new emails arrive
-                      </p>
-                    </div>
-                    <Button
-                      variant={gmailNotificationsEnabled ? 'default' : 'outline'}
-                      size="sm"
-                      disabled={mutations.setGmailNotifications.isPending}
-                      onClick={() => {
-                        mutations.setGmailNotifications.mutate(
-                          { enabled: !gmailNotificationsEnabled },
-                          {
-                            onSuccess: data => {
-                              toast.success(
-                                data.gmailNotificationsEnabled
-                                  ? 'Gmail notifications enabled'
-                                  : 'Gmail notifications disabled'
-                              );
-                            },
-                            onError: err => toast.error(`Failed: ${err.message}`),
-                          }
-                        );
-                      }}
-                    >
-                      {mutations.setGmailNotifications.isPending
-                        ? 'Saving...'
-                        : gmailNotificationsEnabled
-                          ? 'Enabled'
-                          : 'Disabled'}
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {!connected && !command && (
-                <p className="text-muted-foreground text-xs">Loading setup command...</p>
-              )}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-foreground text-sm font-medium">Gmail Notifications</h4>
+                  <p className="text-muted-foreground text-xs">
+                    Notify your bot when new emails arrive
+                  </p>
+                </div>
+                <Button
+                  variant={gmailNotificationsEnabled ? 'default' : 'outline'}
+                  size="sm"
+                  disabled={mutations.setGmailNotifications.isPending}
+                  onClick={() => {
+                    mutations.setGmailNotifications.mutate(
+                      { enabled: !gmailNotificationsEnabled },
+                      {
+                        onSuccess: data => {
+                          toast.success(
+                            data.gmailNotificationsEnabled
+                              ? 'Gmail notifications enabled'
+                              : 'Gmail notifications disabled'
+                          );
+                        },
+                        onError: err => toast.error(`Failed: ${err.message}`),
+                      }
+                    );
+                  }}
+                >
+                  {mutations.setGmailNotifications.isPending
+                    ? 'Saving...'
+                    : gmailNotificationsEnabled
+                      ? 'Enabled'
+                      : 'Disabled'}
+                </Button>
+              </div>
             </div>
           </CollapsibleContent>
         </div>
@@ -471,7 +652,7 @@ function GoogleAccountCard({
         open={confirmDisconnect}
         onOpenChange={setConfirmDisconnect}
         title="Disconnect Google Account"
-        description="This will remove your Google credentials. Reconnecting requires re-running the Docker setup flow (gcloud login, project setup, OAuth consent). Redeploy after disconnecting to apply."
+        description="This removes your legacy Google credentials. This connection method is being retired. To keep calendar access, use the Google Calendar (OAuth) card; for email, use your Inbound Email address. Redeploy after disconnecting to apply."
         confirmLabel="Disconnect"
         confirmIcon={<X className="mr-1 h-4 w-4" />}
         isPending={isDisconnecting}
@@ -495,6 +676,430 @@ function GoogleAccountCard({
   );
 }
 
+/**
+ * Inline editor for the user's free-text location, surfaced inside the
+ * Morning Briefing card. Drives the Local News source of the brief.
+ *
+ * When no location is set, surfaces an amber-bordered nudge with an
+ * inline input. When a location is set, renders a read-only value with
+ * an Edit affordance and a Clear button.
+ *
+ * Saves via the existing `updateConfig` mutation. Two delivery paths
+ * downstream:
+ *   - Instance running: the worker DO calls
+ *     `gateway.updateMorningBriefingUserLocation`, which writes the
+ *     new value into the plugin's `config.json`. The plugin reads
+ *     that file at the start of every brief via
+ *     `resolveLocationContextWithOverride`, so the next brief uses
+ *     the new location with no restart.
+ *   - Instance stopped: the DO updates state + Postgres, and the
+ *     `KILOCLAW_USER_LOCATION` env var is rewritten on next boot so
+ *     the plugin picks it up via the env-var fallback.
+ * Either way, the next briefing run picks up the new value — no
+ * manual restart needed.
+ */
+function MorningBriefingLocationEditor({
+  mutations,
+  userLocation,
+  userTimezone,
+  isRunning,
+}: {
+  mutations: ClawMutations;
+  userLocation: string | null;
+  userTimezone: string | null;
+  /**
+   * Editor is disabled when the instance is not running. The DO method
+   * rejects saves while not running because the plugin reads
+   * `config.json.userLocation` first and silently persisting a change
+   * here would not affect the next briefing on the current boot.
+   */
+  isRunning: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(userLocation ?? '');
+  const isSaving = mutations.updateUserLocation.isPending;
+  const hasLocation = userLocation !== null && userLocation.trim().length > 0;
+  const controlsDisabled = !isRunning || isSaving;
+
+  function handleSave() {
+    const value = draft.trim();
+    if (value.length === 0) {
+      toast.error('Location cannot be empty');
+      return;
+    }
+    mutations.updateUserLocation.mutate(
+      { userLocation: value },
+      {
+        onSuccess: () => {
+          toast.success('Location saved. Changes take effect on your next morning brief.', {
+            duration: 6000,
+          });
+          setEditing(false);
+        },
+        onError: err => toast.error(`Failed to save location: ${err.message}`),
+      }
+    );
+  }
+
+  function handleClear() {
+    mutations.updateUserLocation.mutate(
+      { userLocation: null },
+      {
+        onSuccess: () => {
+          // Note: clearing the override only removes the Settings-side
+          // value. The plugin still falls back to the onboarding
+          // `KILOCLAW_USER_LOCATION` env var if one was set there, so
+          // Local News may keep running off the old onboarding
+          // location. To fully disable Local News, deselect it from
+          // the Interests list above.
+          toast.success(
+            'Override cleared. Local News will fall back to your onboarding location until you set a new one. To fully disable, deselect "Local News" from Interests.',
+            { duration: 8000 }
+          );
+          setDraft('');
+          setEditing(false);
+        },
+        onError: err => toast.error(`Failed to clear location: ${err.message}`),
+      }
+    );
+  }
+
+  function handleCancel() {
+    setDraft(userLocation ?? '');
+    setEditing(false);
+  }
+
+  const containerClass = hasLocation
+    ? 'rounded-lg border p-4'
+    : 'rounded-lg border border-amber-500/50 bg-amber-500/5 p-4';
+  const dimmedClass = !isRunning ? ' opacity-60' : '';
+
+  return (
+    <div className={containerClass + dimmedClass}>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-foreground text-sm font-semibold">Location for Local News</h3>
+        {hasLocation && !editing && (
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)} disabled={!isRunning}>
+            Edit
+          </Button>
+        )}
+      </div>
+      {!isRunning && (
+        <p className="text-muted-foreground mb-2 text-xs">
+          Start your instance to update Location.
+        </p>
+      )}
+
+      {hasLocation && !editing && (
+        <>
+          <p className="text-foreground text-sm">{userLocation}</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Used by the Local News source in your morning briefing.
+            {userTimezone ? ` Timezone: ${userTimezone}.` : ''}
+          </p>
+        </>
+      )}
+
+      {!hasLocation && !editing && (
+        <>
+          <p className="text-foreground text-sm">
+            No location set. Local News is disabled until you provide one.
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {userTimezone
+              ? `We know your timezone is ${userTimezone}, but that's too coarse for local news — a city or address works much better.`
+              : 'Add a city or address (e.g. "San Francisco, CA") and we\'ll surface local headlines.'}
+          </p>
+          <div className="mt-3">
+            <Button size="sm" onClick={() => setEditing(true)} disabled={!isRunning}>
+              Set location
+            </Button>
+          </div>
+        </>
+      )}
+
+      {editing && (
+        <div className="flex flex-col gap-2">
+          <Input
+            placeholder="e.g. San Francisco, CA"
+            value={draft}
+            onChange={event => setDraft(event.target.value)}
+            disabled={controlsDisabled}
+            maxLength={200}
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleSave} disabled={controlsDisabled}>
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
+              Cancel
+            </Button>
+            {hasLocation && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleClear}
+                disabled={controlsDisabled}
+                className="text-destructive hover:text-destructive"
+              >
+                Clear
+              </Button>
+            )}
+            <p className="text-muted-foreground text-xs">
+              Changes take effect on your next morning brief.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MorningBriefingInterestsEditor({
+  mutations,
+  briefingStatus,
+  actionsReady,
+  supportsInterests,
+  onRequestUpgrade,
+}: {
+  mutations: ClawMutations;
+  briefingStatus: MorningBriefingStatusLite | undefined;
+  actionsReady: boolean;
+  /** Whether the running controller has the interests plugin route. */
+  supportsInterests: boolean;
+  /** Opens the focused upgrade confirmation flow. */
+  onRequestUpgrade?: () => void;
+}) {
+  // All hooks must run unconditionally before any early return so a
+  // `supportsInterests` transition (e.g. controller version query
+  // resolves to old) doesn't change the hook count between renders.
+  const storedTopics = briefingStatus?.interestTopics ?? null;
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const [customInput, setCustomInput] = useState('');
+
+  // Sync draft from server when the stored value first arrives or changes
+  // out from under us (e.g. another tab saved). Drop changes the user has
+  // in flight if the saved set differs from what we last seeded.
+  const lastSeenStored = useRef<string | null>(null);
+  useEffect(() => {
+    if (storedTopics === null) return;
+    // JSON.stringify avoids the separator-collision case where a user-
+    // typed topic like "Tech||AI" would produce the same signature as
+    // two separate topics joined with "||". Matches the isDirty
+    // comparison just below.
+    const serialized = JSON.stringify(storedTopics);
+    if (lastSeenStored.current === serialized) return;
+    lastSeenStored.current = serialized;
+    setDraft(storedTopics);
+  }, [storedTopics]);
+
+  const effective = draft ?? storedTopics ?? [];
+  const isDirty = draft !== null && JSON.stringify(draft) !== JSON.stringify(storedTopics ?? []);
+  const atCap = effective.length >= MORNING_BRIEFING_INTERESTS_MAX_TOPICS;
+
+  function togglePreset(topic: string) {
+    setDraft(current => {
+      const base = current ?? storedTopics ?? [];
+      const isSelected = base.some(value => value.toLowerCase() === topic.toLowerCase());
+      if (isSelected) {
+        return base.filter(value => value.toLowerCase() !== topic.toLowerCase());
+      }
+      if (base.length >= MORNING_BRIEFING_INTERESTS_MAX_TOPICS) return base;
+      return [...base, topic];
+    });
+  }
+
+  function addCustom() {
+    const value = customInput.trim().slice(0, MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH);
+    if (!value) return;
+    setDraft(current => {
+      const base = current ?? storedTopics ?? [];
+      if (base.some(existing => existing.toLowerCase() === value.toLowerCase())) return base;
+      if (base.length >= MORNING_BRIEFING_INTERESTS_MAX_TOPICS) return base;
+      return [...base, value];
+    });
+    setCustomInput('');
+  }
+
+  function removeTopic(topic: string) {
+    setDraft(current => {
+      const base = current ?? storedTopics ?? [];
+      return base.filter(value => value !== topic);
+    });
+  }
+
+  function reset() {
+    setDraft(storedTopics ?? []);
+    setCustomInput('');
+  }
+
+  function save() {
+    const topics = effective;
+    // For the org variant, `bind` (useOrgKiloClaw.ts) injects
+    // `organizationId` automatically; the personal variant takes just
+    // `{ topics }`. Same call site works for both.
+    mutations.updateBriefingInterests.mutate(
+      { topics },
+      {
+        onSuccess: () => {
+          toast.success('Interests saved');
+        },
+        onError: err => toast.error(`Failed to save interests: ${err.message}`),
+      }
+    );
+  }
+
+  const saving = mutations.updateBriefingInterests.isPending;
+  const disabled = !actionsReady;
+
+  // Early return AFTER all hooks have run. When the controller is too
+  // old the worker would return `controller_route_unavailable` on save,
+  // so render the same amber upgrade-required block + Upgrade button
+  // used by the parent MorningBriefingCard's controller-out-of-date
+  // branch. We deliberately don't surface a version number to end users
+  // (controller calver is an internal detail; just direct them to
+  // upgrade).
+  if (!supportsInterests) {
+    return (
+      <div className="mt-3 flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-amber-200">Upgrade required</p>
+          <p className="text-muted-foreground text-xs">
+            Interest topics require a newer KiloClaw version. Upgrade to choose the topics your
+            morning briefing covers.
+          </p>
+        </div>
+        {onRequestUpgrade && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
+            onClick={onRequestUpgrade}
+          >
+            Upgrade
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-border mt-3 flex flex-col gap-3 rounded-md border p-3">
+      <div className="flex flex-col gap-1">
+        <span className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+          Interests
+        </span>
+        <p className="text-muted-foreground text-xs">
+          Topics that scope tomorrow’s briefing web search.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {INTEREST_TOPIC_PRESETS.map(preset => {
+          const active = effective.some(value => value.toLowerCase() === preset.toLowerCase());
+          return (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => togglePreset(preset)}
+              disabled={disabled || saving || (!active && atCap)}
+              className={`focus-visible:ring-ring rounded-full border px-3 py-1 text-xs transition focus-visible:ring-2 focus-visible:outline-none ${
+                active
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50'
+              }`}
+              aria-pressed={active}
+            >
+              {preset}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={customInput}
+          onChange={event => setCustomInput(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              addCustom();
+            }
+          }}
+          maxLength={MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH}
+          placeholder="Add your own (e.g. Biotech)"
+          disabled={disabled || saving || atCap}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={addCustom}
+          disabled={disabled || saving || !customInput.trim() || atCap}
+        >
+          Add
+        </Button>
+      </div>
+      {effective.some(
+        topic =>
+          !INTEREST_TOPIC_PRESETS.some(preset => preset.toLowerCase() === topic.toLowerCase())
+      ) && (
+        <div className="flex flex-wrap gap-2">
+          {effective
+            .filter(
+              topic =>
+                !INTEREST_TOPIC_PRESETS.some(preset => preset.toLowerCase() === topic.toLowerCase())
+            )
+            .map(topic => (
+              <span
+                key={topic}
+                className="border-border bg-muted text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+              >
+                {topic}
+                <button
+                  type="button"
+                  onClick={() => removeTopic(topic)}
+                  aria-label={`Remove ${topic}`}
+                  className="hover:text-destructive"
+                  disabled={disabled || saving}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-muted-foreground text-xs">
+          {effective.length === 0
+            ? 'No topics selected. Briefing falls back to its default search.'
+            : `${effective.length} topic${effective.length === 1 ? '' : 's'} selected.`}
+        </span>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={reset}
+            disabled={!isDirty || saving}
+          >
+            Reset
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="primary"
+            onClick={save}
+            disabled={!isDirty || saving || disabled}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MorningBriefingCard({
   mutations,
   briefingStatus,
@@ -502,6 +1107,9 @@ function MorningBriefingCard({
   isRunning,
   actionsReady,
   onRequestUpgrade,
+  supportsInterests,
+  userLocation,
+  userTimezone,
 }: {
   mutations: ClawMutations;
   briefingStatus: MorningBriefingStatusLite | undefined;
@@ -514,8 +1122,27 @@ function MorningBriefingCard({
   actionsReady: boolean;
   /** Callback that opens the focused upgrade confirmation flow. */
   onRequestUpgrade?: () => void;
+  /**
+   * Whether the running controller image includes the
+   * `/_kilo/morning-briefing/interests` plugin route. When false the
+   * interests editor renders an "Upgrade Required" placeholder instead
+   * of the controls so users on stale images don't hit a 404 on save.
+   */
+  supportsInterests: boolean;
+  /**
+   * Current user-provided location (e.g. "San Francisco, CA"). Drives
+   * the Local News source — when null the brief surfaces a "set a
+   * location" nudge. Editable via the Location section below.
+   */
+  userLocation: string | null;
+  /** IANA timezone, shown as context next to the location editor. */
+  userTimezone: string | null;
 }) {
   const [requestedDay, setRequestedDay] = useState<'today' | 'yesterday' | null>(null);
+  // Card starts collapsed — matches the OpenClaw Manage Version section. The
+  // collapsed trigger surfaces enabled-state and the schedule at a glance;
+  // expand to reach the enable/disable/run controls and the interests editor.
+  const [open, setOpen] = useState(false);
   const { data: readData, isFetching: isReading } = useClawReadMorningBriefing(requestedDay, true);
 
   const sourceReadiness =
@@ -651,8 +1278,26 @@ function MorningBriefingCard({
     config_unavailable: 'Config unavailable',
   } as const;
 
+  // One-line summary surfaced in the collapsed trigger. Conveys
+  // "what's currently happening" without expanding the card. The amber
+  // upgrade banner above the collapsible covers the controller-out-of-
+  // date case, so we don't repeat it here.
+  const triggerSummary = (() => {
+    if (isControllerOutOfDate) return null;
+    if (isWarmupState) return 'Instance warming up';
+    if (showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone) {
+      const schedule = formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone);
+      const last = briefingStatus.lastGeneratedDate;
+      return last ? `${schedule} · last ${last}` : schedule;
+    }
+    if (!desiredEnabled) return 'Disabled — expand to enable';
+    return null;
+  })();
+
   return (
-    <div className="rounded-lg border px-4 py-3">
+    <>
+      {/* Amber upgrade banner stays outside the collapsible so the call-to-
+          action is visible without expanding. */}
       {isControllerOutOfDate && (
         <div className="mb-3 flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
@@ -675,143 +1320,201 @@ function MorningBriefingCard({
           )}
         </div>
       )}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <Newspaper className="text-muted-foreground h-5 w-5 shrink-0" />
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">Morning Briefing</p>
-              <Badge variant={statusVariant} className="px-1.5 py-0 text-[10px] leading-4">
-                {statusLabel}
-              </Badge>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="rounded-lg border">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-colors"
+            >
+              <Newspaper className="text-muted-foreground h-5 w-5 shrink-0" />
+              <div className="flex min-w-0 flex-1 flex-col items-start">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Morning Briefing</span>
+                  <Badge variant={statusVariant} className="px-1.5 py-0 text-[10px] leading-4">
+                    {statusLabel}
+                  </Badge>
+                </div>
+                {triggerSummary && (
+                  <span className="text-muted-foreground text-xs">{triggerSummary}</span>
+                )}
+              </div>
+              <ChevronDown
+                className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 ${
+                  open ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <Separator />
+            <div className="space-y-3 px-4 py-3">
+              {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
+                <p className="text-muted-foreground text-xs">
+                  {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
+                </p>
+              )}
+              {showScheduleDetails && (
+                <p className="text-muted-foreground text-xs">
+                  Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
+                </p>
+              )}
+              {showLastDelivery && (
+                <p className="text-muted-foreground text-xs">
+                  Last delivery:{' '}
+                  {lastDelivery
+                    .map(entry => {
+                      const channel = deliveryChannelLabel[entry.channel] ?? entry.channel;
+                      const status = deliveryStatusLabel[entry.status] ?? entry.status;
+                      const reason = entry.reason
+                        ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
+                        : undefined;
+                      return reason
+                        ? `${channel} (${status}: ${reason})`
+                        : `${channel} (${status})`;
+                    })
+                    .join(' • ')}
+                </p>
+              )}
+
+              {isWarmupState && (
+                <p className="text-muted-foreground text-xs">
+                  Instance is still warming up. Morning Briefing controls will become available once
+                  the gateway is fully ready.
+                </p>
+              )}
+
+              <p className="text-muted-foreground text-xs">{sourceSummaryText}</p>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    !controlsEnabled || desiredEnabled || mutations.enableMorningBriefing.isPending
+                  }
+                  onClick={() => {
+                    mutations.enableMorningBriefing.mutate(
+                      {},
+                      {
+                        onSuccess: () => toast.success('Morning Briefing enabled'),
+                        onError: err =>
+                          toast.error(`Failed to enable Morning Briefing: ${err.message}`),
+                      }
+                    );
+                  }}
+                >
+                  {mutations.enableMorningBriefing.isPending ? 'Enabling...' : 'Enable'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    !controlsEnabled ||
+                    !desiredEnabled ||
+                    mutations.disableMorningBriefing.isPending
+                  }
+                  onClick={() => {
+                    mutations.disableMorningBriefing.mutate(undefined, {
+                      onSuccess: () => toast.success('Morning Briefing disabled'),
+                      onError: err =>
+                        toast.error(`Failed to disable Morning Briefing: ${err.message}`),
+                    });
+                  }}
+                >
+                  {mutations.disableMorningBriefing.isPending ? 'Disabling...' : 'Disable'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!canUseBriefingControls || mutations.runMorningBriefing.isPending}
+                  onClick={() => {
+                    mutations.runMorningBriefing.mutate(undefined, {
+                      onSuccess: data => {
+                        const date = data.date ? ` for ${data.date}` : '';
+                        toast.success(`Morning Briefing generated${date}`);
+                      },
+                      onError: err => toast.error(`Failed to run Morning Briefing: ${err.message}`),
+                    });
+                  }}
+                >
+                  {mutations.runMorningBriefing.isPending ? 'Running...' : 'Run Now'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!canUseBriefingControls}
+                  onClick={() => setRequestedDay('today')}
+                >
+                  View Today
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!canUseBriefingControls}
+                  onClick={() => setRequestedDay('yesterday')}
+                >
+                  View Yesterday
+                </Button>
+              </div>
+
+              {!desiredEnabled && controlsEnabled && (
+                <p className="text-muted-foreground text-xs">
+                  Enable Morning Briefing to get a personalized briefing everyday.
+                </p>
+              )}
+
+              <MorningBriefingInterestsEditor
+                mutations={mutations}
+                briefingStatus={briefingStatus}
+                actionsReady={actionsReady}
+                supportsInterests={supportsInterests}
+                onRequestUpgrade={onRequestUpgrade}
+              />
+
+              {/* Location card only matters when the user has opted
+                  into Local News. For everyone else it's noise. Case-
+                  insensitive trim matches what the plugin's
+                  `wantsLocalNews` does so custom-cased entries like
+                  "local news" still count. */}
+              {(briefingStatus?.interestTopics ?? []).some(
+                topic => topic.trim().toLowerCase() === 'local news'
+              ) && (
+                <MorningBriefingLocationEditor
+                  mutations={mutations}
+                  userLocation={userLocation}
+                  userTimezone={userTimezone}
+                  isRunning={isRunning}
+                />
+              )}
+
+              {requestedDay && (
+                <div>
+                  {isReading ? (
+                    <p className="text-muted-foreground text-xs">Loading saved briefing...</p>
+                  ) : readData?.markdown ? (
+                    <>
+                      <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
+                        {readData.markdown}
+                      </pre>
+                      <p className="text-muted-foreground mt-2 text-xs italic">
+                        Raw markdown output. Briefings delivered to chat are reformatted for
+                        readability.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">
+                      No saved briefing for {requestedDay === 'today' ? 'today' : 'yesterday'}.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-            {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
-              <p className="text-muted-foreground text-xs">
-                {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
-              </p>
-            )}
-            {showScheduleDetails && (
-              <p className="text-muted-foreground text-xs">
-                Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
-              </p>
-            )}
-            {showLastDelivery && (
-              <p className="text-muted-foreground text-xs">
-                Last delivery:{' '}
-                {lastDelivery
-                  .map(entry => {
-                    const channel = deliveryChannelLabel[entry.channel] ?? entry.channel;
-                    const status = deliveryStatusLabel[entry.status] ?? entry.status;
-                    const reason = entry.reason
-                      ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
-                      : undefined;
-                    return reason ? `${channel} (${status}: ${reason})` : `${channel} (${status})`;
-                  })
-                  .join(' • ')}
-              </p>
-            )}
-
-            {isWarmupState && (
-              <p className="text-muted-foreground mt-2 text-xs">
-                Instance is still warming up. Morning Briefing controls will become available once
-                the gateway is fully ready.
-              </p>
-            )}
-
-            <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
-          </div>
+          </CollapsibleContent>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={
-              !controlsEnabled || desiredEnabled || mutations.enableMorningBriefing.isPending
-            }
-            onClick={() => {
-              mutations.enableMorningBriefing.mutate(
-                {},
-                {
-                  onSuccess: () => toast.success('Morning Briefing enabled'),
-                  onError: err => toast.error(`Failed to enable Morning Briefing: ${err.message}`),
-                }
-              );
-            }}
-          >
-            {mutations.enableMorningBriefing.isPending ? 'Enabling...' : 'Enable'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={
-              !controlsEnabled || !desiredEnabled || mutations.disableMorningBriefing.isPending
-            }
-            onClick={() => {
-              mutations.disableMorningBriefing.mutate(undefined, {
-                onSuccess: () => toast.success('Morning Briefing disabled'),
-                onError: err => toast.error(`Failed to disable Morning Briefing: ${err.message}`),
-              });
-            }}
-          >
-            {mutations.disableMorningBriefing.isPending ? 'Disabling...' : 'Disable'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canUseBriefingControls || mutations.runMorningBriefing.isPending}
-            onClick={() => {
-              mutations.runMorningBriefing.mutate(undefined, {
-                onSuccess: data => {
-                  const date = data.date ? ` for ${data.date}` : '';
-                  toast.success(`Morning Briefing generated${date}`);
-                },
-                onError: err => toast.error(`Failed to run Morning Briefing: ${err.message}`),
-              });
-            }}
-          >
-            {mutations.runMorningBriefing.isPending ? 'Running...' : 'Run Now'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canUseBriefingControls}
-            onClick={() => setRequestedDay('today')}
-          >
-            View Today
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!canUseBriefingControls}
-            onClick={() => setRequestedDay('yesterday')}
-          >
-            View Yesterday
-          </Button>
-        </div>
-      </div>
-
-      {!desiredEnabled && controlsEnabled && (
-        <p className="text-muted-foreground mt-2 text-xs">
-          Enable Morning Briefing to get a personalized briefing everyday.
-        </p>
-      )}
-
-      {requestedDay && (
-        <div className="mt-3">
-          {isReading ? (
-            <p className="text-muted-foreground text-xs">Loading saved briefing...</p>
-          ) : readData?.markdown ? (
-            <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
-              {readData.markdown}
-            </pre>
-          ) : (
-            <p className="text-muted-foreground text-xs">
-              No saved briefing for {requestedDay === 'today' ? 'today' : 'yesterday'}.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
+      </Collapsible>
+    </>
   );
 }
 
@@ -1360,7 +2063,6 @@ export function SettingsTab({
   organizationName?: string;
 }) {
   const posthog = usePostHog();
-  const { data: user } = useUser();
   const { data: config } = useClawConfig();
   const { organizationId } = useClawContext();
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
@@ -1381,7 +2083,10 @@ export function SettingsTab({
   } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
   const morningBriefingStatusQuery = useClawMorningBriefingStatus(isRunning);
-  const morningBriefingStatus = morningBriefingStatusQuery.data;
+  // Narrow off the instance-not-running sentinel that the worker returns
+  // when DO state isn't `running`. The MB card only renders meaningfully
+  // when the OK-shape payload is available.
+  const morningBriefingStatus = morningBriefingStatusOk(morningBriefingStatusQuery.data);
   const gatewayReadyQuery = useClawGatewayReady(isRunning);
   const gatewayReady = gatewayReadyQuery.data;
   const [confirmDestroy, setConfirmDestroy] = useState(false);
@@ -1425,7 +2130,11 @@ export function SettingsTab({
   const modelOptions = useMemo<ModelOption[]>(
     () =>
       getSettingsModelOptions({
-        models: (modelsData?.data || []).map(model => ({ id: model.id, name: model.name })),
+        models: (modelsData?.data || []).map(model => ({
+          id: model.id,
+          name: model.name,
+          isFree: model.isFree,
+        })),
         trackedOpenClawVersion: trackedVersion,
         runningOpenClawVersion: runningVersion,
         isRunning,
@@ -1472,37 +2181,37 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION
   );
+  const supportsOpenclawSaveValidation =
+    controllerVersion?.capabilities?.includes('files.write-openclaw-config') === true;
+  // Fail OPEN: hide the interests editor only when the controller
+  // version is positively parsed as too old, OR the worker reports an
+  // explicit `version: null` (its positive old-controller signal for a
+  // missing `/_kilo/version` route). A still-loading / errored /
+  // unparseable version keeps the editor visible — the worker's
+  // `controller_route_unavailable` 404 on save is the backstop for those,
+  // and a false "Upgrade required" on a current instance is a worse UX.
+  // Hook count stays stable (the editor early-returns on false) since
+  // genuinely-unknown states no longer flip the gate.
+  const supportsBriefingInterests = controllerCalverSupports(
+    controllerVersion?.version,
+    MORNING_BRIEFING_INTERESTS_MIN_CONTROLLER_VERSION
+  );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
+  // Reflects which provider is actually active. Mirrors controller arbitration
+  // in services/kiloclaw/controller/src/config-writer.ts.
   const exaSearchConfigured =
-    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || kiloExaSearchMode === null);
+    supportsExaSearchUi &&
+    (kiloExaSearchMode === 'kilo-proxy' || (kiloExaSearchMode === null && !braveSearchConfigured));
+  // Editor reflects stored intent, not the resolved active provider, so users
+  // can persist an explicit choice when their mode is unset.
   const exaSearchDisplayMode =
     supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
-  const googleCalendarConnectHref = useMemo(() => {
-    const params = new URLSearchParams({ capabilities: 'calendar_read' });
-    if (organizationId) {
-      params.set('organizationId', organizationId);
-    }
-
-    return `/api/integrations/google/connect?${params.toString()}`;
-  }, [organizationId]);
-  const googleCalendarDisconnectHref = useMemo(() => {
-    const params = new URLSearchParams();
-    if (organizationId) {
-      params.set('organizationId', organizationId);
-    }
-
-    const qs = params.toString();
-    return qs.length > 0
-      ? `/api/integrations/google/disconnect?${qs}`
-      : '/api/integrations/google/disconnect';
-  }, [organizationId]);
-  const canSeeGoogleCalendar = !!user?.is_admin;
-  const canSeeMorningBriefing = !!user?.is_admin;
+  const byokHref = organizationId ? `/organizations/${organizationId}/byok` : '/byok';
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -1683,6 +2392,13 @@ export function SettingsTab({
               <p className="text-muted-foreground text-xs">
                 Used for new conversations. Can be changed per-conversation.
               </p>
+              <p className="text-muted-foreground mt-2 text-xs">
+                Configure your own model provider keys in{' '}
+                <Link href={byokHref} target="_blank" className="underline">
+                  Kilo BYOK settings
+                </Link>
+                .
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <ModelCombobox
@@ -1727,35 +2443,6 @@ export function SettingsTab({
 
       {/* ── Webhook Integration ── */}
       <WebhookIntegrationSection />
-
-      {canSeeGoogleCalendar && (
-        <div className="rounded-lg border px-4 py-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <GoogleGIcon className="h-5 w-5 shrink-0" />
-              <div>
-                <p className="text-sm font-medium">Google Calendar</p>
-                <div className="text-muted-foreground text-xs">
-                  {status.googleOAuthConnected
-                    ? `Connected${status.googleOAuthAccountEmail ? ` as ${status.googleOAuthAccountEmail}` : ''}`
-                    : 'Not connected'}
-                </div>
-              </div>
-            </div>
-            {status.googleOAuthConnected ? (
-              <form action={googleCalendarDisconnectHref} method="POST">
-                <Button type="submit" variant="outline" size="sm">
-                  Disconnect
-                </Button>
-              </form>
-            ) : (
-              <Button asChild variant="outline" size="sm">
-                <a href={googleCalendarConnectHref}>Connect</a>
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ── Messaging Channels ── */}
       <div>
@@ -1845,7 +2532,7 @@ export function SettingsTab({
       )}
 
       {/* ── Developer Tools ── */}
-      {toolEntries.some(e => e.id === 'github' || e.id === 'linear') && (
+      {toolEntries.some(e => e.id === 'github' || e.id === 'linear' || e.id === 'composio') && (
         <div>
           <h2 className="text-foreground mb-3 text-base font-semibold">Developer Tools</h2>
           <div className="space-y-3">
@@ -1888,6 +2575,19 @@ export function SettingsTab({
               ))}
             {toolEntries
               .filter(e => e.id === 'linear')
+              .map(entry => (
+                <SecretEntrySection
+                  key={entry.id}
+                  entry={entry}
+                  configured={configuredSecrets[entry.id] ?? false}
+                  mutations={mutations}
+                  onSecretsChanged={onSecretsChanged}
+                  isDirty={dirtySecrets.has(entry.id)}
+                  onRedeploy={onRedeploy}
+                />
+              ))}
+            {toolEntries
+              .filter(e => e.id === 'composio')
               .map(entry => (
                 <SecretEntrySection
                   key={entry.id}
@@ -1953,26 +2653,39 @@ export function SettingsTab({
       <div>
         <h2 className="text-foreground mb-3 text-base font-semibold">Productivity</h2>
         <div className="space-y-3">
-          <GoogleAccountCard
-            connected={status.googleConnected}
-            gmailNotificationsEnabled={status.gmailNotificationsEnabled}
-            mutations={mutations}
-            onRedeploy={onRedeploy}
+          <GoogleCalendarCard
+            connected={status.googleOAuthConnected}
+            oauthStatus={status.googleOAuthStatus}
+            accountEmail={status.googleOAuthAccountEmail}
+            organizationId={organizationId ?? null}
           />
-          {canSeeMorningBriefing && (
-            <MorningBriefingCard
+          {/* Legacy Gog connection: only surfaced to users who already have it,
+              so new users are never offered the retired setup flow. */}
+          {status.googleConnected && (
+            <GoogleAccountCard
+              connected={status.googleConnected}
+              gmailNotificationsEnabled={status.gmailNotificationsEnabled}
+              inboundEmailAddress={status.inboundEmailAddress}
+              inboundEmailEnabled={status.inboundEmailEnabled}
               mutations={mutations}
-              briefingStatus={morningBriefingStatus}
-              isRunning={isRunning}
-              actionsReady={morningBriefingActionsReady}
-              onRequestUpgrade={onRequestUpgrade}
-              fallbackReadiness={{
-                githubConfigured: configuredSecrets.github ?? false,
-                linearConfigured: configuredSecrets.linear ?? false,
-                webConfigured: braveSearchConfigured || exaSearchConfigured,
-              }}
+              onRedeploy={onRedeploy}
             />
           )}
+          <MorningBriefingCard
+            mutations={mutations}
+            briefingStatus={morningBriefingStatus}
+            isRunning={isRunning}
+            actionsReady={morningBriefingActionsReady}
+            onRequestUpgrade={onRequestUpgrade}
+            supportsInterests={supportsBriefingInterests}
+            userLocation={status.userLocation ?? null}
+            userTimezone={status.userTimezone ?? null}
+            fallbackReadiness={{
+              githubConfigured: configuredSecrets.github ?? false,
+              linearConfigured: configuredSecrets.linear ?? false,
+              webConfigured: braveSearchConfigured || exaSearchConfigured,
+            }}
+          />
         </div>
       </div>
 
@@ -2085,6 +2798,7 @@ export function SettingsTab({
                   enabled={isRunning}
                   mutations={mutations}
                   onOpenChange={setEditConfigOpen}
+                  enableOpenclawValidation={supportsOpenclawSaveValidation}
                 />
               </div>
             )}

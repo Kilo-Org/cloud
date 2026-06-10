@@ -75,6 +75,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
 export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
   'bedrock',
+  'deepseek',
   'fireworks',
   'google', // Google AI Studio
   'inception',
@@ -97,9 +98,16 @@ export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'byteplus-coding',
   'chutes-byok',
   'codestral',
+  'crofai',
+  'inceptron-byok',
   'kimi-coding',
+  'martian',
   'neuralwatt',
   'ollama-cloud',
+  'orcarouter',
+  'synthetic',
+  'xiaomi-token-plan-ams',
+  'xiaomi-token-plan-sgp',
   'zai-coding',
 ]);
 
@@ -116,13 +124,14 @@ export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.deepseek]: 'deepseek/deepseek-v3.2',
   [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
   [VercelUserByokInferenceProviderIdSchema.enum.inception]: 'inception/mercury-2',
   [VercelUserByokInferenceProviderIdSchema.enum.moonshotai]: 'moonshotai/kimi-k2.5',
   [VercelUserByokInferenceProviderIdSchema.enum.novita]: 'openai/gpt-oss-20b',
   [VercelUserByokInferenceProviderIdSchema.enum.google]: 'google/gemini-2.5-flash-lite',
   [VercelUserByokInferenceProviderIdSchema.enum.minimax]: 'minimax/minimax-m2.5',
-  [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/devstral-2',
+  [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/mistral-medium-3.5',
   [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.perplexity]: 'perplexity/sonar',
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
@@ -132,8 +141,15 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
+  [DirectUserByokInferenceProviderIdSchema.enum['inceptron-byok']]: 'moonshotai/Kimi-K2.6',
+  [DirectUserByokInferenceProviderIdSchema.enum.martian]: 'google/gemini-3.5-flash',
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
+  [DirectUserByokInferenceProviderIdSchema.enum['orcarouter']]: 'google/gemini-3.5-flash',
+  [DirectUserByokInferenceProviderIdSchema.enum['crofai']]: 'deepseek-v4-flash',
+  [DirectUserByokInferenceProviderIdSchema.enum['synthetic']]: 'hf:zai-org/GLM-5.1',
   [DirectUserByokInferenceProviderIdSchema.enum['ollama-cloud']]: 'kimi-k2.6:cloud',
+  [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-ams']]: 'mimo-v2-flash',
+  [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-sgp']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
 } satisfies Record<UserByokProviderId, string>;
 
@@ -148,7 +164,6 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'chutes',
   'cohere',
   'deepinfra',
-  'deepseek',
   'groq',
   'interfaze',
   'klingai',
@@ -189,11 +204,16 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
 } as Record<string, VercelInferenceProviderId | undefined>;
 
-export function openRouterToVercelInferenceProviderId(providerId: string) {
+export function normalizeInferenceProviderId(providerId: string): string;
+export function normalizeInferenceProviderId(providerId: string | undefined): string | undefined;
+export function normalizeInferenceProviderId(providerId: string | undefined) {
+  if (!providerId) return providerId;
   const slashIndex = providerId.indexOf('/');
-  const normalizedProviderId = (
-    slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId
-  ).toLowerCase();
+  return (slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId).toLowerCase();
+}
+
+export function openRouterToVercelInferenceProviderId(providerId: string) {
+  const normalizedProviderId = normalizeInferenceProviderId(providerId);
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
 }
 

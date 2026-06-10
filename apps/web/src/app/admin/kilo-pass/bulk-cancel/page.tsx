@@ -5,7 +5,7 @@ import { KiloPassBulkCancel } from '../../components/KiloPassBulkCancel';
 const breadcrumbs = (
   <>
     <BreadcrumbItem>
-      <BreadcrumbPage>Kilo Pass Bulk Cancel</BreadcrumbPage>
+      <BreadcrumbPage>Kilo Pass bulk cancel</BreadcrumbPage>
     </BreadcrumbItem>
   </>
 );
@@ -15,7 +15,7 @@ export default function KiloPassBulkCancelPage() {
     <AdminPage breadcrumbs={breadcrumbs}>
       <div className="flex w-full flex-col gap-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Kilo Pass Bulk Cancel + Refund</h2>
+          <h2 className="text-2xl font-bold">Kilo Pass bulk cancel</h2>
         </div>
         <KiloPassBulkCancel />
       </div>

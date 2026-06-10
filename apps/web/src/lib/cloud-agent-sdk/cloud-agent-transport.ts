@@ -77,7 +77,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     ): void {
       if (expectedGeneration !== lifecycleGeneration) return;
 
-      const stoppedEvent: ServiceEvent = { type: 'stopped', reason: 'disconnected' };
+      const stoppedEvent: ServiceEvent = { type: 'stopped', reason: 'transport-disconnected' };
 
       const nextConnection = createConnection({
         websocketUrl: buildWebsocketUrl(),

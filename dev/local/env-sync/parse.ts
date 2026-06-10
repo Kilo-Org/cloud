@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import { services } from '../services';
-import type { Annotation, ExampleEntry } from './types';
+import type { Annotation, ExampleEntry, ResolvedValueSource } from './types';
 
 // ---------------------------------------------------------------------------
 // JSONC parsing (handles // comments, /* */ comments, trailing commas)
@@ -97,10 +97,12 @@ function readEnvFile(filePath: string): Map<string, string> {
 // Annotation parser
 // ---------------------------------------------------------------------------
 
-const KNOWN_DIRECTIVES = new Set(['url', 'from', 'pkcs8', 'exec']);
+const KNOWN_DIRECTIVES = new Set(['override', 'url', 'from', 'pkcs8', 'exec']);
 
 function parseAnnotation(directive: string, args: string): Annotation | undefined {
   switch (directive) {
+    case 'override':
+      return { type: 'override' };
     case 'url': {
       const refs = args.split(',').map(ref => {
         const trimmed = ref.trim();
@@ -200,7 +202,7 @@ function toPkcs8IfNeeded(pem: string): string {
 // Annotation-based value resolution
 // ---------------------------------------------------------------------------
 
-type ResolvedValueSource = 'env-local' | 'generated' | 'exec' | 'default' | 'missing';
+const WORKER_LOCALHOST_URL_KEYS = new Set(['KILOCODE_BACKEND_BASE_URL', 'KILO_OPENROUTER_BASE']);
 
 function resolveAnnotatedValue(
   key: string,
@@ -210,6 +212,9 @@ function resolveAnnotatedValue(
   serviceUsesLanIp: boolean
 ): { value: string; resolved: boolean; source: ResolvedValueSource } {
   switch (entry.annotation.type) {
+    case 'override':
+      return { value: entry.defaultValue, resolved: true, source: 'override' };
+
     case 'from': {
       const val = envLocal.get(entry.annotation.envLocalKey);
       if (val !== undefined) return { value: val, resolved: true, source: 'env-local' };
@@ -224,14 +229,21 @@ function resolveAnnotatedValue(
       const isHostname = key.includes('HOSTNAME') && !key.includes('URL');
       const isWs = key.includes('_WS_');
       const defaultUsesDockerHost = entry.defaultValue.includes('host.docker.internal');
+      const defaultUsesWorkerLocalhost =
+        WORKER_LOCALHOST_URL_KEYS.has(key) &&
+        (entry.defaultValue.includes('localhost') || entry.defaultValue.includes('127.0.0.1'));
       // LAN IP for container services, but never for ORIGINS keys.
       // Preserve host.docker.internal when the example default uses it
       // (sandbox containers need it to reach the host from inside Docker).
+      // Preserve localhost for worker-side URLs that are translated separately
+      // before being sent into sandbox containers.
       const host = defaultUsesDockerHost
         ? 'host.docker.internal'
-        : serviceUsesLanIp && !isOrigins && lanIp
-          ? lanIp
-          : 'localhost';
+        : defaultUsesWorkerLocalhost
+          ? 'localhost'
+          : serviceUsesLanIp && !isOrigins && lanIp
+            ? lanIp
+            : 'localhost';
       const protocol = isWs ? 'ws' : 'http';
 
       const resolvedParts: string[] = [];

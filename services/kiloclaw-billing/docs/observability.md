@@ -8,18 +8,18 @@ Use this filter for every billing lifecycle query in Axiom:
 
 Important dimensions:
 
-| Field              | Meaning                                                                                                                                                                                                                                                                       |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `billingComponent` | `worker`, `side_effects`, `kiloclaw_platform`, or `snowflake_sql_api`                                                                                                                                                                                                         |
-| `billingRunId`     | One hourly billing run across all sweeps                                                                                                                                                                                                                                      |
-| `billingSweep`     | The current sweep name, including `trial_inactivity_stop` for daily coordination and `trial_inactivity_stop_candidate` for per-instance stop work                                                                                                                             |
-| `billingCallId`    | One downstream call from the worker                                                                                                                                                                                                                                           |
-| `billingAttempt`   | Queue delivery attempt number                                                                                                                                                                                                                                                 |
-| `event`            | `run_started`, `sweep_started`, `sweep_completed`, `sweep_failed`, `queue_retry`, `run_completed`, `run_failed`, `downstream_call`, `downstream_action`, `request_rejected`, `subscription_row_skipped`, and trial-inactivity-specific events such as `trial_inactivity_stop` |
-| `outcome`          | `started`, `completed`, `failed`, `retry`, `discarded`, or `skipped`                                                                                                                                                                                                          |
-| `durationMs`       | Elapsed time for a sweep or downstream request                                                                                                                                                                                                                                |
-| `snowflakeCode`    | Snowflake SQL API error code on failed submit/poll requests                                                                                                                                                                                                                   |
-| `snowflakeMessage` | Snowflake SQL API error message on failed submit/poll requests                                                                                                                                                                                                                |
+| Field | Meaning |
+|---|---|
+| `billingComponent` | `worker`, `side_effects`, `kiloclaw_platform`, or `snowflake_sql_api` |
+| `billingRunId` | One hourly billing run across all sweeps |
+| `billingSweep` | The current sweep name, including `trial_inactivity_stop` for daily coordination and `trial_inactivity_stop_candidate` for per-instance stop work |
+| `billingCallId` | One downstream call from the worker |
+| `billingAttempt` | Queue delivery attempt number |
+| `event` | `run_started`, `sweep_started`, `sweep_completed`, `sweep_failed`, `queue_retry`, `run_completed`, `run_failed`, `downstream_call`, `downstream_action`, `request_rejected`, `subscription_row_skipped`, and trial-inactivity-specific events such as `trial_inactivity_stop` |
+| `outcome` | `started`, `completed`, `failed`, `retry`, `discarded`, or `skipped` |
+| `durationMs` | Elapsed time for a sweep or downstream request |
+| `snowflakeCode` | Snowflake SQL API error code on failed submit/poll requests |
+| `snowflakeMessage` | Snowflake SQL API error message on failed submit/poll requests |
 
 ## Saved Queries
 
@@ -94,6 +94,43 @@ Display:
 
 - show `billingRunId`, `userId`, `instanceId`, `subscriptionId`, `reason`, `platformStatus`
 
+### Credit renewal fanout discovery
+
+Filter:
+
+- `billingFlow = "kiloclaw_lifecycle"`
+- `billingSweep = "credit_renewal_discovery"`
+- `event = "credit_renewal_discovery"`
+
+Display:
+
+- show `billingRunId`, `billingAttempt`, `cutoffTime`, cursor fields, `pageBudget`, `fetchedCount`, `enqueuedCount`, `discoveryBacklogLikely`, `continuationEnqueued`, next cursor fields
+
+### Credit renewal item outcomes and age
+
+Filter:
+
+- `billingFlow = "kiloclaw_lifecycle"`
+- `billingSweep = "credit_renewal_item"`
+- `event = "credit_renewal_item"`
+
+Display:
+
+- group by `itemOutcome`
+- chart `itemQueueAgeMs` p50 / p95 / max
+- show `billingRunId`, `billingAttempt`, `subscriptionId`, `instanceId`, `renewalBoundary`, `terminalFailureStatus`
+
+### Credit renewal terminal failures
+
+Filter:
+
+- `billingFlow = "kiloclaw_lifecycle"`
+- `event = "credit_renewal_terminal_failure"`
+
+Display:
+
+- show `subscriptionId`, `renewalBoundary`, `attempts`, `terminalFailureStatus`, `terminalFailureCount`, `oldestUnresolvedTerminalFailureAt`, oldest unresolved subscription/boundary fields
+
 ### Entity drilldown
 
 Filter:
@@ -130,6 +167,18 @@ Create these monitors in Axiom:
    Trigger when `billingComponent = "snowflake_sql_api"` and `outcome = "failed"` count is `>= 5` in 15 minutes.
    Severity: ticket.
 
+6. `credit-renewal-terminal-failures`
+   Trigger when `event = "credit_renewal_terminal_failure"` and `terminalFailureStatus = "unresolved"` count is `>= 1` in 5 minutes.
+   Severity: page.
+
+7. `credit-renewal-item-age-risk`
+   Trigger when `event = "credit_renewal_item"` and `itemQueueAgeMs` p95 approaches the past-due enforcement grace window.
+   Severity: ticket; page if the age risks false suspension or destruction.
+
+8. `credit-renewal-discovery-backlog`
+   Trigger when `event = "credit_renewal_discovery"` and `discoveryBacklogLikely = true` persists across repeated billing runs.
+   Severity: ticket.
+
 ## Credit Enrollment Flow
 
 The user-initiated "Pay with Credits" flow emits its own logs under a separate `billingFlow` so they can be queried independently of the hourly lifecycle sweep.
@@ -140,17 +189,17 @@ Base filter:
 
 Dimensions:
 
-| Field              | Meaning                                                                                                                                                |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `billingComponent` | `web_trpc` (the enrollWithCredits TRPC mutation)                                                                                                       |
-| `event`            | `credit_enrollment.attempted`, `credit_enrollment.succeeded`, `credit_enrollment.failed`                                                               |
-| `outcome`          | `started`, `completed`, `failed`                                                                                                                       |
-| `failureReason`    | `insufficient_credits`, `duplicate_enrollment`, `active_subscription_exists`, `no_instance`, `user_not_found`, `precondition_failed`, `internal_error` |
-| `plan`             | `commit` or `standard`                                                                                                                                 |
-| `userId`           | KiloCode user id                                                                                                                                       |
-| `instanceId`       | KiloClaw instance id (omitted on `no_instance` failures when the user never resolved to an instance)                                                   |
-| `durationMs`       | Time from mutation entry to success/failure                                                                                                            |
-| `error`            | Error message on failures (truncated to 500 chars; may include upstream ORM/driver text on `internal_error` — treat as semi-sensitive)                 |
+| Field | Meaning |
+|---|---|
+| `billingComponent` | `web_trpc` (the enrollWithCredits TRPC mutation) |
+| `event` | `credit_enrollment.attempted`, `credit_enrollment.succeeded`, `credit_enrollment.failed` |
+| `outcome` | `started`, `completed`, `failed` |
+| `failureReason` | `insufficient_credits`, `duplicate_enrollment`, `active_subscription_exists`, `no_instance`, `user_not_found`, `precondition_failed`, `internal_error` |
+| `plan` | `commit` or `standard` |
+| `userId` | KiloCode user id |
+| `instanceId` | KiloClaw instance id (omitted on `no_instance` failures when the user never resolved to an instance) |
+| `durationMs` | Time from mutation entry to success/failure |
+| `error` | Error message on failures (truncated to 500 chars; may include upstream ORM/driver text on `internal_error` — treat as semi-sensitive) |
 
 Funnel shape: every attempt emits exactly one `credit_enrollment.attempted`, followed by exactly one of `credit_enrollment.succeeded` or `credit_enrollment.failed` (with a `failureReason`). The enclosing try/catch guarantees this even if upstream helpers (anchor resolution, prior-subscription lookup) throw.
 

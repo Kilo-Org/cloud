@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import type { SandboxId } from '../types.js';
 
@@ -12,14 +13,32 @@ export const CallbackTargetSchema = z.object({
 });
 
 /**
- * Schema for image attachments that will be downloaded from R2 to the sandbox.
- * Defined here to avoid circular dependency with router/schemas.ts.
- * Images are stored in R2 at path: {bucket}/{userId}/{path}/{filename}
+ * R2 attachment descriptors carry only server-issued names. The worker derives
+ * service/user prefixes and never accepts caller-provided object key prefixes.
  */
-const imageMessageUuidSchema = z
+const attachmentMessageUuidSchema = z
   .string()
   .uuid()
   .describe('Bare message upload UUID; service prefix is derived by the worker');
+
+const attachmentFilenameSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/,
+    'Attachment filename must be a UUID with extension png, jpg, jpeg, webp, gif, pdf, txt, md, or csv'
+  );
+
+export const AttachmentsSchema = z.object({
+  path: attachmentMessageUuidSchema,
+  files: z
+    .array(attachmentFilenameSchema)
+    .min(1)
+    .max(5)
+    .describe('Ordered array of specific UUID attachment filenames to download'),
+});
+export type Attachments = z.infer<typeof AttachmentsSchema>;
 
 const imageFilenameSchema = z
   .string()
@@ -30,8 +49,9 @@ const imageFilenameSchema = z
     'Image filename must be a UUID with extension png, jpg, jpeg, webp, or gif'
   );
 
+/** Legacy public image decoder retained only for API request compatibility. */
 export const ImagesSchema = z.object({
-  path: imageMessageUuidSchema,
+  path: attachmentMessageUuidSchema,
   files: z
     .array(imageFilenameSchema)
     .min(1)
@@ -259,18 +279,58 @@ export const RuntimeAgentsSchema = z
 
 export type RuntimeAgentInput = z.infer<typeof RuntimeAgentSchema>;
 
+// --- Runtime kilo commands ---
+
+export const RuntimeKiloCommandSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(Limits.MAX_RUNTIME_KILO_COMMAND_NAME_LENGTH)
+    .regex(/^[a-z][a-z0-9-]*$/, 'Command name must start with a letter and be a slug'),
+  template: z.string().min(1).max(Limits.MAX_RUNTIME_KILO_COMMAND_TEMPLATE),
+  description: z.string().max(Limits.MAX_RUNTIME_KILO_COMMAND_DESCRIPTION).nullable().optional(),
+  agent: z.string().max(Limits.MAX_RUNTIME_AGENT_SLUG_LENGTH).nullable().optional(),
+  model: z.string().max(Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
+  subtask: z.boolean().optional(),
+});
+
+export const RuntimeKiloCommandsSchema = z
+  .array(RuntimeKiloCommandSchema)
+  .max(
+    Limits.MAX_RUNTIME_KILO_COMMANDS,
+    `Maximum ${Limits.MAX_RUNTIME_KILO_COMMANDS} runtime kilo commands allowed`
+  );
+
+export type RuntimeKiloCommandInput = z.infer<typeof RuntimeKiloCommandSchema>;
+
+/** Discriminated payload for the initial execution on a newly-prepared session. */
+export const InitialExecutionPayloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('prompt'),
+    prompt: z.string().min(1),
+    mode: z.string().min(1),
+    model: z.string().min(1),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    command: z.string().min(1),
+    arguments: z.string().default(''),
+  }),
+]);
+
+export type InitialExecutionPayload = z.infer<typeof InitialExecutionPayloadSchema>;
+
 // --- Profile bundle ---
 
 /**
  * Schema for the profile-derived configuration bundle persisted with a
- * session. Writers always emit this nested shape; readers prefer it but
- * fall back to the legacy flat fields (`envVars`, `encryptedSecrets`, …)
- * co-located on the same record for backwards compatibility with sessions
- * stored before the nesting landed.
- *
- * The flat read-fallback can be deleted once all live sessions have been
- * rewritten with the nested `profile` key (typically a few weeks of
- * session TTL after deploy).
+ * session. Current metadata stores this under the nested `profile` key.
+ * Legacy flat profile fields are normalized by `parseSessionMetadata`.
  */
 export const SessionProfileBundleSchema = z.object({
   envVars: z
@@ -289,13 +349,15 @@ export const SessionProfileBundleSchema = z.object({
     .optional(),
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
+  kiloCommands: RuntimeKiloCommandsSchema.optional(),
 });
 
 export type SessionProfileBundle = z.infer<typeof SessionProfileBundleSchema>;
 
 /**
- * Zod schema for CloudAgentSession metadata validation.
- * Used for both DO storage and restoration validation.
+ * Legacy flat CloudAgentSession metadata schema.
+ * Current storage reads and writes go through `session-metadata.ts`, which
+ * converts this shape to the grouped SessionMetadata boundary type.
  */
 export const MetadataSchema = z.object({
   version: z.number(),
@@ -316,9 +378,9 @@ export const MetadataSchema = z.object({
   /**
    * Profile-derived configuration (envVars, encryptedSecrets, MCP servers,
    * setup commands, runtime skills/agents). This nested form is what
-   * writers emit; the flat fields below are kept optional so that records
-   * written before this key existed still parse. Readers must go through
-   * `readProfileBundle` so the fallback stays in one place.
+   * older grouped profile form. Current metadata uses the schema in
+   * `session-metadata.ts`; the flat fields below are retained only for
+   * legacy record parsing.
    */
   profile: SessionProfileBundleSchema.optional(),
   // --- Legacy flat profile fields (read-only fallback, no longer written) ---
@@ -355,6 +417,7 @@ export const MetadataSchema = z.object({
   autoCommit: z.boolean().optional(),
   condenseOnComplete: z.boolean().optional(),
   appendSystemPrompt: z.string().max(10000).optional(),
+  shallow: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
 
   // Lifecycle
@@ -363,9 +426,6 @@ export const MetadataSchema = z.object({
 
   // Callback configuration
   callbackTarget: CallbackTargetSchema.optional(),
-
-  // Image attachments
-  images: ImagesSchema.optional(),
 
   // Kilo server lifecycle tracking
   kiloServerLastActivity: z.number().optional(),
@@ -377,69 +437,23 @@ export const MetadataSchema = z.object({
   sandboxId: z
     .string()
     .refine(
-      s => /^(ses|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
+      s => /^(ses|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
       'Invalid sandboxId format'
     )
     .transform(s => s as SandboxId)
     .optional(),
+  devcontainer: z
+    .object({
+      workspacePath: z.string(),
+      innerWorkspaceFolder: z.string(),
+      wrapperPort: z.number().int().min(1).max(65535),
+      configPath: z.string(),
+    })
+    .optional(),
 
   // Initial message ID for correlation
-  initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+  initialMessageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION).optional(),
+
+  // Discriminated payload for the first execution (prompt or command)
+  initialPayload: InitialExecutionPayloadSchema.optional(),
 });
-
-/**
- * Schema for async preparation input stored in DO storage.
- * Single source of truth for the shape of data passed between
- * startPreparationAsync (write) and runPreparationAsync (read via alarm).
- */
-export const PreparationInputSchema = z.object({
-  // Session identity
-  sessionId: z.string(),
-  kiloSessionId: z.string().optional(),
-  userId: z.string(),
-  orgId: z.string().optional(),
-  botId: z.string().optional(),
-  // Auth
-  authToken: z.string(),
-  // Git source
-  githubRepo: z.string().optional(),
-  githubToken: z.string().optional(),
-  gitUrl: z.string().optional(),
-  gitToken: z.string().optional(),
-  platform: z.enum(['github', 'gitlab']).optional(),
-  // Set to true when gitToken was resolved by the caller via the managed
-  // GitLab integration (git-token-service). Signals that async prep should
-  // NOT re-resolve the token, avoiding a refresh-token rotation race
-  // between the caller and the alarm.
-  gitlabTokenManaged: z.boolean().optional(),
-  // Execution params
-  prompt: z.string(),
-  mode: z.string(),
-  model: z.string(),
-  variant: z.string().optional(),
-  // Profile-derived configuration (nested form — what writers emit).
-  profile: SessionProfileBundleSchema.optional(),
-  // Legacy flat profile fields (read-only fallback, no longer written).
-  envVars: z.record(z.string(), z.string()).optional(),
-  encryptedSecrets: EncryptedSecretsSchema.optional(),
-  setupCommands: z.array(z.string()).optional(),
-  mcpServers: z.record(z.string(), MCPServerConfigSchema).optional(),
-  runtimeSkills: RuntimeSkillsSchema.optional(),
-  runtimeAgents: RuntimeAgentsSchema.optional(),
-  upstreamBranch: z.string().optional(),
-  autoCommit: z.boolean().optional(),
-  condenseOnComplete: z.boolean().optional(),
-  appendSystemPrompt: z.string().optional(),
-  callbackTarget: CallbackTargetSchema.optional(),
-  images: ImagesSchema.optional(),
-  createdOnPlatform: z.string().optional(),
-  shallow: z.boolean().optional(),
-  gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
-  kilocodeOrganizationId: z.string().optional(),
-  // Auto-initiate after preparation
-  autoInitiate: z.boolean(),
-
-  initialMessageId: z.string().optional(),
-});
-
-export type PreparationInput = z.infer<typeof PreparationInputSchema>;

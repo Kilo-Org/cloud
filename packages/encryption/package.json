@@ -13,9 +13,9 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/encryption/src"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "~3.2.4"
+    "vitest": "catalog:"
   }
 }

@@ -1,11 +1,16 @@
 import 'server-only';
 
-import { kilo_pass_subscriptions } from '@kilocode/db/schema';
+import { kilo_pass_store_purchases, kilo_pass_subscriptions } from '@kilocode/db/schema';
 
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import type { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import {
+  type KiloPassPaymentProvider,
+  KiloPassPaymentProvider as KiloPassPaymentProviderValue,
+  type KiloPassCadence,
+  type KiloPassTier,
+} from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { getOpenPauseEvent } from '@/lib/kilo-pass/pause-events';
@@ -15,7 +20,9 @@ type DbOrTx = Db | DrizzleTransaction;
 
 export type KiloPassSubscriptionState = {
   subscriptionId: string;
-  stripeSubscriptionId: string;
+  stripeSubscriptionId: string | null;
+  paymentProvider: KiloPassPaymentProvider;
+  providerSubscriptionId: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
   status: Stripe.Subscription.Status;
@@ -28,7 +35,9 @@ export type KiloPassSubscriptionState = {
 
 type KiloPassSubscriptionRowForState = {
   subscriptionId: string;
-  stripeSubscriptionId: string;
+  stripeSubscriptionId: string | null;
+  paymentProvider: KiloPassPaymentProvider;
+  providerSubscriptionId: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
   status: Stripe.Subscription.Status;
@@ -60,6 +69,16 @@ function getSubscriptionRecencyMillis(subscription: KiloPassSubscriptionRowForSt
     isoToMillis(subscription.createdAt) ??
     Number.NEGATIVE_INFINITY
   );
+}
+
+function isStoreManagedProvider(paymentProvider: KiloPassPaymentProvider): boolean {
+  return paymentProvider !== KiloPassPaymentProviderValue.Stripe;
+}
+
+function isExpiredAtOrBeforeNow(expiresAt: string | null, nowIso: string): boolean {
+  const expiresAtMillis = isoToMillis(expiresAt);
+  const nowMillis = isoToMillis(nowIso);
+  return expiresAtMillis !== null && nowMillis !== null && expiresAtMillis <= nowMillis;
 }
 
 /**
@@ -109,6 +128,8 @@ export async function getKiloPassStateForUser(
     .select({
       subscriptionId: kilo_pass_subscriptions.id,
       stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
+      paymentProvider: kilo_pass_subscriptions.payment_provider,
+      providerSubscriptionId: kilo_pass_subscriptions.provider_subscription_id,
       tier: kilo_pass_subscriptions.tier,
       cadence: kilo_pass_subscriptions.cadence,
       status: kilo_pass_subscriptions.status,
@@ -124,6 +145,38 @@ export async function getKiloPassStateForUser(
   const selected = pickSubscriptionForState(subscriptions);
   if (!selected) return null;
 
+  if (isStoreManagedProvider(selected.paymentProvider)) {
+    const latestStorePurchase = await db.query.kilo_pass_store_purchases.findFirst({
+      where: and(
+        eq(kilo_pass_store_purchases.kilo_pass_subscription_id, selected.subscriptionId),
+        eq(kilo_pass_store_purchases.payment_provider, selected.paymentProvider)
+      ),
+      orderBy: desc(kilo_pass_store_purchases.purchased_at),
+    });
+    const nowIso = dayjs().utc().toISOString();
+
+    // Apple's EXPIRED server notification is best-effort and can be dropped, so we
+    // derive the canceled status here when the latest store purchase has lapsed.
+    // The DB row is reconciled asynchronously by the
+    // `/api/cron/kilo-pass-store-subscription-reconcile` cron — this read path is pure.
+    if (isExpiredAtOrBeforeNow(latestStorePurchase?.expires_at ?? null, nowIso)) {
+      return {
+        subscriptionId: selected.subscriptionId,
+        stripeSubscriptionId: selected.stripeSubscriptionId,
+        paymentProvider: selected.paymentProvider,
+        providerSubscriptionId: selected.providerSubscriptionId,
+        tier: selected.tier,
+        cadence: selected.cadence,
+        status: 'canceled',
+        cancelAtPeriodEnd: false,
+        currentStreakMonths: selected.currentStreakMonths,
+        nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
+        startedAt: normalizeTimestampToIso(selected.startedAt),
+        resumesAt: null,
+      };
+    }
+  }
+
   // Check for an open pause event. Stripe keeps status 'active' when pause_collection
   // is first set (the status changes to 'paused' only at the next billing cycle), so we
   // derive the paused state from the pause event table rather than the DB status.
@@ -137,6 +190,8 @@ export async function getKiloPassStateForUser(
   return {
     subscriptionId: selected.subscriptionId,
     stripeSubscriptionId: selected.stripeSubscriptionId,
+    paymentProvider: selected.paymentProvider,
+    providerSubscriptionId: selected.providerSubscriptionId,
     tier: selected.tier,
     cadence: selected.cadence,
     status: isPaused ? 'paused' : selected.status,

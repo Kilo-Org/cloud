@@ -9,19 +9,21 @@
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/security-auto-analysis/src",
     "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^3.2.4",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

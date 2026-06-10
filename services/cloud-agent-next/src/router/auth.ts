@@ -1,14 +1,14 @@
 import { initTRPC, TRPCError } from '@trpc/server';
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { TRPCContext } from '../types.js';
 
 /**
  * Type for error cause data that should be surfaced in the response.
- * Used for 409 Conflict (activeExecutionId) and 503 Retryable errors.
+ * Used for structured 409 Conflict and 503 Retryable errors.
  */
 type ErrorCauseData = {
   error?: string;
   message?: string;
-  activeExecutionId?: string;
   retryable?: boolean;
 };
 
@@ -24,7 +24,6 @@ export const t = initTRPC.context<TRPCContext>().create({
           ...shape.data,
           // Include structured error info from cause
           ...(causeData.error && { error: causeData.error }),
-          ...(causeData.activeExecutionId && { activeExecutionId: causeData.activeExecutionId }),
           ...(causeData.retryable !== undefined && { retryable: causeData.retryable }),
         },
       };
@@ -60,7 +59,7 @@ export const internalApiProtectedProcedure = t.procedure.use(async ({ ctx, next 
       message: 'Internal API secret not configured',
     });
   }
-  if (!internalApiKey || internalApiKey !== ctx.env.INTERNAL_API_SECRET) {
+  if (!internalApiKey || !timingSafeEqual(internalApiKey, ctx.env.INTERNAL_API_SECRET)) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'Invalid or missing internal API key',

@@ -6,11 +6,11 @@ This runbook walks you through the full cycle: making a change to the Docker ima
 
 ### Files you'll typically change
 
-| File                                   | Purpose                                                                 |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| `kiloclaw/Dockerfile`                  | Base image, dependencies, OpenClaw version                              |
+| File | Purpose |
+|---|---|
+| `kiloclaw/Dockerfile` | Base image, dependencies, OpenClaw version |
 | `kiloclaw/controller/src/bootstrap.ts` | Controller bootstrap (config generation, env decryption, feature flags) |
-| `kiloclaw/scripts/push-dev.sh`         | Dev image build and push script                                         |
+| `kiloclaw/scripts/push-dev.sh` | Dev image build and push script |
 
 ### Workflow at a glance
 
@@ -85,7 +85,7 @@ Edit the relevant files in `kiloclaw/`:
 To debug a bootstrap change interactively:
 
 ```bash
-docker build -t kiloclaw:test -f Dockerfile .
+docker buildx build --build-context workspace=../.. --load -t kiloclaw:test -f Dockerfile .
 
 # Run the controller directly — bootstrap logs will appear on stdout
 docker run --rm \
@@ -102,7 +102,7 @@ docker run --rm \
 ### Build the image
 
 ```bash
-docker build -t kiloclaw:test -f Dockerfile .
+docker buildx build --build-context workspace=../.. --load -t kiloclaw:test -f Dockerfile .
 ```
 
 ### Quick validation
@@ -111,7 +111,7 @@ Run these three tests before pushing any image changes:
 
 ```bash
 # 1. Build test
-docker build -t kiloclaw:test -f Dockerfile . && \
+docker buildx build --build-context workspace=../.. --load -t kiloclaw:test -f Dockerfile . && \
 docker run --rm kiloclaw:test openclaw --version
 
 # 2. Startup test
@@ -141,7 +141,7 @@ docker rm kiloclaw-gateway
 ```bash
 # Check versions
 docker run --rm kiloclaw:test node --version        # v24.15.0
-docker run --rm kiloclaw:test openclaw --version    # 2026.4.23
+docker run --rm kiloclaw:test openclaw --version    # 2026.5.26
 
 # Check directories
 docker run --rm kiloclaw:test ls -la /root/.openclaw

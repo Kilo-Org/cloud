@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { captureException } from '@sentry/nextjs';
+import { addBreadcrumb, captureException } from '@sentry/nextjs';
 import type { PullRequestPayload } from '../webhook-schemas';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import {
   createCodeReview,
+  cancelSupersededReviewsForPR,
   findExistingReview,
   findActiveReviewsForPR,
   updateReviewHeadShaAndCheckRun,
@@ -26,6 +27,7 @@ import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-wo
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
 import { APP_URL } from '@/lib/constants';
+import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
 
 /**
  * GitHub Pull Request Event Handler
@@ -113,7 +115,7 @@ export async function handlePullRequestCodeReview(
     // 2. Check if code review agent is enabled for this owner
     const agentConfig = await getAgentConfigForOwner(owner, 'code_review', 'github');
 
-    if (!agentConfig || !agentConfig.is_enabled) {
+    if (!agentConfig || !agentConfig.is_enabled || getCodeReviewActionRequiredState(agentConfig)) {
       logExceptInTest(
         `Code review agent not enabled for ${owner.type} ${owner.id} (repo: ${repository.full_name})`
       );
@@ -198,25 +200,79 @@ export async function handlePullRequestCodeReview(
 
     // 5. Cancel any existing reviews for this PR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
-    const oldReviewIds = await findActiveReviewsForPR(
+    const cancelledReviews = await cancelSupersededReviewsForPR(
       repository.full_name,
       pull_request.number,
       pull_request.head.sha
     );
 
-    if (oldReviewIds.length > 0) {
+    if (cancelledReviews.length > 0) {
+      const cancellationCounts = {
+        pending: cancelledReviews.filter(review => review.prevStatus === 'pending').length,
+        queued: cancelledReviews.filter(review => review.prevStatus === 'queued').length,
+        running: cancelledReviews.filter(review => review.prevStatus === 'running').length,
+      };
+
       logExceptInTest(
-        `Cancelling ${oldReviewIds.length} old review(s) for ${repository.full_name}#${pull_request.number}`
+        `Cancelled ${cancelledReviews.length} superseded review(s) for ${repository.full_name}#${pull_request.number}`,
+        cancellationCounts
       );
 
-      // Cancel each review via the orchestrator (fire-and-forget, don't block new review)
       await Promise.allSettled(
-        oldReviewIds.map(reviewId =>
-          codeReviewWorkerClient.cancelReview(reviewId, 'Superseded by new push').catch(err => {
-            logExceptInTest(`Failed to cancel review ${reviewId}:`, err);
-            return { success: false, reviewId };
+        cancelledReviews
+          .filter(review => review.prevStatus !== 'pending')
+          .map(async review => {
+            try {
+              const response = await codeReviewWorkerClient.cancelReview(
+                review.id,
+                'Superseded by new push',
+                review.latestActiveAttemptId ?? undefined
+              );
+
+              if (!response.success) {
+                addBreadcrumb({
+                  category: 'code-review.cancel',
+                  level: 'info',
+                  message: 'Worker cancel returned success=false for superseded review',
+                  data: {
+                    reviewId: review.id,
+                    prevStatus: review.prevStatus,
+                    repo: repository.full_name,
+                    prNumber: pull_request.number,
+                  },
+                });
+              }
+            } catch (error) {
+              logExceptInTest(`Failed to interrupt review ${review.id}:`, error);
+            }
           })
-        )
+      );
+
+      const [repoOwner, repoName] = repository.full_name.split('/');
+      await Promise.allSettled(
+        cancelledReviews
+          .filter(review => review.checkRunId != null && review.platform === 'github')
+          .map(async review => {
+            try {
+              await updateCheckRun(
+                integration.platform_installation_id as string,
+                repoOwner,
+                repoName,
+                review.checkRunId as number,
+                {
+                  status: 'completed',
+                  conclusion: 'cancelled',
+                  output: {
+                    title: 'Kilo Code Review superseded',
+                    summary: 'A newer commit was pushed; this review was cancelled.',
+                  },
+                },
+                appType
+              );
+            } catch (error) {
+              logExceptInTest(`Failed to cancel old check run ${review.checkRunId}:`, error);
+            }
+          })
       );
     }
 
@@ -299,7 +355,8 @@ export async function handlePullRequestCodeReview(
               repoOwner,
               repoName,
               checkRunId,
-              { status: 'completed', conclusion: 'cancelled' }
+              { status: 'completed', conclusion: 'cancelled' },
+              appType
             );
             logExceptInTest(
               `Cancelled orphaned check run ${checkRunId} for ${repository.full_name}#${pull_request.number}`
@@ -334,7 +391,7 @@ export async function handlePullRequestCodeReview(
       logExceptInTest(`Dispatch attempt for ${repository.full_name}#${pull_request.number}`, {
         reviewId,
         dispatched: dispatchResult.dispatched,
-        pending: dispatchResult.pending,
+        notDispatched: dispatchResult.notDispatched,
         activeCount: dispatchResult.activeCount,
       });
     } catch (dispatchError) {
@@ -477,7 +534,8 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
             args.baseOwner,
             args.baseRepoName,
             newCheckRunId,
-            { status: 'completed', conclusion: 'cancelled' }
+            { status: 'completed', conclusion: 'cancelled' },
+            args.appType
           );
         } catch (cancelError) {
           logExceptInTest('Failed to cancel orphaned merge-commit check run:', cancelError);

@@ -1,6 +1,11 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import {
+  getOrphanVolumeContextProtections,
+  insertKiloClawSubscriptionChangeLog,
+  orphanVolumeSubscriptionContextKey,
+} from '@kilocode/db';
+import { createHash } from 'crypto';
 import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -21,6 +26,7 @@ import {
   getInboundEmailAddressForInstance,
 } from '@/lib/kiloclaw/inbound-email-alias';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import {
@@ -37,6 +43,11 @@ import {
 } from '@/lib/kiloclaw/admin-audit-log';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  classifyOrphanVolume,
+  ORPHAN_VOLUME_GRACE_PERIOD_MS,
+  type OrphanVolumeClassification,
+} from '@/lib/kiloclaw/orphan-volume';
 import type {
   PlatformDebugStatusResponse,
   VolumeSnapshot,
@@ -74,6 +85,7 @@ import {
 
 const initiatingAdminUsers = alias(kilocode_users, 'initiating_admin_users');
 const pinnedByUsers = alias(kilocode_users, 'pinned_by_users');
+const fleetSourceCatalog = alias(kiloclaw_image_catalog, 'fleet_source_catalog');
 
 /**
  * Validate the JSONB `admin_size_override` column via the shared Zod
@@ -126,6 +138,20 @@ const DetectOrphansSchema = z.object({
   createdBefore: z.string().datetime(),
 });
 
+const FindOrphanVolumesSchema = z.object({
+  /** ISO date string — only check instances destroyed on or after this date. */
+  destroyedAfter: z.string().datetime(),
+  /** ISO date string — only check instances destroyed on or before this date. */
+  destroyedBefore: z.string().datetime(),
+  /** Continue scanning older rows after a previous bounded batch. */
+  cursor: z
+    .object({
+      destroyedAt: z.string().datetime(),
+      id: z.string().uuid(),
+    })
+    .optional(),
+});
+
 const GetInstanceSchema = z.object({
   id: z.string().uuid(),
 });
@@ -151,6 +177,37 @@ const GatewayProcessSchema = z.object({
 
 const StatsSchema = z.object({
   days: z.number().min(1).max(365).default(30),
+});
+
+const NoticeConfigSchema = z.object({
+  notify: z.boolean().default(true),
+  noticeLeadHours: z.number().int().min(0).max(168).default(24),
+  noticeSubject: z.string().max(120).default(''),
+  noticeBody: z.string().max(2000).default(''),
+  noticeChannels: z
+    .array(z.enum(['email', 'webapp', 'mobile_push']))
+    .min(1)
+    .default(['email', 'webapp', 'mobile_push']),
+});
+
+const ImageTagSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/);
+
+const CalVerSchema = z
+  .string()
+  .regex(/^\d{4}\.\d{1,2}\.\d{1,2}$/, 'Version must use YYYY.M.D format');
+
+const FleetUpgradeFilterSchema = NoticeConfigSchema.extend({
+  versionBelow: CalVerSchema,
+  targetImageTag: ImageTagSchema,
+  overridePins: z.boolean().default(false),
+  startsAt: z.string().datetime(),
+  tranchePercent: z.number().int().min(1).max(100),
+  intervalDays: z.number().int().min(1).max(30),
+  reason: z.string().max(256).optional(),
 });
 
 type KiloclawTrpcCode =
@@ -405,6 +462,331 @@ export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
   workerStatusError: string | null;
 };
 
+type NoticeChannel = z.infer<typeof NoticeConfigSchema>['noticeChannels'][number];
+type ScheduledActionType = 'scheduled_restart' | 'version_change';
+type ScheduledActionInstanceRow = {
+  instance: typeof kiloclaw_instances.$inferSelect;
+  owner_id: string;
+};
+type ScheduledActionTargetRow = ScheduledActionInstanceRow & {
+  stageIndex: number;
+};
+type ScheduledActionStageInput = {
+  stageIndex: number;
+  scheduledAt: string;
+};
+
+function assertScheduledTimeInFuture(value: string, fieldName: string) {
+  const scheduledAtMs = new Date(value).getTime();
+  if (Number.isNaN(scheduledAtMs) || scheduledAtMs - Date.now() < 60_000) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `${fieldName} must be at least 1 minute in the future`,
+    });
+  }
+}
+
+async function validateAvailableImageTag(imageTag: string) {
+  const [catalogEntry] = await db
+    .select({
+      image_tag: kiloclaw_image_catalog.image_tag,
+      status: kiloclaw_image_catalog.status,
+    })
+    .from(kiloclaw_image_catalog)
+    .where(eq(kiloclaw_image_catalog.image_tag, imageTag))
+    .limit(1);
+
+  if (!catalogEntry) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Target image tag not found in catalog: ${imageTag}`,
+    });
+  }
+  if (catalogEntry.status === 'disabled') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Target image tag is disabled: ${imageTag}`,
+    });
+  }
+}
+
+async function findPendingScheduledActionConflicts(instanceIds: string[]) {
+  if (instanceIds.length === 0) return [];
+  const existingPending = await db
+    .select({
+      instance_id: kiloclaw_scheduled_action_targets.instance_id,
+      scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
+    })
+    .from(kiloclaw_scheduled_action_targets)
+    .innerJoin(
+      kiloclaw_scheduled_actions,
+      eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+    )
+    .where(
+      and(
+        inArray(kiloclaw_scheduled_action_targets.instance_id, instanceIds),
+        inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
+        inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+      )
+    );
+  return Array.from(new Set(existingPending.map(e => e.instance_id)));
+}
+
+async function createScheduledActionRows(params: {
+  actionType: ScheduledActionType;
+  targetImageTag: string | null;
+  overridePins: boolean;
+  noticeLeadHours: number;
+  noticeSubject: string;
+  noticeBody: string;
+  reason: string | null;
+  createdBy: string;
+  stages: ScheduledActionStageInput[];
+  targets: ScheduledActionTargetRow[];
+  notify: boolean;
+  noticeChannels: NoticeChannel[];
+}) {
+  const liveInstanceIds = Array.from(new Set(params.targets.map(row => row.instance.id)));
+  if (liveInstanceIds.length === 0) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'No target instances to schedule',
+    });
+  }
+
+  return db.transaction(
+    async tx => {
+      const existingPending = await tx
+        .select({
+          instance_id: kiloclaw_scheduled_action_targets.instance_id,
+          scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
+        })
+        .from(kiloclaw_scheduled_action_targets)
+        .innerJoin(
+          kiloclaw_scheduled_actions,
+          eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+        )
+        .where(
+          and(
+            inArray(kiloclaw_scheduled_action_targets.instance_id, liveInstanceIds),
+            inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
+            inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+          )
+        );
+
+      if (existingPending.length > 0) {
+        const conflictIds = Array.from(new Set(existingPending.map(e => e.instance_id)));
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            conflictIds.length === 1
+              ? `Instance ${conflictIds[0]} already has a pending or in-flight scheduled action; cancel it first`
+              : `${conflictIds.length} instances already have pending or in-flight scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
+        });
+      }
+
+      const [parentRow] = await tx
+        .insert(kiloclaw_scheduled_actions)
+        .values({
+          action_type: params.actionType,
+          target_image_tag: params.targetImageTag,
+          override_pins: params.overridePins,
+          notice_lead_hours: params.noticeLeadHours,
+          notice_subject: params.noticeSubject,
+          notice_body: params.noticeBody,
+          reason: params.reason,
+          status: 'scheduled',
+          created_by: params.createdBy,
+          total_count: liveInstanceIds.length,
+        })
+        .returning({ id: kiloclaw_scheduled_actions.id });
+
+      const stageRows = await tx
+        .insert(kiloclaw_scheduled_action_stages)
+        .values(
+          params.stages.map(stage => ({
+            scheduled_action_id: parentRow.id,
+            stage_index: stage.stageIndex,
+            scheduled_at: stage.scheduledAt,
+            status: 'pending' as const,
+          }))
+        )
+        .returning({
+          id: kiloclaw_scheduled_action_stages.id,
+          stage_index: kiloclaw_scheduled_action_stages.stage_index,
+        });
+
+      const stageIdByIndex = new Map(stageRows.map(stage => [stage.stage_index, stage.id]));
+
+      const insertedTargets = await tx
+        .insert(kiloclaw_scheduled_action_targets)
+        .values(
+          params.targets.map(row => {
+            const stageId = stageIdByIndex.get(row.stageIndex);
+            if (!stageId) throw new Error(`Missing stage id for stage ${row.stageIndex}`);
+            return {
+              scheduled_action_id: parentRow.id,
+              stage_id: stageId,
+              instance_id: row.instance.id,
+              source_image_tag: row.instance.tracked_image_tag,
+              target_image_tag: params.targetImageTag,
+              user_id: row.owner_id,
+              status: 'pending' as const,
+            };
+          })
+        )
+        .returning({
+          id: kiloclaw_scheduled_action_targets.id,
+          instance_id: kiloclaw_scheduled_action_targets.instance_id,
+        });
+
+      if (params.notify && params.noticeChannels.length > 0) {
+        const notificationRows: NewKiloClawScheduledActionNotification[] = [];
+        for (const target of insertedTargets) {
+          for (const channel of params.noticeChannels) {
+            notificationRows.push({
+              target_id: target.id,
+              channel,
+              kind: 'notice',
+              status: 'pending',
+            });
+          }
+        }
+        await tx.insert(kiloclaw_scheduled_action_notifications).values(notificationRows);
+      }
+
+      return {
+        id: parentRow.id,
+        stageIds: stageRows.sort((a, b) => a.stage_index - b.stage_index).map(stage => stage.id),
+        insertedTargets,
+      };
+    },
+    { isolationLevel: 'serializable' }
+  );
+}
+
+function buildFleetStagePlan(params: {
+  targetCount: number;
+  startsAt: string;
+  tranchePercent: number;
+  intervalDays: number;
+}) {
+  if (params.targetCount === 0) return [];
+  const trancheSize = Math.max(1, Math.ceil((params.targetCount * params.tranchePercent) / 100));
+  const startsAtMs = new Date(params.startsAt).getTime();
+  const stages: Array<{ stageIndex: number; scheduledAt: string; targetCount: number }> = [];
+  let remaining = params.targetCount;
+  let stageIndex = 0;
+  while (remaining > 0) {
+    const targetCount = Math.min(trancheSize, remaining);
+    stages.push({
+      stageIndex,
+      scheduledAt: new Date(
+        startsAtMs + stageIndex * params.intervalDays * 86_400_000
+      ).toISOString(),
+      targetCount,
+    });
+    remaining -= targetCount;
+    stageIndex += 1;
+  }
+  return stages;
+}
+
+function fleetSortKey(seed: string, instanceId: string) {
+  return createHash('sha256').update(`${seed}:${instanceId}`).digest('hex');
+}
+
+async function getFleetUpgradePlan(input: z.infer<typeof FleetUpgradeFilterSchema>) {
+  await validateAvailableImageTag(input.targetImageTag);
+
+  const rows = await db
+    .select({
+      instance: kiloclaw_instances,
+      owner_id: kilocode_users.id,
+      source_openclaw_version: fleetSourceCatalog.openclaw_version,
+      source_is_below_cutoff: sql<boolean | null>`
+        string_to_array(${fleetSourceCatalog.openclaw_version}, '.')::int[]
+        < string_to_array(${input.versionBelow}, '.')::int[]
+      `,
+      pin_id: kiloclaw_version_pins.id,
+    })
+    .from(kiloclaw_instances)
+    .innerJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+    .innerJoin(
+      kiloclaw_subscriptions,
+      eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+    )
+    .leftJoin(
+      fleetSourceCatalog,
+      eq(kiloclaw_instances.tracked_image_tag, fleetSourceCatalog.image_tag)
+    )
+    .leftJoin(kiloclaw_version_pins, eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id))
+    .where(
+      and(
+        isNull(kiloclaw_instances.destroyed_at),
+        isNull(kiloclaw_instances.inactive_trial_stopped_at),
+        isNull(kiloclaw_subscriptions.suspended_at)
+      )
+    );
+
+  const unknownVersionRows = rows.filter(
+    row => !row.instance.tracked_image_tag || !row.source_openclaw_version
+  );
+  const alreadyOnTargetRows = rows.filter(
+    row => row.instance.tracked_image_tag === input.targetImageTag
+  );
+  const eligibleRows = rows.filter(
+    row =>
+      row.source_openclaw_version &&
+      row.source_is_below_cutoff === true &&
+      row.instance.tracked_image_tag !== input.targetImageTag
+  );
+  const pinnedRows = eligibleRows.filter(row => row.pin_id !== null);
+  const preConflictRows = eligibleRows.filter(row => input.overridePins || row.pin_id === null);
+  const conflictInstanceIds = await findPendingScheduledActionConflicts(
+    preConflictRows.map(row => row.instance.id)
+  );
+  const conflictIdSet = new Set(conflictInstanceIds);
+  const seed = [
+    input.versionBelow,
+    input.targetImageTag,
+    input.startsAt,
+    input.tranchePercent,
+    input.intervalDays,
+  ].join('|');
+  const actionableRows = preConflictRows
+    .filter(row => !conflictIdSet.has(row.instance.id))
+    .map(row => ({ row, sortKey: fleetSortKey(seed, row.instance.id) }))
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    .map(({ row }) => row);
+  const stages = buildFleetStagePlan({
+    targetCount: actionableRows.length,
+    startsAt: input.startsAt,
+    tranchePercent: input.tranchePercent,
+    intervalDays: input.intervalDays,
+  });
+
+  return {
+    counts: {
+      eligible: eligibleRows.length,
+      actionable: actionableRows.length,
+      pinned: pinnedRows.length,
+      conflicts: conflictInstanceIds.length,
+      alreadyOnTarget: alreadyOnTargetRows.length,
+      unknownVersion: unknownVersionRows.length,
+    },
+    stages,
+    actionableRows,
+    actionableInstanceIds: actionableRows.map(row => row.instance.id),
+    excluded: {
+      pinnedInstanceIds: pinnedRows.map(row => row.instance.id),
+      conflictInstanceIds,
+      alreadyOnTargetInstanceIds: alreadyOnTargetRows.map(row => row.instance.id),
+      unknownVersionInstanceIds: unknownVersionRows.map(row => row.instance.id),
+    },
+  };
+}
+
 export const adminKiloclawInstancesRouter = createTRPCRouter({
   get: adminProcedure.input(GetInstanceSchema).query(async ({ input }) => {
     const [result] = await db
@@ -546,6 +928,51 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const client = new KiloClawInternalClient();
       return client.getRegistryEntries(input.userId, input.orgId ?? undefined);
+    }),
+
+  // Admin break-glass: release a STUCK provision reservation (status
+  // in_progress / failed_requires_reconciliation) so the user can provision
+  // again. This is an operator action — the admin asserts (via the UI confirm
+  // dialog) that they have verified the attempt is dead and any provider
+  // resources are cleaned up. The worker mutates only the registry bookkeeping
+  // row (no provider/Postgres changes) and refuses reservations backing an
+  // active instance or in a non-releasable state.
+  releaseReservation: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid(),
+        orgId: z.string().uuid().optional(),
+        // Caller (the break-glass confirmation dialog) must supply this; enforced
+        // at the API boundary, not auto-inserted by the client.
+        acknowledgeCleanupVerified: z.literal(true),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.releaseProvisionReservation(
+        input.userId,
+        input.instanceId,
+        input.orgId,
+        input.acknowledgeCleanupVerified
+      );
+      await createKiloClawAdminAuditLog({
+        action: 'kiloclaw.provision_reservation.release',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        target_user_id: input.userId,
+        message:
+          `Break-glass released stuck provision reservation ${input.instanceId} ` +
+          `(was ${result.previousStatus}); operator asserted provider cleanup verified`,
+        metadata: {
+          instanceId: input.instanceId,
+          orgId: input.orgId ?? null,
+          previousStatus: result.previousStatus,
+          acknowledgeCleanupVerified: true,
+        },
+      });
+      return result;
     }),
 
   list: adminProcedure.input(ListInstancesSchema).query(async ({ input }) => {
@@ -1213,12 +1640,21 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   }),
 
   fileTree: adminProcedure
-    .input(z.object({ userId: z.string().min(1), instanceId: z.string().uuid().optional() }))
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        path: kiloclawFilePathSchema.optional(),
+      })
+    )
     .query(async ({ input }) => {
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
         const client = new KiloClawInternalClient();
-        const result = await client.getFileTree(input.userId, workerInstanceId(instance));
+        const result = await client.getFileTree(input.userId, {
+          instanceId: workerInstanceId(instance),
+          path: input.path,
+        });
         return result.tree;
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to fetch file tree');
@@ -1230,7 +1666,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
       })
     )
     .query(async ({ input }) => {
@@ -1248,15 +1684,31 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
         content: z.string(),
         etag: z.string().optional(),
+        openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
       })
     )
     .mutation(async ({ input }) => {
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
         const client = new KiloClawInternalClient();
+        if (input.openclawValidation) {
+          if (input.path !== 'openclaw.json') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'OpenClaw validation is only available for openclaw.json',
+            });
+          }
+          return await client.writeOpenclawConfigFile(
+            input.userId,
+            input.content,
+            input.etag,
+            workerInstanceId(instance),
+            input.openclawValidation
+          );
+        }
         return await client.writeFile(
           input.userId,
           input.path,
@@ -1822,39 +2274,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       // Validate scheduledAt > now() + 1 minute so admins can't
       // accidentally schedule something that fires immediately.
-      const scheduledAtMs = new Date(input.scheduledAt).getTime();
-      if (scheduledAtMs - Date.now() < 60_000) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'scheduledAt must be at least 1 minute in the future',
-        });
-      }
+      assertScheduledTimeInFuture(input.scheduledAt, 'scheduledAt');
 
       // For version_change, validate the target image tag matches the
       // catalog rules bulkChangeVersion uses (must exist + status='available').
       // We do this BEFORE inserting any rows so a bad tag fails fast.
       if (input.actionType === 'version_change') {
-        const [catalogEntry] = await db
-          .select({
-            image_tag: kiloclaw_image_catalog.image_tag,
-            status: kiloclaw_image_catalog.status,
-          })
-          .from(kiloclaw_image_catalog)
-          .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
-          .limit(1);
-
-        if (!catalogEntry) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Target image tag not found in catalog: ${input.imageTag}`,
-          });
-        }
-        if (catalogEntry.status === 'disabled') {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Target image tag is disabled: ${input.imageTag}`,
-          });
-        }
+        await validateAvailableImageTag(input.imageTag);
       }
 
       // Dedupe instance ids — duplicate target rows would violate
@@ -1907,129 +2333,21 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       // schedule requests on the same instance can both observe "no
       // pending" outside any transaction and then both insert separate
       // scheduled actions, violating the one-pending-action-per-instance
-      // invariant. SSI in Postgres detects the conflict and aborts the
-      // losing tx with 40001; the admin retries (the click) and the
-      // second attempt sees the now-committed pending row and rejects
-      // with the normal CONFLICT message. We don't add an in-procedure
-      // retry loop — admin-initiated path, low contention, retry-by-
-      // clicking is fine.
-      const result = await db.transaction(
-        async tx => {
-          // Filter must include 'running' as well as 'pending'. The DO
-          // apply path flips the target to 'running' via
-          // claimScheduledActionTarget right before invoking the side
-          // effect; if a second schedule request lands during that
-          // window and we filter on 'pending' alone, we'd miss the
-          // in-flight target and create a duplicate parent action.
-          const existingPending = await tx
-            .select({
-              instance_id: kiloclaw_scheduled_action_targets.instance_id,
-              scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
-            })
-            .from(kiloclaw_scheduled_action_targets)
-            .innerJoin(
-              kiloclaw_scheduled_actions,
-              eq(
-                kiloclaw_scheduled_actions.id,
-                kiloclaw_scheduled_action_targets.scheduled_action_id
-              )
-            )
-            .where(
-              and(
-                inArray(kiloclaw_scheduled_action_targets.instance_id, liveInstanceIds),
-                inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
-                inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
-              )
-            );
-
-          if (existingPending.length > 0) {
-            const conflictIds = Array.from(new Set(existingPending.map(e => e.instance_id)));
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message:
-                conflictIds.length === 1
-                  ? `Instance ${conflictIds[0]} already has a pending or in-flight scheduled action; cancel it first`
-                  : `${conflictIds.length} instances already have pending or in-flight scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
-            });
-          }
-
-          const [parentRow] = await tx
-            .insert(kiloclaw_scheduled_actions)
-            .values({
-              action_type: input.actionType,
-              target_image_tag: parentTargetImageTag,
-              override_pins: parentOverridePins,
-              notice_lead_hours: input.noticeLeadHours,
-              notice_subject: input.noticeSubject,
-              notice_body: input.noticeBody,
-              reason: input.reason ?? null,
-              status: 'scheduled',
-              created_by: ctx.user.id,
-              total_count: liveInstanceIds.length,
-            })
-            .returning({ id: kiloclaw_scheduled_actions.id });
-
-          const [stageRow] = await tx
-            .insert(kiloclaw_scheduled_action_stages)
-            .values({
-              scheduled_action_id: parentRow.id,
-              stage_index: 0,
-              scheduled_at: input.scheduledAt,
-              status: 'pending',
-            })
-            .returning({ id: kiloclaw_scheduled_action_stages.id });
-
-          const insertedTargets = await tx
-            .insert(kiloclaw_scheduled_action_targets)
-            .values(
-              liveInstanceIds.map(id => {
-                const row = liveResolvedById.get(id);
-                // liveResolvedById is built from liveInstanceRows (filtered
-                // above), so every id resolves.
-                if (!row) throw new Error(`unresolved instance ${id}`);
-                return {
-                  scheduled_action_id: parentRow.id,
-                  stage_id: stageRow.id,
-                  instance_id: row.instance.id,
-                  source_image_tag: row.instance.tracked_image_tag,
-                  // For version_change targets we stamp the target tag so the
-                  // DO apply path can read it from the target row directly
-                  // without having to join back to the parent.
-                  target_image_tag: parentTargetImageTag,
-                  user_id: row.owner_id,
-                  status: 'pending' as const,
-                };
-              })
-            )
-            .returning({
-              id: kiloclaw_scheduled_action_targets.id,
-              instance_id: kiloclaw_scheduled_action_targets.instance_id,
-            });
-
-          // Fan out one notification row per (target, channel) when
-          // notify=true. The sweep selects pending rows whose stage's
-          // (scheduled_at - notice_lead_hours) is in the past. Channels
-          // dispatch independently; one failed channel doesn't poison
-          // the others.
-          if (input.notify && input.noticeChannels.length > 0) {
-            const notificationRows: NewKiloClawScheduledActionNotification[] = [];
-            for (const target of insertedTargets) {
-              for (const channel of input.noticeChannels) {
-                notificationRows.push({
-                  target_id: target.id,
-                  channel,
-                  kind: 'notice',
-                  status: 'pending',
-                });
-              }
-            }
-            await tx.insert(kiloclaw_scheduled_action_notifications).values(notificationRows);
-          }
-
-          return { id: parentRow.id, stageId: stageRow.id };
-        },
-        { isolationLevel: 'serializable' }
-      );
+      // invariant.
+      const result = await createScheduledActionRows({
+        actionType: input.actionType,
+        targetImageTag: parentTargetImageTag,
+        overridePins: parentOverridePins,
+        noticeLeadHours: input.noticeLeadHours,
+        noticeSubject: input.noticeSubject,
+        noticeBody: input.noticeBody,
+        reason: input.reason ?? null,
+        createdBy: ctx.user.id,
+        stages: [{ stageIndex: 0, scheduledAt: input.scheduledAt }],
+        targets: liveInstanceRows.map(row => ({ ...row, stageIndex: 0 })),
+        notify: input.notify,
+        noticeChannels: input.noticeChannels,
+      });
 
       // Audit log fire-and-forget. Multi-user actions still use the
       // actor's id as the target_user_id sentinel since the column is
@@ -2119,7 +2437,115 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         );
       }
 
-      return { id: result.id, stageId: result.stageId };
+      return { id: result.id, stageId: result.stageIds[0] };
+    }),
+
+  previewFleetUpgrade: adminProcedure.input(FleetUpgradeFilterSchema).query(async ({ input }) => {
+    assertScheduledTimeInFuture(input.startsAt, 'startsAt');
+    const plan = await getFleetUpgradePlan(input);
+
+    return {
+      counts: plan.counts,
+      stages: plan.stages,
+      actionableInstanceIds: plan.actionableInstanceIds,
+      excluded: plan.excluded,
+    };
+  }),
+
+  createFleetUpgrade: adminProcedure
+    .input(FleetUpgradeFilterSchema)
+    .mutation(async ({ input, ctx }) => {
+      assertScheduledTimeInFuture(input.startsAt, 'startsAt');
+      const plan = await getFleetUpgradePlan(input);
+
+      if (plan.excluded.conflictInstanceIds.length > 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `${plan.excluded.conflictInstanceIds.length} instances already have pending or in-flight scheduled actions; cancel those first: ${plan.excluded.conflictInstanceIds.join(', ')}`,
+        });
+      }
+
+      if (plan.actionableRows.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No actionable fleet upgrade targets match the selected filters',
+        });
+      }
+
+      const stageTargets: ScheduledActionTargetRow[] = [];
+      let offset = 0;
+      for (const stage of plan.stages) {
+        const rows = plan.actionableRows.slice(offset, offset + stage.targetCount);
+        stageTargets.push(...rows.map(row => ({ ...row, stageIndex: stage.stageIndex })));
+        offset += stage.targetCount;
+      }
+
+      const result = await createScheduledActionRows({
+        actionType: 'version_change',
+        targetImageTag: input.targetImageTag,
+        overridePins: input.overridePins,
+        noticeLeadHours: input.noticeLeadHours,
+        noticeSubject: input.noticeSubject,
+        noticeBody: input.noticeBody,
+        reason: input.reason ?? null,
+        createdBy: ctx.user.id,
+        stages: plan.stages.map(stage => ({
+          stageIndex: stage.stageIndex,
+          scheduledAt: stage.scheduledAt,
+        })),
+        targets: stageTargets,
+        notify: input.notify,
+        noticeChannels: input.noticeChannels,
+      });
+
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.fleet_upgrade.created',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: ctx.user.id,
+          message: `Created fleet upgrade to ${input.targetImageTag} for ${stageTargets.length} instances in ${plan.stages.length} tranches`,
+          metadata: {
+            scheduledActionId: result.id,
+            versionBelow: input.versionBelow,
+            targetImageTag: input.targetImageTag,
+            overridePins: input.overridePins,
+            startsAt: input.startsAt,
+            tranchePercent: input.tranchePercent,
+            intervalDays: input.intervalDays,
+            targetCount: stageTargets.length,
+            counts: plan.counts,
+            stageSizes: plan.stages.map(stage => stage.targetCount),
+          },
+        });
+      } catch (auditErr) {
+        console.error('Failed to write audit log for createFleetUpgrade:', auditErr);
+      }
+
+      const internalClient = new KiloClawInternalClient();
+      const wakeConcurrency = 20;
+      for (let i = 0; i < plan.actionableRows.length; i += wakeConcurrency) {
+        const batch = plan.actionableRows.slice(i, i + wakeConcurrency);
+        await Promise.all(
+          batch.map(async row => {
+            try {
+              await internalClient.wakeScheduledAction(row.owner_id, row.instance.id);
+            } catch (wakeErr) {
+              console.error(
+                `Failed to wake DO after createFleetUpgrade (instance=${row.instance.id}):`,
+                wakeErr
+              );
+            }
+          })
+        );
+      }
+
+      return {
+        id: result.id,
+        stageIds: result.stageIds,
+        targetCount: stageTargets.length,
+      };
     }),
 
   /**
@@ -2191,19 +2617,25 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           ? await db
               .select({
                 scheduled_action_id: kiloclaw_scheduled_action_stages.scheduled_action_id,
-                scheduled_at: kiloclaw_scheduled_action_stages.scheduled_at,
+                scheduled_at: sql<string>`MIN(${kiloclaw_scheduled_action_stages.scheduled_at})`,
+                stage_count: sql<number>`COUNT(*)::int`,
+                latest_scheduled_at: sql<string>`MAX(${kiloclaw_scheduled_action_stages.scheduled_at})`,
               })
               .from(kiloclaw_scheduled_action_stages)
               .where(inArray(kiloclaw_scheduled_action_stages.scheduled_action_id, actionIds))
-              .orderBy(asc(kiloclaw_scheduled_action_stages.scheduled_at))
+              .groupBy(kiloclaw_scheduled_action_stages.scheduled_action_id)
           : [];
       const scheduledAtByAction = new Map<string, string>();
+      const stageSummaryByAction = new Map<
+        string,
+        { stage_count: number; latest_scheduled_at: string }
+      >();
       for (const s of stageRows) {
-        // First stage we see per action wins (rows are ordered ascending
-        // so this captures the earliest scheduled_at).
-        if (!scheduledAtByAction.has(s.scheduled_action_id)) {
-          scheduledAtByAction.set(s.scheduled_action_id, s.scheduled_at);
-        }
+        scheduledAtByAction.set(s.scheduled_action_id, s.scheduled_at);
+        stageSummaryByAction.set(s.scheduled_action_id, {
+          stage_count: s.stage_count,
+          latest_scheduled_at: s.latest_scheduled_at,
+        });
       }
 
       const totalCountResult = await db
@@ -2216,6 +2648,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return {
         items: rows.map(r => {
           const summary = targetSummaryByAction.get(r.id);
+          const stageSummary = stageSummaryByAction.get(r.id);
           return {
             ...r,
             target_count: summary?.count ?? 0,
@@ -2223,6 +2656,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             // "N instances" otherwise.
             first_instance_id: summary?.first_instance_id ?? null,
             scheduled_at: scheduledAtByAction.get(r.id) ?? null,
+            stage_count: stageSummary?.stage_count ?? 0,
+            latest_scheduled_at: stageSummary?.latest_scheduled_at ?? null,
           };
         }),
         pagination: {
@@ -2265,12 +2700,18 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           target: kiloclaw_scheduled_action_targets,
           user_email: kilocode_users.google_user_email,
           instance_sandbox_id: kiloclaw_instances.sandbox_id,
+          stage_index: kiloclaw_scheduled_action_stages.stage_index,
+          stage_scheduled_at: kiloclaw_scheduled_action_stages.scheduled_at,
         })
         .from(kiloclaw_scheduled_action_targets)
         .leftJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_scheduled_action_targets.user_id))
         .leftJoin(
           kiloclaw_instances,
           eq(kiloclaw_instances.id, kiloclaw_scheduled_action_targets.instance_id)
+        )
+        .leftJoin(
+          kiloclaw_scheduled_action_stages,
+          eq(kiloclaw_scheduled_action_stages.id, kiloclaw_scheduled_action_targets.stage_id)
         )
         .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, input.id));
 
@@ -2281,6 +2722,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           ...t.target,
           user_email: t.user_email,
           instance_sandbox_id: t.instance_sandbox_id,
+          stage_index: t.stage_index,
+          stage_scheduled_at: t.stage_scheduled_at,
         })),
       };
     }),
@@ -3091,6 +3534,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         const result = await client.resizeMachine(
           input.userId,
           input.instanceType,
+          { actorId: ctx.user.id, actorEmail: ctx.user.google_user_email },
           workerInstanceId(instance)
         );
 
@@ -3452,6 +3896,434 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
 
       return { success: true };
+    }),
+
+  // ── Orphan-volume reaper ──────────────────────────────────────────────
+  //
+  // Finds Fly volumes left behind by destroyed instances and lets an admin
+  // reap them one row at a time. Detection is anchored on the (soft-deleted,
+  // never hard-deleted) `kiloclaw_instances` row — the Fly app + volume name
+  // are derived deterministically from it by the worker, so a finalized DO
+  // with wiped storage does not impair correlation. Every safety check is
+  // re-run server-side in `destroyOrphanVolume` before anything is deleted.
+
+  // A mutation, not a query: this is an expensive admin-triggered fan-out
+  // (matches `detectOrphans`) — it must not auto-refetch on the client.
+  findOrphanVolumes: adminProcedure.input(FindOrphanVolumesSchema).mutation(async ({ input }) => {
+    const MAX_SCAN = 500;
+    const CONCURRENCY = 10;
+
+    type DestroyedInstanceScanRow = {
+      id: string;
+      user_id: string;
+      sandbox_id: string;
+      organization_id: string | null;
+      destroyed_at: string;
+      latest_sandbox_destroyed_at: string | null;
+      user_email: string | null;
+      subscription_status: string | null;
+    };
+
+    // 1. The latest destroyed row per (user, sandbox) inside the requested
+    //    window.
+    //
+    // This is intentionally written as raw SQL matching the production query
+    // we used to diagnose the scanner. The previous Drizzle `selectDistinctOn`
+    // derived table returned `scanned: 0` in production for a narrow same-day
+    // ISO window even though this SQL shape returned the matching rows.
+    //
+    // `DISTINCT ON` collapses reprovisioned sandboxes to the latest destroyed
+    // row inside the admin-selected scan window, restoring the pre-#3407 scan
+    // semantics. `latest_sandbox_destroyed_at` still tracks the latest
+    // destruction across all time so grace-period safety is measured from the
+    // most recent volume use, not just from the selected row.
+    // Timestamps are cast explicitly so ISO inputs and Postgres timestamp text
+    // are compared as timestamptz values in every runtime. The outer SELECT
+    // formats timestamps as strict ISO 8601 (to_char with AT TIME ZONE 'UTC')
+    // so downstream code never has to parse Postgres's space-separated text
+    // representation (e.g. "2026-05-15 10:06:30.976+00").
+    const cursorPredicate = input.cursor
+      ? sql`
+          and (
+            ranked.destroyed_at < ${input.cursor.destroyedAt}::timestamptz
+            or (
+              ranked.destroyed_at = ${input.cursor.destroyedAt}::timestamptz
+              and ranked.id < ${input.cursor.id}::uuid
+            )
+          )
+        `
+      : sql``;
+
+    const { rows: instances } = await db.execute<DestroyedInstanceScanRow>(sql`
+      select
+        ranked.id::text as id,
+        ranked.user_id,
+        ranked.sandbox_id,
+        ranked.organization_id,
+        to_char(ranked.destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as destroyed_at,
+        to_char(ranked.latest_sandbox_destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as latest_sandbox_destroyed_at,
+        ranked.user_email,
+        ranked.subscription_status
+      from (
+        select distinct on (i.user_id, i.sandbox_id)
+          i.id,
+          i.user_id,
+          i.sandbox_id,
+          i.organization_id,
+          i.destroyed_at,
+          (
+            select max(latest.destroyed_at)
+            from kiloclaw_instances latest
+            where latest.user_id = i.user_id
+              and latest.sandbox_id = i.sandbox_id
+              and latest.destroyed_at is not null
+          ) as latest_sandbox_destroyed_at,
+          u.google_user_email as user_email,
+          s.status as subscription_status
+        from kiloclaw_instances i
+        left join kilocode_users u on i.user_id = u.id
+        left join kiloclaw_subscriptions s on i.id = s.instance_id
+        where i.destroyed_at >= ${input.destroyedAfter}::timestamptz
+          and i.destroyed_at <= ${input.destroyedBefore}::timestamptz
+        order by i.user_id, i.sandbox_id, i.destroyed_at desc, i.id desc
+      ) ranked
+      where true
+        ${cursorPredicate}
+      order by ranked.destroyed_at desc, ranked.id desc
+      limit ${MAX_SCAN + 1}
+    `);
+
+    const capped = instances.length > MAX_SCAN;
+    const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
+    const lastScanned = toScan.at(-1);
+    const nextCursor =
+      capped && lastScanned?.destroyed_at
+        ? {
+            // destroyed_at is already ISO 8601 (formatted by to_char in the
+            // query above) so no Date round-trip is needed here.
+            destroyedAt: lastScanned.destroyed_at,
+            id: lastScanned.id,
+          }
+        : null;
+
+    type VolumeRow = {
+      instance_id: string;
+      user_id: string;
+      user_email: string | null;
+      sandbox_id: string;
+      organization_id: string | null;
+      destroyed_at: string;
+      subscription_status: string | null;
+      fly_app: string;
+      volume_id: string;
+      volume_name: string;
+      volume_state: string;
+      volume_region: string;
+      volume_size_gb: number;
+      attached_machine_id: string | null;
+      volume_created_at: string;
+      do_status: string | null;
+      classification: OrphanVolumeClassification;
+    };
+    type ScanErrorRow = {
+      instance_id: string;
+      user_id: string;
+      user_email: string | null;
+      sandbox_id: string;
+      error: string;
+    };
+
+    if (toScan.length === 0) {
+      return {
+        volumes: [] as VolumeRow[],
+        errors: [] as ScanErrorRow[],
+        scanned: 0,
+        capped: false,
+        nextCursor: null,
+      };
+    }
+
+    const client = new KiloClawInternalClient();
+    const now = new Date();
+    const { accessGrantingContextKeys, pendingDestructionContextKeys } =
+      await getOrphanVolumeContextProtections(
+        db,
+        toScan.map(instance => ({
+          user_id: instance.user_id,
+          organization_id: instance.organization_id,
+        })),
+        now
+      );
+    const volumes: VolumeRow[] = [];
+    const errors: ScanErrorRow[] = [];
+
+    for (let i = 0; i < toScan.length; i += CONCURRENCY) {
+      const batch = toScan.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(instance =>
+          client.scanOrphanVolumes(instance.user_id, instance.id, instance.sandbox_id)
+        )
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const instance = batch[j];
+        const result = results[j];
+        if (!instance || !result) continue;
+
+        // The worker call itself failed — surface it so an empty result is
+        // never silently read as "no orphans".
+        if (result.status === 'rejected') {
+          errors.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            error: result.reason instanceof Error ? result.reason.message : 'Volume scan failed',
+          });
+          continue;
+        }
+
+        const scan = result.value;
+        // listVolumes failed inside the worker — same false-negative risk.
+        if (scan.scanError) {
+          errors.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            error: `Could not list Fly volumes: ${scan.scanError}`,
+          });
+          continue;
+        }
+        // The DO state could not be read, so a volume cannot be confirmed as
+        // an orphan. Surface it as an unscanned instance rather than silently
+        // dropping it from a results table that only shows confirmed orphans.
+        if (scan.doStatusError !== null) {
+          errors.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            error: `Could not read Durable Object state: ${scan.doStatusError}`,
+          });
+          continue;
+        }
+
+        // destroyed_at is non-null here (the WHERE clause guarantees it).
+        const destroyedAt = instance.destroyed_at as string;
+        const graceDestroyedAt = instance.latest_sandbox_destroyed_at ?? destroyedAt;
+        const graceElapsed =
+          now.getTime() - new Date(graceDestroyedAt).getTime() > ORPHAN_VOLUME_GRACE_PERIOD_MS;
+        const contextKey = orphanVolumeSubscriptionContextKey({
+          user_id: instance.user_id,
+          organization_id: instance.organization_id,
+        });
+        const hasAccess = accessGrantingContextKeys.has(contextKey);
+        const destructionScheduled = pendingDestructionContextKeys.has(contextKey);
+
+        // Only volumes whose name exactly matches THIS instance are ours.
+        // A non-matching volume belongs to a different (possibly live)
+        // sandbox sharing the app and must never be surfaced as reapable.
+        for (const v of scan.volumes) {
+          if (!v.nameMatchesInstance) continue;
+
+          const classification = classifyOrphanVolume({
+            volumeState: v.state,
+            attachedMachineId: v.attached_machine_id,
+            trackedByLiveDo: v.trackedByLiveDo,
+            doStatus: scan.doStatus,
+            doStatusError: scan.doStatusError,
+            hasAccessGrantingSubscription: hasAccess,
+            destructionScheduled,
+            graceElapsed,
+          });
+          // Surface confirmed orphans ONLY. Every other classification —
+          // attached to a machine, live DO, active subscription, pending
+          // destruction, still in grace, Fly already reaping — is correctly
+          // not an orphan and is dropped rather than shown as a non-actionable
+          // row.
+          if (classification !== 'safe_destroy') {
+            continue;
+          }
+
+          volumes.push({
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            user_email: instance.user_email,
+            sandbox_id: instance.sandbox_id,
+            organization_id: instance.organization_id,
+            destroyed_at: destroyedAt,
+            subscription_status: instance.subscription_status,
+            fly_app: scan.flyApp,
+            volume_id: v.id,
+            volume_name: v.name,
+            volume_state: v.state,
+            volume_region: v.region,
+            volume_size_gb: v.size_gb,
+            attached_machine_id: v.attached_machine_id,
+            volume_created_at: v.created_at,
+            do_status: scan.doStatus,
+            classification,
+          });
+        }
+      }
+    }
+
+    return { volumes, errors, scanned: toScan.length, capped, nextCursor };
+  }),
+
+  destroyOrphanVolume: adminProcedure
+    .input(
+      z.object({
+        instanceId: z.string().uuid(),
+        volumeId: z
+          .string()
+          .min(1)
+          .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // 1. Re-fetch the instance. Every DB-side guard is re-evaluated here —
+      //    the scan result the admin saw may be stale.
+      // Aliased outer table so the correlated subquery below can refer to
+      // it as `target_inst.*`. Drizzle interpolates `${kiloclaw_instances.X}`
+      // inside a raw `sql` template as a BARE `"X"` column reference (no
+      // table qualifier). Postgres then resolves that bare reference to the
+      // most-local scope — the inner `sandbox_destroys` alias — which
+      // collapses the correlation to a trivially-true
+      // `sandbox_destroys.user_id = sandbox_destroys.user_id` and turns the
+      // subquery into a table-wide `max(destroyed_at)`. With many users in
+      // production that max is always recent, so the grace gate would fail
+      // closed for every destroy regardless of the target. Aliasing the
+      // outer table and writing the correlation columns as literal SQL
+      // keeps every reference explicitly qualified.
+      const targetInstance = alias(kiloclaw_instances, 'target_inst');
+      const [row] = await db
+        .select({
+          id: targetInstance.id,
+          user_id: targetInstance.user_id,
+          sandbox_id: targetInstance.sandbox_id,
+          organization_id: targetInstance.organization_id,
+          destroyed_at: targetInstance.destroyed_at,
+          // Whether the orphan-volume grace period has elapsed, evaluated
+          // entirely in Postgres. Grace runs from the LATEST destruction of
+          // this (user, sandbox): a reprovisioned sandbox has several
+          // destroyed rows sharing one Fly volume, so the clock follows the
+          // most recent destruction, not whichever row the admin selected.
+          // Computing this in SQL avoids parsing a database timestamp with
+          // the JS `Date` constructor, whose handling of Postgres timestamp
+          // text differs across the Vercel and Cloudflare runtimes.
+          grace_period_elapsed: sql<boolean>`
+            extract(epoch from (now() - (
+              select max(sandbox_destroys.destroyed_at)
+              from ${kiloclaw_instances} as sandbox_destroys
+              where sandbox_destroys.user_id = target_inst.user_id
+                and sandbox_destroys.sandbox_id = target_inst.sandbox_id
+                and sandbox_destroys.destroyed_at is not null
+            ))) * 1000 > ${ORPHAN_VOLUME_GRACE_PERIOD_MS}`,
+        })
+        .from(targetInstance)
+        .where(eq(targetInstance.id, input.instanceId))
+        .limit(1);
+
+      if (!row) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+
+      // 2. The instance must be destroyed. This endpoint never touches a
+      //    volume belonging to a live instance.
+      if (row.destroyed_at === null) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Instance is not destroyed — orphan-volume cleanup does not apply',
+        });
+      }
+
+      // 3. Grace period, measured from the latest destruction of this
+      //    sandbox — give Fly + the DO sweep time to self-heal first.
+      //    `grace_period_elapsed` is computed by Postgres in the query above;
+      //    `false` or `null` (no destroyed row, already ruled out by gate 2)
+      //    both fail closed.
+      if (row.grace_period_elapsed !== true) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Instance was destroyed too recently — wait out the 7-day grace period',
+        });
+      }
+
+      // 4. Subscription guard — never destroy data while this ownership
+      //    context still has access (active / unsuspended past_due / live trial),
+      //    or while the billing lifecycle reaper is still scheduled to destroy
+      //    it (a future `destruction_deadline`). Reprovision transfers move
+      //    access to a current successor row; a detached current row has no
+      //    resolvable context, so the shared lookup fails closed for the user.
+      const context = {
+        user_id: row.user_id,
+        organization_id: row.organization_id,
+      };
+      const { accessGrantingContextKeys, pendingDestructionContextKeys } =
+        await getOrphanVolumeContextProtections(db, [context], new Date());
+      const contextKey = orphanVolumeSubscriptionContextKey(context);
+      if (accessGrantingContextKeys.has(contextKey)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'User has an access-granting subscription — volume preserved',
+        });
+      }
+      if (pendingDestructionContextKeys.has(contextKey)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message:
+            'A billing destruction deadline is still pending — the lifecycle reaper will handle it',
+        });
+      }
+
+      console.log(
+        `[admin-kiloclaw] Orphan volume cleanup by admin ${ctx.user.id} (${ctx.user.google_user_email}) ` +
+          `instance=${row.id} volume=${input.volumeId} (user: ${row.user_id})`
+      );
+
+      // 5. Hand off to the worker, which re-verifies the Fly-side and
+      //    DO-side invariants (name match, quiescent state, no live DO
+      //    reference) before deleting.
+      let result: Awaited<ReturnType<KiloClawInternalClient['destroyOrphanVolume']>>;
+      try {
+        const client = new KiloClawInternalClient();
+        result = await client.destroyOrphanVolume(
+          row.user_id,
+          row.id,
+          row.sandbox_id,
+          input.volumeId
+        );
+      } catch (err) {
+        throwKiloclawAdminError(err, 'Failed to destroy orphan volume');
+      }
+
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.orphan_volume.destroy',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: row.user_id,
+          message: `Orphan volume destroyed: ${result.volumeId} (${result.volumeName})`,
+          metadata: {
+            instance_id: row.id,
+            sandbox_id: row.sandbox_id,
+            fly_app: result.flyApp,
+            volume_id: result.volumeId,
+            volume_name: result.volumeName,
+            already_gone: result.alreadyGone,
+          },
+        });
+      } catch (auditErr) {
+        console.error(
+          '[admin-kiloclaw] Failed to write audit log for orphan volume destroy:',
+          auditErr
+        );
+      }
+
+      return { success: true, ...result };
     }),
 
   setEarlyAccess: adminProcedure

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock cloudflare:workers before importing UserConnectionDO
 vi.mock('cloudflare:workers', () => ({
@@ -127,6 +127,31 @@ function setup() {
   return { doInstance, ctx, mockCtx };
 }
 
+function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): MockWS {
+  const client = createMockWs();
+  const server = createMockWs();
+  vi.stubGlobal(
+    'WebSocketPair',
+    class {
+      0 = client;
+      1 = server;
+    }
+  );
+  vi.stubGlobal(
+    'Response',
+    class {
+      constructor(_body?: BodyInit | null, _init?: ResponseInit) {}
+    }
+  );
+
+  doInstance.fetch(
+    new Request(`http://local/web?connectionId=${connectionId}`, {
+      headers: { Upgrade: 'websocket' },
+    })
+  );
+  return server;
+}
+
 /** Create a CLI WebSocket and add it to the context with proper attachment. */
 function addCliSocket(
   mockCtx: ReturnType<typeof createMockCtx>,
@@ -173,6 +198,12 @@ function sendUnsubscribe(doInstance: UserConnectionDO, webWs: MockWS, sessionId:
   doInstance.webSocketMessage(webWs as never, msg);
 }
 
+/** Send a viewer ping from a web ws */
+function sendPing(doInstance: UserConnectionDO, webWs: MockWS, nonce: string) {
+  const msg = JSON.stringify({ type: 'ping', nonce });
+  doInstance.webSocketMessage(webWs as never, msg);
+}
+
 /** Send a command from a web ws */
 function sendCommand(
   doInstance: UserConnectionDO,
@@ -210,6 +241,55 @@ function disconnectWeb(doInstance: UserConnectionDO, webWs: MockWS) {
 describe('UserConnectionDO', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  describe('notifySessionEvent', () => {
+    it('broadcasts semantic session events to web sockets only', async () => {
+      const { doInstance, mockCtx } = setup();
+      const webWs = addWebSocket(mockCtx);
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const session = {
+        source: 'v2' as const,
+        sessionId: 'ses_12345678901234567890123456',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:01.000Z',
+        title: 'Test',
+        createdOnPlatform: 'web',
+        organizationId: null,
+        gitUrl: null,
+        gitBranch: null,
+        parentSessionId: null,
+        status: 'idle' as const,
+        statusUpdatedAt: null,
+      };
+
+      const result = await doInstance.notifySessionEvent({
+        type: 'session.created',
+        data: { source: 'v2', session, changedAt: session.updatedAt },
+      });
+
+      expect(result).toEqual({ delivered: 1 });
+      expect(parseSent(webWs)).toEqual({
+        type: 'system',
+        event: 'session.created',
+        data: { source: 'v2', session, changedAt: session.updatedAt },
+      });
+      expect(cliWs.send).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalid session event payloads without broadcasting', async () => {
+      const { doInstance, mockCtx } = setup();
+      const webWs = addWebSocket(mockCtx);
+
+      await expect(
+        doInstance.notifySessionEvent({ type: 'session.created', data: { source: 'v1' } } as never)
+      ).rejects.toThrow();
+      expect(webWs.send).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -446,6 +526,21 @@ describe('UserConnectionDO', () => {
       expect(parseSent(cliWs)).toEqual({ type: 'subscribe', sessionId: 's1' });
     });
 
+    it('sends the active session list when web subscribes after the socket is open', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Fix bug')]);
+      sendSubscribe(doInstance, webWs, 's1');
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'system',
+        event: 'sessions.list',
+        data: { sessions: [{ id: 's1', status: 'busy', title: 'Fix bug', connectionId: 'cli-1' }] },
+      });
+    });
+
     it('broadcasts subscribe to all CLIs when no owner found', () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
@@ -513,6 +608,136 @@ describe('UserConnectionDO', () => {
       sendUnsubscribe(doInstance, web2, 's1');
       expect(cliWs.send).toHaveBeenCalledTimes(1);
       expect(parseSent(cliWs)).toEqual({ type: 'unsubscribe', sessionId: 's1' });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Viewer liveness
+  // -------------------------------------------------------------------------
+
+  describe('viewer liveness', () => {
+    it('replies to a viewer ping with the matching nonce only', () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'viewer-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      ctx.storage.setAlarm.mockClear();
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+
+      sendPing(doInstance, webWs, 'nonce-1');
+
+      expect(webWs.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(webWs)).toEqual({ type: 'pong', nonce: 'nonce-1' });
+      expect(doInstance.getActiveSessions()).toEqual([
+        { id: 's1', status: 'busy', title: 'Test', connectionId: 'cli-1' },
+      ]);
+      expect(cliWs.send).not.toHaveBeenCalled();
+      expect(ctx.storage.setAlarm).not.toHaveBeenCalled();
+      expect(webWs.deserializeAttachment()).toEqual({
+        role: 'web',
+        connectionId: 'viewer-1',
+        subscribedSessions: [],
+      });
+    });
+  });
+
+  describe('viewer connection identity', () => {
+    it('replaces an older web viewer with the same connectionId and broadcasts only to its replacement', async () => {
+      const { doInstance, mockCtx } = setup();
+      const oldWeb = connectWebSocket(doInstance, 'viewer-1');
+      oldWeb.send.mockClear();
+
+      const newWeb = connectWebSocket(doInstance, 'viewer-1');
+      newWeb.send.mockClear();
+
+      expect(oldWeb.close).toHaveBeenCalledWith(1000, 'replaced by reconnect');
+
+      await doInstance.notifySessionEvent({
+        type: 'session.deleted',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          parentSessionId: null,
+          organizationId: null,
+          gitUrl: null,
+          gitBranch: null,
+          createdOnPlatform: 'web',
+          deletedAt: '2026-01-01T00:00:02.000Z',
+        },
+      });
+
+      expect(oldWeb.send).not.toHaveBeenCalled();
+      expect(newWeb.send).toHaveBeenCalledTimes(1);
+      expect(mockCtx.sockets.filter(socket => socket._tags.includes('web'))).toHaveLength(2);
+    });
+
+    it('does not migrate old subscriptions when replacing a viewer', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+
+      const oldWeb = connectWebSocket(doInstance, 'viewer-1');
+      sendSubscribe(doInstance, oldWeb, 's1');
+      cliWs.send.mockClear();
+
+      const newWeb = connectWebSocket(doInstance, 'viewer-1');
+
+      expect(cliWs.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(cliWs)).toEqual({ type: 'unsubscribe', sessionId: 's1' });
+      expect(newWeb.deserializeAttachment()).toEqual({
+        role: 'web',
+        connectionId: 'viewer-1',
+        subscribedSessions: [],
+      });
+    });
+
+    it('ignores messages from a viewer that has been replaced', () => {
+      const { doInstance } = setup();
+      const oldWeb = connectWebSocket(doInstance, 'viewer-1');
+      connectWebSocket(doInstance, 'viewer-1');
+      oldWeb.send.mockClear();
+
+      sendPing(doInstance, oldWeb, 'stale-ping');
+
+      expect(oldWeb.send).not.toHaveBeenCalled();
+    });
+
+    it('keeps distinct viewer identities connected for independent broadcasts', async () => {
+      const { doInstance } = setup();
+      const firstWeb = connectWebSocket(doInstance, 'viewer-1');
+      const secondWeb = connectWebSocket(doInstance, 'viewer-2');
+      firstWeb.send.mockClear();
+      secondWeb.send.mockClear();
+
+      await doInstance.notifySessionEvent({
+        type: 'session.deleted',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          parentSessionId: null,
+          organizationId: null,
+          gitUrl: null,
+          gitBranch: null,
+          createdOnPlatform: 'web',
+          deletedAt: '2026-01-01T00:00:02.000Z',
+        },
+      });
+
+      expect(firstWeb.close).not.toHaveBeenCalled();
+      expect(firstWeb.send).toHaveBeenCalledTimes(1);
+      expect(secondWeb.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not replace a CLI socket when a viewer connectionId collides', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'shared-id');
+
+      connectWebSocket(doInstance, 'shared-id');
+
+      expect(cliWs.close).not.toHaveBeenCalled();
     });
   });
 
@@ -1200,6 +1425,25 @@ describe('UserConnectionDO', () => {
         type: 'event',
         sessionId: 's1',
       });
+    });
+
+    it('does not restore subscriptions from a viewer already replaced before hibernation', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [makeSession('s1')]);
+      const replacedWeb = addWebSocket(mockCtx, 'web-old', ['s1']);
+      replacedWeb.serializeAttachment({
+        role: 'web',
+        connectionId: 'web-old',
+        subscribedSessions: ['s1'],
+        replaced: true,
+      });
+
+      doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'event', sessionId: 's1', event: 'test', data: {} })
+      );
+
+      expect(replacedWeb.send).not.toHaveBeenCalled();
     });
   });
 

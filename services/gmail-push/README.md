@@ -18,10 +18,10 @@ Push requests are authenticated via **Google OIDC JWT** (mandatory). The Pub/Sub
 
 ## API Endpoints
 
-| Endpoint             | Method | Auth     | Description          |
-| -------------------- | ------ | -------- | -------------------- |
-| `/health`            | GET    | None     | Health check         |
-| `/push/user/:userId` | POST   | OIDC JWT | Receive Pub/Sub push |
+| Endpoint | Method | Auth | Description |
+|---|---|---|---|
+| `/health` | GET | None | Health check |
+| `/push/user/:userId` | POST | OIDC JWT | Receive Pub/Sub push |
 
 ## Development
 
@@ -114,18 +114,18 @@ Deploys to: `cloudflare-gmail-push`
 
 ## Secrets (via Secrets Store)
 
-| Secret                | Description                            |
-| --------------------- | -------------------------------------- |
+| Secret | Description |
+|---|---|
 | `INTERNAL_API_SECRET` | Shared secret for service binding auth |
 
 ## Environment Variables
 
-| Variable             | Description                                          |
-| -------------------- | ---------------------------------------------------- |
+| Variable | Description |
+|---|---|
 | `OIDC_AUDIENCE_BASE` | Base URL for per-user OIDC audience claim validation |
 
 ## Service Bindings
 
-| Binding    | Target Worker | Environment |
-| ---------- | ------------- | ----------- |
-| `KILOCLAW` | `kiloclaw`    | Production  |
+| Binding | Target Worker | Environment |
+|---|---|---|
+| `KILOCLAW` | `kiloclaw` | Production |

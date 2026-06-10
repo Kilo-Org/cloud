@@ -1,5 +1,5 @@
 import type { ProfileOrganization } from '@/lib/organizations/organizations';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getUserFromAuth } from '@/lib/user/server';
 import { getProfileOrganizations } from '@/lib/organizations/organizations';
 import { NextResponse } from 'next/server';
 

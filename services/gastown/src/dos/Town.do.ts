@@ -29,8 +29,11 @@ import * as dispatch from './town/container-dispatch';
 import * as patrol from './town/patrol';
 import * as scheduling from './town/scheduling';
 import * as events from './town/events';
+import { stopContainerIfIdle as _stopContainerIfIdle } from './town/container-idle-stop';
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
+import * as wasteland from './town/wasteland';
+import { pickCanonicalBead, type ReporterBead } from './town/wasteland-reporter';
 import { applyAction } from './town/actions';
 import type { Action, ApplyActionContext } from './town/actions';
 import { buildPolecatSystemPrompt } from '../prompts/polecat-system.prompt';
@@ -47,7 +50,7 @@ import { agent_metadata } from '../db/tables/agent-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../db/tables/bead-dependencies.table';
-import { town_events, TownEventRecord } from '../db/tables/town-events.table';
+import { town_events, TownEventRecord, type TownEventType } from '../db/tables/town-events.table';
 import {
   agent_nudges,
   AgentNudgeRecord,
@@ -397,7 +400,176 @@ export class TownDO extends DurableObject<Env> {
           this.emitEvent(data as Parameters<typeof this.emitEvent>[0]);
         }
       },
+      reportWastelandDone: async input => this.reportWastelandDone(input),
     };
+  }
+
+  /**
+   * Stamp the canonical bead for a wasteland claim with `reported_done_at`.
+   * Used by the manual `handleWastelandDone` path so the auto-done
+   * reconciler doesn't re-fire for items the mayor already reported.
+   * No-op when no canonical bead is found (e.g. the mayor reported done
+   * for an item that never produced a wasteland-tagged bead in this town).
+   */
+  async stampWastelandReported(input: {
+    wastelandId: string;
+    itemId: string;
+    evidence: string;
+  }): Promise<{ stamped: boolean; bead_id: string | null }> {
+    // Find every bead carrying this wasteland tag and pick the canonical one
+    // by the same rule the reconciler uses (convoy bead if any, else the
+    // earliest-created bead).
+    const candidates = BeadRecord.array().parse([
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${beads}
+          WHERE json_extract(${beads.metadata}, '$.wasteland.wasteland_id') = ?
+            AND json_extract(${beads.metadata}, '$.wasteland.item_id') = ?
+          ORDER BY ${beads.created_at} ASC
+        `,
+        [input.wastelandId, input.itemId]
+      ),
+    ]);
+    if (candidates.length === 0) {
+      return { stamped: false, bead_id: null };
+    }
+    // Reuse the same canonical-bead rule the reconciler uses so the manual
+    // and auto paths can never disagree about which bead carries the flag.
+    const reporterCandidates: ReporterBead[] = candidates.map(b => ({
+      bead_id: b.bead_id,
+      type: b.type,
+      status: b.status,
+      title: b.title,
+      metadata: b.metadata,
+      pr_url: null,
+      created_at: b.created_at,
+    }));
+    const canonical = pickCanonicalBead(reporterCandidates);
+    if (!canonical) {
+      return { stamped: false, bead_id: null };
+    }
+    const stamped = wasteland.stampWastelandReportedDone(this.sql, canonical.bead_id, {
+      evidence: input.evidence,
+    });
+    if (!stamped) {
+      console.warn(
+        `${TOWN_LOG} stampWastelandReported: bead=${canonical.bead_id} has no metadata.wasteland; nothing to stamp`
+      );
+    }
+    return { stamped, bead_id: canonical.bead_id };
+  }
+
+  /**
+   * Mark a wasteland wanted item as done upstream and stamp
+   * `metadata.wasteland.reported_done_at` on the canonical bead. Best
+   * effort: returns false on any failure so the reconciler retries on
+   * the next tick (the local stamp is the idempotency gate). The
+   * upstream RPC is the meaningful side effect; the local stamp is just
+   * how we remember we did it.
+   *
+   * Before issuing the RPC, this checks whether the upstream item is
+   * already in `done` state — that handles the crash-window case where
+   * a previous tick called the RPC successfully but the worker died
+   * before writing the local stamp. In that case we just stamp locally
+   * and skip the duplicate RPC.
+   */
+  private async reportWastelandDone(input: {
+    wastelandId: string;
+    itemId: string;
+    evidence: string;
+    canonicalBeadId: string;
+  }): Promise<boolean> {
+    const townConfig = await this.getTownConfig();
+    const userId = townConfig.owner_user_id;
+    if (!userId) {
+      console.warn(
+        `${TOWN_LOG} reportWastelandDone: town has no owner_user_id; skipping item=${input.itemId}`
+      );
+      return false;
+    }
+
+    // Crash-window guard: if a previous tick already called markWantedItemDone
+    // but died before stamping locally, the upstream item is already in
+    // 'done' state. Detect that and just stamp locally — calling the RPC
+    // again can produce a duplicate upstream PR.
+    const alreadyDoneUpstream = await this.isWantedItemDoneUpstream(
+      input.wastelandId,
+      userId,
+      input.itemId
+    );
+    if (alreadyDoneUpstream) {
+      const stamped = wasteland.stampWastelandReportedDone(this.sql, input.canonicalBeadId, {
+        evidence: input.evidence,
+      });
+      if (!stamped) {
+        console.warn(
+          `${TOWN_LOG} reportWastelandDone: upstream already done but bead=${input.canonicalBeadId} has no metadata.wasteland; cannot stamp`
+        );
+        return false;
+      }
+      console.log(
+        `${TOWN_LOG} reportWastelandDone: upstream already done for item=${input.itemId}; stamped bead=${input.canonicalBeadId} without re-calling RPC`
+      );
+      return true;
+    }
+
+    try {
+      const result = await this.env.WASTELAND_SERVICE.markWantedItemDone({
+        wastelandId: input.wastelandId,
+        userId,
+        itemId: input.itemId,
+        evidence: input.evidence,
+      });
+      if (!result.success) {
+        console.warn(
+          `${TOWN_LOG} reportWastelandDone: upstream call failed code=${result.code} item=${input.itemId} msg=${result.message}`
+        );
+        return false;
+      }
+      const stamped = wasteland.stampWastelandReportedDone(this.sql, input.canonicalBeadId, {
+        evidence: input.evidence,
+      });
+      if (!stamped) {
+        console.warn(
+          `${TOWN_LOG} reportWastelandDone: RPC succeeded but bead=${input.canonicalBeadId} has no metadata.wasteland; cannot stamp (will retry next tick — risk of duplicate upstream call mitigated by isWantedItemDoneUpstream precheck)`
+        );
+        return false;
+      }
+      console.log(
+        `${TOWN_LOG} reportWastelandDone: marked item=${input.itemId} as done; stamped bead=${input.canonicalBeadId}`
+      );
+      return true;
+    } catch (err) {
+      console.error(`${TOWN_LOG} reportWastelandDone: unexpected error item=${input.itemId}:`, err);
+      return false;
+    }
+  }
+
+  /**
+   * Best-effort check of whether a wanted item is already `done` upstream.
+   * Returns false on any error (network, parse, item missing) so the
+   * caller falls through to the normal RPC path. Used as the crash-window
+   * guard inside `reportWastelandDone`.
+   */
+  private async isWantedItemDoneUpstream(
+    wastelandId: string,
+    userId: string,
+    itemId: string
+  ): Promise<boolean> {
+    try {
+      const browse = await this.env.WASTELAND_SERVICE.browseWantedBoard({
+        wastelandId,
+        userId,
+      });
+      if (!browse.success) return false;
+      const item = browse.data.find(it => it.id === itemId);
+      if (!item) return false;
+      return item.status === 'done';
+    } catch (err) {
+      console.warn(`${TOWN_LOG} isWantedItemDoneUpstream: browse failed for item=${itemId}:`, err);
+      return false;
+    }
   }
 
   // ── WebSocket: status broadcast ──────────────────────────────────────
@@ -606,6 +778,9 @@ export class TownDO extends DurableObject<Env> {
       query(this.sql, idx, []);
     }
 
+    // Wasteland connections
+    wasteland.initWastelandTables(this.sql);
+
     // Reconciler event log
     events.initTownEventsTable(this.sql);
 
@@ -785,9 +960,22 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const container = getTownContainerStub(this.env, townId);
 
+    // Resolve a fresh GitHub token here too — this method runs both at
+    // initial config push and on every config change, so the persisted
+    // GIT_TOKEN must be live rather than the stale value stored in
+    // git_auth.github_token from rig creation. The container's
+    // syncTownConfigToProcessEnv path reads `git_auth.github_token`
+    // from the X-Town-Config header on every request, so the in-process
+    // GIT_TOKEN follows the same source-of-truth as the persisted one.
+    const githubToken = await scm.resolveGitHubTokenString({
+      env: this.env,
+      townId,
+      getTownConfig: () => Promise.resolve(townConfig),
+    });
+
     // Phase 1: Persist to DO storage for next boot.
     const envMapping: Array<[string, string | undefined]> = [
-      ['GIT_TOKEN', townConfig.git_auth?.github_token],
+      ['GIT_TOKEN', githubToken ?? undefined],
       ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
       ['GITLAB_INSTANCE_URL', townConfig.git_auth?.gitlab_instance_url],
       ['GITHUB_CLI_PAT', townConfig.github_cli_pat],
@@ -860,7 +1048,11 @@ export class TownDO extends DurableObject<Env> {
     // /sync-config endpoint. The X-Town-Config header delivers the
     // full config; the endpoint applies CONFIG_ENV_MAP to process.env.
     try {
-      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const containerConfig = await config.buildContainerConfig(
+        this.ctx.storage,
+        this.env,
+        this.townId
+      );
       await container.fetch('http://container/sync-config', {
         method: 'POST',
         headers: {
@@ -919,6 +1111,26 @@ export class TownDO extends DurableObject<Env> {
   async updateRigConfig(rigId: string, config: RigOverrideConfig): Promise<rigs.RigRecord | null> {
     rigs.updateRigConfig(this.sql, rigId, config);
     return rigs.getRig(this.sql, rigId);
+  }
+
+  // ── Wasteland Connection ─────────────────────────────────────────────
+
+  async connectWasteland(input: {
+    connectionId: string;
+    wastelandId: string;
+    upstream: string;
+    rigHandle: string;
+    dolthubOrg: string;
+  }): Promise<wasteland.WastelandConnectionRecord> {
+    return wasteland.connectWasteland(this.sql, input);
+  }
+
+  async disconnectWasteland(wastelandId: string): Promise<void> {
+    wasteland.disconnectWasteland(this.sql, wastelandId);
+  }
+
+  async getWastelandConnection(): Promise<wasteland.WastelandConnectionRecord | null> {
+    return wasteland.getWastelandConnection(this.sql);
   }
 
   // ── Rig Config (KV, per-rig — configuration needed for container dispatch) ──
@@ -984,8 +1196,19 @@ export class TownDO extends DurableObject<Env> {
     logger.setTags({ rigId: rigConfig.rigId });
     const townConfig = await this.getTownConfig();
     const envVars: Record<string, string> = {};
-    if (townConfig.git_auth?.github_token) {
-      envVars.GIT_TOKEN = townConfig.git_auth.github_token;
+    // Resolve GitHub token through scm.resolveGitHubTokenString so the rig
+    // setup uses a fresh installation token when a platform integration
+    // is configured. The rig's own integration ID takes precedence over
+    // the town-level one (this rig may be wired to a different repo
+    // installation than the rest of the town).
+    const githubToken = await scm.resolveGitHubTokenString({
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => Promise.resolve(townConfig),
+      platformIntegrationId: rigConfig.platformIntegrationId,
+    });
+    if (githubToken) {
+      envVars.GIT_TOKEN = githubToken;
     }
     if (townConfig.git_auth?.gitlab_token) {
       envVars.GITLAB_TOKEN = townConfig.git_auth.gitlab_token;
@@ -1000,7 +1223,11 @@ export class TownDO extends DurableObject<Env> {
       envVars.KILOCODE_TOKEN = kilocodeToken;
     }
 
-    const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+    const containerConfig = await config.buildContainerConfig(
+      this.ctx.storage,
+      this.env,
+      this.townId
+    );
     const container = getTownContainerStub(this.env, this.townId);
     const response = await container.fetch('http://container/repos/setup', {
       method: 'POST',
@@ -2403,19 +2630,27 @@ export class TownDO extends DurableObject<Env> {
    * Create an open bead with the given labels, without arming the reconciler alarm.
    * The caller is responsible for including `gt:held` in the labels if the bead
    * should not be dispatched immediately.
+   *
+   * `rigId` is optional: callers like the wasteland integration that don't have
+   * a confidently-resolved local rig can omit it; the bead will still be
+   * persisted (the `rig_id` column is nullable) and surfaces in admin views.
    */
   async createHeldBead(input: {
-    rigId: string;
+    rigId: string | null;
     title: string;
     body?: string;
     labels?: string[];
+    metadata?: Record<string, unknown>;
+    created_by?: string;
   }): Promise<Bead> {
     const bead = beadOps.createBead(this.sql, {
       type: 'issue',
       title: input.title,
       body: input.body,
-      rig_id: input.rigId,
+      rig_id: input.rigId ?? undefined,
       labels: input.labels,
+      metadata: input.metadata,
+      created_by: input.created_by,
     });
 
     events.insertEvent(this.sql, 'bead_created', {
@@ -2653,6 +2888,68 @@ export class TownDO extends DurableObject<Env> {
    * Called eagerly on page load so the terminal is available immediately
    * without requiring the user to send a message first.
    */
+  async getMayorAgentId(): Promise<string | null> {
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+    return mayor?.id ?? null;
+  }
+
+  /**
+   * Returns everything the container needs to prewarm the mayor SDK
+   * server with a config that matches what the next /agents/start will
+   * use — so the prewarm cache hit is real instead of triggering the
+   * "config mismatch, evicting prewarmed server" eviction path.
+   *
+   * Returns null only when there's no mayor at all. When the mayor
+   * exists but the kilocode token isn't available, returns a partial
+   * shape with just { agentId } so callers can derive the fallback
+   * agentId without a second RPC hop.
+   */
+  async getMayorPrewarmContext(): Promise<{
+    agentId: string;
+    model?: string;
+    smallModel?: string;
+    kilocodeToken?: string;
+    organizationId?: string | null;
+    githubToken?: string;
+    githubCliPat?: string;
+  } | null> {
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+    if (!mayor) return null;
+
+    const kilocodeToken = await this.resolveKilocodeToken();
+    if (!kilocodeToken) {
+      return { agentId: mayor.id };
+    }
+
+    const townConfig = await this.getTownConfig();
+
+    // Resolve the GitHub token using the same chain as startAgentInContainer
+    // so the prewarmed mayor SDK boots with `gh` CLI auth (`GH_TOKEN`)
+    // already populated. Without this, the mayor's bash tool sees an
+    // empty environment for git/gh until the SDK is torn down and the
+    // /agents/start path's buildAgentEnv runs — which never happens
+    // while ensureMayor short-circuits on a warm session.
+    const githubToken = await scm.resolveGitHubTokenString({
+      env: this.env,
+      townId: this.townId,
+      getTownConfig: () => Promise.resolve(townConfig),
+    });
+
+    // _ensureMayor dispatches the mayor without a per-rig override
+    // (Town.do.ts:2766-2790). Match that resolution here so the prewarm
+    // KILO_CONFIG_CONTENT is byte-identical to what /agents/start will
+    // build, and ensureSDKServer's config-mismatch eviction never fires.
+    return {
+      agentId: mayor.id,
+      model: config.resolveModel(townConfig, null, 'mayor'),
+      smallModel: config.resolveSmallModel(townConfig),
+      kilocodeToken,
+      organizationId: townConfig.organization_id ?? null,
+      ...(githubToken ? { githubToken } : {}),
+      ...(townConfig.github_cli_pat ? { githubCliPat: townConfig.github_cli_pat } : {}),
+    };
+  }
+
   async ensureMayor(): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
@@ -2681,14 +2978,46 @@ export class TownDO extends DurableObject<Env> {
 
     logger.setTags({ agentId: mayor.id });
 
-    // Check if the container is already running
+    // Check if the container is already running AND the SDK has a live
+    // session for the mayor. The SDK can be torn down (serverPort=0,
+    // sessionId='') after stream errors or drain while the agent record
+    // still says "running" — in that case we must fall through to a
+    // fresh dispatch instead of returning early.
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
+    const sdkAlive =
+      isAlive && (containerStatus.serverPort ?? 0) > 0 && Boolean(containerStatus.sessionId);
 
-    if (isAlive) {
+    if (sdkAlive) {
       const isActive =
         mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting';
+      writeEvent(this.env, {
+        event: 'mayor.ensure_decision',
+        townId,
+        agentId: mayor.id,
+        role: 'mayor',
+        label: isActive ? 'short_circuit_warm' : 'short_circuit_idle',
+      });
       return { agentId: mayor.id, sessionStatus: isActive ? 'active' : 'idle' };
+    }
+
+    // Container says running/starting but SDK has no port/session — the
+    // SDK was torn down (e.g. stream error, drain). Fall through to a
+    // fresh dispatch so the user doesn't have to manually refresh.
+    if (isAlive && !sdkAlive) {
+      logger.info('ensureMayor: container alive but SDK torn down, redispatching', {
+        agentId: mayor.id,
+        containerStatus: containerStatus.status,
+        serverPort: containerStatus.serverPort,
+        sessionId: containerStatus.sessionId,
+      });
+      writeEvent(this.env, {
+        event: 'mayor.ensure_decision',
+        townId,
+        agentId: mayor.id,
+        role: 'mayor',
+        label: 'sdk_dead_redispatch',
+      });
     }
 
     // Start the container with an idle mayor (no initial prompt)
@@ -2707,6 +3036,14 @@ export class TownDO extends DurableObject<Env> {
       });
       return { agentId: mayor.id, sessionStatus: 'idle' };
     }
+
+    writeEvent(this.env, {
+      event: 'mayor.ensure_decision',
+      townId,
+      agentId: mayor.id,
+      role: 'mayor',
+      label: 'fresh_dispatch',
+    });
 
     try {
       const containerStub = getTownContainerStub(this.env, townId);
@@ -2768,7 +3105,11 @@ export class TownDO extends DurableObject<Env> {
     if (isAlive) {
       // Attach fresh town config so the container can update process.env
       // before restarting the SDK server (tokens, git identity, etc.).
-      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const containerConfig = await config.buildContainerConfig(
+        this.ctx.storage,
+        this.env,
+        this.townId
+      );
 
       // Resolve townConfig to thread the organization_id into the request body
       // (belt-and-suspenders: ensures org billing survives even if X-Town-Config
@@ -3145,6 +3486,12 @@ export class TownDO extends DurableObject<Env> {
     tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
     merge_mode?: 'review-then-land' | 'review-and-merge';
     staged?: boolean;
+    /**
+     * Metadata stamped onto BOTH the convoy bead AND every task bead. Useful
+     * for cross-cutting context like the wasteland origin tag. Reserved keys
+     * managed internally (`convoy_id`, `feature_branch`) take precedence.
+     */
+    metadata?: Record<string, unknown>;
   }): Promise<{
     convoy: ConvoyEntry;
     beads: Array<{ bead: Bead; agent: Agent | null }>;
@@ -3209,6 +3556,12 @@ export class TownDO extends DurableObject<Env> {
     }
 
     // 2. Create convoy bead + convoy_metadata
+    // Merge caller-supplied metadata FIRST so reserved keys (feature_branch)
+    // always win and can't be accidentally overridden.
+    const convoyBeadMetadata = {
+      ...(input.metadata ?? {}),
+      feature_branch: featureBranch,
+    };
     query(
       this.sql,
       /* sql */ `
@@ -3232,7 +3585,7 @@ export class TownDO extends DurableObject<Env> {
         null, // assignee_agent_bead_id
         'medium',
         JSON.stringify(['gt:convoy']),
-        JSON.stringify({ feature_branch: featureBranch }),
+        JSON.stringify(convoyBeadMetadata),
         null,
         timestamp,
         timestamp,
@@ -3289,13 +3642,20 @@ export class TownDO extends DurableObject<Env> {
     const results: Array<{ bead: Bead; agent: Agent | null }> = [];
 
     for (const task of input.tasks) {
+      // Merge caller-supplied metadata FIRST so reserved keys
+      // (convoy_id, feature_branch) always win.
+      const taskBeadMetadata = {
+        ...(input.metadata ?? {}),
+        convoy_id: convoyId,
+        feature_branch: featureBranch,
+      };
       const createdBead = beadOps.createBead(this.sql, {
         type: 'issue',
         title: task.title,
         body: task.body,
         priority: 'medium',
         rig_id: input.rigId,
-        metadata: { convoy_id: convoyId, feature_branch: featureBranch },
+        metadata: taskBeadMetadata,
       });
       beadIds.push(createdBead.bead_id);
 
@@ -3896,15 +4256,27 @@ export class TownDO extends DurableObject<Env> {
           reconciler.applyEvent(this.sql, event, { townConfig });
           events.markProcessed(this.sql, event.event_id);
         } catch (err) {
-          logger.error('reconciler: applyEvent failed', {
-            eventId: event.event_id,
-            eventType: event.event_type,
-            error: err instanceof Error ? err.message : String(err),
-          });
-          // Event stays unprocessed — will be retried on the next alarm tick.
-          // Mark it processed anyway after 3 consecutive failures to prevent
-          // a poison event from blocking the entire queue forever.
-          // For now, we skip it and let the next tick retry.
+          const message = err instanceof Error ? err.message : String(err);
+          // Terminal errors referencing a missing bead/agent can never
+          // succeed on retry — mark them processed so the drain loop
+          // stops re-running them every alarm tick.
+          const isMissingEntity =
+            err instanceof Error && /\b(Bead|Agent) [0-9a-f-]{36} not found\b/.test(err.message);
+          if (isMissingEntity) {
+            logger.warn('reconciler: applyEvent skipped (missing entity)', {
+              eventId: event.event_id,
+              eventType: event.event_type,
+              error: message,
+            });
+            events.markProcessed(this.sql, event.event_id);
+          } else {
+            logger.error('reconciler: applyEvent failed', {
+              eventId: event.event_id,
+              eventType: event.event_type,
+              error: message,
+            });
+            // Event stays unprocessed — will be retried on the next alarm tick.
+          }
         }
       }
     } catch (err) {
@@ -4092,6 +4464,12 @@ export class TownDO extends DurableObject<Env> {
       }),
     ]);
 
+    await this.stopContainerIfIdle().catch(err =>
+      logger.warn('alarm: stopContainerIfIdle failed', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    );
+
     // Re-arm: fast when active, slow when idle
     const interval = activeWork ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
     await this.ctx.storage.setAlarm(Date.now() + interval);
@@ -4150,6 +4528,27 @@ export class TownDO extends DurableObject<Env> {
     // Only mark as refreshed after success — failed refreshes should
     // be retried on the next alarm tick, not throttled for an hour.
     await this.ctx.storage.put('container:lastTokenRefreshAt', now);
+  }
+
+  /**
+   * Proactively stop the town container when the town is idle.
+   *
+   * Cloudflare's sleepAfter timer resets on any port-8080 traffic (including
+   * long-lived PTY WebSockets), so containers can stay awake for hours after
+   * all real work finishes. Delegates to container-idle-stop sub-module.
+   */
+  private async stopContainerIfIdle(): Promise<void> {
+    await _stopContainerIfIdle({
+      hasActiveWork: () => this.hasActiveWork(),
+      isDraining: () => this._draining,
+      getMayor: () => agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null,
+      getTownId: () => this.townId,
+      getLastIdleStopAt: () => this.ctx.storage.get<number>('container:lastIdleStopAt'),
+      setLastIdleStopAt: value => this.ctx.storage.put('container:lastIdleStopAt', value),
+      getContainerStub: townId => getTownContainerStub(this.env, townId),
+      writeEventFn: data => writeEvent(this.env, data),
+      now: () => Date.now(),
+    });
   }
 
   /**
@@ -4555,7 +4954,11 @@ export class TownDO extends DurableObject<Env> {
       // This ensures org context and credentials are available immediately
       // after a container restart when the first request is a model update
       // (PATCH /model) rather than a new agent start.
-      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const containerConfig = await config.buildContainerConfig(
+        this.ctx.storage,
+        this.env,
+        this.townId
+      );
       const headers: Record<string, string> = {
         'X-Town-Config': JSON.stringify(containerConfig),
       };
@@ -4691,7 +5094,9 @@ export class TownDO extends DurableObject<Env> {
   /**
    * Health check: verify the alarm is set and return basic town status.
    * Called by the GastownUserDO watchdog alarm to ensure each town's
-   * alarm loop is firing. Re-arms the alarm if it's missing.
+   * alarm loop is firing. Re-arms the alarm if it's missing, picking the
+   * cadence based on `hasActiveWork` so idle towns don't all wake up
+   * on the fast 5s cadence after a deploy.
    */
   async healthCheck(): Promise<{
     townId: string;
@@ -4705,10 +5110,17 @@ export class TownDO extends DurableObject<Env> {
     const currentAlarm = await this.ctx.storage.getAlarm();
     const alarmSet = currentAlarm !== null && currentAlarm > Date.now();
 
-    // Re-arm if missing — this is the whole point of the watchdog
+    // Re-arm if missing — this is the whole point of the watchdog. Pick
+    // the cadence to match observed activity: active towns recover fast,
+    // idle towns don't pay the cost of a 5s wake-up storm across the fleet.
     if (!alarmSet) {
-      console.warn(`${TOWN_LOG} healthCheck: alarm not set for town=${townId}, re-arming`);
-      await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
+      const interval = scheduling.hasActiveWork(this.sql)
+        ? ACTIVE_ALARM_INTERVAL_MS
+        : IDLE_ALARM_INTERVAL_MS;
+      console.warn(
+        `${TOWN_LOG} healthCheck: alarm not set for town=${townId}, re-arming with ${interval}ms`
+      );
+      await this.ctx.storage.setAlarm(Date.now() + interval);
     }
 
     const activeAgents = Number(
@@ -5073,6 +5485,26 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
+  // DEBUG: enumerate every bead carrying a `metadata.wasteland` tag.
+  // Used by the /debug/towns/:townId/wasteland-beads endpoint to verify the
+  // wasteland → bead integration without going through the UI.
+  // Returns `unknown[]` to keep Hono's response type inference shallow —
+  // the caller validates / projects the rows it cares about.
+  async debugListWastelandBeads(): Promise<unknown[]> {
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${beads}
+          WHERE json_extract(${beads.metadata}, '$.wasteland') IS NOT NULL
+          ORDER BY ${beads.created_at} DESC
+        `,
+        []
+      ),
+    ];
+    return BeadRecord.array().parse(rows);
+  }
+
   // DEBUG: concise non-terminal bead summary — remove after debugging
   async debugBeadSummary(): Promise<unknown[]> {
     return [
@@ -5084,6 +5516,10 @@ export class TownDO extends DurableObject<Env> {
                  ${beads.status},
                  ${beads.title},
                  ${beads.assignee_agent_bead_id},
+                 ${beads.rig_id},
+                 ${beads.created_by},
+                 ${beads.labels},
+                 ${beads.metadata},
                  ${beads.updated_at}
           FROM ${beads}
           WHERE ${beads.status} NOT IN ('closed', 'failed')
@@ -5159,6 +5595,56 @@ export class TownDO extends DurableObject<Env> {
         []
       ),
     ];
+  }
+
+  async debugTownEvents(): Promise<unknown[]> {
+    return [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${town_events.event_id},
+                 ${town_events.event_type},
+                 ${town_events.agent_id},
+                 ${town_events.bead_id},
+                 ${town_events.processed_at}
+          FROM ${town_events}
+          ORDER BY ${town_events.created_at} ASC
+        `,
+        []
+      ),
+    ];
+  }
+
+  /**
+   * Test-only helper: directly insert a row into the town_events queue
+   * without going through the producer APIs. Used to reproduce orphan
+   * events (referencing deleted beads/agents) in tests.
+   */
+  async debugInsertTownEvent(input: {
+    event_type: TownEventType;
+    agent_id?: string | null;
+    bead_id?: string | null;
+    payload?: Record<string, unknown>;
+  }): Promise<string> {
+    const eventId = events.insertEvent(this.sql, input.event_type, {
+      agent_id: input.agent_id ?? null,
+      bead_id: input.bead_id ?? null,
+      payload: input.payload ?? {},
+    });
+    await this.armAlarmIfNeeded();
+    return eventId;
+  }
+
+  /**
+   * Test-only helper: insert a container_status event for a given agent.
+   * Mirrors the container observer's upsert so tests can verify that
+   * deleteBead sweeps agent-keyed events.
+   */
+  async debugRecordContainerStatus(
+    agentId: string,
+    payload: { status: string; exit_reason?: string | null }
+  ): Promise<void> {
+    events.upsertContainerStatus(this.sql, agentId, payload);
   }
 
   async destroy(): Promise<void> {

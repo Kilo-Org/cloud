@@ -8,6 +8,8 @@ export type ContentSecurityPolicyMode = 'enforce' | 'report-only' | 'off';
 
 const CSP_REPORTING_GROUP = 'csp-endpoint';
 const SENTRY_SECURITY_REPORT_MAX_AGE_SECONDS = 10886400;
+const KILO_CHAT_R2_ATTACHMENT_ORIGIN =
+  'https://e115e769bcdd4c3d66af59d3332cb394.r2.cloudflarestorage.com';
 
 function compactUnique(values: Array<string | null | undefined>): string[] {
   const compacted = values.filter((value): value is string => Boolean(value && value.length > 0));
@@ -164,6 +166,7 @@ export function buildContentSecurityPolicy({
     'https://api.churnkey.co',
     'https://*.churnkey.co',
     'https://*.d.kiloapps.io',
+    KILO_CHAT_R2_ATTACHMENT_ORIGIN,
     isDevelopment ? 'http://localhost:*' : null,
     isDevelopment ? 'ws://localhost:*' : null,
     ...configuredConnectSrcUrls.map(originFromUrl),
@@ -198,6 +201,7 @@ export function buildContentSecurityPolicy({
       'https://*.churnkey.co',
       'https://www.gravatar.com',
       'https://openrouter.ai',
+      KILO_CHAT_R2_ATTACHMENT_ORIGIN,
     ],
     'style-src': ["'self'", "'unsafe-inline'"],
     'font-src': ["'self'", 'data:'],

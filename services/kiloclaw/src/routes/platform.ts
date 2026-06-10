@@ -7,6 +7,10 @@
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import * as fly from '../fly/client';
+import type { InstanceStatus } from '../durable-objects/kiloclaw-instance/types';
+import type { FileWriteResponse } from '../durable-objects/gateway-controller-types';
+import { isAgentConfigErrorEnvelope } from '../durable-objects/gateway-controller-types';
 import type { AppEnv } from '../types';
 import {
   ProvisionRequestSchema,
@@ -20,9 +24,11 @@ import {
   InstanceIdParam,
 } from '../schemas/instance-config';
 import {
+  compareTierRank,
   DEFAULT_INSTANCE_TIER,
   InstanceTierKeySchema,
   isOfferedTier,
+  type InstanceTierKey,
 } from '@kilocode/kiloclaw-instance-tiers';
 import { ImageVersionEntrySchema, imageVersionKey } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
@@ -32,7 +38,10 @@ import {
   markImageAsLatest,
   disableImageAndClearRollout,
 } from '../lib/version-rollout';
-import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
+import {
+  setKiloclawEarlyAccess,
+  lookupKiloclawRolloutContextByInstanceId,
+} from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
@@ -40,10 +49,17 @@ import {
   KiloclawStartReasonSchema,
   KiloclawStopReasonSchema,
   withDORetry,
+  type DORetryConfig,
 } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
+  getOrphanVolumeContextProtections,
+  getKiloClawPricingCatalogEntry,
+  isKiloClawPriceVersion,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  ORPHAN_VOLUME_GRACE_PERIOD_MS,
+  orphanVolumeSubscriptionContextKey,
+  type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
 import {
@@ -66,11 +82,24 @@ import {
 } from '../providers/rollout';
 import type { ProviderId } from '../schemas/instance-config';
 import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
-import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
-import { and, eq, isNull } from 'drizzle-orm';
+import {
+  getActiveOrganizationInstance,
+  getActivePersonalInstance,
+  getInstanceById,
+  getInstanceByIdIncludingDestroyed,
+  getWorkerDb,
+  hasSubscriptionForInstance,
+} from '../db';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { volumeNameFromSandboxId } from '../durable-objects/machine-config';
+import { fallbackAppNameForRestore } from '../durable-objects/kiloclaw-instance/postgres';
+import { getAppKey } from '../durable-objects/kiloclaw-instance/types';
+import type { FlyVolume } from '../fly/types';
 import {
   BootstrapProvisionFallbackError,
   bootstrapProvisionedSubscriptionWithFallback,
+  resolveProvisionEntitlementWithFallback,
 } from './provision-bootstrap';
 
 const GmailHistoryIdSchema = z.object({
@@ -98,6 +127,22 @@ const KiloCodeConfigPatchSchema = z.object({
 const WebSearchConfigPatchSchema = z.object({
   userId: z.string().min(1),
   exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
+});
+
+const ProvisionReservationRepairSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.uuid(),
+  orgId: z.uuid().nullable().optional(),
+});
+
+const ProvisionReservationReleaseSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.uuid(),
+  orgId: z.uuid().nullable().optional(),
+  // Break-glass: the operator must explicitly assert they have confirmed the
+  // attempt is dead and any provider resources are cleaned up. `z.literal(true)`
+  // makes the request fail validation unless the flag is present and true.
+  acknowledgeCleanupVerified: z.literal(true),
 });
 
 const KILOCLAW_WORKER_DESTROY_ACTOR = {
@@ -384,10 +429,28 @@ async function withResolvedDORetry<TResult>(
   userId: string,
   instanceId: string | undefined,
   operation: (stub: KiloClawInstanceStub) => Promise<TResult>,
-  operationName: string
+  operationName: string,
+  config?: DORetryConfig
 ): Promise<TResult> {
-  return withDORetry(await instanceStubFactory(env, userId, instanceId), operation, operationName);
+  return withDORetry(
+    await instanceStubFactory(env, userId, instanceId),
+    operation,
+    operationName,
+    config
+  );
 }
+
+/**
+ * Opt non-idempotent operations out of automatic DO retries. Cloudflare's
+ * `.retryable` retries are only safe for idempotent operations: agent
+ * create/delete are non-idempotent, and etag-guarded updates are not
+ * response-idempotent, so an auto-replay after a lost-but-committed success
+ * would surface a misleading agent_exists / agent_not_found / config_etag_conflict
+ * for an action that already succeeded. With retries disabled, a transient DO
+ * failure surfaces to the caller, who retries explicitly once state has settled
+ * and the typed outcome is accurate. Reads keep the default retry.
+ */
+const NO_DO_RETRY: DORetryConfig = { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 };
 
 type ProvisionedInstanceRecord = {
   id: string;
@@ -396,6 +459,53 @@ type ProvisionedInstanceRecord = {
 
 function buildDefaultInboundEmailAlias(instanceId: string): string {
   return `claw-${instanceId.replaceAll('-', '')}`;
+}
+
+function provisionRegistryKey(userId: string, orgId: string | null | undefined): string {
+  return orgId ? `org:${orgId}` : `user:${userId}`;
+}
+
+function getProvisionRegistryStub(
+  env: AppEnv['Bindings'],
+  userId: string,
+  orgId: string | null | undefined
+) {
+  const registryKey = provisionRegistryKey(userId, orgId);
+  return {
+    registryKey,
+    stub: env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(registryKey)),
+  };
+}
+
+async function getActiveProvisionContextInstance(
+  env: AppEnv['Bindings'],
+  userId: string,
+  orgId: string | null | undefined
+) {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) throw new Error('HYPERDRIVE is not configured');
+  const db = getWorkerDb(connectionString);
+  return orgId
+    ? await getActiveOrganizationInstance(db, userId, orgId)
+    : await getActivePersonalInstance(db, userId);
+}
+
+async function hasCanonicalProvisionSubscription(
+  env: AppEnv['Bindings'],
+  instanceId: string
+): Promise<boolean> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) throw new Error('HYPERDRIVE is not configured');
+  return await hasSubscriptionForInstance(getWorkerDb(connectionString), instanceId);
+}
+
+function isWithinSelfServiceEntitlement(
+  requestedTier: InstanceTierKey,
+  entitlementTier: InstanceTierKey
+): boolean {
+  if (requestedTier === entitlementTier) return true;
+  if (!isOfferedTier(entitlementTier)) return false;
+  return compareTierRank(requestedTier, entitlementTier) <= 0;
 }
 
 async function insertProvisionedInstanceRecord(params: {
@@ -709,6 +819,175 @@ function jsonError(message: string, status: number, code?: string): Response {
   });
 }
 
+/**
+ * Result of the running-state check used by the polling guards.
+ *
+ * `running: true` means the proxied call is safe to make. `running: false`
+ * carries the best-known instance status label (from DO or, when verified,
+ * the mapped Fly state) so the caller can include it in the sentinel
+ * payload — useful for the frontend's "Instance is {status}…" hint.
+ */
+type InstanceRunningCheck = { running: true } | { running: false; status: InstanceStatus | null };
+
+/**
+ * Decide whether the instance is actually running, for the polling guards.
+ *
+ * Polling endpoints (gateway/status, gateway/ready, controller-version,
+ * morning-briefing/status) proxy to port 18789 on the Fly machine via Fly's
+ * HTTPS edge. Even with `services[0].autostart: false`, Fly's proxy will wake
+ * a stopped machine to serve the request. The check below decides whether to
+ * skip the proxied call so no traffic reaches the machine while it is stopped.
+ *
+ * Two layers, in order:
+ *
+ * 1. **Durable Object cached state.** Cheap (storage read). Handles the
+ *    common case where DO and Fly agree, plus admin-UI-initiated stops where
+ *    the DO has already updated its cached state.
+ *
+ * 2. **Fly Machines REST API state.** Only when DO says `running` and the
+ *    instance is on Fly. The Machines REST API is a separate path from the
+ *    HTTPS edge proxy, so this call does not wake the machine. Catches drift
+ *    where DO cached state lags real Fly state (out-of-band stops: Fly CLI,
+ *    dashboard, health-check kill, platform incidents). Also closes the
+ *    in-flight stop race: while `DO.stop()` is waiting on `Fly.stopMachine`,
+ *    DO state still reads `running` for the duration of that call, so a
+ *    concurrent poll would otherwise fall through. Adds ~50-200ms to each
+ *    poll where DO says running; acceptable given the 5-10s polling cadence
+ *    and the alternative (the wake bug).
+ *
+ * Fail-open on Fly API errors: if we can't reach Fly to verify, trust the DO
+ * state and forward. Logs a warning so the failure mode is visible.
+ */
+async function checkInstanceRunningState(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId: string | undefined
+): Promise<InstanceRunningCheck> {
+  const status = await withResolvedDORetry(
+    env,
+    userId,
+    instanceId,
+    stub => stub.getStatus(),
+    'getStatus'
+  );
+
+  // Layer 1: DO cached state says not running. Trust it (cheapest path).
+  if (status.status !== 'running') {
+    return { running: false, status: status.status };
+  }
+
+  // Layer 2: DO says running. Verify against live Fly state when we can,
+  // because DO state can lag (out-of-band stops, in-flight stops where DO
+  // hasn't yet updated its cached status after the Fly stop call).
+  //
+  // Skip the Fly check when:
+  //   - the instance has no flyMachineId yet (pre-provisioning or non-Fly
+  //     provider — nothing to verify, and forwarding is safe because there
+  //     is nothing for Fly's proxy to wake);
+  //   - FLY_API_TOKEN isn't configured (dev environments without Fly creds).
+  const flyMachineId = status.flyMachineId;
+  const flyAppName = status.flyAppName;
+  if (status.provider !== 'fly' || !flyMachineId || !flyAppName || !env.FLY_API_TOKEN) {
+    return { running: true };
+  }
+
+  try {
+    const machine = await fly.getMachine(
+      { apiToken: env.FLY_API_TOKEN, appName: flyAppName },
+      flyMachineId
+    );
+    if (machine.state !== 'started') {
+      // Drift detected. DO will reconcile its cached state on the next
+      // `maybeDispatchLiveCheck` tick (already dispatched by getStatus()
+      // above), so we don't force a synchronous reconcile here. Return
+      // the sentinel using Fly's reported state so the frontend can show
+      // an accurate label.
+      console.warn('[platform] poll short-circuit: Fly reports machine not started', {
+        userId,
+        instanceId,
+        flyMachineId,
+        doStatus: status.status,
+        flyState: machine.state,
+      });
+      return { running: false, status: mapFlyStateToDoStatus(machine.state) };
+    }
+  } catch (err) {
+    // Fail open: trust DO state when Fly is unreachable. The alternative
+    // (failing closed) would break polling during any Fly API hiccup.
+    console.warn('[platform] poll short-circuit: Fly state check failed, trusting DO', {
+      userId,
+      instanceId,
+      flyMachineId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return { running: true };
+}
+
+/**
+ * Wrapper around `checkInstanceRunningState` that builds the unified 200
+ * sentinel response (`{ ok: false, reason, status }`) when not running.
+ * Returns `null` when the proxied call is safe to make.
+ *
+ * Routes whose existing response shape is `{ ready, ... }` should call
+ * `checkInstanceRunningState` directly and build a route-shaped sentinel
+ * — see `/gateway/ready` for an example.
+ */
+async function shortCircuitIfNotRunning(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId: string | undefined
+): Promise<Response | null> {
+  const check = await checkInstanceRunningState(env, userId, instanceId);
+  if (check.running) return null;
+  return new Response(
+    JSON.stringify({
+      ok: false,
+      reason: 'instance_not_running',
+      status: check.status,
+    }),
+    {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }
+  );
+}
+
+/**
+ * Map a Fly machine state into the closest equivalent DO status label so
+ * the frontend's "Instance is {status}…" hint reads naturally. We can't
+ * always represent Fly states 1:1 (e.g. Fly has no `restoring`), so
+ * unknown states fall through to `stopped` which is the safer default for
+ * a polling guard.
+ *
+ * Return type is `InstanceStatus` (the worker's canonical DO status enum)
+ * rather than `string`, so adding a new Fly state mapping to a value
+ * outside the DO vocabulary fails to typecheck instead of silently
+ * shipping a label the frontend doesn't understand.
+ */
+function mapFlyStateToDoStatus(state: string): InstanceStatus {
+  switch (state) {
+    case 'started':
+      return 'running';
+    case 'starting':
+    case 'created':
+    case 'replacing':
+    case 'updating':
+      return 'starting';
+    case 'stopping':
+      return 'stopped';
+    case 'stopped':
+    case 'suspended':
+    case 'destroying':
+    case 'destroyed':
+    case 'failed':
+      return 'stopped';
+    default:
+      return 'stopped';
+  }
+}
+
 function kiloCliRunConflictResponse(response: unknown): Response | undefined {
   const result = KiloCliRunConflictSchema.safeParse(response);
   if (result.success) {
@@ -757,6 +1036,7 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot destroy: ', // destroy while restoring
   'Cannot resize: ', // resize during destroying/restoring/recovering
   'Cannot retry recovery', // force-retry-recovery guard messages
+  'Organization KiloClaw entitlement ', // org provision fail-closed entitlement gate
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
   'Provider ', // explicit not-implemented provider errors
@@ -816,6 +1096,27 @@ const OPENCLAW_CONFIG_ERROR_CODES = new Set([
   'invalid_request_body',
 ]);
 
+const FILE_TREE_RPC_LIMIT_ERROR_PREFIX =
+  'Serialized RPC arguments or return values are limited to 32MiB';
+
+function sanitizeFileTreeRpcLimitError(message: string): {
+  message: string;
+  status: number;
+  code: string;
+} | null {
+  if (!message.startsWith(FILE_TREE_RPC_LIMIT_ERROR_PREFIX)) return null;
+
+  const sizeMatch = message.match(/size of this value was: (\d+) bytes/);
+  const returnedSize = sizeMatch?.[1];
+  const returnedSizeSegment = returnedSize ? `; returned ${returnedSize} bytes` : '';
+
+  return {
+    message: `File tree is too large to load through the Cloudflare RPC limit (32 MiB${returnedSizeSegment}).`,
+    status: 413,
+    code: 'file_tree_too_large',
+  };
+}
+
 function isSafeOpenclawConfigCode(code: string): boolean {
   return OPENCLAW_CONFIG_ERROR_CODES.has(code) || code.startsWith('openclaw_import_');
 }
@@ -831,6 +1132,11 @@ function sanitizeOpenclawConfigError(
 
   console.error(`[platform] ${operation} failed:`, raw);
 
+  if (operation === 'files/tree') {
+    const fileTreeRpcLimitError = sanitizeFileTreeRpcLimitError(normalized);
+    if (fileTreeRpcLimitError) return fileTreeRpcLimitError;
+  }
+
   if (code && isSafeOpenclawConfigCode(code)) {
     return { message: normalized, status, code };
   }
@@ -843,6 +1149,61 @@ function sanitizeOpenclawConfigError(
     };
   }
 
+  return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
+}
+
+// Agent config CRUD error codes that are safe to forward verbatim to the caller.
+// Mirrors OPENCLAW_CONFIG_ERROR_CODES; the controller's messages for these are
+// generic (no internal paths/PII), so the message + status + code pass through.
+const AGENT_CONFIG_ERROR_CODES = new Set([
+  'controller_route_unavailable', // old controller missing the route entirely
+  'capability_unavailable', // gateway capability gate (501) — old controller image
+  'config_etag_conflict', // stale config-wide etag
+  'agent_not_found',
+  'agent_exists',
+  'reserved_agent_id',
+  'invalid_agent_id',
+  'invalid_agent_request',
+  'invalid_agent_config',
+  'invalid_config_after_patch',
+  'agent_binding_rollback_failed', // 500 — binding change rejected but routing left uncertain
+  'openclaw_cli_failed', // 502 — controller CLI message is generic
+  'openclaw_cli_timeout', // 504
+]);
+
+function sanitizeAgentConfigError(
+  err: unknown,
+  operation: string
+): { message: string; status: number; code?: string } {
+  const raw = err instanceof Error ? err.message : 'Unknown error';
+  const status = statusCodeFromError(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  const code = getErrorCode(err);
+
+  console.error(`[platform] ${operation} failed:`, raw);
+
+  if (code && AGENT_CONFIG_ERROR_CODES.has(code)) {
+    return { message: normalized, status, code };
+  }
+
+  return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
+}
+
+/**
+ * Reconstruct an HTTP error from the serializable envelope a DO agent method
+ * RETURNS (typed errors can't be thrown across the DO RPC boundary; see
+ * gateway.ts). Forwards the message only for known-safe codes; otherwise redacts
+ * the message but preserves the status.
+ */
+function reconstructAgentError(
+  operation: string,
+  agentError: { status: number; code: string | null; message: string }
+): { message: string; status: number; code?: string } {
+  const { status, code, message } = agentError;
+  if (code && AGENT_CONFIG_ERROR_CODES.has(code)) {
+    return { message, status, code };
+  }
+  console.error(`[platform] ${operation} returned error envelope:`, { status, code, message });
   return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
 }
 
@@ -913,18 +1274,13 @@ platform.post('/provision', async c => {
   const provisionedInstanceId = instanceId ?? crypto.randomUUID();
   const shouldInsertInstanceRecord = !instanceId;
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
-  // Only default to the catalog tier on FRESH inserts. On re-provision (config
-  // updates with an existing instanceId), pass `undefined` so the DO's
-  // `inferredInstanceType` path preserves existing tier / machineSize /
-  // volumeSizeGb. `provision()` is overloaded as the entrypoint for both
-  // fresh-create and config-update flows; defaulting unconditionally would
-  // silently overwrite custom (e.g. extend-volume) and legacy tiers on the
-  // next config change.
-  const instanceType =
-    requestedInstanceType ?? (shouldInsertInstanceRecord ? DEFAULT_INSTANCE_TIER : undefined);
-  const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionRoute = '/api/platform/provision';
+  const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionStartedAt = performance.now();
+  let provisionRegistry: ReturnType<typeof getProvisionRegistryStub> | null = null;
+  let freshReservationAdmitted = false;
+  let freshProviderWorkStarted = false;
+  let explicitInstanceRequiresSubscriptionBootstrap = false;
 
   let selectedProvider = provider;
   if (!selectedProvider && shouldInsertInstanceRecord) {
@@ -937,11 +1293,186 @@ platform.post('/provision', async c => {
     });
   }
 
+  let provisionEntitlement: {
+    priceVersion: KiloClawPriceVersion;
+    selfServiceInstanceType: InstanceTierKey;
+  } | null = null;
+  let instanceType: InstanceTierKey | undefined;
   let provision: Awaited<ReturnType<KiloClawInstanceStub['provision']>>;
   try {
+    if (instanceId) {
+      const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+      if (activeInstance?.id !== instanceId) {
+        return jsonError('Active instance not found', 404, 'instance_not_found');
+      }
+      if (await hasCanonicalProvisionSubscription(c.env, instanceId)) {
+        const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+        try {
+          await stub.repairCompletedProvision(
+            registryKey,
+            userId,
+            instanceId,
+            doKeyFromActiveInstance(activeInstance)
+          );
+        } catch (repairError) {
+          console.error(
+            '[platform] Failed to repair existing provision before update:',
+            repairError
+          );
+          return jsonError(
+            'Provisioning completed but finalization is pending',
+            503,
+            'provision_completion_pending'
+          );
+        }
+      } else if (bootstrapSubscription === true) {
+        explicitInstanceRequiresSubscriptionBootstrap = true;
+      } else {
+        return jsonError(
+          'Provisioning completed but subscription finalization is pending',
+          503,
+          'provision_completion_pending'
+        );
+      }
+    }
     if (selectedProvider) {
       assertAvailableProvider(c.env, selectedProvider);
     }
+    if (shouldInsertInstanceRecord) {
+      const resolvedEntitlement = await resolveProvisionEntitlementWithFallback({
+        env: c.env,
+        input: { userId, orgId: orgId ?? null },
+      });
+      if (!isKiloClawPriceVersion(resolvedEntitlement.priceVersion)) {
+        throw new Error(`Unknown KiloClaw price version: ${resolvedEntitlement.priceVersion}`);
+      }
+      const pricing = getKiloClawPricingCatalogEntry(resolvedEntitlement.priceVersion);
+      const resolvedSelfServiceInstanceType = InstanceTierKeySchema.parse(
+        resolvedEntitlement.selfServiceInstanceType
+      );
+      if (resolvedSelfServiceInstanceType !== pricing.selfServiceInstanceType) {
+        throw new Error(
+          `KiloClaw entitlement tier drift during provision: price version ${pricing.priceVersion} resolved ${resolvedSelfServiceInstanceType}, catalog expects ${pricing.selfServiceInstanceType}`
+        );
+      }
+      provisionEntitlement = {
+        priceVersion: pricing.priceVersion,
+        selfServiceInstanceType: pricing.selfServiceInstanceType,
+      };
+      if (
+        requestedInstanceType &&
+        !isWithinSelfServiceEntitlement(
+          requestedInstanceType,
+          provisionEntitlement.selfServiceInstanceType
+        )
+      ) {
+        return c.json({ error: 'instanceType exceeds self-service entitlement' }, 400);
+      }
+
+      provisionRegistry = getProvisionRegistryStub(c.env, userId, orgId);
+      const admission = await provisionRegistry.stub.beginFreshProvision(
+        provisionRegistry.registryKey,
+        userId,
+        provisionedInstanceId,
+        provisionDoKey
+      );
+      if (admission.outcome === 'conflict') {
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_conflict',
+          delivery: 'http',
+          route: provisionRoute,
+          userId,
+          instanceId: admission.reservation.instanceId,
+          orgId: orgId ?? undefined,
+          label: admission.reservation.status,
+        });
+        const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+        if (
+          activeInstance?.id === admission.reservation.instanceId &&
+          (await hasCanonicalProvisionSubscription(c.env, activeInstance.id))
+        ) {
+          try {
+            await provisionRegistry.stub.repairCompletedProvision(
+              provisionRegistry.registryKey,
+              userId,
+              activeInstance.id,
+              doKeyFromActiveInstance(activeInstance)
+            );
+            writeEvent(c.env, {
+              event: 'instance.provision_reservation_repaired',
+              delivery: 'http',
+              route: provisionRoute,
+              userId,
+              instanceId: activeInstance.id,
+              orgId: orgId ?? undefined,
+            });
+            return jsonError('User already has an active instance', 409, 'instance_already_active');
+          } catch (repairError) {
+            console.error(
+              '[platform] Failed to repair completed provision reservation:',
+              repairError
+            );
+            return jsonError(
+              'Provisioning completed but finalization is pending',
+              503,
+              'provision_completion_pending'
+            );
+          }
+        }
+        return jsonError(
+          'An instance is already being created. Wait for setup to finish, then try again.',
+          409,
+          'provision_in_progress'
+        );
+      }
+      freshReservationAdmitted = true;
+      writeEvent(c.env, {
+        event: 'instance.provision_reservation_started',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? undefined,
+      });
+
+      const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+      if (activeInstance) {
+        if (await hasCanonicalProvisionSubscription(c.env, activeInstance.id)) {
+          const repaired = await provisionRegistry.stub.repairCompletedProvision(
+            provisionRegistry.registryKey,
+            userId,
+            activeInstance.id,
+            doKeyFromActiveInstance(activeInstance)
+          );
+          if (!repaired) {
+            await provisionRegistry.stub.createInstance(
+              provisionRegistry.registryKey,
+              userId,
+              activeInstance.id,
+              doKeyFromActiveInstance(activeInstance)
+            );
+          }
+        }
+        await provisionRegistry.stub.releaseFreshProvision(
+          provisionRegistry.registryKey,
+          userId,
+          provisionedInstanceId,
+          'active_instance_exists'
+        );
+        return jsonError('User already has an active instance', 409, 'instance_already_active');
+      }
+    }
+    // Only default to the billing entitlement tier on FRESH inserts. On
+    // re-provision (config updates with an existing instanceId), pass
+    // `undefined` so the DO's `inferredInstanceType` path preserves existing
+    // tier / machineSize / volumeSizeGb. `provision()` is overloaded as the
+    // entrypoint for both fresh-create and config-update flows; defaulting
+    // unconditionally would silently overwrite custom (e.g. extend-volume) and
+    // legacy tiers on the next config change.
+    instanceType =
+      requestedInstanceType ??
+      (shouldInsertInstanceRecord ? provisionEntitlement?.selfServiceInstanceType : undefined);
+    freshProviderWorkStarted = shouldInsertInstanceRecord;
     provision = await withResolvedDORetry(
       c.env,
       userId,
@@ -962,11 +1493,47 @@ platform.post('/provision', async c => {
             region,
             pinnedImageTag,
           },
-          { instanceId: provisionedInstanceId, orgId, provider: selectedProvider }
+          {
+            instanceId: provisionedInstanceId,
+            orgId,
+            provider: selectedProvider,
+            freshProvision: shouldInsertInstanceRecord,
+          }
         ),
       'provision'
     );
+    if (instanceId) {
+      const activeAfterProvision = await getActiveProvisionContextInstance(c.env, userId, orgId);
+      if (activeAfterProvision?.id !== instanceId) {
+        return jsonError('Instance was destroyed during update', 409, 'instance_destroyed');
+      }
+    }
   } catch (err) {
+    if (freshReservationAdmitted && provisionRegistry) {
+      try {
+        if (freshProviderWorkStarted) {
+          await provisionRegistry.stub.failFreshProvision(
+            provisionRegistry.registryKey,
+            userId,
+            provisionedInstanceId,
+            'provider_provision_failed'
+          );
+        } else {
+          await provisionRegistry.stub.releaseFreshProvision(
+            provisionRegistry.registryKey,
+            userId,
+            provisionedInstanceId,
+            'failed_before_provider_work'
+          );
+        }
+      } catch (reservationError) {
+        console.error('[platform] Failed to update fresh provision reservation after error:', {
+          instanceId: provisionedInstanceId,
+          error:
+            reservationError instanceof Error ? reservationError.message : String(reservationError),
+        });
+      }
+    }
     const raw = err instanceof Error ? err.message : 'Unknown error';
     if (raw.includes('duplicate key') || raw.includes('unique constraint')) {
       console.error('[platform] provision failed: duplicate instance');
@@ -1002,7 +1569,10 @@ platform.post('/provision', async c => {
         // worker-side tier default has already been applied to `instanceType`
         // — but TS can't narrow `string | undefined` from the broader scope.
         // Re-derive locally so the helper signature stays `string`.
-        instanceType: requestedInstanceType ?? DEFAULT_INSTANCE_TIER,
+        instanceType:
+          requestedInstanceType ??
+          provisionEntitlement?.selfServiceInstanceType ??
+          DEFAULT_INSTANCE_TIER,
       });
       writeEvent(c.env, {
         event: 'instance.record_inserted',
@@ -1039,16 +1609,48 @@ platform.post('/provision', async c => {
           '[platform] Failed to destroy provisioned instance after bootstrap error:',
           destroyErr
         );
+        return null;
       });
+      let instanceMarkedDestroyed = true;
       await markProvisionedInstanceDestroyed({
         env: c.env,
         instanceId: provisionedInstanceId,
       }).catch(markErr => {
+        instanceMarkedDestroyed = false;
         console.error(
           '[platform] Failed to mark instance destroyed after bootstrap error:',
           markErr
         );
       });
+      if (instanceMarkedDestroyed) {
+        await withResolvedDORetry(
+          c.env,
+          userId,
+          provisionedInstanceId,
+          stub => stub.allowProvisionReservationReleaseOnFinalize(),
+          'allowProvisionReservationReleaseOnFinalize'
+        ).catch(releaseSignalError => {
+          console.error(
+            '[platform] Failed to confirm reservation cleanup release; DO will retry after Postgres confirmation:',
+            releaseSignalError
+          );
+        });
+      }
+      if (provisionRegistry && !instanceMarkedDestroyed) {
+        await provisionRegistry.stub
+          .failFreshProvision(
+            provisionRegistry.registryKey,
+            userId,
+            provisionedInstanceId,
+            'instance_record_insert_failed'
+          )
+          .catch(reservationError => {
+            console.error(
+              '[platform] Failed to finalize failed provision reservation:',
+              reservationError
+            );
+          });
+      }
       return jsonError(message, status);
     }
   }
@@ -1069,6 +1671,7 @@ platform.post('/provision', async c => {
           userId,
           instanceId: provisionedInstanceId,
           orgId: orgId ?? null,
+          expectedPriceVersion: provisionEntitlement?.priceVersion,
         },
       });
       logProvisionWrite('info', 'Provisioned subscription bootstrapped', {
@@ -1137,15 +1740,59 @@ platform.post('/provision', async c => {
         durationMs: performance.now() - bootstrapStartedAt,
       });
       if (shouldInsertInstanceRecord) {
+        await withResolvedDORetry(
+          c.env,
+          userId,
+          provisionedInstanceId,
+          stub => stub.destroy({ reason: 'bootstrap_cleanup_failure' }),
+          'destroy'
+        ).catch(destroyErr => {
+          console.error(
+            '[platform] Failed to destroy provisioned instance after subscription bootstrap error:',
+            destroyErr
+          );
+          return null;
+        });
+        let instanceMarkedDestroyed = true;
         await markProvisionedInstanceDestroyed({
           env: c.env,
           instanceId: provisionedInstanceId,
         }).catch(markErr => {
+          instanceMarkedDestroyed = false;
           console.error(
             '[platform] Failed to mark bootstrap-quarantined instance destroyed for retry:',
             markErr
           );
         });
+        if (instanceMarkedDestroyed) {
+          await withResolvedDORetry(
+            c.env,
+            userId,
+            provisionedInstanceId,
+            stub => stub.allowProvisionReservationReleaseOnFinalize(),
+            'allowProvisionReservationReleaseOnFinalize'
+          ).catch(releaseSignalError => {
+            console.error(
+              '[platform] Failed to confirm reservation cleanup release; DO will retry after Postgres confirmation:',
+              releaseSignalError
+            );
+          });
+        }
+        if (provisionRegistry && !instanceMarkedDestroyed) {
+          await provisionRegistry.stub
+            .failFreshProvision(
+              provisionRegistry.registryKey,
+              userId,
+              provisionedInstanceId,
+              'subscription_bootstrap_failed'
+            )
+            .catch(reservationError => {
+              console.error(
+                '[platform] Failed to finalize failed provision reservation:',
+                reservationError
+              );
+            });
+        }
       }
       console.error(
         '[platform] Subscription bootstrap failed after local fallback; instance quarantined for remediation',
@@ -1162,19 +1809,91 @@ platform.post('/provision', async c => {
     }
   }
 
-  try {
-    const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
-    const registryStub = c.env.KILOCLAW_REGISTRY.get(
-      c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-    );
-    await registryStub.createInstance(registryKey, userId, provisionedInstanceId, provisionDoKey);
-    console.log('[platform] Registry entry created:', {
-      registryKey,
-      instanceId: provisionedInstanceId,
-      doKey: provisionDoKey,
-    });
-  } catch (registryErr) {
-    console.error('[platform] Registry create failed (non-fatal):', registryErr);
+  if (shouldInsertInstanceRecord && provisionRegistry) {
+    try {
+      await provisionRegistry.stub.completeFreshProvision(
+        provisionRegistry.registryKey,
+        userId,
+        provisionedInstanceId,
+        provisionDoKey
+      );
+      writeEvent(c.env, {
+        event: 'instance.provision_reservation_completed',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? undefined,
+      });
+    } catch (registryErr) {
+      console.error('[platform] Registry completion failed; attempting repair:', registryErr);
+      writeEvent(c.env, {
+        event: 'instance.provision_reservation_repair_required',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? undefined,
+      });
+      try {
+        const repaired = await provisionRegistry.stub.repairCompletedProvision(
+          provisionRegistry.registryKey,
+          userId,
+          provisionedInstanceId,
+          provisionDoKey
+        );
+        if (!repaired) throw new Error('Provision reservation missing during completion repair');
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_repaired',
+          delivery: 'http',
+          route: provisionRoute,
+          userId,
+          instanceId: provisionedInstanceId,
+          orgId: orgId ?? undefined,
+        });
+      } catch (repairError) {
+        console.error('[platform] Registry completion repair failed:', repairError);
+        return jsonError(
+          'Provisioning completed but finalization is pending',
+          503,
+          'provision_completion_pending'
+        );
+      }
+    }
+  } else if (explicitInstanceRequiresSubscriptionBootstrap) {
+    try {
+      const registryKey = provisionRegistryKey(userId, orgId);
+      const registryStub = c.env.KILOCLAW_REGISTRY.get(
+        c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+      );
+      const repaired = await registryStub.repairCompletedProvision(
+        registryKey,
+        userId,
+        provisionedInstanceId,
+        provisionDoKey
+      );
+      if (!repaired) {
+        const published = await registryStub.publishRecoveredInstance(
+          registryKey,
+          userId,
+          provisionedInstanceId,
+          provisionDoKey
+        );
+        if (!published) {
+          return jsonError('Instance was destroyed during update', 409, 'instance_destroyed');
+        }
+      }
+    } catch (registryErr) {
+      console.error(
+        '[platform] Registry completion failed after subscription recovery:',
+        registryErr
+      );
+      return jsonError(
+        'Provisioning completed but finalization is pending',
+        503,
+        'provision_completion_pending'
+      );
+    }
   }
 
   return c.json(
@@ -1186,7 +1905,143 @@ platform.post('/provision', async c => {
   );
 });
 
+platform.post('/provision/repair-reservation', async c => {
+  const result = await parseBody(c, ProvisionReservationRepairSchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, orgId } = result.data;
+
+  try {
+    const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+    if (
+      activeInstance?.id !== instanceId ||
+      !(await hasCanonicalProvisionSubscription(c.env, instanceId))
+    ) {
+      return jsonError(
+        'No completed active provision exists for repair',
+        409,
+        'provision_repair_unavailable'
+      );
+    }
+    const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+    const repaired = await stub.repairCompletedProvision(
+      registryKey,
+      userId,
+      instanceId,
+      doKeyFromActiveInstance(activeInstance)
+    );
+    if (!repaired) {
+      return jsonError(
+        'No provision reservation exists for repair',
+        409,
+        'provision_repair_unavailable'
+      );
+    }
+    writeEvent(c.env, {
+      event: 'instance.provision_reservation_repaired',
+      delivery: 'http',
+      route: '/api/platform/provision/repair-reservation',
+      userId,
+      instanceId,
+      orgId: orgId ?? undefined,
+    });
+    return c.json({ ok: true });
+  } catch (error) {
+    const { message, status } = sanitizeError(error, 'provision reservation repair');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/provision/release-reservation
+// Admin break-glass: release a stuck provision reservation (`in_progress` or
+// `failed_requires_reconciliation`) so the user can provision again. A failed
+// fresh provision can leave such a row behind (e.g. `provider_provision_failed`
+// during a provider outage); the partial unique index then rejects every new
+// provision with `provision_in_progress` ("An instance is already being
+// created"), and nothing auto-heals it because no instance/DO exists to finalize
+// a destroy.
+//
+// This is an OPERATOR action, not an autonomous safety decision. The admin must
+// have already confirmed the attempt is dead and any provider resources are
+// cleaned up; `acknowledgeCleanupVerified: true` records that assertion (and the
+// admin identity is captured in the tRPC audit log upstream). It mutates only
+// the registry bookkeeping row — no provider (Fly/Northflank) or Postgres
+// changes. Guards: refuses a reservation backing a live active instance, refuses
+// non-releasable statuses, and releases atomically via a compare-and-set on the
+// validated status so a concurrent completion is reported, not clobbered.
+platform.post('/provision/release-reservation', async c => {
+  const result = await parseBody(c, ProvisionReservationReleaseSchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, orgId } = result.data;
+
+  try {
+    // Never release a reservation that belongs to a currently-active instance.
+    const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+    if (activeInstance?.id === instanceId) {
+      return jsonError(
+        'Reservation belongs to an active instance; refusing to release',
+        409,
+        'reservation_active'
+      );
+    }
+
+    const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+    const { reservations } = await stub.listAllInstances(registryKey);
+    const reservation = reservations.find(r => r.instanceId === instanceId);
+    if (!reservation) {
+      return jsonError('No provision reservation found for instance', 404, 'reservation_not_found');
+    }
+    if (
+      reservation.status !== 'in_progress' &&
+      reservation.status !== 'failed_requires_reconciliation'
+    ) {
+      return jsonError(
+        `Reservation is not in a releasable state (status=${reservation.status})`,
+        409,
+        'reservation_not_releasable'
+      );
+    }
+
+    // Atomic compare-and-set on the exact status we validated.
+    const release = await stub.adminReleaseStuckReservation(
+      registryKey,
+      userId,
+      instanceId,
+      reservation.status,
+      'manual_admin_release'
+    );
+    switch (release.outcome) {
+      case 'not_found':
+        return jsonError(
+          'No provision reservation found for instance',
+          404,
+          'reservation_not_found'
+        );
+      case 'status_changed':
+        return jsonError(
+          `Reservation status changed to ${release.status} during release; re-check and retry`,
+          409,
+          'reservation_status_changed'
+        );
+      case 'released':
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_released',
+          delivery: 'http',
+          route: '/api/platform/provision/release-reservation',
+          userId,
+          instanceId,
+          orgId: orgId ?? undefined,
+          label: release.previousStatus,
+        });
+        return c.json({ ok: true, previousStatus: release.previousStatus });
+    }
+  } catch (error) {
+    const { message, status } = sanitizeError(error, 'provision reservation release');
+    return jsonError(message, status);
+  }
+});
+
 // PATCH /api/platform/kilocode-config
+
 platform.patch('/kilocode-config', async c => {
   const result = await parseBody(c, KiloCodeConfigPatchSchema);
   if ('error' in result) return result.error;
@@ -1698,6 +2553,9 @@ platform.get('/gateway/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const gatewayStatus = await withResolvedDORetry(
       c.env,
       userId,
@@ -1714,7 +2572,12 @@ platform.get('/gateway/status', async c => {
 
 // GET /api/platform/gateway/ready?userId=...
 // Non-fatal polling endpoint — always returns 200 so the frontend poll
-// doesn't generate a wall of errors during startup.
+// doesn't generate a wall of errors during startup. Polled aggressively
+// (every 5s on the user dashboard) so it shares the wake-bug exposure with
+// the other guarded routes; the guard below short-circuits it for the same
+// reason. The response keeps its existing `{ ready, ... }` shape rather
+// than the unified `{ ok, reason }` sentinel so consumers that already
+// check `gatewayReady?.ready` keep working unchanged.
 platform.get('/gateway/ready', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) {
@@ -1725,6 +2588,11 @@ platform.get('/gateway/ready', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const check = await checkInstanceRunningState(c.env, userId, iidResult.instanceId);
+    if (!check.running) {
+      return c.json({ ready: false, reason: 'instance_not_running', status: check.status }, 200);
+    }
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -1750,6 +2618,9 @@ platform.get('/controller-version', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -1963,10 +2834,276 @@ platform.patch('/openclaw-config', async c => {
   }
 });
 
+// ──────────────────────────────────────────────────────────────────────
+// Agent config CRUD (controller: /_kilo/config/agents*)
+// Mirrors the openclaw-config proxy: x-internal-api-key auth (mount-level),
+// userId + optional instanceId resolution, opaque payload forwarding (deep
+// validation lives at the tRPC layer and the controller), and typed
+// error-code passthrough via sanitizeAgentConfigError. Each DO method fails
+// closed (501 capability_unavailable) on controllers that lack the capability.
+// ──────────────────────────────────────────────────────────────────────
+
+// GET /api/platform/agents?userId=...&instanceId=...
+platform.get('/agents', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.listAgents().then(r => r),
+      'listAgents'
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agents list', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agents list');
+    return jsonError(message, status, code);
+  }
+});
+
+// GET /api/platform/agents/:agentId?userId=...&instanceId=...
+platform.get('/agents/:agentId', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getAgent(agentId).then(r => r),
+      'getAgent'
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent read', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent read');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/agents — create an agent (payload forwarded opaquely).
+const CreateAgentSchema = z.object({
+  userId: z.string().min(1),
+  agent: z.record(z.string(), z.unknown()),
+});
+
+platform.post('/agents', async c => {
+  const result = await parseBody(c, CreateAgentSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, agent } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.createAgent(agent).then(r => r),
+      'createAgent',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent create', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent create');
+    return jsonError(message, status, code);
+  }
+});
+
+// PATCH /api/platform/agents/:agentId — edit one agent (payload forwarded opaquely).
+const UpdateAgentSchema = z.object({
+  userId: z.string().min(1),
+  patch: z.record(z.string(), z.unknown()),
+});
+
+platform.patch('/agents/:agentId', async c => {
+  const result = await parseBody(c, UpdateAgentSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+  const { userId, patch } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgent(agentId, patch).then(r => r),
+      'updateAgent',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent update', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent update');
+    return jsonError(message, status, code);
+  }
+});
+
+// PATCH /api/platform/agent-defaults — edit the fleet-wide defaults.
+const UpdateAgentDefaultsSchema = z.object({
+  userId: z.string().min(1),
+  patch: z.record(z.string(), z.unknown()),
+});
+
+platform.patch('/agent-defaults', async c => {
+  const result = await parseBody(c, UpdateAgentDefaultsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, patch } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgentDefaults(patch).then(r => r),
+      'updateAgentDefaults',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError(
+        'agent-defaults update',
+        response.agentError
+      );
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent-defaults update');
+    return jsonError(message, status, code);
+  }
+});
+
+// DELETE /api/platform/agents/:agentId?userId=...&instanceId=...
+platform.delete('/agents/:agentId', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.deleteAgent(agentId).then(r => r),
+      'deleteAgent',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent delete', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent delete');
+    return jsonError(message, status, code);
+  }
+});
+
+// PUT /api/platform/agents/:agentId/bindings — declaratively set channel routes.
+const UpdateAgentBindingsSchema = z.object({
+  userId: z.string().min(1),
+  bindings: z.record(z.string(), z.unknown()),
+});
+
+platform.put('/agents/:agentId/bindings', async c => {
+  const result = await parseBody(c, UpdateAgentBindingsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+  const { userId, bindings } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgentBindings(agentId, bindings).then(r => r),
+      'updateAgentBindings',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError(
+        'agent bindings update',
+        response.agentError
+      );
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent bindings update');
+    return jsonError(message, status, code);
+  }
+});
+
 const MorningBriefingSetupSchema = z.object({
   userId: z.string().min(1),
   cron: z.string().min(1).optional(),
   timezone: z.string().min(1).optional(),
+});
+
+// Caps protect both the plugin (config.json size) and the eventual
+// web-search query (PR-4c) from runaway input.
+const MAX_INTEREST_TOPICS = 20;
+const MAX_INTEREST_TOPIC_LENGTH = 64;
+const MorningBriefingInterestsSchema = z.object({
+  userId: z.string().min(1),
+  topics: z.array(z.string().trim().min(1).max(MAX_INTEREST_TOPIC_LENGTH)).max(MAX_INTEREST_TOPICS),
+});
+
+// Keep in sync with `userLocationSchema` in apps/web/src/routers/kiloclaw-router.ts
+// and the MAX_USER_LOCATION_LENGTH in the morning-briefing plugin's user-location route.
+const MAX_USER_LOCATION_LENGTH = 200;
+const MorningBriefingUserLocationSchema = z.object({
+  userId: z.string().min(1),
+  userLocation: z.string().trim().max(MAX_USER_LOCATION_LENGTH).nullable(),
 });
 
 type MorningBriefingWarmupRetryPolicy = {
@@ -2035,6 +3172,9 @@ platform.get('/morning-briefing/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    const sentinel = await shortCircuitIfNotRunning(c.env, userId, iidResult.instanceId);
+    if (sentinel) return sentinel;
+
     const result = await withResolvedDORetry(
       c.env,
       userId,
@@ -2150,6 +3290,85 @@ platform.post('/morning-briefing/disable', async c => {
   }
 });
 
+// POST /api/platform/morning-briefing/interests
+platform.post('/morning-briefing/interests', async c => {
+  const result = await parseBody(c, MorningBriefingInterestsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, topics } = result.data;
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.updateBriefingInterests({ topics }),
+        'updateBriefingInterests'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'morning-briefing/interests'
+    );
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/user-location
+platform.post('/morning-briefing/user-location', async c => {
+  const result = await parseBody(c, MorningBriefingUserLocationSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, userLocation } = result.data;
+  const normalized = userLocation === null ? null : userLocation.length > 0 ? userLocation : null;
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.updateUserLocation({ userLocation: normalized }),
+        'updateUserLocation'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'morning-briefing/user-location'
+    );
+    return jsonError(message, status, code);
+  }
+});
+
 // POST /api/platform/morning-briefing/run
 platform.post('/morning-briefing/run', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
@@ -2194,6 +3413,51 @@ platform.post('/morning-briefing/run', async c => {
   }
 });
 
+// POST /api/platform/morning-briefing/onboarding-briefing
+platform.post('/morning-briefing/onboarding-briefing', async c => {
+  // `settingsHref` is the org-aware Settings link the web router derived for
+  // the briefing's "Connect more" items. The plugin re-validates it.
+  const result = await parseBody(
+    c,
+    UserIdRequestSchema.extend({ settingsHref: z.string().optional() })
+  );
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withMorningBriefingWarmupRetry(
+      () =>
+        withResolvedDORetry(
+          c.env,
+          result.data.userId,
+          iidResult.instanceId,
+          stub => stub.startOnboardingBriefing(result.data.settingsHref),
+          'startOnboardingBriefing'
+        ),
+      { includeTimeout: false }
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err, { includeTimeout: false })) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'morning-briefing/onboarding-briefing'
+    );
+    return jsonError(message, status, code);
+  }
+});
+
 // GET /api/platform/morning-briefing/read/{today|yesterday}?userId=...
 platform.get('/morning-briefing/read/:day', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -2234,9 +3498,10 @@ platform.get('/morning-briefing/read/:day', async c => {
   }
 });
 
-// GET /api/platform/files/tree?userId=...
+// GET /api/platform/files/tree?userId=...[&path=...]
 platform.get('/files/tree', async c => {
   const userId = setValidatedQueryUserId(c);
+  const filePath = c.req.query('path');
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -2249,7 +3514,7 @@ platform.get('/files/tree', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.getFileTree(),
+      stub => stub.getFileTree(filePath),
       'getFileTree'
     );
     if (!result) {
@@ -2309,6 +3574,13 @@ const WriteFileSchema = z.object({
   etag: z.string().optional(),
 });
 
+const WriteOpenclawConfigFileSchema = z.object({
+  userId: z.string().min(1),
+  content: z.string(),
+  etag: z.string().optional(),
+  mode: z.enum(['warn-before-write', 'allow-invalid']),
+});
+
 const OpenclawWorkspaceImportSchema = z.object({
   userId: z.string().min(1),
   files: z
@@ -2349,6 +3621,40 @@ platform.post('/files/write', async c => {
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'files/write');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/files/write-openclaw-config
+platform.post('/files/write-openclaw-config', async c => {
+  const result = await parseBody(c, WriteOpenclawConfigFileSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, content, etag, mode } = result.data;
+  try {
+    const response = await withResolvedDORetry<FileWriteResponse | null>(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.writeOpenclawConfigFile(content, etag, mode),
+      'writeOpenclawConfigFile'
+    );
+    if (!response) {
+      return jsonError(
+        'OpenClaw validation-aware writing not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'files/write-openclaw-config'
+    );
     return jsonError(message, status, code);
   }
 });
@@ -2840,7 +4146,7 @@ platform.post('/destroy', async c => {
 
   try {
     const destroyOptions = result.data.reason ? { reason: result.data.reason } : undefined;
-    await withResolvedDORetry(
+    const destroyResult = await withResolvedDORetry(
       c.env,
       userId,
       instanceId,
@@ -2890,7 +4196,7 @@ platform.post('/destroy', async c => {
       console.error('[platform] Registry destroy failed (non-fatal):', registryErr);
     }
 
-    return c.json({ ok: true });
+    return c.json({ ok: true, ...destroyResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'destroy');
     return jsonError(message, status);
@@ -3224,6 +4530,9 @@ platform.get('/debug-status', async c => {
   const { instanceId } = iidResult;
 
   try {
+    // No guard here: getDebugState() reads DO storage only and never proxies
+    // through Fly's edge to the machine. The wake-up bug (services that proxy
+    // to port 18789) does not apply.
     const status = await withResolvedDORetry(
       c.env,
       userId,
@@ -3254,6 +4563,17 @@ platform.get('/registry-entries', async c => {
       assignedUserId: string;
       createdAt: string;
       destroyedAt: string | null;
+    }>;
+    reservations: Array<{
+      instanceId: string;
+      doKey: string;
+      assignedUserId: string;
+      status: string;
+      startedAt: string;
+      updatedAt: string;
+      completedAt: string | null;
+      failureCode: string | null;
+      resolutionReason: string | null;
     }>;
     migrated: boolean;
   }> = [];
@@ -3429,11 +4749,403 @@ platform.post('/reassociate-volume', async c => {
   }
 });
 
+// ── Admin orphan-volume reaper ────────────────────────────────────────────
+//
+// Two admin-only endpoints that back the web app's "Orphan volumes" admin
+// tab. They exist because the web app has no Fly API token — every Fly call
+// must go through this worker. The worker is also the single source of truth
+// for Fly app-name + volume-name derivation, so the web app never computes
+// those strings itself (drift there would silently misattribute volumes).
+//
+// Safety model: the volume↔instance attribution is by *exact volume name*,
+// the volume must be in a quiescent (`created`/`detached`) state, and a live
+// Durable Object that still references the volume — or whose state we cannot
+// confirm — blocks the destroy. The web router layers the DB-side guards
+// (instance is destroyed, grace period elapsed, no access-granting
+// subscription) on top before ever calling these.
+
+const OrphanVolumeIdentitySchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+  sandboxId: z.string().min(1).max(128),
+});
+
+/** The six DO state fields that can hold a live Fly volume ID. */
+function liveDoVolumeIds(debug: {
+  flyVolumeId: string | null;
+  pendingDestroyVolumeId: string | null;
+  pendingRecoveryVolumeId: string | null;
+  recoveryPreviousVolumeId: string | null;
+  previousVolumeId: string | null;
+  pendingRestoreVolumeId: string | null;
+}): string[] {
+  return [
+    debug.flyVolumeId,
+    debug.pendingDestroyVolumeId,
+    debug.pendingRecoveryVolumeId,
+    debug.recoveryPreviousVolumeId,
+    debug.previousVolumeId,
+    debug.pendingRestoreVolumeId,
+  ].filter((id): id is string => id !== null);
+}
+
+/**
+ * Build a DO stub factory for the orphan-volume endpoints, deriving the DO
+ * key deterministically from the sandbox ID via `doKeyFromActiveInstance`.
+ *
+ * Deliberately NOT `withResolvedDORetry`: that resolver does a second,
+ * best-effort Postgres lookup and falls back to the raw instanceId on any
+ * hiccup. For a legacy (non-`ki_`) sandbox the real DO is user-keyed, so
+ * that fallback would read an unrelated, empty instanceId-keyed DO —
+ * `getDebugState()` would report `status: null` and no tracked volumes,
+ * silently passing the destroy guards against the wrong instance. The key
+ * derivation runs inside the returned factory so a malformed sandbox
+ * surfaces as a DO-call failure (fail closed) rather than a sync throw.
+ */
+function orphanVolumeDoStubFactory(
+  env: AppEnv['Bindings'],
+  identity: { id: string; sandboxId: string }
+): () => KiloClawInstanceStub {
+  return () =>
+    env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(doKeyFromActiveInstance(identity)));
+}
+
+async function resolveOrphanVolumeFlyAppName(
+  env: AppEnv['Bindings'],
+  identity: { userId: string; sandboxId: string }
+): Promise<string> {
+  const appKey = getAppKey(identity);
+  const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
+  const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
+  const fallbackAppName = await fallbackAppNameForRestore(
+    identity.userId,
+    identity.sandboxId,
+    prefix
+  );
+
+  return (await appStub.getAppName()) ?? fallbackAppName;
+}
+
+// GET /api/platform/admin/orphan-volume-scan?userId=&instanceId=&sandboxId=
+// Lists the Fly volumes in the instance's app and annotates each with whether
+// it belongs to this instance (exact name match) and whether a live DO still
+// tracks it. Read-only — never deletes anything.
+platform.get('/admin/orphan-volume-scan', async c => {
+  const parsed = OrphanVolumeIdentitySchema.safeParse({
+    userId: c.req.query('userId'),
+    instanceId: c.req.query('instanceId'),
+    sandboxId: c.req.query('sandboxId'),
+  });
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', details: parsed.error.flatten().fieldErrors }, 400);
+  }
+  const { userId, instanceId, sandboxId } = parsed.data;
+  c.set('userId', userId);
+
+  const apiToken = c.env.FLY_API_TOKEN;
+  if (!apiToken) {
+    return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
+  }
+
+  const flyApp = await resolveOrphanVolumeFlyAppName(c.env, { userId, sandboxId });
+  const expectedVolumeName = volumeNameFromSandboxId(sandboxId);
+
+  // Fetch the volume list and the DO debug state concurrently. Either can fail
+  // independently; a failure is surfaced (not swallowed) so the web UI can
+  // distinguish "no orphans" from "could not check" — a swallowed listVolumes
+  // failure would otherwise read as a false negative.
+  const [volumesResult, debugResult] = await Promise.allSettled([
+    fly.listVolumes({ apiToken, appName: flyApp }),
+    withDORetry(
+      orphanVolumeDoStubFactory(c.env, { id: instanceId, sandboxId }),
+      stub => stub.getDebugState(),
+      'getDebugState'
+    ),
+  ]);
+
+  let volumes: FlyVolume[] = [];
+  let appExists = true;
+  let scanError: string | null = null;
+  if (volumesResult.status === 'fulfilled') {
+    volumes = volumesResult.value;
+  } else if (fly.isFlyNotFound(volumesResult.reason)) {
+    // App is gone — deleting an app removes its volumes, so there is nothing
+    // to reap. Not an error.
+    appExists = false;
+  } else {
+    scanError =
+      volumesResult.reason instanceof Error ? volumesResult.reason.message : 'listVolumes failed';
+    console.error(`[platform] orphan-volume-scan listVolumes failed app=${flyApp}:`, scanError);
+  }
+
+  let doStatus: string | null = null;
+  let doStatusError: string | null = null;
+  let doVolumeIds: string[] = [];
+  if (debugResult.status === 'fulfilled') {
+    doStatus = debugResult.value.status;
+    doVolumeIds = liveDoVolumeIds(debugResult.value);
+  } else {
+    doStatusError =
+      debugResult.reason instanceof Error ? debugResult.reason.message : 'getDebugState failed';
+    console.error(
+      `[platform] orphan-volume-scan getDebugState failed user=${userId}:`,
+      doStatusError
+    );
+  }
+
+  return c.json({
+    flyApp,
+    appExists,
+    expectedVolumeName,
+    doStatus,
+    doStatusError,
+    scanError,
+    volumes: volumes.map(v => ({
+      id: v.id,
+      name: v.name,
+      state: v.state,
+      size_gb: v.size_gb,
+      region: v.region,
+      attached_machine_id: v.attached_machine_id,
+      created_at: v.created_at,
+      // Attribution: this volume belongs to THIS instance only if its name is
+      // an exact match for the instance's derived volume name.
+      nameMatchesInstance: v.name === expectedVolumeName,
+      // A live DO that still references this volume must not have it deleted.
+      trackedByLiveDo: doVolumeIds.includes(v.id),
+    })),
+  });
+});
+
+// POST /api/platform/admin/orphan-volume-destroy
+// Destroys a single orphaned Fly volume. Re-verifies every Fly/DO-side
+// invariant server-side; never trusts the caller's view of the volume.
+const OrphanVolumeDestroySchema = OrphanVolumeIdentitySchema.extend({
+  volumeId: z
+    .string()
+    .min(1)
+    .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+});
+
+platform.post('/admin/orphan-volume-destroy', async c => {
+  const result = await parseBody(c, OrphanVolumeDestroySchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, sandboxId, volumeId } = result.data;
+
+  const apiToken = c.env.FLY_API_TOKEN;
+  if (!apiToken) {
+    return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
+  }
+
+  // Resolve the instance row and re-enforce every DB-side safety gate here.
+  // The web router applies the same gates, but this is a destructive
+  // endpoint reachable by any internal-API-key caller, so it must fail
+  // closed on its own rather than trust the caller to have checked.
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    return c.json({ error: 'Database connection is not configured' }, 503);
+  }
+  const workerDb = getWorkerDb(connectionString);
+  // Aliased outer table so the correlated subquery below can refer to it as
+  // `target_inst.*`. Drizzle interpolates `${kiloclaw_instances.X}` inside a
+  // raw `sql` template as a BARE `"X"` column reference (no table qualifier).
+  // Postgres then resolves that bare reference to the most-local scope — the
+  // inner `sandbox_destroys` alias — which collapses the correlation to a
+  // trivially-true `sandbox_destroys.user_id = sandbox_destroys.user_id` and
+  // turns the subquery into a table-wide `max(destroyed_at)`. With many
+  // users in production that max is always recent, so the grace gate would
+  // fail closed for every destroy regardless of the target. Aliasing the
+  // outer table and writing the correlation columns as literal SQL keeps
+  // every reference explicitly qualified.
+  const targetInstance = alias(kiloclaw_instances, 'target_inst');
+  const [instance] = await workerDb
+    .select({
+      id: targetInstance.id,
+      userId: targetInstance.user_id,
+      sandboxId: targetInstance.sandbox_id,
+      organizationId: targetInstance.organization_id,
+      destroyedAt: targetInstance.destroyed_at,
+      // Whether the orphan-volume grace period has elapsed, evaluated entirely
+      // in Postgres. Grace runs from the LATEST destruction of this
+      // (user, sandbox): a reprovisioned sandbox has several destroyed rows
+      // sharing one Fly volume, so the clock follows the most recent
+      // destruction, not whichever row the caller happened to submit.
+      // Computing this in SQL avoids parsing a database timestamp with the JS
+      // `Date` constructor, whose handling of Postgres timestamp text differs
+      // across the Vercel and Cloudflare runtimes.
+      gracePeriodElapsed: sql<boolean>`
+        extract(epoch from (now() - (
+          select max(sandbox_destroys.destroyed_at)
+          from ${kiloclaw_instances} as sandbox_destroys
+          where sandbox_destroys.user_id = target_inst.user_id
+            and sandbox_destroys.sandbox_id = target_inst.sandbox_id
+            and sandbox_destroys.destroyed_at is not null
+        ))) * 1000 > ${ORPHAN_VOLUME_GRACE_PERIOD_MS}`,
+    })
+    .from(targetInstance)
+    .where(eq(targetInstance.id, instanceId))
+    .limit(1);
+
+  if (!instance) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+  // Identity — the caller-supplied tuple must be internally consistent so the
+  // Fly-side name guard and the DO-side guard both anchor to one instance.
+  if (instance.userId !== userId || instance.sandboxId !== sandboxId) {
+    return c.json(
+      { error: 'Instance identity mismatch: userId/sandboxId do not match instanceId' },
+      409
+    );
+  }
+  // Gate A — the instance must be destroyed. A live instance still owns its
+  // volume; this endpoint only reaps orphans of destroyed instances.
+  if (instance.destroyedAt === null) {
+    return c.json({ error: 'Instance is not destroyed; its volume is not an orphan' }, 409);
+  }
+  // Gate B — grace period, measured from the LATEST destruction of this
+  // sandbox. A reprovisioned sandbox has several destroyed rows sharing one
+  // Fly volume; the volume's cleanup clock runs from the most recent
+  // destruction, so an older submitted row must not shorten the grace.
+  // `gracePeriodElapsed` is computed by Postgres in the query above; `false`
+  // or `null` (no destroyed row, already ruled out by gate A) both fail closed.
+  if (instance.gracePeriodElapsed !== true) {
+    return c.json({ error: 'Instance is still within the orphan-volume grace period' }, 409);
+  }
+  // Gate C — never destroy data while this ownership context still has
+  // product access, or while the billing lifecycle reaper is still scheduled
+  // to destroy it (a future `destruction_deadline`). Reprovision transfers
+  // move access to a current successor row; a detached current row has no
+  // resolvable context, so the shared lookup fails closed for the user.
+  const context = {
+    user_id: instance.userId,
+    organization_id: instance.organizationId,
+  };
+  const { accessGrantingContextKeys, pendingDestructionContextKeys } =
+    await getOrphanVolumeContextProtections(workerDb, [context], new Date());
+  const contextKey = orphanVolumeSubscriptionContextKey(context);
+  if (accessGrantingContextKeys.has(contextKey)) {
+    return c.json({ error: 'User has an access-granting subscription; volume preserved' }, 409);
+  }
+  if (pendingDestructionContextKeys.has(contextKey)) {
+    return c.json(
+      { error: 'A billing destruction deadline is still pending; volume preserved' },
+      409
+    );
+  }
+
+  const flyApp = await resolveOrphanVolumeFlyAppName(c.env, {
+    userId: instance.userId,
+    sandboxId: instance.sandboxId,
+  });
+  const expectedVolumeName = volumeNameFromSandboxId(instance.sandboxId);
+  const flyConfig = { apiToken, appName: flyApp };
+
+  // 1. Re-list and locate the target volume by its immutable ID. We act on the
+  //    freshly-fetched volume, never on caller-supplied state.
+  let volume: FlyVolume | undefined;
+  try {
+    volume = (await fly.listVolumes(flyConfig)).find(v => v.id === volumeId);
+  } catch (err) {
+    if (fly.isFlyNotFound(err)) {
+      return c.json({ error: 'Fly app not found; nothing to destroy' }, 404);
+    }
+    const { message, status } = sanitizeError(err, 'orphan-volume-destroy listVolumes');
+    return jsonError(message, status);
+  }
+  if (!volume) {
+    return c.json({ error: 'Volume not found in Fly app' }, 404);
+  }
+
+  // 2. Attribution guard — the volume name must exactly match this instance.
+  if (volume.name !== expectedVolumeName) {
+    return c.json(
+      {
+        error: `Volume name "${volume.name}" does not match this instance's volume "${expectedVolumeName}"`,
+      },
+      409
+    );
+  }
+
+  // 3. State guard — only quiescent, unattached volumes are reapable. An
+  //    attached volume still backs a machine; a *_destroy state means Fly is
+  //    already reaping it.
+  if (volume.state !== 'created' && volume.state !== 'detached') {
+    return c.json(
+      { error: `Volume is in state "${volume.state}"; only created/detached volumes are reapable` },
+      409
+    );
+  }
+  if (volume.attached_machine_id !== null) {
+    return c.json(
+      {
+        error: `Volume is attached to machine ${volume.attached_machine_id}; destroy the machine first`,
+      },
+      409
+    );
+  }
+
+  // 4. DO cross-check — refuse if a live DO references this volume, if the DO
+  //    is alive at all (the instance is supposed to be destroyed), or if we
+  //    cannot confirm DO state. "Cannot confirm" fails closed.
+  let debug: Awaited<ReturnType<KiloClawInstanceStub['getDebugState']>>;
+  try {
+    debug = await withDORetry(
+      orphanVolumeDoStubFactory(c.env, instance),
+      stub => stub.getDebugState(),
+      'getDebugState'
+    );
+  } catch (err) {
+    const { message } = sanitizeError(err, 'orphan-volume-destroy getDebugState');
+    return c.json(
+      { error: `Could not confirm Durable Object state; refusing to destroy (${message})` },
+      502
+    );
+  }
+  if (liveDoVolumeIds(debug).includes(volumeId)) {
+    return c.json(
+      {
+        error: `Durable Object still references this volume (status: ${debug.status}); refusing to destroy`,
+      },
+      409
+    );
+  }
+  if (debug.status !== null) {
+    return c.json(
+      {
+        error: `Durable Object is alive (status: ${debug.status}); resolve its state before reaping this volume`,
+      },
+      409
+    );
+  }
+
+  // 5. Destroy. A concurrent deletion (404 / missing-volume) is treated as
+  //    success — the goal state is reached either way.
+  try {
+    await fly.deleteVolume(flyConfig, volumeId);
+  } catch (err) {
+    if (fly.isFlyNotFound(err) || fly.isFlyMissingVolume(err)) {
+      console.log(
+        `[platform] orphan-volume-destroy: volume already gone app=${flyApp} volume=${volumeId}`
+      );
+      return c.json({ ok: true, flyApp, volumeId, volumeName: volume.name, alreadyGone: true });
+    }
+    const { message, status } = sanitizeError(err, 'orphan-volume-destroy deleteVolume');
+    return jsonError(message, status);
+  }
+
+  console.log(
+    `[platform] orphan-volume-destroy ok: app=${flyApp} volume=${volumeId} name=${volume.name}`
+  );
+  return c.json({ ok: true, flyApp, volumeId, volumeName: volume.name, alreadyGone: false });
+});
+
 // POST /api/platform/resize-machine
 // Updates the machine size for an instance. Takes effect on next start/restart.
 const ResizeMachineSchema = z.object({
   userId: z.string().min(1),
   instanceType: InstanceTierKeySchema,
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
 });
 
 platform.post('/resize-machine', async c => {
@@ -3448,7 +5160,12 @@ platform.post('/resize-machine', async c => {
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.resizeMachine(result.data.instanceType),
+      stub =>
+        stub.resizeMachine({
+          targetTierKey: result.data.instanceType,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
       'resizeMachine'
     );
     return c.json(response);
@@ -3588,51 +5305,50 @@ platform.get('/versions', async c => {
 // GET /api/platform/versions/latest
 // Resolves the image version this caller should be on next.
 //
-// Query params (all optional):
-//   instanceId       — bucket subject for rollout candidate selection
-//   currentImageTag  — caller's current image; used to suppress self-upgrades
-//
-// Without instanceId, returns the current :latest pointer (back-compat for
-// anonymous callers — public version banner, CI, etc.). With instanceId, runs
-// the rollout-aware selector and returns the candidate when the instance falls
-// in cohort, the :latest baseline when not, or 404 when the caller is already
-// on the newest applicable image (banner: "no upgrade").
-//
-// The Early Access flag is looked up server-side from the instance's owning
-// user — callers cannot pass it as a query param. This keeps the service as
-// the single authoritative source: even an internal-key-holding caller can't
-// claim Early Access for an arbitrary instance.
+// Without rolloutSubject or instanceId, returns the current :latest pointer for
+// anonymous callers. With a rollout subject, runs the same rollout selector used
+// by restartMachine({ imageTag: 'latest' }). instanceId is the authoritative DB
+// row used to resolve Early Access and the rollout subject server-side.
 platform.get('/versions/latest', async c => {
   try {
+    const requestedRolloutSubject = c.req.query('rolloutSubject');
     const instanceId = c.req.query('instanceId');
     const currentImageTag = c.req.query('currentImageTag') ?? null;
 
-    if (!instanceId) {
+    let rolloutSubject = instanceId ?? requestedRolloutSubject;
+    if (!rolloutSubject) {
       const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
       if (!latest) return c.json({ error: 'No latest version registered' }, 404);
       return c.json(latest);
     }
 
-    // Resolve Early Access from the instance's owner. This requires Hyperdrive;
-    // without it we degrade gracefully to autoEnroll=false (the bucket math
-    // still works correctly — only the staff/beta-tester override is missing).
     let autoEnroll = false;
     const connectionString = c.env.HYPERDRIVE?.connectionString;
-    if (connectionString) {
+    if (instanceId && connectionString) {
       try {
-        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
+        const rolloutContext = await lookupKiloclawRolloutContextByInstanceId(
+          connectionString,
+          instanceId
+        );
+        if (rolloutContext) {
+          rolloutSubject = rolloutContext.rolloutSubject;
+          autoEnroll = rolloutContext.earlyAccess;
+        } else {
+          rolloutSubject = instanceId;
+        }
       } catch (err) {
         console.warn(
-          '[platform] Early Access lookup failed; treating as false:',
+          '[platform] Instance rollout context lookup failed; treating as false:',
           err instanceof Error ? err.message : err
         );
+        rolloutSubject = instanceId;
       }
     }
 
     const selected = await selectImageVersionForInstance({
       kv: c.env.KV_CLAW_CACHE,
       variant: 'default',
-      instanceId,
+      rolloutSubject,
       currentImageTag,
       autoEnroll,
     });
@@ -3769,7 +5485,7 @@ platform.post('/versions/apply-pin', async c => {
       c.env,
       userId,
       instanceId,
-      stub => stub.applyPinnedVersion(imageTag, instanceId),
+      stub => stub.applyPinnedVersion(imageTag),
       'applyPinnedVersion'
     );
     return c.json({ ok: true, ...applied });

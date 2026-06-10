@@ -4,7 +4,9 @@ import {
   createCloudAgentNextClient,
   rethrowAsPaymentRequired,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { generateCloudAgentToken } from '@/lib/tokens';
+import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -27,11 +29,86 @@ import {
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
+  baseCreateTerminalNextSchema,
+  baseCreateTerminalNextOutputSchema,
+  baseRefreshTerminalTicketNextSchema,
+  baseRefreshTerminalTicketNextOutputSchema,
+  baseResizeTerminalNextSchema,
+  baseResizeTerminalNextOutputSchema,
+  baseCloseTerminalNextSchema,
+  baseCloseTerminalNextOutputSchema,
+  cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
 } from '../cloud-agent-next-schemas';
-import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
+import {
+  generateCloudAgentAttachmentUploadUrl,
+  generateImageUploadUrl,
+} from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { db } from '@/lib/drizzle';
+import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+import { TRPCError } from '@trpc/server';
+import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
+
+function buildTerminalUrl(params: {
+  cloudAgentSessionId: string;
+  ptyId: string;
+  ticket: string;
+}): string {
+  const search = new URLSearchParams({
+    cloudAgentSessionId: params.cloudAgentSessionId,
+    ptyId: params.ptyId,
+    ticket: params.ticket,
+  });
+  return `/terminal?${search.toString()}`;
+}
+
+function createTerminalTicket(params: {
+  userId: string;
+  organizationId: string;
+  cloudAgentSessionId: string;
+  ptyId: string;
+}) {
+  const signed = signStreamTicket({
+    purpose: 'terminal',
+    userId: params.userId,
+    cloudAgentSessionId: params.cloudAgentSessionId,
+    organizationId: params.organizationId,
+    ptyId: params.ptyId,
+  });
+
+  return {
+    wsUrl: buildTerminalUrl({
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      ptyId: params.ptyId,
+      ticket: signed.ticket,
+    }),
+    ticket: signed.ticket,
+    expiresAt: signed.expiresAt,
+  };
+}
+
+async function assertOrganizationOwnsTerminalSession(params: {
+  organizationId: string;
+  userId: string;
+  cloudAgentSessionId: string;
+}): Promise<void> {
+  const sessionOwnership = await verifyOrgOwnsSessionV2ByCloudAgentId(
+    db,
+    params.organizationId,
+    params.userId,
+    params.cloudAgentSessionId
+  );
+
+  if (!sessionOwnership) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Organization does not own this session',
+    });
+  }
+}
 
 // Extend base schemas with organizationId for organization context
 const PrepareSessionInput = basePrepareSessionNextSchema.and(
@@ -56,7 +133,27 @@ const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
   organizationId: z.uuid(),
 });
 
+const AttachmentUploadUrlInput = cloudAgentGetAttachmentUploadUrlSchema.extend({
+  organizationId: z.uuid(),
+});
+
 const GetSessionInput = baseGetSessionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const CreateTerminalInput = baseCreateTerminalNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const RefreshTerminalTicketInput = baseRefreshTerminalTicketNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const ResizeTerminalInput = baseResizeTerminalNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const CloseTerminalInput = baseCloseTerminalNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -105,10 +202,21 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(PrepareSessionInput)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (
+        input.devcontainer &&
+        !(await isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', input.organizationId))
+      ) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Dev container sessions are not available',
+        });
+      }
+
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
-      const { gitlabProject, githubRepo, organizationId, ...restInput } = input;
+      const { gitlabProject, githubRepo, organizationId, attachments, images, ...restInput } =
+        input;
 
       // Profile resolution happens inside cloud-agent-next. Tokens are resolved
       // there as well via GIT_TOKEN_SERVICE. We forward profileId + inline
@@ -131,6 +239,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
+          attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
           kilocodeOrganizationId: organizationId,
         });
@@ -159,7 +268,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       try {
         return await client.initiateFromPreparedSession({
           cloudAgentSessionId: input.cloudAgentSessionId,
-          kilocodeOrganizationId: input.organizationId,
         });
       } catch (error) {
         rethrowAsPaymentRequired(error);
@@ -186,17 +294,113 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       try {
         return await client.sendMessage({
           cloudAgentSessionId: input.cloudAgentSessionId,
-          prompt: input.prompt,
-          mode: input.mode,
-          model: input.model,
-          variant: input.variant,
+          payload: input.payload,
           autoCommit: input.autoCommit,
-          messageId: input.messageId,
-          images: input.images,
+          messageId: input.messageId ?? generateMessageId(),
+          attachments: input.attachments ?? input.images,
         });
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;
+      }
+    }),
+
+  createTerminal: organizationMemberMutationProcedure
+    .input(CreateTerminalInput)
+    .output(baseCreateTerminalNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsTerminalSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+
+      try {
+        const authToken = generateCloudAgentToken(ctx.user);
+        const client = createCloudAgentNextClient(authToken);
+        const result = await client.createTerminal({
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          cols: input.cols,
+          rows: input.rows,
+        });
+        const terminalTicket = createTerminalTicket({
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          ptyId: result.pty.id,
+        });
+
+        return {
+          pty: result.pty,
+          ptyId: result.pty.id,
+          ...terminalTicket,
+        };
+      } catch (error) {
+        rethrowAsTerminalError(error);
+      }
+    }),
+
+  refreshTerminalTicket: organizationMemberMutationProcedure
+    .input(RefreshTerminalTicketInput)
+    .output(baseRefreshTerminalTicketNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsTerminalSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+
+      return createTerminalTicket({
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        ptyId: input.ptyId,
+      });
+    }),
+
+  resizeTerminal: organizationMemberMutationProcedure
+    .input(ResizeTerminalInput)
+    .output(baseResizeTerminalNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsTerminalSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+
+      try {
+        const authToken = generateCloudAgentToken(ctx.user);
+        const client = createCloudAgentNextClient(authToken);
+        return await client.resizeTerminal({
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          ptyId: input.ptyId,
+          cols: input.cols,
+          rows: input.rows,
+        });
+      } catch (error) {
+        rethrowAsTerminalError(error);
+      }
+    }),
+
+  closeTerminal: organizationMemberMutationProcedure
+    .input(CloseTerminalInput)
+    .output(baseCloseTerminalNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsTerminalSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+
+      try {
+        const authToken = generateCloudAgentToken(ctx.user);
+        const client = createCloudAgentNextClient(authToken);
+        return await client.closeTerminal({
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          ptyId: input.ptyId,
+        });
+      } catch (error) {
+        rethrowAsTerminalError(error);
       }
     }),
 
@@ -211,6 +415,21 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         messageUuid: input.messageUuid,
         imageId: input.imageId,
+        contentType: input.contentType,
+        contentLength: input.contentLength,
+      });
+    }),
+
+  /**
+   * Generate a presigned URL for uploading a canonical Cloud Agent attachment.
+   */
+  getAttachmentUploadUrl: organizationMemberMutationProcedure
+    .input(AttachmentUploadUrlInput)
+    .mutation(async ({ ctx, input }) => {
+      return generateCloudAgentAttachmentUploadUrl({
+        userId: ctx.user.id,
+        messageUuid: input.messageUuid,
+        attachmentId: input.attachmentId,
         contentType: input.contentType,
         contentLength: input.contentLength,
       });

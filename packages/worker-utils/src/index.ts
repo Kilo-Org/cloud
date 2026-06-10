@@ -25,7 +25,11 @@ export { createNotFoundHandler } from './not-found-handler.js';
 
 export type { Owner, MCPServerConfig } from './types.js';
 
-export { createCloudAgentNextFetchClient } from './cloud-agent-next-client.js';
+export {
+  CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS,
+  createCloudAgentNextFetchClient,
+  isCloudAgentNextBillingErrorBody,
+} from './cloud-agent-next-client.js';
 export type {
   CloudAgentNextFetchClient,
   CallbackTarget,
@@ -64,6 +68,9 @@ export { redactSensitiveHeaders } from './redact-headers.js';
 
 export { normalizeGitUrl } from './normalize-git-url.js';
 
+export { deriveCallbackToken, verifyCallbackToken } from './callback-token.js';
+export type { CallbackTokenParams, VerifyCallbackTokenParams } from './callback-token.js';
+
 export {
   BILLING_FLOW,
   BILLING_HEADER_NAMES,
@@ -89,3 +96,16 @@ export type {
 
 export { isValidGitUrl, sanitizeGitUrl, parseGitUrl, repoFullNameFromGitUrl } from './git-url.js';
 export type { RepoCoordinates } from './git-url.js';
+
+export { KILO_MODEL_PREFIX, unprefixKiloGatewayModelId } from './kilo-model-id.js';
+
+export {
+  CloudAgentQueueReportSchema,
+  CloudAgentRunStatuses,
+  CloudAgentRunFailureClassifications,
+  DIAGNOSTIC_RETENTION_MS,
+} from './cloud-agent-queue-report.js';
+export type {
+  CloudAgentQueueReport,
+  CloudAgentRunStateReport,
+} from './cloud-agent-queue-report.js';

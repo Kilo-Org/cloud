@@ -13,6 +13,8 @@ import type { db as defaultDb } from '@/lib/drizzle';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { fromMicrodollars } from '@/lib/utils';
+import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 
 type Db = typeof defaultDb;
 
@@ -23,11 +25,12 @@ export type CancelAndRefundKiloPassStripeClient = Pick<
 
 export type CancelAndRefundKiloPassReason =
   | { kind: 'no_subscription' }
-  | { kind: 'already_canceled' };
+  | { kind: 'already_canceled' }
+  | { kind: 'store_managed_subscription'; paymentProvider: 'apple' };
 
 export type CancelAndRefundKiloPassResult =
   | {
-      status: 'cancelled_and_refunded';
+      status: 'cancelled' | 'cancelled_and_refunded';
       refundedAmountCents: number | null;
       balanceResetAmountUsd: number | null;
       alreadyBlocked: boolean;
@@ -43,12 +46,24 @@ export type CancelAndRefundKiloPassParams = {
   userId: string;
   reason: string;
   adminKiloUserId: string;
+  refundLatestPayment?: boolean;
   noteSuffix?: string;
 };
 
+function isAlreadyCanceledStripeSubscriptionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalizedMessage = message.toLowerCase();
+  return (
+    (normalizedMessage.includes('already') && normalizedMessage.includes('cancel')) ||
+    normalizedMessage.includes('has been canceled') ||
+    normalizedMessage.includes('is canceled')
+  );
+}
+
 /**
- * Cancels and refunds a user's Kilo Pass subscription, zeroes their balance,
- * blocks the account if not already blocked, and appends an admin note.
+ * Cancels a user's Kilo Pass subscription, optionally refunds the latest Stripe
+ * payment, zeroes their balance, blocks the account if not already blocked, and
+ * appends an admin note.
  *
  * Each invocation runs its own DB transaction for the local mutations; the
  * Stripe-side calls happen before the transaction to minimize open transaction
@@ -63,6 +78,7 @@ export async function cancelAndRefundKiloPassForUser({
   userId,
   reason,
   adminKiloUserId,
+  refundLatestPayment = true,
   noteSuffix,
 }: CancelAndRefundKiloPassParams): Promise<CancelAndRefundKiloPassResult> {
   const user = await db.query.kilocode_users.findFirst({
@@ -87,10 +103,22 @@ export async function cancelAndRefundKiloPassForUser({
     return { status: 'skipped', reason: { kind: 'already_canceled' } };
   }
 
+  if (subscription.paymentProvider !== KiloPassPaymentProvider.Stripe) {
+    return {
+      status: 'skipped',
+      reason: { kind: 'store_managed_subscription', paymentProvider: 'apple' },
+    };
+  }
+
+  const stripeSubscriptionId = subscription.stripeSubscriptionId;
+  if (!stripeSubscriptionId) {
+    return { status: 'skipped', reason: { kind: 'no_subscription' } };
+  }
+
   const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
     columns: { stripe_schedule_id: true },
     where: and(
-      eq(kilo_pass_scheduled_changes.stripe_subscription_id, subscription.stripeSubscriptionId),
+      eq(kilo_pass_scheduled_changes.stripe_subscription_id, stripeSubscriptionId),
       isNull(kilo_pass_scheduled_changes.deleted_at)
     ),
   });
@@ -99,43 +127,51 @@ export async function cancelAndRefundKiloPassForUser({
     await releaseScheduledChangeForSubscription({
       dbOrTx: db,
       stripe,
-      stripeSubscriptionId: subscription.stripeSubscriptionId,
+      stripeSubscriptionId,
       stripeScheduleIdIfMissingRow: scheduledChange.stripe_schedule_id,
       kiloUserIdIfMissingRow: userId,
       reason: 'cancel_subscription',
     });
   }
 
-  await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+  try {
+    await stripe.subscriptions.cancel(stripeSubscriptionId);
+  } catch (error) {
+    if (!isAlreadyCanceledStripeSubscriptionError(error)) {
+      throw error;
+    }
+  }
 
   let refundedAmountCents: number | null = null;
-  const paidInvoices = await stripe.invoices.list({
-    subscription: subscription.stripeSubscriptionId,
-    status: 'paid',
-    limit: 1,
-  });
-  const paidInvoice = paidInvoices.data[0];
-  if (paidInvoice) {
-    const payments = await stripe.invoicePayments.list({
-      invoice: paidInvoice.id,
+  if (refundLatestPayment) {
+    const paidInvoices = await stripe.invoices.list({
+      subscription: stripeSubscriptionId,
       status: 'paid',
       limit: 1,
     });
-    const rawPaymentIntent = payments.data[0]?.payment.payment_intent;
-    const paymentIntentId =
-      typeof rawPaymentIntent === 'string' ? rawPaymentIntent : rawPaymentIntent?.id;
-    if (paymentIntentId) {
-      try {
-        const refund = await stripe.refunds.create({
-          payment_intent: paymentIntentId,
-        });
-        refundedAmountCents = refund.amount;
-      } catch (err) {
-        if (
-          !(err instanceof stripe.errors.StripeInvalidRequestError) ||
-          err.code !== 'charge_already_refunded'
-        ) {
-          throw err;
+    const paidInvoice = paidInvoices.data[0];
+    if (paidInvoice) {
+      const payments = await stripe.invoicePayments.list({
+        invoice: paidInvoice.id,
+        status: 'paid',
+        limit: 1,
+      });
+      const rawPaymentIntent = payments.data[0]?.payment.payment_intent;
+      const paymentIntentId =
+        typeof rawPaymentIntent === 'string' ? rawPaymentIntent : rawPaymentIntent?.id;
+      if (paymentIntentId) {
+        try {
+          const refund = await stripe.refunds.create({
+            payment_intent: paymentIntentId,
+          });
+          refundedAmountCents = refund.amount;
+        } catch (err) {
+          if (
+            !(err instanceof stripe.errors.StripeInvalidRequestError) ||
+            err.code !== 'charge_already_refunded'
+          ) {
+            throw err;
+          }
         }
       }
     }
@@ -150,7 +186,7 @@ export async function cancelAndRefundKiloPassForUser({
         ended_at: new Date().toISOString(),
         current_streak_months: 0,
       })
-      .where(eq(kilo_pass_subscriptions.stripe_subscription_id, subscription.stripeSubscriptionId));
+      .where(eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId));
 
     if (!user.blocked_reason) {
       await tx
@@ -184,7 +220,9 @@ export async function cancelAndRefundKiloPassForUser({
         organization_id: null,
         is_free: true,
         amount_microdollars: -currentBalanceMicrodollars,
-        credit_category: 'admin-cancel-refund-kilo-pass',
+        credit_category: refundLatestPayment
+          ? 'admin-cancel-refund-kilo-pass'
+          : 'admin-cancel-kilo-pass-no-refund',
         description: `Balance zeroed by admin: ${reason}`,
         original_baseline_microdollars_used: freshUser.microdollars_used,
       });
@@ -198,11 +236,15 @@ export async function cancelAndRefundKiloPassForUser({
     }
 
     const noteParts = [
-      `Kilo Pass cancelled and refunded by admin.`,
+      refundLatestPayment
+        ? `Kilo Pass cancelled and refunded by admin.`
+        : `Kilo Pass cancelled by admin.`,
       `Reason: ${reason}`,
-      refundedAmountCents != null
-        ? `Refunded: $${(refundedAmountCents / 100).toFixed(2)}`
-        : 'No invoice to refund.',
+      refundLatestPayment
+        ? refundedAmountCents != null
+          ? `Refunded: $${(refundedAmountCents / 100).toFixed(2)}`
+          : 'No invoice to refund.'
+        : 'Stripe refund skipped.',
       balanceReset != null
         ? `Balance reset: $${balanceReset.toFixed(2)} zeroed.`
         : 'Balance was already $0.',
@@ -220,8 +262,23 @@ export async function cancelAndRefundKiloPassForUser({
     return balanceReset;
   });
 
+  if (!user.blocked_reason) {
+    void reportEvents({
+      events: [
+        {
+          type: 'user.blocked',
+          data: {
+            kilo_user_id: userId,
+            reason,
+            actor_email: null,
+          },
+        },
+      ],
+    });
+  }
+
   return {
-    status: 'cancelled_and_refunded',
+    status: refundLatestPayment ? 'cancelled_and_refunded' : 'cancelled',
     refundedAmountCents,
     balanceResetAmountUsd,
     alreadyBlocked: !!user.blocked_reason,

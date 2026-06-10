@@ -13,18 +13,23 @@
  * The reviewId is passed in the URL path.
  *
  * URL: POST /api/internal/code-review-status/{reviewId}
- * Protected by internal API secret
+ * Protected by scoped callback token
  */
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
   updateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal,
   updateCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
+  updateCodeReviewAttemptForCallback,
+  getLatestCodeReviewAttempt,
+  createInfraRetryAttemptIfMissing,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
+import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import {
@@ -51,15 +56,30 @@ import {
   getStoredProjectAccessToken,
 } from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
+import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { appendUsageFooter } from '@/lib/code-reviews/summary/usage-footer';
+import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
 import { APP_URL } from '@/lib/constants';
-import type { CloudAgentCodeReview, PlatformIntegration } from '@kilocode/db/schema';
+import type {
+  CloudAgentCodeReview,
+  CloudAgentCodeReviewAttempt,
+  PlatformIntegration,
+} from '@kilocode/db/schema';
+import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason,
 } from '@kilocode/db/schema-types';
+import { isCloudAgentNextBillingErrorBody } from '@kilocode/worker-utils/cloud-agent-next-client';
+import {
+  classifyCodeReviewActionRequiredFailure,
+  disableCodeReviewForActionRequiredFailure,
+  getCodeReviewActionRequiredCopy,
+  isCodeReviewActionRequiredReason,
+  type CodeReviewActionRequiredReason,
+} from '@/lib/code-reviews/action-required';
+import type { Owner } from '@/lib/code-reviews/core';
 
 /**
  * Payload from the orchestrator DO (legacy format).
@@ -89,6 +109,11 @@ type CloudAgentNextCallbackPayload = {
 };
 
 type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
+
+type TerminalOwnerResolution = {
+  owner: Owner;
+  canDispatch: boolean;
+};
 
 /**
  * Normalize a payload from either the orchestrator or cloud-agent-next callback
@@ -123,6 +148,20 @@ function normalizePayload(raw: StatusUpdatePayload): {
   let terminalReason: CodeReviewTerminalReason | undefined =
     raw.terminalReason && validReasons.has(raw.terminalReason) ? raw.terminalReason : undefined;
 
+  if (terminalReason && isCodeReviewActionRequiredReason(terminalReason)) {
+    if (status === 'cancelled') {
+      status = 'failed';
+    }
+  }
+
+  const actionRequiredReason = classifyCodeReviewActionRequiredFailure(raw.errorMessage);
+  if (!terminalReason && actionRequiredReason) {
+    if (status === 'cancelled') {
+      status = 'failed';
+    }
+    terminalReason = actionRequiredReason;
+  }
+
   // Infer billing when no explicit terminalReason was provided.
   // v1: billing errors arrive as 'interrupted' (→ cancelled) with billing error text
   // v2: billing errors arrive as 'failed' with billing error text (after wrapper fix)
@@ -131,6 +170,18 @@ function normalizePayload(raw: StatusUpdatePayload): {
       status = 'failed'; // billing is not a user cancellation
     }
     terminalReason = 'billing';
+  }
+
+  if (
+    (raw.status === 'failed' || raw.status === 'interrupted') &&
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, raw.errorMessage)
+  ) {
+    status = 'cancelled';
+    terminalReason = 'model_not_found';
+  }
+
+  if (!terminalReason && raw.status === 'interrupted') {
+    terminalReason = 'interrupted';
   }
 
   return {
@@ -151,17 +202,210 @@ function isBillingCodeReviewTerminalReason(
     return true;
   }
 
-  const message = errorMessage?.toLowerCase();
-  if (!message) {
+  if (!errorMessage) {
     return false;
   }
 
-  return ['insufficient credits', 'paid model', 'add credits', 'credits required'].some(pattern =>
-    message.includes(pattern)
+  return isCloudAgentNextBillingErrorBody(errorMessage);
+}
+
+function isModelNotFoundCodeReviewTerminalReason(
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string | null
+): boolean {
+  if (terminalReason === 'model_not_found') {
+    return true;
+  }
+
+  return /\bmodel\s+not\s+found\b/i.test(errorMessage ?? '');
+}
+
+function getActionRequiredTerminalReason(
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string | null
+): CodeReviewActionRequiredReason | null {
+  if (isCodeReviewActionRequiredReason(terminalReason)) {
+    return terminalReason;
+  }
+
+  return classifyCodeReviewActionRequiredFailure(errorMessage);
+}
+
+const MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY = 100_000;
+const MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY = 200_000;
+
+function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalReason): boolean {
+  return (
+    terminalReason === 'billing' ||
+    terminalReason === 'model_not_found' ||
+    terminalReason === 'user_cancelled' ||
+    terminalReason === 'superseded' ||
+    terminalReason === 'interrupted' ||
+    isCodeReviewActionRequiredReason(terminalReason)
   );
 }
 
+function hasKnownUnretryableFailureMessage(errorMessage?: string | null): boolean {
+  const message = errorMessage?.toLowerCase();
+  if (!message) return false;
+
+  return (
+    message.includes('maximum runtime') ||
+    /\b(cancelled|canceled)\b/i.test(message) ||
+    message.includes('superseded') ||
+    message.includes('user interrupted') ||
+    message.includes(
+      '[byok] your api key has hit its rate limit. please try again later or check your rate limit settings with your api provider.'
+    ) ||
+    /code reviewer is disabled for owner [^\s]+ on (github|gitlab)/i.test(message)
+  );
+}
+
+function isKnownUnretryableCodeReviewFailure(
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string | null
+): boolean {
+  return (
+    hasKnownUnretryableTerminalReason(terminalReason) ||
+    classifyCodeReviewActionRequiredFailure(errorMessage) !== null ||
+    isBillingCodeReviewTerminalReason(terminalReason, errorMessage) ||
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage) ||
+    hasKnownUnretryableFailureMessage(errorMessage)
+  );
+}
+
+function shouldAutoRetryCodeReviewFailure(
+  status: 'running' | 'completed' | 'failed' | 'cancelled',
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string | null
+): boolean {
+  if (status !== 'failed') return false;
+  return !isKnownUnretryableCodeReviewFailure(terminalReason, errorMessage);
+}
+
+function isInfraRetryAttempt(attempt: CloudAgentCodeReviewAttempt): boolean {
+  return attempt.retry_reason === 'infra_failure' || attempt.retry_of_attempt_id !== null;
+}
+
+type FailedSessionUsage = NonNullable<Awaited<ReturnType<typeof getSessionUsageFromBilling>>>;
+
+function failedSessionTokenCount(usage: FailedSessionUsage): number {
+  return usage.totalTokensIn + usage.totalTokensOut;
+}
+
+function canRetryFailedSessionUsage(usage: FailedSessionUsage): boolean {
+  return (
+    usage.totalCostMusd < MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY &&
+    failedSessionTokenCount(usage) < MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY
+  );
+}
+
+async function shouldSkipAutoRetryForFailedSessionUsage(params: {
+  reviewId: string;
+  failedAttemptId: string;
+  failedCliSessionId?: string | null;
+  reviewCreatedAt: string;
+}): Promise<boolean> {
+  if (!params.failedCliSessionId) {
+    logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
+      reviewId: params.reviewId,
+      failedAttemptId: params.failedAttemptId,
+      reason: 'missing_cli_session_id',
+    });
+    return false;
+  }
+
+  const usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
+  if (!usage) {
+    logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
+      reviewId: params.reviewId,
+      failedAttemptId: params.failedAttemptId,
+      cliSessionId: params.failedCliSessionId,
+      reason: 'usage_unavailable',
+    });
+    return true;
+  }
+
+  const failedSessionTokens = failedSessionTokenCount(usage);
+  if (canRetryFailedSessionUsage(usage)) {
+    return false;
+  }
+
+  logExceptInTest('[code-review-status] Skipping infra retry after expensive failed session', {
+    reviewId: params.reviewId,
+    failedAttemptId: params.failedAttemptId,
+    cliSessionId: params.failedCliSessionId,
+    totalTokensIn: usage.totalTokensIn,
+    totalTokensOut: usage.totalTokensOut,
+    totalCostMusd: usage.totalCostMusd,
+    failedSessionTokens,
+    maxFailedSessionCostMusdForAutoRetry: MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY,
+    maxFailedSessionTokensForAutoRetry: MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY,
+  });
+  return true;
+}
+
+function isSupersededReview(review: CloudAgentCodeReview): boolean {
+  return review.terminal_reason === 'superseded';
+}
+
+async function resolveTerminalOwner(
+  review: CloudAgentCodeReview,
+  reviewId: string
+): Promise<TerminalOwnerResolution | undefined> {
+  if (review.owned_by_organization_id) {
+    const botUserId = await getBotUserId(review.owned_by_organization_id, 'code-review');
+    if (!botUserId) {
+      errorExceptInTest('[code-review-status] Bot user not found for organization', {
+        organizationId: review.owned_by_organization_id,
+        reviewId,
+      });
+      captureMessage('Bot user missing for organization code review', {
+        level: 'error',
+        tags: { source: 'code-review-status' },
+        extra: {
+          organizationId: review.owned_by_organization_id,
+          reviewId,
+        },
+      });
+    }
+
+    return {
+      owner: {
+        type: 'org',
+        id: review.owned_by_organization_id,
+        userId: botUserId ?? 'system',
+      },
+      canDispatch: !!botUserId,
+    };
+  }
+
+  if (review.owned_by_user_id) {
+    return {
+      owner: {
+        type: 'user',
+        id: review.owned_by_user_id,
+        userId: review.owned_by_user_id,
+      },
+      canDispatch: true,
+    };
+  }
+
+  return undefined;
+}
+
 const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
+const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
+const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
+const MODEL_NOT_FOUND_STATUS_SUMMARY = `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
+const MODEL_NOT_FOUND_GITLAB_DESCRIPTION = `Selected model is no longer available. Choose another model: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
+
+const MODEL_NOT_FOUND_SUMMARY_BODY = `<!-- kilo-review -->
+## Code Review Summary
+
+The review did not run because the selected model is no longer available.
+
+Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
 
 const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
 **Kilo Code Review could not run — your account is out of credits.**
@@ -227,6 +471,14 @@ async function getReviewUsageData(reviewId: string) {
   return { model: null, tokensIn: null, tokensOut: null };
 }
 
+function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
+  return {
+    used: review.repository_review_instructions_used,
+    ref: review.repository_review_instructions_ref,
+    truncated: review.repository_review_instructions_truncated,
+  };
+}
+
 /**
  * Maps a review status to a GitHub Check Run update.
  * Returns null for statuses that don't have a check run mapping (e.g. 'queued').
@@ -256,18 +508,34 @@ function mapStatusToCheckRun(
   const reviewFailed = reviewStatus === 'completed' && gateResult === 'fail';
   const billingFailure =
     reviewStatus === 'failed' && isBillingCodeReviewTerminalReason(terminalReason, errorMessage);
+  const actionRequiredReason =
+    reviewStatus === 'failed'
+      ? getActionRequiredTerminalReason(terminalReason, errorMessage)
+      : null;
+  const modelNotFoundCancellation =
+    reviewStatus === 'cancelled' &&
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
+  const actionRequiredCopy = actionRequiredReason
+    ? getCodeReviewActionRequiredCopy(actionRequiredReason)
+    : null;
 
   const conclusionMap: Record<string, CheckRunConclusion> = {
     completed: reviewFailed ? 'failure' : 'success',
-    failed: billingFailure ? 'action_required' : 'failure',
+    failed: billingFailure || actionRequiredReason ? 'action_required' : 'failure',
     cancelled: 'cancelled',
   };
 
   const titleMap: Record<string, string> = {
     running: 'Kilo Code Review in progress',
     completed: reviewFailed ? 'Kilo Code Review found issues' : 'Kilo Code Review completed',
-    failed: billingFailure ? 'Insufficient credits to run review' : 'Kilo Code Review failed',
-    cancelled: 'Kilo Code Review cancelled',
+    failed: actionRequiredCopy
+      ? actionRequiredCopy.checkTitle
+      : billingFailure
+        ? 'Insufficient credits to run review'
+        : 'Kilo Code Review failed',
+    cancelled: modelNotFoundCancellation
+      ? MODEL_NOT_FOUND_CHECK_TITLE
+      : 'Kilo Code Review cancelled',
   };
 
   const summaryMap: Record<string, string> = {
@@ -275,12 +543,14 @@ function mapStatusToCheckRun(
     completed: reviewFailed
       ? 'Code review completed with findings that require attention.'
       : 'Code review completed successfully.',
-    failed: billingFailure
-      ? 'Review could not start because the account has insufficient credits.'
-      : errorMessage
-        ? `Review failed: ${errorMessage}`
-        : 'Review failed.',
-    cancelled: 'Review was cancelled.',
+    failed: actionRequiredCopy
+      ? actionRequiredCopy.checkSummary
+      : billingFailure
+        ? 'Review could not start because the account has insufficient credits.'
+        : errorMessage
+          ? `Review failed: ${errorMessage}`
+          : 'Review failed.',
+    cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
   };
 
   return {
@@ -319,6 +589,12 @@ function getGitLabStatusDescription(
     return 'Kilo Code Review found issues that require attention';
   }
   if (reviewStatus === 'completed') return 'Kilo Code Review completed';
+  if (
+    reviewStatus === 'cancelled' &&
+    isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage)
+  ) {
+    return MODEL_NOT_FOUND_GITLAB_DESCRIPTION;
+  }
   if (reviewStatus === 'cancelled') return 'Kilo Code Review cancelled';
   if (
     reviewStatus === 'failed' &&
@@ -326,12 +602,100 @@ function getGitLabStatusDescription(
   ) {
     return 'Insufficient credits to run review';
   }
+  const actionRequiredReason =
+    reviewStatus === 'failed'
+      ? getActionRequiredTerminalReason(terminalReason, errorMessage)
+      : null;
+  if (actionRequiredReason) {
+    return getCodeReviewActionRequiredCopy(actionRequiredReason).gitlabDescription;
+  }
   if (reviewStatus === 'failed' && errorMessage) {
     const desc = `Review failed: ${errorMessage}`;
     return desc.length > 255 ? desc.slice(0, 252) + '...' : desc;
   }
   if (reviewStatus === 'failed') return 'Kilo Code Review failed';
   return undefined;
+}
+
+async function upsertModelNotFoundSummary(
+  review: CloudAgentCodeReview,
+  integration: PlatformIntegration,
+  gitlabAccessToken?: string
+): Promise<void> {
+  const platform = review.platform || 'github';
+
+  if (platform === 'github' && integration.platform_installation_id) {
+    const [repoOwner, repoName] = review.repo_full_name.split('/');
+    const appType: GitHubAppType = integration.github_app_type || 'standard';
+    const existing = await findKiloReviewComment(
+      integration.platform_installation_id,
+      repoOwner,
+      repoName,
+      review.pr_number,
+      appType
+    );
+
+    if (existing) {
+      await updateKiloReviewComment(
+        integration.platform_installation_id,
+        repoOwner,
+        repoName,
+        existing.commentId,
+        MODEL_NOT_FOUND_SUMMARY_BODY,
+        appType
+      );
+    } else {
+      await createPRComment(
+        integration.platform_installation_id,
+        repoOwner,
+        repoName,
+        review.pr_number,
+        MODEL_NOT_FOUND_SUMMARY_BODY,
+        appType
+      );
+    }
+
+    logExceptInTest(
+      `[code-review-status] Upserted model unavailable summary on ${review.repo_full_name}#${review.pr_number}`
+    );
+    return;
+  }
+
+  if (platform === PLATFORM.GITLAB) {
+    const instanceUrl = getGitLabInstanceUrl(integration);
+    const accessToken =
+      gitlabAccessToken ??
+      (await resolveGitLabAccessToken(integration, review.platform_project_id));
+    const existing = await findKiloReviewNote(
+      accessToken,
+      review.repo_full_name,
+      review.pr_number,
+      instanceUrl
+    );
+
+    if (existing) {
+      await updateKiloReviewNote(
+        accessToken,
+        review.repo_full_name,
+        review.pr_number,
+        existing.noteId,
+        MODEL_NOT_FOUND_SUMMARY_BODY,
+        instanceUrl
+      );
+    } else {
+      await createMRNote(
+        accessToken,
+        review.repo_full_name,
+        review.pr_number,
+        MODEL_NOT_FOUND_SUMMARY_BODY,
+        instanceUrl
+      );
+    }
+
+    logExceptInTest(
+      `[code-review-status] Upserted model unavailable summary on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+    );
+  }
 }
 
 /**
@@ -399,7 +763,8 @@ async function updatePRGateCheck(
           title: checkRunMapping.title,
           summary: checkRunMapping.summary,
         },
-      }
+      },
+      integration.github_app_type ?? 'standard'
     );
 
     logExceptInTest(
@@ -447,16 +812,26 @@ export async function POST(
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   try {
-    // Validate internal API secret
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
+    const { reviewId } = await params;
+    const callbackAttemptId = req.nextUrl.searchParams.get('attemptId') ?? '';
+    const callbackToken = req.headers.get('X-Callback-Token');
+    const validCallbackToken =
+      !!CALLBACK_TOKEN_SECRET &&
+      (await verifyCallbackToken({
+        token: callbackToken,
+        secret: CALLBACK_TOKEN_SECRET,
+        scope: 'code-review-status-callback',
+        resourceParts: [reviewId, callbackAttemptId],
+      }));
+    if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { reviewId } = await params;
     const rawPayload: StatusUpdatePayload = await req.json();
+    const attemptId = callbackAttemptId || undefined;
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult } =
       normalizePayload(rawPayload);
+    const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;
 
     // Validate payload
     if (!status) {
@@ -473,6 +848,7 @@ export async function POST(
 
     logExceptInTest('[code-review-status] Received status update', {
       reviewId,
+      attemptId,
       sessionId,
       cliSessionId,
       status,
@@ -488,12 +864,43 @@ export async function POST(
       return NextResponse.json({ error: 'Review not found' }, { status: 404 });
     }
 
+    const attempt = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      attemptId: attemptId ?? undefined,
+      status,
+      sessionId,
+      cliSessionId,
+      executionId,
+      errorMessage,
+      terminalReason,
+      startedAt: status === 'running' ? new Date() : undefined,
+      completedAt:
+        status === 'completed' || status === 'failed' || status === 'cancelled'
+          ? new Date()
+          : undefined,
+    });
+
+    const latestAttempt = await getLatestCodeReviewAttempt(reviewId);
+    const isStaleAttempt = !!latestAttempt && attempt.id !== latestAttempt.id;
+    if (isStaleAttempt) {
+      logExceptInTest('[code-review-status] Stale callback updated old attempt, skipping parent', {
+        reviewId,
+        attemptId: attempt.id,
+        latestAttemptId: latestAttempt?.id,
+        requestedStatus: status,
+      });
+      return NextResponse.json({
+        success: true,
+        message: 'Stale callback from superseded attempt',
+      });
+    }
+
     // Determine valid transitions based on incoming status
     const isTerminalState =
       review.status === 'completed' || review.status === 'failed' || review.status === 'cancelled';
 
     if (isTerminalState) {
-      // Already in terminal state - skip update
+      // Already in terminal state - skip parent update, but attempt history above is still recorded.
       logExceptInTest('[code-review-status] Review already in terminal state, skipping update', {
         reviewId,
         currentStatus: review.status,
@@ -503,6 +910,7 @@ export async function POST(
         success: true,
         message: 'Review already in terminal state',
         currentStatus: review.status,
+        terminalReason: review.terminal_reason,
       });
     }
 
@@ -512,7 +920,14 @@ export async function POST(
     // may arrive and corrupt the new review's state.  If the review already
     // has a session_id and the callback carries a different sessionId, the
     // callback belongs to a previous (superseded) session — ignore it.
-    if (sessionId && review.session_id && sessionId !== review.session_id) {
+    const updatesLatestAttemptSession =
+      sessionId && latestAttempt?.id === attempt.id && attempt.session_id === sessionId;
+    if (
+      sessionId &&
+      review.session_id &&
+      sessionId !== review.session_id &&
+      !updatesLatestAttemptSession
+    ) {
       logExceptInTest(
         '[code-review-status] Stale callback from superseded session, skipping update',
         {
@@ -528,11 +943,210 @@ export async function POST(
       });
     }
 
+    let terminalOwnerResolution: TerminalOwnerResolution | undefined;
+    const getTerminalOwnerResolution = async () => {
+      terminalOwnerResolution ??= await resolveTerminalOwner(review, reviewId);
+      return terminalOwnerResolution;
+    };
+
+    if (shouldAutoRetryCodeReviewFailure(status, terminalReason, errorMessage)) {
+      const retryableReview = await getCodeReviewById(reviewId);
+      if (!retryableReview || isSupersededReview(retryableReview)) {
+        logExceptInTest('[code-review-status] Skipping infra retry for superseded review', {
+          reviewId,
+          status: retryableReview?.status,
+          terminalReason: retryableReview?.terminal_reason,
+        });
+        return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
+      }
+
+      if (isInfraRetryAttempt(attempt)) {
+        logExceptInTest('[code-review-status] Fresh retry attempt failed, terminalizing parent', {
+          reviewId,
+          failedAttemptId: attempt.id,
+          retryOfAttemptId: attempt.retry_of_attempt_id,
+          retryReason: attempt.retry_reason,
+          sessionId,
+        });
+      } else {
+        const failedCliSessionId = attempt.cli_session_id ?? cliSessionId ?? review.cli_session_id;
+        const skipRetryForSessionUsage = await shouldSkipAutoRetryForFailedSessionUsage({
+          reviewId,
+          failedAttemptId: attempt.id,
+          failedCliSessionId,
+          reviewCreatedAt: review.created_at,
+        });
+
+        if (!skipRetryForSessionUsage) {
+          const retryAttemptResult = await createInfraRetryAttemptIfMissing({
+            codeReviewId: reviewId,
+            retryOfAttemptId: attempt.id,
+          });
+
+          if (retryAttemptResult.outcome === 'created') {
+            const retryAttempt = retryAttemptResult.attempt;
+
+            try {
+              const latestReview = await getCodeReviewById(reviewId);
+              if (!latestReview || isSupersededReview(latestReview)) {
+                await updateCodeReviewAttemptForCallback({
+                  codeReviewId: reviewId,
+                  attemptId: retryAttempt.id,
+                  status: 'cancelled',
+                  errorMessage: 'Superseded by new push',
+                  terminalReason: 'superseded',
+                  completedAt: new Date(),
+                });
+                logExceptInTest('[code-review-status] Skipping fresh retry for superseded review', {
+                  reviewId,
+                  retryAttemptId: retryAttempt.id,
+                  status: latestReview?.status,
+                  terminalReason: latestReview?.terminal_reason,
+                });
+                return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
+              }
+
+              const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
+                sessionId,
+                reason: errorMessage ?? terminalReason ?? 'retryable infra failure',
+                failedAttemptId: attempt.id,
+                retryAttemptId: retryAttempt.id,
+              });
+
+              if (retryResult.success) {
+                logExceptInTest('[code-review-status] Scheduled fresh retry after infra failure', {
+                  reviewId,
+                  failedAttemptId: attempt.id,
+                  retryAttemptId: retryAttempt.id,
+                  sessionId,
+                });
+                return NextResponse.json({ success: true, retried: true });
+              }
+
+              await updateCodeReviewAttemptForCallback({
+                codeReviewId: reviewId,
+                attemptId: retryAttempt.id,
+                status: 'failed',
+                errorMessage: 'Worker declined fresh retry after infra failure',
+                terminalReason: 'sandbox_error',
+                completedAt: new Date(),
+              });
+            } catch (retryError) {
+              await updateCodeReviewAttemptForCallback({
+                codeReviewId: reviewId,
+                attemptId: retryAttempt.id,
+                status: 'failed',
+                errorMessage: retryError instanceof Error ? retryError.message : String(retryError),
+                terminalReason: 'sandbox_error',
+                completedAt: new Date(),
+              });
+              logExceptInTest('[code-review-status] Fresh retry startup failed, falling through', {
+                reviewId,
+                failedAttemptId: attempt.id,
+                retryAttemptId: retryAttempt.id,
+                error: retryError instanceof Error ? retryError.message : String(retryError),
+              });
+            }
+          } else if (retryAttemptResult.outcome === 'existing-for-attempt') {
+            logExceptInTest('[code-review-status] Fresh retry already queued for failed attempt', {
+              reviewId,
+              failedAttemptId: attempt.id,
+              retryAttemptId: retryAttemptResult.attempt.id,
+              sessionId,
+            });
+            return NextResponse.json({ success: true, retried: true });
+          } else if (retryAttemptResult.outcome === 'existing-for-review') {
+            logExceptInTest('[code-review-status] Fresh retry already consumed for review', {
+              reviewId,
+              failedAttemptId: attempt.id,
+              retryAttemptId: retryAttemptResult.attempt.id,
+              sessionId,
+            });
+            return NextResponse.json({ success: true, retried: false, skipped: 'already-retried' });
+          } else if (retryAttemptResult.outcome === 'skipped-inactive') {
+            logExceptInTest('[code-review-status] Skipping infra retry for inactive review', {
+              reviewId,
+              failedAttemptId: attempt.id,
+              reviewStatus: retryAttemptResult.reviewStatus,
+              terminalReason: retryAttemptResult.terminalReason,
+            });
+            return NextResponse.json({ success: true, retried: false, skipped: 'inactive' });
+          }
+        }
+      }
+    }
+
     // Valid transitions:
     // - queued -> running (orchestrator starting)
     // - running -> running (sessionId update)
     // - running -> completed/failed (callback)
     // - queued -> completed/failed (edge case: immediate failure)
+
+    const parentStatusUpdates = {
+      sessionId,
+      cliSessionId,
+      errorMessage,
+      terminalReason,
+      startedAt:
+        status === 'running'
+          ? review.started_at
+            ? new Date(review.started_at)
+            : new Date()
+          : undefined,
+      completedAt:
+        status === 'completed' || status === 'failed' || status === 'cancelled'
+          ? new Date()
+          : undefined,
+    };
+    const isModelNotFoundCancellation =
+      status === 'cancelled' &&
+      isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
+
+    if (isModelNotFoundCancellation) {
+      const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(
+        reviewId,
+        status,
+        parentStatusUpdates
+      );
+      if (!claimedTerminalUpdate) {
+        logExceptInTest(
+          '[code-review-status] Model unavailable cancellation was already persisted, skipping summary upsert',
+          { reviewId }
+        );
+        return NextResponse.json({
+          success: true,
+          message: 'Review already in terminal state',
+        });
+      }
+    } else {
+      await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
+    }
+
+    const actionRequiredReason =
+      status === 'failed' ? getActionRequiredTerminalReason(terminalReason, errorMessage) : null;
+    if (actionRequiredReason) {
+      const ownerResolution = await getTerminalOwnerResolution();
+      if (ownerResolution) {
+        try {
+          await disableCodeReviewForActionRequiredFailure({
+            owner: ownerResolution.owner,
+            platform: review.platform === 'gitlab' ? 'gitlab' : 'github',
+            reviewId,
+            reason: actionRequiredReason,
+            errorMessage: errorMessage ?? actionRequiredReason,
+          });
+        } catch (disableError) {
+          logExceptInTest(
+            '[code-review-status] Failed to disable Code Reviewer for action-required failure:',
+            disableError
+          );
+          captureException(disableError, {
+            tags: { source: 'code-review-status-action-required-disable' },
+            extra: { reviewId, reason: actionRequiredReason },
+          });
+        }
+      }
+    }
 
     // Fetch integration once — used for gate check updates and post-completion actions
     const integration = review.platform_integration_id
@@ -548,9 +1162,6 @@ export async function POST(
           )
         : undefined;
 
-    // Update PR gate check BEFORE writing terminal DB state.
-    // Once the DB moves to a terminal status, subsequent callbacks hit the early-return
-    // above, so a flaky gate update would be unrecoverable.
     if (integration) {
       try {
         await updatePRGateCheck(
@@ -574,25 +1185,24 @@ export async function POST(
               checkRunId: String(review.check_run_id ?? ''),
             },
           });
-          // Abort so the caller retries — once the DB moves to a terminal status
-          // the early-return above prevents any later attempt to update the gate.
-          throw gateCheckError;
         }
       }
     }
 
-    // Update review status in database
-    await updateCodeReviewStatus(reviewId, status, {
-      sessionId,
-      cliSessionId,
-      errorMessage,
-      terminalReason,
-      startedAt: status === 'running' ? new Date() : undefined,
-      completedAt:
-        status === 'completed' || status === 'failed' || status === 'cancelled'
-          ? new Date()
-          : undefined,
-    });
+    if (integration && isModelNotFoundCancellation) {
+      try {
+        await upsertModelNotFoundSummary(review, integration, gitlabAccessToken);
+      } catch (summaryError) {
+        logExceptInTest(
+          '[code-review-status] Failed to upsert model unavailable summary:',
+          summaryError
+        );
+        captureException(summaryError, {
+          tags: { source: 'code-review-status-model-not-found-summary' },
+          extra: { reviewId, platform: review.platform || 'github' },
+        });
+      }
+    }
 
     logExceptInTest('[code-review-status] Updated review status', {
       reviewId,
@@ -604,53 +1214,23 @@ export async function POST(
     // Only trigger dispatch for terminal states (completed/failed/cancelled)
     // This frees up a slot for the next pending review
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
-      let owner;
-      if (review.owned_by_organization_id) {
-        const botUserId = await getBotUserId(review.owned_by_organization_id, 'code-review');
-        if (botUserId) {
-          owner = {
-            type: 'org' as const,
-            id: review.owned_by_organization_id,
-            userId: botUserId,
-          };
-        } else {
-          errorExceptInTest('[code-review-status] Bot user not found for organization', {
-            organizationId: review.owned_by_organization_id,
-            reviewId,
-          });
-          captureMessage('Bot user missing for organization code review', {
-            level: 'error',
-            tags: { source: 'code-review-status' },
-            extra: {
-              organizationId: review.owned_by_organization_id,
-              reviewId,
-            },
-          });
-        }
-      } else {
-        owner = {
-          type: 'user' as const,
-          id: review.owned_by_user_id || '',
-          userId: review.owned_by_user_id || '',
-        };
-      }
-
-      if (owner) {
+      const ownerResolution = await getTerminalOwnerResolution();
+      if (ownerResolution?.canDispatch) {
         // Trigger dispatch in background (don't await - fire and forget)
-        tryDispatchPendingReviews(owner).catch(dispatchError => {
+        tryDispatchPendingReviews(ownerResolution.owner).catch(dispatchError => {
           errorExceptInTest(
             '[code-review-status] Error dispatching pending reviews:',
             dispatchError
           );
           captureException(dispatchError, {
             tags: { source: 'code-review-status-dispatch' },
-            extra: { reviewId, owner },
+            extra: { reviewId, owner: ownerResolution.owner },
           });
         });
 
         logExceptInTest('[code-review-status] Triggered dispatch for pending reviews', {
           reviewId,
-          owner,
+          owner: ownerResolution.owner,
         });
       }
 
@@ -662,6 +1242,7 @@ export async function POST(
 
             if (platform === 'github' && integration.platform_installation_id) {
               const [repoOwner, repoName] = review.repo_full_name.split('/');
+              const appType: GitHubAppType = integration.github_app_type || 'standard';
 
               // Reaction
               const reaction = status === 'completed' ? 'hooray' : 'confused';
@@ -670,7 +1251,8 @@ export async function POST(
                 repoOwner,
                 repoName,
                 review.pr_number,
-                reaction
+                reaction,
+                appType
               );
               logExceptInTest(
                 `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
@@ -686,7 +1268,8 @@ export async function POST(
                   repoOwner,
                   repoName,
                   review.pr_number,
-                  BILLING_NOTICE_MARKER
+                  BILLING_NOTICE_MARKER,
+                  appType
                 );
                 if (!alreadyPosted) {
                   await createPRComment(
@@ -694,7 +1277,8 @@ export async function POST(
                     repoOwner,
                     repoName,
                     review.pr_number,
-                    BILLING_NOTICE_BODY
+                    BILLING_NOTICE_BODY,
+                    appType
                   );
                   logExceptInTest(
                     `[code-review-status] Posted billing notice on ${review.repo_full_name}#${review.pr_number}`
@@ -705,30 +1289,35 @@ export async function POST(
               // Usage footer (completed only)
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+                const usage =
+                  model && tokensIn != null && tokensOut != null
+                    ? { model, tokensIn, tokensOut }
+                    : undefined;
+                const reviewGuidance = getReviewGuidanceFooterData(review);
 
-                if (model && tokensIn != null && tokensOut != null) {
+                if (usage || reviewGuidance.used) {
                   const existing = await findKiloReviewComment(
                     integration.platform_installation_id,
                     repoOwner,
                     repoName,
-                    review.pr_number
+                    review.pr_number,
+                    appType
                   );
                   if (existing) {
-                    const updatedBody = appendUsageFooter(
-                      existing.body,
-                      model,
-                      tokensIn,
-                      tokensOut
-                    );
+                    const updatedBody = appendReviewSummaryFooter(existing.body, {
+                      usage,
+                      reviewGuidance,
+                    });
                     await updateKiloReviewComment(
                       integration.platform_installation_id,
                       repoOwner,
                       repoName,
                       existing.commentId,
-                      updatedBody
+                      updatedBody,
+                      appType
                     );
                     logExceptInTest(
-                      `[code-review-status] Updated summary comment with usage footer on ${review.repo_full_name}#${review.pr_number}`
+                      `[code-review-status] Updated summary comment footer on ${review.repo_full_name}#${review.pr_number}`
                     );
                   }
                 } else {
@@ -791,8 +1380,13 @@ export async function POST(
               // Usage footer (completed only)
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+                const usage =
+                  model && tokensIn != null && tokensOut != null
+                    ? { model, tokensIn, tokensOut }
+                    : undefined;
+                const reviewGuidance = getReviewGuidanceFooterData(review);
 
-                if (model && tokensIn != null && tokensOut != null) {
+                if (usage || reviewGuidance.used) {
                   const existing = await findKiloReviewNote(
                     accessToken,
                     review.repo_full_name,
@@ -800,12 +1394,10 @@ export async function POST(
                     instanceUrl
                   );
                   if (existing) {
-                    const updatedBody = appendUsageFooter(
-                      existing.body,
-                      model,
-                      tokensIn,
-                      tokensOut
-                    );
+                    const updatedBody = appendReviewSummaryFooter(existing.body, {
+                      usage,
+                      reviewGuidance,
+                    });
                     await updateKiloReviewNote(
                       accessToken,
                       review.repo_full_name,
@@ -815,7 +1407,7 @@ export async function POST(
                       instanceUrl
                     );
                     logExceptInTest(
-                      `[code-review-status] Updated summary note with usage footer on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+                      `[code-review-status] Updated summary note footer on GitLab MR ${review.repo_full_name}!${review.pr_number}`
                     );
                   }
                 } else {

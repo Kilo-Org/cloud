@@ -1,0 +1,138 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wasteland",
+  "main": "src/wasteland.worker.ts",
+  "compatibility_date": "2026-02-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "placement": { "mode": "smart" },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true,
+    },
+    "traces": {
+      "enabled": true,
+      "persist": true,
+      "head_sampling_rate": 1,
+    },
+  },
+  "upload_source_maps": true,
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "routes": [
+    {
+      "pattern": "wasteland.kiloapps.io/*",
+      "zone_name": "kiloapps.io",
+    },
+  ],
+  "workers_dev": false,
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "WASTELAND", "class_name": "WastelandDO" },
+      { "name": "WASTELAND_REGISTRY", "class_name": "WastelandRegistryDO" },
+    ],
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WastelandDO", "WastelandContainerDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["WastelandRegistryDO"],
+    },
+    // v3: drop the retired WastelandContainerDO. The Cloudflare
+    // Container that backed this class is gone (Phase 2 of the
+    // container retirement). The DO carried no load-bearing state, so
+    // deleting any surviving instances is intentional.
+    {
+      "tag": "v3",
+      "deleted_classes": ["WastelandContainerDO"],
+    },
+  ],
+
+  "vars": {
+    "ENVIRONMENT": "production",
+    "CF_ACCESS_TEAM": "engineering-e11",
+    "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
+    "KILO_API_URL": "https://api.kilo.ai",
+    // KILO_INTERNAL_API_URL is the URL the *worker* uses for direct
+    // outbound calls to apps/web's `/api/internal/*` routes. In prod
+    // it matches KILO_API_URL; in dev it differs because KILO_API_URL
+    // is set to the Docker Desktop VM host gateway IP for the
+    // Cloudflare Container, while the worker process itself runs on
+    // the host and needs `localhost`.
+    "KILO_INTERNAL_API_URL": "https://api.kilo.ai",
+    "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
+  },
+
+  "analytics_engine_datasets": [{ "binding": "WASTELAND_AE", "dataset": "wasteland_events" }],
+
+  // PRODUCTION Secrets Store (shared Kilo secrets store)
+  "secrets_store_secrets": [
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET",
+    },
+    {
+      "binding": "WASTELAND_ENCRYPTION_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "WASTELAND_ENCRYPTION_KEY",
+    },
+    {
+      "binding": "INTERNAL_API_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+  ],
+
+  "env": {
+    "dev": {
+      "vars": {
+        "ENVIRONMENT": "development",
+        "CF_ACCESS_TEAM": "engineering-e11",
+        "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
+        // Wrangler's workerd-network doesn't get Docker Desktop's
+        // host.docker.internal → host proxy mapping. Use the Docker
+        // Desktop VM host gateway IP directly so containers can reach
+        // the host's dev servers.
+        "KILO_API_URL": "http://192.168.65.254:3000",
+        // The worker process runs on the host (not inside the
+        // Cloudflare Container), so it can reach apps/web on
+        // localhost:3000 directly — no Docker bridge needed.
+        "KILO_INTERNAL_API_URL": "http://localhost:3000",
+        "WASTELAND_API_URL": "http://192.168.65.254:8787",
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "WASTELAND", "class_name": "WastelandDO" },
+          { "name": "WASTELAND_REGISTRY", "class_name": "WastelandRegistryDO" },
+        ],
+      },
+      "analytics_engine_datasets": [{ "binding": "WASTELAND_AE", "dataset": "wasteland_events" }],
+      "secrets_store_secrets": [
+        {
+          "binding": "NEXTAUTH_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "NEXTAUTH_SECRET",
+        },
+        {
+          "binding": "WASTELAND_ENCRYPTION_KEY",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "WASTELAND_ENCRYPTION_KEY",
+        },
+        {
+          "binding": "INTERNAL_API_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "INTERNAL_API_SECRET_PROD",
+        },
+      ],
+    },
+  },
+}

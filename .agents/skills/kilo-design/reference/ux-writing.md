@@ -19,14 +19,14 @@ Prefer concrete verbs and specific nouns.
 
 Pick one term per concept and hold it across web, mobile, docs, and UI:
 
-| Use                | Not                                                              |
-| ------------------ | ---------------------------------------------------------------- |
-| Sign in / Sign out | Log in, Log out, Enter, Exit                                     |
-| Delete             | Remove, Trash, Clear (for destructive ops)                       |
-| Settings           | Preferences, Options, Configuration                              |
-| Create             | Add, New (for creating a persistent thing)                       |
-| Workspace          | Team, Account, Org (if "workspace" is what the product calls it) |
-| Kilo Code          | KiloCode, kilo-code (product name)                               |
+| Use | Not |
+|---|---|
+| Sign in / Sign out | Log in, Log out, Enter, Exit |
+| Delete | Remove, Trash, Clear (for destructive ops) |
+| Settings | Preferences, Options, Configuration |
+| Create | Add, New (for creating a persistent thing) |
+| Workspace | Team, Account, Org (if "workspace" is what the product calls it) |
+| Kilo Code | KiloCode, kilo-code (product name) |
 
 If this repo has a newer glossary, prefer that. Do not invent synonyms
 to add variety.
@@ -35,12 +35,12 @@ to add variety.
 
 Use verb + object. Specific over generic. Kilo-flavored examples:
 
-| Bad        | Good                 |
-| ---------- | -------------------- |
-| OK         | Save changes         |
-| Submit     | Create workspace     |
-| Yes        | Delete project       |
-| Cancel     | Keep editing         |
+| Bad | Good |
+|---|---|
+| OK | Save changes |
+| Submit | Create workspace |
+| Yes | Delete project |
+| Cancel | Keep editing |
 | Click here | View billing history |
 
 For destructive actions, name the destruction and the count:
@@ -128,13 +128,13 @@ action in both buttons:
 
 Never use `OK`, `Submit`, or `Yes`/`No`. Use specific verb + object:
 
-| Bad        | Good           | Why                           |
-| ---------- | -------------- | ----------------------------- |
-| OK         | Save changes   | Says what will happen         |
-| Submit     | Create account | Outcome-focused               |
-| Yes        | Delete message | Confirms the action           |
-| Cancel     | Keep editing   | Clarifies what "cancel" means |
-| Click here | Download PDF   | Describes the destination     |
+| Bad | Good | Why |
+|---|---|---|
+| OK | Save changes | Says what will happen |
+| Submit | Create account | Outcome-focused |
+| Yes | Delete message | Confirms the action |
+| Cancel | Keep editing | Clarifies what "cancel" means |
+| Click here | Download PDF | Describes the destination |
 
 For destructive actions, name the destruction:
 
@@ -150,13 +150,13 @@ Every error should answer: (1) what happened, (2) why, (3) how to fix it.
 
 ### Error message templates
 
-| Situation         | Template                                                        |
-| ----------------- | --------------------------------------------------------------- |
-| Format error      | "[Field] needs to be [format]. Example: [example]"              |
-| Missing required  | "Please enter [what's missing]"                                 |
-| Permission denied | "You don't have access to [thing]. [What to do instead]"        |
-| Network error     | "We couldn't reach [thing]. Check your connection and [action]" |
-| Server error      | "Something went wrong on our end. We're looking into it."       |
+| Situation | Template |
+|---|---|
+| Format error | "[Field] needs to be [format]. Example: [example]" |
+| Missing required | "Please enter [what's missing]" |
+| Permission denied | "You don't have access to [thing]. [What to do instead]" |
+| Network error | "We couldn't reach [thing]. Check your connection and [action]" |
+| Server error | "Something went wrong on our end. We're looking into it." |
 
 ### Don't blame the user
 
@@ -179,11 +179,11 @@ Empty states are onboarding moments:
 **Voice** is your brand's personality — consistent everywhere. **Tone**
 adapts to the moment.
 
-| Moment              | Tone shift                                                   |
-| ------------------- | ------------------------------------------------------------ |
-| Success             | Celebratory, brief: "Done! Your changes are live."           |
-| Error               | Empathetic, helpful: "That didn't work. Here's what to try…" |
-| Loading             | Reassuring: "Saving your work…"                              |
+| Moment | Tone shift |
+|---|---|
+| Success | Celebratory, brief: "Done! Your changes are live." |
+| Error | Empathetic, helpful: "That didn't work. Here's what to try…" |
+| Loading | Reassuring: "Saving your work…" |
 | Destructive confirm | Serious, clear: "Delete this project? This can't be undone." |
 
 Never use humor for errors.
@@ -203,12 +203,12 @@ Never use humor for errors.
 
 German text is ~30% longer than English. Allocate space:
 
-| Language | Expansion                      |
-| -------- | ------------------------------ |
-| German   | +30%                           |
-| French   | +20%                           |
-| Finnish  | +30–40%                        |
-| Chinese  | -30% (fewer chars, same width) |
+| Language | Expansion |
+|---|---|
+| German | +30% |
+| French | +20% |
+| Finnish | +30–40% |
+| Chinese | -30% (fewer chars, same width) |
 
 ### Translation-friendly patterns
 

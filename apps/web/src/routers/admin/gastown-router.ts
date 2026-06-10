@@ -392,7 +392,7 @@ export const adminGastownRouter = createTRPCRouter({
    * Calls: GET /api/users/:userId/towns (kiloAuthMiddleware, no ownership check)
    */
   getUserTowns: adminProcedure
-    .input(z.object({ userId: z.string().uuid() }))
+    .input(z.object({ userId: z.string().min(1) }))
     .output(z.array(UserTownRecord))
     .query(({ input, ctx }) => {
       return gastownGet(ctx.user, `/api/users/${input.userId}/towns`, z.array(UserTownRecord));
@@ -403,7 +403,7 @@ export const adminGastownRouter = createTRPCRouter({
    * Calls: GET /api/users/:userId/towns/:townId/rigs for each town.
    */
   getUserRigs: adminProcedure
-    .input(z.object({ userId: z.string().uuid() }))
+    .input(z.object({ userId: z.string().min(1) }))
     .output(z.array(UserRigRecord))
     .query(async ({ input, ctx }) => {
       const towns = await gastownGet(

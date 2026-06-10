@@ -20,6 +20,18 @@ Follow the official Expo guide to set up the development environment: https://do
 
 The dev server (`pnpm start`) is always started by the user — do not start it yourself.
 
+## Tmux Services
+
+The user typically has a `tmux` session running with all backend services and the Expo dev server in separate windows (e.g., `kilo-chat`, `kiloclaw`, `nextjs`, `postgres`, `redis`, etc.). When debugging mobile issues that touch the backend, inspect the relevant window's logs to confirm what the server actually received:
+
+```bash
+tmux ls                                       # list sessions
+tmux list-windows -t <session>                # list windows
+tmux capture-pane -p -t <session>:<window> -S -200   # last 200 lines of a window
+```
+
+If `tmux ls` shows no session, tell the user the expected services aren't running and ask them to start the tmux session before continuing — don't try to start services yourself.
+
 ## Commands
 
 ```bash
@@ -41,10 +53,34 @@ npx expo install --dev <package-name>   # devDependencies
 
 After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any issues it reports (version mismatches, duplicate deps, etc.).
 
+## Injected Workspace Packages
+
+Some workspace packages are listed under `dependenciesMeta` with `"injected": true` (currently `@kilocode/kilo-chat-hooks`). pnpm **copies** these into `apps/mobile/node_modules/.pnpm/.../node_modules/@kilocode/...` at install time instead of symlinking — so edits to the source under `packages/<pkg>/src/` are NOT picked up by Metro until you re-inject:
+
+```bash
+pnpm install --filter kilo-app...   # refreshes the injected copies
+```
+
+After re-injecting, also clear the Metro cache (it has the old bundled module hashed):
+
+```bash
+rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
+```
+
+…then restart Metro and force-kill the iOS app so the dev client pulls a fresh bundle. Symptom when you forget: edits to event-service, kilo-chat, etc. show up on device, but edits to an injected package don't — including `console.log` lines you just added.
+
+## Implementation Principles
+
+- Implement features in the simplest boring way that preserves the requested behavior. Avoid speculative abstractions, defensive layers, and "just in case" code paths.
+- Keep code DRY when behavior or contracts are actually shared. Prefer one shared helper, schema, or type over duplicated local copies.
+- Define shared types at the ownership boundary instead of recreating the same shape in mobile code. Use existing package exports, tRPC router output types, or a new shared contract when multiple surfaces need the same shape.
+- Parse untrusted HTTP inputs with Zod at the boundary where data enters the system. After data has crossed a trusted tRPC or shared-package boundary, rely on TypeScript rather than re-parsing the same value in the mobile app.
+- Do not add defense-in-depth validation inside mobile components or hooks unless the data source is genuinely untrusted or the extra check handles a real user-visible failure mode.
+
 ## Data Fetching
 
 - When you need data from the backend, **always add a new tRPC procedure** rather than copying data or inventing client-side alternatives. The app uses tRPC with React Query — adding a procedure is cheap and keeps the source of truth on the server.
-- When a component takes backend data as props, derive the prop types from the tRPC router's return types (e.g., `NonNullable<ReturnType<typeof useMyQuery>['data']>`) instead of manually copying type definitions. This keeps types in sync with the backend automatically.
+- When a component takes backend data as props, derive the prop types from the tRPC router's return types (e.g., `NonNullable<ReturnType<typeof useMyQuery>['data']>`) or an existing shared type instead of manually copying type definitions. This keeps types in sync with the backend automatically.
 - **Never use `new Date()` on any date or timestamp string from the backend.** Hermes cannot reliably parse PostgreSQL timestamps (`2026-03-13 14:30:00+00`) or date-only strings (`2026-09-26`). Always use `parseTimestamp()` from `@/lib/utils` — it handles both formats.
 
 ### Mutations
@@ -76,6 +112,18 @@ After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any i
 - `as never` is a code smell — it silences all type checking. For Expo Router dynamic paths, use `as Href` instead (import `Href` from `expo-router`). If you find yourself needing `as never`, the types are wrong and need fixing.
 
 ## UX Patterns
+
+### Native Feel
+
+- Prefer native-feeling platform experiences styled with Kilo tokens and existing app components. Start with the simplest platform-expected interaction, then apply Kilo spacing, color, type, and icon conventions.
+- For platform primitives such as sheets, alerts, pickers, tabs, gestures, and keyboard behavior, use established native or app-standard components that preserve expected gestures and accessibility.
+- Avoid custom replacements that need workarounds, omit standard gestures, or add complexity without a product reason. A plain sheet that behaves correctly on iOS and Android is better than a bespoke sheet that looks clever but feels broken.
+
+### Press Feedback
+
+- Every pressable surface must notify the user when the press gesture lands. Use the feedback that best fits the surface: pressed opacity, native ripple, haptics, state change, navigation transition, loading state, or another platform-appropriate response.
+- Do not add redundant feedback. If the press immediately causes a clear visual transition or native control response, that can be enough; if the surface otherwise feels inert, add explicit pressed styling or haptics.
+- Keep feedback native-feeling and lightweight. Avoid custom animations or haptic patterns that make simple list rows, cards, or buttons feel heavier than the action deserves.
 
 ### Icons
 

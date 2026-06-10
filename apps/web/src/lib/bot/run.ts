@@ -1,6 +1,7 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
-import { extractAndUploadImages } from '@/lib/bot/images';
+import { extractAndUploadAttachments } from '@/lib/bot/attachments';
+import { botPlatforms } from '@/lib/bot/platforms';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
@@ -16,39 +17,55 @@ export async function processLinkedMessage({
   platformIntegration: PlatformIntegration;
   user: User;
 }) {
-  await thread.startTyping('Thinking...');
+  const botPlatform = botPlatforms.requireByAdapter(thread.adapter);
+  const stopProcessingIndicator = await botPlatform.startProcessingIndicator({
+    thread,
+    messageId: message.id,
+    status: 'Thinking...',
+  });
 
-  let botRequestId: string;
+  let handedOff = false;
   try {
-    botRequestId = await createBotRequest({
-      createdBy: user.id,
-      organizationId: platformIntegration.owned_by_organization_id ?? null,
-      platformIntegrationId: platformIntegration.id,
-      platform: thread.adapter.name,
-      platformThreadId: thread.id,
-      platformMessageId: message.id,
-      userMessage: message.text,
-      modelUsed: undefined,
-    });
-  } catch (error) {
-    captureException(error, {
-      tags: { component: 'kilo-bot', op: 'create-bot-request' },
-      extra: {
-        platform: thread.adapter.name,
+    let botRequestId: string;
+    try {
+      botRequestId = await createBotRequest({
+        createdBy: user.id,
+        organizationId: platformIntegration.owned_by_organization_id ?? null,
         platformIntegrationId: platformIntegration.id,
-        userId: user.id,
-        threadId: thread.id,
-        messageId: message.id,
-      },
-    });
-    await thread.post({
-      markdown:
-        'Sorry, I could not start processing your message because of an internal error. Please try again in a moment.',
-    });
-    return;
-  }
+        platform: thread.adapter.name,
+        platformThreadId: thread.id,
+        platformMessageId: message.id,
+        userMessage: message.text,
+        modelUsed: undefined,
+      });
+    } catch (error) {
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'create-bot-request' },
+        extra: {
+          platform: thread.adapter.name,
+          platformIntegrationId: platformIntegration.id,
+          userId: user.id,
+          threadId: thread.id,
+          messageId: message.id,
+        },
+      });
+      await thread.post({
+        markdown:
+          'Sorry, I could not start processing your message because of an internal error. Please try again in a moment.',
+      });
+      return;
+    }
 
-  await processMessage({ thread, message, platformIntegration, user, botRequestId });
+    handedOff = await processMessage({
+      thread,
+      message,
+      platformIntegration,
+      user,
+      botRequestId,
+    });
+  } finally {
+    await stopProcessingIndicator({ handedOff });
+  }
 }
 
 async function processMessage({
@@ -63,19 +80,21 @@ async function processMessage({
   platformIntegration: PlatformIntegration;
   user: User;
   botRequestId: string;
-}) {
+}): Promise<boolean> {
   const startedAt = Date.now();
 
-  // Extract and upload any image attachments from the chat message to R2.
-  // This runs before the agent loop so the images are ready when a Cloud Agent
-  // session is spawned. Failures are non-fatal — we log and continue without images.
-  let images: Awaited<ReturnType<typeof extractAndUploadImages>>;
+  // Upload all supported files through the canonical attachments contract so
+  // mixed image/document messages share one path and one five-file limit.
+  let attachments: Awaited<ReturnType<typeof extractAndUploadAttachments>>;
   try {
-    images = await extractAndUploadImages(message, user.id);
+    attachments = await extractAndUploadAttachments(message, user.id);
   } catch (error) {
-    console.error('[KiloBot] Failed to extract/upload images, continuing without them:', error);
+    console.error(
+      '[KiloBot] Failed to extract/upload attachments, continuing without them:',
+      error
+    );
     captureException(error, {
-      tags: { component: 'kilo-bot', op: 'extract-upload-images' },
+      tags: { component: 'kilo-bot', op: 'extract-upload-attachments' },
     });
   }
 
@@ -88,7 +107,7 @@ async function processMessage({
       user,
       botRequestId,
       prompt: message.text,
-      images,
+      attachments,
     });
 
     updateBotRequest(botRequestId, {
@@ -100,6 +119,8 @@ async function processMessage({
     if (!result.startedCloudAgentSession) {
       await thread.post({ markdown: result.finalText });
     }
+
+    return result.startedCloudAgentSession;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
 
@@ -114,5 +135,7 @@ async function processMessage({
     await Promise.all([
       thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`),
     ]);
+
+    return false;
   }
 }

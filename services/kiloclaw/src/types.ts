@@ -27,7 +27,6 @@ export type KiloClawEnv = {
   // Auth secrets
   NEXTAUTH_SECRET?: string;
   INTERNAL_API_SECRET?: string;
-  KILOCLAW_INTERNAL_API_SECRET?: string;
   GATEWAY_TOKEN_SECRET?: string;
   GOOGLE_WORKSPACE_OAUTH_CLIENT_ID?: string;
   GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET?: string;

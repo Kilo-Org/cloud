@@ -1,18 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { Check } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import {
-  COMMIT_PERIOD_MONTHS,
-  PLAN_DISPLAY,
-  STANDARD_FIRST_MONTH_DOLLARS,
+  createKiloClawSignupDisplay,
+  PLAN_COST_MICRODOLLARS,
+  type KiloClawSignupDisplay,
 } from '@/app/(app)/claw/components/billing/billing-types';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 type KiloClawSubscribeCardProps = {
-  creditIntroEligible: boolean;
+  standardCostMicrodollars?: number;
+  commitCostMicrodollars?: number;
   hasActiveKiloPass: boolean;
+  commitPlanAvailable?: boolean;
 };
 
 type KiloClawPlanCardProps = {
@@ -39,17 +43,12 @@ function KiloClawPlanCard({
   isRecommended = false,
 }: KiloClawPlanCardProps) {
   return (
-    <div
-      className={cn(
-        'group bg-background relative flex h-full flex-col rounded-xl border p-4 text-left transition-colors',
-        'hover:border-blue-400/70 hover:shadow-[0_0_0_1px_rgba(59,130,246,0.25)]',
-        isRecommended
-          ? 'border-blue-500/60 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]'
-          : 'border-border/70'
-      )}
-    >
+    <Card className="border-border/60 relative flex h-full flex-col p-4 text-left shadow-sm">
       {isRecommended && badge ? (
-        <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 text-white">
+        <Badge
+          variant="secondary"
+          className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full px-3"
+        >
           {badge}
         </Badge>
       ) : null}
@@ -75,44 +74,51 @@ function KiloClawPlanCard({
             key={detail}
             className="text-muted-foreground flex items-start gap-2 text-xs leading-5"
           >
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
             <span>{detail}</span>
           </div>
         ))}
         {accentDetail ? (
           <div className="flex items-start gap-2 text-xs leading-5 text-emerald-300">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
             <span>{accentDetail}</span>
           </div>
         ) : null}
       </div>
 
-      <div className="mt-4 flex items-center justify-end pt-2">
-        <Link
-          href="/claw"
+      <div className="mt-4 pt-2">
+        <Button
+          asChild
+          variant={isRecommended ? 'default' : 'secondary'}
           className={cn(
-            'inline-flex items-center gap-2 rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-1.5 text-sm font-semibold text-blue-100 transition',
-            'hover:border-blue-400 hover:bg-blue-500/20 hover:text-white',
-            'focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 focus-visible:outline-none'
+            'h-11 w-full sm:h-9',
+            isRecommended &&
+              'bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 focus-visible:ring-brand-primary/50'
           )}
         >
-          {ctaLabel}
-          <span className="text-base">→</span>
-        </Link>
+          <Link href="/claw">
+            {ctaLabel}
+            <ArrowRight />
+          </Link>
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }
 
 export function KiloClawSubscribeCard({
-  creditIntroEligible,
+  standardCostMicrodollars = PLAN_COST_MICRODOLLARS.standard,
+  commitCostMicrodollars = PLAN_COST_MICRODOLLARS.commit,
   hasActiveKiloPass,
+  commitPlanAvailable = false,
 }: KiloClawSubscribeCardProps) {
+  const signupDisplay: KiloClawSignupDisplay = createKiloClawSignupDisplay({
+    standardCostMicrodollars,
+    commitCostMicrodollars,
+  });
   const standardDetails = [
     'Month-to-month hosting for one personal KiloClaw instance.',
-    creditIntroEligible
-      ? `Billed at $${PLAN_DISPLAY.standard.monthlyDollars}/month after the intro month.`
-      : `$${PLAN_DISPLAY.standard.monthlyDollars}/month with no long-term commitment.`,
+    signupDisplay.standard.accessoryDetail,
     hasActiveKiloPass
       ? 'Use Kilo Pass credits during activation or pay directly with Stripe.'
       : 'Activate and manage the instance inside KiloClaw.',
@@ -120,10 +126,11 @@ export function KiloClawSubscribeCard({
 
   const commitDetails = [
     'Six-month hosting commitment for one personal KiloClaw instance.',
-    `Lower effective cost at $${PLAN_DISPLAY.commit.monthlyDollars}/month, billed $${PLAN_DISPLAY.commit.totalDollars} upfront.`,
+    signupDisplay.commit.accessoryDetail,
+    signupDisplay.commit.monthlyEquivalent,
     hasActiveKiloPass
-      ? 'Works well when your Kilo Pass balance can cover the full commit period.'
-      : 'Best for steady usage when you want the lowest effective monthly rate.',
+      ? 'Works when your Kilo Pass balance can cover the first commit charge.'
+      : 'Best for steady usage when you want the lower effective monthly rate.',
   ];
 
   const benefits = [
@@ -136,44 +143,44 @@ export function KiloClawSubscribeCard({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 lg:gap-5">
+      <div className={cn('grid gap-4 lg:gap-5', commitPlanAvailable && 'sm:grid-cols-2')}>
         <KiloClawPlanCard
           title="Standard"
           cadenceLabel="Monthly"
-          price={
-            creditIntroEligible
-              ? `$${STANDARD_FIRST_MONTH_DOLLARS}`
-              : `$${PLAN_DISPLAY.standard.monthlyDollars}`
-          }
+          badge={commitPlanAvailable ? undefined : 'Available plan'}
+          price={signupDisplay.standard.primaryPrice}
           priceDetail={
-            creditIntroEligible
-              ? `first month, then $${PLAN_DISPLAY.standard.monthlyDollars}/month`
-              : '/month'
+            signupDisplay.standard.introDetail
+              ? `${signupDisplay.standard.priceDetail}, ${signupDisplay.standard.introDetail}`
+              : signupDisplay.standard.priceDetail
           }
           details={standardDetails}
           accentDetail={
-            creditIntroEligible
-              ? `First month: $${STANDARD_FIRST_MONTH_DOLLARS} intro price`
+            signupDisplay.standard.introDetail
+              ? `${signupDisplay.standard.primaryPrice} intro price preserved for this live lineage.`
               : undefined
           }
           ctaLabel="Sign up in KiloClaw"
+          isRecommended={!commitPlanAvailable}
         />
-        <KiloClawPlanCard
-          title="Commit"
-          cadenceLabel={`${COMMIT_PERIOD_MONTHS} months`}
-          badge="Best value"
-          price={`$${PLAN_DISPLAY.commit.totalDollars}`}
-          priceDetail={`/ ${COMMIT_PERIOD_MONTHS} months`}
-          details={commitDetails}
-          ctaLabel="Sign up in KiloClaw"
-          isRecommended
-        />
+        {commitPlanAvailable ? (
+          <KiloClawPlanCard
+            title="Commit"
+            cadenceLabel="6 months"
+            badge="Best value"
+            price={signupDisplay.commit.primaryPrice}
+            priceDetail={signupDisplay.commit.priceDetail}
+            details={commitDetails}
+            ctaLabel="Sign up in KiloClaw"
+            isRecommended
+          />
+        ) : null}
       </div>
 
       <div className="space-y-2 text-xs">
         {benefits.map(benefit => (
           <div key={benefit} className="text-muted-foreground flex items-start gap-2">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
             <span>{benefit}</span>
           </div>
         ))}

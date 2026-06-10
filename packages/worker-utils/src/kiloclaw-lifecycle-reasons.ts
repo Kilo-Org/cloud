@@ -5,6 +5,7 @@ export const KILOCLAW_START_REASONS = [
   'manual_user_request',
   'admin_request',
   'interrupted_auto_resume',
+  'organization_trial_access_restored',
   'snapshot_restore',
   'crash_recovery',
 ] as const;
@@ -17,6 +18,7 @@ export const KILOCLAW_STOP_REASONS = [
   'manual_user_request',
   'admin_request',
   'trial_expiry',
+  'organization_trial_expiry',
   'subscription_expiry',
   'past_due_cleanup',
   'trial_inactivity',

@@ -11,7 +11,40 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+env:
+  VERCEL_VERSION: '53.3.1'
+
 jobs:
+  check-production-db-startup:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Setup Vercel ENV — link from repo root; Vercel rootDirectory (apps/web) is set on the dashboard
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Check production DB startup path
+        run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
+
   run-migrations:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
@@ -36,9 +69,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Setup Vercel ENV — link from repo root; Vercel rootDirectory (apps/web) is set on the dashboard
-      - run: pnpm install --global vercel@latest
-      - run: vercel link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-      - run: vercel env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate
@@ -46,7 +78,7 @@ jobs:
   deploy-app:
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
-    needs: run-migrations
+    needs: [check-production-db-startup, run-migrations]
     environment: production
 
     env:
@@ -81,26 +113,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
-      - name: Install Vercel CLI
-        run: pnpm install --global vercel@latest
-
-      - run: vercel link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
 
       - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy Project Artifacts to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-global-app:
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
-    needs: run-migrations
+    needs: [check-production-db-startup, run-migrations]
     environment: production
 
     env:
@@ -135,46 +164,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
-      - name: Install Vercel CLI
-        run: pnpm install --global vercel@latest
-
-      - run: vercel link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
 
       - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy Project Artifacts to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-  check-kiloclaw-changes:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    outputs:
-      changed: ${{ steps.changes.outputs.kiloclaw }}
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          fetch-depth: 0
-
-      - name: Check for kiloclaw changes
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
-        id: changes
-        with:
-          filters: |
-            kiloclaw:
-              - 'services/kiloclaw/**'
+        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-kiloclaw:
-    needs: [check-kiloclaw-changes]
-    if: needs.check-kiloclaw-changes.outputs.changed == 'true'
+    needs: [check-production-db-startup, run-migrations]
+    # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
+    # exceed the caller). The reusable workflow restricts further per job — only
+    # its isolated attest-sbom job actually uses id-token/attestations.
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
     uses: ./.github/workflows/deploy-kiloclaw.yml
     secrets: inherit

@@ -1,29 +1,26 @@
-/**
- * WrapperState - Single source of truth for wrapper state.
- *
- * All wrapper state is centralized here. Other modules receive a WrapperState
- * instance and interact with it through methods. This makes state transitions
- * explicit, simplifies testing, and prevents scattered state bugs.
- *
- * State model:
- * - IDLE: _isActive == false
- * - ACTIVE: _isActive == true
- */
-
 import type { IngestEvent } from '../../src/shared/protocol.js';
+import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
 import type { LogUploader } from './log-uploader.js';
 export type { LogUploader } from './log-uploader.js';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type JobContext = {
-  executionId: string;
+export type SessionContext = {
   kiloSessionId: string;
   ingestUrl: string;
-  ingestToken: string;
+  ingestToken?: string;
   workerAuthToken: string;
+  platform?: string;
+  wrapperRunId?: string;
+  wrapperGeneration?: number;
+  wrapperConnectionId?: string;
+  agentSessionId?: string;
+};
+
+export type FinalizationConfig = {
+  autoCommit: boolean;
+  condenseOnComplete: boolean;
+  model?: string;
+  upstreamBranch?: string;
+  commitCoAuthor?: WrapperCommitCoAuthor;
 };
 
 export type LastError = {
@@ -34,112 +31,68 @@ export type LastError = {
 };
 
 export type WrapperStatus = {
-  state: 'idle' | 'active';
-  executionId?: string;
+  state: 'idle' | 'active' | 'finalizing';
   sessionId?: string;
+  pendingMessages: string[];
   lastError?: LastError;
 };
 
-// ---------------------------------------------------------------------------
-// WrapperState Class
-// ---------------------------------------------------------------------------
-
 export class WrapperState {
-  // Job context (set on the first turn-start request, cleared on reset or drain)
-  private job: JobContext | null = null;
-
-  // Whether the wrapper is actively processing a prompt
-  private _isActive = false;
-
-  // Connection state - managed externally, stored here for reference
+  private session: SessionContext | null = null;
+  private admittedMessages = new Map<string, FinalizationConfig>();
+  private latestAdmittedFinalizationConfig: FinalizationConfig | null = null;
+  private _deliveryAcknowledgementsInFlight = 0;
+  private _admissionsBlocked = false;
+  private _blockedWrapperRunId: string | undefined;
+  private _isFinalizing = false;
   private _ingestWs: WebSocket | null = null;
   private _sseAbortController: AbortController | null = null;
-
-  // Activity tracking
   private lastActivityAt = Date.now();
   private _lastError: LastError | null = null;
-
-  // Last root-session assistant message ID (tracked from message.updated kilocode events)
   private _lastAssistantMessageId: string | null = null;
-
-  // Callbacks for sending events to ingest
+  private _observedGateResult: 'pass' | 'fail' | null = null;
   private _sendToIngestFn: ((event: IngestEvent) => void) | null = null;
-
-  // Log uploader (set per-job, cleared on job end)
   private _logUploader: LogUploader | null = null;
 
-  // ---------------------------------------------------------------------------
-  // State Queries
-  // ---------------------------------------------------------------------------
-
   get isIdle(): boolean {
-    return !this._isActive;
+    return !this.isActive;
   }
 
   get isActive(): boolean {
-    return this._isActive;
+    return (
+      this.hasPendingMessages || this._deliveryAcknowledgementsInFlight > 0 || this._isFinalizing
+    );
   }
 
-  get hasJob(): boolean {
-    return this.job !== null;
+  get isFinalizing(): boolean {
+    return this._isFinalizing;
   }
 
-  get currentJob(): JobContext | null {
-    return this.job;
+  get admissionsBlocked(): boolean {
+    return this._admissionsBlocked;
   }
 
-  // ---------------------------------------------------------------------------
-  // Job Lifecycle
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Start a new job. Idempotent for same executionId.
-   * Throws if a different job is currently active (caller should return 409).
-   */
-  startJob(context: JobContext): void {
-    if (this.job && this.job.executionId === context.executionId) {
-      return;
+  beginFinalizing(): boolean {
+    if (
+      this._isFinalizing ||
+      !this.hasPendingMessages ||
+      this._deliveryAcknowledgementsInFlight > 0
+    ) {
+      return false;
     }
-
-    if (this.job && this.job.executionId !== context.executionId && this.isActive) {
-      throw new Error(`Cannot start new job while active (current: ${this.job.executionId})`);
-    }
-
-    // Start new job
-    this.job = context;
-    this._lastError = null;
-    this.updateActivity();
+    this._isFinalizing = true;
+    this.blockAdmissions();
+    return true;
   }
 
-  /**
-   * Clear job context. Called on explicit reset or when draining.
-   */
-  clearJob(): void {
-    this._logUploader?.stop();
-    this._logUploader = null;
-    this.job = null;
-    this._isActive = false;
-    this._lastAssistantMessageId = null;
+  blockAdmissions(): void {
+    this._admissionsBlocked = true;
+    this._blockedWrapperRunId = this.session?.wrapperRunId;
   }
 
-  // ---------------------------------------------------------------------------
-  // Active State Management
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Set whether the wrapper is actively processing a prompt.
-   * Replaces addInflight/removeInflight — only one prompt is active at a time.
-   */
-  setActive(active: boolean): void {
-    this._isActive = active;
-    if (active) {
-      this.updateActivity();
-    }
+  get finalizingWrapperRunId(): string | undefined {
+    return this._blockedWrapperRunId ?? this.session?.wrapperRunId;
   }
-
-  // ---------------------------------------------------------------------------
-  // Connection Management
-  // ---------------------------------------------------------------------------
 
   get isConnected(): boolean {
     return this._ingestWs !== null && this._ingestWs.readyState === WebSocket.OPEN;
@@ -153,45 +106,23 @@ export class WrapperState {
     return this._sseAbortController;
   }
 
-  /**
-   * Store connection references. Actual connection management is in connection.ts.
-   */
   setConnections(ws: WebSocket, sseAbortController: AbortController): void {
     this._ingestWs = ws;
     this._sseAbortController = sseAbortController;
   }
 
-  /**
-   * Clear connection references. Does NOT close or abort — connection.ts
-   * exclusively owns close semantics and calls this after its own cleanup.
-   */
   clearConnectionRefs(): void {
     this._sseAbortController = null;
     this._ingestWs = null;
   }
 
-  /**
-   * Set the function used to send events to ingest.
-   * This is set by connection.ts when connection is established.
-   */
   setSendToIngestFn(fn: ((event: IngestEvent) => void) | null): void {
     this._sendToIngestFn = fn;
   }
 
-  /**
-   * Send an event to ingest WebSocket.
-   * Silently drops the event if not connected (events are buffered in ConnectionManager).
-   */
   sendToIngest(event: IngestEvent): void {
-    if (!this._sendToIngestFn) {
-      return;
-    }
-    this._sendToIngestFn(event);
+    this._sendToIngestFn?.(event);
   }
-
-  // ---------------------------------------------------------------------------
-  // Log Uploader
-  // ---------------------------------------------------------------------------
 
   get logUploader(): LogUploader | null {
     return this._logUploader;
@@ -202,82 +133,152 @@ export class WrapperState {
     this._logUploader = uploader;
   }
 
-  // ---------------------------------------------------------------------------
-  // Activity Tracking
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Update last activity timestamp. Called on any meaningful action.
-   */
   updateActivity(): void {
     this.lastActivityAt = Date.now();
   }
 
-  /**
-   * Get milliseconds since last activity.
-   */
   getIdleMs(now: number): number {
     return now - this.lastActivityAt;
   }
 
-  // ---------------------------------------------------------------------------
-  // Error Tracking
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Set the last error. This is cached for Worker to poll via /job/status.
-   */
   setLastError(error: LastError): void {
     this._lastError = error;
   }
 
-  /**
-   * Get the last error.
-   */
   getLastError(): LastError | null {
     return this._lastError;
   }
 
-  /**
-   * Clear the last error.
-   */
   clearLastError(): void {
     this._lastError = null;
   }
 
-  // ---------------------------------------------------------------------------
-  // Assistant Message ID Tracking
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Get the last root-session assistant message ID.
-   * Tracked from message.updated kilocode events for autocommit association.
-   */
   get lastAssistantMessageId(): string | null {
     return this._lastAssistantMessageId;
   }
 
-  /**
-   * Update the last assistant message ID.
-   * Called by connection.ts when a message.updated event with role=assistant is seen.
-   */
   setLastAssistantMessageId(messageId: string): void {
     this._lastAssistantMessageId = messageId;
   }
 
-  // ---------------------------------------------------------------------------
-  // Status for API Responses
-  // ---------------------------------------------------------------------------
+  get observedGateResult(): 'pass' | 'fail' | undefined {
+    return this._observedGateResult ?? undefined;
+  }
 
-  /**
-   * Get current wrapper status for /job/status endpoint.
-   */
+  observeGateResult(gateResult: 'pass' | 'fail'): void {
+    this._observedGateResult = gateResult;
+  }
+
+  consumeObservedGateResult(): 'pass' | 'fail' | undefined {
+    const gateResult = this.observedGateResult;
+    this._observedGateResult = null;
+    return gateResult;
+  }
+
   getStatus(): WrapperStatus {
     return {
-      state: this.isActive ? 'active' : 'idle',
-      executionId: this.job?.executionId,
-      sessionId: this.job?.kiloSessionId,
+      state: this._isFinalizing ? 'finalizing' : this.isActive ? 'active' : 'idle',
+      sessionId: this.session?.kiloSessionId,
+      pendingMessages: this.pendingMessageIds,
       lastError: this._lastError ?? undefined,
     };
+  }
+
+  get hasSession(): boolean {
+    return this.session !== null;
+  }
+
+  get currentSession(): SessionContext | null {
+    return this.session;
+  }
+
+  bindSession(context: SessionContext): { changed: boolean } {
+    if (!this.session) {
+      this.session = context;
+      this._admissionsBlocked = false;
+      this._blockedWrapperRunId = undefined;
+      this._lastError = null;
+      this.updateActivity();
+      return { changed: true };
+    }
+    const changed =
+      this.session.ingestUrl !== context.ingestUrl ||
+      this.session.ingestToken !== context.ingestToken ||
+      this.session.workerAuthToken !== context.workerAuthToken ||
+      this.session.platform !== context.platform ||
+      this.session.wrapperRunId !== context.wrapperRunId ||
+      this.session.wrapperGeneration !== context.wrapperGeneration ||
+      this.session.wrapperConnectionId !== context.wrapperConnectionId;
+    if (changed) {
+      this.session = context;
+      this.updateActivity();
+    }
+    return { changed };
+  }
+
+  clearSession(): void {
+    this._logUploader?.stop();
+    this._logUploader = null;
+    this.session = null;
+    this.clearAllMessages();
+    this._lastAssistantMessageId = null;
+  }
+
+  beginDeliveryAcknowledgement(): boolean {
+    if (this._admissionsBlocked || this._isFinalizing) return false;
+    this._deliveryAcknowledgementsInFlight++;
+    this.updateActivity();
+    return true;
+  }
+
+  endDeliveryAcknowledgement(): void {
+    if (this._deliveryAcknowledgementsInFlight > 0) {
+      this._deliveryAcknowledgementsInFlight--;
+    }
+  }
+
+  get deliveryAcknowledgementsInFlight(): number {
+    return this._deliveryAcknowledgementsInFlight;
+  }
+
+  acceptMessage(messageId: string, config: FinalizationConfig): boolean {
+    if (this.admittedMessages.has(messageId)) return false;
+    this.admittedMessages.set(messageId, config);
+    this.latestAdmittedFinalizationConfig = config;
+    this.updateActivity();
+    return true;
+  }
+
+  get hasPendingMessages(): boolean {
+    return this.admittedMessages.size > 0;
+  }
+
+  get pendingMessageIds(): string[] {
+    return [...this.admittedMessages.keys()];
+  }
+
+  get batchFinalizationConfig(): FinalizationConfig | null {
+    return this.latestAdmittedFinalizationConfig;
+  }
+
+  getMessageConfig(messageId: string): FinalizationConfig | null {
+    return this.admittedMessages.get(messageId) ?? null;
+  }
+
+  removeMessage(messageId: string): void {
+    const removedLatest =
+      this.latestAdmittedFinalizationConfig === this.admittedMessages.get(messageId);
+    this.admittedMessages.delete(messageId);
+    if (removedLatest) {
+      this.latestAdmittedFinalizationConfig = [...this.admittedMessages.values()].at(-1) ?? null;
+    }
+  }
+
+  clearAllMessages(): void {
+    this.admittedMessages.clear();
+    this.latestAdmittedFinalizationConfig = null;
+    this._deliveryAcknowledgementsInFlight = 0;
+    this._isFinalizing = false;
+    this._observedGateResult = null;
   }
 }

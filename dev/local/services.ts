@@ -21,12 +21,13 @@ const groups: ServiceGroup[] = [
     alwaysOn: false,
     sectionBreakBefore: true,
   },
-  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false },
+  { id: 'notifications', label: 'Notifications', alwaysOn: false },
+  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, groupDependsOn: ['notifications'] },
   {
     id: 'cloud-agent',
     label: 'Cloud Agent',
     alwaysOn: false,
-    groupDependsOn: ['git-token-service'],
+    groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
@@ -39,6 +40,12 @@ const groups: ServiceGroup[] = [
     sectionBreakBefore: true,
   },
   { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
+  {
+    id: 'security-agent',
+    label: 'Security Agent',
+    alwaysOn: false,
+    groupDependsOn: ['cloud-agent'],
+  },
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
@@ -65,13 +72,21 @@ type ServiceMeta = {
 
 const serviceMeta: Record<string, ServiceMeta> = {
   // core
-  nextjs: { group: 'core', dependsOn: ['postgres', 'redis'] },
+  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'redis-http', 'stripe'] },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
+  'redis-http': { group: 'core', dependsOn: ['redis'] },
+  stripe: { group: 'core', dependsOn: [] },
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
-    dependsOn: ['postgres', 'nextjs', 'cloudflare-session-ingest', 'cloudflare-git-token-service'],
+    dependsOn: [
+      'postgres',
+      'nextjs',
+      'cloudflare-session-ingest',
+      'cloudflare-git-token-service',
+      'notifications',
+    ],
     dir: 'services/cloud-agent-next',
     useLanIp: true,
   },
@@ -84,6 +99,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'cloud-agent',
     dependsOn: ['postgres'],
     dir: 'services/session-ingest',
+  },
+  'fake-llm': {
+    group: 'cloud-agent',
+    dependsOn: [],
+    dir: 'services/cloud-agent-next/test/e2e',
   },
   // git-token-service (shared by cloud-agent, app-builder, gastown)
   'cloudflare-git-token-service': {
@@ -122,6 +142,23 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/auto-fix-infra',
   },
+  // security-agent
+  'cloudflare-security-sync': {
+    group: 'security-agent',
+    dependsOn: ['postgres', 'cloudflare-git-token-service'],
+    dir: 'services/security-sync',
+  },
+  'cloudflare-security-auto-analysis': {
+    group: 'security-agent',
+    dependsOn: [
+      'postgres',
+      'nextjs',
+      'cloud-agent-next',
+      'cloudflare-git-token-service',
+      'cloudflare-session-ingest',
+    ],
+    dir: 'services/security-auto-analysis',
+  },
   // deploy
   'cloudflare-deploy-builder': {
     group: 'deploy',
@@ -135,10 +172,9 @@ const serviceMeta: Record<string, ServiceMeta> = {
   },
   // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
-  'kiloclaw-stripe': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   notifications: {
-    group: 'kiloclaw',
+    group: 'notifications',
     dependsOn: ['postgres'],
     dir: 'services/notifications',
   },
@@ -172,6 +208,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'observability',
     dependsOn: ['nextjs'],
     dir: 'services/o11y',
+  },
+  'cloudflare-model-eval-ingest': {
+    group: 'observability',
+    dependsOn: ['postgres'],
+    dir: 'services/model-eval-ingest',
   },
   'cloudflare-ai-attribution': {
     group: 'observability',
@@ -222,6 +263,20 @@ function getPortOffset(): number {
 }
 
 export const portOffset = getPortOffset();
+
+function getNextjsTargetPort(): number {
+  const explicit = process.env.PORT;
+  if (explicit === undefined || explicit === '') return 3000 + portOffset;
+
+  const port = Number(explicit);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid PORT: ${explicit}`);
+  }
+
+  return port;
+}
+
+const nextjsTargetPort = getNextjsTargetPort();
 
 // ---------------------------------------------------------------------------
 // Wrangler config discovery
@@ -280,7 +335,12 @@ function readWranglerPort(dir: string): number {
 // Build service definitions from serviceMeta + wrangler.jsonc
 // ---------------------------------------------------------------------------
 
-const INFRA_PORTS: Record<string, number> = { postgres: 5432, redis: 6379, grafana: 4000 };
+const INFRA_PORTS: Record<string, number> = {
+  postgres: 5432,
+  redis: 6379,
+  'redis-http': 8079,
+  grafana: 4000,
+};
 
 // Docker Compose profile that gates each infra service, if any. Services not
 // listed here are part of the default profile and start with a plain `up -d`.
@@ -306,7 +366,7 @@ function buildServiceDefs(): ServiceDef[] {
         name,
         type: 'nextjs',
         dir: 'apps/web',
-        port: 3000 + portOffset,
+        port: nextjsTargetPort,
         dependsOn: meta.dependsOn,
         command: ['pnpm', 'run', 'dev'],
         group: meta.group,
@@ -341,6 +401,20 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'fake-llm') {
+      const fakeLlmPort = 8811 + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: meta.dir ?? name,
+        port: fakeLlmPort,
+        dependsOn: meta.dependsOn,
+        command: ['env', `PORT=${fakeLlmPort}`, 'pnpm', 'exec', 'tsx', 'fake-llm-server.ts'],
+        group: meta.group,
+      });
+      continue;
+    }
+
     if (name in INFRA_PORTS) {
       defs.push({
         name,
@@ -355,7 +429,6 @@ function buildServiceDefs(): ServiceDef[] {
     }
 
     if (name === 'kiloclaw-tunnel') {
-      const nextjsPort = 3000 + portOffset;
       const kiloclawPort = readWranglerPort(path.join(repoRoot, 'services/kiloclaw')) + portOffset;
       const kiloChatPort = readWranglerPort(path.join(repoRoot, 'services/kilo-chat')) + portOffset;
       defs.push({
@@ -367,7 +440,7 @@ function buildServiceDefs(): ServiceDef[] {
         command: [
           'tsx',
           'dev/local/scripts/start-tunnel.ts',
-          String(nextjsPort),
+          String(nextjsTargetPort),
           String(kiloclawPort),
           String(kiloChatPort),
         ],
@@ -376,14 +449,14 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
-    if (name === 'kiloclaw-stripe') {
+    if (name === 'stripe') {
       defs.push({
         name,
         type: 'process',
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-stripe.ts'],
+        command: ['tsx', 'dev/local/scripts/start-stripe.ts', String(nextjsTargetPort)],
         group: meta.group,
       });
       continue;
@@ -426,23 +499,25 @@ function buildServiceDefs(): ServiceDef[] {
     const port = basePort + portOffset;
     const inspectorPort = port + 10000;
 
+    const command = [
+      'pnpm',
+      'run',
+      'dev',
+      '--port',
+      String(port),
+      '--inspector-port',
+      String(inspectorPort),
+      '--ip',
+      '0.0.0.0',
+    ];
+
     defs.push({
       name,
       type: 'worker',
       dir,
       port,
       dependsOn: meta.dependsOn,
-      command: [
-        'pnpm',
-        'run',
-        'dev',
-        '--port',
-        String(port),
-        '--inspector-port',
-        String(inspectorPort),
-        '--ip',
-        '0.0.0.0',
-      ],
+      command,
       group: meta.group,
       ...(meta.useLanIp ? { useLanIp: true } : {}),
     });

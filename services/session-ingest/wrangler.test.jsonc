@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   // Test configuration - stripped down for vitest-pool-workers
   "name": "session-ingest-test",
-  "main": "src/index.ts",
+  "main": "test/test-worker.ts",
   "compatibility_date": "2026-01-27",
   "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
 
@@ -20,17 +20,13 @@
         "name": "SESSION_INGEST_DO",
         "class_name": "SessionIngestDO",
       },
-      {
-        "name": "SESSION_ACCESS_CACHE_DO",
-        "class_name": "SessionAccessCacheDO",
-      },
     ],
   },
 
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["SessionIngestDO", "SessionAccessCacheDO"],
+      "new_sqlite_classes": ["SessionIngestDO"],
     },
   ],
 

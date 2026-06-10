@@ -32,7 +32,15 @@ export async function postMessageAsUser(
   ctx: DeferCtx,
   params: PostMessageAsUserParams
 ): Promise<PostMessageAsUserResult> {
-  const { userId, sandboxId, message, source, autoCreateConversation = true, correlation } = params;
+  const {
+    userId,
+    sandboxId,
+    message,
+    source,
+    autoCreateConversation = true,
+    forceNewConversation = false,
+    correlation,
+  } = params;
 
   logger.setTags({ sandboxId, callerId: userId });
 
@@ -88,13 +96,17 @@ export async function postMessageAsUser(
   // rare: webhook triggers fire serially per trigger, and a user with
   // multiple triggers pointing at the same bot would only race on the very
   // first delivery across all of them.
-  const existingConversationId = await findUserBotConversation(env, userId, sandboxId);
+  // `forceNewConversation` skips the reuse lookup so the call always starts a
+  // fresh conversation (the install flow wants a dedicated chat per install).
+  const existingConversationId = forceNewConversation
+    ? null
+    : await findUserBotConversation(env, userId, sandboxId);
 
   let conversationId: string;
   let conversationCreated = false;
   if (existingConversationId) {
     conversationId = existingConversationId;
-  } else if (autoCreateConversation) {
+  } else if (autoCreateConversation || forceNewConversation) {
     const created = await createConversationFor(env, userId, { sandboxId });
     if (!created.ok) {
       logger.warn('postMessageAsUser: failed to create conversation', {
@@ -138,7 +150,13 @@ export async function postMessageAsUser(
       error: result.error,
       ...correlation,
     });
-    return { ok: false, code: result.code, error: result.error };
+    if (result.code === 'forbidden') {
+      return { ok: false, code: 'forbidden', error: result.error };
+    }
+    if (result.code === 'invalid' || result.code === 'conflict') {
+      return { ok: false, code: 'invalid_request', error: result.error };
+    }
+    return { ok: false, code: 'internal', error: result.error };
   }
 
   logger.info('postMessageAsUser: delivered', {

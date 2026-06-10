@@ -21,7 +21,11 @@ import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import { findKiloExclusiveModel, isFreeModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  shouldRedactModelNameInMicrodollarUsage,
+} from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
@@ -60,9 +64,10 @@ import {
   drainSseStream,
   extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  calculateCost_mUsd,
+  type KiloExclusiveModel,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const posthogClient = PostHogClient();
 
@@ -109,6 +114,12 @@ const extractMessageTextContent = (m: Message) =>
 
 export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
+export type UsageRecordInsertResult = {
+  usageId: string;
+  createdAt: string;
+  newMicrodollarsUsed: number | null;
+};
+
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
     kilo_user_id: usageContext.kiloUserId,
@@ -131,6 +142,8 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
     ttfb_ms: usageContext.ttfb_ms,
+    abuse_delay: usageContext.abuse_delay ?? null,
+    abuse_downgraded_from: usageContext.abuse_downgraded_from ?? null,
   };
 }
 
@@ -164,10 +177,10 @@ export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: 
   }
 }
 
-export function toInsertableDbUsageRecord(
+export async function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
   usageContextInfo: UsageContextInfo
-): CoreUsageWithMetaData {
+): Promise<CoreUsageWithMetaData> {
   const id = randomUUID();
   const created_at = new Date().toISOString();
 
@@ -208,7 +221,9 @@ export function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: isFreeModel(usageContextInfo.requested_model),
+    is_free: await isFreeModel(usageContextInfo.requested_model),
+    abuse_delay: metadataFromContext.abuse_delay,
+    abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
 
   // Legacy heuristic classification removed - abuse_classification is now handled
@@ -245,17 +260,27 @@ export function toInsertableDbUsageRecord(
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
-) {
+): Promise<{ usageId: string; createdAt: string } | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
-  const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
+  const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
-  await saveUsageRelatedData(
+  const inserted = await saveUsageRelatedData(
     core,
     metadata,
     usageContext.prior_microdollar_usage,
     usageContext.posthog_distinct_id ?? null
   );
+
+  // `insertUsageRecord` swallows DB errors and returns null; surface that
+  // failure to callers so dependent FK writes don't dangle on a row that
+  // was never persisted.
+  // Use the JS-side identity values we constructed in toInsertableDbUsageRecord
+  // rather than the DB-returned ones. The DB round-trip for created_at returns a
+  // Postgres timestamp string (e.g. "2026-04-29 01:16:12.945+00") which is not
+  // strict ISO 8601 and will fail downstream datetime validators. core.created_at
+  // is always new Date().toISOString() so the format is guaranteed.
+  return inserted ? { usageId: core.id, createdAt: core.created_at } : null;
 }
 
 async function saveUsageRelatedData(
@@ -263,20 +288,24 @@ async function saveUsageRelatedData(
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
   posthog_distinct_id: string | null
-) {
+): Promise<UsageRecordInsertResult | null> {
   const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
   if (isFirst && posthog_distinct_id)
     await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
-  const balanceUpdateResult = await insertUsageRecord(coreUsageFields, metadataFields);
+  const inserted = await insertUsageRecord(coreUsageFields, metadataFields);
+  if (!inserted) return null;
   if (posthog_distinct_id) {
     await sendFirstMicrodollarUsageEventIfNeeded(
-      balanceUpdateResult,
+      inserted.newMicrodollarsUsed === null
+        ? null
+        : { newMicrodollarsUsed: inserted.newMicrodollarsUsed },
       coreUsageFields,
       posthog_distinct_id,
       isFirst
     );
   }
   await ingestOrganizationTokenUsage(coreUsageFields);
+  return inserted;
 }
 
 async function isFirstUsage(
@@ -383,7 +412,7 @@ ${metaDataKindName}_cte AS (
 export async function insertUsageRecord(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
-): Promise<BalanceUpdateResult> {
+): Promise<UsageRecordInsertResult | null> {
   try {
     const result = await startSpan(
       {
@@ -422,11 +451,21 @@ export async function insertUsageRecord(
 async function insertUsageAndMetadataWithBalanceUpdate(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
-): Promise<BalanceUpdateResult> {
+): Promise<UsageRecordInsertResult> {
+  // Pick the matching partial unique index for the daily-rollup upsert. The
+  // microdollar_usage_daily table has two partial unique indexes; the upsert
+  // must target the one corresponding to this row's scope.
+  const dailyConflictTarget =
+    coreUsageFields.organization_id === null
+      ? sql`(kilo_user_id, usage_date) WHERE organization_id IS NULL`
+      : sql`(kilo_user_id, organization_id, usage_date) WHERE organization_id IS NOT NULL`;
+
   // Use a single SQL statement with CTEs to insert usage, upsert all lookup values, metadata, and update user balance in one roundtrip
   // This ensures atomicity: microdollar_usage insert and kilocode_users.microdollars_used update happen together
   const result = await db.execute<{
-    new_microdollars_used: number;
+    usage_id: string;
+    usage_created_at: string;
+    new_microdollars_used: number | null;
     kilo_pass_threshold: number | null;
   }>(sql`
           WITH microdollar_usage_ins AS (
@@ -454,6 +493,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${coreUsageFields.inference_provider},
               ${coreUsageFields.project_id}
             )
+            RETURNING id, created_at
           )
           , ${createUpsertCTE(sql`http_user_agent`, metadataFields.http_user_agent)}
           , ${createUpsertCTE(sql`http_ip`, metadataFields.http_x_forwarded_for)}
@@ -492,6 +532,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               session_id,
               market_cost,
               is_free,
+              abuse_delay,
+              abuse_downgraded_from,
 
               http_user_agent_id,
               http_ip_id,
@@ -530,6 +572,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.session_id},
               ${metadataFields.market_cost},
               ${metadataFields.is_free},
+              ${metadataFields.abuse_delay},
+              ${metadataFields.abuse_downgraded_from},
 
               (SELECT http_user_agent_id FROM http_user_agent_cte),
               (SELECT http_ip_id FROM http_ip_cte),
@@ -544,55 +588,92 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT mode_id FROM mode_cte),
               (SELECT auto_model_id FROM auto_model_cte)
           )
-          UPDATE kilocode_users
-          SET microdollars_used = microdollars_used + ${coreUsageFields.cost}
-          WHERE id = ${coreUsageFields.kilo_user_id}
-            AND ${coreUsageFields.organization_id}::uuid IS NULL
-            AND ${coreUsageFields.cost} > 0
-          RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold
+          , microdollar_usage_daily_upsert AS (
+            INSERT INTO microdollar_usage_daily (
+              kilo_user_id, organization_id, usage_date, total_cost_microdollars
+            )
+            SELECT
+              ${coreUsageFields.kilo_user_id},
+              ${coreUsageFields.organization_id}::uuid,
+              date_trunc('day', ${coreUsageFields.created_at}::timestamptz)::date,
+              ${coreUsageFields.cost}::bigint
+            WHERE ${coreUsageFields.cost} <> 0
+            ON CONFLICT ${dailyConflictTarget}
+            DO UPDATE SET
+              total_cost_microdollars =
+                microdollar_usage_daily.total_cost_microdollars + EXCLUDED.total_cost_microdollars,
+              updated_at = NOW()
+          )
+          , balance_update AS (
+            UPDATE kilocode_users
+            SET microdollars_used = microdollars_used + ${coreUsageFields.cost}
+            WHERE id = ${coreUsageFields.kilo_user_id}
+              AND ${coreUsageFields.organization_id}::uuid IS NULL
+              AND ${coreUsageFields.cost} > 0
+            RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold
+          )
+          SELECT
+            microdollar_usage_ins.id AS usage_id,
+            microdollar_usage_ins.created_at AS usage_created_at,
+            balance_update.new_microdollars_used,
+            balance_update.kilo_pass_threshold
+          FROM microdollar_usage_ins
+          LEFT JOIN balance_update ON true
         `);
 
-  // No rows returned means either: org usage (no user balance update), zero cost, or missing user
-  if (!result.rows[0]) {
-    // Only log error if we expected an update (non-org, positive cost)
-    if (!coreUsageFields.organization_id && coreUsageFields.cost && coreUsageFields.cost > 0) {
-      captureMessage('impossible: missing user', {
-        level: 'fatal',
-        tags: { source: 'insertUsageAndUpdateBalance' },
-        extra: { coreUsageFields },
-      });
-    }
-    return null;
+  const inserted = result.rows[0];
+  if (!inserted) {
+    throw new Error('microdollar_usage insert returned no identity');
   }
 
-  // Convert BigInt to number (microdollars_used is a bigint column)
-  const newMicrodollarsUsed = Number(result.rows[0].new_microdollars_used);
-
-  const kiloPassThreshold =
-    result.rows[0].kilo_pass_threshold == null ? null : Number(result.rows[0].kilo_pass_threshold);
-
-  const effectiveKiloPassThreshold = getEffectiveKiloPassThreshold(kiloPassThreshold);
-
-  if (effectiveKiloPassThreshold !== null && newMicrodollarsUsed >= effectiveKiloPassThreshold) {
-    // Trigger this async to avoid blocking
-    void maybeIssueKiloPassBonusFromUsageThreshold({
-      kiloUserId: coreUsageFields.kilo_user_id,
-      nowIso: coreUsageFields.created_at,
-    }).catch(async error => {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      await appendKiloPassAuditLog(db, {
-        action: KiloPassAuditLogAction.BonusCreditsIssued,
-        result: KiloPassAuditLogResult.Failed,
-        kiloUserId: coreUsageFields.kilo_user_id,
-        payload: {
-          source: 'usage_threshold',
-          error: errorMessage,
-        },
-      });
+  // Missing balance update is expected for org usage and zero-cost rows, but
+  // suspicious for positive-cost personal usage.
+  if (
+    inserted.new_microdollars_used === null &&
+    !coreUsageFields.organization_id &&
+    coreUsageFields.cost > 0
+  ) {
+    captureMessage('impossible: missing user', {
+      level: 'fatal',
+      tags: { source: 'insertUsageAndUpdateBalance' },
+      extra: { coreUsageFields },
     });
   }
 
-  return { newMicrodollarsUsed };
+  const newMicrodollarsUsed =
+    inserted.new_microdollars_used === null ? null : Number(inserted.new_microdollars_used);
+
+  const kiloPassThreshold =
+    inserted.kilo_pass_threshold == null ? null : Number(inserted.kilo_pass_threshold);
+
+  if (newMicrodollarsUsed !== null) {
+    const effectiveKiloPassThreshold = getEffectiveKiloPassThreshold(kiloPassThreshold);
+
+    if (effectiveKiloPassThreshold !== null && newMicrodollarsUsed >= effectiveKiloPassThreshold) {
+      // Trigger this async to avoid blocking
+      void maybeIssueKiloPassBonusFromUsageThreshold({
+        kiloUserId: coreUsageFields.kilo_user_id,
+        nowIso: coreUsageFields.created_at,
+      }).catch(async error => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await appendKiloPassAuditLog(db, {
+          action: KiloPassAuditLogAction.BonusCreditsIssued,
+          result: KiloPassAuditLogResult.Failed,
+          kiloUserId: coreUsageFields.kilo_user_id,
+          payload: {
+            source: 'usage_threshold',
+            error: errorMessage,
+          },
+        });
+      });
+    }
+  }
+
+  return {
+    usageId: inserted.usage_id,
+    createdAt: inserted.usage_created_at,
+    newMicrodollarsUsed,
+  };
 }
 
 export function countAndStoreUsage(
@@ -870,7 +951,7 @@ export function calculateKiloExclusiveCost_mUsd(
     });
   }
   return Math.round(
-    pricing.calculate_mUsd(
+    calculateCost_mUsd(
       {
         uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
         totalOutputTokens: usage.outputTokens,
@@ -882,24 +963,24 @@ export function calculateKiloExclusiveCost_mUsd(
   );
 }
 
-async function processTokenData(
+export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
-) {
+): Promise<{ usageId: string; createdAt: string } | null> {
   if (!usageStats) {
     captureMessage('SUSPICIOUS: No usage information', {
       level: 'error',
       tags: { source: 'usage_processing' },
       extra: { usageContext },
     });
-    return;
+    return null;
   }
 
   const timer = createTimer();
   const provider = Object.values(PROVIDERS).find(p => p.id === usageContext.provider);
   const generation =
     provider &&
-    useGenerationLookup(usageStats, usageContext) &&
+    (await useGenerationLookup(usageStats, usageContext)) &&
     usageStats.messageId &&
     (await fetchGeneration(usageStats.messageId, provider));
   if (usageStats.messageId) {
@@ -910,9 +991,18 @@ async function processTokenData(
       generation,
       usageStats.responseContent,
       usageContext.kiloUserId,
-      usageContext.requested_model,
       usageContext.provider
     );
+
+    if (usageContext.provider === 'vercel' && usageStats.inputTokens > 0) {
+      // It seems Vercel's /generation result does not include cache hit tokens in input tokens, unlike OpenRouter.
+      // Since it's not completely clear this is the case and in the past the numbers were inconsistent
+      // we keep the response usage data if we have it.
+      genStats.inputTokens = usageStats.inputTokens;
+      genStats.outputTokens = usageStats.outputTokens;
+      genStats.cacheHitTokens = usageStats.cacheHitTokens;
+      genStats.cacheWriteTokens = usageStats.cacheWriteTokens;
+    }
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.hasError = usageStats.hasError; // retain by choice
@@ -926,20 +1016,12 @@ async function processTokenData(
         [genStats.cacheDiscount_mUsd, usageStats.cacheDiscount_mUsd]
       );
     }
-    if (genStats.inputTokens < usageStats.inputTokens) {
-      console.warn(
-        'Suspicious: fewer input tokens in generation data compared to usage stats. Did provider return Anthropic-style token counts?'
-      );
-    }
     usageStats = genStats;
   }
 
-  if (usageStats.inputTokens - usageStats.cacheHitTokens > 100000)
-    console.warn(`Abuse?: Large uncached token request detected:`, usageStats);
-
   if (
     !usageStats.model || // fallback for failure cases
-    isKiloStealthModel(usageContext.requested_model) // this can probably be removed once we're sure we only present requested_model to users
+    shouldRedactModelNameInMicrodollarUsage(usageContext.provider, usageContext.requested_model)
   ) {
     usageStats.model = usageContext.requested_model;
   }
@@ -958,36 +1040,49 @@ async function processTokenData(
   // Preserve the real cost before zeroing for free/BYOK
   usageStats.market_cost = usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
 
-  await logMicrodollarUsage(usageStats, usageContext);
+  return logMicrodollarUsage(usageStats, usageContext);
 }
 
-function useAnthropicStyleTokenCounting(requestedModel: string, provider: ProviderId) {
-  return provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel));
-}
-
-function useGenerationLookup(
+async function useGenerationLookup(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
-) {
+): Promise<boolean> {
   const isGatewayProvider =
     usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
+  if (!isGatewayProvider || !isSuccessStatusCode) {
+    return false;
+  }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    isFreeModel(usageContext.requested_model) || (usageStats?.cost_mUsd ?? 0) > 0;
-  return isGatewayProvider && isSuccessStatusCode && (!hasOutputTokens || !hasCostWhenPaid);
+    (await isFreeModel(usageContext.requested_model)) ||
+    usageContext.user_byok ||
+    (usageStats?.cost_mUsd ?? 0) > 0;
+  const hasInferenceProvider = Boolean(usageStats?.inference_provider);
+  if (!hasOutputTokens) {
+    console.debug('[useGenerationLookup] token stats are missing');
+    return true;
+  }
+  if (!hasCostWhenPaid) {
+    console.debug('[useGenerationLookup] cost is missing');
+    return true;
+  }
+  if (!hasInferenceProvider) {
+    console.debug('[useGenerationLookup] inference provider is missing');
+    return true;
+  }
+  return false;
 }
 
 export const mapToUsageStats = (
   { data }: OpenRouterGeneration,
   responseContent: string,
   kiloUserId: string,
-  requestedModel: string,
   provider: ProviderId
 ): MicrodollarUsageStats => {
   let llmCostUsd;
@@ -1010,16 +1105,18 @@ export const mapToUsageStats = (
     hasError: false,
     model: data.model,
     responseContent,
-    inputTokens: useAnthropicStyleTokenCounting(requestedModel, provider)
-      ? (data.native_tokens_prompt ?? 0) +
-        (data.native_tokens_cached ?? 0) +
-        (data.native_tokens_cache_creation ?? 0)
-      : (data.native_tokens_prompt ?? 0),
+    inputTokens:
+      provider === 'vercel'
+        ? (data.native_tokens_prompt ?? 0) +
+          (data.native_tokens_cached ?? 0) +
+          (data.native_tokens_cache_creation ?? 0)
+        : (data.native_tokens_prompt ?? 0),
     cacheHitTokens: data.native_tokens_cached ?? 0,
     cacheWriteTokens: data.native_tokens_cache_creation ?? 0,
-    outputTokens: useAnthropicStyleTokenCounting(requestedModel, provider)
-      ? (data.native_tokens_completion ?? 0) + (data.native_tokens_reasoning ?? 0)
-      : (data.native_tokens_completion ?? 0),
+    outputTokens:
+      provider === 'vercel'
+        ? (data.native_tokens_completion ?? 0) + (data.native_tokens_reasoning ?? 0)
+        : (data.native_tokens_completion ?? 0),
     cost_mUsd: toMicrodollars(llmCostUsd),
     is_byok: data.is_byok ?? null,
     cacheDiscount_mUsd:

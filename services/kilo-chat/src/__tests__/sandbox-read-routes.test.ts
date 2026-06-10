@@ -168,7 +168,7 @@ describe('POST /v1/sandboxes/:sandboxId/request-bot-status', () => {
     expect(res.status).toBe(403);
   });
 
-  it('fires the bot.status_request webhook when no fresh cache exists', async () => {
+  it('fires the bot.status_request webhook and returns cached: null when no cached record exists', async () => {
     grantSandbox('user-req-fresh', 'sandbox-req-fresh');
     await recordingKiloclaw.__clearWebhookCalls();
 
@@ -179,7 +179,7 @@ describe('POST /v1/sandboxes/:sandboxId/request-bot-status', () => {
       makeEnv()
     );
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ ok: true });
+    await expect(res.json()).resolves.toEqual({ ok: true, cached: null });
 
     const calls = await recordingKiloclaw.__recordedWebhookCalls();
     const myCalls = calls.filter(c => c.targetBotId === 'bot:kiloclaw:sandbox-req-fresh');
@@ -190,15 +190,16 @@ describe('POST /v1/sandboxes/:sandboxId/request-bot-status', () => {
     });
   });
 
-  it('skips the webhook when cached status is fresh (dedupe)', async () => {
+  it('skips the webhook and returns cached record when within dedup window (< 10s)', async () => {
     grantSandbox('user-req-dedupe', 'sandbox-req-dedupe');
     const testEnv = makeEnv();
     const stub = testEnv.SANDBOX_STATUS_DO.get(
       testEnv.SANDBOX_STATUS_DO.idFromName('sandbox-req-dedupe')
     );
-    // putBotStatus stamps `updatedAt = Date.now()`, which by definition is
-    // within the FRESH_STATUS_TTL_MS window when the request below runs.
-    await stub.putBotStatus({ online: true, at: Date.now() });
+    // putBotStatus stamps `updatedAt = Date.now()`, which is within the
+    // 10s dedup window when the request below runs immediately after.
+    const at = Date.now();
+    await stub.putBotStatus({ online: true, at });
     await recordingKiloclaw.__clearWebhookCalls();
 
     const app = makeReadAppAs('user-req-dedupe');
@@ -208,11 +209,33 @@ describe('POST /v1/sandboxes/:sandboxId/request-bot-status', () => {
       testEnv
     );
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ ok: true });
+    const body = await res.json<{ ok: boolean; cached: { online: boolean; at: number } | null }>();
+    expect(body.ok).toBe(true);
+    expect(body.cached).not.toBeNull();
+    expect(body.cached!.online).toBe(true);
 
     const calls = await recordingKiloclaw.__recordedWebhookCalls();
     const myCalls = calls.filter(c => c.targetBotId === 'bot:kiloclaw:sandbox-req-dedupe');
     expect(myCalls).toHaveLength(0);
+  });
+
+  it('returns cached: null and fires webhook when cached record is stale (> 90s)', async () => {
+    grantSandbox('user-req-stale', 'sandbox-req-stale');
+    // No cached record → cached: null, webhook triggered (same code path as stale)
+    await recordingKiloclaw.__clearWebhookCalls();
+
+    const app = makeReadAppAs('user-req-stale');
+    const res = await app.request(
+      '/v1/sandboxes/sandbox-req-stale/request-bot-status',
+      { method: 'POST' },
+      makeEnv()
+    );
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true, cached: null });
+
+    const calls = await recordingKiloclaw.__recordedWebhookCalls();
+    const myCalls = calls.filter(c => c.targetBotId === 'bot:kiloclaw:sandbox-req-stale');
+    expect(myCalls).toHaveLength(1);
   });
 });
 

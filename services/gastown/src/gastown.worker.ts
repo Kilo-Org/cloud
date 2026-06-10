@@ -4,10 +4,13 @@ import { TRPCError } from '@trpc/server';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { cors } from 'hono/cors';
+import { z } from 'zod';
 import { getTownContainerStub } from './dos/TownContainer.do';
 import { getTownDOStub } from './dos/Town.do';
 import { TownConfigUpdateSchema } from './types';
 import { resError } from './util/res.util';
+import { writeEvent } from './util/analytics.util';
+import { logger } from './util/log.util';
 import {
   authMiddleware,
   agentOnlyMiddleware,
@@ -15,6 +18,7 @@ import {
   type AuthVariables,
 } from './middleware/auth.middleware';
 import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
+import { validateCfAccessRequest } from './middleware/cf-access.middleware';
 
 import { trpcServer } from '@hono/trpc-server';
 import { wrappedGastownRouter } from './trpc/router';
@@ -122,12 +126,17 @@ import {
   handleMayorConvoyAddBead,
   handleMayorConvoyRemoveBead,
 } from './handlers/mayor-tools.handler';
+import {
+  handleWastelandBrowse,
+  handleWastelandClaim,
+  handleWastelandPost,
+  handleWastelandDone,
+} from './handlers/wasteland-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
 import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
-import { logger } from './util/log.util';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
@@ -162,6 +171,28 @@ export type GastownEnv = {
 };
 
 const app = new Hono<GastownEnv>();
+const LOCAL_DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+async function cfAccessDebugMiddleware(c: Context<GastownEnv>, next: () => Promise<void>) {
+  const hostname = new URL(c.req.url).hostname;
+  if (c.env.ENVIRONMENT === 'development' && LOCAL_DEV_HOSTNAMES.has(hostname)) {
+    return next();
+  }
+
+  try {
+    await validateCfAccessRequest(c.req.raw, {
+      team: c.env.CF_ACCESS_TEAM,
+      audience: c.env.CF_ACCESS_AUD,
+    });
+  } catch (e) {
+    console.warn(`CF Access validation failed ${e instanceof Error ? e.message : 'unknown'}`, {
+      error: e,
+    });
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
+  return next();
+}
 
 // ── Timing ──────────────────────────────────────────────────────────────
 // Capture high-resolution start timestamp before any other middleware.
@@ -172,33 +203,65 @@ app.use('*', timingMiddleware);
 // Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
 app.use('*', useWorkersLogger('gastown-worker') as unknown as MiddlewareHandler);
 
-// ── Request logging ─────────────────────────────────────────────────────
-// Extract IDs from the URL path directly — c.req.param() only works
-// after Hono has matched a route, which hasn't happened yet in a
-// wildcard middleware.
-// Matches /orgs/:orgId, /towns/:townId, /rigs/:rigId, /agents/:agentId
-// in any combination that appears in our route patterns.
-const RE_ORG = /\/orgs\/(?<orgId>[^/]+)/;
-const RE_TOWN = /\/towns\/(?<townId>[^/]+)/;
-const RE_RIG = /\/rigs\/(?<rigId>[^/]+)/;
-const RE_AGENT = /\/agents\/(?<agentId>[^/]+)/;
-
-app.use('*', async (c, next) => {
-  const method = c.req.method;
-  const path = c.req.path;
-  // Tag with route params immediately so all downstream logs (auth,
-  // handlers, DO calls) inherit them. Auth-derived tags (userId, orgId)
-  // are set by kiloAuthMiddleware and orgAuthMiddleware when they run.
-  logger.setTags({
-    orgId: RE_ORG.exec(path)?.groups?.orgId,
-    townId: RE_TOWN.exec(path)?.groups?.townId,
-    rigId: RE_RIG.exec(path)?.groups?.rigId,
-    agentId: RE_AGENT.exec(path)?.groups?.agentId,
-  });
-  logger.info(`--> ${method} ${path}`);
+// ── Per-route logger tagging ────────────────────────────────────────
+// Use Hono path matching (not regex) so tags are sourced from
+// c.req.param() once the route is matched. Each handler runs only
+// when its prefix matches; if a request hits /api/towns/:townId/rigs/:rigId,
+// both town and rig handlers run in order.
+app.use('/api/orgs/:orgId/*', async (c, next) => {
+  const orgId = c.req.param('orgId');
+  if (orgId) logger.setTags({ orgId });
   await next();
-  const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
-  logger.info(`<-- ${method} ${path} ${c.res.status}`, { durationMs: elapsed });
+});
+app.use('/api/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/mayor/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/orgs/:orgId/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/users/:userId/towns/:townId/*', async (c, next) => {
+  const townId = c.req.param('townId');
+  if (townId) logger.setTags({ townId });
+  await next();
+});
+app.use('/api/users/:userId/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/towns/:townId/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/orgs/:orgId/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/mayor/:townId/tools/rigs/:rigId/*', async (c, next) => {
+  const rigId = c.req.param('rigId');
+  if (rigId) logger.setTags({ rigId });
+  await next();
+});
+app.use('/api/towns/:townId/rigs/:rigId/agents/:agentId/*', async (c, next) => {
+  const agentId = c.req.param('agentId');
+  if (agentId) logger.setTags({ agentId });
+  await next();
+});
+app.use('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/*', async (c, next) => {
+  const agentId = c.req.param('agentId');
+  if (agentId) logger.setTags({ agentId });
+  await next();
 });
 
 // ── CORS ────────────────────────────────────────────────────────────────
@@ -230,7 +293,9 @@ app.use('/trpc/*', corsMiddleware);
 app.get('/', c => c.json({ service: 'gastown', status: 'ok' }));
 app.get('/health', c => c.json({ status: 'ok' }));
 
-// ── DEBUG: unauthenticated town introspection — REMOVE after debugging ──
+app.use('/debug/*', cfAccessDebugMiddleware);
+
+// ── DEBUG: CF Access-protected town introspection — REMOVE after debugging ──
 app.get('/debug/towns/:townId/status', async c => {
   const townId = c.req.param('townId');
   const town = getTownDOStub(c.env, townId);
@@ -318,6 +383,70 @@ app.post('/debug/towns/:townId/graceful-stop', async c => {
   return c.json({ stopped: true });
 });
 
+app.get('/debug/towns/:townId/wasteland', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const connection = await town.getWastelandConnection();
+  return c.json({ connection });
+});
+
+// List every bead in the town that carries a `metadata.wasteland` tag, plus
+// the deep-link URL the BeadPanel UI should render for it. Use this to verify
+// the wasteland → bead bridge end-to-end without going through the UI.
+app.get('/debug/towns/:townId/wasteland-beads', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const rawBeads = await town.debugListWastelandBeads();
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const rigList = await town.listRigs();
+
+  const DebugBeadRow = z.object({
+    bead_id: z.string(),
+    type: z.string(),
+    status: z.string(),
+    title: z.string(),
+    rig_id: z.string().nullable(),
+    created_by: z.string().nullable(),
+    labels: z.array(z.string()),
+    metadata: z.record(z.string(), z.unknown()),
+  });
+  const beadRows = DebugBeadRow.array().parse(rawBeads);
+
+  const RigRow = z.object({ id: z.string(), name: z.string() });
+  const rigs = RigRow.array().parse(rigList);
+  const ridToName = new Map(rigs.map(r => [r.id, r.name]));
+
+  const WastelandTag = z.object({
+    wasteland_id: z.string(),
+    item_id: z.string(),
+  });
+
+  const enriched = beadRows.map(b => {
+    const wl = WastelandTag.safeParse(b.metadata.wasteland);
+    const expectedHref = wl.success
+      ? `/wasteland/${wl.data.wasteland_id}/wanted?itemId=${encodeURIComponent(wl.data.item_id)}`
+      : null;
+    return {
+      bead_id: b.bead_id,
+      type: b.type,
+      status: b.status,
+      title: b.title,
+      rig_id: b.rig_id,
+      rig_name: b.rig_id ? (ridToName.get(b.rig_id) ?? null) : null,
+      created_by: b.created_by,
+      labels: b.labels,
+      metadata: b.metadata,
+      ui: {
+        drawer_open_url: `/gastown/${townId}#bead=${b.bead_id}&rig=${b.rig_id ?? ''}`,
+        wasteland_link_href: expectedHref,
+      },
+    };
+  });
+  return c.json({ beads: enriched, count: enriched.length });
+});
+
 app.get('/debug/towns/:townId/config', async c => {
   if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
   const townId = c.req.param('townId');
@@ -336,6 +465,49 @@ app.patch('/debug/towns/:townId/config', async c => {
   // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
   const result = await town.updateTownConfig(parsed.data);
   return c.json(result);
+});
+
+app.get('/debug/towns/:townId/rigs', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const rigs = await town.listRigs();
+  return c.json({ rigs });
+});
+
+app.post('/debug/towns/:townId/sling-convoy', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const body: {
+    rigId: string;
+    convoyTitle: string;
+    tasks: Array<{ title: string; body?: string; depends_on?: number[] }>;
+    merge_mode?: 'review-then-land' | 'review-and-merge';
+    staged?: boolean;
+  } = await c.req.json();
+  if (!body.rigId || !body.convoyTitle || !Array.isArray(body.tasks)) {
+    return c.json({ error: 'Missing required fields: rigId, convoyTitle, tasks' }, 400);
+  }
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const result = await town.slingConvoy({
+    rigId: body.rigId,
+    convoyTitle: body.convoyTitle,
+    tasks: body.tasks,
+    merge_mode: body.merge_mode,
+    staged: body.staged,
+  });
+  return c.json(result);
+});
+
+app.get('/debug/towns/:townId/convoys', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const convoys = await town.listConvoys();
+  return c.json({ convoys });
 });
 
 // ── Town ID + Auth ──────────────────────────────────────────────────────
@@ -659,6 +831,68 @@ app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c
   return c.json({ success: true });
 });
 
+// ── Mayor Agent ID ──────────────────────────────────────────────────────
+// Returns the mayor's agent ID for a town so the container can prewarm
+// the mayor's SDK server during bootHydration. Protected by authMiddleware
+// (accepts container JWTs), not kiloAuthMiddleware.
+
+app.use('/api/towns/:townId/mayor-id', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+);
+
+app.get('/api/towns/:townId/mayor-id', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // Response contract (consumed by fetchMayorPrewarmContext in the
+  // container's process-manager.ts):
+  // - When the town has a mayor AND a kilocode token, return the full
+  //   prewarm context so KILO_CONFIG_CONTENT matches what /agents/start
+  //   will send (no eviction churn in ensureSDKServer).
+  // - When the mayor agent exists but no kilocode token is available,
+  //   return { agentId } only — the container will skip prewarm.
+  // - When there is no mayor at all, return { agentId: null } — the
+  //   container treats missing/null agentId as "no mayor, skip prewarm".
+  const ctx = await town.getMayorPrewarmContext();
+  if (!ctx) {
+    return c.json({ success: true, agentId: null });
+  }
+  return c.json({ success: true, ...ctx });
+});
+
+// ── Container Events ─────────────────────────────────────────────────────
+// Container-to-worker event proxy. The container can't call writeEvent
+// directly (it's worker-side), so it POSTs events here. Protected by
+// authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
+
+app.use('/api/towns/:townId/container-events', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+);
+
+app.post('/api/towns/:townId/container-events', async c => {
+  const townId = c.req.param('townId');
+  const body: unknown = await c.req.json();
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('event' in body) ||
+    typeof (body as { event: unknown }).event !== 'string'
+  ) {
+    return c.json({ success: false, error: 'Missing event name' }, 400);
+  }
+  const data = body as { event: string; [key: string]: unknown };
+  writeEvent(c.env, {
+    event: data.event,
+    townId,
+    agentId: typeof data.agentId === 'string' ? data.agentId : undefined,
+    durationMs: typeof data.durationMs === 'number' ? data.durationMs : undefined,
+    role: typeof data.role === 'string' ? data.role : undefined,
+    label: typeof data.label === 'string' ? data.label : undefined,
+    double3: typeof data.phaseMs === 'number' ? data.phaseMs : undefined,
+    double4: typeof data.elapsedMs === 'number' ? data.elapsedMs : undefined,
+  });
+  return c.json({ success: true });
+});
+
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
 // routes. Container→worker routes use the agent JWT middleware instead
@@ -671,7 +905,12 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
 // Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
-  if (path.includes('/container-registry') || path.includes('/db-snapshot')) {
+  if (
+    path.includes('/container-registry') ||
+    path.includes('/db-snapshot') ||
+    path.includes('/mayor-id') ||
+    path.includes('/container-events')
+  ) {
     return next();
   }
   await kiloAuthMiddleware(c, async () => {
@@ -1047,6 +1286,55 @@ app.post('/api/mayor/:townId/tools/convoys/:convoyId/add-bead', c =>
 app.post('/api/mayor/:townId/tools/convoys/:convoyId/remove-bead', c =>
   instrumented(c, 'POST /api/mayor/:townId/tools/convoys/:convoyId/remove-bead', () =>
     handleMayorConvoyRemoveBead(c, c.req.param())
+  )
+);
+
+// ── Wasteland Tools ──────────────────────────────────────────────────────
+// Mayor tools for interacting with hosted Wastelands. The wasteland is
+// auto-resolved from the town's connection — mayor never supplies it.
+// Auth is handled by the `/api/mayor/:townId/tools/*` wildcard middleware.
+app.get('/api/mayor/:townId/tools/wasteland/browse', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/wasteland/browse', () =>
+    handleWastelandBrowse(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/claim', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/claim', () =>
+    handleWastelandClaim(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/post', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/post', () =>
+    handleWastelandPost(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/done', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/done', () =>
+    handleWastelandDone(c, c.req.param())
+  )
+);
+
+// Legacy routes — accepted for backward compatibility with older mayor
+// container plugins that still supply a wasteland_id in the URL. The
+// path param is ignored; the wasteland is always resolved from the town.
+app.get('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/browse', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/wasteland/:legacyWastelandId/browse', () =>
+    handleWastelandBrowse(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/claim', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/:legacyWastelandId/claim', () =>
+    handleWastelandClaim(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/post', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/:legacyWastelandId/post', () =>
+    handleWastelandPost(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/done', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/:legacyWastelandId/done', () =>
+    handleWastelandDone(c, c.req.param())
   )
 );
 // ── tRPC ────────────────────────────────────────────────────────────────

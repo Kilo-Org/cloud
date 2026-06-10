@@ -120,7 +120,7 @@ export async function fetchOrgIdForSession(
 ): Promise<string | undefined> {
   try {
     const metadata = await fetchSessionMetadata(env, userId, sessionId);
-    return metadata?.orgId;
+    return metadata?.identity.orgId;
   } catch (error) {
     logger
       .withFields({ error: error instanceof Error ? error.message : String(error), sessionId })
@@ -130,9 +130,15 @@ export async function fetchOrgIdForSession(
 }
 
 /**
- * Set of V2 mutation procedure names that require balance validation
+ * Set of V2 mutation procedure names that require balance validation.
+ *
+ * Includes both the legacy (`initiateFromKilocodeSessionV2`, `sendMessageV2`)
+ * and unified (`start`, `send`) surfaces — all of them result in model usage
+ * once the queued message is flushed to the wrapper.
  */
 export const BALANCE_REQUIRED_MUTATIONS = new Set([
   'initiateFromKilocodeSessionV2',
   'sendMessageV2',
+  'start',
+  'send',
 ]);

@@ -144,6 +144,10 @@ export const GetAnalysisInputSchema = z.object({
   findingId: z.string().uuid(),
 });
 
+export const GetCommandStatusInputSchema = z.object({
+  commandId: z.string().uuid(),
+});
+
 export const DeleteFindingsByRepoInputSchema = z.object({
   repoFullName: z.string().min(1),
 });
@@ -166,5 +170,6 @@ export type SecurityFindingSandboxAnalysisResponse = z.infer<
 >;
 export type StartAnalysisInput = z.infer<typeof StartAnalysisInputSchema>;
 export type GetAnalysisInput = z.infer<typeof GetAnalysisInputSchema>;
+export type GetCommandStatusInput = z.infer<typeof GetCommandStatusInputSchema>;
 export type DeleteFindingsByRepoInput = z.infer<typeof DeleteFindingsByRepoInputSchema>;
 export type GetDashboardStatsInput = z.infer<typeof GetDashboardStatsInputSchema>;

@@ -24,10 +24,18 @@ validateGitLfs();
 
 const monorepoRoot = resolve(import.meta.dirname, '../..');
 
+const localNetworkDevOrigins = [
+  '10.*.*.*',
+  '192.168.*.*',
+  ...Array.from({ length: 16 }, (_, index) => `172.${16 + index}.*.*`),
+  ...(process.env.APP_URL_OVERRIDE ? [new URL(process.env.APP_URL_OVERRIDE).host] : []),
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  allowedDevOrigins: localNetworkDevOrigins,
 
   // Both values MUST be set to the monorepo root and kept in sync.
   // `vercel build` sets NEXT_PRIVATE_OUTPUT_TRACE_ROOT to the project dir (apps/web)
@@ -51,6 +59,10 @@ const nextConfig = {
             {
               source: '/api/fim/completions',
               destination: 'https://global-api.kilo.ai/api/fim/completions',
+            },
+            {
+              source: '/api/edit/completions',
+              destination: 'https://global-api.kilo.ai/api/edit/completions',
             },
             {
               source: '/api/exa/:path*',

@@ -1,3 +1,4 @@
+// admin-router.ts
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
@@ -30,6 +31,7 @@ import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-rou
 import { adminKiloclawProvidersRouter } from '@/routers/admin-kiloclaw-providers-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
+import { adminCloudAgentNextRouter } from '@/routers/admin-cloud-agent-next-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
@@ -39,21 +41,26 @@ import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { adminGastownRouter } from '@/routers/admin/gastown-router';
 import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router';
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
+import { adminModelExperimentsRouter } from '@/routers/admin/model-experiments-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
 import { adminKiloclawReferralsRouter } from '@/routers/admin/kiloclaw-referrals-router';
+import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-router';
+import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
 import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
+import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { toNonNullish } from '@/lib/utils';
 import { TRPCError } from '@trpc/server';
@@ -72,7 +79,7 @@ import { sum } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
-import { recomputeUserBalances } from '@/lib/recomputeUserBalances';
+import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@/lib/stripe-client';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
@@ -491,22 +498,52 @@ export const adminRouter = createTRPCRouter({
     updateBlockStatus: adminProcedure
       .input(UpdateUserBlockStatusSchema)
       .mutation(async ({ input, ctx }) => {
-        const blockMetadata = input.blocked_reason
-          ? {
-              blocked_reason: input.blocked_reason,
-              blocked_at: new Date().toISOString(),
-              blocked_by_kilo_user_id: ctx.user.id,
-            }
-          : {
-              blocked_reason: null,
-              blocked_at: null,
-              blocked_by_kilo_user_id: null,
-            };
+        const isBlocking = Boolean(input.blocked_reason);
+        let didTransition = false;
 
-        await db
-          .update(kilocode_users)
-          .set(blockMetadata)
-          .where(eq(kilocode_users.id, input.userId));
+        await db.transaction(async tx => {
+          const [current] = await tx
+            .select({ blocked_reason: kilocode_users.blocked_reason })
+            .from(kilocode_users)
+            .where(eq(kilocode_users.id, input.userId))
+            .for('update')
+            .limit(1);
+
+          const wasBlocked = Boolean(current?.blocked_reason);
+          didTransition = isBlocking !== wasBlocked;
+
+          const blockMetadata = isBlocking
+            ? {
+                blocked_reason: input.blocked_reason,
+                blocked_at: new Date().toISOString(),
+                blocked_by_kilo_user_id: ctx.user.id,
+              }
+            : {
+                blocked_reason: null,
+                blocked_at: null,
+                blocked_by_kilo_user_id: null,
+              };
+
+          await tx
+            .update(kilocode_users)
+            .set(blockMetadata)
+            .where(eq(kilocode_users.id, input.userId));
+        });
+
+        if (didTransition) {
+          void reportEvents({
+            events: [
+              {
+                type: isBlocking ? 'user.blocked' : 'user.unblocked',
+                data: {
+                  kilo_user_id: input.userId,
+                  reason: input.blocked_reason ?? null,
+                  actor_email: ctx.user.google_user_email,
+                },
+              },
+            ],
+          });
+        }
 
         return successResult();
       }),
@@ -1360,6 +1397,13 @@ export const adminRouter = createTRPCRouter({
               message: 'No Kilo Pass subscription found for this user',
             });
           }
+          if (result.reason.kind === 'store_managed_subscription') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message:
+                'Refund must be initiated via the App Store. The customer needs to contact Apple Support.',
+            });
+          }
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Kilo Pass subscription is already canceled',
@@ -1633,6 +1677,8 @@ export const adminRouter = createTRPCRouter({
 
   codeReviews: adminCodeReviewsRouter,
 
+  cloudAgentNext: adminCloudAgentNextRouter,
+
   sessionTraces: createTRPCRouter({
     resolveCloudAgentSession: adminProcedure
       .input(z.object({ cloud_agent_session_id: z.string().startsWith('agent_') }))
@@ -1845,14 +1891,18 @@ export const adminRouter = createTRPCRouter({
   gastown: adminGastownRouter,
   extendClawTrial: extendClawTrialRouter,
   customLlm: adminCustomLlmRouter,
+  modelExperiments: adminModelExperimentsRouter,
   gatewayConfig: adminGatewayConfigRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   bulkBlock: adminBulkBlockRouter,
   kiloPass: adminKiloPassRouter,
+  disputes: adminStripeDisputesRouter,
+  earlyFraudWarnings: adminStripeEarlyFraudWarningsRouter,
   // Key kept as `securityAdvisorContent` for tRPC client compatibility —
   // admin UI consumers reference `trpc.admin.securityAdvisorContent.*`.
   // Backing router renamed to `adminShellSecurityContentRouter` as part of
   // the shell-security rebrand; the key/symbol asymmetry is intentional.
   securityAdvisorContent: adminShellSecurityContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
+  modelEvalIngest: adminModelEvalIngestRouter,
 });

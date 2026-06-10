@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 import {
   APP_BUILDER_IMAGE_MAX_COUNT,
   APP_BUILDER_IMAGE_MAX_SIZE_BYTES,
@@ -29,7 +30,7 @@ export type UploadUrlResult = {
 
 type ImageAllowedType = (typeof APP_BUILDER_IMAGE_ALLOWED_TYPES)[number];
 
-type ImageResizeOptions = {
+export type ImageResizeOptions = {
   maxDimensionPx: number;
   quality?: number;
 };
@@ -203,7 +204,7 @@ async function resizeImageFile(file: File, resizeImages?: ImageResizeOptions): P
   }
 }
 
-async function preprocessImageFile(
+export async function preprocessImageFile(
   file: File,
   options: {
     allowedTypes: readonly string[];
@@ -415,7 +416,7 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
       }
 
       const processingImages = filesToAdd.map(file => ({
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         file,
         previewUrl: URL.createObjectURL(file),
         status: 'processing' as const,

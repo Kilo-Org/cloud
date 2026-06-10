@@ -143,6 +143,33 @@ describe('CloudAgentTransport event routing', () => {
     transport.destroy();
   });
 
+  it('routes cached command catalogs emitted without an execution ID', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+    const commands = [
+      {
+        name: 'deploy-prod',
+        description: 'Deploy production',
+        hints: ['$ARGUMENTS'],
+        source: 'command',
+      },
+    ];
+
+    transport.connect();
+    await flushPromises();
+    sendRaw({
+      eventId: 0,
+      executionId: null,
+      sessionId: 'ses-1',
+      streamEventType: 'commands.available',
+      timestamp: new Date().toISOString(),
+      data: { commands },
+    });
+
+    expect(serviceEvents).toContainEqual({ type: 'commands.available', commands });
+
+    transport.destroy();
+  });
+
   it('routes mixed events to correct sinks', async () => {
     const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
 
@@ -232,7 +259,7 @@ describe('CloudAgentTransport unexpected disconnect', () => {
 
     const stoppedEvents = serviceEvents.filter(e => e.type === 'stopped');
     expect(stoppedEvents).toHaveLength(1);
-    expect(stoppedEvents[0]).toEqual({ type: 'stopped', reason: 'disconnected' });
+    expect(stoppedEvents[0]).toEqual({ type: 'stopped', reason: 'transport-disconnected' });
 
     transport.destroy();
   });
@@ -369,13 +396,35 @@ describe('CloudAgentTransport command delegation', () => {
     const api = createMockApi();
     const { transport } = createTransportWithSinks(undefined, undefined, api);
 
-    void transport.send!({ prompt: 'hello', mode: 'code', model: 'gpt-4' });
+    void transport.send!({
+      payload: { type: 'prompt', prompt: 'hello', mode: 'code', model: 'gpt-4' },
+    });
 
     expect(api.send).toHaveBeenCalledWith({
       sessionId: 'ses-1',
-      prompt: 'hello',
-      mode: 'code',
-      model: 'gpt-4',
+      payload: { type: 'prompt', prompt: 'hello', mode: 'code', model: 'gpt-4' },
+    });
+
+    transport.destroy();
+  });
+
+  it('send() delegates canonical document attachments to api.send', () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.pdf'],
+    };
+
+    void transport.send!({
+      payload: { type: 'prompt', prompt: 'read it', mode: 'code', model: 'gpt-4' },
+      attachments,
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      payload: { type: 'prompt', prompt: 'read it', mode: 'code', model: 'gpt-4' },
+      attachments,
     });
 
     transport.destroy();

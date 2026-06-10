@@ -17,7 +17,7 @@ export function MessageMarkdown({ text, isFromMe }: Readonly<MessageMarkdownProp
     return (
       <MarkdownText
         value={text}
-        variant={isFromMe ? 'user' : 'assistant'}
+        variant={isFromMe ? 'kilo-chat-user' : 'assistant'}
         selectable={isMessageTextSelectionEnabled()}
       />
     );

@@ -6,6 +6,8 @@ Cloudflare Worker that automatically triages and analyzes security findings via 
 
 - `GET /health` — health check
 - `POST /internal/dispatch` — manual dispatch trigger (bearer-token auth)
+- `POST /internal/manual-analysis-start` — manual command ingress; `MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED=false` pauses new Worker commands
+- `POST /internal/security-analysis-callback/:findingId` — callback ingress; `SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED=false` pauses Worker callback acceptance
 - Cron trigger (`* * * * *`) — discovers owners with queued work and enqueues them
 
 ## Queue
@@ -63,7 +65,7 @@ pnpm --filter cloudflare-security-auto-analysis exec wrangler queues list
 - `pending` is stale after 15 minutes
 - `running` is stale after 2 hours
 
-> **Note:** There is no automated reconciliation cron for stale rows yet. Stuck rows must be identified and resolved manually using the diagnostic queries below.
+> **Note:** The dispatcher reconciles stale rows before enqueueing due owners: queue rows first heal to already-advanced finding states, remaining stale `pending` rows return to `queued`, and stale `running` rows become terminal `failed` rows with `RUN_LOST` only while the finding still reports `running`. Diagnostic queries below remain useful for verification and incident review.
 
 ### Failure codes
 
@@ -197,7 +199,14 @@ Do not clear the block until credits are restored. After top-up, clear the block
 
 1. Disable the Cloudflare scheduled trigger for `security-auto-analysis`
 2. Pause the `security-auto-analysis-owner-queue` consumer
-3. Verify queued backlog is no longer draining
+3. Set `MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED=false` to reject new manual Worker launches
+4. Set `SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED=false` only when routing callbacks back through compatibility ingress
+5. Verify queued backlog is no longer draining
+
+**Callback routing:**
+
+- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=worker` is the default and targets `${SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL}/internal/security-analysis-callback/:findingId`; base URL must be reachable from `cloud-agent-next`. Worker ingress validates, enqueues callback finalization, then returns `202`.
+- `SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE=web` targets `${SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL}/api/internal/security-analysis-callback/:findingId`; this is compatibility-only rollback routing while legacy callback traffic drains, not the durable default.
 
 **Owner-scoped stop** (surgical):
 

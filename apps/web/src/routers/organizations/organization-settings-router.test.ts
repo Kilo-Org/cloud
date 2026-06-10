@@ -10,8 +10,7 @@ import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
 } from '@/lib/organizations/organization-types';
-import type { User, Organization } from '@kilocode/db/schema';
-import { organizations } from '@kilocode/db/schema';
+import { type User, type Organization, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '@/lib/drizzle';

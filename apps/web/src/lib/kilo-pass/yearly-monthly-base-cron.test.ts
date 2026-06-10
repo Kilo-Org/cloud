@@ -21,6 +21,17 @@ import { runKiloPassYearlyMonthlyBaseCron } from '@/lib/kilo-pass/yearly-monthly
 import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
 import { toMicrodollars } from '@/lib/utils';
 
+function stripeSubscriptionFields(): {
+  provider_subscription_id: string;
+  stripe_subscription_id: string;
+} {
+  const stripeSubscriptionId = `test-stripe-sub-${crypto.randomUUID()}`;
+  return {
+    provider_subscription_id: stripeSubscriptionId,
+    stripe_subscription_id: stripeSubscriptionId,
+  };
+}
+
 describe('runKiloPassYearlyMonthlyBaseCron', () => {
   test('issues yearly cadence monthly base (with catch-up) and advances next_yearly_issue_at', async () => {
     const now = new Date('2026-01-06T00:00:00.000Z');
@@ -32,7 +43,7 @@ describe('runKiloPassYearlyMonthlyBaseCron', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields(),
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Yearly,
         status: 'active',
@@ -138,7 +149,7 @@ describe('runKiloPassYearlyMonthlyBaseCron', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields(),
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Yearly,
         status: 'paused',
@@ -176,7 +187,7 @@ describe('runKiloPassYearlyMonthlyBaseCron', () => {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
-        stripe_subscription_id: `test-stripe-sub-${crypto.randomUUID()}`,
+        ...stripeSubscriptionFields(),
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Yearly,
         status: 'paused',

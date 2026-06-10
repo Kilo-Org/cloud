@@ -6,6 +6,37 @@ import type { UserConfigResponse, PlatformStatusResponse, RestartMachineResponse
 
 type RequestContext = { userId: string; instanceId?: string };
 
+type SerializedKiloClawErrorBody = {
+  success?: false;
+  error?: string;
+  code?: string;
+};
+
+function readNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function serializeSafeKiloClawErrorResponseBody(responseBody: string): string {
+  try {
+    const parsed: unknown = JSON.parse(responseBody);
+    if (typeof parsed !== 'object' || parsed === null) return '';
+
+    const error = readNonEmptyString('error' in parsed ? parsed.error : undefined);
+    const code = readNonEmptyString('code' in parsed ? parsed.code : undefined);
+
+    if (!error && !code) return '';
+
+    const serialized: SerializedKiloClawErrorBody = {};
+    if ('success' in parsed && parsed.success === false) serialized.success = false;
+    if (error) serialized.error = error;
+    if (code) serialized.code = code;
+
+    return JSON.stringify(serialized);
+  } catch {
+    return '';
+  }
+}
+
 /**
  * KiloClaw worker client for user-facing routes.
  * Uses Bearer JWT auth (forwarding the user's token). Server-only.
@@ -40,13 +71,13 @@ export class KiloClawUserClient {
     });
 
     if (!res.ok) {
-      const body = await res.text();
+      const responseBody = serializeSafeKiloClawErrorResponseBody(await res.text());
       console.error(
         `KiloClaw API error (${res.status}) ${options?.method ?? 'GET'} ${path}:`,
-        body,
+        responseBody,
         ...(ctx ? [`userId=${ctx.userId}`] : [])
       );
-      throw new KiloClawApiError(res.status);
+      throw new KiloClawApiError(res.status, responseBody);
     }
 
     return res.json() as Promise<T>;

@@ -19,6 +19,17 @@ type CodeReviewExportRow = {
   completed_at: Date | string | null;
   created_at: Date | string | null;
   session_id: string | null;
+  attempt_id?: string | null;
+  attempt_number?: number | null;
+  retry_of_attempt_id?: string | null;
+  retry_reason?: string | null;
+  attempt_status?: string | null;
+  attempt_error_message?: string | null;
+  attempt_terminal_reason?: string | null;
+  attempt_session_id?: string | null;
+  attempt_cli_session_id?: string | null;
+  attempt_started_at?: Date | string | null;
+  attempt_completed_at?: Date | string | null;
 };
 
 /**
@@ -49,12 +60,16 @@ function escapeCsvValue(value: string | number | null | undefined): string {
   return str;
 }
 
+function toDownloadFilenameToken(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]+/g, '-');
+}
+
 /**
  * Exports code review data to a CSV file and triggers download.
  *
  * @param data - Array of code review records
- * @param startDate - Start date for filename
- * @param endDate - End date for filename
+ * @param startDate - Start ISO datetime for filename
+ * @param endDate - End ISO datetime for filename
  */
 export function exportCodeReviewsToCSV(
   data: CodeReviewExportRow[],
@@ -63,6 +78,7 @@ export function exportCodeReviewsToCSV(
 ): void {
   if (!data || data.length === 0) return;
 
+  const hasAttemptFields = data.some(row => row.attempt_id !== undefined);
   const headers = [
     'id',
     'ownership_type',
@@ -78,6 +94,21 @@ export function exportCodeReviewsToCSV(
     'completed_at',
     'created_at',
     'session_id',
+    ...(hasAttemptFields
+      ? [
+          'attempt_id',
+          'attempt_number',
+          'retry_of_attempt_id',
+          'retry_reason',
+          'attempt_status',
+          'attempt_error_message',
+          'attempt_terminal_reason',
+          'attempt_session_id',
+          'attempt_cli_session_id',
+          'attempt_started_at',
+          'attempt_completed_at',
+        ]
+      : []),
   ];
 
   const csvRows = [
@@ -98,6 +129,21 @@ export function exportCodeReviewsToCSV(
         escapeCsvValue(row.completed_at ? String(row.completed_at) : ''),
         escapeCsvValue(row.created_at ? String(row.created_at) : ''),
         escapeCsvValue(row.session_id),
+        ...(hasAttemptFields
+          ? [
+              escapeCsvValue(row.attempt_id),
+              escapeCsvValue(row.attempt_number),
+              escapeCsvValue(row.retry_of_attempt_id),
+              escapeCsvValue(row.retry_reason),
+              escapeCsvValue(row.attempt_status),
+              escapeCsvValue(row.attempt_error_message),
+              escapeCsvValue(row.attempt_terminal_reason),
+              escapeCsvValue(row.attempt_session_id),
+              escapeCsvValue(row.attempt_cli_session_id),
+              escapeCsvValue(row.attempt_started_at ? String(row.attempt_started_at) : ''),
+              escapeCsvValue(row.attempt_completed_at ? String(row.attempt_completed_at) : ''),
+            ]
+          : []),
       ].join(',')
     ),
   ];
@@ -107,9 +153,11 @@ export function exportCodeReviewsToCSV(
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
+  const startDateToken = toDownloadFilenameToken(startDate);
+  const endDateToken = toDownloadFilenameToken(endDate);
 
   link.setAttribute('href', url);
-  link.setAttribute('download', `code-reviews-${startDate}-to-${endDate}.csv`);
+  link.setAttribute('download', `code-reviews-${startDateToken}-to-${endDateToken}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();

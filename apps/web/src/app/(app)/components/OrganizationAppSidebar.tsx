@@ -34,7 +34,7 @@ import OrganizationSwitcher from './OrganizationSwitcher';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import HeaderLogo from '@/components/HeaderLogo';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
+import { useOrgKiloClawNavState } from '@/hooks/useOrgKiloClaw';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
@@ -53,7 +53,7 @@ export default function OrganizationAppSidebar({
   const { assumedRole, setAssumedRole, setOriginalRole } = useRoleTesting();
   // Fetch full organization data to access settings
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const kiloClawStatusQuery = useOrgKiloClawStatus(organizationId);
+  const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -141,6 +141,16 @@ export default function OrganizationAppSidebar({
       icon: MessageSquare,
       url: `/organizations/${organizationId}/claw/chat`,
     },
+    // Agent management is admin-only for now.
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'Agents',
+            icon: Bot,
+            url: `/organizations/${organizationId}/claw/agents`,
+          },
+        ]
+      : []),
     {
       title: 'Settings',
       icon: Settings,
@@ -232,6 +242,15 @@ export default function OrganizationAppSidebar({
           },
         ]
       : []),
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'MCP Gateway',
+            icon: Cable,
+            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
+          },
+        ]
+      : []),
   ];
 
   // Account group
@@ -299,10 +318,10 @@ export default function OrganizationAppSidebar({
   ];
 
   const kiloClawBaseUrl = `/organizations/${organizationId}/claw`;
-  const kiloClawInstanceState = kiloClawStatusQuery.isSuccess
-    ? kiloClawStatusQuery.data.status === null
-      ? 'absent'
-      : 'present'
+  const kiloClawInstanceState = kiloClawNavStateQuery.isSuccess
+    ? kiloClawNavStateQuery.data.hasActiveInstance
+      ? 'present'
+      : 'absent'
     : 'unknown';
   const hasKiloClawInstance = kiloClawInstanceState === 'present';
   const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');

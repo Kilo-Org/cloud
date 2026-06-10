@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { UserDetailProps } from '@/types/admin';
-import type { UserBalanceUpdates } from '@/lib/recomputeUserBalances';
+import type { UserBalanceUpdates } from '@/lib/user/recompute-balances';
 import { IS_DEVELOPMENT } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
 

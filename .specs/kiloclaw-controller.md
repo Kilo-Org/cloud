@@ -2,8 +2,8 @@
 
 ## Status
 
-Draft — generated from branch `florian/chore/controller-is-the-one-true-path`
-on 2026-03-17.
+Maintained — audited against `services/kiloclaw/controller/src` on
+2026-05-14.
 
 ## Conventions
 
@@ -15,18 +15,23 @@ capitals, as shown here.
 
 ## Overview
 
-The KiloClaw controller is the single process running inside each
-Fly.io machine. It is the Dockerfile CMD entrypoint (`node
+The KiloClaw controller is the machine entrypoint process running inside
+each Fly.io machine. It is the Dockerfile CMD entrypoint (`node
 kiloclaw-controller.js`) and is responsible for:
 
 1. Bootstrapping the machine environment (env decryption, openclaw
-   onboarding/doctor, config patching, feature flags).
+   onboarding/doctor, config patching, feature flags, integration
+   metadata).
 2. Serving an HTTP API on port 18789 for health probes, diagnostics,
    configuration management, and gateway lifecycle control.
-3. Supervising the openclaw gateway process (automatic respawn on
-   crash with exponential backoff).
+3. Supervising the openclaw gateway process and auxiliary local
+   processes such as Gmail watch delivery (automatic respawn on crash
+   with exponential backoff).
 4. Reverse-proxying HTTP and WebSocket traffic from the CF worker to
    the openclaw gateway on port 3001.
+5. Bridging controller-mediated platform integrations: Kilo Chat,
+   Google OAuth/Gmail, inbound email hooks, file import/write, doctor
+   runs, Kilo CLI repair runs, and morning briefing control.
 
 The controller owns the machine's entire lifecycle from boot to
 shutdown. The CF worker communicates with it exclusively through the
@@ -45,8 +50,8 @@ one succeeding, except where noted.
    takes seconds or fails entirely.
 
 2. **Critical bootstrap.** The controller MUST run the critical
-   bootstrap steps (decryption, directories, feature flags, gateway
-   args) after the HTTP server is listening. Each major step updates
+   bootstrap steps (decryption, directories, feature flags, hooks token,
+   gateway args) after the HTTP server is listening. Each major step updates
    the controller state so `/_kilo/health` reflects progress. If any
    critical step fails, the controller MUST enter degraded mode (see
    Degraded Mode) and MUST NOT proceed to subsequent phases.
@@ -66,21 +71,26 @@ one succeeding, except where noted.
    the gateway itself fails.
 
 5. **Non-critical bootstrap.** The controller MUST then run the
-   non-critical bootstrap steps (GitHub config, Linear config,
-   onboard/doctor with config patching, TOOLS.md updates, mcporter
-   config). If one of these steps fails, the controller MUST enter
-   degraded mode but MUST keep the Hono app active so authenticated
-   recovery endpoints remain available. The controller MUST NOT
-   proceed to gateway start after a non-critical bootstrap failure.
+   non-critical bootstrap steps in order: GitHub config, Linear config,
+   gateway-client device scope remediation, onboard/doctor with config
+   patching, bounded `TOOLS.md` section updates, and mcporter config. If
+   one of these steps fails, the controller MUST enter degraded mode but
+   MUST keep the Hono app active so authenticated recovery endpoints
+   remain available. The controller MUST NOT proceed to gateway start
+   after a non-critical bootstrap failure.
 
 6. **Pre-gateway setup.** The controller SHOULD attempt best-effort
-   setup tasks (Kilo CLI config, gog credentials). Failures in this
-   phase MUST be logged but MUST NOT prevent startup from continuing.
+   setup tasks (npm cache cleanup, Kilo CLI config, gog credentials,
+   legacy Google credential migration, gog shim installation). Failures
+   in this phase MUST be logged but MUST NOT prevent startup from
+   continuing.
 
-7. **Gateway start.** The controller MUST start the gateway
-   supervisor as the final phase. If the gateway fails to start, the
-   controller MUST enter degraded mode but MUST NOT tear down the
-   Hono app — all `/_kilo/*` routes MUST remain functional.
+7. **Gateway start.** The controller MUST start the gateway supervisor
+   as the final phase. It MUST then start the pairing cache, Gmail watch
+   supervisor when configured, Gmail watch renewal, controller check-in,
+   and delayed background Kilo CLI upgrade when enabled. If the gateway
+   fails to start, the controller MUST enter degraded mode but MUST NOT
+   tear down the Hono app — all `/_kilo/*` routes MUST remain functional.
 
 ### Event Loop Yields
 
@@ -118,12 +128,12 @@ health handler can process pending HTTP requests during bootstrap.
 
 ### State Values
 
-| State           | Meaning                                          |
-| --------------- | ------------------------------------------------ |
+| State | Meaning |
+|---|---|
 | `bootstrapping` | Bootstrap is in progress; `phase` indicates step |
-| `starting`      | Bootstrap complete, gateway is starting          |
-| `ready`         | Controller startup completed successfully        |
-| `degraded`      | A startup phase failed; `error` explains which   |
+| `starting` | Bootstrap complete, gateway is starting |
+| `ready` | Controller startup completed successfully |
+| `degraded` | A startup phase failed; `error` explains which |
 
 Note: `ready` means the controller startup sequence completed and the
 gateway was started. It does NOT mean the gateway is currently healthy.
@@ -136,30 +146,33 @@ endpoint.
 
 The `phase` field during `bootstrapping` progresses through:
 
-| Phase                          | What is happening                                 |
-| ------------------------------ | ------------------------------------------------- |
-| `init`                         | HTTP server started, bootstrap not yet begun      |
-| `decrypting`                   | Decrypting `KILOCLAW_ENC_*` env vars              |
-| `directories`                  | Creating config/workspace dirs, setting env vars  |
-| `feature-flags`                | Applying instance feature flags                   |
-| `github`                       | Configuring GitHub access (best-effort)           |
+| Phase | What is happening |
+|---|---|
+| `init` | HTTP server started, bootstrap not yet begun |
+| `decrypting` | Decrypting `KILOCLAW_ENC_*` env vars |
+| `directories` | Creating config/workspace dirs, setting env vars |
+| `feature-flags` | Applying instance feature flags |
+| `github` | Configuring GitHub access (best-effort) |
+| `linear` | Configuring Linear MCP availability |
 | `gateway-client-device-scopes` | Remediating gateway-client device approval scopes |
-| `onboard`                      | Running `openclaw onboard` (first boot)           |
-| `doctor`                       | Running `openclaw doctor --fix` (subsequent boot) |
+| `onboard` | Running `openclaw onboard` (first boot) |
+| `doctor` | Running `openclaw doctor --fix` (subsequent boot) |
+| `tools-md` | Synchronizing managed `TOOLS.md` sections |
+| `mcporter` | Writing managed MCP server config |
 
 ### Endpoint Availability by Phase
 
-| Phase                          | `/_kilo/health`                 | `/_kilo/*` routes | User traffic (proxy)    | WebSocket               |
-| ------------------------------ | ------------------------------- | ----------------- | ----------------------- | ----------------------- |
-| Critical bootstrap running     | Inline: `bootstrapping` + phase | 503               | 503                     | 503 reject              |
-| Critical bootstrap failed      | Inline: `degraded`              | 503               | 503                     | 503 reject              |
-| Runtime config failed          | Inline: `degraded`              | 503               | 503                     | 503 reject              |
-| Routes registered              | Hono: `bootstrapping` + phase   | Auth-gated        | 503 "Gateway not ready" | 503 reject              |
-| Non-critical bootstrap failed  | Hono: `degraded`                | Auth-gated        | 503 "Gateway not ready" | 503 reject              |
-| Routes registered, gw starting | Hono: `starting`                | Auth-gated        | 503 "Gateway not ready" | Auth-gated              |
-| Gateway start failed           | Hono: `degraded`                | Auth-gated        | 503 "Gateway not ready" | Auth-gated              |
-| Fully operational              | Hono: `ready`                   | Auth-gated        | Proxied to gateway      | Proxied to gateway      |
-| Gateway crashes at runtime     | Hono: `ready` (unchanged)       | Auth-gated        | 503 "Gateway not ready" | 503 "Gateway not ready" |
+| Phase | `/_kilo/health` | `/_kilo/*` routes | User traffic (proxy) | WebSocket |
+|---|---|---|---|---|
+| Critical bootstrap running | Inline: `bootstrapping` + phase | 503 | 503 | 503 reject |
+| Critical bootstrap failed | Inline: `degraded` | 503 | 503 | 503 reject |
+| Runtime config failed | Inline: `degraded` | 503 | 503 | 503 reject |
+| Routes registered | Hono: `bootstrapping` + phase | Auth-gated | 503 "Gateway not ready" | 503 reject |
+| Non-critical bootstrap failed | Hono: `degraded` | Auth-gated | 503 "Gateway not ready" | 503 reject |
+| Routes registered, gw starting | Hono: `starting` | Auth-gated | 503 "Gateway not ready" | Auth-gated |
+| Gateway start failed | Hono: `degraded` | Auth-gated | 503 "Gateway not ready" | Auth-gated |
+| Fully operational | Hono: `ready` | Auth-gated | Proxied to gateway | Proxied to gateway |
+| Gateway crashes at runtime | Hono: `ready` (unchanged) | Auth-gated | 503 "Gateway not ready" | 503 "Gateway not ready" |
 
 The first observable state over HTTP is `bootstrapping` with phase
 `init`. There is no separately observable "HTTP server starting" state
@@ -177,32 +190,32 @@ gateway supervisor handles crash recovery independently. Use
 1. The endpoint MUST require bearer token authentication.
 2. The response MUST include the following fields:
 
-| Field      | Type           | Description                                                 |
-| ---------- | -------------- | ----------------------------------------------------------- |
-| `state`    | string         | Supervisor state (see below)                                |
-| `pid`      | number \| null | OS process ID of the gateway, null if not running           |
-| `uptime`   | number         | Seconds since the current process started, 0 if not running |
-| `restarts` | number         | Total restart count since controller boot                   |
-| `lastExit` | object \| null | Last exit information, null if never exited                 |
+| Field | Type | Description |
+|---|---|---|
+| `state` | string | Supervisor state (see below) |
+| `pid` | number \| null | OS process ID of the gateway, null if not running |
+| `uptime` | number | Seconds since the current process started, 0 if not running |
+| `restarts` | number | Total restart count since controller boot |
+| `lastExit` | object \| null | Last exit information, null if never exited |
 
 3. The `lastExit` object, when present, MUST include:
 
-| Field    | Type           | Description                                            |
-| -------- | -------------- | ------------------------------------------------------ |
-| `code`   | number \| null | Exit code, null if killed by signal                    |
+| Field | Type | Description |
+|---|---|---|
+| `code` | number \| null | Exit code, null if killed by signal |
 | `signal` | string \| null | Signal name (e.g., `SIGTERM`), null if exited normally |
-| `at`     | string         | ISO 8601 timestamp of the exit                         |
+| `at` | string | ISO 8601 timestamp of the exit |
 
 ### Supervisor States
 
-| State           | Meaning                                                 |
-| --------------- | ------------------------------------------------------- |
-| `stopped`       | Gateway is not running (manual stop or not yet started) |
-| `starting`      | Gateway process is spawning                             |
-| `running`       | Gateway process has been spawned and has not exited     |
-| `stopping`      | SIGTERM sent, waiting for exit                          |
-| `crashed`       | Gateway exited unexpectedly, restart pending            |
-| `shutting_down` | Controller is shutting down, gateway being terminated   |
+| State | Meaning |
+|---|---|
+| `stopped` | Gateway is not running (manual stop or not yet started) |
+| `starting` | Gateway process is spawning |
+| `running` | Gateway process has been spawned and has not exited |
+| `stopping` | SIGTERM sent, waiting for exit |
+| `crashed` | Gateway exited unexpectedly, restart pending |
+| `shutting_down` | Controller is shutting down, gateway being terminated |
 
 ### Gateway Lifecycle Endpoints
 
@@ -275,6 +288,12 @@ tag (16 bytes)`.
      supervisor.
    - `GOG_KEYRING_PASSWORD=kiloclaw` — required for the gog keyring
      backend (not a secret; see gog-credentials.ts).
+   - `OPENCLAW_PLUGIN_STAGE_DIR=/usr/local/share/openclaw-plugin-runtime-deps`
+     when unset — keep bundled OpenClaw plugin runtime dependencies in
+     the image-baked stage directory instead of mutating `/root` or each
+     bundled plugin directory during doctor/gateway startup.
+   - `KILO_API_URL` to the origin of `KILOCODE_API_BASE_URL` when the
+     API base URL override is set.
 
 ### Feature Flags
 
@@ -299,32 +318,85 @@ tag (16 bytes)`.
 
 1. GitHub configuration is best-effort. Failures MUST be logged but
    MUST NOT abort bootstrap.
-2. When `GITHUB_TOKEN` is set, the controller SHOULD run `gh auth
-login --with-token` and `gh auth setup-git`.
-3. When `GITHUB_USERNAME` is set, the controller SHOULD run `git
-config --global user.name`. When `GITHUB_EMAIL` is set, the
+2. When `GITHUB_TOKEN` is set, the controller SHOULD run
+   `gh auth login --with-token` and `gh auth setup-git`.
+3. When `GITHUB_USERNAME` is set, the controller SHOULD run
+   `git config --global user.name`. When `GITHUB_EMAIL` is set, the
    controller SHOULD run `git config --global user.email`. Failures
    MUST be logged but MUST NOT abort bootstrap.
 4. When `GITHUB_TOKEN` is not set, the controller SHOULD clean up
-   any previously stored credentials (`gh auth logout`, `git config
---global --unset user.name/email`). Cleanup failures MUST be
-   silently ignored.
+   any previously stored credentials (`gh auth logout`,
+   `git config --global --unset user.name/email`). Cleanup failures
+   MUST be silently ignored.
+
+### Linear and MCPorter Configuration
+
+1. Linear configuration is managed through mcporter, not by writing
+   OpenClaw MCP config directly.
+2. When `LINEAR_API_KEY` is present, the controller MUST preserve it for
+   the gateway environment and MUST configure the `linear` MCP server in
+   `/root/.openclaw/workspace/config/mcporter.json` with URL
+   `https://mcp.linear.app/mcp` and authorization header
+   `Bearer ${LINEAR_API_KEY}`.
+3. When `LINEAR_API_KEY` is absent, the controller MUST remove any
+   managed `linear` entry from mcporter config and MUST remove any
+   managed Linear section from `TOOLS.md`.
+4. When `AGENTCARD_API_KEY` is present, the controller MUST configure
+   the `agentcard` MCP server in mcporter with URL
+   `https://mcp.agentcard.sh/mcp` and bearer authorization.
+5. When `AGENTCARD_API_KEY` is absent, the controller MUST remove any
+   managed `agentcard` entry from mcporter config.
+6. mcporter config writes MUST preserve user-added server entries whose
+   keys are not managed by the controller.
 
 ### Onboard vs Doctor
 
 1. If `/root/.openclaw/openclaw.json` does not exist (first boot),
-   the controller MUST run `openclaw onboard --non-interactive` with
-   the flags: `--accept-risk`, `--mode local`, `--gateway-port 3001`,
-   `--gateway-bind loopback`, `--skip-channels`, `--skip-skills`,
-   `--skip-health`, and `--kilocode-api-key`.
-2. If the config file exists (subsequent boot), the controller MUST
+   the controller MUST generate a base config by running
+   `openclaw onboard --non-interactive` against a temporary
+   `OPENCLAW_CONFIG_PATH`, patching the temp config, chmodding it to
+   `0600`, and atomically renaming it into place.
+2. The onboard invocation MUST include the flags: `--accept-risk`,
+   `--mode local`, `--gateway-port 3001`, `--gateway-bind loopback`,
+   `--skip-channels`, `--skip-skills`, `--skip-health`,
+   `--secret-input-mode ref`, and `--kilocode-api-key`.
+3. If the config file exists (subsequent boot), the controller MUST
    run `openclaw doctor --fix --non-interactive`.
-3. On first boot, the controller MUST seed
+4. On first boot, the controller MUST seed
    `/root/.openclaw/workspace/TOOLS.md` from the image-baked copy at
    `/usr/local/share/kiloclaw/TOOLS.md`.
-4. When `KILOCLAW_USER_TIMEZONE` is set, the controller MUST create or
-   update `/root/.openclaw/workspace/USER.md` so its `Timezone` field is
-   set to that IANA timezone.
+5. After onboard or doctor, the controller MUST seed
+   `/root/.openclaw/exec-approvals.json` defaults to match the configured
+   exec policy.
+6. After onboard or doctor, the controller MUST migrate legacy plaintext
+   KiloCode auth profile keys to env-backed key references.
+7. The controller MUST seed `/root/.openclaw/workspace/IDENTITY.md` if
+   it does not already exist, using `KILOCLAW_BOT_NAME`,
+   `KILOCLAW_BOT_NATURE`, `KILOCLAW_BOT_VIBE`, and
+   `KILOCLAW_BOT_EMOJI` when present and defaults otherwise. It MUST
+   remove legacy `/root/.openclaw/workspace/BOOTSTRAP.md`.
+8. When `KILOCLAW_USER_TIMEZONE` or `KILOCLAW_USER_LOCATION` is set,
+   the controller MUST create or update `/root/.openclaw/workspace/USER.md`
+   so the corresponding `Timezone` or `Location` field is present.
+9. When `KILOCLAW_USER_LOCATION` is set, the controller SHOULD install
+   the image-baked weather skill into `/root/clawd/skills/weather/SKILL.md`.
+
+### TOOLS.md Sections
+
+1. The controller MUST manage bounded sections in
+   `/root/.openclaw/workspace/TOOLS.md` using begin/end markers so edits
+   outside managed sections are preserved.
+2. The controller MUST always enable the Kilo CLI, KiloClaw mitigations,
+   plugin install guidance, and process model sections.
+3. The controller MUST enable the Google Workspace section when
+   `KILOCLAW_GOOGLE_WORKSPACE_ENABLED=true` or
+   `KILOCLAW_GOG_CONFIG_TARBALL` is present; otherwise it MUST remove the
+   managed section.
+4. The controller MUST enable the 1Password section when
+   `OP_SERVICE_ACCOUNT_TOKEN` is present; otherwise it MUST remove the
+   managed section.
+5. The controller MUST enable the Linear section when `LINEAR_API_KEY` is
+   present; otherwise it MUST remove the managed section.
 
 ### Config Patching
 
@@ -356,16 +428,45 @@ patches to `openclaw.json`. The patches MUST include:
     models).
 11. `tools.profile`: MUST be set to `full` on fresh install or config
     restore. MUST be preserved on subsequent boots.
-12. Exec policy: host `gateway`, security `allowlist`, ask `on-miss`.
-13. Browser: enabled, headless, noSandbox.
-14. KiloClaw customizer plugin: load path and entry MUST be present;
+12. Exec policy: host `gateway`, security from `KILOCLAW_EXEC_SECURITY`
+    or default `allowlist`, ask from `KILOCLAW_EXEC_ASK` or default
+    `on-miss`.
+13. Update checks disabled (`update.checkOnStart=false`).
+14. Browser: enabled, headless, noSandbox.
+15. KiloClaw customizer plugin: load path and entry MUST be present;
     when `plugins.allow` exists, it MUST include `kiloclaw-customizer`.
-15. Channel configuration from `TELEGRAM_BOT_TOKEN`,
+    Web search MUST auto-enable the `kilo-exa` provider when
+    `KILO_EXA_SEARCH_MODE=kilo-proxy`, or when the mode is unset and the
+    user has not explicitly configured search; it MUST disable or defer to
+    user/Brave configuration when `KILO_EXA_SEARCH_MODE=disabled` or any
+    unrecognised value (unknown values MUST be logged and treated as `disabled`).
+16. KiloClaw morning briefing plugin: load path and entry MUST be
+    present; when `plugins.allow` exists, it MUST include
+    `kiloclaw-morning-briefing`.
+17. Channel configuration from `TELEGRAM_BOT_TOKEN`,
     `DISCORD_BOT_TOKEN`, `SLACK_BOT_TOKEN`/`SLACK_APP_TOKEN`, with
     corresponding plugin enablement.
-16. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled,
-    token, inbound email mapping. When Gmail credentials are present, the
-    gmail preset MUST also be enabled.
+18. Session default DM scope MUST be `per-channel-peer` when unset.
+19. Kilo Chat channel and plugin MUST be enabled. The channel MUST include
+    `_configured=true` so OpenClaw treats it as meaningful configuration.
+20. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled, token,
+    `/hooks` path, inbound email mapping, and allowed session key prefixes
+    for `hook:` and `inbound-email:`. When Gmail credentials are present,
+    the gmail preset MUST also be enabled. Legacy inbound-email `wake`
+    mappings MUST be migrated to the current `agent` mapping form.
+21. Vector memory: when `KILOCLAW_VECTOR_MEMORY_ENABLED=true`, configure
+    `agents.defaults.memorySearch` to use the Kilo Gateway embeddings
+    endpoint. When disabled and stale memory search config exists, mark it
+    disabled and remove stale remote/provider/model fields.
+22. Dreaming: when `KILOCLAW_DREAMING_ENABLED=true`, enable
+    `plugins.entries.memory-core.config.dreaming`. When disabled and stale
+    dreaming config exists, mark it disabled.
+23. Custom secret path patching from `KILOCLAW_SECRET_CONFIG_PATHS`: for
+    each env-var-to-config-path mapping, set the decrypted env value at the
+    requested JSON dot-notation path unless the path contains a banned
+    prototype-pollution segment.
+24. Legacy Stream Chat channel/plugin config MUST be removed before the
+    patched config is written.
 
 ### Hooks Token
 
@@ -376,6 +477,29 @@ patches to `openclaw.json`. The patches MUST include:
    authenticate to controller endpoints with the gateway token, and the
    controller forwards to local OpenClaw hook endpoints with the hooks
    token.
+
+### Google Workspace and Gmail
+
+1. Google Workspace is configured from `KILOCLAW_GOG_CONFIG_TARBALL` and
+   related metadata. The controller SHOULD extract credentials into the
+   gog config directory, set `GOG_KEYRING_BACKEND=file`, set
+   `GOG_KEYRING_PASSWORD=kiloclaw`, and set `GOG_ACCOUNT` when the
+   Google account email is known.
+2. When `KILOCLAW_GMAIL_LAST_HISTORY_ID` is present, the controller
+   SHOULD patch the gog Gmail watch state so watch delivery resumes from
+   the latest worker-observed history ID.
+3. When Google credentials, account email, and hooks token are available,
+   the controller SHOULD start a gog Gmail watch supervisor using
+   `/usr/local/bin/gog.real gmail watch serve` bound to `127.0.0.1:3002`
+   with path `/gmail-pubsub`, gateway-token authentication, hook URL
+   `http://127.0.0.1:3001/hooks/gmail`, hook-token authentication, body
+   inclusion, and bounded body bytes.
+4. The controller SHOULD renew the Gmail watch periodically while the
+   watch supervisor is running.
+5. The controller SHOULD install the gog shim so normal `gog` invocations
+   can use brokered OAuth tokens and legacy fallback behavior.
+6. Legacy Google credential migration to the Kilo broker is best-effort.
+   Migration failures MUST be logged and MUST NOT prevent gateway startup.
 
 ### Gateway Args
 
@@ -430,11 +554,11 @@ patches to `openclaw.json`. The patches MUST include:
 
 The controller uses three authentication mechanisms:
 
-| Auth type    | Header                          | Used by                               |
-| ------------ | ------------------------------- | ------------------------------------- |
-| Bearer token | `Authorization: Bearer <token>` | All `/_kilo/*` routes except health   |
-| Proxy token  | `x-kiloclaw-proxy-token`        | Catch-all HTTP proxy, WebSocket proxy |
-| None         | —                               | `/health`, `/_kilo/health`            |
+| Auth type | Header | Used by |
+|---|---|---|
+| Bearer token | `Authorization: Bearer <token>` | All `/_kilo/*` routes except health |
+| Proxy token | `x-kiloclaw-proxy-token` | Catch-all HTTP proxy, WebSocket proxy |
+| None | — | `/health`, `/_kilo/health` |
 
 1. Bearer token comparisons MUST be timing-safe.
 2. Proxy token enforcement is controlled by `REQUIRE_PROXY_TOKEN`.
@@ -445,75 +569,258 @@ The controller uses three authentication mechanisms:
 
 #### Health (unauthenticated)
 
-| Method | Path            | Description                                 |
-| ------ | --------------- | ------------------------------------------- |
-| GET    | `/health`       | Bare Fly probe — always `{"status":"ok"}`   |
-| GET    | `/_kilo/health` | Controller lifecycle state with phase/error |
+| Method | Path | Description |
+|---|---|---|
+| GET | `/health` | Bare Fly probe — always `{"status":"ok"}` |
+| GET | `/_kilo/health` | Controller lifecycle state with phase/error |
 
 #### Version (bearer token)
 
-| Method | Path             | Description                                                                   |
-| ------ | ---------------- | ----------------------------------------------------------------------------- |
-| GET    | `/_kilo/version` | Controller version, commit, openclaw version, gateway stats, controller state |
+| Method | Path | Description |
+|---|---|---|
+| GET | `/_kilo/version` | Controller version, commit, openclaw version, gateway stats, controller state |
 
-The response MUST include:
+The response fields are:
 
-| Field             | Type           | Description                                                                        |
-| ----------------- | -------------- | ---------------------------------------------------------------------------------- |
-| `version`         | string         | Controller version (calver)                                                        |
-| `commit`          | string         | Controller build commit hash                                                       |
-| `openclawVersion` | string \| null | Installed openclaw version                                                         |
-| `openclawCommit`  | string \| null | Installed openclaw commit hash                                                     |
-| `gateway`         | object \| null | Supervisor stats (same as `/_kilo/gateway/status`), null if supervisor not created |
-| `controllerState` | object         | Current controller lifecycle state (present when state ref is wired)               |
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `version` | string | Yes | Controller version (calver) |
+| `commit` | string | Yes | Controller build commit hash |
+| `openclawVersion` | string \| null | Yes | Installed openclaw version |
+| `openclawCommit` | string \| null | Yes | Installed openclaw commit hash |
+| `apiVersion` | number | No | Controller response/protocol envelope shape version |
+| `capabilities` | string[] | No | Sorted capability hints for controller routes/behaviors registered in this build |
+| `gateway` | object \| null | Yes | Supervisor stats (same as `/_kilo/gateway/status`), null if supervisor not created |
+| `controllerState` | object | No | Current controller lifecycle state, present when state ref is wired |
+| `kiloChatHealth` | object | No | Kilo Chat health probe summary, present when Kilo Chat probing is active |
+
+Version capability hint rules:
+
+1. `apiVersion`, when present, describes the version response/protocol
+   envelope shape only. It MUST NOT be used as the sole proof that a
+   specific endpoint exists when a named capability is available.
+2. `capabilities`, when present, MUST be sorted in ascending ASCII
+   lexicographic order by stable lowercase dot/kebab capability string
+   and MUST be duplicate-free. Clients MUST treat the array as a set;
+   ordering is canonicalization only and carries no feature semantics.
+3. Capability names MUST be derived from the controller behavior they
+   expose, not from UI labels or release names. Names MUST use dots to
+   separate stable resource/behavior hierarchy and kebab-case inside a
+   segment when a concept is multiple words. For route-backed
+   capabilities, derive the leading segments from the `/_kilo/` route
+   namespace and the final segment from the operation or behavior. For
+   example: `/_kilo/config/read` -> `config.read`,
+   `/_kilo/config/tools-md/google-workspace` ->
+   `config.tools-md.google-workspace`,
+   `/_kilo/morning-briefing/interests` ->
+   `morning-briefing.interests`, and the Kilo Chat attachment routes ->
+   `kilo-chat.attachments`.
+4. A capability MAY cover multiple routes only when those routes are one
+   inseparable behavior for clients, such as start/status/cancel for one
+   async operation or init/url routes for one attachment flow. It MUST NOT
+   combine independent read, update, create, repair, or delete behaviors
+   under one broad name when clients may need to gate those behaviors
+   separately.
+5. Capability names MUST be additive and stable. Renaming or removing a
+   capability is a breaking behavior change; add a new capability instead
+   when a new implementation has meaningfully different semantics.
+6. A capability MUST only be advertised when the corresponding route or
+   behavior is registered in the running controller build.
+7. Capability hints are advisory. Clients MUST keep normal mutation-time
+   handling for old routes, auth failures, validation failures,
+   conflicts, and runtime errors.
+8. Missing `capabilities` on a controller with a non-null version means
+   capability support is unknown and SHOULD fail closed for newly
+   capability-gated features.
 
 #### Gateway (bearer token)
 
-| Method | Path                     | Description                                |
-| ------ | ------------------------ | ------------------------------------------ |
-| GET    | `/_kilo/gateway/status`  | Gateway supervisor state and stats         |
-| POST   | `/_kilo/gateway/start`   | Start the gateway (409 if running)         |
-| POST   | `/_kilo/gateway/stop`    | Stop the gateway gracefully                |
-| POST   | `/_kilo/gateway/restart` | Restart the gateway (409 if shutting down) |
+| Method | Path | Description |
+|---|---|---|
+| GET | `/_kilo/gateway/status` | Gateway supervisor state and stats |
+| POST | `/_kilo/gateway/start` | Start the gateway (409 if running) |
+| POST | `/_kilo/gateway/stop` | Stop the gateway gracefully |
+| GET | `/_kilo/gateway/ready` | Proxy the gateway readiness endpoint |
+| POST | `/_kilo/gateway/restart` | Restart the gateway (409 if shutting down) |
 
 #### Config (bearer token)
 
-| Method | Path                         | Description                                            |
-| ------ | ---------------------------- | ------------------------------------------------------ |
-| GET    | `/_kilo/config/read`         | Read openclaw.json with MD5 etag                       |
-| POST   | `/_kilo/config/restore/base` | Regenerate config from env vars, signal gateway reload |
-| POST   | `/_kilo/config/replace`      | Atomically replace openclaw.json (etag concurrency)    |
-| POST   | `/_kilo/config/patch`        | Deep-merge a JSON patch into openclaw.json             |
+| Method | Path | Description |
+|---|---|---|
+| GET | `/_kilo/config/read` | Read openclaw.json with MD5 etag |
+| POST | `/_kilo/config/restore/base` | Regenerate config from env vars, signal gateway reload |
+| POST | `/_kilo/config/replace` | Atomically replace openclaw.json (etag concurrency) |
+| POST | `/_kilo/config/patch` | Deep-merge a JSON patch into openclaw.json |
+| GET | `/_kilo/config/agents` | List normalized configured-agent summaries and effective defaults |
+| GET | `/_kilo/config/agents/:agentId` | Read one normalized configured-agent summary |
+| POST | `/_kilo/config/agents` | Create a basic agent through non-interactive OpenClaw CLI behavior |
+| PATCH | `/_kilo/config/agents/:agentId` | Update approved agent model/settings fields |
+| DELETE | `/_kilo/config/agents/:agentId` | Delete a configured agent through non-interactive OpenClaw CLI behavior |
+| PUT | `/_kilo/config/agents/:agentId/bindings` | Declaratively set an agent's channel-level (default-account) route bindings |
+| PATCH | `/_kilo/config/agent-defaults` | Update approved inherited agent-default fields |
+| POST | `/_kilo/config/tools-md/google-workspace` | Enable/disable managed Google Workspace `TOOLS.md` section |
 
 The restore endpoint only accepts `base` as the version parameter.
 Other values MUST return 400.
 
+##### Agent configuration CRUD
+
+1. All agent configuration endpoints MUST require bearer-token authentication.
+2. `GET /_kilo/config/agents` MUST return configured agent summaries, effective defaults, and an etag representing the read config snapshot.
+3. Agent reads MAY represent the implicit default `main` agent as `configured: false` when no explicit list entry exists for it.
+4. `PATCH /_kilo/config/agents/:agentId` and `PATCH /_kilo/config/agent-defaults` MUST expose only controller-approved model/settings fields and MUST reject unknown patch fields.
+5. Agent/default native updates MUST use guarded read-modify-write behavior that preserves unrelated configuration and sibling agent entries.
+6. `POST /_kilo/config/agents` MUST delegate basic creation to non-interactive OpenClaw CLI behavior and MUST return the normalized created agent identifier.
+7. Controller-accepted CLI creation values MUST NOT be interpreted as additional OpenClaw command options beyond the defined basic-create surface.
+8. `POST /_kilo/config/agents` MAY accept arbitrary absolute workspace paths. Clients MUST NOT assume every configured workspace is exposed by `/_kilo/files/*`.
+9. Native agent resource lookup and update requests MUST reject non-empty IDs that collapse to the reserved implicit `main` identifier rather than silently targeting `main`.
+10. `DELETE /_kilo/config/agents/:agentId` MUST delegate deletion to non-interactive OpenClaw CLI behavior and MUST reject deletion of `main`.
+11. The delete response MUST NOT claim verified filesystem deletion or verified file retention. Filesystem disposition is controlled by the installed OpenClaw CLI/runtime behavior and is not represented by the controller response.
+12. The following capability hints MUST be advertised when the corresponding CRUD routes are registered: `config.agents.read`, `config.agents.create.basic.cli`, `config.agents.update`, `config.agents.delete.cli`, `config.agents.bindings.update`, and `config.agent-defaults.update`.
+13. Native updates MUST report stale config etags or config changes observed before commit as `409 config_etag_conflict`.
+14. Controller-originated agent create, update, defaults-update, and delete mutations MUST be serialized per config path so a lifecycle CLI mutation cannot be overwritten by a concurrent native controller update.
+15. CLI lifecycle operations MUST report known reserved/not-found/conflict validation failures using stable HTTP error codes, and MUST report timeout or malformed/process failures without exposing secret environment values.
+16. Controller server errors from agent-config reads MUST NOT expose filesystem error details in HTTP responses.
+17. Agent read summaries MUST include the agent's routing bindings as reported by non-interactive OpenClaw CLI binding behavior (the routing source of truth), surfacing channel, account id (verbatim; absent account → null), and a flag for bindings more specific than a plain channel(/account) route (e.g. peer/guild/team/roles matches). The CLI binding listing covers routing bindings only; non-route binding types are out of scope for this surface and need not be reported. Every response that returns an agent summary (list, read, create, settings-update, bindings-update) MUST carry these CLI-sourced bindings rather than an empty placeholder.
+18. `PUT /_kilo/config/agents/:agentId/bindings` MUST declaratively set the agent's channel-level default-account routes to exactly the requested channel set by delegating to non-interactive OpenClaw CLI binding behavior (diffing the CLI's current view and issuing bind/unbind). It MUST be serialized per config path with the other agent mutations, and MUST report a stale request etag as `409 config_etag_conflict` before issuing CLI writes. It MUST report success only after confirming, from a fresh CLI read, that the agent's managed channel routes equal the requested set; if they differ (e.g. a requested channel resolved to an existing account-scoped route and was reported `skipped`, or an unbind resolved to a different scope and was reported `missing`) it MUST roll back and fail with `422 invalid_agent_config` rather than report a result it did not achieve.
+19. The binding set MUST manage only channel-level default-account routes; account-scoped routes, advanced bindings (peer/guild/team/roles or non-`route` type), and other agents' bindings MUST be left intact. Every post-write step through the final managed-set verification runs under one recovery path (see rule 20): any failure restores the pre-change routing.
+20. The binding set MUST report a requested channel that the CLI rejects as already routed to another agent as `409 agent_binding_conflict`. Because OpenClaw applies non-conflicting additions before reporting a conflict, on any rejection the binding set MUST roll back only the routes that invocation created — identified by diffing against the pre-change snapshot, never by blindly unbinding the requested channels (a bare unbind can resolve to and delete a pre-existing account-scoped route) — and MUST NOT remove any pre-existing route. It MUST then confirm the agent's routing was restored to the pre-change snapshot; if restoration cannot be confirmed it MUST fail with `500 agent_binding_rollback_failed` rather than report a clean rejection over mutated routing.
+21. Binding edits MUST target an agent present in `agents.list`; a request for an absent agent (including unconfigured implicit `main`) MUST return `404 agent_not_found` rather than misrouting to the default agent.
+22. Managed scope and concurrency (documented limits): the binding set authors and manages only channel-key-only default routes (match with a `channel` key and nothing else). A route carrying any `accountId` — including a blank/whitespace value, which this endpoint never authors — MUST be surfaced verbatim in reads (per rule 17) and treated as account-scoped (left unmanaged), never coerced to a default route. The endpoint assumes at most one managed route per channel (the shape it authors); externally-authored states it cannot produce (duplicate route matches, account-scoped or non-`route` bindings) are out of its management scope. Concurrency with non-agent config writers (`/_kilo/config/patch`, `/_kilo/config/replace`, restore) is bounded by the same config-wide etag model as the other agent mutations; this endpoint does not add stronger cross-writer serialization.
+
 #### Environment (bearer token)
 
-| Method | Path               | Description                                          |
-| ------ | ------------------ | ---------------------------------------------------- |
-| POST   | `/_kilo/env/patch` | Hot-patch allowed env vars and signal gateway reload |
+| Method | Path | Description |
+|---|---|---|
+| POST | `/_kilo/env/patch` | Hot-patch allowed env vars and signal gateway reload |
+
+#### Google OAuth (bearer token)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/_kilo/google-oauth/token` | Resolve a brokered Google OAuth access token |
+| POST | `/_kilo/google-oauth/status` | Report broker/legacy Google credential readiness |
 
 #### Pairing (bearer token)
 
-| Method | Path                              | Description                              |
-| ------ | --------------------------------- | ---------------------------------------- |
-| GET    | `/_kilo/pairing/channels`         | Channel pairing state (optional refresh) |
-| GET    | `/_kilo/pairing/devices`          | Device pairing state (optional refresh)  |
-| POST   | `/_kilo/pairing/channels/approve` | Approve a channel pairing request        |
-| POST   | `/_kilo/pairing/devices/approve`  | Approve a device pairing request         |
+| Method | Path | Description |
+|---|---|---|
+| GET | `/_kilo/pairing/channels` | Channel pairing state (optional refresh) |
+| GET | `/_kilo/pairing/devices` | Device pairing state (optional refresh) |
+| POST | `/_kilo/pairing/channels/approve` | Approve a channel pairing request |
+| POST | `/_kilo/pairing/devices/approve` | Approve a device pairing request |
 
 #### Gmail Push (bearer token)
 
-| Method | Path                  | Description                                     |
-| ------ | --------------------- | ----------------------------------------------- |
-| POST   | `/_kilo/gmail-pubsub` | Forward Google Pub/Sub push to gog on port 3002 |
+| Method | Path | Description |
+|---|---|---|
+| POST | `/_kilo/gmail-pubsub` | Forward Google Pub/Sub push to gog watch on port 3002 |
+
+The Gmail push endpoint MUST return 404 when Gmail watch is not
+configured and 503 when the watch supervisor is configured but not
+running. When forwarding, it MUST authenticate to gog with
+`x-gog-token: <gateway token>`.
+
+#### Inbound Hooks (bearer token)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/_kilo/hooks/email` | Forward inbound email payloads to OpenClaw hooks |
+
+#### Files and Profiles (bearer token)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/_kilo/bot-identity` | Write bot identity metadata |
+| POST | `/_kilo/user-profile` | Write user profile metadata |
+| GET | `/_kilo/files/tree` | List immediate safe file-tree children under controller root, or under `?path=<directory>` when `files.tree.path` is advertised |
+| GET | `/_kilo/files/read` | Read a safe file path |
+| POST | `/_kilo/files/import-openclaw-workspace` | Import OpenClaw workspace files |
+| POST | `/_kilo/files/write` | Write a safe file path |
+| POST | `/_kilo/files/write-openclaw-config` | Validate and write `openclaw.json`, with explicit invalid override support |
+
+##### File tree listing
+
+1. `GET /_kilo/files/tree` MUST return only the immediate children of the requested directory; it MUST NOT recursively serialize the full descendant tree in a single response.
+2. Without `?path=...`, the endpoint MUST list immediate children under the controller root.
+3. When the controller advertises `files.tree.path`, clients MAY pass `?path=<directory>` to list immediate children under that safe relative directory.
+4. Requested directory paths MUST use the same safe-path protections as file reads and writes: reject absolute paths, root escapes, symlinks, non-directory paths, and controller-owned internal validation artifacts.
+5. Directory nodes MAY omit `children`; clients MUST treat omitted `children` as not loaded yet, not as proof that the directory is empty.
+
+##### Validation-aware `openclaw.json` file writes
+
+1. `POST /_kilo/files/write-openclaw-config` MUST provide the validation-aware save flow for `openclaw.json`; clients MUST NOT use optional fields on generic `/_kilo/files/write` to infer validation behavior.
+2. For a normal validation-aware save, the controller MUST evaluate the submitted candidate using the installed OpenClaw config-validation behavior before committing it.
+3. When the candidate is invalid or validation cannot complete, the controller MUST leave `openclaw.json` unchanged and MUST return a bounded structured warning result suitable for an authenticated client to display.
+4. The controller MAY accept an explicit invalid-write override after a warning. An override MUST remain subject to normal safe-path and ETag concurrency checks and MUST NOT be inferred from an ordinary save request.
+5. Validation-warning responses MAY return bounded diagnostics derived while validating the authenticated instance's configuration, including substituted values; those diagnostics MUST be returned only to authenticated config-management clients and MUST NOT be logged. Responses and logs MUST NOT expose staging paths or unrestricted subprocess output.
+6. Validation-aware writes MUST remain usable when the gateway process is unavailable after controller routes are registered.
+7. Controllers implementing this behavior MUST advertise `files.write-openclaw-config`; clients MUST NOT infer this behavior solely from controller CalVer.
+8. Controllers implementing this behavior MUST serialize any remaining generic `POST /_kilo/files/write` mutation of `openclaw.json` with validation-aware writes and other controller-owned config mutations so legacy clients cannot interleave config commits.
+9. This validation reports OpenClaw configuration validity. It MUST NOT be represented as proof that runtime SecretRefs or optional environment substitutions resolve successfully.
+
+#### Doctor (bearer token)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/_kilo/doctor/start` | Start an async `openclaw doctor` run |
+| GET | `/_kilo/doctor/status` | Inspect current doctor run status |
+| POST | `/_kilo/doctor/cancel` | Cancel the active doctor run |
+
+#### Kilo CLI Run (bearer token)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/_kilo/cli-run/start` | Start an async Kilo CLI run |
+| GET | `/_kilo/cli-run/status` | Inspect current run status |
+| POST | `/_kilo/cli-run/cancel` | Cancel the active Kilo run |
+
+#### Morning Briefing (bearer token)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/_kilo/morning-briefing/status` | Proxy morning briefing plugin status |
+| POST | `/_kilo/morning-briefing/enable` | Enable the morning briefing schedule |
+| POST | `/_kilo/morning-briefing/disable` | Disable the morning briefing schedule |
+| POST | `/_kilo/morning-briefing/run` | Run briefing generation immediately |
+| POST | `/_kilo/morning-briefing/interests` | Update briefing interest topics |
+| POST | `/_kilo/morning-briefing/user-location` | Update briefing user location |
+| GET | `/_kilo/morning-briefing/read/today` | Read today's briefing markdown |
+| GET | `/_kilo/morning-briefing/read/yesterday` | Read yesterday's briefing markdown |
+
+#### Kilo Chat (bearer token)
+
+Kilo Chat routes are registered only when both `KILOCLAW_SANDBOX_ID` and
+`KILOCHAT_BASE_URL` are set. When registered, the controller MUST relay
+to `${KILOCHAT_BASE_URL}/bot/v1/sandboxes/:sandboxId` using the
+per-sandbox gateway token.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/_kilo/kilo-chat/send` | Send a Kilo Chat message |
+| PATCH | `/_kilo/kilo-chat/messages/:messageId` | Edit a Kilo Chat message |
+| DELETE | `/_kilo/kilo-chat/messages/:messageId` | Delete a Kilo Chat message |
+| POST | `/_kilo/kilo-chat/messages/:messageId/reactions` | Add a message reaction |
+| DELETE | `/_kilo/kilo-chat/messages/:messageId/reactions` | Delete a message reaction |
+| POST | `/_kilo/kilo-chat/typing` | Start typing indicator |
+| POST | `/_kilo/kilo-chat/typing/stop` | Stop typing indicator |
+| GET | `/_kilo/kilo-chat/conversations/:conversationId/messages` | List conversation messages |
+| PATCH | `/_kilo/kilo-chat/conversations/:conversationId` | Rename a conversation |
+| POST | `/_kilo/kilo-chat/bot-status` | Set bot status |
+| POST | `/_kilo/kilo-chat/conversations/:conversationId/conversation-status` | Set conversation status |
+| POST | `/_kilo/kilo-chat/conversations` | Create a conversation |
+| GET | `/_kilo/kilo-chat/conversations` | List conversations |
+| GET | `/_kilo/kilo-chat/conversations/:conversationId/members` | List conversation members |
+| POST | `/_kilo/kilo-chat/conversations/:conversationId/messages/:messageId/delivery-failed` | Report message delivery failure |
+| POST | `/_kilo/kilo-chat/conversations/:conversationId/actions/:groupId/delivery-failed` | Report action delivery failure |
+| POST | `/_kilo/kilo-chat/attachments/init` | Initialize an attachment upload |
+| GET | `/_kilo/kilo-chat/attachments/:attachmentId/url` | Resolve an attachment URL |
 
 #### Catch-All Proxy (proxy token)
 
-| Method | Path | Description                                |
-| ------ | ---- | ------------------------------------------ |
-| ALL    | `*`  | Reverse-proxy to gateway at 127.0.0.1:3001 |
+| Method | Path | Description |
+|---|---|---|
+| ALL | `*` | Reverse-proxy to gateway at 127.0.0.1:3001 |
 
 1. The catch-all MUST be registered last so all `/_kilo/*` routes
    take priority.
@@ -595,13 +902,14 @@ Other values MUST return 400.
    MAY include operational error details in responses since the
    caller has already proven identity via bearer token.
 3. The full error MUST always be logged to stdout.
-4. Best-effort steps (Kilo CLI config, gog credentials, GitHub
-   configuration) MUST log failures but MUST NOT abort startup or
-   enter degraded mode.
+4. Best-effort steps (npm cache cleanup, Kilo CLI config, gog
+   credentials, legacy Google credential migration, gog shim
+   installation, GitHub configuration) MUST log failures but MUST NOT
+   abort startup or enter degraded mode.
 5. Feature flag directory creation failures MUST log a warning and
    skip the corresponding env var setup, matching the documented
    behavior of each flag.
-6. The `writeBaseConfig` function MUST internally set
-   `KILOCLAW_FRESH_INSTALL=true` before calling `generateBaseConfig`
-   so that `tools.profile` is forced to `full` on both fresh
-   installs and config restores.
+6. The first-boot path MUST set `KILOCLAW_FRESH_INSTALL=true` before
+   calling `writeBaseConfig` so `generateBaseConfig` forces
+   `tools.profile=full`; config restore MUST also force
+   `tools.profile=full` before atomically replacing `openclaw.json`.

@@ -23,6 +23,8 @@ import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
 import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { sanitizeUserInput } from './prompt-utils';
+import { formatRepositoryReviewInstructions } from './repository-review-instructions';
+import { stripReviewSummaryFooter } from '../summary/usage-footer';
 
 /**
  * Inline comment info for duplicate detection
@@ -107,6 +109,10 @@ function mergeStyleOverrides<V>(
   return { ...local, ...remote };
 }
 
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+}
+
 /**
  * Merges a remote (PostHog) template with the local template.
  * Remote wins for all base prompt sections and for style override
@@ -189,6 +195,8 @@ export type GenerateReviewPromptOptions = {
   gitlabContext?: GitLabDiffContext;
   /** HEAD SHA from a previous completed review (enables incremental mode) */
   previousHeadSha?: string | null;
+  /** Root REVIEW.md instructions from the base branch, replacing built-in review policy */
+  repositoryReviewInstructions?: string | null;
 };
 
 /**
@@ -211,6 +219,7 @@ export async function generateReviewPrompt(
     platform = 'github',
     gitlabContext,
     previousHeadSha,
+    repositoryReviewInstructions,
   } = options;
   // Load template from PostHog (remote) or local fallback
   const { template, source } = await loadPromptTemplate(platform);
@@ -268,9 +277,10 @@ export async function generateReviewPrompt(
     existingReviewState?.summaryComment
   ) {
     const activeCount = existingReviewState.inlineComments?.filter(c => !c.isOutdated).length ?? 0;
+    const previousSummary = stripReviewSummaryFooter(existingReviewState.summaryComment.body);
     const incrementalWorkflow = template.incrementalReviewWorkflow
       .replace(/{PREVIOUS_SHA}/g, previousHeadSha)
-      .replace(/{PREVIOUS_SUMMARY}/g, existingReviewState.summaryComment.body)
+      .replace(/{PREVIOUS_SUMMARY}/g, previousSummary)
       .replace(/{ACTIVE_COMMENT_COUNT}/g, String(activeCount));
     prompt += replacePlaceholders(incrementalWorkflow) + '\n\n';
     logExceptInTest('[generateReviewPrompt] Using incremental workflow', {
@@ -292,7 +302,10 @@ export async function generateReviewPrompt(
   }
 
   // 6. What to review
-  prompt += template.whatToReview + '\n\n';
+  prompt +=
+    (repositoryReviewInstructions
+      ? formatRepositoryReviewInstructions(repositoryReviewInstructions)
+      : template.whatToReview) + '\n\n';
 
   // 7. Focus areas (if any selected)
   if (config.focus_areas.length > 0) {
@@ -326,7 +339,7 @@ export async function generateReviewPrompt(
     prompt += '| File | Line | Issue |\n|------|------|-------|\n';
 
     for (const c of active.slice(0, 20)) {
-      const firstLine = c.body.split('\n')[0].substring(0, 60).replace(/\|/g, '\\|');
+      const firstLine = escapeMarkdownTableCell(c.body.split('\n')[0].substring(0, 60));
       prompt += `| \`${c.path}\` | ${c.line ?? 'N/A'} | ${firstLine} |\n`;
     }
 

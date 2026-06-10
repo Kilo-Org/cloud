@@ -82,6 +82,21 @@ export type ProfileAgentResponse = {
   updatedAt: string;
 };
 
+/** Profile kilo command response type. */
+export type ProfileKiloCommandResponse = {
+  id: string;
+  name: string;
+  description: string | null;
+  template: string;
+  agent: string | null;
+  model: string | null;
+  subtask: boolean;
+  enabled: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** Profile response type for list/get operations. */
 export type ProfileResponse = {
   id: string;
@@ -95,6 +110,7 @@ export type ProfileResponse = {
   mcpServers: ProfileMcpServerResponse[];
   skills: ProfileSkillResponse[];
   agents: ProfileAgentResponse[];
+  kiloCommands: ProfileKiloCommandResponse[];
 };
 
 /** Profile response with owner type for combined listings. */
@@ -115,6 +131,7 @@ export type ProfileSummary = {
   mcpServerCount: number;
   skillCount: number;
   agentCount: number;
+  kiloCommandCount: number;
 };
 
 /** Profile summary with owner type for combined listings. */

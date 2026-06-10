@@ -1,16 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as DbModule from '@kilocode/db';
 
-const { mockGetWorkerDb, mockGetMissingSnowflakeConfig, mockQueryKiloclawActiveUserIds } =
-  vi.hoisted(() => ({
-    mockGetWorkerDb: vi.fn(),
-    mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
-    mockQueryKiloclawActiveUserIds: vi.fn(),
-  }));
+const {
+  mockFindLatestPreCutoffUserCommitSwitchQualification,
+  mockGetWorkerDb,
+  mockGetMissingSnowflakeConfig,
+  mockQueryKiloclawActiveUserIds,
+} = vi.hoisted(() => ({
+  mockFindLatestPreCutoffUserCommitSwitchQualification: vi.fn<
+    () => Promise<DbModule.KiloClawCommitSwitchQualification | null>
+  >(async () => null),
+  mockGetWorkerDb: vi.fn(),
+  mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
+  mockQueryKiloclawActiveUserIds: vi.fn(),
+}));
 
 vi.mock('@kilocode/db', async importOriginal => {
   const actual: Record<string, unknown> = await importOriginal();
   return {
     ...actual,
+    findLatestPreCutoffUserCommitSwitchQualification:
+      mockFindLatestPreCutoffUserCommitSwitchQualification,
     getWorkerDb: mockGetWorkerDb,
   };
 });
@@ -20,10 +30,45 @@ vi.mock('./snowflake.js', () => ({
   queryKiloclawActiveUserIds: mockQueryKiloclawActiveUserIds,
 }));
 
-import { processTrialInactivityStopCandidate, runSweep } from './lifecycle.js';
+import {
+  buildOrganizationKiloClawLifecycleNotification,
+  decideCommitRetirementCreditRenewal,
+  processCreditRenewalDiscovery,
+  processCreditRenewalItem,
+  processOrganizationTrialExpiryPage,
+  processTrialExpiryPage,
+  processTrialInactivityStopCandidate,
+  recordCreditRenewalTerminalFailure,
+  runCommitRetirementGuardSweep,
+  runCreditRenewalSweep,
+  runSweep,
+  selectOrganizationKiloClawLifecycleRecipients,
+} from './lifecycle.js';
 import type { BillingWorkerEnv } from './types.js';
 
 let loggedValues: unknown[] = [];
+
+function destroyResponse(overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    finalized: true,
+    destroyedUserId: 'user-1',
+    destroyedSandboxId: 'ki_11111111111141118111111111111111',
+    pendingMachineId: null,
+    pendingVolumeId: null,
+    lastDestroyErrorOp: null,
+    lastDestroyErrorStatus: null,
+    lastDestroyErrorAt: null,
+    ...overrides,
+  };
+}
+
+function findLogRecord(message: string): Record<string, unknown> | undefined {
+  return loggedValues.find(
+    (value: unknown) =>
+      typeof value === 'object' && value !== null && 'message' in value && value.message === message
+  ) as Record<string, unknown> | undefined;
+}
 
 type SelectBuilder = {
   from: ReturnType<typeof vi.fn>;
@@ -40,8 +85,10 @@ function createMockDb(
   options?: {
     insertRowCounts?: number[];
     txInsertRowCounts?: number[];
+    insertReturningRows?: unknown[][];
     updateReturningRows?: unknown[][];
     txUpdateReturningRows?: unknown[][];
+    txFallbackFromDbSelect?: boolean;
   }
 ) {
   const updates: Array<Record<string, unknown>> = [];
@@ -50,12 +97,29 @@ function createMockDb(
   const txDeletes: unknown[] = [];
   const inserts: Array<Record<string, unknown>> = [];
   const txInserts: Array<Record<string, unknown>> = [];
+  const txExecutes: unknown[] = [];
   const selectBuilders: SelectBuilder[] = [];
   const insertRowCounts = [...(options?.insertRowCounts ?? [])];
   const txInsertRowCounts = [...(options?.txInsertRowCounts ?? [])];
+  const insertReturningRows = [...(options?.insertReturningRows ?? [])];
   const updateReturningRows = [...(options?.updateReturningRows ?? [])];
   const txUpdateReturningRows = [...(options?.txUpdateReturningRows ?? [])];
-  const nextSelectRows = () => selectResults.shift() ?? [];
+  let lastSelectRows: unknown[] = [];
+  let txFallbackSelectRows: unknown[][] = [];
+  const nextSelectRows = (source: 'db' | 'tx') => {
+    if (source === 'tx' && txFallbackSelectRows.length > 0) {
+      lastSelectRows = txFallbackSelectRows.shift() ?? [];
+      return lastSelectRows;
+    }
+    if (selectResults.length === 0) {
+      return lastSelectRows;
+    }
+    lastSelectRows = selectResults.shift() ?? [];
+    if (options?.txFallbackFromDbSelect && source === 'db' && lastSelectRows.length > 0) {
+      txFallbackSelectRows = lastSelectRows.flatMap(row => [[row], [row]]);
+    }
+    return lastSelectRows;
+  };
   const createWhereResult = (returningRows: unknown[]) => {
     const promise = Promise.resolve(undefined);
     return {
@@ -63,8 +127,8 @@ function createMockDb(
       then: promise.then.bind(promise),
     };
   };
-  const createSelectBuilder = (): SelectBuilder => {
-    const rows = nextSelectRows();
+  const createSelectBuilder = (source: 'db' | 'tx'): SelectBuilder => {
+    const rows = nextSelectRows(source);
     const promise = Promise.resolve(rows);
     const builder: SelectBuilder = {
       from: vi.fn(() => builder),
@@ -78,7 +142,7 @@ function createMockDb(
     selectBuilders.push(builder);
     return builder;
   };
-  const select = vi.fn(() => createSelectBuilder());
+  const select = vi.fn(() => createSelectBuilder('db'));
   const update = vi.fn(() => ({
     set: vi.fn((values: Record<string, unknown>) => {
       updates.push(values);
@@ -93,6 +157,9 @@ function createMockDb(
       inserts.push(values);
       return {
         onConflictDoNothing: vi.fn(async () => ({ rowCount: insertRowCounts.shift() ?? 1 })),
+        onConflictDoUpdate: vi.fn(() => ({
+          returning: vi.fn(async () => insertReturningRows.shift() ?? [{}]),
+        })),
       };
     }),
   }));
@@ -106,6 +173,7 @@ function createMockDb(
     async (
       callback: (tx: {
         delete: ReturnType<typeof vi.fn>;
+        execute: ReturnType<typeof vi.fn>;
         insert: ReturnType<typeof vi.fn>;
         select: ReturnType<typeof vi.fn>;
         update: ReturnType<typeof vi.fn>;
@@ -118,6 +186,10 @@ function createMockDb(
             return undefined;
           }),
         })),
+        execute: vi.fn(async statement => {
+          txExecutes.push(statement);
+          return undefined;
+        }),
         insert: vi.fn(() => ({
           values: vi.fn((values: Record<string, unknown>) => {
             txInserts.push(values);
@@ -128,7 +200,7 @@ function createMockDb(
             };
           }),
         })),
-        select: vi.fn(() => createSelectBuilder()),
+        select: vi.fn(() => createSelectBuilder('tx')),
         update: vi.fn(() => ({
           set: vi.fn((values: Record<string, unknown>) => {
             txUpdates.push(values);
@@ -155,6 +227,7 @@ function createMockDb(
     txDeletes,
     inserts,
     txInserts,
+    txExecutes,
     selectBuilders,
   };
 }
@@ -163,17 +236,204 @@ function createEnv(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): BillingWor
   return createEnvWithQueueMocks(fetchImpl).env;
 }
 
+function creditRenewalItemMessage(params: {
+  renewalBoundary: string;
+  runId?: string;
+  subscriptionId?: string;
+  userId?: string;
+}) {
+  return {
+    kind: 'credit_renewal_item' as const,
+    runId: params.runId ?? '45454545-4545-4545-8545-454545454545',
+    sweep: 'credit_renewal_item' as const,
+    subscriptionId: params.subscriptionId ?? 'sub-1',
+    userId: params.userId ?? 'user-1',
+    renewalBoundary: params.renewalBoundary,
+  };
+}
+
+function createTestBillingSummary() {
+  return {
+    credit_renewals: 0,
+    credit_renewals_canceled: 0,
+    credit_renewals_past_due: 0,
+    credit_renewals_auto_top_up: 0,
+    credit_renewals_skipped_duplicate: 0,
+    commit_retirement_guard_candidates: 0,
+    commit_retirement_guard_requests: 0,
+    interrupted_auto_resume_requests: 0,
+    trial_inactivity_candidates: 0,
+    trial_inactivity_batches: 0,
+    trial_inactivity_batch_fallbacks: 0,
+    trial_inactivity_stop_messages_enqueued: 0,
+    trial_inactivity_stops: 0,
+    trial_inactivity_dry_run_candidates: 0,
+    trial_warnings: 0,
+    earlybird_warnings: 0,
+    sweep1_trial_expiry: 0,
+    organization_trial_expiry_suspensions: 0,
+    organization_trial_entitlement_recoveries: 0,
+    sweep2_subscription_expiry: 0,
+    destruction_warnings: 0,
+    organization_destruction_warnings: 0,
+    sweep3_instance_destruction: 0,
+    organization_instance_destructions: 0,
+    sweep4_past_due_cleanup: 0,
+    sweep5_intro_schedules_repaired: 0,
+    complementary_inference_ended_emails: 0,
+    emails_sent: 0,
+    emails_skipped: 0,
+    errors: 0,
+  };
+}
+
+async function runCreditRenewalSweepForTest(
+  database: unknown,
+  env: BillingWorkerEnv,
+  runId: string
+) {
+  const summary = createTestBillingSummary();
+  await runCreditRenewalSweep(
+    database as never,
+    env,
+    {
+      billingFlow: 'kiloclaw_billing',
+      billingRunId: runId,
+      billingSweep: 'credit_renewal',
+      billingAttempt: 1,
+    } as never,
+    summary
+  );
+  return summary;
+}
+
+function creditRenewalRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    user_id: 'user-1',
+    email: 'user@example.com',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    instance_row_id: '22222222-2222-4222-8222-222222222222',
+    organization_id: null,
+    instance_destroyed_at: null,
+    plan: 'standard',
+    status: 'active',
+    kiloclaw_price_version: '2026-03-19',
+    credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    current_period_start: '2026-05-01T00:00:00.000Z',
+    current_period_end: '2026-06-01T00:00:00.000Z',
+    cancel_at_period_end: false,
+    scheduled_plan: null,
+    scheduled_by: null,
+    commit_ends_at: null,
+    past_due_since: null,
+    suspended_at: null,
+    auto_resume_attempt_count: 0,
+    auto_top_up_triggered_for_period: null,
+    total_microdollars_acquired: 20_000_000,
+    microdollars_used: 0,
+    auto_top_up_enabled: false,
+    kilo_pass_threshold: 1_000_000_000,
+    next_credit_expiration_at: null,
+    user_updated_at: '2026-05-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function trialExpiryRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    user_id: 'user-1',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    sandbox_id: 'ki_22222222222242228222222222222222',
+    instance_destroyed_at: null,
+    organization_id: null,
+    email: 'user-1@example.com',
+    trial_ends_at: '2026-04-17T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function organizationTrialExpiryRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    user_id: 'user-1',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    sandbox_id: 'ki_22222222222242228222222222222222',
+    instance_destroyed_at: null,
+    instance_name: 'Research Claw',
+    plan: 'standard',
+    organization_id: '33333333-3333-4333-8333-333333333333',
+    organization_name: 'Acme Corp',
+    organization_created_at: '2026-04-01T00:00:00.000Z',
+    organization_free_trial_end_at: '2026-04-15T00:00:00.000Z',
+    organization_require_seats: true,
+    organization_settings: {},
+    latest_seat_purchase_status: null,
+    hard_expiry_boundary: '2026-04-18T00:00:00.000Z',
+    email: 'user-1@example.com',
+    ...overrides,
+  };
+}
+
+function organizationDestructionWarningRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '44444444-4444-4444-8444-444444444444',
+    user_id: 'user-1',
+    email: 'user-1@example.com',
+    destruction_deadline: '2099-04-15T10:00:00.000Z',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    instance_name: 'Research Claw',
+    instance_destroyed_at: null,
+    organization_id: '33333333-3333-4333-8333-333333333333',
+    organization_name: 'Acme Corp',
+    organization_created_at: '2026-04-01T00:00:00.000Z',
+    organization_free_trial_end_at: '2026-04-15T00:00:00.000Z',
+    organization_require_seats: true,
+    organization_settings: {},
+    latest_seat_purchase_status: null,
+    plan: 'standard',
+    credit_renewal_at: null,
+    ...overrides,
+  };
+}
+
+function organizationDestructionCandidateRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '55555555-5555-4555-8555-555555555555',
+    user_id: 'user-1',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    sandbox_id: 'ki_22222222222242228222222222222222',
+    instance_name: 'Research Claw',
+    instance_destroyed_at: null,
+    organization_id: '33333333-3333-4333-8333-333333333333',
+    organization_name: 'Acme Corp',
+    organization_created_at: '2026-04-01T00:00:00.000Z',
+    organization_free_trial_end_at: '2026-04-15T00:00:00.000Z',
+    organization_require_seats: true,
+    organization_settings: {},
+    latest_seat_purchase_status: null,
+    plan: 'standard',
+    status: 'canceled',
+    email: 'user-1@example.com',
+    credit_renewal_at: null,
+    ...overrides,
+  };
+}
+
 function createEnvWithQueueMocks(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): {
   env: BillingWorkerEnv;
+  lifecycleSend: ReturnType<typeof vi.fn>;
   trialInactivitySendBatch: ReturnType<typeof vi.fn>;
 } {
+  const lifecycleSend = vi.fn();
   const trialInactivitySendBatch = vi.fn();
 
   return {
     env: {
       HYPERDRIVE: { connectionString: 'postgres://test' },
       LIFECYCLE_QUEUE: {
-        send: vi.fn(),
+        send: lifecycleSend,
       } as never,
       TRIAL_INACTIVITY_QUEUE: {
         send: vi.fn(),
@@ -183,11 +443,12 @@ function createEnvWithQueueMocks(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch'
         fetch: fetchImpl,
       },
       KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
-      STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
-      STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
-      STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
-      INTERNAL_API_SECRET: 'next-internal-api-secret',
-      KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+      STRIPE_KILOCLAW_2026_03_19_STANDARD_INTRO_PRICE_ID: 'price_legacy_standard_intro',
+      STRIPE_KILOCLAW_2026_03_19_STANDARD_PRICE_ID: 'price_legacy_standard',
+      STRIPE_KILOCLAW_2026_03_19_COMMIT_PRICE_ID: 'price_legacy_commit',
+      STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID: 'price_current_standard',
+      STRIPE_KILOCLAW_2026_05_10_COMMIT_PRICE_ID: 'price_current_commit',
+      INTERNAL_API_SECRET: 'internal-api-secret',
       TRIAL_INACTIVITY_STOP_ENABLED: 'true',
       TRIAL_INACTIVITY_STOP_DRY_RUN: 'false',
       SNOWFLAKE_ACCOUNT_HOST: 'fyc17898.us-east-1',
@@ -200,9 +461,1277 @@ function createEnvWithQueueMocks(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch'
       SNOWFLAKE_PRIVATE_KEY_PEM: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----',
       SNOWFLAKE_PUBLIC_KEY_FINGERPRINT: 'SHA256:test',
     },
+    lifecycleSend,
     trialInactivitySendBatch,
   };
 }
+
+describe('Commit retirement credit renewal decisions', () => {
+  it('cancels final Commit boundary without requiring cancel-at-period-end', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-06T00:00:00.000Z',
+          current_period_end: '2026-06-06T00:00:00.000Z',
+          commit_ends_at: '2026-06-06T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'cancel_final_commit' });
+  });
+
+  it('continues explicitly opted-in final Commit as Standard', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          scheduled_plan: 'standard',
+          scheduled_by: 'user',
+          credit_renewal_at: '2026-06-01T00:00:00.000Z',
+          commit_ends_at: '2026-06-01T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'continue_standard' });
+  });
+
+  it('fails closed when Standard continuation renewal boundary mismatches final boundary', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          scheduled_plan: 'standard',
+          scheduled_by: 'user',
+          credit_renewal_at: '2026-06-01T00:00:00.001Z',
+          commit_ends_at: '2026-06-01T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'ambiguous' });
+  });
+
+  it('honors canonical pending Standard-to-Commit switch qualification once', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'standard',
+          scheduled_plan: 'commit',
+          credit_renewal_at: '2026-07-01T00:00:00.000Z',
+        }) as never,
+        true
+      )
+    ).toEqual({
+      kind: 'allow_final_commit',
+      qualificationSource: 'switch_requested_before_cutoff',
+    });
+  });
+
+  it('fails closed for every unqualified scheduled Commit switch', () => {
+    for (const creditRenewalAt of ['2026-06-05T23:59:59.999Z', '2026-07-01T00:00:00.000Z']) {
+      expect(
+        decideCommitRetirementCreditRenewal(
+          creditRenewalRow({
+            plan: 'standard',
+            scheduled_plan: 'commit',
+            credit_renewal_at: creditRenewalAt,
+          }) as never
+        )
+      ).toEqual({ kind: 'ambiguous' });
+    }
+  });
+
+  it('does not authorize pre-cutoff recovery after a final term is already proven', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-05T23:59:59.999Z',
+          commit_ends_at: '2026-12-05T23:59:59.999Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'ambiguous' });
+  });
+
+  it('authorizes pre-cutoff recovery only when no exhaustion state exists', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-05T23:59:59.999Z',
+        }) as never
+      )
+    ).toEqual({
+      kind: 'allow_final_commit',
+      qualificationSource: 'renewal_due_before_cutoff',
+    });
+  });
+
+  it('fails closed instead of canceling before a proven final boundary', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-06T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'ambiguous' });
+  });
+
+  it('does not authorize a qualified pending switch after final-term exhaustion', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'standard',
+          scheduled_plan: 'commit',
+          credit_renewal_at: '2026-07-01T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'ambiguous' });
+  });
+});
+
+describe('Commit retirement guard discovery', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-06T00:00:00.000Z'));
+  });
+
+  it('delegates active Stripe-backed Commit rows with lazy final boundary to web verification', async () => {
+    const candidate = {
+      id: '11111111-1111-4111-8111-111111111111',
+      user_id: 'user-1',
+      instance_id: '22222222-2222-4222-8222-222222222222',
+      final_boundary: '2026-07-01 00:00:00+00',
+    };
+    const { db } = createMockDb([[candidate]]);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+    const timeoutSignal = new AbortController().signal;
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutSignal);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ guarded: true }));
+    const summary = createTestBillingSummary();
+
+    await runCommitRetirementGuardSweep(
+      db as never,
+      env,
+      {
+        billingFlow: 'kiloclaw_billing',
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'commit_retirement_guard',
+        billingAttempt: 1,
+      } as never,
+      summary
+    );
+
+    expect(summary.commit_retirement_guard_candidates).toBe(1);
+    expect(summary.commit_retirement_guard_requests).toBe(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://app.kilo.ai/api/internal/kiloclaw/billing-side-effects',
+      expect.objectContaining({
+        body: JSON.stringify({
+          action: 'commit_retirement_guard',
+          input: {
+            subscriptionId: candidate.id,
+            expectedFinalBoundary: '2026-07-01T00:00:00.000Z',
+          },
+        }),
+        signal: timeoutSignal,
+      })
+    );
+    expect(timeoutSpy).toHaveBeenCalledWith(30_000);
+  });
+
+  it('processes one bounded guard page and emits stable continuation', async () => {
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
+    const candidates = Array.from({ length: 4 }, (_, index) => ({
+      id: `${String(index).padStart(8, '0')}-1111-4111-8111-111111111111`,
+      user_id: `user-${index}`,
+      instance_id: null,
+      final_boundary: '2026-07-01T00:00:00.000Z',
+    }));
+    const { db, selectBuilders } = createMockDb([[...candidates]]);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ guarded: true }));
+    const summary = createTestBillingSummary();
+
+    const result = await runCommitRetirementGuardSweep(
+      db as never,
+      env,
+      {
+        billingFlow: 'kiloclaw_billing',
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'commit_retirement_guard',
+        billingAttempt: 1,
+      } as never,
+      summary,
+      {
+        kind: 'commit_retirement_guard_page',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'commit_retirement_guard',
+        cutoffTime: '2026-06-06T00:00:00.000Z',
+        pageBudget: 3,
+      }
+    );
+
+    expect(selectBuilders[0]?.orderBy).toHaveBeenCalled();
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(4);
+    expect(summary.commit_retirement_guard_candidates).toBe(3);
+    expect(summary.commit_retirement_guard_requests).toBe(3);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'commit_retirement_guard_continuation',
+      runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      sweep: 'commit_retirement_guard',
+      cutoffTime: '2026-06-06T00:00:00.000Z',
+      cursorSubscriptionId: candidates[2]?.id,
+      cursorFinalBoundary: '2026-07-01T00:00:00.000Z',
+      pageBudget: 3,
+      wallClockBudgetMs: undefined,
+    });
+    expect(findLogRecord('Processed bounded Commit retirement guard batch')).toMatchObject({
+      batchSize: 3,
+      fetchedCount: 4,
+      guardBacklogLikely: true,
+      batchLimit: 3,
+      concurrency: 3,
+      continuationEnqueued: true,
+    });
+  });
+
+  it('advances cursor past failed guard candidates so later rows are not starved', async () => {
+    const candidates = Array.from({ length: 3 }, (_, index) => ({
+      id: `${String(index).padStart(8, '0')}-1111-4111-8111-111111111111`,
+      user_id: `user-${index}`,
+      instance_id: null,
+      final_boundary: '2026-07-01T00:00:00.000Z',
+    }));
+    const { db } = createMockDb([[...candidates]]);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+    vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('persistent provider failure'))
+      .mockResolvedValue(Response.json({ guarded: true }));
+    const summary = createTestBillingSummary();
+
+    const result = await runCommitRetirementGuardSweep(
+      db as never,
+      env,
+      {
+        billingFlow: 'kiloclaw_billing',
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'commit_retirement_guard',
+        billingAttempt: 1,
+      } as never,
+      summary,
+      {
+        kind: 'commit_retirement_guard_page',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'commit_retirement_guard',
+        cutoffTime: '2026-06-06T00:00:00.000Z',
+        pageBudget: 2,
+      }
+    );
+
+    expect(summary.errors).toBe(1);
+    expect(summary.commit_retirement_guard_requests).toBe(1);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'commit_retirement_guard_continuation',
+        cursorSubscriptionId: candidates[1]?.id,
+      })
+    );
+  });
+});
+
+describe('credit renewal fanout queue processing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('starts bounded discovery fanout instead of loading renewal candidates inline', async () => {
+    const { db } = createMockDb([[creditRenewalRow()]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    await runSweep(
+      env,
+      {
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal',
+      },
+      1
+    );
+
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'credit_renewal_discovery',
+      runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      sweep: 'credit_renewal_discovery',
+    });
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('does not enqueue item or continuation messages when discovery finds no work', async () => {
+    const { db } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    const summary = await processCreditRenewalDiscovery(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_discovery',
+      },
+      1
+    );
+
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(summary.errors).toBe(0);
+  });
+
+  it('emits bounded per-boundary item messages with user and diagnostic fields', async () => {
+    const row = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      user_id: 'user-1',
+      instance_id: '22222222-2222-4222-8222-222222222222',
+      plan: 'standard',
+      status: 'past_due',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    await processCreditRenewalDiscovery(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_discovery',
+        cutoffTime: '2026-06-02T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'credit_renewal_item',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        userId: 'user-1',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+        diagnostics: {
+          instanceId: '22222222-2222-4222-8222-222222222222',
+          plan: 'standard',
+          status: 'past_due',
+        },
+      })
+    );
+    const itemMessage = lifecycleSend.mock.calls[0]?.[0] as
+      | Parameters<BillingWorkerEnv['LIFECYCLE_QUEUE']['send']>[0]
+      | undefined;
+    expect(itemMessage?.kind).toBe('credit_renewal_item');
+    expect(
+      itemMessage && itemMessage.kind === 'credit_renewal_item'
+        ? typeof itemMessage.discoveredAt
+        : undefined
+    ).toBe('string');
+  });
+
+  it('emits item queue age diagnostics for fanout messages', async () => {
+    const row = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    await processCreditRenewalDiscovery(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_discovery',
+        cutoffTime: '2026-06-02T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'credit_renewal_item',
+      })
+    );
+
+    const itemMessage = lifecycleSend.mock.calls[0]?.[0] as
+      | Parameters<BillingWorkerEnv['LIFECYCLE_QUEUE']['send']>[0]
+      | undefined;
+    if (!itemMessage || itemMessage.kind !== 'credit_renewal_item') {
+      throw new Error('Expected credit renewal item message');
+    }
+    const { db: itemDb } = createMockDb([[row], [row]], { insertRowCounts: [1] });
+    mockGetWorkerDb.mockReturnValue(itemDb);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+
+    await processCreditRenewalItem(
+      env,
+      {
+        ...itemMessage,
+        discoveredAt: '2020-01-01T00:00:00.000Z',
+      },
+      2
+    );
+
+    expect(typeof findLogRecord('Processed credit-renewal item')?.itemQueueAgeMs).toBe('number');
+  });
+
+  it('emits one item per due subscription when one user has multiple subscriptions', async () => {
+    const first = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      user_id: 'user-1',
+      instance_id: '22222222-2222-4222-8222-222222222222',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const second = creditRenewalRow({
+      id: '33333333-3333-4333-8333-333333333333',
+      user_id: 'user-1',
+      instance_id: '44444444-4444-4444-8444-444444444444',
+      credit_renewal_at: '2026-06-02T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[first, second]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    await processCreditRenewalDiscovery(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_discovery',
+        cutoffTime: '2026-06-03T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(lifecycleSend).toHaveBeenCalledTimes(2);
+    expect(lifecycleSend).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        userId: 'user-1',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      })
+    );
+    expect(lifecycleSend).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        subscriptionId: '33333333-3333-4333-8333-333333333333',
+        userId: 'user-1',
+        renewalBoundary: '2026-06-02T00:00:00.000Z',
+      })
+    );
+  });
+
+  it('allows duplicate discovery to enqueue the same subscription boundary again', async () => {
+    const row = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[row], [row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+    const message = {
+      kind: 'credit_renewal_discovery' as const,
+      runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      sweep: 'credit_renewal_discovery' as const,
+      cutoffTime: '2026-06-02T00:00:00.000Z',
+    };
+
+    await processCreditRenewalDiscovery(env, message, 1);
+    await processCreditRenewalDiscovery(env, message, 2);
+
+    expect(lifecycleSend).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        kind: 'credit_renewal_item',
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      })
+    );
+    expect(lifecycleSend).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        kind: 'credit_renewal_item',
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      })
+    );
+  });
+
+  it('enqueues a continuation message after reaching the discovery page budget', async () => {
+    const first = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const second = creditRenewalRow({
+      id: '33333333-3333-4333-8333-333333333333',
+      credit_renewal_at: '2026-06-02T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[first, second]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    await processCreditRenewalDiscovery(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_discovery',
+        cutoffTime: '2026-06-03T00:00:00.000Z',
+        pageBudget: 1,
+      },
+      1
+    );
+
+    expect(lifecycleSend).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        kind: 'credit_renewal_item',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        userId: 'user-1',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+        diagnostics: {
+          instanceId: '22222222-2222-4222-8222-222222222222',
+          plan: 'standard',
+          status: 'active',
+        },
+      })
+    );
+    expect(lifecycleSend).toHaveBeenNthCalledWith(2, {
+      kind: 'credit_renewal_discovery_continuation',
+      runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      sweep: 'credit_renewal_discovery',
+      cutoffTime: '2026-06-03T00:00:00.000Z',
+      cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+      cursorRenewalBoundary: '2026-06-01T00:00:00.000Z',
+      pageBudget: 1,
+      wallClockBudgetMs: undefined,
+    });
+  });
+
+  it('normalizes Postgres credit-renewal timestamps before queue fanout', async () => {
+    const first = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      credit_renewal_at: '2026-04-29 01:16:12.945+00',
+    });
+    const second = creditRenewalRow({
+      id: '33333333-3333-4333-8333-333333333333',
+      credit_renewal_at: '2026-04-30 01:16:12.945+00',
+    });
+    const { db } = createMockDb([[first, second]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    await processCreditRenewalDiscovery(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_discovery',
+        cutoffTime: '2026-05-01T00:00:00.000Z',
+        pageBudget: 1,
+      },
+      1
+    );
+
+    expect(lifecycleSend).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        kind: 'credit_renewal_item',
+        renewalBoundary: '2026-04-29T01:16:12.945Z',
+      })
+    );
+    expect(lifecycleSend).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        kind: 'credit_renewal_discovery_continuation',
+        cursorRenewalBoundary: '2026-04-29T01:16:12.945Z',
+      })
+    );
+  });
+
+  it('logs discovery cursor, page, and backlog diagnostics without user PII', async () => {
+    const first = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      email: 'private-user@example.com',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const second = creditRenewalRow({
+      id: '33333333-3333-4333-8333-333333333333',
+      email: 'second-user@example.com',
+      credit_renewal_at: '2026-06-02T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[first, second]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+
+    await processCreditRenewalDiscovery(
+      env,
+      {
+        kind: 'credit_renewal_discovery_continuation',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_discovery',
+        cutoffTime: '2026-06-03T00:00:00.000Z',
+        cursorSubscriptionId: '00000000-0000-4000-8000-000000000000',
+        cursorRenewalBoundary: '2026-05-01T00:00:00.000Z',
+        pageBudget: 1,
+      },
+      2
+    );
+
+    const discoveryLog = findLogRecord('Processed credit-renewal discovery');
+    expect(discoveryLog).toMatchObject({
+      event: 'credit_renewal_discovery',
+      outcome: 'completed',
+      cutoffTime: '2026-06-03T00:00:00.000Z',
+      cursorSubscriptionId: '00000000-0000-4000-8000-000000000000',
+      cursorRenewalBoundary: '2026-05-01T00:00:00.000Z',
+      pageBudget: 1,
+      fetchedCount: 2,
+      enqueuedCount: 1,
+      discoveryBacklogLikely: true,
+      continuationEnqueued: true,
+      nextCursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+      nextCursorRenewalBoundary: '2026-06-01T00:00:00.000Z',
+    });
+    expect(discoveryLog?.tags).toEqual(
+      expect.objectContaining({
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'credit_renewal_discovery',
+        billingAttempt: 2,
+      })
+    );
+    expect(JSON.stringify(loggedValues)).not.toContain('private-user@example.com');
+    expect(JSON.stringify(loggedValues)).not.toContain('second-user@example.com');
+  });
+
+  it('does not enqueue a continuation after wall-clock budget when no additional page exists', async () => {
+    const first = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const second = creditRenewalRow({
+      id: '33333333-3333-4333-8333-333333333333',
+      credit_renewal_at: '2026-06-02T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[first, second]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+    vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(2);
+
+    await processCreditRenewalDiscovery(
+      env,
+      {
+        kind: 'credit_renewal_discovery',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'credit_renewal_discovery',
+        wallClockBudgetMs: 1,
+      },
+      1
+    );
+
+    expect(lifecycleSend).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'credit_renewal_item',
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      })
+    );
+  });
+
+  it('arms pure-credit final-term cancellation with retirement guard marker', async () => {
+    const row = creditRenewalRow({
+      plan: 'commit',
+      credit_renewal_at: '2026-06-06T00:00:00.000Z',
+      current_period_end: '2026-06-06T00:00:00.000Z',
+      commit_ends_at: '2026-06-06T00:00:00.000Z',
+    });
+    const { db, txUpdates } = createMockDb([[row], [row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await processCreditRenewalItem(
+      createEnvWithQueueMocks(vi.fn()).env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: row.id,
+        userId: row.user_id,
+        renewalBoundary: '2026-06-06T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals_canceled).toBe(1);
+    expect(txUpdates).toContainEqual(
+      expect.objectContaining({
+        status: 'canceled',
+        cancel_at_period_end: false,
+      })
+    );
+  });
+
+  it('skips stale, transferred, or hybrid item messages once no current pure-credit boundary matches', async () => {
+    const { db, txInserts, txUpdates, updates } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+
+    const summary = await processCreditRenewalItem(
+      env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_past_due).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(txInserts).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+    expect(updates).toHaveLength(0);
+  });
+
+  it('skips soft-deleted users during credit-renewal item processing', async () => {
+    const row = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      email: 'deleted-user@deleted.invalid',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const { db, txInserts, txUpdates, updates } = createMockDb([[row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+
+    const summary = await processCreditRenewalItem(
+      env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_past_due).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(txInserts).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+    expect(updates).toHaveLength(0);
+  });
+
+  it('logs item outcome diagnostics without user PII', async () => {
+    const row = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      email: 'private-user@example.com',
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[row], [row]], { insertRowCounts: [1] });
+    mockGetWorkerDb.mockReturnValue(db);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+
+    const summary = await processCreditRenewalItem(
+      createEnvWithQueueMocks(vi.fn()).env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: '11111111-1111-4111-8111-111111111111',
+        userId: 'user-1',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+        diagnostics: {
+          instanceId: '22222222-2222-4222-8222-222222222222',
+          plan: 'standard',
+          status: 'active',
+        },
+      },
+      2
+    );
+
+    expect(summary.credit_renewals_past_due).toBe(1);
+    const itemLog = findLogRecord('Processed credit-renewal item');
+    expect(itemLog).toMatchObject({
+      event: 'credit_renewal_item',
+      outcome: 'completed',
+      itemOutcome: 'past_due',
+      terminalFailureStatus: 'none',
+      subscriptionId: '11111111-1111-4111-8111-111111111111',
+      userId: 'user-1',
+      instanceId: '22222222-2222-4222-8222-222222222222',
+      renewalBoundary: '2026-06-01T00:00:00.000Z',
+      plan: 'standard',
+      status: 'active',
+    });
+    expect(itemLog?.tags).toEqual(
+      expect.objectContaining({
+        billingRunId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        billingSweep: 'credit_renewal_item',
+        billingAttempt: 2,
+      })
+    );
+    expect(JSON.stringify(loggedValues)).not.toContain('private-user@example.com');
+  });
+
+  it('logs terminal-failure count and oldest unresolved failure diagnostics', async () => {
+    const terminalFailure = {
+      id: 'failure-1',
+      subscription_id: '11111111-1111-4111-8111-111111111111',
+      renewal_boundary: '2026-06-01T00:00:00.000Z',
+      status: 'unresolved',
+      attempt_count: 3,
+      first_failure_at: '2026-06-01T00:05:00.000Z',
+      last_failure_at: '2026-06-01T00:07:00.000Z',
+      last_failure_code: 'queue_delivery_exhausted',
+      last_failure_message: 'database unavailable',
+    };
+    const oldestFailure = {
+      ...terminalFailure,
+      subscription_id: '22222222-2222-4222-8222-222222222222',
+      renewal_boundary: '2026-05-01T00:00:00.000Z',
+      first_failure_at: '2026-05-01T00:05:00.000Z',
+    };
+    const { db } = createMockDb([[{ count: 2 }], [oldestFailure]], {
+      insertReturningRows: [[terminalFailure]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await recordCreditRenewalTerminalFailure(createEnvWithQueueMocks(vi.fn()).env, {
+      kind: 'credit_renewal_terminal_failure',
+      runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      sweep: 'credit_renewal_terminal_failure',
+      subscriptionId: '11111111-1111-4111-8111-111111111111',
+      renewalBoundary: '2026-06-01T00:00:00.000Z',
+      attempts: 3,
+      failureMessage: 'database unavailable',
+    });
+
+    expect(findLogRecord('Recorded credit-renewal terminal failure')).toMatchObject({
+      event: 'credit_renewal_terminal_failure',
+      outcome: 'completed',
+      subscriptionId: '11111111-1111-4111-8111-111111111111',
+      renewalBoundary: '2026-06-01T00:00:00.000Z',
+      attempts: 3,
+      terminalFailureStatus: 'unresolved',
+      terminalFailureCount: 2,
+      oldestUnresolvedTerminalFailureAt: '2026-05-01T00:05:00.000Z',
+      oldestUnresolvedTerminalFailureSubscriptionId: '22222222-2222-4222-8222-222222222222',
+      oldestUnresolvedTerminalFailureRenewalBoundary: '2026-05-01T00:00:00.000Z',
+    });
+    expect(JSON.stringify(loggedValues)).not.toContain('database unavailable');
+  });
+
+  it('treats duplicate item delivery as the same idempotent renewal-boundary outcome', async () => {
+    const row = creditRenewalRow();
+    const { db, txUpdates, txInserts } = createMockDb([[row], [row], []], {
+      txInsertRowCounts: [0],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+    const message = {
+      kind: 'credit_renewal_item' as const,
+      runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      sweep: 'credit_renewal_item' as const,
+      subscriptionId: '11111111-1111-4111-8111-111111111111',
+      userId: 'user-1',
+      renewalBoundary: '2026-06-01T00:00:00.000Z',
+    };
+
+    const duplicateResult = await processCreditRenewalItem(env, message, 2);
+    const staleResult = await processCreditRenewalItem(env, message, 3);
+
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          credit_category: 'kiloclaw-subscription:22222222-2222-4222-8222-222222222222:2026-06',
+        }),
+        expect.objectContaining({
+          action: 'period_advanced',
+          reason: 'credit_renewal_duplicate_idempotency_reconciled',
+        }),
+      ])
+    );
+    expect(txUpdates).toContainEqual(
+      expect.objectContaining({
+        current_period_start: '2026-06-01T00:00:00.000Z',
+        current_period_end: '2026-07-01T00:00:00.000Z',
+        credit_renewal_at: '2026-07-01T00:00:00.000Z',
+      })
+    );
+    expect(txUpdates).toContainEqual(
+      expect.objectContaining({
+        status: 'superseded',
+        resolution_actor_type: 'system',
+        resolution_actor_id: 'billing-lifecycle-job',
+        resolution_reason: 'subscription_boundary_advanced',
+      })
+    );
+    expect(duplicateResult.credit_renewals_skipped_duplicate).toBe(1);
+    expect(staleResult.credit_renewals).toBe(0);
+    expect(staleResult.credit_renewals_past_due).toBe(0);
+    expect(staleResult.errors).toBe(0);
+  });
+
+  it('re-reads an item when the diagnostic userId does not match the current subscription owner', async () => {
+    const row = creditRenewalRow({ user_id: 'actual-user' });
+    const { db, txInserts, txUpdates, updates, selectBuilders } = createMockDb([[row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetchImpl = vi.fn();
+    const { env } = createEnvWithQueueMocks(fetchImpl);
+
+    const summary = await processCreditRenewalItem(
+      env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: row.id,
+        userId: 'wrong-user',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.credit_renewals_past_due).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          credit_category: 'kiloclaw-subscription:22222222-2222-4222-8222-222222222222:2026-06',
+        }),
+      ])
+    );
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          current_period_start: '2026-06-01T00:00:00.000Z',
+        }),
+      ])
+    );
+    expect(updates).toHaveLength(0);
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('resolves a terminal failure when an operator retry finalizes an expected past-due outcome', async () => {
+    const row = creditRenewalRow({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const { db, updates } = createMockDb([[row], [row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+
+    const summary = await processCreditRenewalItem(
+      createEnvWithQueueMocks(vi.fn()).env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: row.id,
+        userId: row.user_id,
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+        resolveTerminalFailureOnExpectedOutcome: true,
+      },
+      1
+    );
+
+    expect(summary.credit_renewals_past_due).toBe(1);
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        status: 'past_due',
+      })
+    );
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        status: 'resolved',
+        resolution_actor_type: 'system',
+        resolution_actor_id: 'billing-lifecycle-job',
+        resolution_reason: 'credit_renewal_insufficient_credits_finalized',
+      })
+    );
+  });
+
+  it('resolves a terminal failure when an operator retry finalizes a duplicate boundary', async () => {
+    const row = creditRenewalRow({
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    });
+    const { db, updates } = createMockDb([[row], [row], []], {
+      txInsertRowCounts: [0],
+      txUpdateReturningRows: [[]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_request, init) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action?: string;
+      };
+      if (body.action === 'process_paid_conversion') {
+        return Response.json({
+          affiliateSaleEnqueued: false,
+          winningTouchType: null,
+          conversionId: null,
+          disqualificationReason: 'no_touch',
+        });
+      }
+      return Response.json({ ok: true });
+    });
+
+    const summary = await processCreditRenewalItem(
+      createEnvWithQueueMocks(vi.fn()).env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: row.id,
+        userId: row.user_id,
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+        resolveTerminalFailureOnExpectedOutcome: true,
+      },
+      1
+    );
+
+    expect(summary.credit_renewals_skipped_duplicate).toBe(1);
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        status: 'resolved',
+        resolution_actor_type: 'system',
+        resolution_actor_id: 'billing-lifecycle-job',
+        resolution_reason: 'credit_renewal_duplicate_idempotency_reconciled',
+      })
+    );
+  });
+
+  it('serializes same-user item decisions against the current locked credit balance', async () => {
+    const first = creditRenewalRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      instance_id: '22222222-2222-4222-8222-222222222222',
+      instance_row_id: '22222222-2222-4222-8222-222222222222',
+      total_microdollars_acquired: 15_000_000,
+      microdollars_used: 0,
+    });
+    const secondInitiallyStale = creditRenewalRow({
+      id: '33333333-3333-4333-8333-333333333333',
+      instance_id: '44444444-4444-4444-8444-444444444444',
+      instance_row_id: '44444444-4444-4444-8444-444444444444',
+      total_microdollars_acquired: 15_000_000,
+      microdollars_used: 0,
+    });
+    const secondAfterFirstDeduction = {
+      ...secondInitiallyStale,
+      microdollars_used: 9_000_000,
+    };
+    const { db, txInserts, txUpdates, txExecutes, updates } = createMockDb([
+      [first],
+      [first],
+      [secondAfterFirstDeduction],
+      [secondAfterFirstDeduction],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_request, init) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action?: string;
+      };
+      if (body.action === 'send_email') {
+        return Response.json({ sent: true });
+      }
+      return Response.json({ ok: true });
+    });
+
+    const firstResult = await processCreditRenewalItem(
+      env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: first.id,
+        userId: 'user-1',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      1
+    );
+    const secondResult = await processCreditRenewalItem(
+      env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: secondInitiallyStale.id,
+        userId: 'user-1',
+        renewalBoundary: '2026-06-01T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(firstResult.credit_renewals).toBe(1);
+    expect(secondResult.credit_renewals).toBe(0);
+    expect(txExecutes).toHaveLength(2);
+    expect(secondResult.credit_renewals_past_due).toBe(1);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          credit_category: 'kiloclaw-subscription:22222222-2222-4222-8222-222222222222:2026-06',
+        }),
+      ])
+    );
+    expect(txInserts).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          credit_category: 'kiloclaw-subscription:44444444-4444-4444-8444-444444444444:2026-06',
+        }),
+      ])
+    );
+    expect(txUpdates).toContainEqual(
+      expect.objectContaining({
+        current_period_start: '2026-06-01T00:00:00.000Z',
+        current_period_end: '2026-07-01T00:00:00.000Z',
+      })
+    );
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        status: 'past_due',
+      })
+    );
+  });
+
+  it('skips downstream past-due enforcement only for unresolved terminal failures on the same renewal boundary', async () => {
+    const protectedRow = {
+      id: '11111111-1111-4111-8111-111111111111',
+      user_id: 'user-1',
+      instance_id: '22222222-2222-4222-8222-222222222222',
+      sandbox_id: 'ki_22222222222242228222222222222222',
+      instance_destroyed_at: null,
+      organization_id: null,
+      email: 'user@example.com',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    };
+    const enforceableRow = {
+      ...protectedRow,
+      id: '33333333-3333-4333-8333-333333333333',
+      instance_id: '44444444-4444-4444-8444-444444444444',
+      sandbox_id: 'ki_44444444444444448444444444444444',
+      credit_renewal_at: '2026-06-02T00:00:00.000Z',
+    };
+    const { db, updates } = createMockDb([
+      [protectedRow, enforceableRow],
+      [{ id: 'terminal-failure-1', status: 'unresolved' }],
+      [],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const kiloclawFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+
+    const summary = await runSweep(
+      createEnv(kiloclawFetch),
+      {
+        runId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        sweep: 'past_due_cleanup',
+      },
+      1
+    );
+
+    expect(kiloclawFetch).toHaveBeenCalledTimes(1);
+    expect(updates).toHaveLength(1);
+    expect(summary.sweep4_past_due_cleanup).toBe(1);
+    expect(summary.errors).toBe(0);
+  });
+
+  it('skips organization-managed rows in personal past-due cleanup', async () => {
+    const { db, updates, inserts } = createMockDb([
+      [
+        {
+          id: 'org-past-due-sub',
+          user_id: 'org-past-due-user',
+          instance_id: 'org-past-due-instance',
+          sandbox_id: 'ki_orgpastdue000000000000000000',
+          instance_destroyed_at: null,
+          organization_id: 'org-past-due',
+          email: 'org-past-due@example.com',
+          credit_renewal_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const kiloclawFetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(kiloclawFetch),
+      {
+        runId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        sweep: 'past_due_cleanup',
+      },
+      1
+    );
+
+    expect(summary.sweep4_past_due_cleanup).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(kiloclawFetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+});
 
 describe('interrupted auto-resume sweep', () => {
   beforeEach(() => {
@@ -238,7 +1767,7 @@ describe('interrupted auto-resume sweep', () => {
           reason: 'interrupted_auto_resume',
         });
       }
-      return new Response(JSON.stringify({ ok: true }), {
+      return new Response(JSON.stringify(destroyResponse()), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
@@ -404,6 +1933,56 @@ describe('interrupted auto-resume sweep', () => {
     ]);
   });
 
+  it('retries restored organization instances with the organization recovery start reason', async () => {
+    const instanceId = '22222222-2222-4222-8222-222222222222';
+    const sandboxId = 'ki_22222222222242228222222222222222';
+    const { db, updates } = createMockDb([
+      [
+        {
+          id: 'sub-org-resume',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          organization_id: '33333333-3333-4333-8333-333333333333',
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 1,
+        },
+      ],
+      [{ id: instanceId, sandbox_id: sandboxId }],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'dededede-dede-4ded-8ded-dededededede',
+        sweep: 'interrupted_auto_resume',
+      },
+      1
+    );
+
+    expect(summary.interrupted_auto_resume_requests).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_attempt_count: 2,
+      }),
+    ]);
+  });
+
   it('skips detached rows instead of fan-out updates', async () => {
     const { db, updates, txUpdates, txDeletes } = createMockDb([
       [
@@ -444,7 +2023,10 @@ describe('trial expiry sweep', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetWorkerDb.mockReset();
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       async () =>
@@ -467,6 +2049,7 @@ describe('trial expiry sweep', () => {
           instance_destroyed_at: null,
           organization_id: null,
           email: 'user-1@example.com',
+          trial_ends_at: '2026-04-17T00:00:00.000Z',
         },
       ],
       [
@@ -501,17 +2084,20 @@ describe('trial expiry sweep', () => {
       );
     });
 
-    const summary = await runSweep(
-      createEnv(fetch),
+    const { env } = createEnvWithQueueMocks(fetch);
+    const result = await processTrialExpiryPage(
+      env,
       {
+        kind: 'trial_expiry_page',
         runId: '21212121-2121-4212-8212-212121212120',
         sweep: 'trial_expiry',
       },
       1
     );
 
-    expect(summary.sweep1_trial_expiry).toBe(1);
-    expect(summary.errors).toBe(0);
+    expect(result.summary.sweep1_trial_expiry).toBe(1);
+    expect(result.summary.errors).toBe(0);
+    expect(result.continuationEnqueued).toBe(false);
     expect(fetch).toHaveBeenCalledTimes(1);
     const stopRequest = fetch.mock.calls[0]?.[0];
     expect(stopRequest).toBeInstanceOf(Request);
@@ -531,13 +2117,522 @@ describe('trial expiry sweep', () => {
     expect(cancellationUpdate).toBeDefined();
     expect(updates).toContainEqual({ inactive_trial_stopped_at: null });
   });
+
+  it('filters detached, missing, destroyed, and organization-managed trial rows in SQL', async () => {
+    const { db, updates, inserts, selectBuilders } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const { env } = createEnvWithQueueMocks(fetch);
+    const result = await processTrialExpiryPage(
+      env,
+      {
+        kind: 'trial_expiry_page',
+        runId: '23232323-2323-4232-8232-232323232320',
+        sweep: 'trial_expiry',
+      },
+      1
+    );
+
+    const trialExpiryWhere = selectBuilders[0]?.where.mock.calls[0]?.[0];
+    expect(trialExpiryWhere).toBeDefined();
+    if (!trialExpiryWhere) {
+      throw new Error('expected trial expiry candidate query predicate');
+    }
+
+    const actualDbModule = await vi.importActual<typeof DbModule>('@kilocode/db');
+    const trialExpirySql = actualDbModule
+      .getWorkerDb('postgres://unused:unused@localhost:0/unused')
+      .select()
+      .from(actualDbModule.kiloclaw_subscriptions)
+      .where(trialExpiryWhere)
+      .toSQL().sql;
+
+    expect(trialExpirySql).toMatch(/"kiloclaw_subscriptions"\."instance_id"\s+is not null/i);
+    expect(trialExpirySql).toMatch(/"kiloclaw_instances"\."sandbox_id"\s+is not null/i);
+    expect(trialExpirySql).toMatch(/"kiloclaw_instances"\."destroyed_at"\s+is null/i);
+    expect(trialExpirySql).toMatch(/"kiloclaw_instances"\."organization_id"\s+is null/i);
+    expect(result.summary.sweep1_trial_expiry).toBe(0);
+    expect(result.summary.errors).toBe(0);
+    expect(result.continuationEnqueued).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+
+  it('does not expire a legacy trial before its recorded trial end timestamp', async () => {
+    const instanceId = '22222222-2222-4222-8222-222222222222';
+    const { db, updates, inserts } = createMockDb([
+      [
+        {
+          id: 'sub-legacy-active-trial',
+          user_id: 'user-legacy-active',
+          instance_id: instanceId,
+          sandbox_id: 'ki_22222222222242228222222222222222',
+          instance_destroyed_at: null,
+          organization_id: null,
+          email: 'legacy-active@example.com',
+          trial_ends_at: '2099-04-17T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const { env } = createEnvWithQueueMocks(fetch);
+    const result = await processTrialExpiryPage(
+      env,
+      {
+        kind: 'trial_expiry_page',
+        runId: '22222222-2222-4222-8222-222222222220',
+        sweep: 'trial_expiry',
+      },
+      1
+    );
+
+    expect(result.summary.sweep1_trial_expiry).toBe(0);
+    expect(result.summary.errors).toBe(0);
+    expect(result.continuationEnqueued).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+
+  it('processes only the trial-expiry page budget and enqueues a continuation', async () => {
+    const first = trialExpiryRow({
+      id: '11111111-1111-4111-8111-111111111111',
+      trial_ends_at: '2026-04-17T00:00:00.000Z',
+    });
+    const second = trialExpiryRow({
+      id: '33333333-3333-4333-8333-333333333333',
+      instance_id: '44444444-4444-4444-8444-444444444444',
+      trial_ends_at: '2026-04-18T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[first, second], [first]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            stopped: true,
+            previousStatus: 'running',
+            currentStatus: 'stopped',
+            stoppedAt: Date.parse('2026-04-22T00:00:00.000Z'),
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    );
+    const { env, lifecycleSend } = createEnvWithQueueMocks(fetch);
+
+    const result = await processTrialExpiryPage(env, {
+      kind: 'trial_expiry_page',
+      runId: '44444444-4444-4444-8444-444444444440',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(result.summary.sweep1_trial_expiry).toBe(1);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'trial_expiry_continuation',
+      runId: '44444444-4444-4444-8444-444444444440',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+      cursorTrialEndsAt: '2026-04-17T00:00:00.000Z',
+      pageBudget: 1,
+      wallClockBudgetMs: undefined,
+    });
+  });
+
+  it('does not enqueue another trial-expiry continuation after the final page', async () => {
+    const { db } = createMockDb([
+      [
+        trialExpiryRow({
+          email: 'deleted-user@deleted.invalid',
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    const result = await processTrialExpiryPage(env, {
+      kind: 'trial_expiry_continuation',
+      runId: '55555555-5555-4555-8555-555555555550',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      cursorSubscriptionId: '00000000-0000-4000-8000-000000000000',
+      cursorTrialEndsAt: '2026-04-16T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(result.summary.sweep1_trial_expiry).toBe(0);
+    expect(result.continuationEnqueued).toBe(false);
+    expect(lifecycleSend).not.toHaveBeenCalled();
+  });
+
+  it('keeps trial-expiry cursors ordered by subscription id at the same trial end', async () => {
+    const sharedTrialEnd = '2026-04-17T00:00:00.000Z';
+    const { db } = createMockDb([
+      [
+        trialExpiryRow({
+          id: '11111111-1111-4111-8111-111111111111',
+          email: 'deleted-first@deleted.invalid',
+          trial_ends_at: sharedTrialEnd,
+        }),
+        trialExpiryRow({
+          id: '33333333-3333-4333-8333-333333333333',
+          email: 'deleted-second@deleted.invalid',
+          trial_ends_at: sharedTrialEnd,
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    await processTrialExpiryPage(env, {
+      kind: 'trial_expiry_page',
+      runId: '66666666-6666-4666-8666-666666666660',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'trial_expiry_continuation',
+        cursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+        cursorTrialEndsAt: sharedTrialEnd,
+      })
+    );
+  });
+
+  it('logs trial-expiry page backlog and cursor diagnostics without user PII', async () => {
+    const { db } = createMockDb([
+      [
+        trialExpiryRow({
+          id: '11111111-1111-4111-8111-111111111111',
+          email: 'private-first@deleted.invalid',
+        }),
+        trialExpiryRow({
+          id: '33333333-3333-4333-8333-333333333333',
+          email: 'private-second@deleted.invalid',
+          trial_ends_at: '2026-04-18T00:00:00.000Z',
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+
+    await processTrialExpiryPage(env, {
+      kind: 'trial_expiry_continuation',
+      runId: '77777777-7777-4777-8777-777777777770',
+      sweep: 'trial_expiry',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      cursorSubscriptionId: '00000000-0000-4000-8000-000000000000',
+      cursorTrialEndsAt: '2026-04-16T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(findLogRecord('Processed trial-expiry page')).toMatchObject({
+      event: 'trial_expiry_page',
+      outcome: 'completed',
+      cutoffTime: '2026-04-20T00:00:00.000Z',
+      cursorSubscriptionId: '00000000-0000-4000-8000-000000000000',
+      cursorTrialEndsAt: '2026-04-16T00:00:00.000Z',
+      pageBudget: 1,
+      fetchedCount: 2,
+      processedCount: 1,
+      trialExpiryBacklogLikely: true,
+      continuationEnqueued: true,
+      nextCursorSubscriptionId: '11111111-1111-4111-8111-111111111111',
+      nextCursorTrialEndsAt: '2026-04-17T00:00:00.000Z',
+    });
+    expect(JSON.stringify(loggedValues)).not.toContain('private-first@deleted.invalid');
+    expect(JSON.stringify(loggedValues)).not.toContain('private-second@deleted.invalid');
+  });
+});
+
+describe('organization trial expiry sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+  });
+
+  it('suspends expired unentitled organization instances with fresh grace and organization notifications', async () => {
+    const row = organizationTrialExpiryRow();
+    const { db, updates, inserts } = createMockDb(
+      [
+        [row],
+        [row],
+        [
+          {
+            id: row.id,
+            user_id: row.user_id,
+            instance_id: row.instance_id,
+            status: 'active',
+            suspended_at: null,
+            destruction_deadline: null,
+          },
+        ],
+        [{ userId: 'owner-1', email: 'owner@example.com' }],
+      ],
+      {
+        updateReturningRows: [
+          [
+            {
+              id: row.id,
+              user_id: row.user_id,
+              instance_id: row.instance_id,
+              status: 'canceled',
+              suspended_at: '2026-05-18T00:00:00.000Z',
+              destruction_deadline: '2026-05-25T00:00:00.000Z',
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const stopFetch = vi.fn(
+      async (_request: RequestInfo | URL) =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            stopped: true,
+            previousStatus: 'running',
+            currentStatus: 'stopped',
+            stoppedAt: Date.parse('2026-05-18T00:00:00.000Z'),
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    );
+    const { env } = createEnvWithQueueMocks(stopFetch);
+
+    const result = await processOrganizationTrialExpiryPage(env, {
+      kind: 'organization_trial_expiry_page',
+      runId: '81818181-8181-4818-8818-818181818181',
+      sweep: 'organization_trial_expiry',
+    });
+
+    expect(result.summary.organization_trial_expiry_suspensions).toBe(1);
+    expect(result.summary.errors).toBe(0);
+    expect(result.summary.emails_sent).toBe(2);
+    expect(result.continuationEnqueued).toBe(false);
+    expect(stopFetch).toHaveBeenCalledTimes(1);
+    const stopRequest = stopFetch.mock.calls[0]?.[0];
+    expect(stopRequest).toBeInstanceOf(Request);
+    if (!(stopRequest instanceof Request)) {
+      throw new Error('expected Request');
+    }
+    expect(await stopRequest.json()).toEqual({
+      userId: 'user-1',
+      reason: 'organization_trial_expiry',
+    });
+
+    const suspensionUpdate = updates.find(
+      update =>
+        update.status === 'canceled' &&
+        typeof update.suspended_at === 'string' &&
+        typeof update.destruction_deadline === 'string'
+    );
+    expect(suspensionUpdate).toBeDefined();
+    if (!suspensionUpdate || typeof suspensionUpdate.destruction_deadline !== 'string') {
+      throw new Error('expected organization suspension update');
+    }
+    const freshDeadlineAt = Date.parse(suspensionUpdate.destruction_deadline);
+    const expectedGraceDeadlineAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    expect(Math.abs(freshDeadlineAt - expectedGraceDeadlineAt)).toBeLessThan(5_000);
+    expect(freshDeadlineAt).toBeGreaterThan(Date.parse(row.hard_expiry_boundary));
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'suspended',
+          reason: 'organization_trial_expired',
+        }),
+        {
+          user_id: 'user-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_trial_suspended',
+        },
+        {
+          user_id: 'owner-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_trial_suspended',
+        },
+      ])
+    );
+
+    const emailBodies = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.map(([, init]) => JSON.parse(typeof init?.body === 'string' ? init.body : '{}'));
+    expect(emailBodies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'send_email',
+          input: expect.objectContaining({
+            to: 'user-1@example.com',
+            templateName: 'clawOrganizationTrialSuspendedUser',
+            organizationId: row.organization_id,
+          }),
+        }),
+        expect.objectContaining({
+          action: 'send_email',
+          input: expect.objectContaining({
+            to: 'owner@example.com',
+            templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+            organizationId: row.organization_id,
+          }),
+        }),
+      ])
+    );
+    expect(
+      findLogRecord('Suspended organization KiloClaw instance after hard-expired trial')
+    ).toMatchObject({
+      event: 'organization_trial_expiry_suspension',
+      outcome: 'completed',
+      subscriptionId: row.id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      organizationId: row.organization_id,
+      notificationSentCount: 2,
+    });
+    expect(findLogRecord('Processed organization-trial-expiry page')).toMatchObject({
+      event: 'organization_trial_expiry_page',
+      summary: expect.objectContaining({
+        organization_trial_expiry_suspensions: 1,
+      }),
+    });
+  });
+
+  it('skips organization trial expiry when entitlement returns after candidate selection', async () => {
+    const staleCandidate = organizationTrialExpiryRow();
+    const currentRow = organizationTrialExpiryRow({ latest_seat_purchase_status: 'active' });
+    const { db, updates, inserts } = createMockDb([[staleCandidate], [currentRow]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const stopFetch = vi.fn();
+    const { env } = createEnvWithQueueMocks(stopFetch);
+
+    const result = await processOrganizationTrialExpiryPage(env, {
+      kind: 'organization_trial_expiry_page',
+      runId: '83838383-8383-4838-8838-838383838383',
+      sweep: 'organization_trial_expiry',
+    });
+
+    expect(result.summary.organization_trial_expiry_suspensions).toBe(0);
+    expect(result.summary.errors).toBe(0);
+    expect(stopFetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+
+  it('skips paid, exempt, and still-trialing organization rows after entitlement revalidation', async () => {
+    const paidRow = organizationTrialExpiryRow({
+      id: '91919191-9191-4919-8919-919191919191',
+      latest_seat_purchase_status: 'past_due',
+    });
+    const exemptRow = organizationTrialExpiryRow({
+      id: 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
+      organization_id: '44444444-4444-4444-8444-444444444444',
+      organization_require_seats: false,
+    });
+    const trialingRow = organizationTrialExpiryRow({
+      id: 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2',
+      organization_id: '55555555-5555-4555-8555-555555555555',
+      organization_free_trial_end_at: '2099-05-18T00:00:00.000Z',
+      hard_expiry_boundary: '2099-05-21T00:00:00.000Z',
+    });
+    const { db, updates, inserts } = createMockDb([
+      [paidRow, exemptRow, trialingRow],
+      [paidRow],
+      [exemptRow],
+      [trialingRow],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const stopFetch = vi.fn();
+    const { env } = createEnvWithQueueMocks(stopFetch);
+
+    const result = await processOrganizationTrialExpiryPage(env, {
+      kind: 'organization_trial_expiry_page',
+      runId: '92929292-9292-4929-8929-929292929292',
+      sweep: 'organization_trial_expiry',
+    });
+
+    expect(result.summary.organization_trial_expiry_suspensions).toBe(0);
+    expect(result.summary.errors).toBe(0);
+    expect(stopFetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+
+  it('processes only the organization page budget and enqueues a cursor continuation', async () => {
+    const first = organizationTrialExpiryRow({
+      id: 'c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3',
+      organization_free_trial_end_at: '2099-05-18T00:00:00.000Z',
+      hard_expiry_boundary: '2026-04-18 00:00:00+00',
+    });
+    const second = organizationTrialExpiryRow({
+      id: 'd4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4',
+      organization_free_trial_end_at: '2099-05-18T00:00:00.000Z',
+      hard_expiry_boundary: '2026-04-19T00:00:00.000Z',
+    });
+    const { db } = createMockDb([[first, second], [first]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+
+    const result = await processOrganizationTrialExpiryPage(env, {
+      kind: 'organization_trial_expiry_page',
+      runId: 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3',
+      sweep: 'organization_trial_expiry',
+      cutoffTime: '2026-05-18T00:00:00.000Z',
+      pageBudget: 1,
+    });
+
+    expect(result.summary.organization_trial_expiry_suspensions).toBe(0);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'organization_trial_expiry_continuation',
+      runId: 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3',
+      sweep: 'organization_trial_expiry',
+      cutoffTime: '2026-05-18T00:00:00.000Z',
+      cursorSubscriptionId: first.id,
+      cursorHardExpiryBoundary: '2026-04-18T00:00:00.000Z',
+      pageBudget: 1,
+      wallClockBudgetMs: undefined,
+    });
+  });
 });
 
 describe('destruction warning sweep', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetWorkerDb.mockReset();
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       async () =>
@@ -579,7 +2674,7 @@ describe('destruction warning sweep', () => {
     expect(summary.destruction_warnings).toBe(1);
     expect(summary.emails_sent).toBe(1);
     expect(selectBuilders[0]?.innerJoin).toHaveBeenCalledTimes(2);
-    expect(selectBuilders[0]?.leftJoin).not.toHaveBeenCalled();
+    expect(selectBuilders[0]?.leftJoin).toHaveBeenCalledTimes(1);
     expect(inserts).toEqual([
       {
         user_id: 'user-1',
@@ -714,6 +2809,478 @@ describe('destruction warning sweep', () => {
     ]);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
+
+  it('sends organization destruction warnings while entitlement remains absent', async () => {
+    const row = organizationDestructionWarningRow();
+    const { db, inserts } = createMockDb([
+      [row],
+      [{ userId: 'owner-1', email: 'owner@example.com' }],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '18181818-1818-4818-8818-181818181818',
+        sweep: 'destruction_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.destruction_warnings).toBe(1);
+    expect(summary.organization_destruction_warnings).toBe(1);
+    expect(summary.emails_sent).toBe(2);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        {
+          user_id: 'user-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_destruction_warning',
+        },
+        {
+          user_id: 'owner-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_destruction_warning',
+        },
+      ])
+    );
+
+    const bodies = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.map(([, init]) => JSON.parse(typeof init?.body === 'string' ? init.body : '{}'));
+    expect(bodies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'send_email',
+          input: expect.objectContaining({
+            to: 'user-1@example.com',
+            templateName: 'clawOrganizationDestructionWarningUser',
+            organizationId: row.organization_id,
+          }),
+        }),
+        expect.objectContaining({
+          action: 'send_email',
+          input: expect.objectContaining({
+            to: 'owner@example.com',
+            templateName: 'clawOrganizationDestructionWarningBillingAuthority',
+            organizationId: row.organization_id,
+          }),
+        }),
+      ])
+    );
+    expect(findLogRecord('Sent organization KiloClaw destruction warning')).toMatchObject({
+      event: 'organization_destruction_warning',
+      outcome: 'completed',
+      subscriptionId: row.id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      organizationId: row.organization_id,
+      notificationSentCount: 2,
+    });
+  });
+
+  it('recovers organization subscriptions before warning when entitlement returns', async () => {
+    const row = organizationDestructionWarningRow({ latest_seat_purchase_status: 'past_due' });
+    const { db, txUpdates, updates, txDeletes, txInserts } = createMockDb(
+      [
+        [row],
+        [
+          {
+            id: row.id,
+            user_id: row.user_id,
+            instance_id: row.instance_id,
+            status: 'canceled',
+            suspended_at: '2026-05-18T00:00:00.000Z',
+            destruction_deadline: row.destruction_deadline,
+          },
+        ],
+        [{ id: row.instance_id, sandbox_id: 'ki_22222222222242228222222222222222' }],
+      ],
+      {
+        txUpdateReturningRows: [
+          [
+            {
+              id: row.id,
+              user_id: row.user_id,
+              instance_id: row.instance_id,
+              status: 'active',
+              suspended_at: null,
+              destruction_deadline: null,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const kiloclawFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(kiloclawFetch),
+      {
+        runId: '19191919-1919-4919-8919-191919191919',
+        sweep: 'destruction_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.organization_trial_entitlement_recoveries).toBe(1);
+    expect(summary.organization_destruction_warnings).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(txDeletes).toHaveLength(1);
+    expect(txUpdates).toEqual([
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: null,
+        auto_resume_attempt_count: 0,
+      }),
+    ]);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actor_id: 'billing-lifecycle-job',
+          action: 'reactivated',
+          reason: 'organization_entitlement_recovered',
+        }),
+      ])
+    );
+    expect(kiloclawFetch).toHaveBeenCalledTimes(1);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: expect.any(String),
+        auto_resume_attempt_count: 1,
+      }),
+    ]);
+    expect(
+      findLogRecord('Recovered organization KiloClaw instance after entitlement returned')
+    ).toMatchObject({
+      event: 'organization_trial_entitlement_recovery',
+      outcome: 'completed',
+      subscriptionId: row.id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      organizationId: row.organization_id,
+    });
+  });
+
+  it('keeps restored organization deletion canceled when compute restart dispatch fails', async () => {
+    const row = organizationDestructionWarningRow({ organization_require_seats: false });
+    const { db, txUpdates, updates } = createMockDb(
+      [
+        [row],
+        [
+          {
+            id: row.id,
+            user_id: row.user_id,
+            instance_id: row.instance_id,
+            status: 'canceled',
+            suspended_at: '2026-05-18T00:00:00.000Z',
+            destruction_deadline: row.destruction_deadline,
+          },
+        ],
+        [{ id: row.instance_id, sandbox_id: 'ki_22222222222242228222222222222222' }],
+      ],
+      {
+        txUpdateReturningRows: [
+          [
+            {
+              id: row.id,
+              user_id: row.user_id,
+              instance_id: row.instance_id,
+              status: 'active',
+              suspended_at: null,
+              destruction_deadline: null,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const kiloclawFetch = vi.fn(
+      async () =>
+        new Response('start failed', {
+          status: 500,
+          headers: { 'content-type': 'text/plain' },
+        })
+    );
+
+    const summary = await runSweep(
+      createEnv(kiloclawFetch),
+      {
+        runId: '1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a',
+        sweep: 'destruction_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(1);
+    expect(summary.organization_trial_entitlement_recoveries).toBe(1);
+    expect(summary.organization_destruction_warnings).toBe(0);
+    expect(txUpdates).toEqual([
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+      }),
+    ]);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: expect.any(String),
+        auto_resume_attempt_count: 1,
+      }),
+    ]);
+  });
+});
+
+describe('trial warning sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+  });
+
+  it('skips organization-managed rows in personal trial warning delivery', async () => {
+    const instanceId = '43434343-4343-4343-8343-434343434343';
+    const { db, inserts } = createMockDb([
+      [
+        {
+          id: 'sub-org-trial-warning',
+          user_id: 'user-org-trial-warning',
+          instance_id: instanceId,
+          instance_destroyed_at: null,
+          instance_sandbox_id: 'ki_43434343434343438343434343434343',
+          organization_id: 'org-trial-warning',
+          email: 'org-trial-warning@example.com',
+          trial_ends_at: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+          kiloclaw_price_version: '2026-03-19',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '43434343-4343-4343-8343-434343434340',
+        sweep: 'trial_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.trial_warnings).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(inserts).toEqual([]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not send the 2-day warning for current-price one-day trials', async () => {
+    const instanceId = '44444444-4444-4444-8444-444444444444';
+    const { db, inserts } = createMockDb([
+      [
+        {
+          id: 'sub-current-one-day',
+          user_id: 'user-current',
+          instance_id: instanceId,
+          instance_destroyed_at: null,
+          instance_sandbox_id: 'ki_44444444444444448444444444444444',
+          organization_id: null,
+          email: 'current@example.com',
+          trial_ends_at: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+          kiloclaw_price_version: '2026-05-10',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '44444444-4444-4444-8444-444444444440',
+        sweep: 'trial_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.trial_warnings).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(inserts).toEqual([]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('sends the 2-day warning for legacy seven-day trials', async () => {
+    const instanceId = '45454545-4545-4545-8545-454545454545';
+    const { db, inserts } = createMockDb([
+      [
+        {
+          id: 'sub-legacy-seven-day',
+          user_id: 'user-legacy',
+          instance_id: instanceId,
+          instance_destroyed_at: null,
+          instance_sandbox_id: 'ki_45454545454545458545454545454545',
+          organization_id: null,
+          email: 'legacy@example.com',
+          trial_ends_at: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+          kiloclaw_price_version: '2026-03-19',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '45454545-4545-4545-8545-454545454540',
+        sweep: 'trial_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.trial_warnings).toBe(1);
+    expect(summary.emails_sent).toBe(1);
+    expect(inserts).toEqual([
+      {
+        user_id: 'user-legacy',
+        instance_id: instanceId,
+        email_type: 'claw_trial_5d',
+      },
+    ]);
+
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+      action: string;
+      input: Record<string, unknown>;
+    };
+    expect(body).toEqual({
+      action: 'send_email',
+      input: {
+        to: 'legacy@example.com',
+        templateName: 'clawTrialEndingSoon',
+        templateVars: { days_remaining: '2', claw_url: 'https://app.kilo.ai/claw' },
+        subjectOverride: 'Your KiloClaw Trial Ends in 2 Days',
+        userId: 'user-legacy',
+        instanceId,
+      },
+    });
+  });
+
+  it('skips clawTrialExpiresTomorrow for current one-day trials', async () => {
+    const instanceId = '46464646-4646-4646-8646-464646464646';
+    const { db, inserts } = createMockDb([
+      [
+        {
+          id: 'sub-current-urgent',
+          user_id: 'user-current-urgent',
+          instance_id: instanceId,
+          instance_destroyed_at: null,
+          instance_sandbox_id: 'ki_46464646464646468646464646464646',
+          organization_id: null,
+          email: 'urgent@example.com',
+          trial_ends_at: new Date(Date.now() + 86_400_000).toISOString(),
+          kiloclaw_price_version: '2026-05-10',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '46464646-4646-4646-8646-464646464640',
+        sweep: 'trial_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.trial_warnings).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(inserts).toEqual([]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('sends clawTrialExpiresTomorrow for legacy seven-day trials at daysRemaining <= 1', async () => {
+    const instanceId = '47474747-4747-4747-8747-474747474747';
+    const { db, inserts } = createMockDb([
+      [
+        {
+          id: 'sub-legacy-urgent',
+          user_id: 'user-legacy-urgent',
+          instance_id: instanceId,
+          instance_destroyed_at: null,
+          instance_sandbox_id: 'ki_47474747474747478747474747474747',
+          organization_id: null,
+          email: 'legacy-urgent@example.com',
+          trial_ends_at: new Date(Date.now() + 86_400_000).toISOString(),
+          kiloclaw_price_version: '2026-03-19',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '47474747-4747-4747-8747-474747474740',
+        sweep: 'trial_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.trial_warnings).toBe(1);
+    expect(summary.emails_sent).toBe(1);
+    expect(inserts).toEqual([
+      {
+        user_id: 'user-legacy-urgent',
+        instance_id: instanceId,
+        email_type: 'claw_trial_1d',
+      },
+    ]);
+
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+      action: string;
+      input: Record<string, unknown>;
+    };
+    expect(body).toEqual({
+      action: 'send_email',
+      input: {
+        to: 'legacy-urgent@example.com',
+        templateName: 'clawTrialExpiresTomorrow',
+        templateVars: { claw_url: 'https://app.kilo.ai/claw' },
+        userId: 'user-legacy-urgent',
+        instanceId,
+      },
+    });
+  });
 });
 
 describe('instance destruction sweep', () => {
@@ -779,9 +3346,180 @@ describe('instance destruction sweep', () => {
     );
   });
 
+  it('clears destruction_deadline on a detached subscription row instead of starving the queue', async () => {
+    // Regression: a subscription with `destruction_deadline < now()` but
+    // `instance_id IS NULL` (its instance was already destroyed via some
+    // other path) has nothing left for this sweep to destroy. Before this
+    // fix the loop logged "missing_instance_id" and `continue`d without
+    // clearing the deadline, so the same detached row stayed at the head
+    // of the FIFO candidate query forever — production saw 25k+ real
+    // overdue rows starve for 40 days behind ~50 detached rows.
+    //
+    // The fix collects all detached IDs during the loop, then after the
+    // loop issues a single bulk SELECT + guarded bulk UPDATE + bulk
+    // changelog INSERT inside one database transaction. The transaction
+    // is what keeps the audit record at-least-once: if the INSERT fails
+    // the UPDATE rolls back so the rows stay detached and the next sweep
+    // retries the whole pair atomically — otherwise a transient INSERT
+    // failure would erase the only signal (`destruction_deadline IS NOT
+    // NULL`) that the cleanup ever ran.
+    const subscriptionId = 'sub-detached-1';
+    const detachedBefore = {
+      id: subscriptionId,
+      user_id: 'user-detached',
+      instance_id: null,
+      destruction_deadline: '2026-04-17T18:41:17.736Z',
+    };
+    const detachedAfter = { ...detachedBefore, destruction_deadline: null };
+    const { db, updates, txUpdates, inserts, txInserts, deletes } = createMockDb(
+      [
+        // 1. Destruction candidates (db.select): a single detached row.
+        [
+          {
+            id: subscriptionId,
+            user_id: 'user-detached',
+            instance_id: null,
+            sandbox_id: null,
+            organization_id: null,
+            status: 'canceled',
+            email: 'detached@example.com',
+          },
+        ],
+        // 2. Bulk SELECT for before-snapshots inside the cleanup transaction.
+        [detachedBefore],
+      ],
+      { txUpdateReturningRows: [[detachedAfter]] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // The guarded UPDATE happens inside a transaction so it lives on
+    // `txUpdates`, not `updates`. The top-level handles see nothing.
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(txUpdates).toEqual([{ destruction_deadline: null }]);
+    // The bulk INSERT writes the changelog entries as an array in one
+    // call inside the same transaction. txInserts[0] is the values array
+    // passed to tx.insert().values([...]).
+    expect(txInserts).toHaveLength(1);
+    expect(txInserts[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: subscriptionId,
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'detached_subscription_no_instance',
+        }),
+      ])
+    );
+    // The pre-existing skip log is still emitted for operator visibility.
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for detached subscription row',
+          reason: 'missing_instance_id',
+          subscriptionId,
+        }),
+      ])
+    );
+  });
+
+  it('clears a soft-deleted detached subscription instead of leaving it to pin the queue', async () => {
+    // Regression for the review of this PR. The detached check fires
+    // BEFORE the soft-deleted check inside the loop, so a row that is
+    // BOTH soft-deleted AND detached (`instance_id IS NULL`) still gets
+    // its destruction_deadline cleared. Without that ordering, the
+    // soft-deleted `continue` would short-circuit the loop and the row
+    // would stay at the head of the bounded FIFO queue forever — the
+    // same starvation the PR fixes for the common case, just gated on
+    // a different attribute.
+    const subscriptionId = 'sub-detached-softdeleted';
+    const detachedBefore = {
+      id: subscriptionId,
+      user_id: 'user-softdeleted',
+      instance_id: null,
+      destruction_deadline: '2026-04-17T18:41:17.736Z',
+    };
+    const detachedAfter = { ...detachedBefore, destruction_deadline: null };
+    const { db, updates, txUpdates, inserts, txInserts, deletes } = createMockDb(
+      [
+        [
+          {
+            id: subscriptionId,
+            user_id: 'user-softdeleted',
+            instance_id: null,
+            sandbox_id: null,
+            organization_id: null,
+            status: 'canceled',
+            // Trailing @deleted.invalid identifies a soft-deleted account
+            // (see SOFT_DELETED_EMAIL_SUFFIX in lifecycle.ts).
+            email: 'user-softdeleted@deleted.invalid',
+          },
+        ],
+        [detachedBefore],
+      ],
+      { txUpdateReturningRows: [[detachedAfter]] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'cdcdcdcd-cdcd-4cdc-8cdc-cdcdcdcdcdcd',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // Cleared inside a transaction even though the user is soft-deleted.
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(txUpdates).toEqual([{ destruction_deadline: null }]);
+    expect(txInserts).toHaveLength(1);
+    expect(txInserts[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: subscriptionId,
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'detached_subscription_no_instance',
+        }),
+      ])
+    );
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for detached subscription row',
+          reason: 'missing_instance_id',
+          subscriptionId,
+        }),
+      ])
+    );
+  });
+
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
-    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
+    const { db, updates, txUpdates, inserts, deletes, selectBuilders } = createMockDb([
       [
         {
           id: 'sub-1',
@@ -814,7 +3552,7 @@ describe('instance destruction sweep', () => {
           reason: 'destruction_deadline_elapsed',
         });
       }
-      return new Response(JSON.stringify({ ok: true }), {
+      return new Response(JSON.stringify(destroyResponse()), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
@@ -831,6 +3569,7 @@ describe('instance destruction sweep', () => {
 
     expect(summary.errors).toBe(0);
     expect(summary.sweep3_instance_destruction).toBe(1);
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(75);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     expect(inserts).toEqual(
@@ -851,6 +3590,15 @@ describe('instance destruction sweep', () => {
     expect(txUpdates[0]?.destroyed_at).toEqual(expect.any(String));
     expect(updates).toEqual([{ destruction_deadline: null }]);
     expect(deletes).toHaveLength(1);
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: 'instance_destroy_confirmed',
+          outcome: 'completed',
+          instanceId,
+        }),
+      ])
+    );
   });
 
   it('treats platform destroy 404 as already gone and continues with later rows', async () => {
@@ -912,7 +3660,7 @@ describe('instance destruction sweep', () => {
         })
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ ok: true }), {
+        new Response(JSON.stringify(destroyResponse({ destroyedUserId: 'user-2' })), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
@@ -963,6 +3711,91 @@ describe('instance destruction sweep', () => {
     expect(txUpdates[1]?.destroyed_at).toEqual(expect.any(String));
     expect(updates).toEqual([{ destruction_deadline: null }, { destruction_deadline: null }]);
     expect(deletes).toHaveLength(2);
+  });
+
+  it('logs pending platform cleanup and still preserves billing state transition', async () => {
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
+      [
+        {
+          id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_11111111111141118111111111111111',
+          status: 'canceled',
+          email: 'user-1@example.com',
+        },
+      ],
+      [
+        {
+          id: instanceId,
+          userId: 'user-1',
+          sandboxId: 'ki_11111111111141118111111111111111',
+          organizationId: null,
+          name: null,
+          inboundEmailEnabled: false,
+          destroyedAt: null,
+        },
+      ],
+      [],
+      [{ id: 'sub-1', user_id: 'user-1', instance_id: instanceId }],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify(
+            destroyResponse({
+              finalized: false,
+              pendingVolumeId: 'vol-1',
+              lastDestroyErrorOp: 'volume',
+              lastDestroyErrorStatus: 412,
+              lastDestroyErrorAt: 1_777_777_777,
+            })
+          ),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    );
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '10101010-1010-4010-8010-101010101010',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(1);
+    expect(txUpdates).toHaveLength(1);
+    expect(txUpdates[0]?.destroyed_at).toEqual(expect.any(String));
+    expect(updates).toEqual([{ destruction_deadline: null }]);
+    expect(deletes).toHaveLength(1);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          email_type: 'claw_instance_destroyed',
+        },
+      ])
+    );
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: 'instance_destroy_pending',
+          outcome: 'retry',
+          instanceId,
+          pendingVolumeId: 'vol-1',
+          lastDestroyErrorOp: 'volume',
+          lastDestroyErrorStatus: 412,
+        }),
+      ])
+    );
   });
 
   it('logs non-404 platform destroy failures and preserves billing state transition', async () => {
@@ -1040,6 +3873,8 @@ describe('instance destruction sweep', () => {
         }),
         expect.objectContaining({
           message: 'Destroy instance during billing enforcement failed',
+          event: 'instance_destroy_request_failed',
+          outcome: 'failed',
           statusCode: 500,
         }),
       ])
@@ -1079,6 +3914,714 @@ describe('instance destruction sweep', () => {
     expect(inserts).toHaveLength(0);
     expect(deletes).toHaveLength(0);
   });
+
+  it('destroys expired organization instances while entitlement remains absent', async () => {
+    const row = organizationDestructionCandidateRow();
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
+      [row],
+      [row],
+      [
+        {
+          id: row.instance_id,
+          userId: row.user_id,
+          sandboxId: row.sandbox_id,
+          organizationId: row.organization_id,
+          name: row.instance_name,
+          inboundEmailEnabled: false,
+          destroyedAt: null,
+        },
+      ],
+      [{ id: row.id, user_id: row.user_id, instance_id: row.instance_id }],
+      [{ userId: 'owner-1', email: 'owner@example.com' }],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const destroyFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'destruction_deadline_elapsed',
+      });
+      return new Response(JSON.stringify(destroyResponse()), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(destroyFetch),
+      {
+        runId: '20202020-2020-4020-8020-202020202020',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(1);
+    expect(summary.organization_instance_destructions).toBe(1);
+    expect(summary.emails_sent).toBe(2);
+    expect(destroyFetch).toHaveBeenCalledTimes(1);
+    expect(txUpdates[0]?.destroyed_at).toEqual(expect.any(String));
+    expect(updates).toEqual([{ destruction_deadline: null }]);
+    expect(deletes).toHaveLength(1);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        {
+          user_id: 'user-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_instance_destroyed',
+        },
+        {
+          user_id: 'owner-1',
+          instance_id: row.instance_id,
+          email_type: 'claw_org_instance_destroyed',
+        },
+        expect.objectContaining({
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'instance_destroyed',
+        }),
+      ])
+    );
+    expect(
+      findLogRecord('Destroyed organization KiloClaw instance after grace elapsed')
+    ).toMatchObject({
+      event: 'organization_instance_destruction',
+      outcome: 'completed',
+      subscriptionId: row.id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      organizationId: row.organization_id,
+      notificationSentCount: 2,
+    });
+  });
+
+  it('recovers organization subscriptions before destruction when entitlement returns', async () => {
+    const row = organizationDestructionCandidateRow({ latest_seat_purchase_status: 'active' });
+    const { db, txUpdates, updates, txDeletes } = createMockDb(
+      [
+        [row],
+        [row],
+        [
+          {
+            id: row.id,
+            user_id: row.user_id,
+            instance_id: row.instance_id,
+            status: 'canceled',
+            suspended_at: '2026-05-18T00:00:00.000Z',
+            destruction_deadline: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+        [{ id: row.instance_id, sandbox_id: row.sandbox_id }],
+      ],
+      {
+        txUpdateReturningRows: [
+          [
+            {
+              id: row.id,
+              user_id: row.user_id,
+              instance_id: row.instance_id,
+              status: 'active',
+              suspended_at: null,
+              destruction_deadline: null,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const startFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(startFetch),
+      {
+        runId: '21212121-2121-4212-8212-212121212121',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(summary.organization_instance_destructions).toBe(0);
+    expect(summary.organization_trial_entitlement_recoveries).toBe(1);
+    expect(startFetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(txDeletes).toHaveLength(1);
+    expect(txUpdates).toEqual([
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+      }),
+    ]);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: expect.any(String),
+        auto_resume_attempt_count: 1,
+      }),
+    ]);
+  });
+
+  it('recovers instead of destroying when organization entitlement returns after destruction candidate selection', async () => {
+    const staleCandidate = organizationDestructionCandidateRow();
+    const currentRow = organizationDestructionCandidateRow({
+      latest_seat_purchase_status: 'active',
+    });
+    const { db, txUpdates, updates, txDeletes } = createMockDb(
+      [
+        [staleCandidate],
+        [currentRow],
+        [
+          {
+            id: currentRow.id,
+            user_id: currentRow.user_id,
+            instance_id: currentRow.instance_id,
+            status: 'canceled',
+            suspended_at: '2026-05-18T00:00:00.000Z',
+            destruction_deadline: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+        [{ id: currentRow.instance_id, sandbox_id: currentRow.sandbox_id }],
+      ],
+      {
+        txUpdateReturningRows: [
+          [
+            {
+              id: currentRow.id,
+              user_id: currentRow.user_id,
+              instance_id: currentRow.instance_id,
+              status: 'active',
+              suspended_at: null,
+              destruction_deadline: null,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const startFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const sentRequest = request instanceof Request ? request : new Request(String(request));
+      await expect(sentRequest.json()).resolves.toEqual({
+        userId: 'user-1',
+        reason: 'organization_trial_access_restored',
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runSweep(
+      createEnv(startFetch),
+      {
+        runId: '23232323-2323-4232-8232-232323232323',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(summary.organization_instance_destructions).toBe(0);
+    expect(summary.organization_trial_entitlement_recoveries).toBe(1);
+    expect(startFetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(txDeletes).toHaveLength(1);
+    expect(txUpdates).toEqual([
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+      }),
+    ]);
+    expect(updates).toEqual([
+      expect.objectContaining({
+        auto_resume_requested_at: expect.any(String),
+        auto_resume_retry_after: expect.any(String),
+        auto_resume_attempt_count: 1,
+      }),
+    ]);
+  });
+});
+
+describe('credit renewal Kilo Pass bonus projection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('renews from raw balance without an HTTP bonus projection when the user has no Kilo Pass threshold', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, txUpdates } = createMockDb([
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: 'instance-1',
+          id: 'sub-1',
+          instance_row_id: 'instance-1',
+          organization_id: null,
+          instance_destroyed_at: null,
+          plan: 'standard',
+          status: 'active',
+          kiloclaw_price_version: '2026-03-19',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+          cancel_at_period_end: false,
+          scheduled_plan: null,
+          commit_ends_at: null,
+          past_due_since: null,
+          suspended_at: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          total_microdollars_acquired: 10_000_000,
+          microdollars_used: 0,
+          auto_top_up_enabled: false,
+          kilo_pass_threshold: null,
+          next_credit_expiration_at: null,
+          user_updated_at: '2026-04-09T09:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+
+      switch (body.action) {
+        case 'issue_kilo_pass_bonus_from_usage_threshold':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'process_paid_conversion':
+          return new Response(
+            JSON.stringify({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }
+          );
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        runId: '45454545-4545-4545-8545-454545454545',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ current_period_start: renewalAt })])
+    );
+
+    const sideEffectActions = fetch.mock.calls.map(([, init]) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+      return body.action;
+    });
+
+    expect(sideEffectActions).not.toContain('project_pending_kilo_pass_bonus');
+  });
+
+  it('marks past due without an HTTP bonus projection when no Kilo Pass exists', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, updates } = createMockDb([
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: 'instance-1',
+          id: 'sub-1',
+          instance_row_id: 'instance-1',
+          organization_id: null,
+          instance_destroyed_at: null,
+          plan: 'standard',
+          status: 'active',
+          kiloclaw_price_version: '2026-03-19',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+          cancel_at_period_end: false,
+          scheduled_plan: null,
+          commit_ends_at: null,
+          past_due_since: null,
+          suspended_at: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          total_microdollars_acquired: 7_000_000,
+          microdollars_used: 0,
+          auto_top_up_enabled: false,
+          kilo_pass_threshold: 8_000_000,
+          next_credit_expiration_at: null,
+          user_updated_at: '2026-04-09T09:00:00.000Z',
+        },
+      ],
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: 'instance-1',
+          id: 'sub-1',
+          instance_row_id: 'instance-1',
+          organization_id: null,
+          instance_destroyed_at: null,
+          plan: 'standard',
+          status: 'active',
+          kiloclaw_price_version: '2026-03-19',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+          cancel_at_period_end: false,
+          scheduled_plan: null,
+          commit_ends_at: null,
+          past_due_since: null,
+          suspended_at: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          total_microdollars_acquired: 7_000_000,
+          microdollars_used: 0,
+          auto_top_up_enabled: false,
+          kilo_pass_threshold: 8_000_000,
+          next_credit_expiration_at: null,
+          user_updated_at: '2026-04-09T09:00:00.000Z',
+        },
+      ],
+      [],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+
+      switch (body.action) {
+        case 'send_email':
+          return new Response(JSON.stringify({ sent: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        runId: '46464646-4646-4646-8646-464646464646',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals_past_due).toBe(1);
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(updates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: 'past_due' })])
+    );
+
+    const sideEffectActions = fetch.mock.calls.map(([, init]) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+      return body.action;
+    });
+
+    expect(sideEffectActions).toEqual(['send_email']);
+  });
+
+  it('marks past due without an HTTP bonus projection when projected usage remains below the threshold', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, updates } = createMockDb([
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: 'instance-1',
+          id: 'sub-1',
+          instance_row_id: 'instance-1',
+          organization_id: null,
+          instance_destroyed_at: null,
+          plan: 'standard',
+          status: 'active',
+          kiloclaw_price_version: '2026-03-19',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+          cancel_at_period_end: false,
+          scheduled_plan: null,
+          commit_ends_at: null,
+          past_due_since: null,
+          suspended_at: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          total_microdollars_acquired: 7_000_000,
+          microdollars_used: 0,
+          auto_top_up_enabled: false,
+          kilo_pass_threshold: 20_000_000,
+          next_credit_expiration_at: null,
+          user_updated_at: '2026-04-09T09:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+
+      switch (body.action) {
+        case 'send_email':
+          return new Response(JSON.stringify({ sent: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        runId: '47474747-4747-4747-8747-474747474747',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals_past_due).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(updates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: 'past_due' })])
+    );
+
+    const sideEffectActions = fetch.mock.calls.map(([, init]) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+      return body.action;
+    });
+
+    expect(sideEffectActions).toEqual(['send_email']);
+  });
+
+  it('renews when a local Kilo Pass threshold-crossing projection makes the effective balance sufficient', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const renewalRow = {
+      user_id: 'user-1',
+      email: 'user-1@example.com',
+      instance_id: 'instance-1',
+      id: 'sub-1',
+      instance_row_id: 'instance-1',
+      organization_id: null,
+      instance_destroyed_at: null,
+      plan: 'standard',
+      status: 'active',
+      kiloclaw_price_version: '2026-03-19',
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      cancel_at_period_end: false,
+      scheduled_plan: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      total_microdollars_acquired: 17_000_000,
+      microdollars_used: 10_000_000,
+      auto_top_up_enabled: false,
+      kilo_pass_threshold: 20_000_000,
+      next_credit_expiration_at: null,
+      user_updated_at: '2026-04-09T09:00:00.000Z',
+    };
+    const kiloPassSubscription = {
+      id: 'kp-sub-1',
+      tier: 'tier_49',
+      cadence: 'monthly',
+      status: 'active',
+      cancelAtPeriodEnd: false,
+      currentStreakMonths: 1,
+      startedAt: '2026-04-01T00:00:00.000Z',
+      createdAt: '2026-04-01T00:00:00.000Z',
+    };
+    const { db, txUpdates } = createMockDb([
+      [renewalRow],
+      [renewalRow],
+      [kiloPassSubscription],
+      [],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+
+      switch (body.action) {
+        case 'issue_kilo_pass_bonus_from_usage_threshold':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'process_paid_conversion':
+          return new Response(
+            JSON.stringify({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }
+          );
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        runId: '48484848-4848-4848-8848-484848484848',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.credit_renewals_past_due).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ current_period_start: renewalAt })])
+    );
+
+    const sideEffectActions = fetch.mock.calls.map(([, init]) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+      return body.action;
+    });
+
+    expect(sideEffectActions).toEqual([
+      'issue_kilo_pass_bonus_from_usage_threshold',
+      'process_paid_conversion',
+    ]);
+  });
+
+  it('marks past due without projecting another bonus when the Kilo Pass threshold is already cleared', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, updates } = createMockDb([
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: 'instance-1',
+          id: 'sub-1',
+          instance_row_id: 'instance-1',
+          organization_id: null,
+          instance_destroyed_at: null,
+          plan: 'standard',
+          status: 'active',
+          kiloclaw_price_version: '2026-03-19',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+          cancel_at_period_end: false,
+          scheduled_plan: null,
+          commit_ends_at: null,
+          past_due_since: null,
+          suspended_at: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          total_microdollars_acquired: 7_000_000,
+          microdollars_used: 0,
+          auto_top_up_enabled: false,
+          kilo_pass_threshold: null,
+          next_credit_expiration_at: null,
+          user_updated_at: '2026-04-09T09:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+
+      switch (body.action) {
+        case 'send_email':
+          return new Response(JSON.stringify({ sent: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        runId: '49494949-4949-4949-8949-494949494949',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals_past_due).toBe(1);
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(updates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: 'past_due' })])
+    );
+
+    const sideEffectActions = fetch.mock.calls.map(([, init]) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+      return body.action;
+    });
+
+    expect(sideEffectActions).toEqual(['send_email']);
+  });
 });
 
 describe('credit renewal sweep affiliate tracking', () => {
@@ -1087,6 +4630,973 @@ describe('credit renewal sweep affiliate tracking', () => {
     mockGetWorkerDb.mockReset();
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('charges Standard renewals from catalog and cancels final Commit without another charge', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, txInserts } = createMockDb(
+      [
+        [
+          {
+            user_id: 'legacy-user',
+            email: 'legacy-user@example.com',
+            instance_id: 'legacy-instance',
+            id: 'legacy-sub',
+            instance_row_id: 'legacy-instance',
+            organization_id: null,
+            instance_destroyed_at: null,
+            plan: 'standard',
+            status: 'active',
+            kiloclaw_price_version: '2026-03-19',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            cancel_at_period_end: false,
+            scheduled_plan: null,
+            commit_ends_at: null,
+            past_due_since: null,
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 100_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+          {
+            user_id: 'current-user',
+            email: 'current-user@example.com',
+            instance_id: 'current-instance',
+            id: 'current-sub',
+            instance_row_id: 'current-instance',
+            organization_id: null,
+            instance_destroyed_at: null,
+            plan: 'standard',
+            status: 'active',
+            kiloclaw_price_version: '2026-05-10',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            cancel_at_period_end: false,
+            scheduled_plan: null,
+            commit_ends_at: null,
+            past_due_since: null,
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 100_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+          {
+            user_id: 'current-commit-user',
+            email: 'current-commit-user@example.com',
+            instance_id: 'current-commit-instance',
+            id: 'current-commit-sub',
+            instance_row_id: 'current-commit-instance',
+            organization_id: null,
+            instance_destroyed_at: null,
+            plan: 'commit',
+            status: 'active',
+            kiloclaw_price_version: '2026-05-10',
+            credit_renewal_at: renewalAt,
+            current_period_start: '2026-04-01T10:00:00.000Z',
+            current_period_end: renewalAt,
+            cancel_at_period_end: false,
+            scheduled_plan: null,
+            scheduled_by: null,
+            commit_ends_at: renewalAt,
+            past_due_since: null,
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 400_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+        ],
+      ],
+      { txFallbackFromDbSelect: true }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'issue_kilo_pass_bonus_from_usage_threshold':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'process_paid_conversion':
+          return new Response(
+            JSON.stringify({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }
+          );
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runCreditRenewalSweepForTest(
+      db,
+      createEnv(vi.fn()),
+      'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+    );
+
+    expect(summary.credit_renewals).toBe(2);
+    expect(summary.credit_renewals_canceled).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kilo_user_id: 'legacy-user',
+          amount_microdollars: -9_000_000,
+          credit_category: 'kiloclaw-subscription:legacy-instance:2026-04',
+        }),
+        expect.objectContaining({
+          kilo_user_id: 'current-user',
+          amount_microdollars: -55_000_000,
+          credit_category: 'kiloclaw-subscription:current-instance:2026-04',
+        }),
+      ])
+    );
+
+    const paidConversionCalls = fetch.mock.calls
+      .map(
+        ([, init]) =>
+          JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+            action: string;
+            input: Record<string, unknown>;
+          }
+      )
+      .filter(call => call.action === 'process_paid_conversion');
+    const paidConversionInputs = paidConversionCalls.map(call => call.input);
+    expect(paidConversionInputs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          userId: 'legacy-user',
+          amount: 9,
+          itemCategory: 'kiloclaw-standard-2026-03-19',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'kiloclaw-standard-2026-03-19',
+        }),
+        expect.objectContaining({
+          userId: 'current-user',
+          amount: 55,
+          itemCategory: 'kiloclaw-standard-2026-05-10',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'kiloclaw-standard-2026-05-10',
+        }),
+      ])
+    );
+  });
+
+  it('skips hybrid rows in the credit renewal sweep', async () => {
+    const { db, txInserts, txUpdates } = createMockDb(
+      [
+        [
+          {
+            user_id: 'hybrid-user',
+            email: 'hybrid-user@example.com',
+            instance_id: 'hybrid-instance',
+            id: 'hybrid-sub',
+            instance_row_id: 'hybrid-instance',
+            organization_id: null,
+            instance_destroyed_at: null,
+            plan: 'standard',
+            status: 'active',
+            kiloclaw_price_version: '2026-05-10',
+            stripe_subscription_id: 'stripe-subscription',
+            credit_renewal_at: '2026-04-09T10:00:00.000Z',
+            current_period_end: '2026-04-09T10:00:00.000Z',
+            cancel_at_period_end: false,
+            scheduled_plan: null,
+            commit_ends_at: null,
+            past_due_since: null,
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 100_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+        ],
+      ],
+      { txFallbackFromDbSelect: true }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runCreditRenewalSweepForTest(
+      db,
+      createEnv(vi.fn()),
+      'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2'
+    );
+
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_skipped_duplicate).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(txInserts).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+  });
+
+  it('applies canonically qualified pure-credit plan switches atomically at the versioned renewal cost', async () => {
+    mockFindLatestPreCutoffUserCommitSwitchQualification.mockResolvedValueOnce({
+      qualifiedAt: '2026-04-08T10:00:00.000Z',
+      qualificationSource: 'switch_requested_before_cutoff',
+    });
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, updates, txInserts, txUpdates } = createMockDb(
+      [
+        [
+          {
+            user_id: 'switch-user',
+            email: 'switch-user@example.com',
+            instance_id: 'switch-instance',
+            id: 'switch-sub',
+            instance_row_id: 'switch-instance',
+            organization_id: null,
+            instance_destroyed_at: null,
+            plan: 'standard',
+            status: 'active',
+            kiloclaw_price_version: '2026-05-10',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            cancel_at_period_end: false,
+            scheduled_plan: 'commit',
+            scheduled_by: 'user',
+            commit_ends_at: null,
+            past_due_since: null,
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 400_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+          {
+            user_id: 'legacy-switch-user',
+            email: 'legacy-switch-user@example.com',
+            instance_id: 'legacy-switch-instance',
+            id: 'legacy-switch-sub',
+            instance_row_id: 'legacy-switch-instance',
+            organization_id: null,
+            instance_destroyed_at: null,
+            plan: 'commit',
+            status: 'active',
+            kiloclaw_price_version: '2026-03-19',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            cancel_at_period_end: false,
+            scheduled_plan: 'standard',
+            scheduled_by: 'user',
+            commit_ends_at: renewalAt,
+            past_due_since: null,
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 100_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+        ],
+      ],
+      { txFallbackFromDbSelect: true }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+        };
+
+        switch (body.action) {
+          case 'project_pending_kilo_pass_bonus':
+            return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 'issue_kilo_pass_bonus_from_usage_threshold':
+            return new Response(JSON.stringify({ ok: true }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 'process_paid_conversion':
+            return new Response(
+              JSON.stringify({
+                affiliateSaleEnqueued: true,
+                winningTouchType: 'affiliate',
+                conversionId: null,
+                disqualificationReason: null,
+              }),
+              {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              }
+            );
+          default:
+            throw new Error(`Unexpected side effect action: ${body.action}`);
+        }
+      })
+    );
+
+    const summary = await runCreditRenewalSweepForTest(
+      db,
+      createEnv(vi.fn()),
+      'c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3'
+    );
+
+    expect(summary.credit_renewals).toBe(2);
+    expect(summary.errors).toBe(0);
+    expect(updates).toHaveLength(0);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kilo_user_id: 'switch-user',
+          amount_microdollars: -306_000_000,
+          credit_category: 'kiloclaw-subscription-commit:switch-instance:2026-04',
+        }),
+        expect.objectContaining({
+          subscription_id: 'switch-sub',
+          action: 'plan_switched',
+          reason: 'credit_renewal_plan_switch',
+        }),
+        expect.objectContaining({
+          kilo_user_id: 'legacy-switch-user',
+          amount_microdollars: -9_000_000,
+          credit_category: 'kiloclaw-subscription:legacy-switch-instance:2026-04',
+        }),
+        expect.objectContaining({
+          subscription_id: 'legacy-switch-sub',
+          action: 'plan_switched',
+          reason: 'credit_renewal_plan_switch',
+        }),
+      ])
+    );
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          current_period_start: renewalAt,
+          current_period_end: '2026-10-09T10:00:00.000Z',
+          credit_renewal_at: '2026-10-09T10:00:00.000Z',
+          plan: 'commit',
+          scheduled_plan: null,
+          scheduled_by: null,
+          commit_ends_at: '2026-10-09T10:00:00.000Z',
+        }),
+        expect.objectContaining({
+          current_period_start: renewalAt,
+          current_period_end: '2026-05-09T10:00:00.000Z',
+          credit_renewal_at: '2026-05-09T10:00:00.000Z',
+          plan: 'standard',
+          scheduled_plan: null,
+          scheduled_by: null,
+          commit_ends_at: null,
+        }),
+      ])
+    );
+    for (const update of txUpdates) {
+      expect(update).not.toHaveProperty('kiloclaw_price_version');
+    }
+  });
+
+  it('cancels destroyed pending pure-credit rows without charging, advancing, or rewriting price version', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, inserts, updates, txInserts, txUpdates } = createMockDb(
+      [
+        [
+          {
+            user_id: 'cancel-user',
+            email: 'cancel-user@example.com',
+            instance_id: 'cancel-instance',
+            id: 'cancel-sub',
+            instance_row_id: 'cancel-instance',
+            organization_id: null,
+            instance_destroyed_at: '2026-04-08T10:00:00.000Z',
+            plan: 'standard',
+            status: 'active',
+            kiloclaw_price_version: '2026-05-10',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            cancel_at_period_end: true,
+            scheduled_plan: null,
+            commit_ends_at: null,
+            past_due_since: null,
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 100_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+        ],
+      ],
+      {
+        updateReturningRows: [
+          [
+            {
+              id: 'cancel-sub',
+              status: 'canceled',
+              cancel_at_period_end: false,
+              kiloclaw_price_version: '2026-05-10',
+              current_period_end: renewalAt,
+              credit_renewal_at: renewalAt,
+            },
+          ],
+        ],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runCreditRenewalSweepForTest(
+      db,
+      createEnv(vi.fn()),
+      'd4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4'
+    );
+
+    expect(summary.credit_renewals_canceled).toBe(1);
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: 'cancel-sub',
+          action: 'canceled',
+          reason: 'credit_renewal_cancel_at_period_end',
+        }),
+      ])
+    );
+    expect(txInserts.some(insert => typeof insert.credit_category === 'string')).toBe(false);
+    expect(txUpdates).toEqual([
+      {
+        status: 'canceled',
+        cancel_at_period_end: false,
+        auto_top_up_triggered_for_period: null,
+      },
+    ]);
+    expect(txUpdates[0]).not.toHaveProperty('kiloclaw_price_version');
+    expect(txUpdates[0]).not.toHaveProperty('current_period_start');
+    expect(txUpdates[0]).not.toHaveProperty('current_period_end');
+    expect(txUpdates[0]).not.toHaveProperty('credit_renewal_at');
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+  });
+
+  it('recovers past-due pure-credit renewals at the versioned cost and clears retry email state', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, deletes, txInserts, txUpdates } = createMockDb(
+      [
+        [
+          {
+            user_id: 'past-due-user',
+            email: 'past-due-user@example.com',
+            instance_id: 'past-due-instance',
+            id: 'past-due-sub',
+            instance_row_id: 'past-due-instance',
+            organization_id: null,
+            instance_destroyed_at: null,
+            plan: 'standard',
+            status: 'past_due',
+            kiloclaw_price_version: '2026-05-10',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            cancel_at_period_end: false,
+            scheduled_plan: null,
+            commit_ends_at: null,
+            past_due_since: '2026-04-08T10:00:00.000Z',
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 100_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: 55_000_000,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+        ],
+      ],
+      { txFallbackFromDbSelect: true }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'issue_kilo_pass_bonus_from_usage_threshold':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'process_paid_conversion':
+          return new Response(
+            JSON.stringify({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }
+          );
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runCreditRenewalSweepForTest(
+      db,
+      createEnv(vi.fn()),
+      'e5e5e5e5-e5e5-4e5e-8e5e-e5e5e5e5e5e5'
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(deletes).toHaveLength(1);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kilo_user_id: 'past-due-user',
+          amount_microdollars: -55_000_000,
+        }),
+        expect.objectContaining({
+          subscription_id: 'past-due-sub',
+          action: 'reactivated',
+          reason: 'credit_renewal_reactivated',
+        }),
+      ])
+    );
+    expect(txUpdates.some(update => 'microdollars_used' in update)).toBe(true);
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: 'active',
+          past_due_since: null,
+          credit_renewal_at: '2026-05-09T10:00:00.000Z',
+        }),
+      ])
+    );
+
+    const sideEffectCalls = fetch.mock.calls.map(
+      ([, init]) =>
+        JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+          input: Record<string, unknown>;
+        }
+    );
+    expect(sideEffectCalls.map(call => call.action)).not.toContain(
+      'project_pending_kilo_pass_bonus'
+    );
+    const bonusCall = sideEffectCalls.find(
+      call => call.action === 'issue_kilo_pass_bonus_from_usage_threshold'
+    );
+    expect(bonusCall?.input.userId).toBe('past-due-user');
+    expect(typeof bonusCall?.input.nowIso).toBe('string');
+  });
+
+  it('sends insufficient-credit email without charging when balance and auto top-up are unavailable', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, inserts, updates, txInserts } = createMockDb(
+      [
+        [
+          {
+            user_id: 'insufficient-user',
+            email: 'insufficient-user@example.com',
+            instance_id: 'insufficient-instance',
+            id: 'insufficient-sub',
+            instance_row_id: 'insufficient-instance',
+            organization_id: null,
+            instance_destroyed_at: null,
+            plan: 'standard',
+            status: 'active',
+            kiloclaw_price_version: '2026-05-10',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            cancel_at_period_end: false,
+            scheduled_plan: null,
+            commit_ends_at: null,
+            past_due_since: null,
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 1_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+        ],
+      ],
+      { txFallbackFromDbSelect: true }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'send_email':
+          return new Response(JSON.stringify({ sent: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runCreditRenewalSweepForTest(
+      db,
+      createEnv(vi.fn()),
+      'f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6'
+    );
+
+    expect(summary.credit_renewals_past_due).toBe(1);
+    expect(summary.emails_sent).toBe(1);
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(txInserts).toHaveLength(0);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ status: 'past_due' });
+    expect(updates[0]).toHaveProperty('past_due_since');
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: 'insufficient-sub',
+          action: 'status_changed',
+          reason: 'credit_renewal_insufficient_credits',
+        }),
+        expect.objectContaining({
+          email_type: 'claw_credit_renewal_failed',
+          user_id: 'insufficient-user',
+          instance_id: 'insufficient-instance',
+        }),
+      ])
+    );
+
+    const sideEffectCalls = fetch.mock.calls.map(
+      ([, init]) =>
+        JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+          input: Record<string, unknown>;
+        }
+    );
+    expect(sideEffectCalls).toEqual([
+      {
+        action: 'send_email',
+        input: {
+          to: 'insufficient-user@example.com',
+          templateName: 'clawCreditRenewalFailed',
+          templateVars: { claw_url: 'https://app.kilo.ai/claw' },
+          userId: 'insufficient-user',
+          instanceId: 'insufficient-instance',
+        },
+      },
+    ]);
+  });
+
+  it('requests auto-resume when suspended past-due rows recover through credit renewal', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const instanceId = '77777777-7777-4777-8777-777777777777';
+    const { db, updates, txUpdates } = createMockDb(
+      [
+        [
+          {
+            user_id: 'suspended-user',
+            email: 'suspended-user@example.com',
+            instance_id: instanceId,
+            id: 'suspended-sub',
+            instance_row_id: instanceId,
+            organization_id: null,
+            instance_destroyed_at: null,
+            plan: 'standard',
+            status: 'past_due',
+            kiloclaw_price_version: '2026-05-10',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            cancel_at_period_end: false,
+            scheduled_plan: null,
+            commit_ends_at: null,
+            past_due_since: '2026-03-20T10:00:00.000Z',
+            suspended_at: '2026-04-08T10:00:00.000Z',
+            auto_resume_attempt_count: 2,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 100_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+        ],
+        [{ id: instanceId, sandbox_id: 'ki_77777777777747778777777777777777' }],
+      ],
+      { txFallbackFromDbSelect: true }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+        };
+
+        switch (body.action) {
+          case 'project_pending_kilo_pass_bonus':
+            return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 'issue_kilo_pass_bonus_from_usage_threshold':
+            return new Response(JSON.stringify({ ok: true }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 'process_paid_conversion':
+            return new Response(
+              JSON.stringify({
+                affiliateSaleEnqueued: true,
+                winningTouchType: 'affiliate',
+                conversionId: null,
+                disqualificationReason: null,
+              }),
+              {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              }
+            );
+          default:
+            throw new Error(`Unexpected side effect action: ${body.action}`);
+        }
+      })
+    );
+    const kiloclawFetch = vi.fn(async (request: RequestInfo | URL) => {
+      const url = request instanceof Request ? request.url : String(request);
+      expect(url).toContain(`/api/platform/start-async?instanceId=${instanceId}`);
+      if (request instanceof Request) {
+        await expect(request.json()).resolves.toEqual({
+          userId: 'suspended-user',
+          reason: 'interrupted_auto_resume',
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const summary = await runCreditRenewalSweepForTest(
+      db,
+      createEnv(kiloclawFetch),
+      '17171717-1717-4717-8717-171717171717'
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(kiloclawFetch).toHaveBeenCalledTimes(1);
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: 'active', past_due_since: null })])
+    );
+    const autoResumeUpdate = updates.find(update => update.auto_resume_attempt_count === 3);
+    expect(autoResumeUpdate).toMatchObject({ auto_resume_attempt_count: 3 });
+    expect(typeof autoResumeUpdate?.auto_resume_requested_at).toBe('string');
+    expect(typeof autoResumeUpdate?.auto_resume_retry_after).toBe('string');
+  });
+
+  it('normalizes Postgres renewal timestamps before paid-conversion side effects', async () => {
+    const postgresRenewalAt = '2026-04-29 01:16:12.945+00';
+    const renewalAtIso = '2026-04-29T01:16:12.945Z';
+    const { db } = createMockDb([
+      [
+        creditRenewalRow({
+          id: 'sub-1',
+          instance_id: 'instance-1',
+          instance_row_id: 'instance-1',
+          credit_renewal_at: postgresRenewalAt,
+          current_period_end: postgresRenewalAt,
+          total_microdollars_acquired: 50_000_000,
+          kilo_pass_threshold: null,
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return Response.json({ projectedBonusMicrodollars: 0 });
+        case 'issue_kilo_pass_bonus_from_usage_threshold':
+          return Response.json({ ok: true });
+        case 'process_paid_conversion':
+          return Response.json({
+            affiliateSaleEnqueued: false,
+            winningTouchType: 'none',
+            conversionId: null,
+            disqualificationReason: null,
+          });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        runId: 'acacacac-acac-4cac-8cac-acacacacacac',
+        renewalBoundary: renewalAtIso,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    const saleCall = fetch.mock.calls
+      .map(
+        ([, init]) =>
+          JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+            action: string;
+            input: Record<string, unknown>;
+          }
+      )
+      .find(call => call.action === 'process_paid_conversion');
+
+    expect(saleCall?.input.eventDateIso).toBe(renewalAtIso);
+  });
+
+  it('normalizes Postgres user timestamps before auto top-up side effects', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const beforeRow = creditRenewalRow({
+      id: 'sub-1',
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      total_microdollars_acquired: 1_000_000,
+      microdollars_used: 900_000,
+      auto_top_up_enabled: true,
+      kilo_pass_threshold: null,
+      next_credit_expiration_at: '2026-04-29 01:16:12.945+00',
+      user_updated_at: '2026-04-09 09:00:00+00',
+    });
+    const afterRow = {
+      ...beforeRow,
+      auto_top_up_triggered_for_period: renewalAt,
+    };
+    const { db } = createMockDb([[beforeRow]], {
+      updateReturningRows: [[afterRow]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return Response.json({ projectedBonusMicrodollars: 0 });
+        case 'trigger_user_auto_top_up':
+          return Response.json({ ok: true });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        runId: 'bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbcbc',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals_auto_top_up).toBe(1);
+    const autoTopUpCall = fetch.mock.calls
+      .map(
+        ([, init]) =>
+          JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+            action: string;
+            input: { user?: Record<string, unknown> };
+          }
+      )
+      .find(call => call.action === 'trigger_user_auto_top_up');
+
+    expect(autoTopUpCall?.input.user).toEqual(
+      expect.objectContaining({
+        next_credit_expiration_at: '2026-04-29T01:16:12.945Z',
+        updated_at: '2026-04-09T09:00:00.000Z',
+      })
+    );
   });
 
   it('enqueues a sale affiliate event for pure-credit renewals', async () => {
@@ -1103,6 +5613,7 @@ describe('credit renewal sweep affiliate tracking', () => {
           instance_destroyed_at: null,
           plan: 'standard',
           status: 'active',
+          kiloclaw_price_version: '2026-03-19',
           credit_renewal_at: renewalAt,
           current_period_end: renewalAt,
           cancel_at_period_end: false,
@@ -1159,12 +5670,12 @@ describe('credit renewal sweep affiliate tracking', () => {
     });
     vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
 
-    const summary = await runSweep(
+    const summary = await processCreditRenewalItem(
       createEnv(vi.fn()),
-      {
+      creditRenewalItemMessage({
         runId: 'abababab-abab-4bab-8bab-abababababab',
-        sweep: 'credit_renewal',
-      },
+        renewalBoundary: renewalAt,
+      }),
       1
     );
 
@@ -1214,9 +5725,9 @@ describe('credit renewal sweep affiliate tracking', () => {
         orderId: 'kiloclaw-subscription:instance-1:2026-04',
         amount: 9,
         currencyCode: 'usd',
-        itemCategory: 'kiloclaw-standard',
+        itemCategory: 'kiloclaw-standard-2026-03-19',
         itemName: 'KiloClaw Standard Plan',
-        itemSku: 'price_standard',
+        itemSku: 'kiloclaw-standard-2026-03-19',
       },
     });
   });
@@ -1235,6 +5746,7 @@ describe('credit renewal sweep affiliate tracking', () => {
           instance_destroyed_at: null,
           plan: 'standard',
           status: 'active',
+          kiloclaw_price_version: '2026-03-19',
           credit_renewal_at: renewalAt,
           current_period_end: renewalAt,
           cancel_at_period_end: false,
@@ -1283,12 +5795,12 @@ describe('credit renewal sweep affiliate tracking', () => {
       })
     );
 
-    const summary = await runSweep(
+    const summary = await processCreditRenewalItem(
       createEnv(vi.fn()),
-      {
+      creditRenewalItemMessage({
         runId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
-        sweep: 'credit_renewal',
-      },
+        renewalBoundary: renewalAt,
+      }),
       1
     );
 
@@ -1316,6 +5828,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             instance_destroyed_at: null,
             plan: 'standard',
             status: 'active',
+            kiloclaw_price_version: '2026-03-19',
             credit_renewal_at: renewalAt,
             current_period_end: renewalAt,
             cancel_at_period_end: false,
@@ -1369,20 +5882,44 @@ describe('credit renewal sweep affiliate tracking', () => {
     });
     vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
 
-    const summary = await runSweep(
+    const summary = await processCreditRenewalItem(
       createEnv(vi.fn()),
-      {
+      creditRenewalItemMessage({
         runId: 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
-        sweep: 'credit_renewal',
-      },
+        renewalBoundary: renewalAt,
+      }),
       1
     );
 
     expect(summary.credit_renewals).toBe(0);
     expect(summary.credit_renewals_skipped_duplicate).toBe(1);
     expect(summary.errors).toBe(0);
-    expect(txInserts).toHaveLength(1);
-    expect(txUpdates).toEqual([]);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          credit_category: 'kiloclaw-subscription:instance-1:2026-04',
+        }),
+        expect.objectContaining({
+          action: 'period_advanced',
+          reason: 'credit_renewal_duplicate_idempotency_reconciled',
+        }),
+      ])
+    );
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          current_period_start: renewalAt,
+          current_period_end: '2026-05-09T10:00:00.000Z',
+          credit_renewal_at: '2026-05-09T10:00:00.000Z',
+        }),
+        expect.objectContaining({
+          status: 'superseded',
+          resolution_actor_type: 'system',
+          resolution_actor_id: 'billing-lifecycle-job',
+          resolution_reason: 'subscription_boundary_advanced',
+        }),
+      ])
+    );
 
     const sideEffectCalls = fetch.mock.calls.map(
       ([, init]) =>
@@ -1394,14 +5931,6 @@ describe('credit renewal sweep affiliate tracking', () => {
 
     expect(sideEffectCalls).toEqual([
       {
-        action: 'project_pending_kilo_pass_bonus',
-        input: {
-          userId: 'user-1',
-          microdollarsUsed: 9_000_000,
-          kiloPassThreshold: null,
-        },
-      },
-      {
         action: 'process_paid_conversion',
         input: {
           userId: 'user-1',
@@ -1410,9 +5939,9 @@ describe('credit renewal sweep affiliate tracking', () => {
           orderId: 'kiloclaw-subscription:instance-1:2026-04',
           amount: 9,
           currencyCode: 'usd',
-          itemCategory: 'kiloclaw-standard',
+          itemCategory: 'kiloclaw-standard-2026-03-19',
           itemName: 'KiloClaw Standard Plan',
-          itemSku: 'price_standard',
+          itemSku: 'kiloclaw-standard-2026-03-19',
         },
       },
     ]);
@@ -1430,6 +5959,7 @@ describe('credit renewal sweep affiliate tracking', () => {
       instance_destroyed_at: null,
       plan: 'standard',
       status: 'active',
+      kiloclaw_price_version: '2026-03-19',
       credit_renewal_at: renewalAt,
       current_period_end: renewalAt,
       cancel_at_period_end: false,
@@ -1478,12 +6008,12 @@ describe('credit renewal sweep affiliate tracking', () => {
     });
     vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
 
-    const summary = await runSweep(
+    const summary = await processCreditRenewalItem(
       createEnv(vi.fn()),
-      {
+      creditRenewalItemMessage({
         runId: 'dadadada-dada-4ada-8ada-dadadadadada',
-        sweep: 'credit_renewal',
-      },
+        renewalBoundary: renewalAt,
+      }),
       1
     );
 
@@ -1511,14 +6041,6 @@ describe('credit renewal sweep affiliate tracking', () => {
 
     expect(sideEffectCalls).toEqual([
       {
-        action: 'project_pending_kilo_pass_bonus',
-        input: {
-          userId: 'user-1',
-          microdollarsUsed: 9_900_000,
-          kiloPassThreshold: null,
-        },
-      },
-      {
         action: 'trigger_user_auto_top_up',
         input: {
           user: {
@@ -1534,6 +6056,77 @@ describe('credit renewal sweep affiliate tracking', () => {
     ]);
   });
 
+  it('preserves the auto-top-up marker when trigger failure is ambiguous', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const beforeRow = creditRenewalRow({
+      id: 'sub-1',
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      total_microdollars_acquired: 1_000_000,
+      microdollars_used: 900_000,
+      auto_top_up_enabled: true,
+      kilo_pass_threshold: null,
+      user_updated_at: '2026-04-09T09:00:00.000Z',
+    });
+    const afterRow = {
+      ...beforeRow,
+      auto_top_up_triggered_for_period: renewalAt,
+    };
+    const { db, updates, inserts } = createMockDb([[beforeRow]], {
+      updateReturningRows: [[afterRow]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_request, init) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+      };
+
+      if (body.action === 'project_pending_kilo_pass_bonus') {
+        return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (body.action === 'trigger_user_auto_top_up') {
+        return new Response(JSON.stringify({ error: 'auto top-up unavailable' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      throw new Error(`Unexpected side effect action: ${body.action}`);
+    });
+
+    await expect(
+      processCreditRenewalItem(
+        createEnv(vi.fn()),
+        creditRenewalItemMessage({
+          runId: 'cececece-cece-4ece-8ece-cececececece',
+          renewalBoundary: renewalAt,
+        }),
+        1
+      )
+    ).rejects.toThrow('Billing side effect failed (500): {"error":"auto top-up unavailable"}');
+
+    expect(updates).toEqual([{ auto_top_up_triggered_for_period: renewalAt }]);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: 'credit_renewal_auto_top_up_marked',
+        }),
+      ])
+    );
+    expect(inserts).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: 'credit_renewal_auto_top_up_trigger_failed',
+        }),
+      ])
+    );
+  });
+
   it('skips auto-top-up trigger when marker update loses concurrent race', async () => {
     const renewalAt = '2026-04-09T10:00:00.000Z';
     const beforeRow = {
@@ -1546,6 +6139,7 @@ describe('credit renewal sweep affiliate tracking', () => {
       instance_destroyed_at: null,
       plan: 'standard',
       status: 'active',
+      kiloclaw_price_version: '2026-03-19',
       credit_renewal_at: renewalAt,
       current_period_end: renewalAt,
       cancel_at_period_end: false,
@@ -1587,12 +6181,12 @@ describe('credit renewal sweep affiliate tracking', () => {
     });
     vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
 
-    const summary = await runSweep(
+    const summary = await processCreditRenewalItem(
       createEnv(vi.fn()),
-      {
+      creditRenewalItemMessage({
         runId: 'dededede-dede-4ede-8ede-dededededede',
-        sweep: 'credit_renewal',
-      },
+        renewalBoundary: renewalAt,
+      }),
       1
     );
 
@@ -1616,19 +6210,251 @@ describe('credit renewal sweep affiliate tracking', () => {
         }
     );
 
-    expect(sideEffectCalls).toEqual([
-      {
-        action: 'project_pending_kilo_pass_bonus',
-        input: {
-          userId: 'user-1',
-          microdollarsUsed: 9_900_000,
-          kiloPassThreshold: null,
-        },
-      },
-    ]);
+    expect(sideEffectCalls).toEqual([]);
   });
 
-  it('skips organization-managed rows in personal credit renewal sweep', async () => {
+  it('renews active pure-credit rows whose linked instance is destroyed', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, txInserts, txUpdates } = createMockDb([
+      [
+        creditRenewalRow({
+          id: 'destroyed-renew-sub',
+          user_id: 'destroyed-renew-user',
+          email: 'destroyed-renew-user@example.com',
+          instance_id: 'destroyed-renew-instance',
+          instance_row_id: 'destroyed-renew-instance',
+          instance_destroyed_at: '2026-04-08T10:00:00.000Z',
+          kiloclaw_price_version: '2026-05-10',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+          total_microdollars_acquired: 100_000_000,
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+        };
+
+        switch (body.action) {
+          case 'project_pending_kilo_pass_bonus':
+            return Response.json({ projectedBonusMicrodollars: 0 });
+          case 'issue_kilo_pass_bonus_from_usage_threshold':
+            return Response.json({ ok: true });
+          case 'process_paid_conversion':
+            return Response.json({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            });
+          default:
+            throw new Error(`Unexpected side effect action: ${body.action}`);
+        }
+      })
+    );
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        subscriptionId: 'destroyed-renew-sub',
+        userId: 'destroyed-renew-user',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kilo_user_id: 'destroyed-renew-user',
+          amount_microdollars: -55_000_000,
+          credit_category: 'kiloclaw-subscription:destroyed-renew-instance:2026-04',
+        }),
+        expect.objectContaining({
+          subscription_id: 'destroyed-renew-sub',
+          action: 'period_advanced',
+          reason: 'credit_renewal',
+        }),
+      ])
+    );
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ microdollars_used: expect.anything() }),
+        expect.objectContaining({
+          current_period_start: renewalAt,
+          current_period_end: '2026-05-09T10:00:00.000Z',
+          credit_renewal_at: '2026-05-09T10:00:00.000Z',
+        }),
+      ])
+    );
+    expect(loggedValues).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: 'subscription_row_skipped',
+          reason: 'instance_destroyed',
+        }),
+      ])
+    );
+  });
+
+  it('renews destroyed suspended past-due rows without requesting platform auto-resume', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, txUpdates } = createMockDb(
+      [
+        [
+          creditRenewalRow({
+            id: 'destroyed-suspended-sub',
+            user_id: 'destroyed-suspended-user',
+            email: 'destroyed-suspended-user@example.com',
+            instance_id: 'destroyed-suspended-instance',
+            instance_row_id: 'destroyed-suspended-instance',
+            instance_destroyed_at: '2026-04-08T10:00:00.000Z',
+            status: 'past_due',
+            kiloclaw_price_version: '2026-05-10',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            past_due_since: '2026-04-01T10:00:00.000Z',
+            suspended_at: '2026-04-08T10:00:00.000Z',
+            auto_resume_attempt_count: 2,
+            total_microdollars_acquired: 100_000_000,
+          }),
+        ],
+        [],
+      ],
+      { txFallbackFromDbSelect: true }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+        };
+
+        switch (body.action) {
+          case 'project_pending_kilo_pass_bonus':
+            return Response.json({ projectedBonusMicrodollars: 0 });
+          case 'issue_kilo_pass_bonus_from_usage_threshold':
+            return Response.json({ ok: true });
+          case 'process_paid_conversion':
+            return Response.json({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            });
+          default:
+            throw new Error(`Unexpected side effect action: ${body.action}`);
+        }
+      })
+    );
+    const kiloclawFetch = vi.fn();
+
+    const summary = await processCreditRenewalItem(
+      createEnv(kiloclawFetch),
+      creditRenewalItemMessage({
+        subscriptionId: 'destroyed-suspended-sub',
+        userId: 'destroyed-suspended-user',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(kiloclawFetch).not.toHaveBeenCalled();
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: 'active',
+          past_due_since: null,
+          credit_renewal_at: '2026-05-09T10:00:00.000Z',
+        }),
+        expect.objectContaining({
+          suspended_at: null,
+          destruction_deadline: null,
+          auto_resume_requested_at: null,
+          auto_resume_retry_after: null,
+          auto_resume_attempt_count: 0,
+        }),
+      ])
+    );
+  });
+
+  it('skips detached rows in personal credit renewal item processing', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, txInserts, txUpdates } = createMockDb([
+      [
+        creditRenewalRow({
+          id: 'detached-renew-sub',
+          instance_id: null,
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        subscriptionId: 'detached-renew-sub',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_skipped_duplicate).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(txInserts).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+  });
+
+  it('skips rows whose linked instance record is missing in credit renewal item processing', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, txInserts, txUpdates } = createMockDb([
+      [
+        creditRenewalRow({
+          id: 'missing-instance-renew-sub',
+          instance_row_id: null,
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+        }),
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        subscriptionId: 'missing-instance-renew-sub',
+        renewalBoundary: renewalAt,
+      }),
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_skipped_duplicate).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(txInserts).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+  });
+
+  it('skips organization-managed rows in personal credit renewal item processing', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
     const { db, txInserts, txUpdates } = createMockDb([
       [
         {
@@ -1641,8 +6467,9 @@ describe('credit renewal sweep affiliate tracking', () => {
           instance_destroyed_at: null,
           plan: 'standard',
           status: 'active',
-          credit_renewal_at: '2026-04-09T10:00:00.000Z',
-          current_period_end: '2026-04-09T10:00:00.000Z',
+          kiloclaw_price_version: '2026-03-19',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
           cancel_at_period_end: false,
           scheduled_plan: null,
           commit_ends_at: null,
@@ -1663,12 +6490,12 @@ describe('credit renewal sweep affiliate tracking', () => {
     const fetch = vi.fn();
     vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
 
-    const summary = await runSweep(
+    const summary = await processCreditRenewalItem(
       createEnv(vi.fn()),
-      {
+      creditRenewalItemMessage({
         runId: '18181818-1818-4818-8818-181818181818',
-        sweep: 'credit_renewal',
-      },
+        renewalBoundary: renewalAt,
+      }),
       1
     );
 
@@ -1830,6 +6657,85 @@ describe('complementary inference ended sweep', () => {
   });
 });
 
+describe('subscription expiry sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('filters destroyed instances in SQL', async () => {
+    const { db, updates, inserts, selectBuilders } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '95959595-9595-4595-8595-959595959595',
+        sweep: 'subscription_expiry',
+      },
+      1
+    );
+
+    const subscriptionExpiryWhere = selectBuilders[0]?.where.mock.calls[0]?.[0];
+    expect(subscriptionExpiryWhere).toBeDefined();
+    if (!subscriptionExpiryWhere) {
+      throw new Error('expected subscription expiry candidate query predicate');
+    }
+
+    const actualDbModule = await vi.importActual<typeof DbModule>('@kilocode/db');
+    const subscriptionExpirySql = actualDbModule
+      .getWorkerDb('postgres://unused:unused@localhost:0/unused')
+      .select()
+      .from(actualDbModule.kiloclaw_subscriptions)
+      .where(subscriptionExpiryWhere)
+      .toSQL().sql;
+
+    expect(subscriptionExpirySql).toMatch(/"kiloclaw_instances"\."destroyed_at"\s+is null/i);
+    expect(summary.sweep2_subscription_expiry).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+
+  it('skips organization-managed rows in personal subscription expiry cleanup', async () => {
+    const { db, updates, inserts } = createMockDb([
+      [
+        {
+          id: 'org-expired-sub',
+          user_id: 'org-expired-user',
+          instance_id: 'org-expired-instance',
+          sandbox_id: 'ki_orgexpired0000000000000000000',
+          instance_destroyed_at: null,
+          organization_id: 'org-expired',
+          email: 'org-expired@example.com',
+          credit_renewal_at: null,
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '96969696-9696-4969-8969-969696969697',
+        sweep: 'subscription_expiry',
+      },
+      1
+    );
+
+    expect(summary.sweep2_subscription_expiry).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+});
+
 describe('soft-deleted user lifecycle exclusion', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1908,6 +6814,114 @@ describe('trial inactivity stop sweep', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
+  it('filters organization-managed rows from trial inactivity discovery SQL', async () => {
+    const { db, selectBuilders } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const { env, trialInactivitySendBatch } = createEnvWithQueueMocks(vi.fn());
+
+    const summary = await runSweep(
+      env,
+      {
+        runId: '75757575-7575-4757-8757-757575757570',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    const trialInactivityWhere = selectBuilders[0]?.where.mock.calls[0]?.[0];
+    expect(trialInactivityWhere).toBeDefined();
+    if (!trialInactivityWhere) {
+      throw new Error('expected trial inactivity discovery query predicate');
+    }
+
+    const actualDbModule = await vi.importActual<typeof DbModule>('@kilocode/db');
+    const trialInactivitySql = actualDbModule
+      .getWorkerDb('postgres://unused:unused@localhost:0/unused')
+      .select()
+      .from(actualDbModule.kiloclaw_subscriptions)
+      .where(trialInactivityWhere)
+      .toSQL().sql;
+
+    expect(trialInactivitySql).toMatch(/"kiloclaw_instances"\."organization_id"\s+is null/i);
+    expect(summary.trial_inactivity_candidates).toBe(0);
+    expect(summary.trial_inactivity_stop_messages_enqueued).toBe(0);
+    expect(trialInactivitySendBatch).not.toHaveBeenCalled();
+  });
+
+  it('filters organization-managed rows from trial inactivity stop-candidate SQL', async () => {
+    const { db, selectBuilders, updates } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await processTrialInactivityStopCandidate(
+      createEnv(fetch),
+      {
+        kind: 'trial_inactivity_stop_candidate',
+        runId: '74747474-7474-4747-8747-747474747470',
+        sweep: 'trial_inactivity_stop_candidate',
+        subscriptionId: 'sub-org-filter',
+        userId: 'user-org-filter',
+        instanceId: '74747474-7474-4747-8747-747474747474',
+      },
+      1
+    );
+
+    const trialInactivityWhere = selectBuilders[0]?.where.mock.calls[0]?.[0];
+    expect(trialInactivityWhere).toBeDefined();
+    if (!trialInactivityWhere) {
+      throw new Error('expected trial inactivity stop-candidate query predicate');
+    }
+
+    const actualDbModule = await vi.importActual<typeof DbModule>('@kilocode/db');
+    const trialInactivitySql = actualDbModule
+      .getWorkerDb('postgres://unused:unused@localhost:0/unused')
+      .select()
+      .from(actualDbModule.kiloclaw_subscriptions)
+      .where(trialInactivityWhere)
+      .toSQL().sql;
+
+    expect(trialInactivitySql).toMatch(/"kiloclaw_instances"\."organization_id"\s+is null/i);
+    expect(summary.trial_inactivity_candidates).toBe(0);
+    expect(summary.trial_inactivity_stops).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+  });
+
+  it('does not enqueue stop-candidate work for current one-day trial instances', async () => {
+    const instanceId = '76767676-7676-4676-8676-767676767676';
+    const { db } = createMockDb([
+      [
+        {
+          subscription_id: 'sub-current-one-day-inactivity',
+          user_id: 'user-current-one-day-inactivity',
+          instance_id: instanceId,
+          sandbox_id: 'ki_76767676767646768676767676767676',
+          organization_id: null,
+          instance_destroyed_at: null,
+          instance_created_at: '2026-04-18T00:00:00.000Z',
+          kiloclaw_price_version: '2026-05-10',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    mockQueryKiloclawActiveUserIds.mockResolvedValue(new Set());
+    const { env, trialInactivitySendBatch } = createEnvWithQueueMocks(vi.fn());
+
+    const summary = await runSweep(
+      env,
+      {
+        runId: '76767676-7676-4676-8676-767676767670',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    expect(summary.trial_inactivity_candidates).toBe(0);
+    expect(summary.trial_inactivity_stop_messages_enqueued).toBe(0);
+    expect(mockQueryKiloclawActiveUserIds).not.toHaveBeenCalled();
+    expect(trialInactivitySendBatch).not.toHaveBeenCalled();
+  });
+
   it('enqueues stop-candidate work for personal trial instances with no qualifying Snowflake usage', async () => {
     const instanceId = '77777777-7777-4777-8777-777777777777';
     const { db, updates } = createMockDb([
@@ -1920,6 +6934,7 @@ describe('trial inactivity stop sweep', () => {
           organization_id: null,
           instance_destroyed_at: null,
           instance_created_at: '2026-04-18T00:00:00.000Z',
+          kiloclaw_price_version: '2026-03-19',
         },
       ],
     ]);
@@ -1967,6 +6982,7 @@ describe('trial inactivity stop sweep', () => {
           organization_id: null,
           instance_destroyed_at: null,
           instance_created_at: '2026-04-18T00:00:00.000Z',
+          kiloclaw_price_version: '2026-03-19',
         },
       ],
     ]);
@@ -2015,6 +7031,7 @@ describe('trial inactivity stop sweep', () => {
           organization_id: null,
           instance_destroyed_at: null,
           instance_created_at: '2026-04-18T00:00:00.000Z',
+          kiloclaw_price_version: '2026-03-19',
         },
       ],
     ]);
@@ -2069,6 +7086,7 @@ describe('trial inactivity stop sweep', () => {
           organization_id: null,
           instance_destroyed_at: null,
           instance_created_at: '2026-04-18T00:00:00.000Z',
+          kiloclaw_price_version: '2026-03-19',
         },
       ],
     ]);
@@ -2140,6 +7158,7 @@ describe('trial inactivity stop sweep', () => {
           organization_id: null,
           instance_destroyed_at: null,
           instance_created_at: '2026-04-18T00:00:00.000Z',
+          kiloclaw_price_version: '2026-03-19',
         },
       ],
     ]);
@@ -2222,5 +7241,115 @@ describe('trial inactivity stop sweep', () => {
         }),
       ])
     );
+  });
+});
+
+describe('organization KiloClaw lifecycle notification contract', () => {
+  it('deduplicates overlapping recipients and keeps billing-authority guidance', () => {
+    expect(
+      selectOrganizationKiloClawLifecycleRecipients({
+        associatedUser: { userId: 'user-owner', email: 'owner@example.com' },
+        billingAuthorities: [
+          { userId: 'user-owner', email: 'owner@example.com' },
+          { userId: 'user-billing', email: 'billing@example.com' },
+        ],
+      })
+    ).toEqual([
+      {
+        userId: 'user-owner',
+        email: 'owner@example.com',
+        audience: 'billing_authority',
+      },
+      {
+        userId: 'user-billing',
+        email: 'billing@example.com',
+        audience: 'billing_authority',
+      },
+    ]);
+  });
+
+  it('builds billing-authority suspension payloads with org billing routing and dedupe metadata', () => {
+    expect(
+      buildOrganizationKiloClawLifecycleNotification({
+        backendBaseUrl: 'https://app.kilo.ai',
+        recipient: {
+          userId: 'owner-123',
+          email: 'owner@example.com',
+          audience: 'billing_authority',
+        },
+        context: {
+          event: 'trial_suspended',
+          organizationId: 'org-123',
+          organizationName: 'Acme Corp',
+          instanceId: 'instance-456',
+          instanceLabel: 'Research Claw',
+          destructionDate: 'May 25, 2026',
+        },
+      })
+    ).toEqual({
+      emailType: 'claw_org_trial_suspended',
+      templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
+      templateVars: {
+        organization_name: 'Acme Corp',
+        instance_label: 'Research Claw',
+        destruction_date: 'May 25, 2026',
+        organization_billing_url: 'https://app.kilo.ai/organizations/org-123/payment-details',
+      },
+      userId: 'owner-123',
+      userEmail: 'owner@example.com',
+      entityFields: {
+        instanceId: 'instance-456',
+        organizationId: 'org-123',
+      },
+    });
+  });
+
+  it('builds associated-user warning and destroyed payloads with organization KiloClaw routing', () => {
+    const recipient = {
+      userId: 'member-123',
+      email: 'member@example.com',
+      audience: 'associated_user' as const,
+    };
+    const baseContext = {
+      organizationId: 'org-123',
+      organizationName: 'Acme Corp',
+      instanceId: 'instance-456',
+      instanceLabel: 'Research Claw',
+    };
+
+    expect(
+      buildOrganizationKiloClawLifecycleNotification({
+        backendBaseUrl: 'https://app.kilo.ai',
+        recipient,
+        context: {
+          ...baseContext,
+          event: 'destruction_warning',
+          destructionDate: 'May 25, 2026',
+        },
+      })
+    ).toMatchObject({
+      emailType: 'claw_org_destruction_warning',
+      templateName: 'clawOrganizationDestructionWarningUser',
+      templateVars: {
+        organization_claw_url: 'https://app.kilo.ai/organizations/org-123/claw',
+      },
+    });
+
+    expect(
+      buildOrganizationKiloClawLifecycleNotification({
+        backendBaseUrl: 'https://app.kilo.ai',
+        recipient,
+        context: {
+          ...baseContext,
+          event: 'instance_destroyed',
+        },
+      })
+    ).toMatchObject({
+      emailType: 'claw_org_instance_destroyed',
+      templateName: 'clawOrganizationInstanceDestroyedUser',
+      templateVars: {
+        organization_claw_url: 'https://app.kilo.ai/organizations/org-123/claw',
+      },
+    });
   });
 });

@@ -72,6 +72,115 @@ function withFakePnpm(output: string, fn: () => void): void {
   }
 }
 
+test('overrides the pulled web attachment bucket for nextjs development-local output', () => {
+  const repo = createRepo({
+    '.env.local': 'CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME=cloud-agent-attachments\n',
+    'apps/web/.env.development.local.example': fs.readFileSync(
+      new URL('../../../apps/web/.env.development.local.example', import.meta.url),
+      'utf-8'
+    ),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+    assert.equal(plan.missingEnvLocal, false);
+    assert.deepEqual(
+      plan.envDevLocalChanges.find(
+        change => change.key === 'CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME'
+      ),
+      {
+        key: 'CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME',
+        oldValue: undefined,
+        newValue: 'cloud-agent-attachments-dev',
+      }
+    );
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('reconciles an incorrect generated web override to its template literal', () => {
+  const repo = createRepo({
+    '.env.local': 'ATTACHMENTS_BUCKET=production-bucket\n',
+    'apps/web/.env.development.local.example':
+      '# @override\nATTACHMENTS_BUCKET=development-bucket\n',
+    'apps/web/.env.development.local': 'ATTACHMENTS_BUCKET=stale-bucket\n',
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+    assert.deepEqual(plan.envDevLocalChanges, [
+      {
+        key: 'ATTACHMENTS_BUCKET',
+        oldValue: 'stale-bucket',
+        newValue: 'development-bucket',
+      },
+    ]);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('leaves an already correct generated web override unchanged', () => {
+  const repo = createRepo({
+    '.env.local': 'ATTACHMENTS_BUCKET=production-bucket\n',
+    'apps/web/.env.development.local.example':
+      '# @override\nATTACHMENTS_BUCKET=development-bucket\n',
+    'apps/web/.env.development.local': 'ATTACHMENTS_BUCKET=development-bucket\n',
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+    assert.deepEqual(plan.envDevLocalChanges, []);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('preserves root-first resolution for unannotated web template entries', () => {
+  const repo = createRepo({
+    '.env.local': 'STRIPE_PRICE_ID=pulled-stripe-price\n',
+    'apps/web/.env.development.local.example': 'STRIPE_PRICE_ID=template-stripe-price\n',
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+    assert.deepEqual(plan.envDevLocalChanges, [
+      {
+        key: 'STRIPE_PRICE_ID',
+        oldValue: undefined,
+        newValue: 'pulled-stripe-price',
+      },
+    ]);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('applies an explicit worker override even when root and existing dev vars differ', () => {
+  const repo = createRepo({
+    '.env.local': 'SHARED_BUCKET=production-bucket\n',
+    [`${workerDir}/.dev.vars.example`]: '# @override\nSHARED_BUCKET=development-bucket\n',
+    [`${workerDir}/.dev.vars`]: 'SHARED_BUCKET=stale-bucket\n',
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['cloud-agent-next']));
+    assert.deepEqual(plan.devVarsChanges, [
+      {
+        workerDir,
+        isNew: false,
+        keyChanges: [
+          {
+            key: 'SHARED_BUCKET',
+            oldValue: 'stale-bucket',
+            newValue: 'development-bucket',
+          },
+        ],
+        missingValues: [],
+        newFileContent: undefined,
+      },
+    ]);
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('treats selected wrangler environment vars as satisfied without copying them', () => {
   const repo = createCloudAgentNextRepo({
     wranglerJsonc: `{
@@ -380,6 +489,41 @@ test('preserves host.docker.internal in @url defaults for useLanIp services', ()
     assert.ok(content.includes('WORKER_URL=http://host.docker.internal:8794'));
     // ORIGINS keys still use localhost even when example default has host.docker.internal
     assert.ok(content.includes('ALLOWED_ORIGINS=http://localhost:3000'));
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('preserves localhost in worker-side @url defaults for useLanIp services', () => {
+  const repo = createRepo({
+    '.env.local': '',
+    [`${workerDir}/package.json`]: JSON.stringify(
+      { scripts: { dev: "wrangler dev --env 'dev'" } },
+      null,
+      2
+    ),
+    [`${workerDir}/wrangler.jsonc`]: '{ "dev": { "port": 8794 } }',
+    [`${workerDir}/.dev.vars.example`]: [
+      '# @url nextjs',
+      'KILOCODE_BACKEND_BASE_URL=http://localhost:3000',
+      '# @url nextjs/api',
+      'KILO_OPENROUTER_BASE=http://localhost:3000/api',
+      '# @url cloud-agent-next',
+      'WORKER_URL=http://host.docker.internal:8794',
+      '',
+    ].join('\n'),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['cloud-agent-next']));
+    assert.equal(plan.missingEnvLocal, false);
+    assert.equal(plan.devVarsChanges.length, 1);
+    const [change] = plan.devVarsChanges;
+    assert.ok(change);
+    assert.equal(change.isNew, true);
+    const content = change.newFileContent ?? '';
+    assert.ok(content.includes('KILOCODE_BACKEND_BASE_URL=http://localhost:3000'));
+    assert.ok(content.includes('KILO_OPENROUTER_BASE=http://localhost:3000/api'));
+    assert.ok(content.includes('WORKER_URL=http://host.docker.internal:8794'));
   } finally {
     repo.cleanup();
   }

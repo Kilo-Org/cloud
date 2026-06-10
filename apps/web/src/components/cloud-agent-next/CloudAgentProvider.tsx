@@ -6,22 +6,50 @@ import { useRawTRPCClient } from '@/lib/trpc/utils';
 import {
   createSessionManager,
   createBrowserLifecycleHooks,
+  createUserWebConnection,
   type SessionManager,
   type SessionSnapshot,
   type ResolvedSession,
   type FetchedSessionData,
   type KiloSessionId,
   type CloudAgentSessionId,
+  type TransportSendPayload,
+  type UserWebConnection,
 } from '@/lib/cloud-agent-sdk';
+import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
 import { usePostHog } from 'posthog-js/react';
 
 const ManagerContext = createContext<SessionManager | null>(null);
+const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
 
 type CloudAgentProviderProps = {
   children: ReactNode;
   organizationId?: string;
 };
+
+function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePayload {
+  // The transport-level SendPromptPayload makes mode/model optional (CLI
+  // live transport accepts them as optional). The cloud-agent worker schema
+  // requires them for prompts, so coerce here and fail loudly if missing.
+  if (payload.type === 'prompt') {
+    if (!payload.mode) throw new Error('Cloud Agent mode is required');
+    if (!payload.model) throw new Error('Cloud Agent model is required');
+    return {
+      type: 'prompt',
+      prompt: payload.prompt,
+      mode: payload.mode,
+      model: payload.model,
+      variant: payload.variant,
+    };
+  }
+
+  return {
+    type: 'command',
+    command: payload.command,
+    arguments: payload.arguments,
+  };
+}
 
 export function CloudAgentProvider({ children, organizationId }: CloudAgentProviderProps) {
   const storeRef = useRef(createStore());
@@ -29,6 +57,22 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
   const posthog = usePostHog();
   const posthogRef = useRef(posthog);
   posthogRef.current = posthog;
+
+  const sharedConnectionRef = useRef<ReturnType<typeof createUserWebConnection> | null>(null);
+  if (!SESSION_INGEST_WS_URL) {
+    throw new Error('NEXT_PUBLIC_SESSION_INGEST_WS_URL is required for Cloud Agent sessions');
+  }
+  if (sharedConnectionRef.current === null) {
+    sharedConnectionRef.current = createUserWebConnection({
+      websocketUrl: `${SESSION_INGEST_WS_URL}/api/user/web`,
+      getAuthToken: async () => {
+        const result = await trpcClient.activeSessions.getToken.query();
+        return result.token;
+      },
+      lifecycleHooks: createBrowserLifecycleHooks(),
+    });
+  }
+  const sharedConnection = sharedConnectionRef.current;
 
   // Create manager once per provider instance.
   // trpcClient is stable (from context); organizationId is stable per provider mount.
@@ -97,49 +141,36 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
         };
       },
 
-      getAuthToken: async () => {
-        const result = await trpcClient.activeSessions.getToken.query();
-        return result.token;
-      },
-
-      cliWebsocketUrl: SESSION_INGEST_WS_URL ? `${SESSION_INGEST_WS_URL}/api/user/web` : undefined,
+      userWebConnection: sharedConnection,
 
       websocketBaseUrl: CLOUD_AGENT_NEXT_WS_URL,
 
       lifecycleHooks: createBrowserLifecycleHooks(),
 
       api: {
-        send: async payload => {
-          const mode = payload.mode ?? 'code';
-          if (payload.model === undefined) {
-            throw new Error('Cloud Agent model is required');
-          }
+        send: async input => {
+          const normalizedPayload = normalizeTransportPayload(input.payload);
+
           if (organizationId) {
             return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
               {
-                cloudAgentSessionId: payload.sessionId,
-                prompt: payload.prompt,
-                mode,
-                model: payload.model,
-                variant: payload.variant,
+                cloudAgentSessionId: input.sessionId,
+                payload: normalizedPayload,
                 autoCommit: true,
                 organizationId,
-                messageId: payload.messageId,
-                images: payload.images,
+                messageId: input.messageId,
+                attachments: input.attachments ?? input.images,
               },
               { context: { skipBatch: true } }
             );
           }
           return trpcClient.cloudAgentNext.sendMessage.mutate(
             {
-              cloudAgentSessionId: payload.sessionId,
-              prompt: payload.prompt,
-              mode,
-              model: payload.model,
-              variant: payload.variant,
+              cloudAgentSessionId: input.sessionId,
+              payload: normalizedPayload,
               autoCommit: true,
-              messageId: payload.messageId,
-              images: payload.images,
+              messageId: input.messageId,
+              attachments: input.attachments ?? input.images,
             },
             { context: { skipBatch: true } }
           );
@@ -222,7 +253,13 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           | 'build'
           | 'architect'
           | 'custom';
-        const castInput = { ...input, mode: input.mode as AgentMode };
+        const castInput = {
+          ...input,
+          initialPayload: input.initialPayload
+            ? normalizeTransportPayload(input.initialPayload)
+            : undefined,
+          mode: input.mode as AgentMode,
+        };
         const result = organizationId
           ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
               ...castInput,
@@ -238,7 +275,10 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       initiate: async input => {
         if (organizationId) {
           return trpcClient.organizations.cloudAgentNext.initiateFromPreparedSession.mutate(
-            { cloudAgentSessionId: input.cloudAgentSessionId, organizationId },
+            {
+              cloudAgentSessionId: input.cloudAgentSessionId,
+              organizationId,
+            },
             { context: { skipBatch: true } }
           );
         }
@@ -298,17 +338,20 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
     });
   }
 
-  // Cleanup on unmount
   useEffect(() => {
     const manager = managerRef.current;
+    const release = sharedConnection.retain();
     return () => {
       manager?.destroy();
+      release();
     };
-  }, []);
+  }, [sharedConnection]);
 
   return (
     <JotaiProvider store={storeRef.current}>
-      <ManagerContext.Provider value={managerRef.current}>{children}</ManagerContext.Provider>
+      <UserWebConnectionContext.Provider value={sharedConnection}>
+        <ManagerContext.Provider value={managerRef.current}>{children}</ManagerContext.Provider>
+      </UserWebConnectionContext.Provider>
     </JotaiProvider>
   );
 }
@@ -317,4 +360,8 @@ export function useManager(): SessionManager {
   const manager = useContext(ManagerContext);
   if (!manager) throw new Error('useManager must be used within CloudAgentProvider');
   return manager;
+}
+
+export function useUserWebConnection(): UserWebConnection | null {
+  return useContext(UserWebConnectionContext);
 }

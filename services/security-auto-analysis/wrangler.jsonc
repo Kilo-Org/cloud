@@ -58,6 +58,18 @@
         "binding": "MANUAL_ANALYSIS_QUEUE",
         "queue": "security-manual-analysis-command-queue",
       },
+      {
+        "binding": "REMEDIATION_ATTEMPT_QUEUE",
+        "queue": "security-remediation-attempt-queue",
+      },
+      {
+        "binding": "REMEDIATION_COMMAND_QUEUE",
+        "queue": "security-remediation-command-queue",
+      },
+      {
+        "binding": "REMEDIATION_CALLBACK_QUEUE",
+        "queue": "security-remediation-callback-queue",
+      },
     ],
     "consumers": [
       {
@@ -79,6 +91,27 @@
         "max_batch_size": 1,
         "max_retries": 3,
         "dead_letter_queue": "security-manual-analysis-command-dlq",
+        "max_concurrency": 50,
+      },
+      {
+        "queue": "security-remediation-attempt-queue",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "security-remediation-attempt-dlq",
+        "max_concurrency": 50,
+      },
+      {
+        "queue": "security-remediation-command-queue",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "security-remediation-command-dlq",
+        "max_concurrency": 10,
+      },
+      {
+        "queue": "security-remediation-callback-queue",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "security-remediation-callback-dlq",
         "max_concurrency": 50,
       },
     ],
@@ -150,6 +183,18 @@
             "binding": "MANUAL_ANALYSIS_QUEUE",
             "queue": "security-manual-analysis-command-queue-dev",
           },
+          {
+            "binding": "REMEDIATION_ATTEMPT_QUEUE",
+            "queue": "security-remediation-attempt-queue-dev",
+          },
+          {
+            "binding": "REMEDIATION_COMMAND_QUEUE",
+            "queue": "security-remediation-command-queue-dev",
+          },
+          {
+            "binding": "REMEDIATION_CALLBACK_QUEUE",
+            "queue": "security-remediation-callback-queue-dev",
+          },
         ],
         "consumers": [
           {
@@ -171,6 +216,27 @@
             "max_batch_size": 1,
             "max_retries": 3,
             "dead_letter_queue": "security-manual-analysis-command-dlq-dev",
+            "max_concurrency": 50,
+          },
+          {
+            "queue": "security-remediation-attempt-queue-dev",
+            "max_batch_size": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "security-remediation-attempt-dlq-dev",
+            "max_concurrency": 50,
+          },
+          {
+            "queue": "security-remediation-command-queue-dev",
+            "max_batch_size": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "security-remediation-command-dlq-dev",
+            "max_concurrency": 10,
+          },
+          {
+            "queue": "security-remediation-callback-queue-dev",
+            "max_batch_size": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "security-remediation-callback-dlq-dev",
             "max_concurrency": 50,
           },
         ],

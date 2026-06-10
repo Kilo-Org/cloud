@@ -6,8 +6,11 @@ import {
   CheckCircle2,
   ChevronRight,
   Eye,
+  ExternalLink,
+  GitPullRequest,
   Loader2,
   Package,
+  RotateCw,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -144,11 +147,49 @@ function isSeverity(value: string): value is Severity {
   return ['critical', 'high', 'medium', 'low'].includes(value);
 }
 
+export type RemediationSummary = {
+  status: string;
+  latestAttemptId: string | null;
+  prUrl: string | null;
+  prNumber: number | null;
+  prDraft: boolean | null;
+  prHeadBranch: string | null;
+  prBaseBranch: string | null;
+  outcomeSummary: string | null;
+  failureCode: string | null;
+  blockedReason: string | null;
+  completedAt: string | null;
+  updatedAt: string;
+  latestAttempt?: { id: string; status: string } | null;
+};
+
+export type RemediationCapability = {
+  canStart: boolean;
+  startReason: string;
+  canRetry: boolean;
+  retryReason: string;
+  canCancel: boolean;
+  cancelAttemptId: string | null;
+};
+
+export type SecurityFindingWithRemediation = SecurityFinding & {
+  remediationSummary?: RemediationSummary | null;
+  remediationCapability?: RemediationCapability;
+};
+
 type SecurityFindingRowProps = {
-  finding: SecurityFinding;
+  finding: SecurityFindingWithRemediation;
   onClick: () => void;
-  onStartAnalysis?: (findingId: string, options?: { retrySandboxOnly?: boolean }) => void;
+  onStartAnalysis?: (
+    findingId: string,
+    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean }
+  ) => void;
   isStartingAnalysis?: boolean;
+  onStartRemediation?: (findingId: string) => void;
+  onRetryRemediation?: (findingId: string) => void;
+  onCancelRemediation?: (attemptId: string, findingId?: string) => void;
+  isStartingRemediation?: boolean;
+  isCancellingRemediation?: boolean;
 };
 
 function formatCompactDistance(date: Date) {
@@ -160,11 +201,26 @@ function formatCompactDistance(date: Date) {
   return `${Math.abs(differenceInMinutes(now, date))}m`;
 }
 
+function isActiveRemediationStatus(status: string | null | undefined) {
+  return status === 'queued' || status === 'launching' || status === 'running';
+}
+
+function formatRemediationStatus(status: string | null | undefined) {
+  if (status === 'pr_opened') return 'PR opened';
+  if (status === 'no_changes_needed') return 'No changes';
+  return status?.replace(/_/g, ' ') ?? null;
+}
+
 export function SecurityFindingRow({
   finding,
   onClick,
   onStartAnalysis,
   isStartingAnalysis,
+  onStartRemediation,
+  onRetryRemediation,
+  onCancelRemediation,
+  isStartingRemediation,
+  isCancellingRemediation,
 }: SecurityFindingRowProps) {
   const severity: Severity = isSeverity(finding.severity) ? finding.severity : 'medium';
   const canStartAnalysis =
@@ -173,6 +229,14 @@ export function SecurityFindingRow({
     Boolean(onStartAnalysis) &&
     !isStartingAnalysis;
   const outcome = getOutcome(finding);
+  const remediation = finding.remediationSummary;
+  const capability = finding.remediationCapability;
+  const remediationStatus = remediation?.status ?? null;
+  const remediationAttemptId = capability?.cancelAttemptId ?? remediation?.latestAttemptId;
+  const remediationIsActive = isActiveRemediationStatus(remediationStatus) || isStartingRemediation;
+  const remediationStatusLabel = formatRemediationStatus(remediationStatus);
+  const openRemediationPrUrl =
+    remediationStatus === 'pr_opened' && remediation?.prUrl ? remediation.prUrl : null;
   const isHighlighted =
     finding.status === 'open' &&
     finding.sla_due_at !== null &&
@@ -182,6 +246,11 @@ export function SecurityFindingRow({
     const retrySandboxOnly =
       Boolean(finding.analysis?.triage) && finding.analysis_status === 'failed';
     onStartAnalysis?.(finding.id, { retrySandboxOnly });
+  };
+  const startRemediation = () => onStartRemediation?.(finding.id);
+  const retryRemediation = () => onRetryRemediation?.(finding.id);
+  const cancelRemediation = () => {
+    if (remediationAttemptId) onCancelRemediation?.(remediationAttemptId, finding.id);
   };
 
   return (
@@ -209,7 +278,7 @@ export function SecurityFindingRow({
           className="text-muted-foreground size-4 md:col-start-4 md:row-start-1"
           aria-hidden="true"
         />
-        <span className="col-start-2 text-xs md:col-start-3 md:row-start-1">
+        <span className="col-start-2 space-y-1 text-xs md:col-start-3 md:row-start-1">
           {outcome ? (
             <OutcomeLabel outcome={outcome} />
           ) : (
@@ -218,11 +287,81 @@ export function SecurityFindingRow({
               Not analyzed
             </span>
           )}
+          {remediationStatusLabel && (
+            <span
+              className={cn(
+                'text-muted-foreground flex items-center gap-1.5 capitalize',
+                remediationStatus === 'pr_opened' && 'text-green-400',
+                remediationStatus === 'failed' && 'text-red-400',
+                remediationStatus === 'blocked' && 'text-yellow-400',
+                remediationIsActive && 'text-emerald-400'
+              )}
+            >
+              {remediationIsActive ? (
+                <Loader2
+                  className="size-3.5 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              ) : (
+                <GitPullRequest className="size-3.5" aria-hidden="true" />
+              )}
+              {remediationStatusLabel}
+            </span>
+          )}
         </span>
       </button>
 
       <div className="flex items-center justify-end pr-4">
-        {canStartAnalysis ? (
+        {openRemediationPrUrl ? (
+          <Button variant="outline" size="sm" asChild className="gap-1">
+            <a
+              href={openRemediationPrUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={event => event.stopPropagation()}
+              onKeyDown={event => event.stopPropagation()}
+            >
+              <ExternalLink className="size-3" aria-hidden="true" />
+              View PR
+            </a>
+          </Button>
+        ) : isStartingRemediation ? (
+          <Button variant="outline" size="sm" disabled className="gap-1">
+            <Loader2
+              className="size-3 animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+            Queueing
+          </Button>
+        ) : capability?.canCancel && remediationAttemptId && onCancelRemediation ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={cancelRemediation}
+            disabled={isCancellingRemediation}
+            className="gap-1"
+          >
+            {isCancellingRemediation ? (
+              <Loader2
+                className="size-3 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            ) : (
+              <XCircle className="size-3" aria-hidden="true" />
+            )}
+            Cancel
+          </Button>
+        ) : capability?.canRetry && onRetryRemediation ? (
+          <Button variant="outline" size="sm" onClick={retryRemediation} className="gap-1">
+            <RotateCw className="size-3" aria-hidden="true" />
+            Retry fix
+          </Button>
+        ) : capability?.canStart && onStartRemediation ? (
+          <Button variant="outline" size="sm" onClick={startRemediation} className="gap-1">
+            <GitPullRequest className="size-3" aria-hidden="true" />
+            Fix
+          </Button>
+        ) : canStartAnalysis ? (
           <Button variant="outline" size="sm" onClick={startAnalysis} className="gap-1">
             <Brain className="size-3" aria-hidden="true" />
             {finding.analysis_status === 'failed' ? 'Retry' : 'Analyze'}

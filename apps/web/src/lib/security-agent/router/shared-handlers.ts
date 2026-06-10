@@ -22,11 +22,18 @@ import { getDashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import {
   getSecurityAgentCommandStatus,
   listActiveSecurityAgentCommands,
+  createApplyAutoRemediationCommand,
+  markApplyAutoRemediationCommandAdmissionFailed,
 } from '@/lib/security-agent/db/security-commands';
 import {
   canStartAnalysis,
   enqueueBacklogFindings,
 } from '@/lib/security-agent/db/security-analysis';
+import {
+  decorateFindingWithRemediation,
+  decorateFindingsWithRemediation,
+  getRemediationAttemptHistory,
+} from '@/lib/security-agent/db/security-remediation';
 import {
   hasSecurityReviewPermissions,
   getReauthorizeUrl,
@@ -34,6 +41,11 @@ import {
 import { submitManualSecuritySync } from '@/lib/security-agent/services/manual-sync-client';
 import { submitManualFindingDismissal } from '@/lib/security-agent/services/manual-dismiss-client';
 import { submitManualAnalysisStart } from '@/lib/security-agent/services/manual-analysis-client';
+import {
+  submitApplyAutoRemediation,
+  submitManualRemediationStart,
+  submitRemediationCancellation,
+} from '@/lib/security-agent/services/manual-remediation-client';
 import {
   autoDismissEligibleFindings,
   countEligibleForAutoDismiss,
@@ -48,6 +60,9 @@ import {
   GetFindingInputSchema,
   SetEnabledInputSchema,
   StartAnalysisInputSchema,
+  StartRemediationInputSchema,
+  RetryRemediationInputSchema,
+  CancelRemediationInputSchema,
   GetAnalysisInputSchema,
   GetCommandStatusInputSchema,
   DeleteFindingsByRepoInputSchema,
@@ -59,6 +74,9 @@ import {
   type GetFindingInput,
   type SetEnabledInput,
   type StartAnalysisInput,
+  type StartRemediationInput,
+  type RetryRemediationInput,
+  type CancelRemediationInput,
   type GetAnalysisInput,
   type GetCommandStatusInput,
   type DeleteFindingsByRepoInput,
@@ -67,6 +85,8 @@ import {
 import {
   DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
   DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
+  DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
+  DEFAULT_SECURITY_AGENT_CONFIG,
 } from '@/lib/security-agent/core/constants';
 import {
   trackSecurityAgentEnabled,
@@ -100,6 +120,21 @@ type SecurityAgentDeps<TExtra = {}> = {
   getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
   trackingExtras: (ctx: TRPCContext, input: TExtra) => Record<string, string>;
 };
+
+function getRepoFullNamesInScope(
+  integration: Integration,
+  config: { repository_selection_mode?: 'all' | 'selected'; selected_repository_ids?: number[] }
+): string[] {
+  const repositories = integration?.repositories ?? [];
+  if (config.repository_selection_mode === 'all') {
+    return repositories.map(repo => repo.full_name).filter((name): name is string => !!name);
+  }
+  const selectedIds = new Set(config.selected_repository_ids ?? []);
+  return repositories
+    .filter(repo => selectedIds.has(repo.id))
+    .map(repo => repo.full_name)
+    .filter((name): name is string => !!name);
+}
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -177,6 +212,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           autoAnalysisEnabled: false,
           autoAnalysisMinSeverity: 'high' as const,
           autoAnalysisIncludeExisting: false,
+          autoRemediationEnabled: false,
+          autoRemediationMinSeverity: 'high' as const,
+          autoRemediationIncludeExisting: false,
+          autoRemediationEnabledAt: null,
+          remediationModelSlug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
         };
       }
 
@@ -190,6 +230,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         result.storedConfig.model_slug ??
         result.config.analysis_model_slug ??
         DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL;
+      const remediationModelSlug =
+        result.storedConfig.remediation_model_slug ??
+        result.config.remediation_model_slug ??
+        analysisModelSlug ??
+        DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
       return {
         isEnabled: result.isEnabled,
@@ -209,6 +254,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         autoAnalysisEnabled: result.config.auto_analysis_enabled ?? false,
         autoAnalysisMinSeverity: result.config.auto_analysis_min_severity ?? 'high',
         autoAnalysisIncludeExisting: result.config.auto_analysis_include_existing ?? false,
+        autoRemediationEnabled: result.config.auto_remediation_enabled ?? false,
+        autoRemediationMinSeverity: result.config.auto_remediation_min_severity ?? 'high',
+        autoRemediationIncludeExisting: result.config.auto_remediation_include_existing ?? false,
+        autoRemediationEnabledAt: result.config.auto_remediation_enabled_at ?? null,
+        remediationModelSlug,
       };
     },
 
@@ -250,6 +300,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
               autoAnalysisEnabled: existingConfig.config.auto_analysis_enabled,
               autoAnalysisMinSeverity: existingConfig.config.auto_analysis_min_severity,
               autoAnalysisIncludeExisting: existingConfig.config.auto_analysis_include_existing,
+              autoRemediationEnabled: existingConfig.config.auto_remediation_enabled,
+              autoRemediationMinSeverity: existingConfig.config.auto_remediation_min_severity,
+              autoRemediationIncludeExisting:
+                existingConfig.config.auto_remediation_include_existing,
+              autoRemediationEnabledAt: existingConfig.config.auto_remediation_enabled_at,
+              remediationModelSlug:
+                existingConfig.config.remediation_model_slug ?? existingAnalysisModelSlug,
               modelSlug: existingConfig.config.model_slug,
               triageModelSlug: existingTriageModelSlug,
               analysisModelSlug: existingAnalysisModelSlug,
@@ -275,6 +332,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           existingConfig?.storedConfig.model_slug ??
           analysisModelSlug ??
           triageModelSlug;
+        const remediationModelSlug =
+          input.remediationModelSlug ??
+          existingConfig?.storedConfig.remediation_model_slug ??
+          existingConfig?.config.remediation_model_slug ??
+          analysisModelSlug;
 
         await upsertSecurityAgentConfig(
           owner,
@@ -295,6 +357,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             auto_analysis_enabled: input.autoAnalysisEnabled,
             auto_analysis_min_severity: input.autoAnalysisMinSeverity,
             auto_analysis_include_existing: input.autoAnalysisIncludeExisting,
+            auto_remediation_enabled: input.autoRemediationEnabled,
+            auto_remediation_min_severity: input.autoRemediationMinSeverity,
+            auto_remediation_include_existing: input.autoRemediationIncludeExisting,
+            remediation_model_slug: remediationModelSlug,
           },
           ctx.user.id
         );
@@ -330,6 +396,50 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           }
         }
 
+        const wasAutoRemediationOn = existingConfig?.config.auto_remediation_enabled ?? false;
+        const isAutoRemediationOn =
+          input.autoRemediationEnabled ?? existingConfig?.config.auto_remediation_enabled ?? false;
+        const wasRemediationIncludeExisting =
+          existingConfig?.config.auto_remediation_include_existing ?? false;
+        const isNowRemediationIncludeExisting =
+          input.autoRemediationIncludeExisting ?? wasRemediationIncludeExisting;
+        const remediationIncludeExistingJustTurnedOn =
+          isNowRemediationIncludeExisting && !wasRemediationIncludeExisting;
+        const autoRemediationReEnabled =
+          isAutoRemediationOn && !wasAutoRemediationOn && isNowRemediationIncludeExisting;
+        const remediationThresholdChanged =
+          isAutoRemediationOn &&
+          isNowRemediationIncludeExisting &&
+          !!input.autoRemediationMinSeverity &&
+          input.autoRemediationMinSeverity !== existingConfig?.config.auto_remediation_min_severity;
+
+        let existingRemediationCommandId: string | undefined;
+        let remediationBacklogAdmissionWarning: string | undefined;
+        if (
+          isAutoRemediationOn &&
+          (remediationIncludeExistingJustTurnedOn ||
+            autoRemediationReEnabled ||
+            remediationThresholdChanged)
+        ) {
+          const command = await createApplyAutoRemediationCommand(securityOwner);
+          existingRemediationCommandId = command.id;
+          try {
+            await submitApplyAutoRemediation({
+              commandId: command.id,
+              owner: securityOwner,
+              actorUserId: ctx.user.id,
+            });
+          } catch (error) {
+            console.error('Failed to enqueue existing findings for remediation', error);
+            remediationBacklogAdmissionWarning =
+              'Settings saved, but existing exploitable findings could not be queued. Retry saving settings.';
+            await markApplyAutoRemediationCommandAdmissionFailed(
+              command.id,
+              remediationBacklogAdmissionWarning
+            );
+          }
+        }
+
         trackSecurityAgentConfigSaved({
           distinctId: ctx.user.id,
           userId: ctx.user.id,
@@ -341,6 +451,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           modelSlug,
           triageModelSlug,
           analysisModelSlug,
+          remediationModelSlug,
+          autoRemediationEnabled: input.autoRemediationEnabled,
+          autoRemediationMinSeverity: input.autoRemediationMinSeverity,
+          autoRemediationIncludeExisting: input.autoRemediationIncludeExisting,
           repositorySelectionMode: input.repositorySelectionMode,
           selectedRepoCount: input.selectedRepositoryIds?.length,
         });
@@ -362,9 +476,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             autoAnalysisEnabled: input.autoAnalysisEnabled,
             autoAnalysisMinSeverity: input.autoAnalysisMinSeverity,
             autoAnalysisIncludeExisting: input.autoAnalysisIncludeExisting,
+            autoRemediationEnabled: input.autoRemediationEnabled,
+            autoRemediationMinSeverity: input.autoRemediationMinSeverity,
+            autoRemediationIncludeExisting: input.autoRemediationIncludeExisting,
             modelSlug,
             triageModelSlug,
             analysisModelSlug,
+            remediationModelSlug,
             repositorySelectionMode: input.repositorySelectionMode,
             selectedRepositoryIds: input.selectedRepositoryIds,
             slaCriticalDays: input.slaCriticalDays,
@@ -374,7 +492,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           },
         });
 
-        return { success: true, existingFindingsQueuedCount, backlogAdmissionWarning };
+        return {
+          success: true,
+          existingFindingsQueuedCount,
+          backlogAdmissionWarning,
+          existingRemediationCommandId,
+          remediationBacklogAdmissionWarning,
+        };
       },
     },
 
@@ -572,6 +696,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         input: ListFindingsInput & TExtra;
       }) => {
         const input = rawInput;
+        const owner = deps.resolveOwner(ctx, input);
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
 
         const { findings, totalCount } = await listSecurityFindings({
@@ -587,9 +712,20 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
 
         const concurrencyCheck = await canStartAnalysis(securityOwner);
+        const [configWithStatus, integration] = await Promise.all([
+          getSecurityAgentConfigWithStatus(owner),
+          deps.getIntegration(ctx, input),
+        ]);
+        const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
+        const decoratedFindings = await decorateFindingsWithRemediation({
+          findings,
+          config,
+          isAgentEnabled: configWithStatus?.isEnabled ?? false,
+          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+        });
 
         return {
-          findings,
+          findings: decoratedFindings,
           totalCount,
           runningCount: concurrencyCheck.currentCount,
           concurrencyLimit: concurrencyCheck.limit,
@@ -610,6 +746,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         input: GetFindingInput & TExtra;
       }) => {
         const input = rawInput;
+        const owner = deps.resolveOwner(ctx, input);
         const finding = await getSecurityFindingById(input.id);
 
         if (!finding) {
@@ -626,7 +763,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        return finding;
+        const [configWithStatus, integration] = await Promise.all([
+          getSecurityAgentConfigWithStatus(owner),
+          deps.getIntegration(ctx, input),
+        ]);
+        const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
+        return decorateFindingWithRemediation({
+          finding,
+          config,
+          isAgentEnabled: configWithStatus?.isEnabled ?? false,
+          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+        });
       },
     },
 
@@ -954,6 +1101,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             triageModel: input.triageModel,
             analysisModel: input.analysisModel,
           },
+          forceSandbox: input.forceSandbox,
           retrySandboxOnly: input.retrySandboxOnly,
         });
 
@@ -962,7 +1110,112 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     },
 
     // -----------------------------------------------------------------------
-    // 13. getAnalysis
+    // 13. startRemediation
+    // -----------------------------------------------------------------------
+    startRemediation: {
+      inputSchema: StartRemediationInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: StartRemediationInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const finding = await getSecurityFindingById(input.findingId);
+
+        if (!finding) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Security finding not found',
+          });
+        }
+
+        if (!deps.verifyFindingOwnership(finding, ctx, input)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this finding',
+          });
+        }
+
+        const queued = await submitManualRemediationStart({
+          findingId: input.findingId,
+          owner: securityOwner,
+          actorUserId: ctx.user.id,
+        });
+
+        return { success: true, ...queued };
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 14. retryRemediation
+    // -----------------------------------------------------------------------
+    retryRemediation: {
+      inputSchema: RetryRemediationInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: RetryRemediationInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const finding = await getSecurityFindingById(input.findingId);
+
+        if (!finding) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Security finding not found',
+          });
+        }
+
+        if (!deps.verifyFindingOwnership(finding, ctx, input)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this finding',
+          });
+        }
+
+        const queued = await submitManualRemediationStart({
+          findingId: input.findingId,
+          owner: securityOwner,
+          actorUserId: ctx.user.id,
+          retry: true,
+        });
+
+        return { success: true, ...queued };
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 15. cancelRemediation
+    // -----------------------------------------------------------------------
+    cancelRemediation: {
+      inputSchema: CancelRemediationInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: CancelRemediationInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const result = await submitRemediationCancellation({
+          attemptId: input.attemptId,
+          owner: securityOwner,
+          actorUserId: ctx.user.id,
+        });
+
+        return result;
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 16. getAnalysis
     // -----------------------------------------------------------------------
     getAnalysis: {
       inputSchema: GetAnalysisInputSchema,
@@ -991,6 +1244,20 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
+        const owner = deps.resolveOwner(ctx, input);
+        const [configWithStatus, integration, remediationAttempts] = await Promise.all([
+          getSecurityAgentConfigWithStatus(owner),
+          deps.getIntegration(ctx, input),
+          getRemediationAttemptHistory(input.findingId),
+        ]);
+        const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
+        const decoratedFinding = await decorateFindingWithRemediation({
+          finding,
+          config,
+          isAgentEnabled: configWithStatus?.isEnabled ?? false,
+          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+        });
+
         return {
           status: finding.analysis_status,
           startedAt: finding.analysis_started_at,
@@ -999,12 +1266,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           analysis: finding.analysis,
           sessionId: finding.session_id,
           cliSessionId: finding.cli_session_id,
+          remediationSummary: decoratedFinding.remediationSummary ?? null,
+          remediationCapability: decoratedFinding.remediationCapability,
+          remediationAttempts,
         };
       },
     },
 
     // -----------------------------------------------------------------------
-    // 14. getCommandStatus
+    // 17. getCommandStatus
     // -----------------------------------------------------------------------
     getCommandStatus: {
       inputSchema: GetCommandStatusInputSchema,
@@ -1026,7 +1296,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     },
 
     // -----------------------------------------------------------------------
-    // 15. listActiveCommands
+    // 18. listActiveCommands
     // -----------------------------------------------------------------------
     listActiveCommands: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
@@ -1034,7 +1304,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     },
 
     // -----------------------------------------------------------------------
-    // 16. getOrphanedRepositories
+    // 19. getOrphanedRepositories
     // -----------------------------------------------------------------------
     getOrphanedRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);

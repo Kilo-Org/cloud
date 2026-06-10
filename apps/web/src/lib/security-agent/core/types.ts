@@ -47,6 +47,7 @@ export type SecurityFindingAnalysisStatus =
 export type AnalysisMode = 'auto' | 'shallow' | 'deep';
 
 export type AutoAnalysisMinSeverity = 'critical' | 'high' | 'medium' | 'all';
+export type AutoRemediationMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 
 export const SecurityAgentConfigSchema = z
   .object({
@@ -66,6 +67,11 @@ export const SecurityAgentConfigSchema = z
     auto_analysis_enabled: z.boolean().default(false),
     auto_analysis_min_severity: z.enum(['critical', 'high', 'medium', 'all']).default('high'),
     auto_analysis_include_existing: z.boolean().default(false),
+    auto_remediation_enabled: z.boolean().default(false),
+    auto_remediation_min_severity: z.enum(['critical', 'high', 'medium', 'all']).default('high'),
+    auto_remediation_include_existing: z.boolean().default(false),
+    auto_remediation_enabled_at: z.string().nullable().default(null),
+    remediation_model_slug: z.string().optional(),
   })
   .passthrough();
 

@@ -20,6 +20,7 @@
     "./kilo-model-id": "./src/kilo-model-id.ts",
     "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",
     "./security-auto-analysis-policy": "./src/security-auto-analysis-policy.ts",
+    "./security-remediation-policy": "./src/security-remediation-policy.ts",
     "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts"
   },
   "scripts": {

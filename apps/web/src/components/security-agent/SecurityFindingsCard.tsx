@@ -27,9 +27,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { SecurityFinding } from '@kilocode/db/schema';
 import { RepositoryFilter } from './RepositoryFilter';
-import { SecurityFindingRow } from './SecurityFindingRow';
+import { SecurityFindingRow, type SecurityFindingWithRemediation } from './SecurityFindingRow';
 
 type Repository = {
   id: number;
@@ -57,14 +56,14 @@ type FindingsViewState = {
 };
 
 type SecurityFindingsCardProps = {
-  findings: SecurityFinding[];
+  findings: SecurityFindingWithRemediation[];
   repositories: Repository[];
   stats: Stats;
   totalCount: number;
   page: number;
   pageSize: number;
   onPageChange: (page: number) => void;
-  onFindingClick: (finding: SecurityFinding) => void;
+  onFindingClick: (finding: SecurityFindingWithRemediation) => void;
   onSync: (repoFullName?: string) => void;
   state: FindingsViewState;
   filters: {
@@ -84,8 +83,16 @@ type SecurityFindingsCardProps = {
   installUrl?: string;
   onEnableClick: () => void;
   lastSyncTime?: string | null;
-  onStartAnalysis?: (findingId: string, options?: { retrySandboxOnly?: boolean }) => void;
+  onStartAnalysis?: (
+    findingId: string,
+    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean }
+  ) => void;
   startingAnalysisIds?: Set<string>;
+  onStartRemediation?: (findingId: string) => void;
+  onRetryRemediation?: (findingId: string) => void;
+  onCancelRemediation?: (attemptId: string, findingId?: string) => void;
+  startingRemediationIds?: Set<string>;
+  cancellingRemediationAttemptIds?: Set<string>;
   runningCount?: number;
   concurrencyLimit?: number;
   sortBy: 'severity_desc' | 'severity_asc' | 'sla_due_at_asc';
@@ -120,6 +127,11 @@ export function SecurityFindingsCard({
   lastSyncTime,
   onStartAnalysis,
   startingAnalysisIds,
+  onStartRemediation,
+  onRetryRemediation,
+  onCancelRemediation,
+  startingRemediationIds,
+  cancellingRemediationAttemptIds,
   runningCount = 0,
   concurrencyLimit = 3,
   sortBy,
@@ -351,6 +363,14 @@ export function SecurityFindingsCard({
                 onClick={() => onFindingClick(finding)}
                 onStartAnalysis={onStartAnalysis}
                 isStartingAnalysis={startingAnalysisIds?.has(finding.id)}
+                onStartRemediation={onStartRemediation}
+                onRetryRemediation={onRetryRemediation}
+                onCancelRemediation={onCancelRemediation}
+                isStartingRemediation={startingRemediationIds?.has(finding.id)}
+                isCancellingRemediation={
+                  !!finding.remediationSummary?.latestAttemptId &&
+                  cancellingRemediationAttemptIds?.has(finding.remediationSummary.latestAttemptId)
+                }
               />
             ))}
           </div>

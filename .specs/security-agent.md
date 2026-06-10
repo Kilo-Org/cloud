@@ -76,7 +76,7 @@ Then the manual remediation MAY proceed.
 
 Security Agent MUST NOT start remediation unless the finding has a completed Sandbox Analysis.
 
-A finding is eligible for remediation only when all safety conditions are true:
+A finding is eligible for automatic remediation only when all safety conditions are true:
 
 - the finding is still open;
 - the finding belongs to the current user or organization context;
@@ -86,9 +86,11 @@ A finding is eligible for remediation only when all safety conditions are true:
 - the Sandbox Analysis recommends opening a PR;
 - the analysis provides a concrete enough remediation path.
 
-Findings whose analysis recommends `manual_review` or `monitor` MUST NOT be remediated automatically or manually through the one-click remediation flow.
+Findings whose analysis recommends `manual_review` MUST NOT be remediated automatically. Manual Remediation MAY proceed after the user reviews the finding when the analysis or source metadata still provides a concrete remediation path.
 
-Findings whose exploitability is unknown MUST NOT be remediated automatically or manually through the one-click remediation flow, even if other analysis text appears to suggest a PR.
+Findings whose analysis recommends `monitor` MUST NOT be remediated automatically or manually through the one-click remediation flow.
+
+Findings whose exploitability is unknown MUST NOT be remediated automatically. Manual Remediation MAY proceed after the user reviews the finding when the analysis recommends opening a PR or manual review and the analysis or source metadata provides a concrete remediation path.
 
 Triage-only analysis MUST NOT be enough to start remediation.
 
@@ -106,7 +108,8 @@ Then Security Agent MAY offer remediation for that finding.
 Given a finding is open
 And the latest analysis says manual review is required
 When the user views the finding
-Then Security Agent MUST NOT offer "Start remediation" for that finding.
+Then Security Agent MUST NOT automatically start remediation for that finding.
+And Security Agent MAY offer manual remediation if a concrete remediation path is available.
 
 Given a finding is open
 And only triage analysis has completed
@@ -179,13 +182,14 @@ Then Security Agent MUST NOT start new remediation work solely because the model
 
 Users MUST be able to manually start remediation for eligible findings.
 
-Manual Remediation MUST bypass only automatic policy gates:
+Manual Remediation MUST bypass automatic policy gates and MAY use the reviewed-finding override described above:
 
 - Auto Remediation does not need to be enabled;
 - the finding does not need to meet the automatic severity threshold;
 - the analysis does not need to have completed after Auto Remediation was enabled.
+- the analysis MAY have unknown exploitability or recommend manual review when the user chooses to proceed and a concrete remediation path exists.
 
-Manual Remediation MUST still honor all safety gates.
+Manual Remediation MUST still honor ownership, scope, freshness, concrete-fix, active-attempt, and duplicate-PR safety gates.
 
 ### Scenario: Manual Start Below Threshold
 
@@ -206,6 +210,19 @@ Then Security Agent SHOULD start a manual Security Remediation.
 Given a finding is not eligible for remediation
 When the user views the finding
 Then Security Agent SHOULD explain why remediation is unavailable.
+
+### Scenario: Manual Start After Review
+
+Given a finding is open
+And Sandbox Analysis completed with unknown exploitability or a manual-review recommendation
+And the finding has a concrete dependency patch path or suggested fix
+When the user reviews the finding and clicks "Start remediation"
+Then Security Agent MAY start a manual Security Remediation.
+
+Given a finding has unknown exploitability or a manual-review recommendation
+And the finding has no concrete dependency patch path or suggested fix
+When the user views the finding
+Then Security Agent SHOULD explain that remediation needs a concrete fix path.
 
 ## Remediation Execution
 

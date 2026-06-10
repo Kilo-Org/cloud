@@ -2,6 +2,7 @@ export type SecurityAgentAdmissionAction =
   | 'sync'
   | 'dismiss_finding'
   | 'start_analysis'
+  | 'apply_auto_remediation'
   | 'enable_initial_sync'
   | 'existing_findings_backlog';
 
@@ -30,6 +31,11 @@ export const securityAgentCommandAdmissionCopy = {
     successTitle: 'Analysis queued',
     failureTitle: 'Failed to queue analysis',
     pendingLabel: 'Queueing',
+  },
+  apply_auto_remediation: {
+    successTitle: 'Existing remediations queued',
+    failureTitle: 'Failed to queue remediations',
+    pendingLabel: 'Queueing remediations',
   },
   enable_initial_sync: {
     successTitle: 'Security Agent enabled',

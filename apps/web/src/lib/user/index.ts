@@ -41,6 +41,8 @@ import {
   webhook_events,
   agent_environment_profiles,
   security_findings,
+  security_remediation_attempts,
+  security_remediations,
   security_audit_log,
   auto_triage_tickets,
   auto_fix_tickets,
@@ -834,7 +836,8 @@ export class SoftDeletePreconditionError extends Error {
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
- *   security_agent_repository_sync_state,
+ *   security_agent_repository_sync_state, security_remediations,
+ *   security_remediation_attempts actor references,
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, review memory feedback/proposals,
@@ -1097,6 +1100,21 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(security_agent_repository_sync_state)
       .where(eq(security_agent_repository_sync_state.owned_by_user_id, userId));
+    await tx
+      .update(security_remediation_attempts)
+      .set({
+        requested_by_user_id: null,
+        cancellation_requested_by_user_id: null,
+      })
+      .where(
+        or(
+          eq(security_remediation_attempts.requested_by_user_id, userId),
+          eq(security_remediation_attempts.cancellation_requested_by_user_id, userId)
+        )
+      );
+    await tx
+      .delete(security_remediations)
+      .where(eq(security_remediations.owned_by_user_id, userId));
     await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
     await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
     await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));

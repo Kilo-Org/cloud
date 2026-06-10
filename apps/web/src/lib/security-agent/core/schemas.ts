@@ -18,6 +18,7 @@ export const RepositorySelectionModeSchema = z.enum(['all', 'selected']);
 export const AutoDismissConfidenceThresholdSchema = z.enum(['high', 'medium', 'low']);
 export const AnalysisModeSchema = z.enum(['auto', 'shallow', 'deep']);
 export const AutoAnalysisMinSeveritySchema = z.enum(['critical', 'high', 'medium', 'all']);
+export const AutoRemediationMinSeveritySchema = z.enum(['critical', 'high', 'medium', 'all']);
 
 export const SaveSecurityConfigInputSchema = z.object({
   slaCriticalDays: z.number().min(1).max(365).optional(),
@@ -36,6 +37,10 @@ export const SaveSecurityConfigInputSchema = z.object({
   autoAnalysisEnabled: z.boolean().optional(),
   autoAnalysisMinSeverity: AutoAnalysisMinSeveritySchema.optional(),
   autoAnalysisIncludeExisting: z.boolean().optional(),
+  autoRemediationEnabled: z.boolean().optional(),
+  autoRemediationMinSeverity: AutoRemediationMinSeveritySchema.optional(),
+  autoRemediationIncludeExisting: z.boolean().optional(),
+  remediationModelSlug: z.string().optional(),
 });
 
 export const OutcomeFilterSchema = z.enum([
@@ -137,7 +142,20 @@ export const StartAnalysisInputSchema = z.object({
   model: z.string().optional(),
   triageModel: z.string().optional(),
   analysisModel: z.string().optional(),
+  forceSandbox: z.boolean().optional(),
   retrySandboxOnly: z.boolean().optional(),
+});
+
+export const StartRemediationInputSchema = z.object({
+  findingId: z.string().uuid(),
+});
+
+export const RetryRemediationInputSchema = z.object({
+  findingId: z.string().uuid(),
+});
+
+export const CancelRemediationInputSchema = z.object({
+  attemptId: z.string().uuid(),
 });
 
 export const GetAnalysisInputSchema = z.object({
@@ -169,6 +187,9 @@ export type SecurityFindingSandboxAnalysisResponse = z.infer<
   typeof SecurityFindingSandboxAnalysisSchema
 >;
 export type StartAnalysisInput = z.infer<typeof StartAnalysisInputSchema>;
+export type StartRemediationInput = z.infer<typeof StartRemediationInputSchema>;
+export type RetryRemediationInput = z.infer<typeof RetryRemediationInputSchema>;
+export type CancelRemediationInput = z.infer<typeof CancelRemediationInputSchema>;
 export type GetAnalysisInput = z.infer<typeof GetAnalysisInputSchema>;
 export type GetCommandStatusInput = z.infer<typeof GetCommandStatusInputSchema>;
 export type DeleteFindingsByRepoInput = z.infer<typeof DeleteFindingsByRepoInputSchema>;

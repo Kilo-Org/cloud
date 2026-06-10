@@ -36,6 +36,8 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   security_findings,
+  security_remediation_attempts,
+  security_remediations,
   security_analysis_queue,
   security_analysis_owner_state,
   security_agent_commands,
@@ -180,6 +182,8 @@ describe('User', () => {
     await db.delete(kiloclaw_google_oauth_connections);
     await db.delete(kiloclaw_inbound_email_aliases);
     await db.delete(security_analysis_queue);
+    await db.delete(security_remediation_attempts);
+    await db.delete(security_remediations);
     await db.delete(security_agent_commands);
     await db.delete(security_agent_repository_sync_state);
     await db.delete(security_findings);
@@ -2007,6 +2011,141 @@ describe('User', () => {
           .select({ count: count() })
           .from(security_analysis_queue)
           .where(eq(security_analysis_queue.finding_id, finding2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete user-owned remediations and scrub retained remediation actor references', async () => {
+      const user1 = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Security remediation GDPR org' })
+        .returning({ id: organizations.id });
+      if (!organization) throw new Error('Failed to create security remediation GDPR org');
+
+      const [userFinding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_user_id: user1.id,
+          repo_full_name: 'kilo-org/remediation-user',
+          source: 'dependabot',
+          source_id: `user-source-${randomUUID()}`,
+          severity: 'high',
+          package_name: 'zod',
+          package_ecosystem: 'npm',
+          title: 'User remediation finding',
+          analysis_status: 'completed',
+          analysis_completed_at: new Date().toISOString(),
+        })
+        .returning();
+      const [orgFinding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_organization_id: organization.id,
+          repo_full_name: 'kilo-org/remediation-org',
+          source: 'dependabot',
+          source_id: `org-source-${randomUUID()}`,
+          severity: 'critical',
+          package_name: 'drizzle-orm',
+          package_ecosystem: 'npm',
+          title: 'Org remediation finding',
+          analysis_status: 'completed',
+          analysis_completed_at: new Date().toISOString(),
+        })
+        .returning();
+      if (!userFinding || !orgFinding) throw new Error('Failed to create remediation findings');
+
+      const [userRemediation] = await db
+        .insert(security_remediations)
+        .values({
+          owned_by_user_id: user1.id,
+          finding_id: userFinding.id,
+          repo_full_name: userFinding.repo_full_name,
+          status: 'queued',
+        })
+        .returning({ id: security_remediations.id });
+      const [orgRemediation] = await db
+        .insert(security_remediations)
+        .values({
+          owned_by_organization_id: organization.id,
+          finding_id: orgFinding.id,
+          repo_full_name: orgFinding.repo_full_name,
+          status: 'running',
+        })
+        .returning({ id: security_remediations.id });
+      if (!userRemediation || !orgRemediation) {
+        throw new Error('Failed to create security remediations');
+      }
+
+      await db.insert(security_remediation_attempts).values([
+        {
+          remediation_id: userRemediation.id,
+          finding_id: userFinding.id,
+          owned_by_user_id: user1.id,
+          repo_full_name: userFinding.repo_full_name,
+          origin: 'manual',
+          status: 'queued',
+          attempt_number: 1,
+          requested_by_user_id: user1.id,
+          analysis_fingerprint: 'user-fingerprint',
+          analysis_completed_at: new Date().toISOString(),
+          remediation_model_slug: 'claude-sonnet-4-20250514',
+          branch_name: 'security/remediation-user',
+        },
+        {
+          remediation_id: orgRemediation.id,
+          finding_id: orgFinding.id,
+          owned_by_organization_id: organization.id,
+          repo_full_name: orgFinding.repo_full_name,
+          origin: 'manual',
+          status: 'running',
+          attempt_number: 1,
+          requested_by_user_id: user1.id,
+          cancellation_requested_by_user_id: user1.id,
+          analysis_fingerprint: 'org-fingerprint',
+          analysis_completed_at: new Date().toISOString(),
+          remediation_model_slug: 'claude-sonnet-4-20250514',
+          branch_name: 'security/remediation-org',
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_remediations)
+          .where(eq(security_remediations.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_remediation_attempts)
+          .where(eq(security_remediation_attempts.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+
+      const retainedAttempts = await db
+        .select()
+        .from(security_remediation_attempts)
+        .where(eq(security_remediation_attempts.remediation_id, orgRemediation.id));
+      expect(retainedAttempts).toHaveLength(1);
+      expect(retainedAttempts[0].requested_by_user_id).toBeNull();
+      expect(retainedAttempts[0].cancellation_requested_by_user_id).toBeNull();
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_remediations)
+          .where(eq(security_remediations.id, orgRemediation.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_findings)
+          .where(eq(security_findings.id, orgFinding.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

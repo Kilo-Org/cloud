@@ -24,6 +24,9 @@ import {
   Brain,
   Loader2,
   Zap,
+  GitPullRequest,
+  RotateCw,
+  AlertCircle,
 } from 'lucide-react';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -31,15 +34,38 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSecurityAgent } from './SecurityAgentContext';
 import { securityAgentCommandAdmissionCopy } from './security-agent-command-copy';
+import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
+import type { SecurityFindingWithRemediation } from './SecurityFindingRow';
+import { getRemediationUnavailableCopy } from './remediation-unavailable-copy';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
 type FindingAnalysis = SecurityFinding['analysis'];
-type StartAnalysis = (options?: { retrySandboxOnly?: boolean }) => void;
+type StartAnalysis = (options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean }) => void;
 
 const ANALYSIS_POLL_INTERVAL_MS = 3000;
 const statusPanelClassName = 'rounded-lg border border-border bg-muted/40 p-3';
 const linkClassName =
   'text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex rounded-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none';
+
+type RemediationAttempt = {
+  id: string;
+  status: string;
+  origin: string;
+  attemptNumber: number;
+  remediationModelSlug: string;
+  branchName: string;
+  prUrl: string | null;
+  prDraft: boolean | null;
+  failureCode: string | null;
+  blockedReason: string | null;
+  lastErrorRedacted: string | null;
+  riskNotes: string | null;
+  draftReason: string | null;
+  queuedAt: string;
+  launchedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string;
+};
 
 function isSeverity(value: string): value is Severity {
   return ['critical', 'high', 'medium', 'low'].includes(value);
@@ -51,6 +77,30 @@ function LoadingSpinner({ className = 'size-4' }: { className?: string }) {
       className={`${className} animate-spin motion-reduce:animate-none`}
       aria-hidden="true"
     />
+  );
+}
+
+function formatRemediationStatus(status: string | null | undefined): string {
+  if (!status) return 'Not started';
+  if (status === 'pr_opened') return 'PR opened';
+  if (status === 'no_changes_needed') return 'No changes needed';
+  return status.replace(/_/g, ' ');
+}
+
+function isActiveRemediationStatus(status: string | null | undefined): boolean {
+  return status === 'queued' || status === 'launching' || status === 'running';
+}
+
+function getRemediationFailureCopy(failureCode: string | null | undefined): string | null {
+  if (!failureCode) return null;
+  return 'Fix attempt failed. Check attempt details for next steps.';
+}
+
+function isCodebaseAnalysisRequiredReason(reason: string | null | undefined): boolean {
+  return (
+    reason === 'analysis_required' ||
+    reason === 'sandbox_analysis_required' ||
+    reason === 'triage_only'
   );
 }
 
@@ -75,7 +125,7 @@ function AnalysisStatusIcon({
 }
 
 type FindingDetailDialogProps = {
-  finding: SecurityFinding | null;
+  finding: SecurityFindingWithRemediation | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDismiss: () => void;
@@ -318,6 +368,9 @@ function FindingTriage({
 type FindingAnalysisProps = AnalysisPanelProps & {
   cliSessionId: string | null;
   organizationId?: string;
+  remediationNeedsCodebaseAnalysis: boolean;
+  codebaseAnalysisActionLabel: string;
+  onStartCodebaseAnalysis: () => void;
 };
 
 function FindingAnalysis({
@@ -329,6 +382,9 @@ function FindingAnalysis({
   onStartAnalysis,
   cliSessionId,
   organizationId,
+  remediationNeedsCodebaseAnalysis,
+  codebaseAnalysisActionLabel,
+  onStartCodebaseAnalysis,
 }: FindingAnalysisProps) {
   const sessionHref = cliSessionId
     ? organizationId
@@ -430,7 +486,29 @@ function FindingAnalysis({
     );
   } else if (analysis?.triage?.needsSandboxAnalysis === false) {
     content = (
-      <EmptyPanel text="Triage determined codebase analysis is not needed for this finding." />
+      <EmptyPanel
+        text={
+          remediationNeedsCodebaseAnalysis
+            ? 'Remediation needs codebase analysis before it can open a PR.'
+            : 'Triage determined codebase analysis is not needed for this finding.'
+        }
+      >
+        {remediationNeedsCodebaseAnalysis && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onStartCodebaseAnalysis}
+            disabled={isAnalyzing}
+          >
+            {isAnalyzing ? (
+              <LoadingSpinner className="mr-2 size-4" />
+            ) : (
+              <Brain className="mr-2 size-4" aria-hidden="true" />
+            )}
+            {codebaseAnalysisActionLabel}
+          </Button>
+        )}
+      </EmptyPanel>
     );
   } else if (!analysis) {
     content = (
@@ -438,11 +516,13 @@ function FindingAnalysis({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onStartAnalysis()}
+          onClick={() =>
+            remediationNeedsCodebaseAnalysis ? onStartCodebaseAnalysis() : onStartAnalysis()
+          }
           disabled={isAnalyzing}
         >
           <Brain className="mr-2 size-4" aria-hidden="true" />
-          Start analysis
+          {remediationNeedsCodebaseAnalysis ? codebaseAnalysisActionLabel : 'Start analysis'}
         </Button>
       </EmptyPanel>
     );
@@ -513,6 +593,126 @@ function EmptyPanel({ children, text }: { children?: React.ReactNode; text: stri
   );
 }
 
+type FindingRemediationProps = {
+  status: string | null;
+  prDraft: boolean | null;
+  outcomeSummary: string | null;
+  blockedReason: string | null;
+  updatedAt: string | null;
+  failureCopy: string | null;
+  unavailableCopy: string | null;
+  attempts: RemediationAttempt[];
+  action: React.ReactNode;
+};
+
+function FindingRemediation({
+  status,
+  prDraft,
+  outcomeSummary,
+  blockedReason,
+  updatedAt,
+  failureCopy,
+  unavailableCopy,
+  attempts,
+  action,
+}: FindingRemediationProps) {
+  const isActive = isActiveRemediationStatus(status);
+
+  return (
+    <TabsContent value="remediation" className="space-y-4 pt-2">
+      <div className={statusPanelClassName}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              {isActive ? (
+                <LoadingSpinner className="size-4 text-emerald-400" />
+              ) : (
+                <GitPullRequest className="size-4 text-emerald-400" aria-hidden="true" />
+              )}
+              <h4 className="font-medium capitalize">{formatRemediationStatus(status)}</h4>
+              {prDraft && (
+                <Badge variant="outline" className="text-muted-foreground">
+                  Draft
+                </Badge>
+              )}
+            </div>
+            {outcomeSummary && <p className="text-muted-foreground text-sm">{outcomeSummary}</p>}
+            {blockedReason && <p className="text-sm text-yellow-400">Blocked: {blockedReason}</p>}
+            {failureCopy && <p className="text-sm text-red-400">{failureCopy}</p>}
+            {updatedAt && (
+              <p className="text-muted-foreground font-mono text-xs tabular-nums">
+                Updated {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
+              </p>
+            )}
+          </div>
+
+          {action && <div className="flex flex-wrap justify-end gap-2">{action}</div>}
+        </div>
+
+        {unavailableCopy && (
+          <div className="mt-3 flex gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-yellow-400" aria-hidden="true" />
+            <p>{unavailableCopy}</p>
+          </div>
+        )}
+      </div>
+
+      {attempts.length > 0 ? (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Attempts</h4>
+          <div className="space-y-2">
+            {attempts.map(attempt => (
+              <div key={attempt.id} className={statusPanelClassName}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">#{attempt.attemptNumber}</Badge>
+                    <span className="text-sm capitalize">
+                      {formatRemediationStatus(attempt.status)}
+                    </span>
+                    <span className="text-muted-foreground text-xs">{attempt.origin}</span>
+                  </div>
+                  <span className="text-muted-foreground font-mono text-xs tabular-nums">
+                    {format(new Date(attempt.updatedAt), 'PPp')}
+                  </span>
+                </div>
+                <div className="text-muted-foreground mt-2 grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
+                  <div className="min-w-0">
+                    <span className="text-foreground font-medium">Branch:</span>{' '}
+                    <span className="break-all font-mono">{attempt.branchName}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-foreground font-medium">Model:</span>{' '}
+                    <span className="break-all font-mono">{attempt.remediationModelSlug}</span>
+                  </div>
+                </div>
+                {attempt.lastErrorRedacted && (
+                  <p className="mt-2 text-xs text-red-400">{attempt.lastErrorRedacted}</p>
+                )}
+                {attempt.blockedReason && (
+                  <p className="mt-2 text-xs text-yellow-400">{attempt.blockedReason}</p>
+                )}
+                {attempt.riskNotes && (
+                  <p className="text-muted-foreground mt-2 text-xs">{attempt.riskNotes}</p>
+                )}
+                {attempt.prUrl && (
+                  <Button variant="link" size="sm" asChild className="mt-1 h-auto px-0">
+                    <a href={attempt.prUrl} target="_blank" rel="noopener noreferrer">
+                      Open attempt PR
+                      <ExternalLink className="ml-1 size-3" aria-hidden="true" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <EmptyPanel text="No remediation attempts have run for this finding." />
+      )}
+    </TabsContent>
+  );
+}
+
 function FindingFooter({
   finding,
   canDismiss,
@@ -551,12 +751,37 @@ export function FindingDetailDialog({
 }: FindingDetailDialogProps) {
   const trpc = useTRPC();
   const isOrg = Boolean(organizationId);
-  const { handleStartAnalysis: triggerStartAnalysis, startingAnalysisIds } = useSecurityAgent();
+  const {
+    handleStartAnalysis: triggerStartAnalysis,
+    handleStartRemediation,
+    handleRetryRemediation,
+    handleCancelRemediation,
+    startingAnalysisIds,
+    startingRemediationIds,
+    cancellingRemediationAttemptIds,
+  } = useSecurityAgent();
   const isAwaitingAnalysisStart = finding ? startingAnalysisIds.has(finding.id) : false;
+  const isAwaitingRemediationStart = finding ? startingRemediationIds.has(finding.id) : false;
 
-  const pollWhileActive = (query: { state: { data?: { status?: string | null } } }) => {
+  const pollWhileActive = (query: {
+    state: {
+      data?: {
+        status?: string | null;
+        remediationAttempts?: RemediationAttempt[];
+      };
+    };
+  }) => {
     const status = query.state.data?.status;
-    if (isAwaitingAnalysisStart || status === 'pending' || status === 'running') {
+    const hasActiveRemediation = query.state.data?.remediationAttempts?.some(attempt =>
+      isActiveRemediationStatus(attempt.status)
+    );
+    if (
+      isAwaitingAnalysisStart ||
+      isAwaitingRemediationStart ||
+      status === 'pending' ||
+      status === 'running' ||
+      hasActiveRemediation
+    ) {
       return ANALYSIS_POLL_INTERVAL_MS;
     }
     return false as const;
@@ -584,11 +809,165 @@ export function FindingDetailDialog({
   const analysis = analysisData?.analysis ?? finding.analysis;
   const analysisError = analysisData?.error ?? finding.analysis_error;
   const cliSessionId = analysisData?.cliSessionId ?? finding.cli_session_id;
+  const remediationSummary = analysisData?.remediationSummary ?? finding.remediationSummary ?? null;
+  const remediationCapability =
+    analysisData?.remediationCapability ?? finding.remediationCapability;
+  const remediationAttempts = analysisData?.remediationAttempts ?? [];
+  const latestHistoryAttempt = remediationAttempts[0] ?? null;
+  const effectiveRemediationStatus =
+    latestHistoryAttempt?.status ?? remediationSummary?.status ?? null;
+  const isEffectiveRemediationActive = isActiveRemediationStatus(effectiveRemediationStatus);
+  const effectiveRemediationPrUrl =
+    remediationSummary?.prUrl ?? latestHistoryAttempt?.prUrl ?? null;
+  const effectiveRemediationPrDraft =
+    remediationSummary?.prDraft ?? latestHistoryAttempt?.prDraft ?? null;
+  const effectiveRemediationOutcomeSummary = isEffectiveRemediationActive
+    ? null
+    : (remediationSummary?.outcomeSummary ?? null);
+  const effectiveRemediationBlockedReason = isEffectiveRemediationActive
+    ? null
+    : (latestHistoryAttempt?.blockedReason ?? remediationSummary?.blockedReason ?? null);
+  const effectiveRemediationUpdatedAt =
+    latestHistoryAttempt?.updatedAt ?? remediationSummary?.updatedAt ?? null;
+  const hasRegisteredRemediationAttempt =
+    remediationAttempts.length > 0 ||
+    Boolean(remediationSummary?.latestAttemptId ?? remediationSummary?.latestAttempt?.id);
+  const activeRemediationAttemptId = isEffectiveRemediationActive
+    ? (remediationCapability?.cancelAttemptId ??
+      latestHistoryAttempt?.id ??
+      remediationSummary?.latestAttemptId ??
+      null)
+    : null;
+  const isCancellingRemediation =
+    !!activeRemediationAttemptId && cancellingRemediationAttemptIds.has(activeRemediationAttemptId);
+  const remediationUnavailableCopy =
+    remediationCapability &&
+    !remediationCapability.canStart &&
+    !remediationCapability.canRetry &&
+    !remediationCapability.canCancel
+      ? getRemediationUnavailableCopy(remediationCapability.startReason)
+      : null;
+  const effectiveRemediationUnavailableCopy =
+    effectiveRemediationStatus === 'pr_opened'
+      ? getRemediationUnavailableCopy('pr_already_opened')
+      : remediationUnavailableCopy;
+  const remediationNeedsAnalysisRefresh =
+    !hasRegisteredRemediationAttempt &&
+    (remediationCapability?.startReason === 'stale_analysis' ||
+      remediationCapability?.retryReason === 'stale_analysis');
+  const remediationNeedsCodebaseAnalysis =
+    !hasRegisteredRemediationAttempt &&
+    !isEffectiveRemediationActive &&
+    (isCodebaseAnalysisRequiredReason(remediationCapability?.startReason) ||
+      isCodebaseAnalysisRequiredReason(remediationCapability?.retryReason));
+  const canStartRemediation =
+    Boolean(remediationCapability?.canStart) &&
+    !hasRegisteredRemediationAttempt &&
+    !isEffectiveRemediationActive;
+  const canCancelRemediation = Boolean(activeRemediationAttemptId);
+  const canRetryRemediation =
+    Boolean(remediationCapability?.canRetry) &&
+    !isEffectiveRemediationActive &&
+    effectiveRemediationStatus !== 'pr_opened';
+  const remediationFailureCopy = isEffectiveRemediationActive
+    ? null
+    : getRemediationFailureCopy(
+        latestHistoryAttempt?.failureCode ?? remediationSummary?.failureCode
+      );
   const isAnalyzing =
     isAwaitingAnalysisStart || analysisStatus === 'pending' || analysisStatus === 'running';
-  const handleStartAnalysis: StartAnalysis = ({ retrySandboxOnly } = {}) => {
-    triggerStartAnalysis(finding.id, { retrySandboxOnly });
+  const remediationAnalysisRefreshLabel =
+    isAwaitingAnalysisStart || analysisStatus === 'pending'
+      ? manualAnalysisAdmissionCopy.pendingLabel
+      : analysisStatus === 'running'
+        ? 'Analysis running'
+        : 'Rerun analysis';
+  const codebaseAnalysisActionLabel =
+    isAwaitingAnalysisStart || analysisStatus === 'pending'
+      ? manualAnalysisAdmissionCopy.pendingLabel
+      : analysisStatus === 'running'
+        ? 'Analysis running'
+        : 'Run codebase analysis';
+
+  const handleStartAnalysis: StartAnalysis = ({ forceSandbox, retrySandboxOnly } = {}) => {
+    triggerStartAnalysis(finding.id, { forceSandbox, retrySandboxOnly });
   };
+  const handleStartCodebaseAnalysis = () => {
+    handleStartAnalysis({ forceSandbox: true });
+  };
+  const handleCancelRemediationClick = () => {
+    if (activeRemediationAttemptId) handleCancelRemediation(activeRemediationAttemptId, finding.id);
+  };
+  const remediationAction = effectiveRemediationPrUrl ? (
+    <Button variant="outline" size="sm" asChild>
+      <a href={effectiveRemediationPrUrl} target="_blank" rel="noopener noreferrer">
+        <ExternalLink className="mr-2 size-4" aria-hidden="true" />
+        View PR
+      </a>
+    </Button>
+  ) : isAwaitingRemediationStart ? (
+    <Button variant="outline" size="sm" disabled>
+      <LoadingSpinner className="mr-2 size-4" />
+      Queueing
+    </Button>
+  ) : canCancelRemediation ? (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleCancelRemediationClick}
+      disabled={isCancellingRemediation}
+    >
+      {isCancellingRemediation ? (
+        <LoadingSpinner className="mr-2 size-4" />
+      ) : (
+        <XCircle className="mr-2 size-4" aria-hidden="true" />
+      )}
+      Cancel
+    </Button>
+  ) : canRetryRemediation ? (
+    <Button variant="outline" size="sm" onClick={() => handleRetryRemediation(finding.id)}>
+      <RotateCw className="mr-2 size-4" aria-hidden="true" />
+      Retry fix
+    </Button>
+  ) : canStartRemediation ? (
+    <Button variant="outline" size="sm" onClick={() => handleStartRemediation(finding.id)}>
+      <GitPullRequest className="mr-2 size-4" aria-hidden="true" />
+      Fix with PR
+    </Button>
+  ) : remediationNeedsCodebaseAnalysis ? (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleStartCodebaseAnalysis}
+      disabled={isAnalyzing}
+    >
+      {isAnalyzing ? (
+        <LoadingSpinner className="mr-2 size-4" />
+      ) : (
+        <Brain className="mr-2 size-4" aria-hidden="true" />
+      )}
+      {codebaseAnalysisActionLabel}
+    </Button>
+  ) : remediationNeedsAnalysisRefresh ? (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => handleStartAnalysis()}
+      disabled={isAnalyzing}
+    >
+      {isAnalyzing ? (
+        <LoadingSpinner className="mr-2 size-4" />
+      ) : (
+        <Brain className="mr-2 size-4" aria-hidden="true" />
+      )}
+      {remediationAnalysisRefreshLabel}
+    </Button>
+  ) : hasRegisteredRemediationAttempt || effectiveRemediationUnavailableCopy ? (
+    <Button variant="outline" size="sm" disabled>
+      <GitPullRequest className="mr-2 size-4" aria-hidden="true" />
+      Fix with PR
+    </Button>
+  ) : null;
 
   const analysisPanelProps = {
     analysis,
@@ -605,7 +984,7 @@ export function FindingDetailDialog({
         <FindingHeader finding={finding} analysis={analysis} analysisStatus={analysisStatus} />
 
         <Tabs key={finding.id} defaultValue="details" className="min-w-0">
-          <TabsList className="grid w-full grid-cols-3 sm:max-w-md">
+          <TabsList className="grid w-full grid-cols-4 sm:max-w-xl">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="triage" className="flex min-w-0 items-center gap-1.5">
               <AnalysisStatusIcon
@@ -625,6 +1004,14 @@ export function FindingDetailDialog({
               />
               Analysis
             </TabsTrigger>
+            <TabsTrigger value="remediation" className="flex min-w-0 items-center gap-1.5">
+              {isEffectiveRemediationActive ? (
+                <LoadingSpinner className="size-3.5 text-emerald-400" />
+              ) : (
+                <GitPullRequest className="size-3.5" aria-hidden="true" />
+              )}
+              Remediation
+            </TabsTrigger>
           </TabsList>
 
           <FindingDetails finding={finding} />
@@ -633,6 +1020,20 @@ export function FindingDetailDialog({
             {...analysisPanelProps}
             cliSessionId={cliSessionId}
             organizationId={organizationId}
+            remediationNeedsCodebaseAnalysis={remediationNeedsCodebaseAnalysis}
+            codebaseAnalysisActionLabel={codebaseAnalysisActionLabel}
+            onStartCodebaseAnalysis={handleStartCodebaseAnalysis}
+          />
+          <FindingRemediation
+            status={effectiveRemediationStatus}
+            prDraft={effectiveRemediationPrDraft}
+            outcomeSummary={effectiveRemediationOutcomeSummary}
+            blockedReason={effectiveRemediationBlockedReason}
+            updatedAt={effectiveRemediationUpdatedAt}
+            failureCopy={remediationFailureCopy}
+            unavailableCopy={effectiveRemediationUnavailableCopy}
+            attempts={remediationAttempts}
+            action={remediationAction}
           />
           <FindingFooter
             finding={finding}

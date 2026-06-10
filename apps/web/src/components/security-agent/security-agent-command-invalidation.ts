@@ -1,4 +1,8 @@
-export type SecurityAgentCommandType = 'sync' | 'dismiss_finding' | 'start_analysis';
+export type SecurityAgentCommandType =
+  | 'sync'
+  | 'dismiss_finding'
+  | 'start_analysis'
+  | 'apply_auto_remediation';
 export type SecurityAgentInvalidationScope =
   | 'findings'
   | 'findingDetails'
@@ -42,6 +46,13 @@ const analysisScopes = [
   'autoDismissEligible',
 ] as const satisfies readonly SecurityAgentInvalidationScope[];
 
+const remediationScopes = [
+  'findings',
+  'findingDetails',
+  'stats',
+  'dashboardStats',
+] as const satisfies readonly SecurityAgentInvalidationScope[];
+
 export const deletedSecurityAgentFindingsScopes = [
   'findings',
   'findingDetails',
@@ -61,5 +72,7 @@ export function getSecurityAgentInvalidationScopesForCommand(
       return dismissalScopes;
     case 'start_analysis':
       return analysisScopes;
+    case 'apply_auto_remediation':
+      return remediationScopes;
   }
 }

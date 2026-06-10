@@ -9,6 +9,7 @@ import {
   AnalysisModeSection,
   AutoAnalysisSection,
   AutoDismissSection,
+  AutoRemediationSection,
   ModelSection,
   RepositorySection,
   SlaSection,
@@ -67,6 +68,10 @@ function configFingerprint(config: SecurityConfigFormState) {
     config.autoAnalysisEnabled,
     config.autoAnalysisMinSeverity,
     config.autoAnalysisIncludeExisting,
+    config.autoRemediationEnabled,
+    config.autoRemediationMinSeverity,
+    config.autoRemediationIncludeExisting,
+    config.remediationModelSlug,
   ]);
 }
 
@@ -137,6 +142,10 @@ export function SecurityConfigForm({
       autoAnalysisEnabled: state.autoAnalysisEnabled,
       autoAnalysisMinSeverity: state.autoAnalysisMinSeverity,
       autoAnalysisIncludeExisting: state.autoAnalysisIncludeExisting,
+      autoRemediationEnabled: state.autoRemediationEnabled,
+      autoRemediationMinSeverity: state.autoRemediationMinSeverity,
+      autoRemediationIncludeExisting: state.autoRemediationIncludeExisting,
+      remediationModelSlug: state.remediationModelSlug,
     });
   };
 
@@ -163,6 +172,7 @@ export function SecurityConfigForm({
           <ModelSection {...stateProps} models={modelOptions} isLoading={isLoadingModels} />
           <AnalysisModeSection {...stateProps} />
           <AutoAnalysisSection {...stateProps} />
+          <AutoRemediationSection {...stateProps} />
           <AutoDismissSection {...stateProps} />
           <SlaSection {...stateProps} />
           <div className="border-border flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-between">

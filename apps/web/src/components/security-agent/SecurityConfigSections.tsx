@@ -1,7 +1,16 @@
 'use client';
 
 import type { Dispatch, SetStateAction } from 'react';
-import { AlertCircle, AlertTriangle, Bot, Clock, Info, ScanSearch, Settings } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  Bot,
+  Clock,
+  GitPullRequest,
+  Info,
+  ScanSearch,
+  Settings,
+} from 'lucide-react';
 import { RepositoryMultiSelect } from '@/components/code-reviews/RepositoryMultiSelect';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +23,7 @@ import type {
   AnalysisMode,
   AutoAnalysisMinSeverity,
   AutoDismissConfidenceThreshold,
+  AutoRemediationMinSeverity,
   SecurityConfigFormState,
   SecurityRepository,
   SlaConfig,
@@ -160,6 +170,29 @@ const AUTO_ANALYSIS_OPTIONS: RadioOption<AutoAnalysisMinSeverity>[] = [
   { value: 'all', label: 'All severities', description: 'Analyze every finding.' },
 ];
 
+const AUTO_REMEDIATION_OPTIONS: RadioOption<AutoRemediationMinSeverity>[] = [
+  {
+    value: 'critical',
+    label: 'Critical only',
+    description: 'Open remediation PRs for critical exploitable findings.',
+  },
+  {
+    value: 'high',
+    label: 'High and above',
+    description: 'Open remediation PRs for high and critical exploitable findings.',
+  },
+  {
+    value: 'medium',
+    label: 'Medium and above',
+    description: 'Open remediation PRs for medium, high, and critical findings.',
+  },
+  {
+    value: 'all',
+    label: 'All severities',
+    description: 'Open remediation PRs for every eligible exploitable finding.',
+  },
+];
+
 const DISMISS_OPTIONS: RadioOption<AutoDismissConfidenceThreshold>[] = [
   {
     value: 'high',
@@ -297,9 +330,9 @@ export function ModelSection({
       <SectionHeader
         icon={Bot}
         title="AI models"
-        description="Configure dedicated models for quick triage and deep analysis."
+        description="Configure dedicated models for triage, analysis, and remediation."
       />
-      <CardContent className="grid gap-4 md:grid-cols-2">
+      <CardContent className="grid gap-4 md:grid-cols-3">
         <div className="bg-background border-border rounded-lg border p-4">
           <ModelCombobox
             label="Triage model"
@@ -322,6 +355,18 @@ export function ModelSection({
             }
             isLoading={isLoading}
             helperText="Used for sandbox analysis and final extraction."
+          />
+        </div>
+        <div className="bg-background border-border rounded-lg border p-4">
+          <ModelCombobox
+            label="Remediation model"
+            models={models}
+            value={state.remediationModelSlug}
+            onValueChange={remediationModelSlug =>
+              setState(current => ({ ...current, remediationModelSlug }))
+            }
+            isLoading={isLoading}
+            helperText="Used by Cloud Agent when creating remediation PRs."
           />
         </div>
       </CardContent>
@@ -389,6 +434,54 @@ export function AutoAnalysisSection({ state, setState }: StateProps) {
               checked={state.autoAnalysisIncludeExisting}
               onCheckedChange={autoAnalysisIncludeExisting =>
                 setState(current => ({ ...current, autoAnalysisIncludeExisting }))
+              }
+            />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AutoRemediationSection({ state, setState }: StateProps) {
+  return (
+    <Card>
+      <SectionHeader
+        icon={GitPullRequest}
+        title="Auto-remediation"
+        description="Automatically open PRs for eligible exploitable findings."
+      />
+      <CardContent className="space-y-4">
+        <SwitchRow
+          id="auto-remediation-enabled"
+          label="Enable auto-remediation"
+          description="Automatically queue remediation PRs after sandbox analysis confirms an eligible fix."
+          checked={state.autoRemediationEnabled}
+          onCheckedChange={autoRemediationEnabled =>
+            setState(current => ({ ...current, autoRemediationEnabled }))
+          }
+        />
+        {state.autoRemediationEnabled && (
+          <>
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-medium">Minimum severity</legend>
+              <OptionGrid
+                name="auto-remediation-severity"
+                value={state.autoRemediationMinSeverity}
+                options={AUTO_REMEDIATION_OPTIONS}
+                columns="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+                onChange={autoRemediationMinSeverity =>
+                  setState(current => ({ ...current, autoRemediationMinSeverity }))
+                }
+              />
+            </fieldset>
+            <SwitchRow
+              id="auto-remediation-include-existing"
+              label="Include existing findings"
+              description="Also queue already-analyzed eligible findings. Duplicate PRs stay suppressed."
+              checked={state.autoRemediationIncludeExisting}
+              onCheckedChange={autoRemediationIncludeExisting =>
+                setState(current => ({ ...current, autoRemediationIncludeExisting }))
               }
             />
           </>

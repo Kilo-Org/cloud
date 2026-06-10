@@ -214,12 +214,8 @@ function isAnalysisFresh(finding: SecurityRemediationFinding, completedAt: strin
 
 function isRepoInScope(params: {
   finding: SecurityRemediationFinding;
-  config: SecurityRemediationConfig;
   repoFullNamesInScope: string[];
 }): boolean {
-  if (params.config.repository_selection_mode === 'all') {
-    return params.repoFullNamesInScope.includes(params.finding.repo_full_name);
-  }
   return params.repoFullNamesInScope.includes(params.finding.repo_full_name);
 }
 

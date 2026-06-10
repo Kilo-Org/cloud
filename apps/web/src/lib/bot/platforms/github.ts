@@ -268,11 +268,6 @@ async function fetchReviewThreadContext(
   };
 }
 
-function isGitHubBotEnabledForIntegration(integration: PlatformIntegration): boolean {
-  const metadata = integration.metadata as { bot_enabled?: boolean } | null;
-  return metadata?.bot_enabled === true;
-}
-
 async function reactToTriggerMessage(
   thread: Thread,
   messageId: string,
@@ -307,7 +302,7 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
         userId: message.author.userId,
       };
     },
-    isEnabledForBot: isGitHubBotEnabledForIntegration,
+    isEnabledForBot: () => true,
     canHandleMessage({ thread, message, platformIntegration }) {
       return isGitHubRepositoryLinked(
         platformIntegration,

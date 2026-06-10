@@ -69,7 +69,7 @@ describe('GitHub webhook route', () => {
         full_name: 'acme/widgets',
         owner: { login: 'acme' },
       },
-      comment: { id: 456, body: '@kilo fix this' },
+      comment: { id: 456, body: 'please take a look' },
     };
 
     const rawBody = JSON.stringify(payload, null, 2);

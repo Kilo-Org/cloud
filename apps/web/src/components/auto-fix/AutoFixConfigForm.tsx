@@ -68,7 +68,6 @@ export function AutoFixConfigForm({ organizationId }: AutoFixConfigFormProps) {
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [maxPRCreationTime, setMaxPRCreationTime] = useState([15]);
   const [prTitleTemplate, setPrTitleTemplate] = useState('Fix #{issue_number}: {issue_title}');
-  const [enabledForReviewComments, setEnabledForReviewComments] = useState(false);
   const [prBodyTemplate, setPrBodyTemplate] = useState('');
   const [prBaseBranch, setPrBaseBranch] = useState('main');
 
@@ -76,7 +75,6 @@ export function AutoFixConfigForm({ organizationId }: AutoFixConfigFormProps) {
   useEffect(() => {
     if (configData) {
       setIsEnabled(configData.isEnabled);
-      setEnabledForReviewComments(configData.enabled_for_review_comments ?? false);
       setRepositorySelectionMode(configData.repository_selection_mode || 'all');
       setSelectedRepositoryIds(configData.selected_repository_ids || []);
       setSkipLabels((configData.skip_labels || []).join(', '));
@@ -182,7 +180,6 @@ export function AutoFixConfigForm({ organizationId }: AutoFixConfigFormProps) {
       orgSaveMutation.mutate({
         organizationId,
         enabled_for_issues: isEnabled,
-        enabled_for_review_comments: enabledForReviewComments,
         repository_selection_mode: repositorySelectionMode,
         selected_repository_ids: selectedRepositoryIds,
         skip_labels: skipLabelsArray,
@@ -197,7 +194,6 @@ export function AutoFixConfigForm({ organizationId }: AutoFixConfigFormProps) {
     } else {
       personalSaveMutation.mutate({
         enabled_for_issues: isEnabled,
-        enabled_for_review_comments: enabledForReviewComments,
         repository_selection_mode: repositorySelectionMode,
         selected_repository_ids: selectedRepositoryIds,
         skip_labels: skipLabelsArray,
@@ -257,29 +253,6 @@ export function AutoFixConfigForm({ organizationId }: AutoFixConfigFormProps) {
               checked={isEnabled}
               onCheckedChange={handleToggle}
               disabled={orgToggleMutation.isPending || personalToggleMutation.isPending}
-            />
-          </div>
-
-          {/* Review Comments Toggle */}
-          <div
-            className={cn(
-              'flex items-center justify-between rounded-lg border p-4',
-              !isEnabled && 'pointer-events-none opacity-50'
-            )}
-          >
-            <div className="space-y-0.5">
-              <Label htmlFor="enable-review-comments" className="text-base font-semibold">
-                Fix PR Review Comments
-              </Label>
-              <p className="text-muted-foreground text-sm">
-                Respond to <code className="bg-muted rounded px-1 py-0.5">@kilo fix</code> mentions
-                in PR review comments with scoped code changes
-              </p>
-            </div>
-            <Switch
-              id="enable-review-comments"
-              checked={enabledForReviewComments}
-              onCheckedChange={setEnabledForReviewComments}
             />
           </div>
 

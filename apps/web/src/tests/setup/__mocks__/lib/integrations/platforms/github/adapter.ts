@@ -26,15 +26,6 @@ export async function exchangeGitHubOAuthCode(
   return { id: '12345', login: 'octocat' };
 }
 
-export async function getCollaboratorPermissionLevel(
-  _installationId: string,
-  _owner: string,
-  _repo: string,
-  _username: string
-): Promise<'admin' | 'write' | 'read' | 'none' | null> {
-  return 'write';
-}
-
 export async function isMergeCommit(
   _installationId: string,
   _owner: string,

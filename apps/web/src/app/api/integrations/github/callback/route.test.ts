@@ -11,7 +11,6 @@ import { isOrganizationMember } from '@/lib/organizations/organizations';
 import type { StateAdapter } from 'chat';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
-const mockIsEnabledForBot = jest.fn();
 
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/bot/github-link-state');
@@ -21,11 +20,6 @@ jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => undefined),
     getState: jest.fn(() => mockState),
-  },
-}));
-jest.mock('@/lib/bot/platforms', () => ({
-  botPlatforms: {
-    require: jest.fn(() => ({ isEnabledForBot: mockIsEnabledForBot })),
   },
 }));
 jest.mock('@octokit/rest', () => ({
@@ -109,10 +103,9 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       owned_by_organization_id: 'org_1',
       owned_by_user_id: null,
       github_app_type: 'standard',
-      metadata: { bot_enabled: true },
+      metadata: null,
     } as never);
     mockedIsOrganizationMember.mockResolvedValue(true);
-    mockIsEnabledForBot.mockReturnValue(true);
   });
 
   test('redirects unauthenticated bot-link callbacks to existing callback auth fallback', async () => {
@@ -204,34 +197,12 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       owned_by_organization_id: 'org_1',
       owned_by_user_id: null,
       github_app_type: 'lite',
-      metadata: { bot_enabled: true },
+      metadata: null,
     } as never);
 
     const { GET } = await import('./route');
     await GET(makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never);
 
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'lite');
-  });
-
-  test('rejects bot-link callbacks for integrations without bot_enabled metadata', async () => {
-    mockedFindIntegrationByInstallationId.mockResolvedValue({
-      owned_by_organization_id: 'org_1',
-      owned_by_user_id: null,
-      github_app_type: 'standard',
-      metadata: null,
-    } as never);
-    mockIsEnabledForBot.mockReturnValue(false);
-
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
-    );
-
-    expect(response.status).toBe(404);
-    await expect(response.text()).resolves.toContain(
-      'GitHub linking is not enabled for this integration'
-    );
-    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 });

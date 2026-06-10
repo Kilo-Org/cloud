@@ -316,7 +316,6 @@ export async function hasPRCommentWithMarker(
 
 /**
  * Adds a reaction to a PR review comment
- * Used to acknowledge @kilo fix mentions on inline review comments
  * @param appType - The type of GitHub App to use (defaults to 'standard')
  */
 export async function addReactionToPRReviewComment(
@@ -336,43 +335,6 @@ export async function addReactionToPRReviewComment(
     comment_id: commentId,
     content: reaction,
   });
-}
-
-/**
- * Checks the collaborator permission level for a user on a repository.
- * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
- * if the lookup fails (e.g. the App lacks permission to query collaborators).
- * @param appType - The type of GitHub App to use (defaults to 'standard')
- */
-type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
-
-const KNOWN_PERMISSIONS = new Set<string>(['admin', 'write', 'read', 'none']);
-
-export async function getCollaboratorPermissionLevel(
-  installationId: string,
-  owner: string,
-  repo: string,
-  username: string,
-  appType: GitHubAppType = 'standard'
-): Promise<CollaboratorPermission | null> {
-  try {
-    const tokenData = await generateGitHubInstallationToken(installationId, appType);
-    const octokit = new Octokit({ auth: tokenData.token });
-
-    const { data } = await octokit.repos.getCollaboratorPermissionLevel({
-      owner,
-      repo,
-      username,
-    });
-
-    if (KNOWN_PERMISSIONS.has(data.permission)) {
-      // Safe: value validated against the known set above
-      return data.permission as CollaboratorPermission;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 /**

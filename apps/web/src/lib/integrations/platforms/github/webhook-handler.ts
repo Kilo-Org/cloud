@@ -27,7 +27,6 @@ import {
   handlePushEvent,
   handlePullRequest,
   handleIssue,
-  handlePRReviewComment,
   upsertCliSessionPullRequestsFromWebhook,
   upsertCliSessionPullRequestReviewFromWebhook,
 } from '@/lib/integrations/platforms/github/webhook-handlers';
@@ -649,9 +648,8 @@ export async function handleGitHubWebhook(
 
       // Process asynchronously to return 200 within GitHub's timeout
       after(async () => {
-        const handlersTriggered = ['pr_review_comment_fix'];
+        const handlersTriggered: string[] = [];
         try {
-          await handlePRReviewComment(parseResult.data, integration);
           try {
             const reviewMemoryResult = await handleGitHubReviewCommentReply({
               payload: parseResult.data,
@@ -687,7 +685,7 @@ export async function handleGitHubWebhook(
                 errors: [
                   {
                     message: error instanceof Error ? error.message : String(error),
-                    handler: 'pr_review_comment_fix',
+                    handler: 'review_memory_feedback',
                     stack: error instanceof Error ? error.stack : undefined,
                   },
                 ],

@@ -5,6 +5,7 @@ import { after } from 'next/server';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { kilologHash } from '@/lib/ai-gateway/kilologHash';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
+import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 
 const users = [
   '992891e9fe987b8960a05ed0bc9cc456979d1d71410d467f212e6233dbc0a523', // christiaan
@@ -16,10 +17,38 @@ const organizations = [
   '3f48333c176a29aaeeb25f3475e38511fc7184b34321a1605a3c0db54cae6df4', // kilo
 ];
 
-async function isLoggingEnabledForUser(
-  user: User | null,
+const VISITED_URLS_ITEM_REF = '#/properties/filters/properties/visitedUrls/items';
+
+function containsVisitedUrlsItemRef(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(containsVisitedUrlsItemRef);
+
+  return Object.entries(value).some(
+    ([key, nestedValue]) =>
+      (key === '$ref' && nestedValue === VISITED_URLS_ITEM_REF) ||
+      containsVisitedUrlsItemRef(nestedValue)
+  );
+}
+
+export function shouldLogGlmVisitedUrlsRequest(
+  request: GatewayRequest,
+  model: string,
   organizationId: string | null
+): boolean {
+  return (
+    !organizationId &&
+    isGlmModel(model) &&
+    Boolean(request.body.tools?.some(containsVisitedUrlsItemRef))
+  );
+}
+
+async function isLoggingEnabledForRequest(
+  user: User | null,
+  organizationId: string | null,
+  model: string,
+  request: GatewayRequest
 ): Promise<boolean> {
+  if (shouldLogGlmVisitedUrlsRequest(request, model, organizationId)) return true;
   if (user?.google_user_email.endsWith('@kilo.ai')) return true;
   if (user?.google_user_email.endsWith('@kilocode.ai')) return true;
   if (user?.id && users.includes(await kilologHash(user.id))) return true;
@@ -37,7 +66,7 @@ export async function handleRequestLogging(params: {
   request: GatewayRequest;
 }) {
   const { clonedResponse, user, organization_id, session_id, provider, model, request } = params;
-  if (!(await isLoggingEnabledForUser(user, organization_id))) {
+  if (!(await isLoggingEnabledForRequest(user, organization_id, model, request))) {
     return;
   }
   after(async () => {

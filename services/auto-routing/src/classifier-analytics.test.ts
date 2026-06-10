@@ -38,7 +38,7 @@ describe('classifier analytics', () => {
       },
       {
         status: 'classified',
-        classifierModel: 'google/gemma-4-31b-it',
+        classifierModel: 'google/gemini-2.5-flash-lite',
         input,
         classification,
         sessionId: 'task-123',
@@ -49,9 +49,9 @@ describe('classifier analytics', () => {
     );
 
     expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ['google/gemma-4-31b-it'],
+      indexes: ['google/gemini-2.5-flash-lite'],
       blobs: [
-        'google/gemma-4-31b-it',
+        'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
         'chat_completions',
         'classified',

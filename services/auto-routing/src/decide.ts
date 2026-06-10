@@ -7,6 +7,8 @@ import type { NormalizedClassifierInput } from './classifier-input';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { HonoEnv } from './hono-env';
 
+const CLASSIFIER_SUCCESS_LOG_SAMPLE_RATE = 0.01;
+
 function emptyDecisionResponse(): AutoRoutingDecisionResponse {
   return {
     cost: 0,
@@ -18,9 +20,22 @@ function emptyDecisionResponse(): AutoRoutingDecisionResponse {
 function getClassifierFailureMetadata(error: unknown): {
   cost?: number | null;
   classifierModel?: string;
+  failureStage?: string;
+  outputLength?: number;
+  schemaIssueSummary?: string[];
+  topLevelKeys?: string[];
+  fieldTypeSummary?: string[];
 } {
   if (error instanceof ClassifierRunError) {
-    return { cost: error.cost, classifierModel: error.classifierModel };
+    return {
+      cost: error.cost,
+      classifierModel: error.classifierModel,
+      failureStage: error.failureStage,
+      outputLength: error.outputLength,
+      schemaIssueSummary: error.schemaIssueSummary,
+      topLevelKeys: error.topLevelKeys,
+      fieldTypeSummary: error.fieldTypeSummary,
+    };
   }
   return {};
 }
@@ -38,6 +53,11 @@ function logClassifierError({
   classifierDurationMs,
   classifierCostCredits,
   classifierModel,
+  failureStage,
+  outputLength,
+  schemaIssueSummary,
+  topLevelKeys,
+  fieldTypeSummary,
   sessionId,
 }: {
   error: unknown;
@@ -45,6 +65,11 @@ function logClassifierError({
   classifierDurationMs: number;
   classifierCostCredits?: number | null;
   classifierModel?: string;
+  failureStage?: string;
+  outputLength?: number;
+  schemaIssueSummary?: string[];
+  topLevelKeys?: string[];
+  fieldTypeSummary?: string[];
   sessionId: string | null;
 }) {
   console.warn(
@@ -57,7 +82,57 @@ function logClassifierError({
       sessionId,
       classifierDurationMs,
       classifierCostCredits: classifierCostCredits ?? null,
+      ...(failureStage ? { classifierFailureStage: failureStage } : {}),
+      ...(typeof outputLength === 'number' ? { classifierOutputLength: outputLength } : {}),
+      ...(schemaIssueSummary && schemaIssueSummary.length > 0
+        ? { classifierSchemaIssueSummary: schemaIssueSummary }
+        : {}),
+      ...(topLevelKeys && topLevelKeys.length > 0
+        ? { classifierOutputTopLevelKeys: topLevelKeys }
+        : {}),
+      ...(fieldTypeSummary && fieldTypeSummary.length > 0
+        ? { classifierOutputFieldTypes: fieldTypeSummary }
+        : {}),
       ...formatError(error),
+    })
+  );
+}
+
+function logClassifierSuccessSample({
+  classifierInput,
+  classifierDurationMs,
+  classifierCostCredits,
+  classifierModel,
+  sessionId,
+  bodyBytes,
+  classification,
+}: {
+  classifierInput: NormalizedClassifierInput;
+  classifierDurationMs: number;
+  classifierCostCredits: number | null;
+  classifierModel: string;
+  sessionId: string | null;
+  bodyBytes: number;
+  classification: NonNullable<AutoRoutingDecisionResponse['classifierResult']>['classification'];
+}) {
+  if (Math.random() >= CLASSIFIER_SUCCESS_LOG_SAMPLE_RATE) return;
+
+  console.info(
+    JSON.stringify({
+      event: 'auto_routing_classifier_sample',
+      status: 'classified',
+      classifierModel,
+      requestedModel: classifierInput.requestedModel,
+      apiKind: classifierInput.apiKind,
+      sessionId,
+      classifierDurationMs,
+      classifierCostCredits: classifierCostCredits ?? null,
+      confidence: classification.confidence,
+      taskType: classification.taskType,
+      subtaskType: classification.subtaskType,
+      executionMode: classification.executionMode,
+      messageCount: classifierInput.messageCount,
+      bodyBytes,
     })
   );
 }
@@ -102,6 +177,15 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       classifierDurationMs,
       bodyBytes,
     });
+    logClassifierSuccessSample({
+      classifierInput: classifierInput.data,
+      classifierDurationMs,
+      classifierCostCredits: classifier.cost,
+      classifierModel: classifier.classifierModel,
+      sessionId: parsed.data.sessionId,
+      bodyBytes,
+      classification: classifier.classification,
+    });
     // When routing decisions are implemented, include the prior decision for
     // this session as an input alongside classifier output.
     const response: AutoRoutingDecisionResponse = {
@@ -122,6 +206,11 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       classifierDurationMs,
       classifierCostCredits: classifierFailureMetadata.cost,
       classifierModel: classifierFailureMetadata.classifierModel,
+      failureStage: classifierFailureMetadata.failureStage,
+      outputLength: classifierFailureMetadata.outputLength,
+      schemaIssueSummary: classifierFailureMetadata.schemaIssueSummary,
+      topLevelKeys: classifierFailureMetadata.topLevelKeys,
+      fieldTypeSummary: classifierFailureMetadata.fieldTypeSummary,
       sessionId: parsed.data.sessionId,
     });
     writeClassifierMetricsDataPoint(c.env, {

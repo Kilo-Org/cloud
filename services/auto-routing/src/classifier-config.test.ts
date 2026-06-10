@@ -23,9 +23,9 @@ describe('classifier config', () => {
   it('uses the trimmed classifier model from KV', async () => {
     await expect(
       getClassifierModel({
-        AUTO_ROUTING_CONFIG: createKv('  google/gemma-4-31b-it  ').kv,
+        AUTO_ROUTING_CONFIG: createKv('  google/gemini-2.5-flash-lite  ').kv,
       })
-    ).resolves.toBe('google/gemma-4-31b-it');
+    ).resolves.toBe('google/gemini-2.5-flash-lite');
   });
 
   it('falls back to the default classifier model when KV has a blank value', async () => {

@@ -31,7 +31,7 @@ const modelOutput = {
 };
 
 describe('OpenRouter classifier call', () => {
-  it('sends the compact prompt to the Gemma classifier and validates the JSON response', async () => {
+  it('sends the compact prompt to the configured classifier and validates the JSON response', async () => {
     const send = vi.fn(
       async (): Promise<ChatResult> => ({
         id: 'gen-test',
@@ -72,7 +72,7 @@ describe('OpenRouter classifier call', () => {
         responseFormat: { type: 'json_object' },
         stream: false,
         temperature: 0,
-        maxTokens: 400,
+        maxTokens: 160,
       },
     });
   });
@@ -138,6 +138,10 @@ describe('OpenRouter classifier call', () => {
       message: 'Classifier model returned invalid classification',
       cost: 0.00000123,
       classifierModel: DEFAULT_CLASSIFIER_MODEL,
+      failureStage: 'invalid_schema',
+      outputLength: 22,
+      schemaIssueSummary: expect.arrayContaining(['taskType:invalid_value']),
+      fieldTypeSummary: expect.arrayContaining(['taskType:string']),
     } satisfies Partial<ClassifierRunError>);
   });
 });

@@ -1,9 +1,14 @@
 import type { OpenRouter } from '@openrouter/sdk';
 import type { ChatResult } from '@openrouter/sdk/models';
 import { getClassifierModel } from './classifier-config';
-import { buildClassifierMessages } from './classifier-prompt';
+import { buildClassifierMessages, CLASSIFIER_MAX_TOKENS } from './classifier-prompt';
 import type { NormalizedClassifierInput } from './classifier-input';
-import { parseClassifierOutput, type ClassifierOutput } from './classification';
+import {
+  ClassifierOutputParseError,
+  parseClassifierOutput,
+  type ClassifierOutput,
+  type ClassifierOutputParseFailureStage,
+} from './classification';
 import { createOpenRouterClient } from './openrouter';
 
 export type ClassifierRunResult = {
@@ -15,17 +20,32 @@ export type ClassifierRunResult = {
 export type ClassifierRunFailureMetadata = {
   cost: number | null;
   classifierModel: string;
+  failureStage?: ClassifierOutputParseFailureStage;
+  outputLength?: number;
+  schemaIssueSummary?: string[];
+  topLevelKeys?: string[];
+  fieldTypeSummary?: string[];
 };
 
 export class ClassifierRunError extends Error {
   readonly cost: number | null;
   readonly classifierModel: string;
+  readonly failureStage?: ClassifierOutputParseFailureStage;
+  readonly outputLength?: number;
+  readonly schemaIssueSummary: string[];
+  readonly topLevelKeys: string[];
+  readonly fieldTypeSummary: string[];
 
   constructor(message: string, metadata: ClassifierRunFailureMetadata) {
     super(message);
     this.name = 'ClassifierRunError';
     this.cost = metadata.cost;
     this.classifierModel = metadata.classifierModel;
+    this.failureStage = metadata.failureStage;
+    this.outputLength = metadata.outputLength;
+    this.schemaIssueSummary = metadata.schemaIssueSummary ?? [];
+    this.topLevelKeys = metadata.topLevelKeys ?? [];
+    this.fieldTypeSummary = metadata.fieldTypeSummary ?? [];
   }
 }
 
@@ -55,7 +75,7 @@ export async function classifyWithOpenRouter(
       responseFormat: { type: 'json_object' },
       stream: false,
       temperature: 0,
-      maxTokens: 400,
+      maxTokens: CLASSIFIER_MAX_TOKENS,
     },
   });
 
@@ -71,10 +91,19 @@ export async function classifyWithOpenRouter(
   let classification: ClassifierOutput;
   try {
     classification = parseClassifierOutput(text);
-  } catch {
+  } catch (error) {
     throw new ClassifierRunError('Classifier model returned invalid classification', {
       cost,
       classifierModel,
+      ...(error instanceof ClassifierOutputParseError
+        ? {
+            failureStage: error.failureStage,
+            outputLength: error.outputLength,
+            schemaIssueSummary: error.schemaIssueSummary,
+            topLevelKeys: error.topLevelKeys,
+            fieldTypeSummary: error.fieldTypeSummary,
+          }
+        : {}),
     });
   }
 

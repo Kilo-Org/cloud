@@ -47,7 +47,7 @@ const mockClassification = {
 
 const mockClassifierResult = {
   cost: 0.00000123,
-  classifierModel: 'google/gemma-4-31b-it',
+  classifierModel: 'google/gemini-2.5-flash-lite',
   classification: mockClassification,
 };
 
@@ -90,6 +90,9 @@ describe('auto routing worker', () => {
   });
 
   it('normalizes mirrored chat completion requests', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
     const response = await request('/decide', {
       method: 'POST',
       headers: {
@@ -160,9 +163,9 @@ describe('auto routing worker', () => {
       },
     });
     expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ['google/gemma-4-31b-it'],
+      indexes: ['google/gemini-2.5-flash-lite'],
       blobs: [
-        'google/gemma-4-31b-it',
+        'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
         'chat_completions',
         'classified',
@@ -176,6 +179,25 @@ describe('auto routing worker', () => {
         'task-123',
       ],
       doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, expect.any(Number)],
+    });
+    expect(infoSpy).toHaveBeenCalledTimes(1);
+    const [logMessage] = infoSpy.mock.calls[0] ?? [];
+    expect(typeof logMessage).toBe('string');
+    expect(JSON.parse(String(logMessage))).toEqual({
+      event: 'auto_routing_classifier_sample',
+      status: 'classified',
+      classifierModel: 'google/gemini-2.5-flash-lite',
+      requestedModel: 'anthropic/claude-sonnet-4',
+      apiKind: 'chat_completions',
+      sessionId: 'task-123',
+      classifierDurationMs: expect.any(Number),
+      classifierCostCredits: 0.00000123,
+      confidence: 0.82,
+      taskType: 'implementation',
+      subtaskType: 'feature_development',
+      executionMode: 'code_change',
+      messageCount: 3,
+      bodyBytes: expect.any(Number),
     });
   });
 
@@ -374,7 +396,12 @@ describe('auto routing worker', () => {
     classifyNormalizedInput.mockRejectedValueOnce(
       new ClassifierRunError('Classifier model returned invalid classification', {
         cost: 0.00000123,
-        classifierModel: 'google/gemma-4-31b-it',
+        classifierModel: 'google/gemini-2.5-flash-lite',
+        failureStage: 'invalid_schema',
+        outputLength: 22,
+        schemaIssueSummary: ['taskType:invalid_value'],
+        topLevelKeys: ['taskType'],
+        fieldTypeSummary: ['taskType:string'],
       })
     );
 
@@ -408,19 +435,24 @@ describe('auto routing worker', () => {
     expect(JSON.parse(String(logMessage))).toEqual({
       event: 'auto_routing_classifier_error',
       reason: 'classifier_run_error',
-      classifierModel: 'google/gemma-4-31b-it',
+      classifierModel: 'google/gemini-2.5-flash-lite',
       requestedModel: 'anthropic/claude-sonnet-4',
       apiKind: 'chat_completions',
       sessionId: null,
       classifierDurationMs: expect.any(Number),
       classifierCostCredits: 0.00000123,
+      classifierFailureStage: 'invalid_schema',
+      classifierOutputLength: 22,
+      classifierSchemaIssueSummary: ['taskType:invalid_value'],
+      classifierOutputTopLevelKeys: ['taskType'],
+      classifierOutputFieldTypes: ['taskType:string'],
       error: 'Classifier model returned invalid classification',
       stack: expect.any(String),
     });
     expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ['google/gemma-4-31b-it'],
+      indexes: ['google/gemini-2.5-flash-lite'],
       blobs: [
-        'google/gemma-4-31b-it',
+        'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
         'chat_completions',
         'classifier_error',
@@ -509,7 +541,7 @@ describe('auto routing worker', () => {
   });
 
   it('returns the configured classifier model', async () => {
-    configGet.mockResolvedValueOnce('google/gemma-4-31b-it');
+    configGet.mockResolvedValueOnce('google/gemini-2.5-flash-lite');
 
     const response = await request('/admin/classifier-model', {
       headers: { authorization: 'Bearer classifier-token' },
@@ -517,8 +549,8 @@ describe('auto routing worker', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      model: 'google/gemma-4-31b-it',
-      defaultModel: 'google/gemma-4-31b-it',
+      model: 'google/gemini-2.5-flash-lite',
+      defaultModel: 'google/gemini-2.5-flash-lite',
     });
     expect(configGet).toHaveBeenCalledWith('classifier_model');
   });
@@ -530,15 +562,15 @@ describe('auto routing worker', () => {
         authorization: 'Bearer classifier-token',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ model: 'google/gemma-4-31b-it:free' }),
+      body: JSON.stringify({ model: 'google/gemini-2.5-flash-lite:free' }),
     });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      model: 'google/gemma-4-31b-it:free',
-      defaultModel: 'google/gemma-4-31b-it',
+      model: 'google/gemini-2.5-flash-lite:free',
+      defaultModel: 'google/gemini-2.5-flash-lite',
     });
-    expect(configPut).toHaveBeenCalledWith('classifier_model', 'google/gemma-4-31b-it:free');
+    expect(configPut).toHaveBeenCalledWith('classifier_model', 'google/gemini-2.5-flash-lite:free');
   });
 
   it('rejects blank classifier model updates', async () => {
@@ -604,7 +636,7 @@ describe('auto routing worker', () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            data: [{ classifier_model: 'google/gemma-4-31b-it', requests: 10 }],
+            data: [{ classifier_model: 'google/gemini-2.5-flash-lite', requests: 10 }],
           }),
           { status: 200 }
         )
@@ -637,7 +669,7 @@ describe('auto routing worker', () => {
         { status: 'classifier_error', requests: 1 },
       ],
       taskTypeBreakdown: [{ taskType: 'implementation', requests: 5, avgConfidence: 0.9 }],
-      classifierModelBreakdown: [{ classifierModel: 'google/gemma-4-31b-it', requests: 10 }],
+      classifierModelBreakdown: [{ classifierModel: 'google/gemini-2.5-flash-lite', requests: 10 }],
     });
     expect(analyticsTokenGet).toHaveBeenCalled();
     expect(mockedFetch).toHaveBeenCalledWith(

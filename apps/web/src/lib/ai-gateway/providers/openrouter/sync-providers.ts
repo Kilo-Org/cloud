@@ -28,6 +28,11 @@ import { redisClient } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  normalizeInferenceProviderId,
+  openRouterToVercelInferenceProviderId,
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -150,7 +155,10 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   return data.data.models;
 }
 
-async function syncProviders(providers: OpenRouterProvider[]) {
+async function syncProviders(
+  providers: OpenRouterProvider[],
+  vercelModels: Record<string, StoredModel>
+) {
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -179,6 +187,28 @@ async function syncProviders(providers: OpenRouterProvider[]) {
       })
     )
   );
+
+  const openRouterModels = new Map<string, OpenRouterModel>();
+  for (const { models } of providerModelData) {
+    for (const model of models) {
+      openRouterModels.set(normalizeModelId(model.slug), model);
+    }
+  }
+
+  for (const model of openRouterModels.values()) {
+    const vercelModel = vercelModels[mapModelIdToVercel(model.slug, false)];
+    if (!vercelModel) continue;
+
+    const vercelInferenceProviders = new Set(
+      vercelModel.endpoints.map(endpoint => normalizeInferenceProviderId(endpoint.tag))
+    );
+    for (const providerData of providerModelData) {
+      const vercelProviderId = openRouterToVercelInferenceProviderId(providerData.provider.slug);
+      if (vercelInferenceProviders.has(vercelProviderId)) {
+        providerData.models.push(model);
+      }
+    }
+  }
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm => {
@@ -395,7 +425,7 @@ export async function syncAndStoreProviders() {
     );
   }
 
-  const providers = await syncProviders(openrouterProviders);
+  const providers = await syncProviders(openrouterProviders, vercel_data);
 
   if (providers.total_providers < 10) {
     throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);

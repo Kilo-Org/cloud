@@ -28,6 +28,11 @@ import { redisClient } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  normalizeInferenceProviderId,
+  openRouterToVercelInferenceProviderId,
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -150,7 +155,10 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   return data.data.models;
 }
 
-async function syncProviders(providers: OpenRouterProvider[]) {
+async function syncProviders(
+  providers: OpenRouterProvider[],
+  vercelModels: Record<string, StoredModel>
+) {
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -180,38 +188,54 @@ async function syncProviders(providers: OpenRouterProvider[]) {
     )
   );
 
-  const mappedExtraModels = kiloExclusiveModels
-    .flatMap(kfm => {
-      if (kfm.status !== 'public') return [];
-      const inferenceProvider = getInferenceProvider(kfm);
-      if (!inferenceProvider) return [];
-      return [{ kfm, inferenceProvider }];
-    })
-    .map(({ kfm, inferenceProvider }) => {
-      const model = convertFromKiloExclusiveModel(kfm);
-      return {
-        model: {
-          slug: normalizeModelId(model.id),
-          name: model.name,
-          author: 'Other',
-          description: model.description,
-          context_length: model.context_length,
-          input_modalities: model.architecture.input_modalities,
-          output_modalities: model.architecture.output_modalities,
-          group: 'other',
-          updated_at: new Date().toISOString(),
-          endpoint: {
-            provider_display_name: 'Other',
-            is_free: !kfm.pricing,
-            pricing: {
-              prompt: model.pricing.prompt,
-              completion: model.pricing.completion,
-            },
+  const mappedExtraModels = kiloExclusiveModels.flatMap(kfm => {
+    if (kfm.status !== 'public') return [];
+
+    const inferenceProviders = new Set<string>();
+    const configuredInferenceProvider = getInferenceProvider(kfm);
+    if (configuredInferenceProvider) {
+      inferenceProviders.add(configuredInferenceProvider);
+    }
+
+    const vercelModelId = mapModelIdToVercel(kfm.public_id, false);
+    const vercelModel = vercelModels[vercelModelId];
+    if (vercelModel) {
+      const vercelInferenceProviders = new Set(
+        vercelModel.endpoints.map(endpoint => normalizeInferenceProviderId(endpoint.tag))
+      );
+      for (const provider of providers) {
+        if (
+          vercelInferenceProviders.has(openRouterToVercelInferenceProviderId(provider.slug))
+        ) {
+          inferenceProviders.add(provider.slug);
+        }
+      }
+    }
+
+    const model = convertFromKiloExclusiveModel(kfm);
+    return [...inferenceProviders].map(inferenceProvider => ({
+      model: {
+        slug: normalizeModelId(model.id),
+        name: model.name,
+        author: 'Other',
+        description: model.description,
+        context_length: model.context_length,
+        input_modalities: model.architecture.input_modalities,
+        output_modalities: model.architecture.output_modalities,
+        group: 'other',
+        updated_at: new Date().toISOString(),
+        endpoint: {
+          provider_display_name: 'Other',
+          is_free: !kfm.pricing,
+          pricing: {
+            prompt: model.pricing.prompt,
+            completion: model.pricing.completion,
           },
         },
-        provider: inferenceProvider,
-      };
-    });
+      },
+      provider: inferenceProvider,
+    }));
+  });
 
   for (const extraModel of mappedExtraModels) {
     const providerData = providerModelData.find(data => data.provider.slug === extraModel.provider);
@@ -395,7 +419,7 @@ export async function syncAndStoreProviders() {
     );
   }
 
-  const providers = await syncProviders(openrouterProviders);
+  const providers = await syncProviders(openrouterProviders, vercel_data);
 
   if (providers.total_providers < 10) {
     throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);

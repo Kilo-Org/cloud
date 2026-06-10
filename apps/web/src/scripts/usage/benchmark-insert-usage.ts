@@ -43,6 +43,10 @@ function randomCoordinate(min: number, max: number): number {
   return min + (secureRandomInt(0, 1_000_000) / 1_000_000) * (max - min);
 }
 
+function secureRandom(): number {
+  return secureRandomInt(0, 1_000_000) / 1_000_000;
+}
+
 function pickRandom<T>(arr: T[], rand: number): T {
   return arr[Math.floor(rand * arr.length)];
 }
@@ -68,7 +72,7 @@ function generateRandomRecord(
 
   const core: MicrodollarUsage = {
     id,
-    kilo_user_id: pickRandom(uniquePools.userIds, Math.random()),
+    kilo_user_id: pickRandom(uniquePools.userIds, secureRandom()),
     organization_id: maybeNull(randomUUID(), usageStats.organization_id_null_pct),
     provider: maybeNull(
       randomString(

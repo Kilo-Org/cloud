@@ -30,7 +30,11 @@ describe('free model data disclosure', () => {
       })
     ).toBe(true);
     expect(
-      mayTrainOnYourPrompts({ id: 'free-private-model', isFree: true, mayTrainOnYourPrompts: false })
+      mayTrainOnYourPrompts({
+        id: 'free-private-model',
+        isFree: true,
+        mayTrainOnYourPrompts: false,
+      })
     ).toBe(false);
     expect(mayTrainOnYourPrompts({ id: 'free-model', isFree: true })).toBe(false);
   });

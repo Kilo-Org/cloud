@@ -92,7 +92,9 @@ describe('calculateCost_mUsd', () => {
 
 describe('convertFromKiloExclusiveModel', () => {
   it('derives free and training metadata independently', () => {
-    const freePrivateModel = convertFromKiloExclusiveModel(makeModel({ internal_id: 'vendor/free' }));
+    const freePrivateModel = convertFromKiloExclusiveModel(
+      makeModel({ internal_id: 'vendor/free' })
+    );
     const paidTrainingModel = convertFromKiloExclusiveModel(
       makeModel({
         internal_id: 'vendor/paid',

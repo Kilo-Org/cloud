@@ -547,6 +547,31 @@ describe('cli-sessions-v2-router', () => {
       expect(withoutPr?.associatedPr).toBeNull();
     });
 
+    it.each([
+      'git@github.com:Kilo/Repo.git',
+      'ssh://git@github.com/Kilo/Repo.git',
+      'https://token@github.com/Kilo/Repo.git',
+    ])('list normalizes git URL filter %s', async gitUrl => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.list({ gitUrl });
+
+      expect(result.cliSessions.map(session => session.session_id)).toEqual(
+        expect.arrayContaining([sessionWithPr, sessionWithoutPr])
+      );
+    });
+
+    it('search normalizes git URL filters', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: 'session',
+        gitUrl: 'git@github.com:Kilo/Repo.git',
+      });
+
+      expect(result.results.map(session => session.session_id)).toEqual(
+        expect.arrayContaining([sessionWithPr, sessionWithoutPr])
+      );
+    });
+
     it('list exposes reviewDecision when the cache row has it set', async () => {
       // Update the existing cache row to have an approved review decision.
       await db

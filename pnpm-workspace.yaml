@@ -11,8 +11,8 @@ packages:
   - packages/*
 
 catalog:
-  '@cloudflare/vitest-pool-workers': 0.16.4
-  '@cloudflare/workers-types': 4.20260511.1
+  '@cloudflare/vitest-pool-workers': 0.16.13
+  '@cloudflare/workers-types': 4.20260605.1
   '@octokit/auth-app': 8.2.0
   '@sentry/cli': 3.4.2
   '@tanstack/react-query': 5.100.10
@@ -38,7 +38,7 @@ catalog:
   ulid: 3.0.2
   vitest: 4.1.6
   workers-tagged-logger: 1.0.0
-  wrangler: 4.90.1
+  wrangler: 4.98.0
   zod: 4.4.3
 
 minimumReleaseAge: 6842

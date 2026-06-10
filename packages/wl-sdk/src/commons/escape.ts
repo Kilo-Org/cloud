@@ -33,7 +33,7 @@ export function escapeSqlString(s: string): string {
  * a backslash. Mirrors `commons.EscapeLIKE`.
  */
 export function escapeSqlLike(s: string): string {
-  return escapeSqlString(s).replace(/%/g, '\\%').replace(/_/g, '\\_');
+  return escapeSqlString(s).replace(/[%_]/g, wildcard => `\\${wildcard}`);
 }
 
 /**

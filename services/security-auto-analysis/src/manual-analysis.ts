@@ -1,6 +1,12 @@
 import { randomUUID } from 'crypto';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { transitionSecurityAgentCommand } from '@kilocode/db';
+import {
+  isTerminalSecurityAgentCommandTransitionOutcome,
+  markSecurityAgentCommandRetriesExhausted,
+  requireSecurityAgentCommandTransitionOrTerminal,
+  transitionSecurityAgentCommandWithCurrentState,
+  type SecurityAgentCommandTransitionOutcome,
+} from '@kilocode/db';
 import { security_audit_log } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import { z } from 'zod';
@@ -51,6 +57,8 @@ export const ManualAnalysisStartRequestSchema = ManualAnalysisStartCommandSchema
 });
 
 export type ManualAnalysisStartCommand = z.infer<typeof ManualAnalysisStartCommandSchema>;
+
+const MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS = 4;
 
 function commandOwner(command: ManualAnalysisStartCommand): QueueOwner {
   return command.owner.organizationId
@@ -263,33 +271,79 @@ export async function consumeManualAnalysisBatch(
       continue;
     }
     try {
-      await transitionSecurityAgentCommand(db, {
+      const running = await transitionSecurityAgentCommandWithCurrentState(db, {
         commandId: parsed.data.commandId,
         fromStatuses: ['accepted', 'running'],
         status: 'running',
       });
+      if (requireSecurityAgentCommandTransitionOrTerminal(running, 'running') === 'terminal') {
+        console.info('Manual security analysis command delivery already terminal', {
+          command_id: parsed.data.commandId,
+          command_type: 'start_analysis',
+          owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+          result_code: running.command?.result_code,
+          attempts: message.attempts,
+        });
+        message.ack();
+        continue;
+      }
+
       const result = await processManualAnalysisStart({ db, env, command: parsed.data });
       const terminal = manualAnalysisCommandTerminalState(result);
-      await transitionSecurityAgentCommand(db, {
+      const terminalTransition = await transitionSecurityAgentCommandWithCurrentState(db, {
         commandId: parsed.data.commandId,
-        fromStatuses: ['accepted', 'running'],
+        fromStatuses: ['running'],
         status: terminal.status,
         resultCode: terminal.resultCode,
       });
+      requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
       console.info('Manual security analysis command completed', {
         command_id: parsed.data.commandId,
         command_type: 'start_analysis',
         owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
         result_code: terminal.resultCode,
+        attempts: message.attempts,
       });
       message.ack();
     } catch (error) {
+      let exhaustionOutcome: SecurityAgentCommandTransitionOutcome | undefined;
+      if (message.attempts >= MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS) {
+        try {
+          exhaustionOutcome = await markSecurityAgentCommandRetriesExhausted(
+            db,
+            parsed.data.commandId
+          );
+          if (isTerminalSecurityAgentCommandTransitionOutcome(exhaustionOutcome)) {
+            console.info(
+              'Manual security analysis command delivery already terminal after failure',
+              {
+                command_id: parsed.data.commandId,
+                command_type: 'start_analysis',
+                owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+                result_code: exhaustionOutcome.command?.result_code,
+                attempts: message.attempts,
+              }
+            );
+            message.ack();
+            continue;
+          }
+        } catch {
+          console.error('Failed to record exhausted manual security analysis command', {
+            command_id: parsed.data.commandId,
+            command_type: 'start_analysis',
+            owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+            attempts: message.attempts,
+          });
+        }
+      }
+
       console.error('Manual security analysis start failed', {
         command_id: parsed.data.commandId,
         command_type: 'start_analysis',
         owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
-        findingId: parsed.data.findingId,
-        error: error instanceof Error ? error.message : String(error),
+        attempts: message.attempts,
+        result_code: exhaustionOutcome?.transitioned ? 'QUEUE_RETRIES_EXHAUSTED' : undefined,
+        error_type: error instanceof Error ? error.name : 'UnknownError',
       });
       message.retry();
     }

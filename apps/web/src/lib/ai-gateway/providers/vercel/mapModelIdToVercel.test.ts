@@ -1,5 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import {
+  CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
@@ -18,6 +19,7 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 describe('mapModelIdToVercel', () => {
   describe('tilde-prefixed latest aliases', () => {
     it.each([
+      ['~anthropic/claude-fable-latest', CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID],
       ['~anthropic/claude-opus-latest', CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID],
       ['~anthropic/claude-sonnet-latest', CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID],
       ['~anthropic/claude-haiku-latest', CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID],

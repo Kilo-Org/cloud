@@ -12,6 +12,7 @@ import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/gi
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { GitHubAdapter, GitHubRawMessage } from '@chat-adapter/github';
 import { Octokit } from '@octokit/rest';
+import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 
@@ -272,6 +273,21 @@ function isGitHubBotEnabledForIntegration(integration: PlatformIntegration): boo
   return metadata?.bot_enabled === true;
 }
 
+async function reactToTriggerMessage(
+  thread: Thread,
+  messageId: string,
+  emoji: string
+): Promise<void> {
+  try {
+    await thread.adapter.addReaction(thread.id, messageId, emoji);
+  } catch (error) {
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'github-react' },
+      extra: { threadId: thread.id, messageId, emoji },
+    });
+  }
+}
+
 export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup): BotPlatform {
   return {
     platform: PLATFORM.GITHUB,
@@ -411,6 +427,13 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
     },
     async getRequesterInfo({ displayName }) {
       return { displayName, platform: PLATFORM.GITHUB };
+    },
+    async startProcessingIndicator({ thread, messageId }) {
+      await reactToTriggerMessage(thread, messageId, 'eyes');
+      return async outcome => {
+        if (outcome?.handedOff) return;
+        await reactToTriggerMessage(thread, messageId, 'thumbs_up');
+      };
     },
   };
 }

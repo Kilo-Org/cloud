@@ -141,6 +141,16 @@ export default function OrganizationAppSidebar({
       icon: MessageSquare,
       url: `/organizations/${organizationId}/claw/chat`,
     },
+    // Agent management is admin-only for now.
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'Agents',
+            icon: Bot,
+            url: `/organizations/${organizationId}/claw/agents`,
+          },
+        ]
+      : []),
     {
       title: 'Settings',
       icon: Settings,

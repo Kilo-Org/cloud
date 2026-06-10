@@ -1,9 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  markSecurityAgentCommandRetriesExhausted,
+  transitionSecurityAgentCommandWithCurrentState,
+} from '@kilocode/db';
+import type * as DbModule from '@kilocode/db';
+import { getWorkerDb } from '@kilocode/db/client';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { ensureManualAnalysisQueueRow } from './db/queries.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
-import { processManualAnalysisStart, type ManualAnalysisStartCommand } from './manual-analysis.js';
+import {
+  consumeManualAnalysisBatch,
+  processManualAnalysisStart,
+  type ManualAnalysisStartCommand,
+} from './manual-analysis.js';
 
+vi.mock('@kilocode/db', async importOriginal => {
+  const {
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    requireSecurityAgentCommandTransitionOrTerminal,
+  } = await importOriginal<typeof DbModule>();
+  return {
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    markSecurityAgentCommandRetriesExhausted: vi.fn(),
+    requireSecurityAgentCommandTransitionOrTerminal,
+    transitionSecurityAgentCommandWithCurrentState: vi.fn(),
+  };
+});
+vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('./analysis-start-lifecycle.js', () => ({
   transitionAnalysisStartLifecycle: vi.fn(),
 }));
@@ -34,6 +57,15 @@ beforeEach(() => {
   vi.mocked(startSecurityAnalysis).mockReset();
   vi.mocked(transitionAnalysisStartLifecycle).mockReset();
   vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
+  vi.mocked(getWorkerDb).mockReturnValue({} as never);
+  vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValue({
+    transitioned: true,
+    command: {},
+  } as never);
+  vi.mocked(markSecurityAgentCommandRetriesExhausted).mockResolvedValue({
+    transitioned: true,
+    command: {},
+  } as never);
 });
 
 describe('processManualAnalysisStart', () => {
@@ -433,6 +465,117 @@ describe('processManualAnalysisStart', () => {
         },
       })
     );
+  });
+});
+
+describe('consumeManualAnalysisBatch', () => {
+  function queueMessage(attempts = 1) {
+    return { body: command, attempts, ack: vi.fn(), retry: vi.fn() };
+  }
+
+  it('persists running and terminal state before acknowledging', async () => {
+    const message = queueMessage();
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              { ...finding, owned_by_organization_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
+            ],
+          }),
+        }),
+      }),
+    };
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await consumeManualAnalysisBatch(
+      { messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+      } as CloudflareEnv
+    );
+
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
+      1,
+      db,
+      expect.objectContaining({ status: 'running' })
+    );
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
+      2,
+      db,
+      expect.objectContaining({ status: 'failed', resultCode: 'FINDING_UNAVAILABLE' })
+    );
+    expect(
+      vi.mocked(transitionSecurityAgentCommandWithCurrentState).mock.invocationCallOrder[1]
+    ).toBeLessThan(message.ack.mock.invocationCallOrder[0] ?? Infinity);
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges terminal duplicate delivery without performing work', async () => {
+    const message = queueMessage();
+    const select = vi.fn(() => {
+      throw new Error('work must not run');
+    });
+    vi.mocked(getWorkerDb).mockReturnValue({ select } as never);
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: { status: 'succeeded', result_code: 'ANALYSIS_LAUNCH_STARTED' },
+    } as never);
+
+    await consumeManualAnalysisBatch(
+      { messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+      } as CloudflareEnv
+    );
+
+    expect(select).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('retries without work when running transition is rejected without terminal state', async () => {
+    const message = queueMessage();
+    const select = vi.fn();
+    vi.mocked(getWorkerDb).mockReturnValue({ select } as never);
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: null,
+    });
+
+    await consumeManualAnalysisBatch(
+      { messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+      } as CloudflareEnv
+    );
+
+    expect(select).not.toHaveBeenCalled();
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('records exhausted retries before retrying final delivery to the DLQ', async () => {
+    const message = queueMessage(4);
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: null,
+    });
+
+    await consumeManualAnalysisBatch(
+      { messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+      } as CloudflareEnv
+    );
+
+    expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith({}, command.commandId);
+    expect(
+      vi.mocked(markSecurityAgentCommandRetriesExhausted).mock.invocationCallOrder[0]
+    ).toBeLessThan(message.retry.mock.invocationCallOrder[0] ?? Infinity);
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -172,6 +172,12 @@ function toFailureResult(
   };
 }
 
+function isSandboxConnectionRetry(message: PendingSessionMessage): boolean {
+  return (
+    message.lastFlushFailureCode === 'SANDBOX_CONNECT_FAILED' && (message.flushAttempts ?? 0) >= 1
+  );
+}
+
 function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
   failureStage: 'pre_dispatch';
   failureCode: SessionMessageFailureCode;
@@ -393,6 +399,16 @@ export async function flushNextPendingSessionMessage(params: {
 
   const deliveryBlock = await params.getDeliveryBlock?.();
   if (deliveryBlock) {
+    if (isSandboxConnectionRetry(message)) {
+      const failure = await recordPendingFlushFailure(
+        params.storage,
+        message,
+        message.lastFlushError ?? 'Sandbox connection failed',
+        params.now,
+        { policy, code: 'SANDBOX_CONNECT_FAILED' }
+      );
+      return toFailureResult(failure, totalCount);
+    }
     return {
       type: 'skipped',
       nextFlushAttemptAt: deliveryBlock.retryAt,
@@ -429,6 +445,16 @@ export async function flushNextPendingSessionMessage(params: {
       return toFailureResult(error.failure, totalCount);
     }
     if (error instanceof WrapperCleanupBlockedError) {
+      if (isSandboxConnectionRetry(message)) {
+        const failure = await recordPendingFlushFailure(
+          params.storage,
+          message,
+          message.lastFlushError ?? 'Sandbox connection failed',
+          Date.now(),
+          { policy, code: 'SANDBOX_CONNECT_FAILED' }
+        );
+        return toFailureResult(failure, totalCount);
+      }
       return {
         type: 'skipped',
         nextFlushAttemptAt: error.retryAt,

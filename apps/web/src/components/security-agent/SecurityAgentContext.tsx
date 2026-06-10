@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, use, useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -126,6 +126,83 @@ type SecurityAgentCommand = {
   lastErrorRedacted: string | null;
 };
 
+type SecurityAgentProviderState = {
+  optimisticStartingAnalysisIds: Set<string>;
+  trackedCommandIds: Set<string>;
+  processedTerminalCommandIds: Set<string>;
+  gitHubError: string | null;
+};
+
+type SecurityAgentProviderAction =
+  | { type: 'track-command'; commandId: string }
+  | { type: 'add-optimistic-analysis'; findingId: string }
+  | { type: 'remove-optimistic-analysis'; findingId: string }
+  | { type: 'settle-commands'; commands: SecurityAgentCommand[]; gitHubError?: string }
+  | { type: 'prune-processed-commands'; polledCommandIds: Set<string> }
+  | { type: 'set-github-error'; error: string | null };
+
+function createSecurityAgentProviderState(): SecurityAgentProviderState {
+  return {
+    optimisticStartingAnalysisIds: new Set(),
+    trackedCommandIds: new Set(),
+    processedTerminalCommandIds: new Set(),
+    gitHubError: null,
+  };
+}
+
+function securityAgentProviderReducer(
+  state: SecurityAgentProviderState,
+  action: SecurityAgentProviderAction
+): SecurityAgentProviderState {
+  switch (action.type) {
+    case 'track-command':
+      return {
+        ...state,
+        trackedCommandIds: new Set(state.trackedCommandIds).add(action.commandId),
+      };
+    case 'add-optimistic-analysis':
+      return {
+        ...state,
+        optimisticStartingAnalysisIds: new Set(state.optimisticStartingAnalysisIds).add(
+          action.findingId
+        ),
+      };
+    case 'remove-optimistic-analysis': {
+      const optimisticStartingAnalysisIds = new Set(state.optimisticStartingAnalysisIds);
+      optimisticStartingAnalysisIds.delete(action.findingId);
+      return { ...state, optimisticStartingAnalysisIds };
+    }
+    case 'settle-commands': {
+      const optimisticStartingAnalysisIds = new Set(state.optimisticStartingAnalysisIds);
+      const trackedCommandIds = new Set(state.trackedCommandIds);
+      const processedTerminalCommandIds = new Set(state.processedTerminalCommandIds);
+      for (const command of action.commands) {
+        if (command.findingId) optimisticStartingAnalysisIds.delete(command.findingId);
+        trackedCommandIds.delete(command.id);
+        processedTerminalCommandIds.add(command.id);
+      }
+      return {
+        optimisticStartingAnalysisIds,
+        trackedCommandIds,
+        processedTerminalCommandIds,
+        gitHubError: action.gitHubError ?? state.gitHubError,
+      };
+    }
+    case 'prune-processed-commands': {
+      const processedTerminalCommandIds = new Set(
+        [...state.processedTerminalCommandIds].filter(commandId =>
+          action.polledCommandIds.has(commandId)
+        )
+      );
+      return processedTerminalCommandIds.size === state.processedTerminalCommandIds.size
+        ? state
+        : { ...state, processedTerminalCommandIds };
+    }
+    case 'set-github-error':
+      return { ...state, gitHubError: action.error };
+  }
+}
+
 function commandFailureDescription(command: SecurityAgentCommand): string {
   switch (command.resultCode) {
     case 'OWNER_CAP_REACHED':
@@ -156,19 +233,22 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const queryClient = useQueryClient();
   const isOrg = !!organizationId;
 
-  const [optimisticStartingAnalysisIds, setOptimisticStartingAnalysisIds] = useState<Set<string>>(
-    new Set()
+  const [providerState, dispatchProviderState] = useReducer(
+    securityAgentProviderReducer,
+    undefined,
+    createSecurityAgentProviderState
   );
-  const [trackedCommandIds, setTrackedCommandIds] = useState<Set<string>>(new Set());
-  const [gitHubError, setGitHubError] = useState<string | null>(null);
   const toggleEnabledInFlightRef = useRef(false);
-  const processedTerminalCommandIdsRef = useRef(new Set<string>());
-  const recoveredCommandIdsRef = useRef(new Set<string>());
-  const commandSuccessCallbacksRef = useRef(new Map<string, () => void>());
+  const commandSuccessCallbacksRef = useRef<Map<string, () => void>>(null);
 
   const trackCommand = useCallback((commandId: string, onSuccess?: () => void) => {
-    if (onSuccess) commandSuccessCallbacksRef.current.set(commandId, onSuccess);
-    setTrackedCommandIds(previous => new Set(previous).add(commandId));
+    if (onSuccess) {
+      if (commandSuccessCallbacksRef.current === null) {
+        commandSuccessCallbacksRef.current = new Map();
+      }
+      commandSuccessCallbacksRef.current.set(commandId, onSuccess);
+    }
+    dispatchProviderState({ type: 'track-command', commandId });
   }, []);
 
   const invalidateAcceptedQueueQueries = useCallback(() => {
@@ -269,12 +349,24 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       query.state.data && query.state.data.length > 0 ? COMMAND_POLL_INTERVAL_MS : false,
   });
 
-  useEffect(() => {
-    for (const command of activeCommandsData ?? []) recoveredCommandIdsRef.current.add(command.id);
-  }, [activeCommandsData]);
+  const commandIdsToPoll = useMemo(() => {
+    const commandIds = new Set(providerState.trackedCommandIds);
+    for (const command of activeCommandsData ?? []) commandIds.add(command.id);
+    return commandIds;
+  }, [activeCommandsData, providerState.trackedCommandIds]);
 
-  const commandIdsToPoll = new Set([...trackedCommandIds, ...recoveredCommandIdsRef.current]);
-  for (const command of activeCommandsData ?? []) commandIdsToPoll.add(command.id);
+  useEffect(() => {
+    if (
+      [...providerState.processedTerminalCommandIds].some(
+        commandId => !commandIdsToPoll.has(commandId)
+      )
+    ) {
+      dispatchProviderState({
+        type: 'prune-processed-commands',
+        polledCommandIds: commandIdsToPoll,
+      });
+    }
+  }, [commandIdsToPoll, providerState.processedTerminalCommandIds]);
 
   const commandStatusQueries = useQueries({
     queries: [...commandIdsToPoll].map(commandId => ({
@@ -304,32 +396,32 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
     command => command.commandType === 'dismiss_finding'
   );
   const startingAnalysisIds = useMemo(() => {
-    const ids = new Set(optimisticStartingAnalysisIds);
+    const ids = new Set(providerState.optimisticStartingAnalysisIds);
     for (const command of activeCommands) {
       if (command.commandType === 'start_analysis' && command.findingId) {
         ids.add(command.findingId);
       }
     }
     return ids;
-  }, [activeCommands, optimisticStartingAnalysisIds]);
+  }, [activeCommands, providerState.optimisticStartingAnalysisIds]);
 
   useEffect(() => {
-    for (const query of commandStatusQueries) {
+    const terminalCommands = commandStatusQueries.flatMap(query => {
       const command = query.data;
-      if (!command || command.status === 'accepted' || command.status === 'running') continue;
-      if (processedTerminalCommandIdsRef.current.has(command.id)) continue;
-      processedTerminalCommandIdsRef.current.add(command.id);
-      recoveredCommandIdsRef.current.delete(command.id);
+      return command && command.status !== 'accepted' && command.status !== 'running'
+        ? [command]
+        : [];
+    });
+    const unprocessedTerminalCommands = terminalCommands.filter(
+      command => !providerState.processedTerminalCommandIds.has(command.id)
+    );
+    if (unprocessedTerminalCommands.length === 0) return;
+
+    let terminalGitHubError: string | undefined;
+    for (const command of unprocessedTerminalCommands) {
       invalidateAcceptedQueueQueries();
-      if (command.findingId) {
-        setOptimisticStartingAnalysisIds(previous => {
-          const next = new Set(previous);
-          next.delete(command.findingId ?? '');
-          return next;
-        });
-      }
-      const successCallback = commandSuccessCallbacksRef.current.get(command.id);
-      commandSuccessCallbacksRef.current.delete(command.id);
+      const successCallback = commandSuccessCallbacksRef.current?.get(command.id);
+      commandSuccessCallbacksRef.current?.delete(command.id);
       if (command.status === 'failed') {
         const title =
           command.commandType === 'sync'
@@ -338,7 +430,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
               ? 'Failed to dismiss finding'
               : 'Failed to start analysis';
         if (command.resultCode === 'GITHUB_AUTH_INVALID') {
-          setGitHubError(commandFailureDescription(command));
+          terminalGitHubError = commandFailureDescription(command);
         }
         toast.error(title, { description: commandFailureDescription(command), duration: 8000 });
       } else {
@@ -349,26 +441,31 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
           );
         }
       }
-      setTrackedCommandIds(previous => {
-        const next = new Set(previous);
-        next.delete(command.id);
-        return next;
-      });
     }
-  }, [commandStatusQueries, invalidateAcceptedQueueQueries]);
+
+    dispatchProviderState({
+      type: 'settle-commands',
+      commands: unprocessedTerminalCommands,
+      gitHubError: terminalGitHubError,
+    });
+  }, [
+    commandStatusQueries,
+    providerState.processedTerminalCommandIds,
+    invalidateAcceptedQueueQueries,
+  ]);
 
   // ---- Mutations (org) ----
   const { mutate: orgSyncMutate, isPending: isOrgSyncPending } = useMutation(
     trpc.organizations.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
-        setGitHubError(null);
+        dispatchProviderState({ type: 'set-github-error', error: null });
         toast.success('Sync queued');
         trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
-          setGitHubError(message);
+          dispatchProviderState({ type: 'set-github-error', error: message });
           toast.error('GitHub Integration Error', {
             description:
               'The GitHub App may have been uninstalled. Please check your integrations.',
@@ -440,14 +537,14 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const { mutate: orgStartAnalysisMutate } = useMutation(
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async data => {
-        setGitHubError(null);
+        dispatchProviderState({ type: 'set-github-error', error: null });
         toast.success(manualAnalysisAdmissionCopy.successTitle);
         trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
-          setGitHubError(message);
+          dispatchProviderState({ type: 'set-github-error', error: message });
           toast.error('GitHub Integration Error', {
             description:
               'The GitHub App may have been uninstalled. Please check your integrations.',
@@ -459,10 +556,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
           });
         }
         void queryClient.invalidateQueries();
-        setOptimisticStartingAnalysisIds(prev => {
-          const next = new Set(prev);
-          next.delete(variables.findingId);
-          return next;
+        dispatchProviderState({
+          type: 'remove-optimistic-analysis',
+          findingId: variables.findingId,
         });
       },
     })
@@ -486,14 +582,14 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const { mutate: personalSyncMutate, isPending: isPersonalSyncPending } = useMutation(
     trpc.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
-        setGitHubError(null);
+        dispatchProviderState({ type: 'set-github-error', error: null });
         toast.success('Sync queued');
         trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
-          setGitHubError(message);
+          dispatchProviderState({ type: 'set-github-error', error: message });
           toast.error('GitHub Integration Error', {
             description:
               'The GitHub App may have been uninstalled. Please check your integrations.',
@@ -565,14 +661,14 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const { mutate: personalStartAnalysisMutate } = useMutation(
     trpc.securityAgent.startAnalysis.mutationOptions({
       onSuccess: async data => {
-        setGitHubError(null);
+        dispatchProviderState({ type: 'set-github-error', error: null });
         toast.success(manualAnalysisAdmissionCopy.successTitle);
         trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
-          setGitHubError(message);
+          dispatchProviderState({ type: 'set-github-error', error: message });
           toast.error('GitHub Integration Error', {
             description:
               'The GitHub App may have been uninstalled. Please check your integrations.',
@@ -584,10 +680,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
           });
         }
         void queryClient.invalidateQueries();
-        setOptimisticStartingAnalysisIds(prev => {
-          const next = new Set(prev);
-          next.delete(variables.findingId);
-          return next;
+        dispatchProviderState({
+          type: 'remove-optimistic-analysis',
+          findingId: variables.findingId,
         });
       },
     })
@@ -721,7 +816,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const handleStartAnalysis = useCallback(
     (findingId: string, { retrySandboxOnly }: { retrySandboxOnly?: boolean } = {}) => {
-      setOptimisticStartingAnalysisIds(prev => new Set(prev).add(findingId));
+      dispatchProviderState({ type: 'add-optimistic-analysis', findingId });
       if (isOrg && organizationId) {
         orgStartAnalysisMutate({ organizationId, findingId, retrySandboxOnly });
       } else {
@@ -802,7 +897,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       isTogglingEnabled: isOrg ? isOrgSetEnabledPending : isPersonalSetEnabledPending,
       isDeletingFindings: isOrg ? isOrgDeleteFindingsPending : isPersonalDeleteFindingsPending,
       startingAnalysisIds,
-      gitHubError,
+      gitHubError: providerState.gitHubError,
       orphanedRepositories: orphanedReposData ?? [],
     }),
     [
@@ -837,7 +932,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       isOrgDeleteFindingsPending,
       isPersonalDeleteFindingsPending,
       startingAnalysisIds,
-      gitHubError,
+      providerState.gitHubError,
       orphanedReposData,
       triageModelSlug,
       analysisModelSlug,

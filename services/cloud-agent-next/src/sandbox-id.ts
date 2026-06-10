@@ -1,6 +1,8 @@
 import type { SandboxId, Env } from './types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 
+const SHARED_SANDBOX_ID_VERSION = 'shared-v2';
+
 /**
  * Parses a comma-separated org ID list into a set.
  * Returns an empty set when the value is falsy or blank.
@@ -79,5 +81,5 @@ export async function generateSandboxId(
     prefix = orgId ? 'org' : 'usr';
   }
 
-  return hashToSandboxId(originalFormat, prefix);
+  return hashToSandboxId(`${SHARED_SANDBOX_ID_VERSION}:${originalFormat}`, prefix);
 }

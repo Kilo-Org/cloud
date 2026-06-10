@@ -275,10 +275,19 @@ describe('Worker GitHub auth-invalid sync', () => {
     expect(sets).not.toContainEqual(expect.objectContaining({ runtime_state: expect.anything() }));
   });
 
-  it('throws non-401 GitHub errors', async () => {
+  it('records disabled Dependabot alerts as a repository sync failure', async () => {
     const { db } = createFakeDb();
     const gitTokenService = createGitTokenService();
-    stubFetch(new Response('Service unavailable', { status: 500 }));
+    const upsertUpdates: Array<Record<string, unknown>> = [];
+    const originalInsert = db.insert;
+    db.insert = () => ({
+      values: () => ({
+        onConflictDoUpdate: async (config?: { set?: Record<string, unknown> }) => {
+          if (config?.set) upsertUpdates.push(config.set);
+        },
+      }),
+    });
+    stubFetch(new Response('Dependabot alerts are disabled', { status: 422 }));
 
     await expect(
       syncOwner({
@@ -287,7 +296,33 @@ describe('Worker GitHub auth-invalid sync', () => {
         owner: { userId: 'user-1' },
         runId: 'run-1',
       })
-    ).rejects.toThrow('GitHub API error 500 for acme/widgets: Service unavailable');
+    ).resolves.toMatchObject({ skipped: 1 });
+
+    expect(upsertUpdates).toContainEqual(
+      expect.objectContaining({ last_failure_code: 'DEPENDABOT_ALERTS_DISABLED' })
+    );
+    db.insert = originalInsert;
+  });
+
+  it('throws non-401 GitHub errors', async () => {
+    const { db } = createFakeDb();
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response('Service unavailable', { status: 500 }));
+
+    let thrown: unknown;
+    try {
+      await syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toEqual(new Error('GitHub API error 500 for acme/widgets'));
+    expect(thrown).not.toHaveProperty('message', expect.stringContaining('Service unavailable'));
   });
 });
 

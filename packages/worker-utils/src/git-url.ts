@@ -85,7 +85,8 @@ export function sanitizeGitUrl(url: string): string {
  */
 export function parseGitUrl(gitUrl: string, gitlabInstanceUrl?: string): RepoCoordinates | null {
   // Normalize: strip trailing .git and embedded credentials (e.g. https://token@github.com/...)
-  const url = gitUrl.replace(/\.git$/, '').replace(/\/\/[^@]+@/, '//');
+  const withoutGitSuffix = gitUrl.endsWith('.git') ? gitUrl.slice(0, -4) : gitUrl;
+  const url = stripEmbeddedCredentials(withoutGitSuffix);
 
   const httpsMatch = url.match(/^https?:\/\/([^/]+)\/(.+)/);
   if (httpsMatch) {
@@ -98,6 +99,20 @@ export function parseGitUrl(gitUrl: string, gitlabInstanceUrl?: string): RepoCoo
   }
 
   return null;
+}
+
+function stripEmbeddedCredentials(url: string): string {
+  const authorityMarker = '//';
+  const authorityMarkerIndex = url.indexOf(authorityMarker);
+  if (authorityMarkerIndex === -1) return url;
+
+  const authorityStart = authorityMarkerIndex + authorityMarker.length;
+  const pathStart = url.indexOf('/', authorityStart);
+  const authorityEnd = pathStart === -1 ? url.length : pathStart;
+  const atIndex = url.lastIndexOf('@', authorityEnd - 1);
+  if (atIndex < authorityStart) return url;
+
+  return `${url.slice(0, authorityStart)}${url.slice(atIndex + 1)}`;
 }
 
 function coordinatesFromHostAndPath(

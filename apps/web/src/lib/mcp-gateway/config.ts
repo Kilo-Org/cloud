@@ -1,4 +1,5 @@
 import 'server-only';
+import { Buffer } from 'node:buffer';
 import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { z } from 'zod';
@@ -87,27 +88,36 @@ export type GatewayAppConfig = {
   credentialKeyset: GatewayCredentialKeyset;
 };
 
-function parseJsonEnv(value: string | undefined, name: string): unknown {
+const Base64Schema = z
+  .string()
+  .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/);
+
+function parseJsonOrBase64JsonEnv(value: string | undefined, name: string): unknown {
   if (!value) {
     throw new Error(`${name} is required for MCP gateway`);
   }
 
   try {
     return JSON.parse(value);
-  } catch (error) {
-    throw new Error(`${name} must contain valid JSON`, { cause: error });
+  } catch {
+    try {
+      Base64Schema.parse(value);
+      return JSON.parse(Buffer.from(value, 'base64').toString('utf8'));
+    } catch (error) {
+      throw new Error(`${name} must contain valid JSON or base64-encoded JSON`, { cause: error });
+    }
   }
 }
 
 export function getGatewayAppConfig(): GatewayAppConfig {
   const jwtKeyset = JWTKeysetSchema.parse(
-    parseJsonEnv(
+    parseJsonOrBase64JsonEnv(
       getEnvVariable('MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON'),
       'MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON'
     )
   );
   const credentialKeyset = CredentialKeysetSchema.parse(
-    parseJsonEnv(
+    parseJsonOrBase64JsonEnv(
       getEnvVariable('MCP_GATEWAY_CREDENTIAL_KEYSET_JSON'),
       'MCP_GATEWAY_CREDENTIAL_KEYSET_JSON'
     )

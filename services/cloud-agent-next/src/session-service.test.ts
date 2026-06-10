@@ -96,6 +96,8 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab *']).toBeUndefined();
     expect(bashPermissions['gh']).toBeUndefined();
     expect(bashPermissions['gh *']).toBeUndefined();
+    expect(bashPermissions['gh api']).toBeUndefined();
+    expect(bashPermissions['gh api *']).toBeUndefined();
 
     expect(bashPermissions['glab mr diff']).toBe('allow');
     expect(bashPermissions['glab mr diff *']).toBe('allow');
@@ -104,9 +106,29 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab api --method POST *merge_requests/*/discussions*']).toBe('allow');
 
     expect(bashPermissions['gh pr diff']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/reviews']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/reviews *']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/comments']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/comments *']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/*/comments']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/*/comments *']).toBe('allow');
     expect(bashPermissions['gh api repos/*/issues/*/comments --input*']).toBe('allow');
     expect(bashPermissions['gh api repos/*/issues/comments/* -X PATCH*']).toBe('allow');
     expect(bashPermissions['gh api repos/*/pulls/*/reviews --input*']).toBe('allow');
+
+    for (const readOnlyGhApiCommand of [
+      'gh api repos/*/pulls/*/reviews',
+      'gh api repos/*/pulls/*/comments',
+      'gh api repos/*/issues/*/comments',
+    ]) {
+      for (const mutationFlag of ['--method*', '-X*', '-f*', '-F*', '--field*', '--raw-field*']) {
+        const deniedCommand = `${readOnlyGhApiCommand} ${mutationFlag}`;
+        expect(bashPermissions[deniedCommand]).toBe('deny');
+        expect(bashPermissions[`${deniedCommand} *`]).toBe('deny');
+      }
+    }
+    expect(bashPermissions['gh api repos/*/pulls/*/comments --input*']).toBe('deny');
+    expect(bashPermissions['gh api repos/*/pulls/*/comments --input* *']).toBe('deny');
 
     expect(bashPermissions['git']).toBe('allow');
     expect(bashPermissions['git *']).toBe('allow');

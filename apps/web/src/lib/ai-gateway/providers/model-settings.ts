@@ -1,4 +1,8 @@
-import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  isClaudeModel,
+  isFableModel,
+  isOpusModel,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
@@ -72,7 +76,7 @@ export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  if (isOpusModel(model) && (model.includes('4.7') || model.includes('4.8'))) {
+  if (isOpusModel(model) || isFableModel(model)) {
     return REASONING_VARIANTS_OPUS;
   }
   if (isClaudeModel(model)) {

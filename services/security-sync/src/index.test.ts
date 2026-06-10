@@ -2,17 +2,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createSecurityAgentCommand,
   markSecurityAgentCommandQueueAdmissionFailed,
+  markSecurityAgentCommandRetriesExhausted,
+  transitionSecurityAgentCommandWithCurrentState,
 } from '@kilocode/db';
+import type * as DbModule from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import { syncOwner } from './sync.js';
 
-vi.mock('@kilocode/db', () => ({
-  createSecurityAgentCommand: vi.fn(),
-  markSecurityAgentCommandQueueAdmissionFailed: vi.fn(),
-  transitionSecurityAgentCommand: vi.fn(),
-}));
+vi.mock('@kilocode/db', async importOriginal => {
+  const {
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    requireSecurityAgentCommandTransitionOrTerminal,
+  } = await importOriginal<typeof DbModule>();
+  return {
+    createSecurityAgentCommand: vi.fn(),
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    markSecurityAgentCommandQueueAdmissionFailed: vi.fn(),
+    markSecurityAgentCommandRetriesExhausted: vi.fn(),
+    requireSecurityAgentCommandTransitionOrTerminal,
+    transitionSecurityAgentCommandWithCurrentState: vi.fn(),
+  };
+});
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
 vi.mock('./sync.js', () => ({ syncOwner: vi.fn() }));
@@ -22,6 +34,14 @@ beforeEach(() => {
   vi.mocked(getWorkerDb).mockReturnValue({} as never);
   vi.mocked(createSecurityAgentCommand).mockResolvedValue({
     id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  } as never);
+  vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValue({
+    transitioned: true,
+    command: {},
+  } as never);
+  vi.mocked(markSecurityAgentCommandRetriesExhausted).mockResolvedValue({
+    transitioned: true,
+    command: {},
   } as never);
 });
 
@@ -222,6 +242,19 @@ describe('manual sync dispatch', () => {
         repoFullName: 'kilo/repo',
       })
     );
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
+      1,
+      {},
+      expect.objectContaining({ status: 'running' })
+    );
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
+      2,
+      {},
+      expect.objectContaining({ status: 'succeeded', resultCode: 'SYNC_COMPLETED' })
+    );
+    expect(
+      vi.mocked(transitionSecurityAgentCommandWithCurrentState).mock.invocationCallOrder[1]
+    ).toBeLessThan(ack.mock.invocationCallOrder[0] ?? Infinity);
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
@@ -284,6 +317,45 @@ describe('manual sync dispatch', () => {
         owner: { userId: legacyUserId },
       })
     );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('skips duplicate manual sync work after the command is already terminal', async () => {
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: { status: 'succeeded', result_code: 'SYNC_COMPLETED' },
+    } as never);
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 2,
+            body: {
+              schemaVersion: 1,
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'manual-sync-message',
+              trigger: 'manual',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              ownerKey: 'org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              chunkIndex: 0,
+              chunkCount: 1,
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              actor: { id: 'user-123' },
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      { HYPERDRIVE: { connectionString: 'postgres://worker' } } as CloudflareEnv
+    );
+
+    expect(syncOwner).not.toHaveBeenCalled();
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
@@ -406,6 +478,141 @@ describe('manual dismissal dispatch', () => {
     });
   });
 
+  it('persists dismissal terminal state before acknowledging', async () => {
+    vi.mocked(processSecurityFindingDismissal).mockResolvedValue({
+      dismissed: true,
+      findingSource: 'dependabot',
+      commandStatus: 'succeeded',
+      resultCode: 'FINDING_DISMISSED',
+    });
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 1,
+            body: {
+              schemaVersion: 1,
+              kind: 'dismiss',
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'dismiss-message-123',
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              actor: { id: 'user-123' },
+              findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              installationId: 'installation-123',
+              reason: 'not_used',
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+        GIT_TOKEN_SERVICE: {},
+      } as CloudflareEnv
+    );
+
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
+      2,
+      {},
+      expect.objectContaining({ status: 'succeeded', resultCode: 'FINDING_DISMISSED' })
+    );
+    expect(
+      vi.mocked(transitionSecurityAgentCommandWithCurrentState).mock.invocationCallOrder[1]
+    ).toBeLessThan(ack.mock.invocationCallOrder[0] ?? Infinity);
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('does not perform dismissal work when the running transition is rejected', async () => {
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: null,
+    });
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 1,
+            body: {
+              schemaVersion: 1,
+              kind: 'dismiss',
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'dismiss-message-123',
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              actor: { id: 'user-123' },
+              findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              installationId: 'installation-123',
+              reason: 'not_used',
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      { HYPERDRIVE: { connectionString: 'postgres://worker' } } as CloudflareEnv
+    );
+
+    expect(processSecurityFindingDismissal).not.toHaveBeenCalled();
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('records exhausted dismissal retries before retrying final delivery to the DLQ', async () => {
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: null,
+    });
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 4,
+            body: {
+              schemaVersion: 1,
+              kind: 'dismiss',
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'dismiss-message-123',
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              actor: { id: 'user-123' },
+              findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              installationId: 'installation-123',
+              reason: 'not_used',
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      { HYPERDRIVE: { connectionString: 'postgres://worker' } } as CloudflareEnv
+    );
+
+    expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith(
+      {},
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    );
+    expect(
+      vi.mocked(markSecurityAgentCommandRetriesExhausted).mock.invocationCallOrder[0]
+    ).toBeLessThan(retry.mock.invocationCallOrder[0] ?? Infinity);
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
   it('retries queued dismissal messages when Worker processing throws', async () => {
     vi.mocked(getWorkerDb).mockReturnValue({} as never);
     vi.mocked(processSecurityFindingDismissal).mockRejectedValue(new Error('retry dismissal'));
@@ -416,6 +623,7 @@ describe('manual dismissal dispatch', () => {
       {
         messages: [
           {
+            attempts: 1,
             body: {
               schemaVersion: 1,
               kind: 'dismiss',

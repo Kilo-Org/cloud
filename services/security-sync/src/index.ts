@@ -2,9 +2,13 @@ import { timingSafeEqual as nodeTimingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import {
   createSecurityAgentCommand,
+  isTerminalSecurityAgentCommandTransitionOutcome,
   markSecurityAgentCommandQueueAdmissionFailed,
-  transitionSecurityAgentCommand,
+  markSecurityAgentCommandRetriesExhausted,
+  requireSecurityAgentCommandTransitionOrTerminal,
+  transitionSecurityAgentCommandWithCurrentState,
   type SecurityAgentCommandOwner,
+  type SecurityAgentCommandTransitionOutcome,
 } from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { agent_configs } from '@kilocode/db/schema';
@@ -150,6 +154,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 const QUEUE_SEND_BATCH_LIMIT = 100;
+const SECURITY_SYNC_COMMAND_MAX_ATTEMPTS = 4;
 
 function createOwnerKey(owner: SecuritySyncMessage['owner']): string {
   if (owner.organizationId) return `org:${owner.organizationId}`;
@@ -312,6 +317,28 @@ function resolveOwner(
   return null;
 }
 
+function commandCorrelation(body: unknown): {
+  commandId?: string;
+  commandType?: 'sync' | 'dismiss_finding';
+  ownerType?: 'org' | 'user';
+} {
+  const dismiss = SecurityDismissMessageSchema.safeParse(body);
+  if (dismiss.success) {
+    return {
+      commandId: dismiss.data.commandId,
+      commandType: 'dismiss_finding',
+      ownerType: dismiss.data.owner.organizationId ? 'org' : 'user',
+    };
+  }
+  const sync = SecuritySyncMessageSchema.safeParse(body);
+  if (!sync.success || !sync.data.commandId) return {};
+  return {
+    commandId: sync.data.commandId,
+    commandType: 'sync',
+    ownerType: sync.data.owner.organizationId ? 'org' : 'user',
+  };
+}
+
 function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>): {
   status: 'succeeded' | 'failed' | 'no_op';
   resultCode: string;
@@ -339,27 +366,40 @@ async function processSecurityDismissMessage(
   if (!parsed.success) return false;
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
-  await transitionSecurityAgentCommand(db, {
+  const running = await transitionSecurityAgentCommandWithCurrentState(db, {
     commandId: parsed.data.commandId,
     fromStatuses: ['accepted', 'running'],
     status: 'running',
   });
+  if (requireSecurityAgentCommandTransitionOrTerminal(running, 'running') === 'terminal') {
+    console.info('Security Agent dismissal command delivery already terminal', {
+      command_id: parsed.data.commandId,
+      command_type: 'dismiss_finding',
+      owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+      result_code: running.command?.result_code,
+      attempts: message.attempts,
+    });
+    message.ack();
+    return true;
+  }
   const result = await processSecurityFindingDismissal({
     db,
     gitTokenService: env.GIT_TOKEN_SERVICE,
     message: parsed.data,
   });
-  await transitionSecurityAgentCommand(db, {
+  const terminal = await transitionSecurityAgentCommandWithCurrentState(db, {
     commandId: parsed.data.commandId,
-    fromStatuses: ['accepted', 'running'],
+    fromStatuses: ['running'],
     status: result.commandStatus,
     resultCode: result.resultCode,
   });
+  requireSecurityAgentCommandTransitionOrTerminal(terminal, 'terminal');
   console.info('Security Agent dismissal command completed', {
     command_id: parsed.data.commandId,
     command_type: 'dismiss_finding',
     owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
     result_code: result.resultCode,
+    attempts: message.attempts,
   });
   message.ack();
   return true;
@@ -394,11 +434,22 @@ async function processSecuritySyncMessage(
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const startTime = Date.now();
   if (body.commandId) {
-    await transitionSecurityAgentCommand(db, {
+    const running = await transitionSecurityAgentCommandWithCurrentState(db, {
       commandId: body.commandId,
       fromStatuses: ['accepted', 'running'],
       status: 'running',
     });
+    if (requireSecurityAgentCommandTransitionOrTerminal(running, 'running') === 'terminal') {
+      console.info('Security sync command delivery already terminal', {
+        command_id: body.commandId,
+        command_type: 'sync',
+        owner_type: body.owner.organizationId ? 'org' : 'user',
+        result_code: running.command?.result_code,
+        attempts: message.attempts,
+      });
+      message.ack();
+      return;
+    }
   }
 
   const result = await syncOwner({
@@ -413,17 +464,20 @@ async function processSecuritySyncMessage(
 
   const terminal = syncCommandTerminalState(result);
   if (body.commandId) {
-    await transitionSecurityAgentCommand(db, {
+    const terminalTransition = await transitionSecurityAgentCommandWithCurrentState(db, {
       commandId: body.commandId,
-      fromStatuses: ['accepted', 'running'],
+      fromStatuses: ['running'],
       status: terminal.status,
       resultCode: terminal.resultCode,
     });
+    requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
   }
   console.info('Security sync completed for owner', {
     command_id: body.commandId,
     command_type: body.commandId ? 'sync' : undefined,
+    owner_type: body.commandId ? (body.owner.organizationId ? 'org' : 'user') : undefined,
     result_code: body.commandId ? terminal.resultCode : undefined,
+    attempts: message.attempts,
     runId: body.runId,
     ownerKey: body.ownerKey,
     synced: result.synced,
@@ -584,8 +638,43 @@ export default {
         }
         await processSecuritySyncMessage(message, env);
       } catch (error) {
+        const correlation = commandCorrelation(message.body);
+        let exhaustionOutcome: SecurityAgentCommandTransitionOutcome | undefined;
+        if (correlation.commandId && message.attempts >= SECURITY_SYNC_COMMAND_MAX_ATTEMPTS) {
+          try {
+            const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
+            exhaustionOutcome = await markSecurityAgentCommandRetriesExhausted(
+              db,
+              correlation.commandId
+            );
+            if (isTerminalSecurityAgentCommandTransitionOutcome(exhaustionOutcome)) {
+              console.info('Security Agent command delivery already terminal after failure', {
+                command_id: correlation.commandId,
+                command_type: correlation.commandType,
+                owner_type: correlation.ownerType,
+                result_code: exhaustionOutcome.command?.result_code,
+                attempts: message.attempts,
+              });
+              message.ack();
+              continue;
+            }
+          } catch (transitionError) {
+            console.error('Failed to record exhausted Security Agent command', {
+              command_id: correlation.commandId,
+              command_type: correlation.commandType,
+              owner_type: correlation.ownerType,
+              attempts: message.attempts,
+              error_type: transitionError instanceof Error ? transitionError.name : 'UnknownError',
+            });
+          }
+        }
         console.error('Security sync queue processing failed', {
-          error: error instanceof Error ? error.message : String(error),
+          command_id: correlation.commandId,
+          command_type: correlation.commandType,
+          owner_type: correlation.ownerType,
+          attempts: message.attempts,
+          result_code: exhaustionOutcome?.transitioned ? 'QUEUE_RETRIES_EXHAUSTED' : undefined,
+          error_type: error instanceof Error ? error.name : 'UnknownError',
         });
         message.retry();
       }

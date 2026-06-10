@@ -7,7 +7,7 @@ Usage:
   pnpm --filter cloudflare-mcp-gateway keys:generate [options]
 
 Options:
-  --format <json|env>       Output format. Default: json.
+  --format <json|env>       Output format. Default: json. App keyset env values are base64-encoded JSON for transport only, not protection.
   --target <bundle|app|worker>
                             Which env payload to emit. Default: bundle.
   --issuer <url>            OAuth issuer for the generated JWT keyset.
@@ -92,6 +92,10 @@ function shellQuote(value) {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
+function encodeKeyset(value) {
+  return Buffer.from(JSON.stringify(value)).toString('base64');
+}
+
 function envLines(entries) {
   return Object.entries(entries)
     .map(([name, value]) => `${name}=${shellQuote(value)}`)
@@ -135,8 +139,8 @@ function createBundle(options) {
   return {
     issuer: options.issuer,
     appEnv: {
-      MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON: JSON.stringify(jwtPrivateKeyset),
-      MCP_GATEWAY_CREDENTIAL_KEYSET_JSON: JSON.stringify(credentialKeyset),
+      MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON: encodeKeyset(jwtPrivateKeyset),
+      MCP_GATEWAY_CREDENTIAL_KEYSET_JSON: encodeKeyset(credentialKeyset),
       MCP_GATEWAY_RATE_LIMIT_SECRET: rateLimitSecret,
     },
     workerEnv: {

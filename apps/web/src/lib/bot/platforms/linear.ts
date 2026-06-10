@@ -222,5 +222,9 @@ export function createLinearBotPlatform(linearAdapter: LinearAdapter): BotPlatfo
     async getRequesterInfo({ message, displayName }) {
       return getLinearRequesterInfo(message, displayName);
     },
+    async startProcessingIndicator({ thread, status }) {
+      await thread.startTyping(status);
+      return async () => {};
+    },
   };
 }

@@ -1,3 +1,4 @@
+import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob } from '../callbacks/types.js';
 import { logger } from '../logger.js';
 import type {
@@ -240,6 +241,7 @@ export function createMessageSettlementOutbox(
       if (
         representative?.callbackRequired &&
         !representative.callbackEnqueuedAt &&
+        !representative.callbackAbandonedAt &&
         representative.gateResult === undefined
       ) {
         const updated = { ...representative, gateResult };
@@ -420,8 +422,30 @@ export function createMessageSettlementOutbox(
       payload,
     };
 
+    const fittedCallbackJob = fitCallbackJobToQueueLimit(callbackJob);
+    if (fittedCallbackJob.status === 'too-large') {
+      const error = `Callback job is ${fittedCallbackJob.serializedByteLength} bytes after minimizing callback text; maximum is ${fittedCallbackJob.maximumByteLength} bytes`;
+      const abandonedAt = Date.now();
+      state.callbackAbandonedAt = abandonedAt;
+      // Rolled-back workers only recognize callbackEnqueuedAt as a terminal callback marker.
+      state.callbackEnqueuedAt = abandonedAt;
+      state.callbackLastError = error;
+      state.callbackAttempts = (state.callbackAttempts ?? 0) + 1;
+      delete state.callbackRetryAt;
+      await putSessionMessageState(storage, state);
+      logger
+        .withFields({
+          sessionId,
+          messageId: state.messageId,
+          serializedByteLength: fittedCallbackJob.serializedByteLength,
+          maximumByteLength: fittedCallbackJob.maximumByteLength,
+        })
+        .error('Abandoned callback job that cannot fit queue size limit');
+      return;
+    }
+
     try {
-      await callbackQueue.send(callbackJob);
+      await callbackQueue.send(fittedCallbackJob.job);
       state.callbackEnqueuedAt = Date.now();
       await putSessionMessageState(storage, state);
       logger
@@ -571,7 +595,13 @@ export function createMessageSettlementOutbox(
 
     if (!finalized.representativeMessageId) return;
     const representative = await getSessionMessageState(storage, finalized.representativeMessageId);
-    if (!representative?.callbackRequired || representative.callbackEnqueuedAt) return;
+    if (
+      !representative?.callbackRequired ||
+      representative.callbackEnqueuedAt ||
+      representative.callbackAbandonedAt
+    ) {
+      return;
+    }
     await enqueueMessageCallbackNotification(representative);
   }
 
@@ -624,7 +654,8 @@ export function createMessageSettlementOutbox(
     for (const batch of batches.values()) {
       if (batch.finalizedAt === undefined || !batch.representativeMessageId) continue;
       const state = await getSessionMessageState(storage, batch.representativeMessageId);
-      if (!state?.callbackRequired || state.callbackEnqueuedAt) continue;
+      if (!state?.callbackRequired || state.callbackEnqueuedAt || state.callbackAbandonedAt)
+        continue;
       states.push(state);
     }
     return states;

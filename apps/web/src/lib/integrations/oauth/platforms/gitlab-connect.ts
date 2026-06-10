@@ -46,7 +46,6 @@ type GitLabOAuthConnectOptions = {
  * Query parameters:
  * - organizationId: (optional) Organization ID for org-owned integrations
  * - instanceUrl: (optional) Self-hosted GitLab instance URL
- * - clientId/clientSecret: (temporary, authenticated GET compatibility) Self-hosted OAuth credentials
  * - returnTo: (optional) Relative path to return to after OAuth
  */
 export async function handleGitLabOAuthConnect(request: NextRequest) {
@@ -66,19 +65,12 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
     }
 
     const instanceUrl = searchParams.get('instanceUrl') || undefined;
-    const clientId = searchParams.get('clientId') || undefined;
-    const clientSecret = searchParams.get('clientSecret') || undefined;
     const returnToParam = searchParams.get('returnTo') || undefined;
     const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
-    const legacyQueryCredentials =
-      clientId && clientSecret ? { clientId, clientSecret } : undefined;
 
     const oauthUrl = await buildGitLabConnectOAuthUrl(user, {
       organizationId,
       instanceUrl,
-      // Temporary rollout compatibility for old client bundles that sent
-      // self-hosted GitLab credentials through an authenticated GET.
-      ...legacyQueryCredentials,
       returnTo,
     });
 

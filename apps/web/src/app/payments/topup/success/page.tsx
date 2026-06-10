@@ -51,7 +51,6 @@ export default function TopUpSuccessPage() {
 
     const timeoutId = setTimeout(async function () {
       console.info(`Attempt ${tries + 1} to fetch credit transaction ID`);
-      console.info(searchParams, sessionId);
 
       const transaction = await fetchCreditTransactionIdForStripeSession(sessionId);
 

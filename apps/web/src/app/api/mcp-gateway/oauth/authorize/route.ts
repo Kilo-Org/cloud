@@ -62,7 +62,8 @@ async function authorizeRequest(
   query: OAuthAuthorizationQuery,
   route: ScopedConnectRoute | undefined,
   userId: string,
-  executionContext: ReturnType<typeof executionContextFromAuth>
+  executionContext: ReturnType<typeof executionContextFromAuth>,
+  allowBrowserOrgResourceContext: boolean
 ) {
   const services = createGatewayServices();
   const result = await services.authorizationService.authorize({
@@ -70,6 +71,7 @@ async function authorizeRequest(
     route,
     userId,
     executionContext,
+    allowBrowserOrgResourceContext,
   });
   if (result.kind === 'provider_redirect') {
     return NextResponse.redirect(result.authorizationUrl, 303);
@@ -289,15 +291,17 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     route,
     userId: identity.user.id,
     executionContext,
+    allowBrowserOrgResourceContext: !request.headers.has('Authorization'),
     redirectErrors: true,
   });
+  const resolvedExecutionContext = preview.executionContext;
   const approvalState = randomToken(32);
   const approvalCookie = `${approvalState}.${approvalSignature({
     approvalState,
     clientId: preview.clientId,
     resource: preview.resource,
     scopes: preview.scopes,
-    executionContext,
+    executionContext: resolvedExecutionContext,
     secret: services.config.rateLimitSecret,
   })}`;
   const inputs = Object.entries(parsed.data)
@@ -347,8 +351,10 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     route,
     userId: identity.user.id,
     executionContext,
+    allowBrowserOrgResourceContext: !request.headers.has('Authorization'),
     redirectErrors: true,
   });
+  const resolvedExecutionContext = preview.executionContext;
   const cookieState = request.cookies.get(consentCookieName)?.value;
   const [cookieApprovalState, cookieSignature] = cookieState?.split('.') ?? [];
   const expectedSignature = approvalSignature({
@@ -356,7 +362,7 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     clientId: preview.clientId,
     resource: preview.resource,
     scopes: preview.scopes,
-    executionContext,
+    executionContext: resolvedExecutionContext,
     secret: services.config.rateLimitSecret,
   });
   if (
@@ -375,7 +381,13 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
       )
     );
   }
-  const response = await authorizeRequest(parsed.data, route, identity.user.id, executionContext);
+  const response = await authorizeRequest(
+    parsed.data,
+    route,
+    identity.user.id,
+    resolvedExecutionContext,
+    !request.headers.has('Authorization')
+  );
   response.cookies.delete(consentCookieName);
   return response;
 }

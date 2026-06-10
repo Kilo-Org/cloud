@@ -233,6 +233,6 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
     ),
     default_parameters: {},
     isFree,
-    mayTrainOnYourPrompts: model.flags.includes('requires-data-collection'),
+    mayTrainOnYourPrompts: isFree || model.flags.includes('requires-data-collection'),
   };
 }

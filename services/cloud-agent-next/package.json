@@ -50,7 +50,7 @@
   "devDependencies": {
     "@cloudflare/containers": "0.3.7",
     "@cloudflare/vitest-pool-workers": "catalog:",
-    "@kilocode/sdk": "7.2.52",
+    "@kilocode/sdk": "7.3.41",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "catalog:",
     "@types/ws": "^8.5.12",

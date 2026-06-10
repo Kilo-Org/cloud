@@ -18,6 +18,7 @@ import {
   fetchPRInlineComments,
   getPRHeadCommit,
   fetchGitHubRootTextFileAtRef,
+  fetchGitHubRepositorySize,
 } from '@/lib/integrations/platforms/github/adapter';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
@@ -27,6 +28,7 @@ import {
   getMRDiffRefs,
   GitLabProjectAccessTokenPermissionError,
   fetchGitLabRootTextFileAtRef,
+  fetchGitLabRepositorySize,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   getOrCreateProjectAccessToken,
@@ -101,6 +103,8 @@ export type CodeReviewPayload = {
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
+  /** Provider-reported repository storage size, formatted for log correlation. */
+  repositorySize?: string | null;
 };
 
 /**
@@ -158,6 +162,7 @@ export async function prepareReviewPayload(
     let existingReviewState: ExistingReviewState | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
     let repositoryReviewInstructionsLookup = unusedRepositoryReviewInstructionsLookup();
+    let repositorySize: string | null = null;
 
     if (review.platform_integration_id) {
       const integration = await getIntegrationById(review.platform_integration_id);
@@ -174,6 +179,27 @@ export async function prepareReviewPayload(
         const installationToken = tokenData.token;
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
+
+        if (repoOwner && repoName) {
+          repositorySize = await lookupRepositorySize({
+            platform,
+            repoFullName: review.repo_full_name,
+            fetchSize: () =>
+              fetchGitHubRepositorySize({
+                token: installationToken,
+                owner: repoOwner,
+                repo: repoName,
+              }),
+          });
+        } else {
+          warnExceptInTest(
+            '[prepareReviewPayload] Cannot fetch repository size for invalid GitHub repo',
+            {
+              platform,
+              repoFullName: review.repo_full_name,
+            }
+          );
+        }
 
         const repositoryReviewInstructionsPromise =
           shouldUseReviewMd && repoOwner && repoName
@@ -288,6 +314,13 @@ export async function prepareReviewPayload(
           );
         }
         const projectAccessToken = gitlabToken;
+
+        repositorySize = await lookupRepositorySize({
+          platform,
+          repoFullName: review.repo_full_name,
+          fetchSize: () =>
+            fetchGitLabRepositorySize(projectAccessToken, review.repo_full_name, instanceUrl),
+        });
 
         const repositoryReviewInstructionsPromise = shouldUseReviewMd
           ? fetchRepositoryReviewInstructions({
@@ -523,12 +556,14 @@ export async function prepareReviewPayload(
       sessionInput,
       owner,
       previousCloudAgentSessionId,
+      repositorySize,
     };
 
     logExceptInTest('[prepareReviewPayload] Prepared payload', {
       reviewId,
       platform,
       owner,
+      repositorySize,
       sessionInput: {
         ...sessionInput,
         githubToken: sessionInput.githubToken ? '***' : undefined, // Redact token
@@ -545,6 +580,30 @@ export async function prepareReviewPayload(
       extra: { reviewId, owner, platform },
     });
     throw error;
+  }
+}
+
+async function lookupRepositorySize(params: {
+  platform: CodeReviewPlatform;
+  repoFullName: string;
+  fetchSize: () => Promise<string | null>;
+}): Promise<string | null> {
+  try {
+    const repositorySize = await params.fetchSize();
+    logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
+      platform: params.platform,
+      repoFullName: params.repoFullName,
+      repositorySize,
+      repositorySizeKnown: repositorySize !== null,
+    });
+    return repositorySize;
+  } catch (error) {
+    warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
+      platform: params.platform,
+      repoFullName: params.repoFullName,
+      error: getReviewInstructionsFetchErrorMetadata(error),
+    });
+    return null;
   }
 }
 

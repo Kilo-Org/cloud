@@ -276,6 +276,7 @@ describe('CodeReviewOrchestrator recovery', () => {
   });
 
   it('POST /review uses attempt-specific durable object names', async () => {
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = mockSuccessfulCloudAgentNextRun();
     const reviewId = crypto.randomUUID();
     const attemptId = crypto.randomUUID();
@@ -290,6 +291,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         sessionInput: sessionInput(),
         owner: { type: 'user', id: 'user-id', userId: 'user-id' },
         agentVersion: 'v2',
+        repositorySize: '100 MB',
       }),
     });
 
@@ -323,6 +325,18 @@ describe('CodeReviewOrchestrator recovery', () => {
       headers: { 'X-Callback-Token': expectedCallbackToken },
     });
     expect(prepareBody.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
+    expect(prepareBody).not.toHaveProperty('repositorySize');
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      '[CodeReviewOrchestrator] Session prepared',
+      expect.objectContaining({
+        reviewId,
+        attemptId,
+        cloudAgentSessionId: 'agent-fresh',
+        kiloSessionId: 'ses_fresh',
+        repositorySize: '100 MB',
+        repositorySizeKnown: true,
+      })
+    );
   });
 
   it('prepares fresh GitLab code-review sessions without selector transport', async () => {
@@ -504,6 +518,7 @@ describe('CodeReviewOrchestrator recovery', () => {
           cliSessionId: 'ses_old',
           errorMessage: 'Container shutdown: SIGTERM',
           terminalReason: 'sandbox_error',
+          repositorySize: '100 MB',
         })
       );
     });
@@ -532,6 +547,9 @@ describe('CodeReviewOrchestrator recovery', () => {
       reviewId,
       attemptId: retryAttemptId,
       status: 'queued',
+    });
+    await expect(storedReview(retryStub)).resolves.toMatchObject({
+      repositorySize: '100 MB',
     });
     const retryAlarm = await storedAlarm(retryStub);
     expectAutoRetryAlarmInRange(retryAlarm, retrySchedulingStartedAt);

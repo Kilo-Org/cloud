@@ -72,6 +72,8 @@ export interface CodeReview {
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   sandboxRetryAttempted?: boolean;
+  /** Provider-reported repository storage size, formatted for log correlation. */
+  repositorySize?: string | null;
 }
 
 export interface CodeReviewStatusResponse {
@@ -138,6 +140,8 @@ export interface CodeReviewRequest {
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
+  /** Provider-reported repository storage size, formatted for log correlation. */
+  repositorySize?: string | null;
 }
 
 export interface CodeReviewResponse {

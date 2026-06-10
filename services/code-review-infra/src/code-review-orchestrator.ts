@@ -950,6 +950,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     skipBalanceCheck?: boolean;
     agentVersion?: string;
     previousCloudAgentSessionId?: string;
+    repositorySize?: string | null;
     runReviewDelayMs?: number;
   }): Promise<{ status: CodeReviewStatus }> {
     if (!this.state) {
@@ -976,6 +977,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: params.skipBalanceCheck,
       agentVersion: params.agentVersion,
       previousCloudAgentSessionId: params.previousCloudAgentSessionId,
+      repositorySize: params.repositorySize,
     };
     await this.saveState();
     const runReviewDelayMs =
@@ -1086,6 +1088,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: this.state.skipBalanceCheck,
       agentVersion: this.state.agentVersion,
       previousCloudAgentSessionId: undefined,
+      repositorySize: this.state.repositorySize,
       runReviewDelayMs: retryDelayMs,
     });
 
@@ -1290,10 +1293,15 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         prepareInput
       );
 
+      const repositorySize = this.state.repositorySize ?? null;
+
       console.log('[CodeReviewOrchestrator] Session prepared', {
         reviewId: this.state.reviewId,
+        attemptId: this.state.attemptId,
         cloudAgentSessionId,
         kiloSessionId,
+        repositorySize,
+        repositorySizeKnown: repositorySize !== null,
       });
 
       // Store session IDs immediately (no stream parsing needed)

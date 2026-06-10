@@ -28,10 +28,10 @@ export function SecurityConfigPage() {
 
   if (isLoadingConfig) {
     return (
-      <output className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
+      <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
         <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         Loading settings...
-      </output>
+      </div>
     );
   }
 

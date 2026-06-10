@@ -2,7 +2,7 @@ import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { isAlibabaDirectModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
+import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrokModel, isGrokToggleableReasoningModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
@@ -124,11 +124,6 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
 export function getAiSdkProvider(
   model: string
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
-  if (isAlibabaDirectModel(model)) {
-    // with 'openai' (Responses) prompt caching doesn't work
-    // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
-    return 'alibaba';
-  }
   if (seed_20_code_free_model.public_id === model) {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';

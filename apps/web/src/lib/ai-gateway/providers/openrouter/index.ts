@@ -26,6 +26,7 @@ import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-prov
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
+import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -154,6 +155,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           .map(model => convertFromKiloExclusiveModel(model))
       )
       .concat(autoModels)
+      .map(applyCustomPricingToModel)
       .map(async (model: OpenRouterModel) => {
         const preferredIndex = preferredModels.indexOf(model.id);
         const addPdf =

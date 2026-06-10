@@ -6,7 +6,7 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-import { qwen37_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 type AutoModel = {
@@ -94,7 +94,7 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
 };
 
 export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
-  model: qwen37_plus_model.public_id,
+  model: QWEN37_PLUS_MODEL_ID,
   reasoning: { enabled: true },
 };
 

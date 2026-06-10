@@ -12,7 +12,6 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
-import { isAlibabaDirectModel, qwen37_max_model, qwen37_plus_model } from './providers/qwen';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -62,6 +61,11 @@ describe('isFreeModel', () => {
       }
     });
 
+    test('does not register discounted OpenRouter Qwen models as Kilo exclusive', () => {
+      expect(findKiloExclusiveModel('qwen/qwen3.7-max')).toBeNull();
+      expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
+    });
+
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
       expect(getInferenceProvider(claude_opus_4_7_stealth_model)).toBe('stealth');
       expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
@@ -69,22 +73,6 @@ describe('isFreeModel', () => {
       expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
       expect(getInferenceProvider(claude_opus_4_6_stealth_model)).toBe('stealth');
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
-    });
-
-    test('routes Qwen3.7 Max directly through Alibaba', () => {
-      expect(findKiloExclusiveModel(qwen37_max_model.public_id)).toBe(qwen37_max_model);
-      expect(isAlibabaDirectModel(qwen37_max_model.public_id)).toBe(true);
-      expect(qwen37_max_model.gateway).toBe('alibaba');
-      expect(qwen37_max_model.internal_id).toBe('qwen3.7-max');
-      expect(getInferenceProvider(qwen37_max_model)).toBe('alibaba');
-    });
-
-    test('routes Qwen3.7 Plus directly through Alibaba', () => {
-      expect(findKiloExclusiveModel(qwen37_plus_model.public_id)).toBe(qwen37_plus_model);
-      expect(isAlibabaDirectModel(qwen37_plus_model.public_id)).toBe(true);
-      expect(qwen37_plus_model.gateway).toBe('alibaba');
-      expect(qwen37_plus_model.internal_id).toBe('qwen3.7-plus');
-      expect(getInferenceProvider(qwen37_plus_model)).toBe('alibaba');
     });
 
     test('requires data collection for paid training-enabled offerings', () => {

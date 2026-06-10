@@ -1,3 +1,4 @@
+import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
 import { after } from 'next/server';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
@@ -45,19 +46,21 @@ async function sendAutoRoutingMirror({
   const authToken = options.authToken ?? INTERNAL_API_SECRET;
   if (!workerUrl || !authToken) return;
 
+  const payload: MirrorPayload = {
+    path,
+    receivedAt: new Date().toISOString(),
+    sessionId: extractSessionId(request),
+    headers: redactSensitiveHeaders(serializeHeaders(request.headers)),
+    body: bodyText,
+  };
+
   const response = await fetch(`${workerUrl}/decide`, {
     method: 'POST',
     headers: new Headers({
       authorization: `Bearer ${authToken}`,
       'content-type': 'application/json',
     }),
-    body: JSON.stringify({
-      path,
-      receivedAt: new Date().toISOString(),
-      sessionId: extractSessionId(request),
-      headers: redactSensitiveHeaders(serializeHeaders(request.headers)),
-      body: bodyText,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

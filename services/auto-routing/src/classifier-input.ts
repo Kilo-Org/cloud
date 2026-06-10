@@ -1,3 +1,9 @@
+import {
+  MirrorPayloadSchema,
+  type JsonValue,
+  type MirrorPayload,
+  type NormalizedClassifierInput,
+} from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 
 const TEXT_PREFIX_MAX_LENGTH = 1000;
@@ -13,15 +19,7 @@ const SENSITIVE_KEY_PATTERNS = [
   'token',
 ];
 
-const mirrorPathSchema = z.enum(['/chat/completions', '/responses', '/messages']);
-
-export const mirrorPayloadSchema = z.object({
-  path: mirrorPathSchema,
-  receivedAt: z.string().min(1),
-  sessionId: z.string().trim().min(1).nullable(),
-  headers: z.record(z.string(), z.string()),
-  body: z.string(),
-});
+export const mirrorPayloadSchema = MirrorPayloadSchema;
 
 const modelSchema = z.string().trim().min(1);
 const messageSchema = z.looseObject({
@@ -54,28 +52,13 @@ const messagesBodySchema = z.looseObject({
   messages: z.array(messageSchema),
 });
 
-export type MirrorPayload = z.infer<typeof mirrorPayloadSchema>;
-
-export type NormalizedClassifierInput = {
-  apiKind: 'chat_completions' | 'responses' | 'messages';
-  requestedModel: string;
-  systemPromptPrefix: string | null;
-  userPromptPrefix: string | null;
-  messageCount: number | null;
-  hasTools: boolean;
-  stream: boolean;
-  providerHints: {
-    provider: JsonValue;
-    providerOptions: JsonValue;
-  };
-};
+export type { NormalizedClassifierInput };
 
 export type ClassifierInputParseResult =
   | { success: true; data: NormalizedClassifierInput }
   | { success: false; error: 'Invalid mirrored request body' | 'Invalid classifier body' };
 
 type Message = z.infer<typeof messageSchema>;
-type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 type ProviderHintSource = {
   provider?: unknown;
   providerOptions?: unknown;

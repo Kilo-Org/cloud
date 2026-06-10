@@ -1,5 +1,12 @@
 'use client';
 
+import {
+  AutoRoutingClassifierAnalyticsResponseSchema,
+  AutoRoutingClassifierModelResponseSchema,
+  type AutoRoutingAnalyticsPeriod,
+  type AutoRoutingClassifierAnalyticsResponse,
+  type AutoRoutingClassifierModelResponse,
+} from '@kilocode/auto-routing-contracts';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -18,15 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type {
-  AutoRoutingAnalyticsPeriod,
-  AutoRoutingClassifierAnalyticsResponse,
-  AutoRoutingClassifierModelResponse,
-} from '@/lib/ai-gateway/auto-routing-admin-types';
-import {
-  AutoRoutingClassifierAnalyticsResponseSchema,
-  AutoRoutingClassifierModelResponseSchema,
-} from '@/lib/ai-gateway/auto-routing-admin-types';
 import {
   OpenRouterModelsResponseSchema,
   type OpenRouterModelsResponse,

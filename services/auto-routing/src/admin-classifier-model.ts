@@ -1,14 +1,13 @@
+import {
+  UpdateClassifierModelRequestSchema,
+  type AutoRoutingClassifierModelResponse,
+} from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
-import * as z from 'zod';
 import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
 import { getClassifierModel, setClassifierModel } from './classifier-config';
 import type { HonoEnv } from './hono-env';
 
-const updateClassifierModelSchema = z.object({
-  model: z.string().trim().min(1),
-});
-
-function classifierModelResponse(model: string) {
+function classifierModelResponse(model: string): AutoRoutingClassifierModelResponse {
   return {
     model,
     defaultModel: DEFAULT_CLASSIFIER_MODEL,
@@ -28,7 +27,7 @@ export const putClassifierModelHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid JSON body' }, 400);
   }
 
-  const parsed = updateClassifierModelSchema.safeParse(rawBody);
+  const parsed = UpdateClassifierModelRequestSchema.safeParse(rawBody);
   if (!parsed.success) {
     return c.json({ error: 'Invalid classifier model' }, 400);
   }

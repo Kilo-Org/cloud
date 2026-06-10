@@ -1,5 +1,9 @@
+import {
+  AutoRoutingAnalyticsPeriodSchema,
+  type AutoRoutingAnalyticsPeriod,
+  type AutoRoutingClassifierAnalyticsResponse,
+} from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
-import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
 
 const PERIODS = {
@@ -9,9 +13,7 @@ const PERIODS = {
   '30d': { interval: "INTERVAL '30' DAY" },
 } as const;
 
-const periodSchema = z.enum(['1h', '24h', '7d', '30d']);
-
-type AnalyticsPeriod = z.infer<typeof periodSchema>;
+type AnalyticsPeriod = AutoRoutingAnalyticsPeriod;
 
 type AnalyticsEngineResponse<T> = {
   data: T[];
@@ -49,7 +51,7 @@ type ClassifierModelBreakdownRow = {
   requests: number;
 };
 
-function emptyAnalyticsResponse(period: AnalyticsPeriod) {
+function emptyAnalyticsResponse(period: AnalyticsPeriod): AutoRoutingClassifierAnalyticsResponse {
   return {
     period,
     summary: {
@@ -182,7 +184,7 @@ function isMissingLocalAnalyticsSecret(error: unknown): boolean {
 
 export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
   const periodParam = c.req.query('period') ?? '24h';
-  const parsedPeriod = periodSchema.safeParse(periodParam);
+  const parsedPeriod = AutoRoutingAnalyticsPeriodSchema.safeParse(periodParam);
   if (!parsedPeriod.success) {
     return c.json({ error: 'Invalid analytics period' }, 400);
   }
@@ -218,7 +220,7 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
 
   const summary = summaryRows[0] ?? {};
 
-  return c.json({
+  const response: AutoRoutingClassifierAnalyticsResponse = {
     period,
     summary: {
       totalRequests: numberValue(summary.total_requests),
@@ -248,5 +250,6 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
       classifierModel: row.classifier_model,
       requests: numberValue(row.requests),
     })),
-  });
+  };
+  return c.json(response);
 };

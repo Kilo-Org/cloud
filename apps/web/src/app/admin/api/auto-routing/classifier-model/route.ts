@@ -1,15 +1,11 @@
+import { UpdateClassifierModelRequestSchema } from '@kilocode/auto-routing-contracts';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import * as z from 'zod';
 import {
   getAutoRoutingClassifierModel,
   updateAutoRoutingClassifierModel,
 } from '@/lib/ai-gateway/auto-routing-admin-client';
 import { getUserFromAuth } from '@/lib/user/server';
-
-const updateClassifierModelSchema = z.object({
-  model: z.string().trim().min(1),
-});
 
 export async function GET() {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
@@ -30,7 +26,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const parsed = updateClassifierModelSchema.safeParse(rawBody);
+  const parsed = UpdateClassifierModelRequestSchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid classifier model' }, { status: 400 });
   }

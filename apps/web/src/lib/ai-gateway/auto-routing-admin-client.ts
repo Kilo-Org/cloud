@@ -1,10 +1,10 @@
-import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
-import * as z from 'zod';
 import {
   AutoRoutingClassifierAnalyticsResponseSchema,
   AutoRoutingClassifierModelResponseSchema,
   type AutoRoutingAnalyticsPeriod,
-} from './auto-routing-admin-types';
+} from '@kilocode/auto-routing-contracts';
+import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
+import * as z from 'zod';
 
 export type AutoRoutingAdminResult<T> = {
   status: number;

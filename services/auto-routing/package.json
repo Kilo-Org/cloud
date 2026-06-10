@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@kilocode/auto-routing-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@openrouter/sdk": "^0.12.79",
     "hono": "catalog:",

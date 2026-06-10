@@ -1,10 +1,11 @@
+import type { AutoRoutingDecisionResponse } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import { mirrorPayloadSchema, parseClassifierInput } from './classifier-input';
 import { classifyNormalizedInput } from './model-classifier';
 import type { HonoEnv } from './hono-env';
 
-function emptyDecisionResponse() {
+function emptyDecisionResponse(): AutoRoutingDecisionResponse {
   return {
     cost: 0,
     decision: null,
@@ -54,14 +55,15 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     });
     // When routing decisions are implemented, include the prior decision for
     // this session as an input alongside classifier output.
-    return c.json({
+    const response: AutoRoutingDecisionResponse = {
       cost: classifier.cost ?? 0,
       decision: null,
       classifierResult: {
         classification: classifier.classification,
         normalized: classifierInput.data,
       },
-    });
+    };
+    return c.json(response);
   } catch {
     const classifierDurationMs = performance.now() - startedAt;
     writeClassifierMetricsDataPoint(c.env, {

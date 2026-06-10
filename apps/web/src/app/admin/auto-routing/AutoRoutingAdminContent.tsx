@@ -17,12 +17,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import type {
   AutoRoutingAnalyticsPeriod,
   AutoRoutingClassifierAnalyticsResponse,
   AutoRoutingClassifierModelResponse,
 } from '@/lib/ai-gateway/auto-routing-admin-types';
+import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { cn } from '@/lib/utils';
 
 const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
@@ -64,6 +64,11 @@ async function fetchClassifierAnalytics(period: AutoRoutingAnalyticsPeriod) {
   const searchParams = new URLSearchParams({ period });
   const response = await fetch(`/admin/api/auto-routing/classifier-analytics?${searchParams}`);
   return parseAdminResponse<AutoRoutingClassifierAnalyticsResponse>(response);
+}
+
+async function fetchOpenRouterModels() {
+  const response = await fetch('/admin/api/auto-routing/openrouter-models');
+  return parseAdminResponse<OpenRouterModelsResponse>(response);
 }
 
 function formatNumber(value: number) {
@@ -263,7 +268,10 @@ export function AutoRoutingAdminContent() {
     queryKey: ['auto-routing', 'classifier-analytics', period],
     queryFn: () => fetchClassifierAnalytics(period),
   });
-  const modelSelector = useModelSelectorList(undefined);
+  const openRouterModelsQuery = useQuery({
+    queryKey: ['auto-routing', 'openrouter-models'],
+    queryFn: fetchOpenRouterModels,
+  });
 
   useEffect(() => {
     if (classifierModelQuery.data?.model) {
@@ -273,14 +281,13 @@ export function AutoRoutingAdminContent() {
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (
-      modelSelector.data?.data.map(model => ({
+      openRouterModelsQuery.data?.data.map(model => ({
         id: model.id,
         name: model.name,
         supportsVision: model.architecture.input_modalities.includes('image'),
-        isFree: model.isFree,
       })) ?? []
     );
-  }, [modelSelector.data?.data]);
+  }, [openRouterModelsQuery.data?.data]);
 
   const saveMutation = useMutation({
     mutationFn: saveClassifierModel,
@@ -340,8 +347,8 @@ export function AutoRoutingAdminContent() {
             models={modelOptions}
             value={selectedModel}
             onValueChange={setSelectedModel}
-            isLoading={modelSelector.isLoading || classifierModelQuery.isLoading}
-            error={modelSelector.error?.message ?? undefined}
+            isLoading={openRouterModelsQuery.isLoading || classifierModelQuery.isLoading}
+            error={openRouterModelsQuery.error?.message ?? undefined}
             placeholder={classifierModelQuery.data?.defaultModel ?? 'Select classifier model'}
             className="w-full"
           />

@@ -155,7 +155,7 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   return data.data.models;
 }
 
-function injectExtraByokModels(
+function injectExtraUserByokModels(
   openRouterModels: Map<string, OpenRouterModel>,
   vercelModels: Record<string, StoredModel>,
   providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>
@@ -186,21 +186,23 @@ function injectExtraByokModels(
         vercelInferenceProviders.has(vercelProviderId) &&
         !providerData.models.some(m => m.slug === model.slug)
       ) {
-        console.warn(
-          '[syncProviders] Adding missing model %s to provider %s',
-          model.slug,
-          providerData.provider.slug,
-          model
-        );
-        providerData.models.push({
+        const freeSuffixIndex = model.name.indexOf(' (free)');
+        const m = {
           ...model,
+          name: freeSuffixIndex >= 0 ? model.name.substring(0, freeSuffixIndex) : model.name,
           endpoint: {
             ...model.endpoint,
             provider_display_name: providerData.provider.displayName,
             is_free: !endpoint.pricing?.prompt,
             pricing: endpoint.pricing ?? { prompt: '0', completion: '0' },
           },
-        });
+        };
+        console.warn(
+          '[injectExtraUserByokModels] Adding missing model to user byok provider %s: %s',
+          providerData.provider.name,
+          m.name
+        );
+        providerData.models.push(m);
       }
     }
   }
@@ -246,7 +248,7 @@ async function syncProviders(
     }
   }
 
-  injectExtraByokModels(openRouterModels, vercelModels, providerModelData);
+  injectExtraUserByokModels(openRouterModels, vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm => {

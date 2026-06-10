@@ -1,8 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
-  applyCustomPricingToCost_mUsd,
   applyCustomPricingToModel,
+  calculateCustomCost_mUsd,
   QWEN37_MAX_MODEL_ID,
   QWEN37_PLUS_MODEL_ID,
 } from './custom-pricing';
@@ -20,17 +20,25 @@ function makeModel(id: string): OpenRouterModel {
     },
     top_provider: { is_moderated: false },
     pricing: {
-      prompt: '0.0000025',
-      completion: '0.0000075',
-      input_cache_read: '0.00000025',
-      input_cache_write: '0.000003125',
+      prompt: '999',
+      completion: '999',
+      input_cache_read: '999',
+      input_cache_write: '999',
     },
     context_length: 1_000_000,
   };
 }
 
+const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd>[1]> = {}) => ({
+  uncachedInputTokens: 0,
+  totalOutputTokens: 0,
+  cacheWriteTokens: 0,
+  cacheHitTokens: 0,
+  ...overrides,
+});
+
 describe('custom model pricing', () => {
-  test('applies the Qwen3.7 Max discount to model-list pricing and name', () => {
+  test('replaces upstream Qwen3.7 Max pricing in the model list', () => {
     const model = applyCustomPricingToModel(makeModel(QWEN37_MAX_MODEL_ID));
 
     expect(model.name).toBe('Qwen: Qwen3.7 Max (50% off)');
@@ -42,15 +50,41 @@ describe('custom model pricing', () => {
     });
   });
 
-  test('applies custom usage pricing independently of the display percentage', () => {
-    expect(applyCustomPricingToCost_mUsd(QWEN37_MAX_MODEL_ID, 1_001)).toBe(501);
-    expect(applyCustomPricingToCost_mUsd(QWEN37_PLUS_MODEL_ID, 1_001)).toBe(801);
+  test('calculates Qwen3.7 Max usage without relying on upstream cost', () => {
+    expect(
+      calculateCustomCost_mUsd(
+        QWEN37_MAX_MODEL_ID,
+        makeUsage({
+          uncachedInputTokens: 50_000,
+          totalOutputTokens: 10_000,
+          cacheHitTokens: 20_000,
+          cacheWriteTokens: 30_000,
+        })
+      )
+    ).toBe(
+      Math.round(50_000 * 1.25 + 10_000 * 3.75 + 20_000 * 0.125 + 30_000 * 1.5625)
+    );
+  });
+
+  test('calculates both Qwen3.7 Plus context tiers from token usage', () => {
+    expect(
+      calculateCustomCost_mUsd(
+        QWEN37_PLUS_MODEL_ID,
+        makeUsage({ uncachedInputTokens: 100_000, totalOutputTokens: 10_000 })
+      )
+    ).toBe(Math.round(100_000 * 0.32 + 10_000 * 1.28));
+    expect(
+      calculateCustomCost_mUsd(
+        QWEN37_PLUS_MODEL_ID,
+        makeUsage({ uncachedInputTokens: 300_000, totalOutputTokens: 10_000 })
+      )
+    ).toBe(Math.round(300_000 * 0.96 + 10_000 * 3.84));
   });
 
   test('leaves models without custom pricing unchanged', () => {
     const model = makeModel('qwen/another-model');
 
     expect(applyCustomPricingToModel(model)).toBe(model);
-    expect(applyCustomPricingToCost_mUsd(model.id, 1_001)).toBe(1_001);
+    expect(calculateCustomCost_mUsd(model.id, makeUsage())).toBeUndefined();
   });
 });

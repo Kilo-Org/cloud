@@ -68,7 +68,7 @@ import {
   calculateCost_mUsd,
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { applyCustomPricingToCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
+import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
 
 const posthogClient = PostHogClient();
 
@@ -1041,10 +1041,17 @@ export async function processTokenData(
     console.error('[Abuse] Failed to report cost:', error);
   });
 
-  usageStats.cost_mUsd = applyCustomPricingToCost_mUsd(
-    usageContext.requested_model,
-    usageStats.cost_mUsd
-  );
+  const uncachedInputTokens =
+    usageStats.inputTokens - usageStats.cacheHitTokens - usageStats.cacheWriteTokens;
+  const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, {
+    uncachedInputTokens: Math.max(0, uncachedInputTokens),
+    totalOutputTokens: usageStats.outputTokens,
+    cacheHitTokens: usageStats.cacheHitTokens,
+    cacheWriteTokens: usageStats.cacheWriteTokens,
+  });
+  if (customCost_mUsd !== undefined) {
+    usageStats.cost_mUsd = customCost_mUsd;
+  }
 
   if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;

@@ -1,21 +1,59 @@
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import {
+  calculateCost_mUsd,
+  type Pricing,
+  type PricingTiers,
+  type Usage,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export const QWEN37_MAX_MODEL_ID = 'qwen/qwen3.7-max';
 export const QWEN37_PLUS_MODEL_ID = 'qwen/qwen3.7-plus';
 
+const TOKENS_256K = 256 * 1024;
+
 export type CustomPricing = {
-  multiplier: number;
+  pricing: PricingTiers;
+  /** Human-readable discount shown in the model name; never used in calculations. */
   percentage?: number;
 };
 
 export const customPricingByModelId: Record<string, CustomPricing> = {
   [QWEN37_MAX_MODEL_ID]: {
-    multiplier: 0.5,
     percentage: 50,
+    pricing: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 1.25,
+          completion_per_million: 3.75,
+          input_cache_read_per_million: 0.125,
+          input_cache_write_per_million: 1.5625,
+        },
+      },
+    ],
   },
   [QWEN37_PLUS_MODEL_ID]: {
-    multiplier: 0.8,
     percentage: 20,
+    pricing: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 0.32,
+          completion_per_million: 1.28,
+          input_cache_read_per_million: 0.032,
+          input_cache_write_per_million: 0.4,
+        },
+      },
+      {
+        start_context_length: TOKENS_256K,
+        pricing: {
+          prompt_per_million: 0.96,
+          completion_per_million: 3.84,
+          input_cache_read_per_million: 0.096,
+          input_cache_write_per_million: 1.2,
+        },
+      },
+    ],
   },
 };
 
@@ -24,20 +62,29 @@ export function getCustomPricing(modelId: string): CustomPricing | undefined {
   return customPricingByModelId[modelId];
 }
 
+function formatPricePerToken(pricePerMillion: number): string {
+  return (pricePerMillion / 1_000_000).toFixed(12);
+}
+
+function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricing) {
+  return {
+    ...pricing,
+    prompt: formatPricePerToken(customPricing.prompt_per_million),
+    completion: formatPricePerToken(customPricing.completion_per_million),
+    input_cache_read:
+      customPricing.input_cache_read_per_million === null
+        ? undefined
+        : formatPricePerToken(customPricing.input_cache_read_per_million),
+    input_cache_write:
+      customPricing.input_cache_write_per_million === null
+        ? undefined
+        : formatPricePerToken(customPricing.input_cache_write_per_million),
+  };
+}
+
 export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterModel {
   const customPricing = getCustomPricing(model.id);
   if (!customPricing) return model;
-
-  const pricing = { ...model.pricing };
-  for (const key of Object.keys(pricing) as (keyof typeof pricing)[]) {
-    const value = pricing[key];
-    if (value !== undefined) {
-      const parsedPrice = Number.parseFloat(value);
-      if (Number.isFinite(parsedPrice)) {
-        pricing[key] = (parsedPrice * customPricing.multiplier).toFixed(12);
-      }
-    }
-  }
 
   const discountSuffix =
     customPricing.percentage === undefined ? '' : ` (${customPricing.percentage}% off)`;
@@ -45,12 +92,12 @@ export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterMod
   return {
     ...model,
     name: model.name + discountSuffix,
-    pricing,
+    pricing: applyPricing(model.pricing, customPricing.pricing[0].pricing),
   };
 }
 
-export function applyCustomPricingToCost_mUsd(modelId: string, marketCost_mUsd: number): number {
+export function calculateCustomCost_mUsd(modelId: string, usage: Usage): number | undefined {
   const customPricing = getCustomPricing(modelId);
-  if (!customPricing) return marketCost_mUsd;
-  return Math.round(marketCost_mUsd * customPricing.multiplier);
+  if (!customPricing) return undefined;
+  return Math.round(calculateCost_mUsd(usage, customPricing.pricing));
 }

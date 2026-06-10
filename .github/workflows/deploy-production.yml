@@ -142,13 +142,10 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - run: npx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
 
       - name: Deploy to Vercel
-        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel@${{ env.VERCEL_VERSION }} deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-kiloclaw:
     needs: [check-production-db-startup, run-migrations]

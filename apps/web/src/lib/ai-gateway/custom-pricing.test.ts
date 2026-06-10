@@ -30,10 +30,12 @@ function makeModel(id: string): OpenRouterModel {
 }
 
 const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd>[1]> = {}) => ({
-  uncachedInputTokens: 0,
-  totalOutputTokens: 0,
+  cost_mUsd: 0,
+  inputTokens: 0,
+  outputTokens: 0,
   cacheWriteTokens: 0,
   cacheHitTokens: 0,
+  is_byok: false,
   ...overrides,
 });
 
@@ -55,8 +57,8 @@ describe('custom model pricing', () => {
       calculateCustomCost_mUsd(
         QWEN37_MAX_MODEL_ID,
         makeUsage({
-          uncachedInputTokens: 50_000,
-          totalOutputTokens: 10_000,
+          inputTokens: 100_000,
+          outputTokens: 10_000,
           cacheHitTokens: 20_000,
           cacheWriteTokens: 30_000,
         })
@@ -68,13 +70,13 @@ describe('custom model pricing', () => {
     expect(
       calculateCustomCost_mUsd(
         QWEN37_PLUS_MODEL_ID,
-        makeUsage({ uncachedInputTokens: 100_000, totalOutputTokens: 10_000 })
+        makeUsage({ inputTokens: 100_000, outputTokens: 10_000 })
       )
     ).toBe(Math.round(100_000 * 0.32 + 10_000 * 1.28));
     expect(
       calculateCustomCost_mUsd(
         QWEN37_PLUS_MODEL_ID,
-        makeUsage({ uncachedInputTokens: 300_000, totalOutputTokens: 10_000 })
+        makeUsage({ inputTokens: 300_000, outputTokens: 10_000 })
       )
     ).toBe(Math.round(300_000 * 0.96 + 10_000 * 3.84));
   });

@@ -1,9 +1,9 @@
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
 import {
   calculateCost_mUsd,
   type Pricing,
   type PricingTiers,
-  type Usage,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export const QWEN37_MAX_MODEL_ID = 'qwen/qwen3.7-max';
@@ -96,8 +96,23 @@ export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterMod
   };
 }
 
-export function calculateCustomCost_mUsd(modelId: string, usage: Usage): number | undefined {
+export function calculateCustomCost_mUsd(
+  modelId: string,
+  usage: JustTheCostsUsageStats
+): number | undefined {
   const customPricing = getCustomPricing(modelId);
   if (!customPricing) return undefined;
-  return Math.round(calculateCost_mUsd(usage, customPricing.pricing));
+
+  const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
+  return Math.round(
+    calculateCost_mUsd(
+      {
+        uncachedInputTokens: Math.max(0, uncachedInputTokens),
+        totalOutputTokens: usage.outputTokens,
+        cacheHitTokens: usage.cacheHitTokens,
+        cacheWriteTokens: usage.cacheWriteTokens,
+      },
+      customPricing.pricing
+    )
+  );
 }

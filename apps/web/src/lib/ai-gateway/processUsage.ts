@@ -1032,26 +1032,17 @@ export async function processTokenData(
     usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
 
-  // Preserve the market cost before applying custom pricing or zeroing for free/BYOK.
-  usageStats.market_cost = usageStats.cost_mUsd;
+  const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);
 
-  // Report upstream cost to abuse service BEFORE discounting or zeroing for free/BYOK
+  // Report upstream cost to abuse service BEFORE zeroing for free/BYOK
   // (abuse service needs actual spend for heuristics like free_tier_exhausted)
   reportAbuseCost(usageContext, usageStats).catch(error => {
     console.error('[Abuse] Failed to report cost:', error);
   });
 
-  const uncachedInputTokens =
-    usageStats.inputTokens - usageStats.cacheHitTokens - usageStats.cacheWriteTokens;
-  const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, {
-    uncachedInputTokens: Math.max(0, uncachedInputTokens),
-    totalOutputTokens: usageStats.outputTokens,
-    cacheHitTokens: usageStats.cacheHitTokens,
-    cacheWriteTokens: usageStats.cacheWriteTokens,
-  });
-  if (customCost_mUsd !== undefined) {
-    usageStats.cost_mUsd = customCost_mUsd;
-  }
+  // Preserve the real cost before zeroing for free/BYOK
+  usageStats.market_cost = usageStats.cost_mUsd;
+  usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
   if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;

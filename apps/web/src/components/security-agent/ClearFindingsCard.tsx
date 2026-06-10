@@ -63,16 +63,16 @@ export function ClearFindingsCard({
 
   return (
     <>
-      <Card className="w-full border-yellow-500/50">
+      <Card className="w-full">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-yellow-500/20">
               <AlertTriangle className="size-5 text-yellow-400" />
             </div>
             <div>
-              <CardTitle className="text-lg font-bold">Clear Orphaned Findings</CardTitle>
+              <CardTitle className="text-lg font-semibold">Delete orphaned findings</CardTitle>
               <p className="text-muted-foreground text-xs">
-                Remove findings from repositories no longer accessible via GitHub
+                Delete findings from repositories no longer accessible through GitHub.
               </p>
             </div>
           </div>
@@ -88,11 +88,11 @@ export function ClearFindingsCard({
 
           <div className="space-y-3">
             <label htmlFor="orphaned-repository" className="text-sm font-medium">
-              Select repository to clear
+              Select repository
             </label>
             <Select value={selectedRepo ?? ''} onValueChange={setSelectedRepo}>
               <SelectTrigger id="orphaned-repository" className="w-full">
-                <SelectValue placeholder="Select a repository..." />
+                <SelectValue placeholder="Select a repository" />
               </SelectTrigger>
               <SelectContent>
                 {orphanedRepositories.map(repo => (
@@ -111,16 +111,19 @@ export function ClearFindingsCard({
 
           <div className="flex justify-end">
             <Button
-              variant="destructive"
+              variant="outline"
               onClick={handleDeleteClick}
               disabled={!selectedRepo || isDeleting}
             >
               {isDeleting ? (
-                <Loader2 className="mr-2 size-4 animate-spin" />
+                <Loader2
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
               ) : (
-                <Trash2 className="mr-2 size-4" />
+                <Trash2 className="size-4" aria-hidden="true" />
               )}
-              {isDeleting ? 'Deleting…' : 'Delete Findings'}
+              {isDeleting ? 'Deleting...' : 'Delete findings'}
             </Button>
           </div>
         </CardContent>
@@ -132,7 +135,7 @@ export function ClearFindingsCard({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="size-5 text-red-500" />
-              Delete Security Findings?
+              Delete security findings?
             </DialogTitle>
             <DialogDescription>
               This action cannot be undone. All security findings for this repository will be
@@ -158,16 +161,19 @@ export function ClearFindingsCard({
               onClick={() => setConfirmDialogOpen(false)}
               disabled={isDeleting}
             >
-              Cancel
+              Keep findings
             </Button>
             <Button variant="destructive" onClick={handleConfirmDelete} disabled={isDeleting}>
               {isDeleting ? (
                 <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Deleting…
+                  <Loader2
+                    className="size-4 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                  Deleting...
                 </>
               ) : (
-                'Delete Findings'
+                'Delete findings'
               )}
             </Button>
           </DialogFooter>

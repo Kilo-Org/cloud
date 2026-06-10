@@ -113,8 +113,8 @@ const parseFromCodeBlock = (
   }
 
   // Fallback: direct tail search for the last code fence pair.
-  // The regex with lazy quantifier can miss the final block in very large texts
-  // with many ``` markers, so search backwards from the end instead.
+  // This can recover a final JSON block when earlier fenced content contains
+  // embedded fence markers that make forward scanning stop too early.
   const lastFenceEnd = text.lastIndexOf('```');
   if (lastFenceEnd !== -1) {
     const searchStart = Math.max(0, lastFenceEnd - 10_000);

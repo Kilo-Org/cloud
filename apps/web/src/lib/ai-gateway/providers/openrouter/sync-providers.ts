@@ -28,6 +28,11 @@ import { redisClient } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  openRouterToVercelInferenceProviderId,
+  VercelUserByokInferenceProviderIdSchema,
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -150,7 +155,69 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   return data.data.models;
 }
 
-async function syncProviders(providers: OpenRouterProvider[]) {
+function injectExtraUserByokModels(
+  vercelModels: Record<string, StoredModel>,
+  providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>
+) {
+  const openRouterModels = new Map<string, OpenRouterModel>();
+  for (const { models } of providerModelData) {
+    for (const model of models) {
+      openRouterModels.set(model.slug, model);
+    }
+  }
+  for (const model of openRouterModels.values()) {
+    const vercelModel = vercelModels[mapModelIdToVercel(model.slug, false)];
+    if (!vercelModel) continue;
+
+    const vercelInferenceProviders = new Set(
+      vercelModel.endpoints
+        .map(
+          endpoint =>
+            VercelUserByokInferenceProviderIdSchema.safeParse(
+              endpoint.provider_name ?? endpoint.tag
+            ).data
+        )
+        .filter(p => p !== undefined)
+    );
+
+    for (const providerData of providerModelData) {
+      const vercelProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(
+        openRouterToVercelInferenceProviderId(providerData.provider.slug)
+      ).data;
+      const endpoint = vercelModel.endpoints.find(e => e.provider_name === vercelProviderId);
+      if (
+        vercelProviderId &&
+        endpoint &&
+        vercelInferenceProviders.has(vercelProviderId) &&
+        !providerData.models.some(m => m.slug === model.slug)
+      ) {
+        const freeSuffixIndex = model.name.indexOf(' (free)');
+        const m = {
+          ...model,
+          name: freeSuffixIndex >= 0 ? model.name.substring(0, freeSuffixIndex) : model.name,
+          context_length: endpoint.context_length ?? model.context_length,
+          endpoint: {
+            ...model.endpoint,
+            provider_display_name: providerData.provider.displayName,
+            is_free: !endpoint.pricing?.prompt,
+            pricing: endpoint.pricing ?? { prompt: '0', completion: '0' },
+          },
+        };
+        console.warn(
+          '[injectExtraUserByokModels] Adding missing model to user byok provider %s: %s',
+          providerData.provider.name,
+          m.name
+        );
+        providerData.models.push(m);
+      }
+    }
+  }
+}
+
+async function syncProviders(
+  providers: OpenRouterProvider[],
+  vercelModels: Record<string, StoredModel>
+) {
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -179,6 +246,8 @@ async function syncProviders(providers: OpenRouterProvider[]) {
       })
     )
   );
+
+  injectExtraUserByokModels(vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm => {
@@ -395,7 +464,7 @@ export async function syncAndStoreProviders() {
     );
   }
 
-  const providers = await syncProviders(openrouterProviders);
+  const providers = await syncProviders(openrouterProviders, vercel_data);
 
   if (providers.total_providers < 10) {
     throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);

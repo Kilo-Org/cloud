@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { type SetStateAction, useState } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { Button } from '@/components/ui/button';
@@ -54,25 +54,34 @@ function sortedIds(ids: number[]) {
   return ids.toSorted((left, right) => left - right);
 }
 
-function configsMatch(left: SecurityConfigFormState, right: SecurityConfigFormState) {
-  return (
-    left.slaConfig.critical === right.slaConfig.critical &&
-    left.slaConfig.high === right.slaConfig.high &&
-    left.slaConfig.medium === right.slaConfig.medium &&
-    left.slaConfig.low === right.slaConfig.low &&
-    left.repositorySelectionMode === right.repositorySelectionMode &&
-    JSON.stringify(sortedIds(left.selectedRepositoryIds)) ===
-      JSON.stringify(sortedIds(right.selectedRepositoryIds)) &&
-    left.triageModelSlug === right.triageModelSlug &&
-    left.analysisModelSlug === right.analysisModelSlug &&
-    left.analysisMode === right.analysisMode &&
-    left.autoDismissEnabled === right.autoDismissEnabled &&
-    left.autoDismissConfidenceThreshold === right.autoDismissConfidenceThreshold &&
-    left.autoAnalysisEnabled === right.autoAnalysisEnabled &&
-    left.autoAnalysisMinSeverity === right.autoAnalysisMinSeverity &&
-    left.autoAnalysisIncludeExisting === right.autoAnalysisIncludeExisting
-  );
+function configFingerprint(config: SecurityConfigFormState) {
+  return JSON.stringify([
+    config.slaConfig.critical,
+    config.slaConfig.high,
+    config.slaConfig.medium,
+    config.slaConfig.low,
+    config.repositorySelectionMode,
+    sortedIds(config.selectedRepositoryIds),
+    config.triageModelSlug,
+    config.analysisModelSlug,
+    config.analysisMode,
+    config.autoDismissEnabled,
+    config.autoDismissConfidenceThreshold,
+    config.autoAnalysisEnabled,
+    config.autoAnalysisMinSeverity,
+    config.autoAnalysisIncludeExisting,
+  ]);
 }
+
+function configsMatch(left: SecurityConfigFormState, right: SecurityConfigFormState) {
+  return configFingerprint(left) === configFingerprint(right);
+}
+
+type LocalConfigState = {
+  draft: SecurityConfigFormState;
+  serverBaseline: SecurityConfigFormState;
+  serverBaselineFingerprint: string;
+};
 
 export function SecurityConfigForm({
   organizationId,
@@ -86,7 +95,32 @@ export function SecurityConfigForm({
 }: SecurityConfigFormProps) {
   const { enabled, isLoadingRepositories, isSaving, isToggling, isRefreshingRepositories } =
     viewState;
-  const [state, setState] = useState(initialConfig);
+  const initialConfigFingerprint = configFingerprint(initialConfig);
+  const [localConfig, setLocalConfig] = useState<LocalConfigState>(() => ({
+    draft: initialConfig,
+    serverBaseline: initialConfig,
+    serverBaselineFingerprint: initialConfigFingerprint,
+  }));
+  const serverBaselineChanged = localConfig.serverBaselineFingerprint !== initialConfigFingerprint;
+  const state =
+    serverBaselineChanged && configsMatch(localConfig.draft, localConfig.serverBaseline)
+      ? initialConfig
+      : localConfig.draft;
+
+  if (serverBaselineChanged) {
+    setLocalConfig({
+      draft: state,
+      serverBaseline: initialConfig,
+      serverBaselineFingerprint: initialConfigFingerprint,
+    });
+  }
+
+  const setState = (update: SetStateAction<SecurityConfigFormState>) => {
+    setLocalConfig(current => ({
+      ...current,
+      draft: typeof update === 'function' ? update(current.draft) : update,
+    }));
+  };
   const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
   const hasChanges = !configsMatch(state, initialConfig);
   const repositoryCount =

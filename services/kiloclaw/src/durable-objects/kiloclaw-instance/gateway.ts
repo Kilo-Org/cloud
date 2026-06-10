@@ -525,8 +525,9 @@ export async function createAgent(
 
 /**
  * DELETE /_kilo/config/agents/:id — remove an agent + clean up references
- * (bindings, agent-to-agent allow rules) via the OpenClaw CLI. Does NOT confirm
- * on-disk files are gone (filesystemDisposition: 'unverified'). Rejects `main`
+ * (bindings, agent-to-agent allow rules) via the OpenClaw CLI. The controller
+ * verifies the workspace path and reports filesystemDisposition
+ * ('deleted'/'retained'; older controllers report 'unverified'). Rejects `main`
  * (400 reserved_agent_id). 502/504 on CLI failure/timeout.
  */
 export async function deleteAgent(

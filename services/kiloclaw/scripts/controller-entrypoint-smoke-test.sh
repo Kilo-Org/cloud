@@ -178,8 +178,10 @@ check "PUT bindings can clear routes" "True" "$CLEAR_EMPTY"
 DELETE_RESP=$(curl -sS -X DELETE \
   -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:${PORT}/_kilo/config/agents/crud-smoke")
+# OpenClaw 2026.6.x `agents delete` recursively removes the agent workspace, so
+# the controller verifies the CLI-reported path is gone and reports 'deleted'.
 DELETE_DISPOSITION=$(echo "$DELETE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('filesystemDisposition',''))" 2>/dev/null || echo "")
-check "delete reports unverified filesystem disposition" "unverified" "$DELETE_DISPOSITION"
+check "delete reports deleted filesystem disposition" "deleted" "$DELETE_DISPOSITION"
 
 LIST_AFTER_DELETE=$(curl -sS \
   -H "Authorization: Bearer $TOKEN" \
@@ -187,10 +189,11 @@ LIST_AFTER_DELETE=$(curl -sS \
 LIST_STILL_HAS_AGENT=$(echo "$LIST_AFTER_DELETE" | python3 -c "import sys,json; print(any(a.get('id') == 'crud-smoke' and a.get('configured') for a in json.load(sys.stdin).get('agents', [])))" 2>/dev/null || echo "")
 check "deleted agent is no longer configured" "False" "$LIST_STILL_HAS_AGENT"
 
-if [ -d "$ROOTDIR/.openclaw/workspace-crud-smoke" ]; then
-  check "packaged no-trash baseline retains deleted workspace" "1" "1"
+# The workspace dir (and its contents) must be gone after delete.
+if [ ! -d "$ROOTDIR/.openclaw/workspace-crud-smoke" ]; then
+  check "deleted agent workspace removed from disk" "1" "1"
 else
-  check "packaged no-trash baseline retains deleted workspace" "1" "0"
+  check "deleted agent workspace removed from disk" "1" "0"
 fi
 
 echo
@@ -216,25 +219,31 @@ CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/")
 check "root without proxy token (REQUIRE_PROXY_TOKEN=true) -> 401" "401" "$CODE"
 
 echo
-echo "--- auth-profiles migration (doctor path) ---"
+echo "--- auth-profiles migration (doctor path -> SQLite) ---"
 
-# The seeded file had a plaintext kilocode key. After bootstrap's migration
-# runs, the on-disk file must carry a keyRef and no plaintext.
-MIGRATED=$(cat "$ROOTDIR/.openclaw/agents/main/agent/auth-profiles.json" 2>/dev/null || echo "")
+# The seeded auth-profiles.json carried a plaintext kilocode key. OpenClaw
+# 2026.6.1+ doctor imports it into the per-agent SQLite auth store and removes
+# the JSON, but leaves a 0644 plaintext `*.sqlite-import.*.bak` behind. The
+# controller's bootstrap removes that backup so no plaintext key remains in a
+# controller-managed file. (The SQLite WAL may hold a superseded plaintext frame
+# until OpenClaw's next checkpoint; the main DB stores a keyRef.)
+AGENT_DIR="$ROOTDIR/.openclaw/agents/main/agent"
 
-if echo "$MIGRATED" | grep -q '"keyRef"'; then
-  check "legacy plaintext migrated to keyRef" "1" "1"
+if [ ! -f "$AGENT_DIR/auth-profiles.json" ]; then
+  check "legacy auth-profiles.json imported into SQLite" "1" "1"
 else
-  check "legacy plaintext migrated to keyRef" "1" "0"
-  echo "  actual: $MIGRATED"
+  check "legacy auth-profiles.json imported into SQLite" "1" "0"
 fi
 
-if echo "$MIGRATED" | grep -q "legacy-plaintext-must-be-rewritten"; then
-  check "legacy plaintext removed from disk" "1" "0"
-  echo "  actual: $MIGRATED"
+if [ -f "$AGENT_DIR/openclaw-agent.sqlite" ]; then
+  check "SQLite auth store present" "1" "1"
 else
-  check "legacy plaintext removed from disk" "1" "1"
+  check "SQLite auth store present" "1" "0"
 fi
+
+# Our controller cleanup must have removed the plaintext migration backup.
+BAK_COUNT=$(find "$AGENT_DIR" -name '*.sqlite-import.*.bak' 2>/dev/null | wc -l | tr -d ' ')
+check "controller removed plaintext migration backup" "0" "$BAK_COUNT"
 
 echo
 echo "=== Results: $PASS passed, $FAIL failed ==="

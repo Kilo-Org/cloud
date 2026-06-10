@@ -3963,8 +3963,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
-   * Delete an agent + clean up its references via the OpenClaw CLI. On-disk files
-   * are not confirmed removed (`filesystemDisposition: 'unverified'`). Rejects
+   * Delete an agent + clean up its references via the OpenClaw CLI. The controller
+   * verifies the workspace path and reports `filesystemDisposition`
+   * (`'deleted'`/`'retained'`; older controllers report `'unverified'`). Rejects
    * `main` (`reserved_agent_id`). Returns an error envelope for
    * `openclaw_cli_failed`/`_timeout` or `capability_unavailable`.
    */

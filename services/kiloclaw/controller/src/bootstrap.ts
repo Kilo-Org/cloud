@@ -22,7 +22,10 @@ import {
 } from './config-writer';
 import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
-import { migrateKilocodeAuthProfilesToKeyRef } from './auth-profiles-migration';
+import {
+  migrateKilocodeAuthProfilesToKeyRef,
+  removeAuthProfileSqliteImportBackups,
+} from './auth-profiles-migration';
 import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 
 const CONFIG_DIR = '/root/.openclaw';
@@ -841,6 +844,21 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   if (migrationReport.profilesMigrated > 0) {
     console.log(
       `[controller] auth-profiles migration: ${migrationReport.profilesMigrated} profile(s) across ${migrationReport.filesModified} file(s)`
+    );
+  }
+
+  // OpenClaw 2026.6.1+ `doctor` imports auth-profiles.json into a per-agent
+  // SQLite store and leaves a world-readable (0o644) `*.sqlite-import.<ts>.bak`
+  // behind that still contains the plaintext provider key. The SQLite store
+  // holds a keyRef, so the backup is redundant; remove it to keep plaintext
+  // keys off disk. No-op on fresh installs and already-cleaned instances.
+  const backupCleanup = removeAuthProfileSqliteImportBackups(
+    CONFIG_DIR,
+    toAuthProfilesMigrationDeps(deps)
+  );
+  if (backupCleanup.backupsRemoved > 0 || backupCleanup.backupsHardened > 0) {
+    console.log(
+      `[controller] auth-profile backup cleanup: removed ${backupCleanup.backupsRemoved}, hardened ${backupCleanup.backupsHardened}`
     );
   }
 

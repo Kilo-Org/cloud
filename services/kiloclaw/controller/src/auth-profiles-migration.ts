@@ -29,6 +29,11 @@ const AGENT_SUBDIR = 'agent';
 const KILOCODE_PROVIDER = 'kilocode';
 const KILOCODE_ENV_VAR = 'KILOCODE_API_KEY';
 
+// OpenClaw's auth-profile SQLite migration (2026.6.1+) backs each legacy JSON
+// up as `<original>.sqlite-import.<epoch-ms>.bak` before importing it into the
+// per-agent SQLite store and removing the original.
+const SQLITE_IMPORT_BACKUP_RE = /\.sqlite-import\.\d+\.bak$/;
+
 export type AuthProfilesMigrationDeps = {
   existsSync: (p: string) => boolean;
   readdirSync: (dir: string) => string[];
@@ -194,6 +199,105 @@ export function migrateKilocodeAuthProfilesToKeyRef(
       console.log(
         `[auth-profiles-migration] ${filePath}: migrated ${migratedIds.length} kilocode profile(s) to keyRef (${migratedIds.join(', ')})`
       );
+    }
+  }
+
+  return report;
+}
+
+export type AuthProfileBackupCleanupReport = {
+  dirsScanned: number;
+  backupsRemoved: number;
+  backupsHardened: number;
+};
+
+/**
+ * Remove the plaintext backups OpenClaw's auth-profile SQLite migration leaves
+ * behind under `<rootDir>/agents/*&#47;agent/`.
+ *
+ * Since 2026.6.1, `openclaw doctor --fix` imports legacy `auth-profiles.json`
+ * (and its state/legacy siblings) into a per-agent SQLite store and backs the
+ * original up as `<name>.sqlite-import.<epoch-ms>.bak` before deleting it. That
+ * backup is produced with `fs.copyFileSync`, which does NOT preserve the
+ * source's `0o600` mode — it lands at `0o644` — and it retains the plaintext
+ * provider key. The authoritative SQLite store holds a keyRef and
+ * `/root/.openclaw` is `0o700`, but the backup still breaks the
+ * "no plaintext provider key on disk" invariant the controller maintains.
+ *
+ * Nothing reads these backups after import — OpenClaw's migration only keys off
+ * the presence of the original JSON — so removal is safe and idempotent. When a
+ * backup cannot be removed, fall back to tightening it to `0o600` so the
+ * plaintext is at least owner-only.
+ *
+ * Never throws; individual failures are logged and skipped.
+ */
+export function removeAuthProfileSqliteImportBackups(
+  rootDir: string,
+  deps: AuthProfilesMigrationDeps = defaultDeps
+): AuthProfileBackupCleanupReport {
+  const report: AuthProfileBackupCleanupReport = {
+    dirsScanned: 0,
+    backupsRemoved: 0,
+    backupsHardened: 0,
+  };
+
+  const agentsDir = path.join(rootDir, 'agents');
+  if (!deps.existsSync(agentsDir)) {
+    return report;
+  }
+
+  let agentIds: string[];
+  try {
+    agentIds = deps.readdirSync(agentsDir);
+  } catch (error) {
+    console.warn(`[auth-profiles-migration] Failed to list ${agentsDir}:`, error);
+    return report;
+  }
+
+  for (const agentId of agentIds) {
+    const agentRoot = path.join(agentsDir, agentId);
+    try {
+      if (!deps.statSync(agentRoot).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+
+    const agentDir = path.join(agentRoot, AGENT_SUBDIR);
+    if (!deps.existsSync(agentDir)) continue;
+
+    let entries: string[];
+    try {
+      entries = deps.readdirSync(agentDir);
+    } catch (error) {
+      console.warn(`[auth-profiles-migration] Failed to list ${agentDir}:`, error);
+      continue;
+    }
+    report.dirsScanned += 1;
+
+    for (const entry of entries) {
+      if (!SQLITE_IMPORT_BACKUP_RE.test(entry)) continue;
+      const backupPath = path.join(agentDir, entry);
+      try {
+        deps.unlinkSync(backupPath);
+        report.backupsRemoved += 1;
+        console.log(`[auth-profiles-migration] removed plaintext migration backup ${backupPath}`);
+      } catch (error) {
+        // Could not remove — at minimum strip the world/group bits so the
+        // plaintext key is owner-only rather than 0o644.
+        try {
+          deps.chmodSync(backupPath, 0o600);
+          report.backupsHardened += 1;
+          console.warn(
+            `[auth-profiles-migration] could not remove ${backupPath}, tightened to 0o600:`,
+            error
+          );
+        } catch (chmodError) {
+          console.warn(
+            `[auth-profiles-migration] failed to remove or harden ${backupPath}:`,
+            chmodError
+          );
+        }
+      }
     }
   }
 

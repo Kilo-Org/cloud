@@ -623,7 +623,7 @@ export type AgentCreateResponse = {
 
 export type AgentDeleteResponse = {
   ok: boolean;
-  filesystemDisposition: 'unverified';
+  filesystemDisposition: 'deleted' | 'retained' | 'unverified';
   agentId: string;
   workspace: string;
   agentDir: string;

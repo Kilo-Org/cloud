@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   migrateKilocodeAuthProfilesToKeyRef,
+  removeAuthProfileSqliteImportBackups,
   type AuthProfilesMigrationDeps,
 } from './auth-profiles-migration';
 
@@ -278,5 +279,90 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
       email: 'user@example.com',
       metadata: { createdBy: 'onboard' },
     });
+  });
+});
+
+describe('removeAuthProfileSqliteImportBackups', () => {
+  const ROOT = '/root/.openclaw';
+  const AGENT_DIR = `${ROOT}/agents/main/agent`;
+  const BAK = `${AGENT_DIR}/auth-profiles.json.sqlite-import.1781117548412.bak`;
+
+  function seedAgentDir(fs: InMemoryFs): void {
+    seedDir(fs, `${ROOT}/agents`);
+    seedDir(fs, `${ROOT}/agents/main`);
+    seedDir(fs, AGENT_DIR);
+  }
+
+  it('removes the plaintext sqlite-import backup', () => {
+    const fs = createFs();
+    seedAgentDir(fs);
+    seedFile(fs, BAK, JSON.stringify(plaintextStore()));
+
+    const report = removeAuthProfileSqliteImportBackups(ROOT, fsDeps(fs));
+
+    expect(report).toEqual({ dirsScanned: 1, backupsRemoved: 1, backupsHardened: 0 });
+    expect(fs.files.has(BAK)).toBe(false);
+  });
+
+  it('only targets *.sqlite-import.<ts>.bak — leaves live auth files intact', () => {
+    const fs = createFs();
+    seedAgentDir(fs);
+    const keep = [
+      `${AGENT_DIR}/openclaw-agent.sqlite`,
+      `${AGENT_DIR}/openclaw-agent.sqlite-wal`,
+      `${AGENT_DIR}/models.json`,
+      `${AGENT_DIR}/unrelated.bak`,
+    ];
+    for (const f of keep) seedFile(fs, f, 'x');
+    seedFile(fs, BAK, JSON.stringify(plaintextStore()));
+
+    const report = removeAuthProfileSqliteImportBackups(ROOT, fsDeps(fs));
+
+    expect(report.backupsRemoved).toBe(1);
+    expect(fs.files.has(BAK)).toBe(false);
+    for (const f of keep) expect(fs.files.has(f)).toBe(true);
+  });
+
+  it('hardens the backup to 0o600 when removal fails', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fs = createFs();
+    seedAgentDir(fs);
+    seedFile(fs, BAK, JSON.stringify(plaintextStore()));
+    const chmodSync = vi.fn();
+    const deps: AuthProfilesMigrationDeps = {
+      ...fsDeps(fs),
+      unlinkSync: () => {
+        throw new Error('EPERM');
+      },
+      chmodSync,
+    };
+
+    const report = removeAuthProfileSqliteImportBackups(ROOT, deps);
+
+    expect(report).toEqual({ dirsScanned: 1, backupsRemoved: 0, backupsHardened: 1 });
+    expect(chmodSync).toHaveBeenCalledWith(BAK, 0o600);
+    warnSpy.mockRestore();
+  });
+
+  it('scans multiple agent directories', () => {
+    const fs = createFs();
+    seedDir(fs, `${ROOT}/agents`);
+    for (const agent of ['main', 'coding']) {
+      seedDir(fs, `${ROOT}/agents/${agent}`);
+      seedDir(fs, `${ROOT}/agents/${agent}/agent`);
+      seedFile(fs, `${ROOT}/agents/${agent}/agent/auth-profiles.json.sqlite-import.99.bak`, 'x');
+    }
+
+    const report = removeAuthProfileSqliteImportBackups(ROOT, fsDeps(fs));
+
+    expect(report).toEqual({ dirsScanned: 2, backupsRemoved: 2, backupsHardened: 0 });
+  });
+
+  it('is a no-op when the agents dir does not exist', () => {
+    const fs = createFs();
+
+    const report = removeAuthProfileSqliteImportBackups(ROOT, fsDeps(fs));
+
+    expect(report).toEqual({ dirsScanned: 0, backupsRemoved: 0, backupsHardened: 0 });
   });
 });

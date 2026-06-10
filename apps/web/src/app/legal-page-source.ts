@@ -9,10 +9,18 @@ function absolutizeKiloLinks(html: string, sourceUrl: string): string {
 }
 
 function removeActiveContent(html: string): string {
-  return html
-    .replaceAll(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replaceAll(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '')
-    .replaceAll(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  let previous: string;
+  let sanitized = html;
+
+  do {
+    previous = sanitized;
+    sanitized = sanitized
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '')
+      .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  } while (sanitized !== previous);
+
+  return sanitized;
 }
 
 function removeSourceAttributes(html: string): string {

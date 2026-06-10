@@ -221,12 +221,11 @@ check "root without proxy token (REQUIRE_PROXY_TOKEN=true) -> 401" "401" "$CODE"
 echo
 echo "--- auth-profiles migration (doctor path -> SQLite) ---"
 
-# The seeded auth-profiles.json carried a plaintext kilocode key. OpenClaw
-# 2026.6.1+ doctor imports it into the per-agent SQLite auth store and removes
-# the JSON, but leaves a 0644 plaintext `*.sqlite-import.*.bak` behind. The
-# controller's bootstrap removes that backup so no plaintext key remains in a
-# controller-managed file. (The SQLite WAL may hold a superseded plaintext frame
-# until OpenClaw's next checkpoint; the main DB stores a keyRef.)
+# The seeded auth-profiles.json carried a plaintext kilocode key. The controller
+# converts it to an env-backed keyRef BEFORE `openclaw doctor --fix` runs, so
+# doctor's SQLite import stores a keyRef and never the plaintext. doctor then
+# removes the JSON and leaves a `*.sqlite-import.*.bak`, which the controller
+# deletes. End result: no plaintext key anywhere on the volume.
 AGENT_DIR="$ROOTDIR/.openclaw/agents/main/agent"
 
 if [ ! -f "$AGENT_DIR/auth-profiles.json" ]; then
@@ -244,6 +243,11 @@ fi
 # Our controller cleanup must have removed the plaintext migration backup.
 BAK_COUNT=$(find "$AGENT_DIR" -name '*.sqlite-import.*.bak' 2>/dev/null | wc -l | tr -d ' ')
 check "controller removed plaintext migration backup" "0" "$BAK_COUNT"
+
+# The seeded plaintext key must not survive anywhere on disk — not in the SQLite
+# auth store, its WAL, or any backup. -a scans the binary SQLite files as text.
+PLAINTEXT_HITS=$( { grep -ral 'legacy-plaintext-must-be-rewritten' "$AGENT_DIR" 2>/dev/null || true; } | wc -l | tr -d ' ')
+check "no plaintext kilocode key in SQLite auth store" "0" "$PLAINTEXT_HITS"
 
 echo
 echo "=== Results: $PASS passed, $FAIL failed ==="

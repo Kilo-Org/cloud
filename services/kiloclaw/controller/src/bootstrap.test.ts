@@ -1092,9 +1092,10 @@ describe('runOnboardOrDoctor', () => {
 
   it('migrates legacy plaintext kilocode key in auth-profiles.json to a keyRef', () => {
     // Integration check: runOnboardOrDoctor must drive the auth-profiles
-    // migration. On a legacy doctor boot, a plaintext key in
-    // /root/.openclaw/agents/main/agent/auth-profiles.json should be
-    // rewritten to an env-backed keyRef on the same path.
+    // migration BEFORE `openclaw doctor --fix`. On a legacy doctor boot, a
+    // plaintext key in /root/.openclaw/agents/main/agent/auth-profiles.json is
+    // rewritten to an env-backed keyRef on the same path so doctor's SQLite
+    // import snapshots a keyRef, never the plaintext.
     const AGENTS_DIR = '/root/.openclaw/agents';
     const AGENT_ROOT = '/root/.openclaw/agents/main';
     const PROFILE_PATH = '/root/.openclaw/agents/main/agent/auth-profiles.json';
@@ -1162,6 +1163,24 @@ describe('runOnboardOrDoctor', () => {
     });
     expect(rewritten.profiles['kilocode:default']).not.toHaveProperty('key');
     expect(tempWrite.data).not.toContain('legacy-plaintext-key');
+
+    // Security-critical ordering: the keyRef rewrite must land BEFORE
+    // `openclaw doctor --fix` imports the profile into SQLite. OpenClaw imports a
+    // plaintext key verbatim when no keyRef is present, so a rewrite that ran
+    // after doctor would leave the plaintext in the SQLite store.
+    const doctorCallIndex = (
+      harness.deps.execFileSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([_cmd, args]) => Array.isArray(args) && args.includes('doctor'));
+    expect(doctorCallIndex).not.toBe(-1);
+    const doctorCallOrder = (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[doctorCallIndex];
+    const renameToProfileIndex = (
+      harness.deps.renameSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([, to]) => to === PROFILE_PATH);
+    expect(renameToProfileIndex).not.toBe(-1);
+    const renameOrder = (harness.deps.renameSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[renameToProfileIndex];
+    expect(renameOrder).toBeLessThan(doctorCallOrder);
   });
 
   it('does not auto-assign kilo-exa on doctor path when BRAVE_API_KEY is configured', () => {

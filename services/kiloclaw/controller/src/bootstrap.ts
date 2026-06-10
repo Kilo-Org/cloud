@@ -801,6 +801,24 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   } else {
     console.log('Using existing config, running doctor...');
     sanitizeExistingConfigBeforeDoctor(deps);
+
+    // OpenClaw 2026.6.1+ `doctor --fix` imports auth-profiles.json into per-agent
+    // SQLite as one of its steps, and a plaintext `key` with no `keyRef` is
+    // imported verbatim (plaintext is stripped only when a keyRef is present).
+    // Convert any legacy plaintext kilocode key to an env-backed keyRef BEFORE
+    // doctor runs so the SQLite import lands a keyRef, never plaintext. The
+    // post-doctor call below stays for self-healing on versions that still read
+    // the JSON; this idempotent migration no-ops when there is nothing to fix.
+    const preDoctorMigration = migrateKilocodeAuthProfilesToKeyRef(
+      CONFIG_DIR,
+      toAuthProfilesMigrationDeps(deps)
+    );
+    if (preDoctorMigration.profilesMigrated > 0) {
+      console.log(
+        `[controller] pre-doctor auth-profiles migration: ${preDoctorMigration.profilesMigrated} profile(s) across ${preDoctorMigration.filesModified} file(s)`
+      );
+    }
+
     deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
       stdio: 'inherit',
     });

@@ -123,6 +123,7 @@ export type SessionMessageState = {
   callbackRequired?: boolean;
   callbackTarget?: CallbackTarget;
   callbackEnqueuedAt?: number;
+  callbackAbandonedAt?: number;
   callbackLastError?: string;
   callbackAttempts?: number;
   callbackRetryAt?: number;
@@ -230,6 +231,7 @@ export const SessionMessageStateSchema = z
       })
       .optional(),
     callbackEnqueuedAt: z.number().optional(),
+    callbackAbandonedAt: z.number().optional(),
     callbackLastError: z.string().optional(),
     callbackAttempts: z.number().int().nonnegative().optional(),
     callbackRetryAt: z.number().optional(),
@@ -646,7 +648,11 @@ export async function listMessagesWithPendingCallbacks(
 ): Promise<SessionMessageState[]> {
   const entries = await listSessionMessageStates(storage);
   return entries.filter(
-    state => isTerminalStatus(state.status) && state.callbackRequired && !state.callbackEnqueuedAt
+    state =>
+      isTerminalStatus(state.status) &&
+      state.callbackRequired &&
+      !state.callbackEnqueuedAt &&
+      !state.callbackAbandonedAt
   );
 }
 
@@ -658,7 +664,10 @@ export async function listTerminalMessagesWithPendingEffects(
     .flatMap(state => {
       if (!isTerminalStatus(state.status)) return [];
       const normalized =
-        state.terminalEffects || !state.callbackRequired || state.callbackEnqueuedAt
+        state.terminalEffects ||
+        !state.callbackRequired ||
+        state.callbackEnqueuedAt ||
+        state.callbackAbandonedAt
           ? state
           : {
               ...state,

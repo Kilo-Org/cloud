@@ -50,6 +50,10 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       classifierDurationMs,
       bodyBytes,
     });
+    // When routing decisions are implemented, include the prior decision for
+    // this session as an input alongside classifier output. Next.js currently
+    // mirrors session identity indirectly through headers like
+    // `x-kilocode-taskid` and `x-kilo-session`.
     return c.json({
       cost: classifier.cost ?? 0,
       decision: null,

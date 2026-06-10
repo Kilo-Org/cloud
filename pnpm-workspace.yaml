@@ -59,7 +59,6 @@ minimumReleaseAgeExclude:
   - '@typescript/native-preview-linux-x64'
   - '@typescript/native-preview-win32-arm64'
   - '@typescript/native-preview-win32-x64'
-  # AI SDK releases are pinned and validated through KiloClaw image builds.
   - '@ai-sdk/anthropic'
   - '@anthropic-ai/sdk'
   # Kilo SDK releases are owned internally and adopted with pinned runtime validation.

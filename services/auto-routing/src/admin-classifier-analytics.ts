@@ -250,5 +250,3 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
     })),
   });
 };
-
-export const classifierAnalyticsPeriods = Object.keys(PERIODS) as AnalyticsPeriod[];

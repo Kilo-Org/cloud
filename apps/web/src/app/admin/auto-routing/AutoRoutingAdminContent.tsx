@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { BarChart3, Clock3, DollarSign, RefreshCw, Route, Save } from 'lucide-react';
+import * as z from 'zod';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,14 @@ import type {
   AutoRoutingClassifierAnalyticsResponse,
   AutoRoutingClassifierModelResponse,
 } from '@/lib/ai-gateway/auto-routing-admin-types';
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
+import {
+  AutoRoutingClassifierAnalyticsResponseSchema,
+  AutoRoutingClassifierModelResponseSchema,
+} from '@/lib/ai-gateway/auto-routing-admin-types';
+import {
+  OpenRouterModelsResponseSchema,
+  type OpenRouterModelsResponse,
+} from '@/lib/organizations/organization-types';
 import { cn } from '@/lib/utils';
 
 const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
@@ -32,23 +40,30 @@ const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
   { value: '30d', label: '30d' },
 ];
 
-type AdminApiError = {
-  error?: string;
-};
+const AdminApiErrorSchema = z.object({ error: z.string().optional() });
 
-async function parseAdminResponse<T extends object>(response: Response): Promise<T> {
-  const body = (await response.json()) as T | AdminApiError;
+async function parseAdminResponse<T extends object>(
+  response: Response,
+  schema: z.ZodType<T>
+): Promise<T> {
+  const body: unknown = await response.json();
   if (!response.ok) {
+    const parsedError = AdminApiErrorSchema.safeParse(body);
     throw new Error(
-      'error' in body && body.error ? body.error : `Request failed: ${response.status}`
+      parsedError.success && parsedError.data.error
+        ? parsedError.data.error
+        : `Request failed: ${response.status}`
     );
   }
-  return body as T;
+  return schema.parse(body);
 }
 
 async function fetchClassifierModel() {
   const response = await fetch('/admin/api/auto-routing/classifier-model');
-  return parseAdminResponse<AutoRoutingClassifierModelResponse>(response);
+  return parseAdminResponse<AutoRoutingClassifierModelResponse>(
+    response,
+    AutoRoutingClassifierModelResponseSchema
+  );
 }
 
 async function saveClassifierModel(model: string) {
@@ -57,18 +72,24 @@ async function saveClassifierModel(model: string) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ model }),
   });
-  return parseAdminResponse<AutoRoutingClassifierModelResponse>(response);
+  return parseAdminResponse<AutoRoutingClassifierModelResponse>(
+    response,
+    AutoRoutingClassifierModelResponseSchema
+  );
 }
 
 async function fetchClassifierAnalytics(period: AutoRoutingAnalyticsPeriod) {
   const searchParams = new URLSearchParams({ period });
   const response = await fetch(`/admin/api/auto-routing/classifier-analytics?${searchParams}`);
-  return parseAdminResponse<AutoRoutingClassifierAnalyticsResponse>(response);
+  return parseAdminResponse<AutoRoutingClassifierAnalyticsResponse>(
+    response,
+    AutoRoutingClassifierAnalyticsResponseSchema
+  );
 }
 
 async function fetchOpenRouterModels() {
   const response = await fetch('/admin/api/auto-routing/openrouter-models');
-  return parseAdminResponse<OpenRouterModelsResponse>(response);
+  return parseAdminResponse<OpenRouterModelsResponse>(response, OpenRouterModelsResponseSchema);
 }
 
 function formatNumber(value: number) {

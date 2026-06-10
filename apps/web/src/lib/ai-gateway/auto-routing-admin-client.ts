@@ -1,8 +1,9 @@
 import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
-import type {
-  AutoRoutingAnalyticsPeriod,
-  AutoRoutingClassifierAnalyticsResponse,
-  AutoRoutingClassifierModelResponse,
+import * as z from 'zod';
+import {
+  AutoRoutingClassifierAnalyticsResponseSchema,
+  AutoRoutingClassifierModelResponseSchema,
+  type AutoRoutingAnalyticsPeriod,
 } from './auto-routing-admin-types';
 
 export type AutoRoutingAdminResult<T> = {
@@ -11,10 +12,16 @@ export type AutoRoutingAdminResult<T> = {
 };
 
 type ErrorBody = { error: string };
+const ErrorBodySchema = z.object({ error: z.string() });
+
+type AutoRoutingAdminRequestInit = Omit<RequestInit, 'headers'> & {
+  headers?: Record<string, string>;
+};
 
 async function fetchAutoRoutingAdmin<T>(
   path: string,
-  init: RequestInit
+  init: AutoRoutingAdminRequestInit,
+  schema: z.ZodType<T>
 ): Promise<AutoRoutingAdminResult<T | ErrorBody>> {
   if (!AUTO_ROUTING_WORKER_URL || !INTERNAL_API_SECRET) {
     return {
@@ -27,35 +34,55 @@ async function fetchAutoRoutingAdmin<T>(
     ...init,
     headers: {
       authorization: `Bearer ${INTERNAL_API_SECRET}`,
-      ...(init.headers as Record<string, string> | undefined),
+      ...init.headers,
     },
   });
 
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const parsedError = ErrorBodySchema.safeParse(body);
+    return {
+      status: response.status,
+      body: parsedError.success
+        ? parsedError.data
+        : { error: `Request failed: ${response.status}` },
+    };
+  }
+
   return {
     status: response.status,
-    body: (await response.json()) as T | ErrorBody,
+    body: schema.parse(body),
   };
 }
 
 export function getAutoRoutingClassifierModel() {
-  return fetchAutoRoutingAdmin<AutoRoutingClassifierModelResponse>('/admin/classifier-model', {
-    method: 'GET',
-  });
+  return fetchAutoRoutingAdmin(
+    '/admin/classifier-model',
+    {
+      method: 'GET',
+    },
+    AutoRoutingClassifierModelResponseSchema
+  );
 }
 
 export function updateAutoRoutingClassifierModel(model: string) {
-  return fetchAutoRoutingAdmin<AutoRoutingClassifierModelResponse>('/admin/classifier-model', {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ model }),
-  });
+  return fetchAutoRoutingAdmin(
+    '/admin/classifier-model',
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model }),
+    },
+    AutoRoutingClassifierModelResponseSchema
+  );
 }
 
 export function getAutoRoutingClassifierAnalytics(period: AutoRoutingAnalyticsPeriod) {
-  return fetchAutoRoutingAdmin<AutoRoutingClassifierAnalyticsResponse>(
+  return fetchAutoRoutingAdmin(
     `/admin/classifier-analytics?period=${period}`,
     {
       method: 'GET',
-    }
+    },
+    AutoRoutingClassifierAnalyticsResponseSchema
   );
 }

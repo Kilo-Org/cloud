@@ -1,21 +1,18 @@
-import { getOpenCodeGoAiSdkProvider } from './opencode-go';
-import type { DirectByokModel } from './types';
+import { getAiSdkProvider, isOpenCodeGoMessagesModel } from '../model-settings';
 
-function model(id: string): DirectByokModel {
-  return {
-    id,
-    name: id,
-    context_length: 1_000_000,
-    max_completion_tokens: 65_536,
-  };
-}
+describe('isOpenCodeGoMessagesModel', () => {
+  test.each(['opencode-go/minimax-m3', 'opencode-go/qwen3.7-plus'])(
+    'matches OpenCode Go Messages model %s',
+    model => {
+      expect(isOpenCodeGoMessagesModel(model)).toBe(true);
+      expect(getAiSdkProvider(model)).toBe('anthropic');
+    }
+  );
 
-describe('getOpenCodeGoAiSdkProvider', () => {
-  test.each(['minimax-m3', 'qwen3.7-plus'])('prefers Anthropic Messages for %s', modelId => {
-    expect(getOpenCodeGoAiSdkProvider(model(modelId))).toBe('anthropic');
-  });
-
-  test('uses the provider default for other model families', () => {
-    expect(getOpenCodeGoAiSdkProvider(model('deepseek-v4-flash'))).toBeUndefined();
-  });
+  test.each(['opencode-go/deepseek-v4-flash', 'other-provider/qwen3.7-plus'])(
+    'does not match %s',
+    model => {
+      expect(isOpenCodeGoMessagesModel(model)).toBe(false);
+    }
+  );
 });

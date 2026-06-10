@@ -125,6 +125,14 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   return undefined;
 }
 
+export function isOpenCodeGoMessagesModel(model: string): boolean {
+  const normalizedModel = model.toLowerCase();
+  return (
+    normalizedModel.startsWith('opencode-go/') &&
+    (normalizedModel.includes('minimax') || normalizedModel.includes('qwen'))
+  );
+}
+
 export function getAiSdkProvider(
   model: string
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
@@ -136,6 +144,9 @@ export function getAiSdkProvider(
   if (seed_20_code_free_model.public_id === model) {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
+  }
+  if (isOpenCodeGoMessagesModel(model)) {
+    return 'anthropic';
   }
   if (isClaudeModel(model)) {
     // on Vercel AI Gateway, this is necessary to support document attachments

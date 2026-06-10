@@ -46,11 +46,7 @@ const DetailInputSchema = z.object({
 // Also escape LIKE wildcards (% and _) so they are treated as literals, not pattern wildcards.
 // Wildcard escaping must come after backslash-doubling so the escape characters are correctly doubled.
 const escapeHogQLStringLiteral = (value: string) =>
-  value
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/%/g, '\\%')
-    .replace(/_/g, '\\_');
+  value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/%/g, '\\%').replace(/_/g, '\\_');
 
 export const adminFeatureInterestRouter = createTRPCRouter({
   // Feature Interest Leaderboard

@@ -16,7 +16,7 @@ const PERIODS = {
 
 type AnalyticsPeriod = AutoRoutingAnalyticsPeriod;
 
-const analyticsNumberSchema = z.union([z.number(), z.string()]);
+const analyticsNumberSchema = z.union([z.number(), z.string(), z.null()]);
 const optionalAnalyticsNumberSchema = analyticsNumberSchema.optional();
 
 const SummaryRowSchema = z.looseObject({

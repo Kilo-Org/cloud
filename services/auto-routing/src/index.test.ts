@@ -654,6 +654,51 @@ describe('auto routing worker', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
+  it('normalizes nullable Analytics Engine aggregate values', async () => {
+    mockedFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                total_requests: 0,
+                classified_requests: 0,
+                classifier_errors: 0,
+                invalid_requests: 0,
+                total_cost_credits: 0,
+                avg_duration_ms: null,
+                p95_duration_ms: null,
+                avg_confidence: null,
+                with_session_id: 0,
+                unique_sessions: 0,
+                requires_tools: 0,
+                mirrored_has_tools: 0,
+                avg_body_bytes: null,
+              },
+            ],
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+
+    const response = await request('/admin/classifier-analytics?period=24h', {
+      headers: { authorization: 'Bearer classifier-token' },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      summary: {
+        avgDurationMs: 0,
+        p95DurationMs: 0,
+        avgConfidence: 0,
+        avgBodyBytes: 0,
+      },
+    });
+  });
+
   it('rejects malformed Analytics Engine responses', async () => {
     mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify({ data: {} }), { status: 200 }));
 

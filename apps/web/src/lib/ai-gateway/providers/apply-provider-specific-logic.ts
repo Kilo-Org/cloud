@@ -17,7 +17,7 @@ import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
+import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
@@ -92,11 +92,12 @@ function applyPreferredProvider(
 }
 
 export function applyOpenRouterModelsFallback(
+  providerId: ProviderId,
   requestedModel: string,
   requestToMutate: GatewayRequest
 ) {
-  if (isFableModel(requestedModel)) {
-    requestToMutate.body.models = [requestToMutate.body.model, CLAUDE_OPUS_CURRENT_MODEL_ID];
+  if (isFableModel(requestedModel) && (providerId === 'openrouter' || providerId === 'vercel')) {
+    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_CURRENT_MODEL_ID];
     return;
   }
 
@@ -113,7 +114,7 @@ export function applyProviderSpecificLogic(
   userId: string,
   taskId: string | null
 ) {
-  applyOpenRouterModelsFallback(requestedModel, requestToMutate);
+  applyOpenRouterModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

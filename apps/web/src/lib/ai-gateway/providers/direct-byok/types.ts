@@ -25,6 +25,7 @@ export type DirectByokProvider = {
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
   supported_chat_apis: ReadonlyArray<GatewayChatApiKind>;
   default_ai_sdk_provider: CustomLlmProvider;
+  ai_sdk_provider?(model: DirectByokModel): CustomLlmProvider | undefined;
   transformRequest(context: TransformRequestContext): void;
 };
 

@@ -1,7 +1,9 @@
 import type { AutoRoutingDecisionResponse } from '@kilocode/auto-routing-contracts';
+import { formatError } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import { mirrorPayloadSchema, parseClassifierInput } from './classifier-input';
+import type { NormalizedClassifierInput } from './classifier-input';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { HonoEnv } from './hono-env';
 
@@ -21,6 +23,43 @@ function getClassifierFailureMetadata(error: unknown): {
     return { cost: error.cost, classifierModel: error.classifierModel };
   }
   return {};
+}
+
+function getClassifierFailureReason(error: unknown): string {
+  if (error instanceof ClassifierRunError) {
+    return 'classifier_run_error';
+  }
+  return 'unexpected_error';
+}
+
+function logClassifierError({
+  error,
+  classifierInput,
+  classifierDurationMs,
+  classifierCostCredits,
+  classifierModel,
+  sessionId,
+}: {
+  error: unknown;
+  classifierInput: NormalizedClassifierInput;
+  classifierDurationMs: number;
+  classifierCostCredits?: number | null;
+  classifierModel?: string;
+  sessionId: string | null;
+}) {
+  console.warn(
+    JSON.stringify({
+      event: 'auto_routing_classifier_error',
+      reason: getClassifierFailureReason(error),
+      classifierModel: classifierModel ?? 'unknown',
+      requestedModel: classifierInput.requestedModel,
+      apiKind: classifierInput.apiKind,
+      sessionId,
+      classifierDurationMs,
+      classifierCostCredits: classifierCostCredits ?? null,
+      ...formatError(error),
+    })
+  );
 }
 
 export const decideHandler: Handler<HonoEnv> = async c => {
@@ -77,6 +116,14 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   } catch (error) {
     const classifierDurationMs = performance.now() - startedAt;
     const classifierFailureMetadata = getClassifierFailureMetadata(error);
+    logClassifierError({
+      error,
+      classifierInput: classifierInput.data,
+      classifierDurationMs,
+      classifierCostCredits: classifierFailureMetadata.cost,
+      classifierModel: classifierFailureMetadata.classifierModel,
+      sessionId: parsed.data.sessionId,
+    });
     writeClassifierMetricsDataPoint(c.env, {
       status: 'classifier_error',
       classifierModel: classifierFailureMetadata.classifierModel,

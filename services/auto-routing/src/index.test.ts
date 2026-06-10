@@ -74,6 +74,7 @@ describe('auto routing worker', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
   });
 
   it('returns health without requiring classifier payload fields', async () => {
@@ -369,6 +370,7 @@ describe('auto routing worker', () => {
   });
 
   it('returns a null classifier result when the classifier request fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     classifyNormalizedInput.mockRejectedValueOnce(
       new ClassifierRunError('Classifier model returned invalid classification', {
         cost: 0.00000123,
@@ -399,6 +401,21 @@ describe('auto routing worker', () => {
       cost: 0,
       decision: null,
       classifierResult: null,
+    });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [logMessage] = warnSpy.mock.calls[0] ?? [];
+    expect(typeof logMessage).toBe('string');
+    expect(JSON.parse(String(logMessage))).toEqual({
+      event: 'auto_routing_classifier_error',
+      reason: 'classifier_run_error',
+      classifierModel: 'google/gemma-4-31b-it',
+      requestedModel: 'anthropic/claude-sonnet-4',
+      apiKind: 'chat_completions',
+      sessionId: null,
+      classifierDurationMs: expect.any(Number),
+      classifierCostCredits: 0.00000123,
+      error: 'Classifier model returned invalid classification',
+      stack: expect.any(String),
     });
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['google/gemma-4-31b-it'],

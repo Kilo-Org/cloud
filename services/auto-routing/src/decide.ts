@@ -2,7 +2,7 @@ import type { AutoRoutingDecisionResponse } from '@kilocode/auto-routing-contrac
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import { mirrorPayloadSchema, parseClassifierInput } from './classifier-input';
-import { classifyNormalizedInput } from './model-classifier';
+import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { HonoEnv } from './hono-env';
 
 function emptyDecisionResponse(): AutoRoutingDecisionResponse {
@@ -17,19 +17,10 @@ function getClassifierFailureMetadata(error: unknown): {
   cost?: number | null;
   classifierModel?: string;
 } {
-  if (!error || typeof error !== 'object') {
-    return {};
+  if (error instanceof ClassifierRunError) {
+    return { cost: error.cost, classifierModel: error.classifierModel };
   }
-
-  const maybeMetadata = error as { cost?: unknown; classifierModel?: unknown };
-  return {
-    cost:
-      typeof maybeMetadata.cost === 'number' || maybeMetadata.cost === null
-        ? maybeMetadata.cost
-        : undefined,
-    classifierModel:
-      typeof maybeMetadata.classifierModel === 'string' ? maybeMetadata.classifierModel : undefined,
-  };
+  return {};
 }
 
 export const decideHandler: Handler<HonoEnv> = async c => {

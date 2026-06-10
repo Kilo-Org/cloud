@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from './index';
+import { ClassifierRunError } from './model-classifier';
+import type * as ModelClassifierModule from './model-classifier';
 
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 
-vi.mock('./model-classifier', () => ({ classifyNormalizedInput }));
+vi.mock('./model-classifier', async importOriginal => {
+  const actual = await importOriginal<typeof ModelClassifierModule>();
+  return { ...actual, classifyNormalizedInput };
+});
 
 const writeDataPoint = vi.fn();
 const configGet = vi.fn();
@@ -365,7 +370,7 @@ describe('auto routing worker', () => {
 
   it('returns a null classifier result when the classifier request fails', async () => {
     classifyNormalizedInput.mockRejectedValueOnce(
-      Object.assign(new Error('Classifier model returned invalid classification'), {
+      new ClassifierRunError('Classifier model returned invalid classification', {
         cost: 0.00000123,
         classifierModel: 'google/gemma-4-31b-it',
       })

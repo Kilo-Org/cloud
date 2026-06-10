@@ -1,15 +1,33 @@
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { model_experiment, model_experiment_variant_version } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { isPublicIdExperimented } from './membership';
-import { pickModelExperimentVariant } from './pick-variant';
-import { redisClient } from '@/lib/redis';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
+import type * as DrizzleLib from '@/lib/drizzle';
+import type * as MembershipModule from './membership';
+import type * as PickVariantModule from './pick-variant';
+import type * as TestUtils from '@/routers/test-utils';
+import type * as UserHelper from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
+const mockRedisStore = new Map<string, string>();
+
+jest.mock('@/lib/redis', () => ({
+  redisClient: {
+    get: jest.fn(async (key: string) => mockRedisStore.get(key) ?? null),
+    set: jest.fn(async (key: string, value: string) => {
+      mockRedisStore.set(key, value);
+      return 'OK';
+    }),
+    del: jest.fn(async (key: string) => (mockRedisStore.delete(key) ? 1 : 0)),
+  },
+}));
+
+let cleanupDbForTest: typeof DrizzleLib.cleanupDbForTest;
+let db: typeof DrizzleLib.db;
+let insertTestUser: typeof UserHelper.insertTestUser;
+let createCallerForUser: typeof TestUtils.createCallerForUser;
+let isPublicIdExperimented: typeof MembershipModule.isPublicIdExperimented;
+let pickModelExperimentVariant: typeof PickVariantModule.pickModelExperimentVariant;
 let admin: User;
 
 const upstreamA = {
@@ -20,8 +38,14 @@ const upstreamB = {
   internal_id: 'partner-checkpoint-b',
   base_url: 'https://partner.example.com/v1',
 };
-const redisIt =
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? it : it.skip;
+
+beforeAll(async () => {
+  ({ cleanupDbForTest, db } = await import('@/lib/drizzle'));
+  ({ insertTestUser } = await import('@/tests/helpers/user.helper'));
+  ({ createCallerForUser } = await import('@/routers/test-utils'));
+  ({ isPublicIdExperimented } = await import('./membership'));
+  ({ pickModelExperimentVariant } = await import('./pick-variant'));
+});
 
 beforeEach(async () => {
   await cleanupDbForTest();
@@ -32,17 +56,16 @@ beforeEach(async () => {
 });
 
 async function clearRoutingCaches() {
-  // Tests share the dev Redis instance across runs; flush the membership key
-  // so each test sees a fresh load path.
-  await redisClient.del(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+  mockRedisStore.delete(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
 }
 
 async function seedExperimentedPublicIds(ids: string[]): Promise<string | null> {
-  return await redisClient.set(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
+  mockRedisStore.set(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
+  return 'OK';
 }
 
 afterEach(async () => {
-  await redisClient.del(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
+  mockRedisStore.delete(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);
 });
 
 async function makeActiveExperiment(opts: {
@@ -66,16 +89,24 @@ async function makeActiveExperiment(opts: {
     label: 'treatment',
     weight: weights[1],
   });
-  await caller.admin.modelExperiments.swapVariantVersion({
+  const versionA = await caller.admin.modelExperiments.swapVariantVersion({
     variantId: a.id,
     upstream: upstreamA,
     apiKey: apiKeys[0],
   });
-  await caller.admin.modelExperiments.swapVariantVersion({
+  const versionB = await caller.admin.modelExperiments.swapVariantVersion({
     variantId: b.id,
     upstream: upstreamB,
     apiKey: apiKeys[1],
   });
+  await db
+    .update(model_experiment_variant_version)
+    .set({ effective_at: '2020-01-01T00:00:00.000Z' })
+    .where(eq(model_experiment_variant_version.id, versionA.id));
+  await db
+    .update(model_experiment_variant_version)
+    .set({ effective_at: '2020-01-01T00:00:00.000Z' })
+    .where(eq(model_experiment_variant_version.id, versionB.id));
   await caller.admin.modelExperiments.activate({ id: exp.id });
   return { experimentId: exp.id, variantA: a.id, variantB: b.id };
 }
@@ -86,13 +117,13 @@ describe('isPublicIdExperimented', () => {
     expect(await isPublicIdExperimented('partner/preview-not-experimented')).toBe(false);
   });
 
-  redisIt('returns true when the public id has an active experiment', async () => {
+  it('returns true when the public id has an active experiment', async () => {
     await makeActiveExperiment({ publicId: 'partner/preview-iset-active' });
     expect(await seedExperimentedPublicIds(['partner/preview-iset-active'])).toBe('OK');
     expect(await isPublicIdExperimented('partner/preview-iset-active')).toBe(true);
   });
 
-  redisIt('returns true when the public id has only a paused experiment', async () => {
+  it('returns true when the public id has only a paused experiment', async () => {
     const { experimentId } = await makeActiveExperiment({
       publicId: 'partner/preview-iset-paused',
     });

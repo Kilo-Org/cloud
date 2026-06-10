@@ -1,5 +1,6 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
 import { ClearFindingsCard } from './ClearFindingsCard';
 import { SecurityConfigForm } from './SecurityConfigForm';
 import { useSecurityAgent } from './SecurityAgentContext';
@@ -18,11 +19,21 @@ export function SecurityConfigPage() {
     handleSaveConfig,
     handleToggleEnabled,
     handleDeleteFindings,
+    isLoadingConfig,
     isSavingConfig,
     isTogglingEnabled,
     isDeletingFindings,
     orphanedRepositories,
   } = useSecurityAgent();
+
+  if (isLoadingConfig) {
+    return (
+      <output className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
+        <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        Loading settings...
+      </output>
+    );
+  }
 
   const initialConfig = {
     slaConfig: {
@@ -47,12 +58,9 @@ export function SecurityConfigPage() {
     autoAnalysisIncludeExisting: configData?.autoAnalysisIncludeExisting ?? false,
   } satisfies SecurityConfigFormState;
 
-  const configKey = JSON.stringify(initialConfig);
-
   return (
     <div className="space-y-6">
       <SecurityConfigForm
-        key={configKey}
         organizationId={organizationId}
         initialConfig={initialConfig}
         repositories={allRepositories}

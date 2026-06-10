@@ -156,7 +156,10 @@ export function SecurityConfigForm({
               disabled={!hasChanges || isSaving}
             >
               {isSaving ? (
-                <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />
+                <Loader2
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
               ) : (
                 <Save className="size-4" aria-hidden="true" />
               )}

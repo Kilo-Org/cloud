@@ -221,7 +221,7 @@ export function RepositorySection({
         aria-label="Refresh repositories"
       >
         <RefreshCw
-          className={cn('size-4', isRefreshing && 'motion-safe:animate-spin')}
+          className={cn('size-4', isRefreshing && 'animate-spin motion-reduce:animate-none')}
           aria-hidden="true"
         />
       </Button>

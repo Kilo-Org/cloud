@@ -53,6 +53,33 @@ type PageAction =
   | { type: 'close-deep-link'; findingId: string }
   | { type: 'finish-dismiss' };
 
+type SearchParamsReader = {
+  get: (name: string) => string | null;
+};
+
+function createInitialPageState(searchParams: SearchParamsReader): PageState {
+  const statusParam = searchParams.get('status') ?? undefined;
+  const outcomeFilter = searchParams.get('outcomeFilter') ?? undefined;
+  const overdue = searchParams.get('overdue') === 'true';
+  const outcomeImpliesStatus = outcomeFilter === 'fixed' || outcomeFilter === 'dismissed';
+
+  return {
+    page: 1,
+    filters: {
+      status: overdue ? 'open' : outcomeImpliesStatus ? undefined : (statusParam ?? 'open'),
+      severity: searchParams.get('severity') ?? undefined,
+      repoFullName: searchParams.get('repoFullName') ?? undefined,
+      outcomeFilter,
+      overdue: overdue || undefined,
+    },
+    sortBy: overdue ? 'sla_due_at_asc' : 'severity_desc',
+    selectedFinding: null,
+    detailDialogOpen: false,
+    dismissDialogOpen: false,
+    closedDeepLinkId: null,
+  };
+}
+
 function pageReducer(state: PageState, action: PageAction): PageState {
   switch (action.type) {
     case 'set-page':
@@ -95,14 +122,6 @@ function pageReducer(state: PageState, action: PageAction): PageState {
 }
 
 export function SecurityFindingsPage() {
-  const searchParams = useSearchParams();
-  const searchParamsString = searchParams.toString();
-  return (
-    <SecurityFindingsContent key={searchParamsString} searchParamsString={searchParamsString} />
-  );
-}
-
-function SecurityFindingsContent({ searchParamsString }: { searchParamsString: string }) {
   const {
     organizationId,
     isOrg,
@@ -119,30 +138,8 @@ function SecurityFindingsContent({ searchParamsString }: { searchParamsString: s
   } = useSecurityAgent();
   const trpc = useTRPC();
   const router = useRouter();
-  const searchParams = new URLSearchParams(searchParamsString);
-
-  const statusParam = searchParams.get('status') ?? undefined;
-  const outcomeFilter = searchParams.get('outcomeFilter') ?? undefined;
-  const overdue = searchParams.get('overdue') === 'true';
-  const outcomeImpliesStatus = outcomeFilter === 'fixed' || outcomeFilter === 'dismissed';
-  const initialFilters: Filters = {
-    status: overdue ? 'open' : outcomeImpliesStatus ? undefined : (statusParam ?? 'open'),
-    severity: searchParams.get('severity') ?? undefined,
-    repoFullName: searchParams.get('repoFullName') ?? undefined,
-    outcomeFilter,
-    overdue: overdue || undefined,
-  };
-  const initialSortBy: SortBy = overdue ? 'sla_due_at_asc' : 'severity_desc';
-
-  const [state, dispatch] = useReducer(pageReducer, {
-    page: 1,
-    filters: initialFilters,
-    sortBy: initialSortBy,
-    selectedFinding: null,
-    detailDialogOpen: false,
-    dismissDialogOpen: false,
-    closedDeepLinkId: null,
-  });
+  const searchParams = useSearchParams();
+  const [state, dispatch] = useReducer(pageReducer, searchParams, createInitialPageState);
 
   const findingIdParam = searchParams.get('findingId');
   const { data: deepLinkedFinding } = useQuery({

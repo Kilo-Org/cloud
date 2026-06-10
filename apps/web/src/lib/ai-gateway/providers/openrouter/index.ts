@@ -3,6 +3,7 @@ import {
   kiloExclusiveModels,
   preferredModels,
 } from '@/lib/ai-gateway/models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { StoredModel } from '@kilocode/db';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
@@ -153,20 +154,21 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           .map(model => convertFromKiloExclusiveModel(model))
       )
       .concat(autoModels)
-      .map((model: OpenRouterModel) => {
+      .map(async (model: OpenRouterModel) => {
         const preferredIndex = preferredModels.indexOf(model.id);
         const addPdf =
           isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
         const description = isFreeNemotronModel(model.id)
           ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
           : model.description;
+        const isFree = await isFreeModel(model.id);
         return {
           ...model,
           name: formatName(model, preferredIndex),
           description,
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
-          isFree: model.isFree,
-          mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+          isFree: model.isFree ?? isFree,
+          mayTrainOnYourPrompts: model.mayTrainOnYourPrompts ?? isFree,
           opencode: model.opencode ?? getOpenCodeSettings(model.id),
           architecture: addPdf
             ? {

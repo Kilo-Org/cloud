@@ -1,4 +1,5 @@
-import { getAiSdkProvider, isOpenCodeGoMessagesModel } from '../model-settings';
+import { getAiSdkProvider } from '../model-settings';
+import { isOpenCodeGoMessagesModel } from './opencode-go';
 
 describe('isOpenCodeGoMessagesModel', () => {
   test.each(['opencode-go/minimax-m3', 'opencode-go/qwen3.7-plus'])(

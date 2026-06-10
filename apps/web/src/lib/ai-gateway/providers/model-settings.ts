@@ -19,6 +19,7 @@ import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
+import { isOpenCodeGoMessagesModel } from '@/lib/ai-gateway/providers/direct-byok/opencode-go';
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
@@ -123,14 +124,6 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     return REASONING_VARIANTS_NONE_HIGH_XHIGH;
   }
   return undefined;
-}
-
-export function isOpenCodeGoMessagesModel(model: string): boolean {
-  const normalizedModel = model.toLowerCase();
-  return (
-    normalizedModel.startsWith('opencode-go/') &&
-    (normalizedModel.includes('minimax') || normalizedModel.includes('qwen'))
-  );
 }
 
 export function getAiSdkProvider(

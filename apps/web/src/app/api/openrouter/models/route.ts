@@ -49,6 +49,7 @@ export async function GET(
       data: filterByFeature(data.data.concat(byokModels, experimentModels), feature),
     });
   } catch (error) {
+    console.error(error);
     captureException(error, {
       tags: { endpoint: 'openrouter/models' },
       extra: {

@@ -18,7 +18,7 @@ describe('projectSafeFailure', () => {
       failureReason: 'provider body with secret-token',
     };
 
-    expect(projectSafeFailure(durableState)).toEqual({
+    expect(projectSafeFailure(durableState)).toStrictEqual({
       stage: 'agent_activity',
       code: 'assistant_error',
       attempts: 2,

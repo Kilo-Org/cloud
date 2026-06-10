@@ -145,10 +145,10 @@ export function projectSafeFailure(
   }
 
   return {
-    stage: source.failureStage,
-    code: source.failureCode,
-    subtype,
-    attempts: source.attempts,
-    message,
+    ...(source.failureStage === undefined ? {} : { stage: source.failureStage }),
+    ...(source.failureCode === undefined ? {} : { code: source.failureCode }),
+    ...(subtype === undefined ? {} : { subtype }),
+    ...(source.attempts === undefined ? {} : { attempts: source.attempts }),
+    ...(message === undefined ? {} : { message }),
   };
 }

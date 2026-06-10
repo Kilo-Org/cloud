@@ -396,8 +396,11 @@ function InstanceDistributionPanel() {
   // segments stay proportional; the legend rounds for display.
   const segments = rows.map((row, i) => {
     const isLatest = row.is_latest === true;
-    const isCandidate = !isLatest && (row.rollout_percent ?? 0) > 0;
     const isDisabled = row.status === 'disabled';
+    // Match the catalog table's predicate: a disabled row may retain a nonzero
+    // rollout_percent, so gate on status === 'available' before calling it a
+    // candidate — otherwise the panel would badge a disabled image purple.
+    const isCandidate = !isLatest && row.status === 'available' && (row.rollout_percent ?? 0) > 0;
     const isUnknown = row.tracked_image_tag == null;
     const color = isLatest
       ? 'bg-blue-600'

@@ -3,6 +3,7 @@ import { db } from '@/lib/drizzle';
 import {
   kiloclaw_image_catalog,
   kiloclaw_instances,
+  kiloclaw_subscriptions,
   kiloclaw_version_pins,
   kilocode_users,
 } from '@kilocode/db/schema';
@@ -559,10 +560,17 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
     }),
 
   /**
-   * Returns a breakdown of active (non-destroyed) instances grouped by their
+   * Returns a breakdown of the ACTIVE fleet grouped by each instance's
    * last-reported `tracked_image_tag`. Joined with the catalog so callers can
    * classify each bucket as :latest, candidate, old-available, disabled, or
    * "no tag yet" (null — DO hasn't reconciled yet).
+   *
+   * "Active" uses the same predicate as admin instance listing and fleet-upgrade
+   * logic — not destroyed, not trial-stopped, and not suspended — so these
+   * counts match the live, billable fleet rather than inflating rollout
+   * percentages with suspended/trial-stopped instances. The subscriptions inner
+   * join is safe for COUNT(*): `instance_id` is unique on kiloclaw_subscriptions
+   * (UQ_kiloclaw_subscriptions_instance), so it never multiplies instance rows.
    *
    * `pinned_count` tells how many instances in that bucket have an admin pin —
    * useful when assessing rollout coverage since pinned instances are immune to
@@ -583,12 +591,22 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
         status: kiloclaw_image_catalog.status,
       })
       .from(kiloclaw_instances)
+      .innerJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+      )
       .leftJoin(
         kiloclaw_image_catalog,
         eq(kiloclaw_instances.tracked_image_tag, kiloclaw_image_catalog.image_tag)
       )
       .leftJoin(kiloclaw_version_pins, eq(kiloclaw_instances.id, kiloclaw_version_pins.instance_id))
-      .where(isNull(kiloclaw_instances.destroyed_at))
+      .where(
+        and(
+          isNull(kiloclaw_instances.destroyed_at),
+          isNull(kiloclaw_instances.inactive_trial_stopped_at),
+          isNull(kiloclaw_subscriptions.suspended_at)
+        )
+      )
       .groupBy(
         kiloclaw_instances.tracked_image_tag,
         kiloclaw_image_catalog.openclaw_version,

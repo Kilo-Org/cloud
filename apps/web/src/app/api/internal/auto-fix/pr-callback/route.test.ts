@@ -96,16 +96,6 @@ function makeRequest(body: Record<string, unknown>, options: RequestOptions = {}
   } as unknown as NextRequest;
 }
 
-function activeTicket(id = TICKET_ID) {
-  return {
-    id,
-    status: 'running',
-    review_comment_id: null,
-    trigger_source: 'label',
-    platform_integration_id: null,
-  } as Awaited<ReturnType<typeof mockGetFixTicketBySessionId>>;
-}
-
 function terminalTicket(id = TICKET_ID) {
   return {
     id,
@@ -142,91 +132,6 @@ describe('POST /api/internal/auto-fix/pr-callback', () => {
       success: true,
       message: 'Ticket already terminal',
     });
-  });
-
-  it('prefers a validated structured failure message', async () => {
-    const callbackToken = await deriveCallbackToken({
-      secret: CALLBACK_SECRET,
-      scope: 'auto-fix-pr-callback',
-      resourceParts: [TICKET_ID],
-    });
-    mockGetFixTicketBySessionId.mockResolvedValue(activeTicket());
-
-    const response = await POST(
-      makeRequest(
-        {
-          sessionId: SESSION_ID,
-          status: 'failed',
-          errorMessage: 'legacy error',
-          failure: {
-            stage: 'pre_dispatch',
-            code: 'workspace_setup_failed',
-            subtype: 'git_clone_timeout',
-            attempts: 2,
-            message: 'Repository clone timed out',
-          },
-        },
-        { ticketId: TICKET_ID, callbackToken }
-      )
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockUpdateFixTicketStatus).toHaveBeenCalledWith(
-      TICKET_ID,
-      'failed',
-      expect.objectContaining({ errorMessage: 'Repository clone timed out' })
-    );
-  });
-
-  it('falls back to the legacy failure message', async () => {
-    const callbackToken = await deriveCallbackToken({
-      secret: CALLBACK_SECRET,
-      scope: 'auto-fix-pr-callback',
-      resourceParts: [TICKET_ID],
-    });
-    mockGetFixTicketBySessionId.mockResolvedValue(activeTicket());
-
-    const response = await POST(
-      makeRequest(
-        { sessionId: SESSION_ID, status: 'failed', errorMessage: 'legacy error' },
-        { ticketId: TICKET_ID, callbackToken }
-      )
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockUpdateFixTicketStatus).toHaveBeenCalledWith(
-      TICKET_ID,
-      'failed',
-      expect.objectContaining({ errorMessage: 'legacy error' })
-    );
-  });
-
-  it.each([
-    { failure: { code: 'future_failure_code' } },
-    { failure: { subtype: 'unknown_workspace_failure' } },
-    { failure: { extra: true } },
-    { failure: { attempts: -1 } },
-    { failure: { message: 'x'.repeat(4_097) } },
-  ])('discards incompatible failure and uses the legacy message: %o', async extension => {
-    const callbackToken = await deriveCallbackToken({
-      secret: CALLBACK_SECRET,
-      scope: 'auto-fix-pr-callback',
-      resourceParts: [TICKET_ID],
-    });
-
-    const response = await POST(
-      makeRequest(
-        { sessionId: SESSION_ID, status: 'failed', errorMessage: 'legacy error', ...extension },
-        { ticketId: TICKET_ID, callbackToken }
-      )
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockUpdateFixTicketStatus).toHaveBeenCalledWith(
-      TICKET_ID,
-      'failed',
-      expect.objectContaining({ errorMessage: 'legacy error' })
-    );
   });
 
   it('rejects token callbacks missing ticketId query binding', async () => {

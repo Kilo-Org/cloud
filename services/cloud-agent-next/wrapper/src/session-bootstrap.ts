@@ -13,12 +13,20 @@ import {
   logToFile,
   runProcess,
   type ExecResult,
+  type ProcessOptions,
+  type ProcessOutputStream,
 } from './utils.js';
 import { restoreSession } from './restore-session.js';
 import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-error.js';
 
-const SETUP_COMMAND_TIMEOUT_MS = 300_000;
-const GIT_COMMAND_TIMEOUT_MS = 120_000;
+const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
+const LONG_COMMAND_HARD_TIMEOUT_MS = 300_000;
+const WORKSPACE_PREPARATION_TIMEOUT_MS = 8 * 60_000;
+const WORKSPACE_CLEANUP_TIMEOUT_MS = 60_000;
+const SHORT_GIT_COMMAND_TIMEOUT_MS = 120_000;
+const PROGRESS_UPDATE_INTERVAL_MS = 5_000;
+const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
+const BOOTSTRAP_PENDING_MARKER = '.kilo-bootstrap-pending';
 const MAX_ATTACHMENT_BYTES = 5_242_880;
 
 export type BootstrapProgressStep =
@@ -37,20 +45,18 @@ export type WrapperBootstrapResult = {
   workspaceWasWarm: boolean;
 };
 
-type GitRunner = (
-  args: string[],
-  opts?: { cwd?: string; timeoutMs?: number }
-) => Promise<ExecResult>;
+type GitRunner = (args: string[], opts?: ProcessOptions) => Promise<ExecResult>;
 type ProcessRunner = (
   command: string,
   args: string[],
-  opts?: { cwd?: string; timeoutMs?: number }
+  opts?: ProcessOptions
 ) => Promise<ExecResult>;
 
 export type WrapperBootstrapDeps = {
   git?: GitRunner;
   runProcess?: ProcessRunner;
   restoreSession?: typeof restoreSession;
+  workspacePreparationTimeoutMs?: number;
 };
 
 const GIT_FAILURE_PATTERNS = [
@@ -71,7 +77,11 @@ const GIT_FAILURE_PATTERNS = [
 ] as const;
 
 function classifyGitFailure(result: ExecResult, operation: 'clone' | 'checkout') {
-  if (result.terminationReason === 'timeout') {
+  if (
+    result.terminationReason === 'timeout' ||
+    result.terminationReason === 'inactivity_timeout' ||
+    result.terminationReason === 'hard_timeout'
+  ) {
     return operation === 'clone' ? 'git_clone_timeout' : 'git_checkout_timeout';
   }
   const output = `${result.stderr}\n${result.stdout}`;
@@ -93,8 +103,56 @@ function gitOperationError(
 ): WrapperBootstrapError {
   const label = operation === 'clone' ? 'Repository clone' : 'Repository checkout';
   const subtype = classifyGitFailure(result, operation);
-  const message = result.terminationReason === 'timeout' ? `${label} timed out` : `${label} failed`;
+  const timedOut =
+    result.terminationReason === 'timeout' ||
+    result.terminationReason === 'inactivity_timeout' ||
+    result.terminationReason === 'hard_timeout';
+  const message = timedOut ? `${label} timed out` : `${label} failed`;
   return workspaceBootstrapError(subtype, message, createSafeProcessDiagnostic(result));
+}
+
+const GIT_PROGRESS_PATTERN =
+  /\b(Receiving objects|Resolving deltas|Updating files|Checking out files|Compressing objects):\s+(\d+)%/g;
+
+function gitProgressReporter(
+  progress: BootstrapProgress | undefined,
+  step: 'cloning' | 'branch',
+  prefix: string
+): (stream: ProcessOutputStream, output: string) => void {
+  let bufferedOutput = '';
+  let lastReportedProgress = '';
+  let lastReportedAt = 0;
+
+  return (_stream, output) => {
+    bufferedOutput = (bufferedOutput + output).slice(-1_024);
+    const matches = [...bufferedOutput.matchAll(GIT_PROGRESS_PATTERN)];
+    const latest = matches.at(-1);
+    if (!latest) return;
+
+    const progressText = `${latest[1]}: ${latest[2]}%`;
+    if (progressText === lastReportedProgress) return;
+
+    const now = Date.now();
+    if (lastReportedAt !== 0 && now - lastReportedAt < PROGRESS_UPDATE_INTERVAL_MS) return;
+
+    lastReportedProgress = progressText;
+    lastReportedAt = now;
+    progress?.(step, `${prefix} ${progressText}`);
+  };
+}
+
+function longGitOptions(
+  progress: BootstrapProgress | undefined,
+  step: 'cloning' | 'branch',
+  progressPrefix: string,
+  cwd?: string
+): ProcessOptions {
+  return {
+    cwd,
+    inactivityTimeoutMs: LONG_COMMAND_INACTIVITY_TIMEOUT_MS,
+    hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
+    onOutput: gitProgressReporter(progress, step, progressPrefix),
+  };
 }
 
 function authenticatedUrl(
@@ -118,21 +176,68 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
+function gitBootstrapMarkerPath(workspacePath: string): string {
+  return path.join(workspacePath, '.git', GIT_BOOTSTRAP_MARKER);
+}
+
+function bootstrapPendingMarkerPath(sessionHome: string): string {
+  return path.join(sessionHome, BOOTSTRAP_PENDING_MARKER);
+}
+
+function sessionAuthFilePath(sessionHome: string): string {
+  return path.join(sessionHome, '.local/share/kilo/auth.json');
+}
+
+async function isCompleteGitWorkspace(
+  request: WrapperSessionReadyRequest,
+  runGit: GitRunner
+): Promise<boolean> {
+  const { workspacePath, sessionHome } = request.workspace;
+  if (!(await exists(path.join(workspacePath, '.git')))) return false;
+  if (await exists(gitBootstrapMarkerPath(workspacePath))) return true;
+  if (await exists(bootstrapPendingMarkerPath(sessionHome))) return false;
+  if (!(await exists(sessionAuthFilePath(sessionHome)))) return false;
+
+  const result = await runGit(['rev-parse', '--is-inside-work-tree'], {
+    cwd: workspacePath,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+  });
+  if (result.exitCode !== 0 || result.stdout.trim() !== 'true') return false;
+
+  await fs.writeFile(gitBootstrapMarkerPath(workspacePath), 'ready\n');
+  logToFile(
+    `bootstrap migrated legacy workspace kiloSessionId=${request.kiloSessionId} workspacePath=${workspacePath}`
+  );
+  return true;
+}
+
 async function ensureWorkspaceDirectories(request: WrapperSessionReadyRequest): Promise<void> {
   await fs.mkdir(request.workspace.workspacePath, { recursive: true });
   await fs.mkdir(request.workspace.sessionHome, { recursive: true });
 }
 
+async function removePath(filePath: string, signal?: AbortSignal): Promise<void> {
+  const result = await runProcess('rm', ['-rf', '--', filePath], {
+    hardTimeoutMs: WORKSPACE_CLEANUP_TIMEOUT_MS,
+    signal,
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to remove workspace path: ${filePath}`);
+  }
+}
+
 async function cleanupWorkspace(request: WrapperSessionReadyRequest): Promise<void> {
   await Promise.allSettled([
-    fs.rm(request.workspace.workspacePath, { recursive: true, force: true }),
-    fs.rm(request.workspace.sessionHome, { recursive: true, force: true }),
+    removePath(request.workspace.workspacePath),
+    removePath(request.workspace.sessionHome),
   ]);
 }
 
 async function cloneRepository(
   request: WrapperSessionReadyRequest,
-  runGit: GitRunner
+  runGit: GitRunner,
+  progress: BootstrapProgress | undefined,
+  signal: AbortSignal
 ): Promise<void> {
   const repo = request.repo;
   if (!repo) {
@@ -142,16 +247,16 @@ async function cloneRepository(
   const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
   const platform = repo.kind === 'git' ? repo.platform : 'github';
   const repoUrl = authenticatedUrl(gitUrl, repo.token, platform);
-  const args = ['clone'];
+  const args = ['clone', '--progress'];
   if (repo.shallow) {
     args.push('--depth', '1');
   }
   args.push(repoUrl, request.workspace.workspacePath);
 
-  await fs.rm(request.workspace.workspacePath, { recursive: true, force: true });
+  await removePath(request.workspace.workspacePath, signal);
   await fs.mkdir(path.dirname(request.workspace.workspacePath), { recursive: true });
 
-  const result = await runGit(args, { timeoutMs: GIT_COMMAND_TIMEOUT_MS });
+  const result = await runGit(args, longGitOptions(progress, 'cloning', 'Cloning repository...'));
   if (result.exitCode !== 0) {
     throw gitOperationError(result, 'clone');
   }
@@ -162,11 +267,11 @@ async function cloneRepository(
     repo.kind === 'github' ? (repo.gitAuthor?.email ?? 'agent@kilocode.ai') : 'agent@kilocode.ai';
   const authorNameResult = await runGit(['config', 'user.name', authorName], {
     cwd: request.workspace.workspacePath,
-    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
   const authorEmailResult = await runGit(['config', 'user.email', authorEmail], {
     cwd: request.workspace.workspacePath,
-    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
   if (authorNameResult.exitCode !== 0 || authorEmailResult.exitCode !== 0) {
     throw new Error('Failed to configure git author identity');
@@ -182,7 +287,7 @@ async function branchExists(
   const ref = remote ? `origin/${branch}` : branch;
   const result = await runGit(['rev-parse', '--verify', '--quiet', ref], {
     cwd: workspacePath,
-    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
   if (result.exitCode === 0) return true;
   if (result.exitCode !== 1 || result.terminationReason !== undefined) {
@@ -201,20 +306,21 @@ function isSyntheticReviewRef(branchName: string): boolean {
 async function fetchSyntheticReviewRef(
   runGit: GitRunner,
   workspacePath: string,
-  branchName: string
+  branchName: string,
+  progress: BootstrapProgress | undefined
 ): Promise<void> {
-  const fetchResult = await runGit(['fetch', 'origin', branchName], {
-    cwd: workspacePath,
-    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-  });
+  const fetchResult = await runGit(
+    ['fetch', '--progress', 'origin', branchName],
+    longGitOptions(progress, 'branch', 'Fetching review branch...', workspacePath)
+  );
   if (fetchResult.exitCode !== 0) {
     throw gitOperationError(fetchResult, 'checkout');
   }
 
-  const checkoutResult = await runGit(['checkout', '-B', branchName, 'FETCH_HEAD'], {
-    cwd: workspacePath,
-    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-  });
+  const checkoutResult = await runGit(
+    ['checkout', '--progress', '-B', branchName, 'FETCH_HEAD'],
+    longGitOptions(progress, 'branch', 'Checking out review branch...', workspacePath)
+  );
   if (checkoutResult.exitCode !== 0) {
     throw gitOperationError(checkoutResult, 'checkout');
   }
@@ -222,27 +328,28 @@ async function fetchSyntheticReviewRef(
 
 async function prepareBranch(
   request: WrapperSessionReadyRequest,
-  runGit: GitRunner
+  runGit: GitRunner,
+  progress: BootstrapProgress | undefined
 ): Promise<void> {
   const { workspacePath, branchName, strictBranch } = request.workspace;
   if (strictBranch && isSyntheticReviewRef(branchName)) {
-    await fetchSyntheticReviewRef(runGit, workspacePath, branchName);
+    await fetchSyntheticReviewRef(runGit, workspacePath, branchName, progress);
     return;
   }
 
-  const fetchResult = await runGit(['fetch', 'origin'], {
-    cwd: workspacePath,
-    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-  });
+  const fetchResult = await runGit(
+    ['fetch', '--progress', 'origin'],
+    longGitOptions(progress, 'branch', 'Fetching repository...', workspacePath)
+  );
   if (fetchResult.exitCode !== 0) {
     throw gitOperationError(fetchResult, 'checkout');
   }
 
   if (await branchExists(runGit, workspacePath, branchName, false)) {
-    const result = await runGit(['checkout', branchName], {
-      cwd: workspacePath,
-      timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-    });
+    const result = await runGit(
+      ['checkout', '--progress', branchName],
+      longGitOptions(progress, 'branch', 'Checking out branch...', workspacePath)
+    );
     if (result.exitCode !== 0) {
       throw gitOperationError(result, 'checkout');
     }
@@ -250,10 +357,10 @@ async function prepareBranch(
   }
 
   if (await branchExists(runGit, workspacePath, branchName, true)) {
-    const result = await runGit(['checkout', '-B', branchName, `origin/${branchName}`], {
-      cwd: workspacePath,
-      timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-    });
+    const result = await runGit(
+      ['checkout', '--progress', '-B', branchName, `origin/${branchName}`],
+      longGitOptions(progress, 'branch', 'Checking out branch...', workspacePath)
+    );
     if (result.exitCode !== 0) {
       throw gitOperationError(result, 'checkout');
     }
@@ -269,12 +376,12 @@ async function prepareBranch(
     );
   }
 
-  const result = await runGit(['checkout', '-b', branchName], {
-    cwd: workspacePath,
-    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-  });
+  const result = await runGit(
+    ['checkout', '--progress', '-b', branchName],
+    longGitOptions(progress, 'branch', 'Creating branch...', workspacePath)
+  );
   if (result.exitCode !== 0) {
-    throw new Error(`Failed to create session branch ${branchName}`);
+    throw gitOperationError(result, 'checkout');
   }
 }
 
@@ -290,7 +397,7 @@ async function refreshGitRemoteToken(
   const nextUrl = authenticatedUrl(gitUrl, repo.token, platform);
   const result = await runGit(['remote', 'set-url', 'origin', nextUrl], {
     cwd: request.workspace.workspacePath,
-    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
   if (result.exitCode !== 0) {
     throw new Error('Failed to update git remote URL');
@@ -298,11 +405,11 @@ async function refreshGitRemoteToken(
   if (repo.kind === 'github' && repo.gitAuthor) {
     const nameResult = await runGit(['config', 'user.name', repo.gitAuthor.name], {
       cwd: request.workspace.workspacePath,
-      timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
     });
     const emailResult = await runGit(['config', 'user.email', repo.gitAuthor.email], {
       cwd: request.workspace.workspacePath,
-      timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
     });
     if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
       throw new Error('Failed to configure git author identity');
@@ -311,10 +418,10 @@ async function refreshGitRemoteToken(
 }
 
 async function writeSessionAuthFile(request: WrapperSessionReadyRequest): Promise<void> {
-  const kiloAuthDir = path.join(request.workspace.sessionHome, '.local/share/kilo');
-  await fs.mkdir(kiloAuthDir, { recursive: true });
+  const authFilePath = sessionAuthFilePath(request.workspace.sessionHome);
+  await fs.mkdir(path.dirname(authFilePath), { recursive: true });
   await fs.writeFile(
-    path.join(kiloAuthDir, 'auth.json'),
+    authFilePath,
     JSON.stringify({ kilo: { type: 'api', key: request.session.workerAuthToken } }, null, 2)
   );
 }
@@ -440,22 +547,41 @@ async function restoreOrBootstrapKiloSession(
 async function runSetupCommands(
   request: WrapperSessionReadyRequest,
   run: ProcessRunner,
-  failFast: boolean
+  failFast: boolean,
+  progress: BootstrapProgress | undefined
 ): Promise<void> {
   const setupCommands = request.materialized.setupCommands ?? [];
   logToFile(
     `bootstrap setup commands starting kiloSessionId=${request.kiloSessionId} count=${setupCommands.length} failFast=${failFast} workspacePath=${request.workspace.workspacePath}`
   );
-  for (const [commandIndex, command] of setupCommands.entries()) {
+  for (const [index, command] of setupCommands.entries()) {
+    let lastProgressAt = 0;
+    const startedAt = Date.now();
     const result = await run('sh', ['-lc', command], {
       cwd: request.workspace.workspacePath,
-      timeoutMs: SETUP_COMMAND_TIMEOUT_MS,
+      inactivityTimeoutMs: LONG_COMMAND_INACTIVITY_TIMEOUT_MS,
+      hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
+      onOutput: () => {
+        const now = Date.now();
+        if (lastProgressAt !== 0 && now - lastProgressAt < PROGRESS_UPDATE_INTERVAL_MS) return;
+        lastProgressAt = now;
+        progress?.(
+          'setup_commands',
+          `Setup command ${index + 1} of ${setupCommands.length} is still running...`
+        );
+      },
     });
+    logToFile(
+      `bootstrap setup command finished kiloSessionId=${request.kiloSessionId} index=${index + 1} count=${setupCommands.length} elapsedMs=${Date.now() - startedAt} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? '(none)'}`
+    );
     if (result.exitCode !== 0 && failFast) {
-      const timedOut = result.terminationReason === 'timeout';
+      const timedOut =
+        result.terminationReason === 'timeout' ||
+        result.terminationReason === 'inactivity_timeout' ||
+        result.terminationReason === 'hard_timeout';
       throw workspaceBootstrapError(
         timedOut ? 'setup_command_timeout' : 'setup_command_failed',
-        `Setup command ${commandIndex + 1} ${timedOut ? 'timed out' : 'failed'}`,
+        `Setup command ${index + 1} ${timedOut ? 'timed out' : 'failed'}`,
         createSafeProcessDiagnostic(result)
       );
     }
@@ -519,10 +645,11 @@ export async function materializePromptAttachments(
   };
 }
 
-export async function prepareWrapperBootstrapWorkspace(
+async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   request: WrapperSessionReadyRequest,
-  progress?: BootstrapProgress,
-  deps: WrapperBootstrapDeps = {}
+  progress: BootstrapProgress | undefined,
+  deps: WrapperBootstrapDeps,
+  signal: AbortSignal
 ): Promise<WrapperBootstrapResult> {
   const runGit = deps.git ?? git;
   const run = deps.runProcess ?? runProcess;
@@ -530,7 +657,7 @@ export async function prepareWrapperBootstrapWorkspace(
 
   Object.assign(process.env, request.materialized.env);
 
-  const workspaceWasWarm = await exists(path.join(request.workspace.workspacePath, '.git'));
+  const workspaceWasWarm = await isCompleteGitWorkspace(request, runGit);
   const workspaceNeedsBootstrap = !workspaceWasWarm || !request.workspace.preferSnapshot;
   logToFile(
     `bootstrap workspace plan kiloSessionId=${request.kiloSessionId} preferSnapshot=${request.workspace.preferSnapshot} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} workspacePath=${request.workspace.workspacePath} sessionHome=${request.workspace.sessionHome} home=${process.env.HOME ?? '(unset)'} homeMatchesSessionHome=${process.env.HOME === request.workspace.sessionHome} repoKind=${request.repo?.kind ?? '(none)'} setupCommandCount=${request.materialized.setupCommands?.length ?? 0} runtimeSkillCount=${request.materialized.runtimeSkills?.length ?? 0}`
@@ -539,8 +666,14 @@ export async function prepareWrapperBootstrapWorkspace(
     progress?.('workspace_setup', 'Setting up workspace...');
   }
   await ensureWorkspaceDirectories(request);
+  signal.throwIfAborted();
 
   try {
+    if (workspaceNeedsBootstrap) {
+      await fs.rm(gitBootstrapMarkerPath(request.workspace.workspacePath), { force: true });
+      await fs.writeFile(bootstrapPendingMarkerPath(request.workspace.sessionHome), 'pending\n');
+    }
+
     await writeCloudAgentRules(request);
 
     if (workspaceWasWarm) {
@@ -554,7 +687,7 @@ export async function prepareWrapperBootstrapWorkspace(
       logToFile(
         `bootstrap cold workspace cloning repository kiloSessionId=${request.kiloSessionId}`
       );
-      await cloneRepository(request, runGit);
+      await cloneRepository(request, runGit, progress, signal);
       logToFile(`bootstrap cold workspace clone ready kiloSessionId=${request.kiloSessionId}`);
     }
 
@@ -563,7 +696,7 @@ export async function prepareWrapperBootstrapWorkspace(
       logToFile(
         `bootstrap branch preparation starting kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName} strictBranch=${request.workspace.strictBranch ?? false}`
       );
-      await prepareBranch(request, runGit);
+      await prepareBranch(request, runGit, progress);
       logToFile(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
@@ -579,13 +712,19 @@ export async function prepareWrapperBootstrapWorkspace(
 
       if (request.materialized.setupCommands?.length) {
         progress?.('setup_commands', 'Running setup commands...');
-        await runSetupCommands(request, run, !request.workspace.preferSnapshot);
+        await runSetupCommands(request, run, !request.workspace.preferSnapshot, progress);
       }
+
+      signal.throwIfAborted();
+      await fs.writeFile(gitBootstrapMarkerPath(request.workspace.workspacePath), 'ready\n');
+      await fs.rm(bootstrapPendingMarkerPath(request.workspace.sessionHome), { force: true });
     }
 
+    signal.throwIfAborted();
     logToFile(
       `bootstrap workspace ready kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap}`
     );
+    progress?.('kilo_server', 'Starting Kilo...');
     return { workspaceWasWarm };
   } catch (error) {
     const bootstrapError =
@@ -600,5 +739,59 @@ export async function prepareWrapperBootstrapWorkspace(
       logToFile(`bootstrap workspace cleanup finished kiloSessionId=${request.kiloSessionId}`);
     }
     throw bootstrapError;
+  }
+}
+
+function withWorkspaceSignal(
+  options: ProcessOptions | undefined,
+  workspaceSignal: AbortSignal
+): ProcessOptions {
+  const signal = options?.signal
+    ? AbortSignal.any([options.signal, workspaceSignal])
+    : workspaceSignal;
+  return { ...options, signal };
+}
+
+export async function prepareWrapperBootstrapWorkspace(
+  request: WrapperSessionReadyRequest,
+  progress?: BootstrapProgress,
+  deps: WrapperBootstrapDeps = {}
+): Promise<WrapperBootstrapResult> {
+  const workspacePreparationTimeoutMs =
+    deps.workspacePreparationTimeoutMs ?? WORKSPACE_PREPARATION_TIMEOUT_MS;
+  const timeoutError = workspaceBootstrapError(
+    'workspace_setup_unknown',
+    `Workspace preparation timed out after ${workspacePreparationTimeoutMs / 1000}s`
+  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(timeoutError), workspacePreparationTimeoutMs);
+  const runGit = deps.git ?? git;
+  const run = deps.runProcess ?? runProcess;
+  const restore = deps.restoreSession ?? restoreSession;
+
+  try {
+    return await prepareWrapperBootstrapWorkspaceWithinDeadline(
+      request,
+      progress,
+      {
+        ...deps,
+        git: (args, options) => runGit(args, withWorkspaceSignal(options, controller.signal)),
+        runProcess: (command, args, options) =>
+          run(command, args, withWorkspaceSignal(options, controller.signal)),
+        restoreSession: (kiloSessionId, workspacePath, filePath, options) =>
+          restore(kiloSessionId, workspacePath, filePath, {
+            ...options,
+            signal: options?.signal
+              ? AbortSignal.any([options.signal, controller.signal])
+              : controller.signal,
+          }),
+      },
+      controller.signal
+    );
+  } catch (error) {
+    if (controller.signal.aborted) throw timeoutError;
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }

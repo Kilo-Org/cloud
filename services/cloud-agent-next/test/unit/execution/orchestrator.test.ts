@@ -423,6 +423,26 @@ describe('ExecutionOrchestrator bootstrap execution', () => {
     ]);
   });
 
+  it('allows wrapper readiness eight minutes but enforces the ten-minute startup budget', async () => {
+    vi.useFakeTimers();
+    const { sandbox } = createMockSandbox({ workspaceWarm: true });
+    const { ensureSessionReady, prompt } = stubWrapperBootstrap();
+    ensureSessionReady.mockImplementation(() => new Promise(() => {}));
+    const orchestrator = createOrchestrator(sandbox);
+
+    const execution = orchestrator.execute(createExecutionPlan());
+    const rejection = expect(execution).rejects.toThrow(
+      'Workspace preparation timed out during wrapper readiness after 600s'
+    );
+    await vi.advanceTimersByTimeAsync(8 * 60 * 1000);
+
+    expect(ensureSessionReady).toHaveBeenCalledOnce();
+    expect(prompt).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
+    await rejection;
+  });
+
   it('reports Kilo startup progress when delivering to a warm workspace', async () => {
     const { sandbox } = createMockSandbox({ workspaceWarm: true });
     const { ensureSessionReady, prompt } = stubWrapperBootstrap();

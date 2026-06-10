@@ -15,9 +15,6 @@ permissions:
   contents: read
   pull-requests: read
 
-env:
-  VERCEL_VERSION: '53.3.1'
-
 # Optional repo/org variables for runner migration:
 # - RUNNER_DEFAULT_LABEL=blacksmith-2vcpu-ubuntu-2404
 # - RUNNER_LARGE_LABEL=blacksmith-8vcpu-ubuntu-2404
@@ -288,15 +285,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
-      - name: Setup Vercel ENV
+      - name: Setup dummy build env
         working-directory: apps/web
-        run: |
-          pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-          pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.production.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: cp .env.test .env.production.local
 
       - name: Build application
         env:
           NODE_ENV: production
+          VERCEL_ENV: production
+          NEXTAUTH_URL: https://ci-build.invalid
+          POSTGRES_URL: postgres://unused:unused@localhost:5432/unused
           SENTRY_AUTH_TOKEN: ''
           NODE_OPTIONS: '--max-old-space-size=8192'
         run: pnpm run build

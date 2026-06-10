@@ -40,6 +40,10 @@ const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
   'selected model is not available for this cloud agent session';
 const REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE =
   'the requested model is not allowed for your team';
+const BYOK_INVALID_KEY_MESSAGE =
+  '[byok] your api key is invalid or has been revoked. please check your api key configuration.';
+const BYOK_PERMISSION_DENIED_MESSAGE =
+  '[byok] your api key does not have permission to access this resource. please check your api key permissions.';
 
 type AgentConfigWithRuntimeState = {
   runtime_state?: Record<string, unknown> | null;
@@ -87,17 +91,28 @@ export function classifyCodeReviewActionRequiredFailure(
 
   if (
     normalized.includes('github token or active app installation required for this repository') &&
-    normalized.includes('no_installation_found')
+    (normalized.includes('no_installation_found') ||
+      normalized.includes('repository_not_installed'))
   ) {
     return 'github_installation_required';
   }
 
   if (
-    normalized.includes(
-      '[byok] your api key is invalid or has been revoked. please check your api key configuration.'
-    )
+    normalized.includes(BYOK_INVALID_KEY_MESSAGE) ||
+    normalized.includes(BYOK_PERMISSION_DENIED_MESSAGE)
   ) {
     return 'byok_invalid_key';
+  }
+
+  if (
+    normalized.includes('project access token') &&
+    (normalized.includes('failed to create project access token for gitlab code review') ||
+      normalized.includes('cannot create project access token for gitlab code review') ||
+      normalized.includes('insufficient permissions to create project access token') ||
+      normalized.includes('requires maintainer role or higher') ||
+      normalized.includes('project access tokens are disabled for this project'))
+  ) {
+    return 'gitlab_project_access_required';
   }
 
   if (
@@ -109,7 +124,10 @@ export function classifyCodeReviewActionRequiredFailure(
 
   if (
     normalized.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
-    normalized.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)
+    normalized.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE) ||
+    normalized.includes('no allowed providers are specified.') ||
+    normalized.includes('no allowed providers are available for the selected model.') ||
+    normalized.includes('no endpoints found matching your data policy')
   ) {
     return 'selected_model_unavailable';
   }

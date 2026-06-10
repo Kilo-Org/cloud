@@ -13,6 +13,7 @@ import {
   type SessionMetadata,
 } from './session-metadata.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
+import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { logger } from '../logger.js';
@@ -355,9 +356,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       target: callbackTarget,
       payload,
     };
+    const fittedCallbackJob = fitCallbackJobToQueueLimit(callbackJob);
+    if (fittedCallbackJob.status === 'too-large') {
+      logger
+        .withFields({
+          sessionId,
+          messageId,
+          serializedByteLength: fittedCallbackJob.serializedByteLength,
+          maximumByteLength: fittedCallbackJob.maximumByteLength,
+        })
+        .error('Skipped legacy callback job that cannot fit queue size limit');
+      return;
+    }
 
     try {
-      await callbackQueue.send(callbackJob);
+      await callbackQueue.send(fittedCallbackJob.job);
       logger
         .withFields({
           sessionId,

@@ -96,28 +96,32 @@ export interface CodeReviewStatusResponse {
 
 export type CodeReviewStatusResult = CodeReviewStatusResponse | null;
 
+const InternalStatusTerminalReasonSchema = z
+  .enum([
+    'billing',
+    'model_not_found',
+    'github_installation_required',
+    'github_ip_allow_list',
+    'gitlab_project_access_required',
+    'byok_invalid_key',
+    'selected_model_unavailable',
+    'user_cancelled',
+    'superseded',
+    'interrupted',
+    'timeout',
+    'upstream_error',
+    'sandbox_error',
+    'unknown',
+  ])
+  .nullable()
+  .optional()
+  .catch(undefined);
+
 export const InternalStatusResponseSchema = z.object({
   success: z.boolean().optional(),
   message: z.string().optional(),
   currentStatus: z.enum(['completed', 'failed', 'cancelled']).optional(),
-  terminalReason: z
-    .enum([
-      'billing',
-      'model_not_found',
-      'github_installation_required',
-      'github_ip_allow_list',
-      'byok_invalid_key',
-      'selected_model_unavailable',
-      'user_cancelled',
-      'superseded',
-      'interrupted',
-      'timeout',
-      'upstream_error',
-      'sandbox_error',
-      'unknown',
-    ])
-    .nullable()
-    .optional(),
+  terminalReason: InternalStatusTerminalReasonSchema,
   error: z.string().optional(),
 });
 

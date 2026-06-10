@@ -14,6 +14,10 @@ import { describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
+import {
+  CALLBACK_QUEUE_MAX_SERIALIZED_BYTES,
+  serializedCallbackJobByteLength,
+} from '../../../src/callbacks/queue-payload.js';
 import type { CallbackJob } from '../../../src/callbacks/types.js';
 import type { ExecutionId } from '../../../src/types/ids.js';
 import { groupedRegisterSessionInput } from '../../helpers/session-setup.js';
@@ -84,7 +88,8 @@ async function seedAssistantMessage(
 async function prepareSessionWithCallback(
   instance: CloudAgentSession,
   sessionId: string,
-  userId: string
+  userId: string,
+  callbackTarget: CallbackJob['target'] = { url: 'https://example.com/callback' }
 ): Promise<void> {
   const prepareResult = await instance.registerSession(
     groupedRegisterSessionInput({
@@ -97,7 +102,7 @@ async function prepareSessionWithCallback(
       kilocodeToken: 'token',
       gitUrl: 'https://example.com/repo.git',
       gitToken: 'git-token',
-      callbackTarget: { url: 'https://example.com/callback' },
+      callbackTarget,
     })
   );
   expect(prepareResult.success).toBe(true);
@@ -141,6 +146,77 @@ describe('Callback notification with latest assistant message', () => {
     expect(job.payload.status).toBe('completed');
     expect(job.payload.lastAssistantMessageText).toBe('Hello world');
     expect(job.target.url).toBe('https://example.com/callback');
+  });
+
+  it('omits oversized assistant output from legacy completed callbacks', async () => {
+    const userId = 'user_cb_oversized';
+    const sessionId = 'agent_cb_oversized';
+    const executionId = 'exec_cb_oversized' as ExecutionId;
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const assistantText = '😀"\\\n'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
+    const queue = createCapturedQueue();
+
+    await runInDurableObject(stub, async (instance: CloudAgentSession, state) => {
+      injectCallbackQueue(instance, queue);
+      await prepareSessionWithCallback(instance, sessionId, userId);
+      await seedAssistantMessage(state, sessionId, {
+        messageId: 'msg_00000000000000000000000011',
+        parts: [{ id: 'part_00000000000000000000000011', type: 'text', text: assistantText }],
+      });
+      const addResult = await instance.addExecution({
+        executionId,
+        mode: 'followup',
+        streamingMode: 'websocket',
+      });
+      expect(addResult.ok).toBe(true);
+
+      await instance.updateExecutionStatus({ executionId, status: 'running' });
+      await instance.updateExecutionStatus({ executionId, status: 'completed' });
+    });
+
+    expect(queue.captured).toHaveLength(1);
+    const [job] = queue.captured;
+    expect(serializedCallbackJobByteLength(job)).toBeLessThanOrEqual(
+      CALLBACK_QUEUE_MAX_SERIALIZED_BYTES
+    );
+    expect(job.payload.lastAssistantMessageText).toBeUndefined();
+    expect(job.payload.lastAssistantMessageTextTruncation).toEqual({
+      originalUtf8ByteLength: new TextEncoder().encode(assistantText.trim()).byteLength,
+      retainedUtf8ByteLength: 0,
+    });
+  });
+
+  it('skips a legacy callback whose fixed fields cannot fit the queue', async () => {
+    const userId = 'user_cb_oversized_fixed';
+    const sessionId = 'agent_cb_oversized_fixed';
+    const executionId = 'exec_cb_oversized_fixed' as ExecutionId;
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const queue = createCapturedQueue();
+
+    await runInDurableObject(stub, async (instance: CloudAgentSession) => {
+      injectCallbackQueue(instance, queue);
+      await prepareSessionWithCallback(instance, sessionId, userId, {
+        url: 'https://example.com/callback',
+        headers: {
+          'x-callback-context': 'x'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES * 2),
+        },
+      });
+      const addResult = await instance.addExecution({
+        executionId,
+        mode: 'followup',
+        streamingMode: 'websocket',
+      });
+      expect(addResult.ok).toBe(true);
+
+      await instance.updateExecutionStatus({ executionId, status: 'running' });
+      await expect(
+        instance.updateExecutionStatus({ executionId, status: 'completed' })
+      ).resolves.toMatchObject({ ok: true });
+    });
+
+    expect(queue.captured).toHaveLength(0);
   });
 
   it('surfaces callback queue enqueue failures to terminal status updates', async () => {

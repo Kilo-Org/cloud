@@ -121,6 +121,7 @@ export type CloudAgentTerminalReason =
   | 'model_not_found'
   | 'github_installation_required'
   | 'github_ip_allow_list'
+  | 'gitlab_project_access_required'
   | 'byok_invalid_key'
   | 'selected_model_unavailable'
   | 'user_cancelled'
@@ -154,10 +155,20 @@ export class CloudAgentNextBillingError extends CloudAgentNextError {
   }
 }
 
-function isBillingErrorBody(body: string): boolean {
-  return ['insufficient credits', 'paid model', 'add credits', 'credits required'].some(pattern =>
-    body.toLowerCase().includes(pattern)
-  );
+export const CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS = [
+  'insufficient credits',
+  'paid model',
+  'add credits',
+  'credits required',
+  'credit balance is too low',
+  'insufficient funds',
+  'payment required',
+] as const;
+
+export function isCloudAgentNextBillingErrorBody(body: string): boolean {
+  const normalizedBody = body.toLowerCase();
+
+  return CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS.some(pattern => normalizedBody.includes(pattern));
 }
 
 function isCloudAgentSandboxStatus(value: unknown): value is CloudAgentSandboxStatus {
@@ -202,7 +213,7 @@ async function trpcPost<T>(
 
   if (!response.ok) {
     const errorText = await response.text();
-    if (response.status === 402 || isBillingErrorBody(errorText)) {
+    if (response.status === 402 || isCloudAgentNextBillingErrorBody(errorText)) {
       throw new CloudAgentNextBillingError(procedure, response.status, errorText);
     }
     throw new CloudAgentNextError(procedure, response.status, errorText);

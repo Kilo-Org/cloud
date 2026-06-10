@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
+  CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS,
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
   CloudAgentNextError,
+  isCloudAgentNextBillingErrorBody,
 } from './cloud-agent-next-client.js';
 
 const BASE_URL = 'https://cloud-agent-next.test';
@@ -22,6 +24,12 @@ afterEach(() => {
 });
 
 describe('CloudAgentNextFetchClient billing error detection', () => {
+  it('recognizes every exported billing body pattern', () => {
+    for (const pattern of CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS) {
+      expect(isCloudAgentNextBillingErrorBody(`Prefix ${pattern.toUpperCase()} suffix`)).toBe(true);
+    }
+  });
+
   it('throws CloudAgentNextBillingError on 402 status', async () => {
     vi.stubGlobal('fetch', mockFetch(402, 'Payment Required'));
     const client = createCloudAgentNextFetchClient(BASE_URL);

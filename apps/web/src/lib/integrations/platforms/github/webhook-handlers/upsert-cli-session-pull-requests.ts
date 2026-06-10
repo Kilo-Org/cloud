@@ -149,10 +149,12 @@ export async function upsertCliSessionPullRequestsFromWebhook(
       action === GITHUB_ACTION.REOPENED
         ? sql`excluded.pr_state`
         : sql`CASE
-            WHEN ${github_branch_pull_requests.pr_state} = 'merged'
+            WHEN ${github_branch_pull_requests.pr_number} = excluded.pr_number
+              AND ${github_branch_pull_requests.pr_state} = 'merged'
               AND excluded.pr_state IN ('open', 'closed', 'draft')
             THEN ${github_branch_pull_requests.pr_state}
-            WHEN ${github_branch_pull_requests.pr_state} = 'closed'
+            WHEN ${github_branch_pull_requests.pr_number} = excluded.pr_number
+              AND ${github_branch_pull_requests.pr_state} = 'closed'
               AND excluded.pr_state IN ('open', 'draft')
             THEN ${github_branch_pull_requests.pr_state}
             ELSE excluded.pr_state

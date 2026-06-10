@@ -15,9 +15,6 @@ permissions:
   contents: read
   pull-requests: read
 
-env:
-  VERCEL_VERSION: '53.3.1'
-
 # Optional repo/org variables for runner migration:
 # - RUNNER_DEFAULT_LABEL=blacksmith-2vcpu-ubuntu-2404
 # - RUNNER_LARGE_LABEL=blacksmith-8vcpu-ubuntu-2404
@@ -288,11 +285,36 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
-      - name: Setup Vercel ENV
+      - name: Setup dummy build env
         working-directory: apps/web
         run: |
-          pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-          pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.production.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          cp .env.test .env.production.local
+          {
+            echo 'VERCEL_ENV=production'
+            echo 'NEXTAUTH_URL=https://ci-build.invalid'
+            echo 'NEXT_PUBLIC_SESSION_INGEST_WS_URL=wss://session-ingest.ci-build.invalid'
+            echo 'POSTGRES_URL=postgres://unused:unused@localhost:5432/unused'
+            echo 'ABUSE_SERVICE_CF_ACCESS_CLIENT_ID=dummy-ci-client-id'
+            echo 'ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET=dummy-ci-client-secret'
+            echo 'GASTOWN_SERVICE_CF_ACCESS_CLIENT_ID=dummy-ci-client-id'
+            echo 'GASTOWN_SERVICE_CF_ACCESS_CLIENT_SECRET=dummy-ci-client-secret'
+            echo 'GITHUB_CLIENT_ID=dummy-ci-github-client-id'
+            echo 'GITHUB_CLIENT_SECRET=dummy-ci-github-client-secret'
+            echo 'GITHUB_APP_CLIENT_ID=dummy-ci-github-app-client-id'
+            echo 'GITHUB_APP_CLIENT_SECRET=dummy-ci-github-app-client-secret'
+            echo 'GITHUB_APP_ID=dummy-ci-github-app-id'
+            echo 'GITHUB_APP_PRIVATE_KEY=dummy-ci-github-app-private-key'
+            echo 'GITHUB_APP_WEBHOOK_SECRET=dummy-ci-webhook-secret'
+            echo 'GITHUB_WEBHOOK_SECRET=dummy-ci-webhook-secret'
+            echo 'LINEAR_CLIENT_ID=dummy-ci-linear-client-id'
+            echo 'LINEAR_CLIENT_SECRET=dummy-ci-linear-client-secret'
+            echo 'LINEAR_WEBHOOK_SECRET=dummy-ci-webhook-secret'
+            echo 'SLACK_CLIENT_ID=dummy-ci-slack-client-id'
+            echo 'SLACK_CLIENT_SECRET=dummy-ci-slack-client-secret'
+            echo 'SLACK_SIGNING_SECRET=dummy-ci-slack-signing-secret'
+            echo 'UPSTASH_REDIS_REST_URL=https://redis.ci-build.invalid'
+            echo 'UPSTASH_REDIS_REST_TOKEN=dummy-ci-redis-token'
+          } >> .env.production.local
 
       - name: Build application
         env:

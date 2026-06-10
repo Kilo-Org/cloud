@@ -939,8 +939,7 @@ export async function POST(
                 platformIntegration,
                 thread,
                 startedAt,
-                errorMessage:
-                  'Cloud Agent callback processing failed while saving session status.',
+                errorMessage: 'Cloud Agent callback processing failed while saving session status.',
                 logMessage: 'Failed to mark tracked Cloud Agent session terminal',
               });
               return;

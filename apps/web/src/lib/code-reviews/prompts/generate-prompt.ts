@@ -109,6 +109,10 @@ function mergeStyleOverrides<V>(
   return { ...local, ...remote };
 }
 
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+}
+
 /**
  * Merges a remote (PostHog) template with the local template.
  * Remote wins for all base prompt sections and for style override
@@ -335,7 +339,7 @@ export async function generateReviewPrompt(
     prompt += '| File | Line | Issue |\n|------|------|-------|\n';
 
     for (const c of active.slice(0, 20)) {
-      const firstLine = c.body.split('\n')[0].substring(0, 60).replace(/\|/g, '\\|');
+      const firstLine = escapeMarkdownTableCell(c.body.split('\n')[0].substring(0, 60));
       prompt += `| \`${c.path}\` | ${c.line ?? 'N/A'} | ${firstLine} |\n`;
     }
 

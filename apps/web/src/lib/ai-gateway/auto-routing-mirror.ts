@@ -7,6 +7,7 @@ type ScheduleAutoRoutingMirrorParams = {
   request: Request;
   path: '/chat/completions' | '/responses' | '/messages';
   bodyText: string;
+  authContext?: Promise<{ organizationId?: string | null }>;
 };
 
 type BackgroundScheduler = (work: () => void | Promise<void>) => void;
@@ -71,6 +72,7 @@ export function scheduleAutoRoutingMirror(
 ): void {
   schedule(async () => {
     try {
+      if ((await params.authContext)?.organizationId) return;
       await sendAutoRoutingMirror({ ...params, options });
     } catch (error) {
       const onError = options.onError ?? warnExceptInTest;

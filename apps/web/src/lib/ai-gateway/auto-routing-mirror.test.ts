@@ -105,6 +105,27 @@ describe('scheduleAutoRoutingMirror', () => {
     expect(payload.sessionId).toBe('session-456');
   });
 
+  it('does not mirror organization-scoped requests', async () => {
+    scheduleAutoRoutingMirror(
+      {
+        request: makeRequest(),
+        path: '/chat/completions',
+        bodyText: '{"model":"auto","messages":[]}',
+        authContext: Promise.resolve({ organizationId: 'org-123' }),
+      },
+      work => scheduledWork.push(work),
+      {
+        workerUrl: 'https://auto-routing.example.com',
+        authToken: 'classifier-token',
+      }
+    );
+
+    expect(scheduledWork).toHaveLength(1);
+    await scheduledWork[0]();
+
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it('swallows worker failures', async () => {
     mockedFetch.mockRejectedValueOnce(new Error('worker unavailable'));
 

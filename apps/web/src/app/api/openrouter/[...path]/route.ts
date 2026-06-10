@@ -167,7 +167,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
-  scheduleAutoRoutingMirror({ request, path, bodyText: requestBodyText });
+  const authPromise = getUserFromAuth({ adminOnly: false });
+  scheduleAutoRoutingMirror({ request, path, bodyText: requestBodyText, authContext: authPromise });
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: GatewayRequest;
   try {
@@ -217,7 +218,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
   );
 
-  const authPromise = getUserFromAuth({ adminOnly: false });
   const balanceAndSettingsPromise = authPromise.then(res =>
     res.user
       ? getBalanceAndOrgSettings(res.organizationId, res.user)

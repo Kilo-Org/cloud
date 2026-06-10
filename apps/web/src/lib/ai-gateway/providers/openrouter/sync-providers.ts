@@ -156,10 +156,15 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
 }
 
 function injectExtraUserByokModels(
-  openRouterModels: Map<string, OpenRouterModel>,
   vercelModels: Record<string, StoredModel>,
   providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>
 ) {
+  const openRouterModels = new Map<string, OpenRouterModel>();
+  for (const { models } of providerModelData) {
+    for (const model of models) {
+      openRouterModels.set(model.slug, model);
+    }
+  }
   for (const model of openRouterModels.values()) {
     const vercelModel = vercelModels[mapModelIdToVercel(model.slug, false)];
     if (!vercelModel) continue;
@@ -190,6 +195,7 @@ function injectExtraUserByokModels(
         const m = {
           ...model,
           name: freeSuffixIndex >= 0 ? model.name.substring(0, freeSuffixIndex) : model.name,
+          context_length: endpoint.context_length ?? model.context_length,
           endpoint: {
             ...model.endpoint,
             provider_display_name: providerData.provider.displayName,
@@ -241,14 +247,7 @@ async function syncProviders(
     )
   );
 
-  const openRouterModels = new Map<string, OpenRouterModel>();
-  for (const { models } of providerModelData) {
-    for (const model of models) {
-      openRouterModels.set(normalizeModelId(model.slug), model);
-    }
-  }
-
-  injectExtraUserByokModels(openRouterModels, vercelModels, providerModelData);
+  injectExtraUserByokModels(vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm => {

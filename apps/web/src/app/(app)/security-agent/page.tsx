@@ -25,18 +25,18 @@ export default function SecurityAgentDashboardPage() {
 
   if (shouldRedirectToConfig) {
     return (
-      <output className="text-muted-foreground block py-16 text-center text-sm">
+      <div className="text-muted-foreground block py-16 text-center text-sm">
         Opening settings...
-      </output>
+      </div>
     );
   }
 
   if (hasIntegration && isLoadingConfig) {
     return (
-      <output className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
+      <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
         <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         Loading Security Agent...
-      </output>
+      </div>
     );
   }
 

@@ -5,9 +5,9 @@ export default function FindingsPage() {
   return (
     <Suspense
       fallback={
-        <output className="text-muted-foreground block py-16 text-center text-sm">
+        <div className="text-muted-foreground block py-16 text-center text-sm">
           Loading findings...
-        </output>
+        </div>
       }
     >
       <SecurityFindingsPage />

@@ -20,10 +20,11 @@ export async function processLinkedMessage({
   const botPlatform = botPlatforms.requireByAdapter(thread.adapter);
   const stopProcessingIndicator = await botPlatform.startProcessingIndicator({
     thread,
-    message,
+    messageId: message.id,
     status: 'Thinking...',
   });
 
+  let handedOff = false;
   try {
     let botRequestId: string;
     try {
@@ -55,9 +56,15 @@ export async function processLinkedMessage({
       return;
     }
 
-    await processMessage({ thread, message, platformIntegration, user, botRequestId });
+    handedOff = await processMessage({
+      thread,
+      message,
+      platformIntegration,
+      user,
+      botRequestId,
+    });
   } finally {
-    await stopProcessingIndicator();
+    await stopProcessingIndicator({ handedOff });
   }
 }
 
@@ -73,7 +80,7 @@ async function processMessage({
   platformIntegration: PlatformIntegration;
   user: User;
   botRequestId: string;
-}) {
+}): Promise<boolean> {
   const startedAt = Date.now();
 
   // Upload all supported files through the canonical attachments contract so
@@ -112,6 +119,8 @@ async function processMessage({
     if (!result.startedCloudAgentSession) {
       await thread.post({ markdown: result.finalText });
     }
+
+    return result.startedCloudAgentSession;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
 
@@ -126,5 +135,7 @@ async function processMessage({
     await Promise.all([
       thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`),
     ]);
+
+    return false;
   }
 }

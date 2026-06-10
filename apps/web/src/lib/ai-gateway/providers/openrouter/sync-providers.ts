@@ -30,8 +30,8 @@ import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/syn
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
-  normalizeInferenceProviderId,
   openRouterToVercelInferenceProviderId,
+  VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 /**
@@ -200,12 +200,42 @@ async function syncProviders(
     if (!vercelModel) continue;
 
     const vercelInferenceProviders = new Set(
-      vercelModel.endpoints.map(endpoint => normalizeInferenceProviderId(endpoint.tag))
+      vercelModel.endpoints
+        .map(
+          endpoint =>
+            VercelUserByokInferenceProviderIdSchema.safeParse(
+              endpoint.provider_name ?? endpoint.tag
+            ).data
+        )
+        .filter(p => p !== undefined)
     );
+
     for (const providerData of providerModelData) {
-      const vercelProviderId = openRouterToVercelInferenceProviderId(providerData.provider.slug);
-      if (vercelInferenceProviders.has(vercelProviderId)) {
-        providerData.models.push(model);
+      const vercelProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(
+        openRouterToVercelInferenceProviderId(providerData.provider.slug)
+      ).data;
+      const endpoint = vercelModel.endpoints.find(e => e.provider_name === vercelProviderId);
+      if (
+        vercelProviderId &&
+        endpoint &&
+        vercelInferenceProviders.has(vercelProviderId) &&
+        !providerData.models.some(m => m.slug === model.slug)
+      ) {
+        console.warn(
+          '[syncProviders] Adding missing model %s to provider %s',
+          model.slug,
+          providerData.provider.slug,
+          model
+        );
+        providerData.models.push({
+          ...model,
+          endpoint: {
+            ...model.endpoint,
+            provider_display_name: providerData.provider.displayName,
+            is_free: !endpoint.pricing?.prompt,
+            pricing: endpoint.pricing ?? { prompt: '0', completion: '0' },
+          },
+        });
       }
     }
   }

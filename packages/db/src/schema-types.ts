@@ -1342,7 +1342,8 @@ export const ModelSchema = z.object({
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
 export const EndpointSchema = z.object({
-  tag: z.string(),
+  tag: z.string().optional(),
+  provider_name: z.string().optional(),
   context_length: z.number(),
   pricing: z
     .object({
@@ -1358,6 +1359,8 @@ export const EndpointSchema = z.object({
     })
     .optional(),
 });
+
+export type Endpoint = z.infer<typeof EndpointSchema>;
 
 export const EndpointsSchema = z.object({
   data: z.object({ endpoints: z.array(EndpointSchema) }),

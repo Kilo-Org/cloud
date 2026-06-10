@@ -5,9 +5,7 @@ import type {
 } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { CustomLlmProvider } from '@kilocode/db';
 
-export function getOpenCodeGoAiSdkProvider(
-  model: DirectByokModel
-): CustomLlmProvider | undefined {
+export function getOpenCodeGoAiSdkProvider(model: DirectByokModel): CustomLlmProvider | undefined {
   const modelId = model.id.toLowerCase();
   return modelId.includes('minimax') || modelId.includes('qwen') ? 'anthropic' : undefined;
 }

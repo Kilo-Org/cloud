@@ -13,8 +13,8 @@ type ClassifierAnalyticsParams = {
   classifierModel?: string | null;
   input?: NormalizedClassifierInput;
   classification?: ClassifierOutput;
-  classifierLatencyMs?: number;
-  classifierCost?: number | null;
+  classifierDurationMs?: number;
+  classifierCostCredits?: number | null;
   bodyBytes?: number;
 };
 
@@ -34,8 +34,8 @@ type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS'>;
  *   blob9   = executionMode
  *   blob10  = "1" if classified request requires tools, "0" if not, "" if unknown
  *   blob11  = confidence bucket
- *   double1 = classifierLatencyMs
- *   double2 = classifierCostUsd
+ *   double1 = classifierDurationMs
+ *   double2 = classifierCostCredits
  *   double3 = confidence, or -1 if unavailable
  *   double4 = messageCount
  *   double5 = "1" if mirrored request includes tools, "0" if not
@@ -66,8 +66,8 @@ export function writeClassifierMetricsDataPoint(
         classification ? confidenceBucket(classification.confidence) : '',
       ],
       doubles: [
-        params.classifierLatencyMs ?? 0,
-        params.classifierCost ?? 0,
+        params.classifierDurationMs ?? 0,
+        params.classifierCostCredits ?? 0,
         classification?.confidence ?? -1,
         input?.messageCount ?? 0,
         input?.hasTools ? 1 : 0,

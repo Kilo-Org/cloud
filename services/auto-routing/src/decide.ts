@@ -40,14 +40,14 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const startedAt = performance.now();
   try {
     const classifier = await classifyNormalizedInput(c.env, classifierInput.data);
-    const classifierLatencyMs = performance.now() - startedAt;
+    const classifierDurationMs = performance.now() - startedAt;
     writeClassifierMetricsDataPoint(c.env, {
       status: 'classified',
       classifierModel: classifier.classifierModel,
       input: classifierInput.data,
       classification: classifier.classification,
-      classifierCost: classifier.cost,
-      classifierLatencyMs,
+      classifierCostCredits: classifier.cost,
+      classifierDurationMs,
       bodyBytes,
     });
     return c.json({
@@ -59,11 +59,11 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       },
     });
   } catch {
-    const classifierLatencyMs = performance.now() - startedAt;
+    const classifierDurationMs = performance.now() - startedAt;
     writeClassifierMetricsDataPoint(c.env, {
       status: 'classifier_error',
       input: classifierInput.data,
-      classifierLatencyMs,
+      classifierDurationMs,
       bodyBytes,
     });
     return c.json(emptyDecisionResponse());

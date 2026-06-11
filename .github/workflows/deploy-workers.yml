@@ -48,7 +48,7 @@ jobs:
           command: deploy
 
   detect-changes:
-    if: github.event_name == 'workflow_call'
+    if: inputs.base_sha != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:

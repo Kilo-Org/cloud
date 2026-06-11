@@ -165,7 +165,25 @@ jobs:
         run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-workers:
-    needs: [promote-app]
+    needs:
+      [
+        check-production-db-startup,
+        run-migrations,
+        stage-app,
+        stage-global-app,
+        promote-app,
+        promote-global-app,
+      ]
+    if: >-
+      ${{
+        !cancelled() &&
+        needs.check-production-db-startup.result == 'success' &&
+        needs.run-migrations.result == 'success' &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-global-app.result)
+      }}
     uses: ./.github/workflows/deploy-workers.yml
     with:
       base_sha: ${{ github.event.before }}

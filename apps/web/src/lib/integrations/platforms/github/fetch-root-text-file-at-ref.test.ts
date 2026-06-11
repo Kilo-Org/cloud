@@ -115,13 +115,13 @@ describe('fetchGitHubRepositorySize', () => {
   it('fetches and formats the repository size reported in KiB', async () => {
     mockGet.mockResolvedValueOnce({ data: { size: 102_400 } });
 
-    await expect(fetchGitHubRepositorySize(params)).resolves.toBe('100 MB');
+    await expect(fetchGitHubRepositorySize(params)).resolves.toBe('100 MiB');
     expect(mockGet).toHaveBeenCalledWith({ owner: 'acme', repo: 'widgets' });
   });
 
   it('formats zero-sized repositories explicitly', async () => {
     mockGet.mockResolvedValueOnce({ data: { size: 0 } });
 
-    await expect(fetchGitHubRepositorySize(params)).resolves.toBe('0 MB');
+    await expect(fetchGitHubRepositorySize(params)).resolves.toBe('0 MiB');
   });
 });

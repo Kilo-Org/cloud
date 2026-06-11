@@ -776,7 +776,7 @@ describe('fetchGitLabRepositorySize', () => {
     mockFetch.mockReset();
   });
 
-  it('fetches project statistics and formats repository_size bytes as MB', async () => {
+  it('fetches project statistics and formats repository_size bytes as MiB', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ statistics: { repository_size: 104_857_600 } }),
@@ -784,7 +784,7 @@ describe('fetchGitLabRepositorySize', () => {
 
     const result = await fetchGitLabRepositorySize('test-token', 'group/project');
 
-    expect(result).toBe('100 MB');
+    expect(result).toBe('100 MiB');
     expect(mockFetch).toHaveBeenCalledWith(
       'https://gitlab.com/api/v4/projects/group%2Fproject?statistics=true',
       expect.objectContaining({
@@ -801,7 +801,7 @@ describe('fetchGitLabRepositorySize', () => {
       json: async () => ({ statistics: { repository_size: 0 } }),
     });
 
-    await expect(fetchGitLabRepositorySize('test-token', 'group/project')).resolves.toBe('0 MB');
+    await expect(fetchGitLabRepositorySize('test-token', 'group/project')).resolves.toBe('0 MiB');
   });
 });
 

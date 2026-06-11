@@ -312,21 +312,6 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
     expect(profile).not.toHaveProperty('api_key');
     expect(profile).not.toHaveProperty('key');
   });
-
-  it('migrates auth-profiles.json in a custom agent dir outside the standard tree', () => {
-    const fs = createFs();
-    const CUSTOM = '/custom/agent-x';
-    seedDir(fs, CUSTOM);
-    const customFile = `${CUSTOM}/auth-profiles.json`;
-    seedFile(fs, customFile, JSON.stringify(plaintextStore()));
-
-    const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs), [CUSTOM]);
-
-    expect(report).toEqual({ filesScanned: 1, filesModified: 1, profilesMigrated: 1 });
-    expect(parseStore(fs.files.get(customFile)).profiles['kilocode:default']).toHaveProperty(
-      'keyRef'
-    );
-  });
 });
 
 describe('hardenAuthProfileMigrationBackups', () => {
@@ -400,20 +385,6 @@ describe('hardenAuthProfileMigrationBackups', () => {
 
     expect(report).toEqual({ dirsScanned: 1, backupsHardened: 0, backupsFailed: 1 });
     warnSpy.mockRestore();
-  });
-
-  it('hardens backups in custom agent dirs outside the standard tree', () => {
-    const fs = createFs();
-    const CUSTOM = '/custom/agent-x';
-    seedDir(fs, CUSTOM);
-    const customBak = `${CUSTOM}/auth-profiles.json.sqlite-import.5.bak`;
-    seedFile(fs, customBak, JSON.stringify(plaintextStore()));
-    const chmodSync = vi.fn();
-
-    const report = hardenAuthProfileMigrationBackups(ROOT, { ...fsDeps(fs), chmodSync }, [CUSTOM]);
-
-    expect(report.backupsHardened).toBe(1);
-    expect(chmodSync).toHaveBeenCalledWith(customBak, 0o600);
   });
 
   it('scans multiple agent directories', () => {

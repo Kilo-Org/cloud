@@ -735,76 +735,6 @@ function toAuthProfilesMigrationDeps(deps: BootstrapDeps): AuthProfilesMigration
   };
 }
 
-// OpenClaw resolves the active agent directory from these env vars too. KiloClaw
-// lets users set arbitrary instance env vars (only the KILOCLAW_ prefix is
-// reserved), so a user-supplied value lands in the machine env, and doctor
-// migrates auth profiles in that directory — but `openclaw agents list` (which
-// is config-derived) does not report it.
-const ENV_SELECTED_AGENT_DIR_VARS = ['OPENCLAW_AGENT_DIR', 'PI_CODING_AGENT_DIR'];
-
-/**
- * Resolve a path the way OpenClaw's `resolveUserPath` does: trim, expand a
- * leading `~`/`~/` to the home dir, then make absolute. OpenClaw applies this to
- * env-selected agent dirs, so we must match it or we'd scan a different path
- * (e.g. literal `~/custom-agent`) than the one doctor actually migrates.
- */
-function resolveUserPath(input: string, env: EnvLike): string {
-  const trimmed = input.trim();
-  const home = env.HOME && env.HOME.length > 0 ? env.HOME : '/root';
-  if (trimmed === '~') return path.resolve(home);
-  if (trimmed.startsWith('~/')) return path.resolve(home, trimmed.slice(2));
-  if (trimmed.startsWith('~')) return path.resolve(home + trimmed.slice(1));
-  return path.resolve(trimmed);
-}
-
-/**
- * Resolve the absolute `agentDir`s OpenClaw migrates auth profiles in, so the
- * keyRef migration and backup hardening cover the same candidates doctor does
- * (not just `<state>/agents/<id>/agent`). Two sources:
- *   - config-derived agents via the offline `openclaw agents list --json`
- *     (covers custom `agentDir`s set at create time), and
- *   - env-selected agent dirs (`OPENCLAW_AGENT_DIR` / `PI_CODING_AGENT_DIR`),
- *     which doctor processes but `agents list` does not report.
- * Returns whatever it can resolve; callers still cover the conventional layout.
- */
-function resolveConfiguredAgentDirs(env: EnvLike, deps: BootstrapDeps): string[] {
-  const dirs = new Set<string>();
-
-  for (const name of ENV_SELECTED_AGENT_DIR_VARS) {
-    const value = env[name];
-    if (typeof value === 'string' && value.trim().length > 0) {
-      dirs.add(resolveUserPath(value, env));
-    }
-  }
-
-  let raw: string | undefined;
-  try {
-    raw = deps.execFileSync('openclaw', ['agents', 'list', '--json']);
-  } catch (error) {
-    console.warn(
-      '[controller] could not enumerate config agent dirs; auth migration uses the conventional layout and env-selected dirs only:',
-      error
-    );
-  }
-  if (raw && raw.trim()) {
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        for (const entry of parsed) {
-          if (entry && typeof entry === 'object') {
-            const agentDir = (entry as { agentDir?: unknown }).agentDir;
-            if (typeof agentDir === 'string' && agentDir.length > 0) dirs.add(agentDir);
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('[controller] could not parse agent list for auth migration:', error);
-    }
-  }
-
-  return [...dirs];
-}
-
 function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
   let parsed: unknown;
   try {
@@ -854,11 +784,6 @@ function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
 export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
   const configExists = deps.existsSync(CONFIG_PATH);
   const cwDeps = toConfigWriterDeps(deps);
-  // Custom agent directories OpenClaw migrates auth profiles in. Resolved so the
-  // keyRef migration and backup hardening below cover the same candidates, not
-  // just the conventional `<state>/agents/<id>/agent` layout. Empty on fresh
-  // installs (no agents yet) and when enumeration is unavailable.
-  const configuredAgentDirs = configExists ? resolveConfiguredAgentDirs(env, deps) : [];
 
   if (!configExists) {
     console.log('No existing config found, running openclaw onboard...');
@@ -886,8 +811,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     // the JSON; this idempotent migration no-ops when there is nothing to fix.
     const preDoctorMigration = migrateKilocodeAuthProfilesToKeyRef(
       CONFIG_DIR,
-      toAuthProfilesMigrationDeps(deps),
-      configuredAgentDirs
+      toAuthProfilesMigrationDeps(deps)
     );
     if (preDoctorMigration.profilesMigrated > 0) {
       console.log(
@@ -906,8 +830,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
       // OpenClaw's recovery copy; tightened to owner-only.
       const backupHarden = hardenAuthProfileMigrationBackups(
         CONFIG_DIR,
-        toAuthProfilesMigrationDeps(deps),
-        configuredAgentDirs
+        toAuthProfilesMigrationDeps(deps)
       );
       if (backupHarden.backupsHardened > 0 || backupHarden.backupsFailed > 0) {
         console.log(
@@ -950,8 +873,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   // on first load).
   const migrationReport = migrateKilocodeAuthProfilesToKeyRef(
     CONFIG_DIR,
-    toAuthProfilesMigrationDeps(deps),
-    configuredAgentDirs
+    toAuthProfilesMigrationDeps(deps)
   );
   if (migrationReport.profilesMigrated > 0) {
     console.log(

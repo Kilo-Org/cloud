@@ -77,19 +77,16 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 /**
- * Resolve the set of agent directories that may contain an `auth-profiles.json`.
+ * Resolve the conventional `<rootDir>/agents/*&#47;agent` directories that may
+ * contain an `auth-profiles.json`. Returns absolute directory paths, each
+ * expected to hold `auth-profiles.json` directly. Never throws.
  *
- * Combines the conventional `<rootDir>/agents/*&#47;agent` layout with any
- * explicitly-configured custom `agentDir`s (KiloClaw allows arbitrary absolute
- * agent directories, and OpenClaw doctor migrates auth profiles in those too).
- * Returns absolute directory paths, each expected to hold `auth-profiles.json`
- * directly. Never throws.
+ * This intentionally only covers the standard layout (every agent created
+ * through KiloClaw lives here). Custom/env-selected agent directories — which
+ * only arise from undocumented, hand-rolled configuration — are out of scope;
+ * the remediation for those rare cases is re-entering the credential.
  */
-function collectAgentDirs(
-  rootDir: string,
-  deps: AuthProfilesMigrationDeps,
-  extraAgentDirs: string[]
-): string[] {
+function collectAgentDirs(rootDir: string, deps: AuthProfilesMigrationDeps): string[] {
   const dirs = new Set<string>();
 
   const agentsDir = path.join(rootDir, 'agents');
@@ -109,10 +106,6 @@ function collectAgentDirs(
       }
       dirs.add(path.join(agentRoot, AGENT_SUBDIR));
     }
-  }
-
-  for (const dir of extraAgentDirs) {
-    if (isNonEmptyString(dir)) dirs.add(dir);
   }
 
   return [...dirs];
@@ -200,18 +193,15 @@ function migrateOneFile(filePath: string, deps: AuthProfilesMigrationDeps): stri
 }
 
 /**
- * Migrate `<agentDir>/auth-profiles.json` for every resolved agent directory
- * (conventional layout plus any configured custom `agentDir`s in
- * `extraAgentDirs`) in place. `rootDir` is typically the openclaw state dir
- * (e.g. `/root/.openclaw`).
+ * Migrate `<agentDir>/auth-profiles.json` for every conventional agent directory
+ * in place. `rootDir` is typically the openclaw state dir (e.g. `/root/.openclaw`).
  *
  * Returns a report for logging. Never throws — individual file failures produce
  * warnings and are skipped.
  */
 export function migrateKilocodeAuthProfilesToKeyRef(
   rootDir: string,
-  deps: AuthProfilesMigrationDeps = defaultDeps,
-  extraAgentDirs: string[] = []
+  deps: AuthProfilesMigrationDeps = defaultDeps
 ): AuthProfilesMigrationReport {
   const report: AuthProfilesMigrationReport = {
     filesScanned: 0,
@@ -219,7 +209,7 @@ export function migrateKilocodeAuthProfilesToKeyRef(
     profilesMigrated: 0,
   };
 
-  for (const agentDir of collectAgentDirs(rootDir, deps, extraAgentDirs)) {
+  for (const agentDir of collectAgentDirs(rootDir, deps)) {
     const filePath = path.join(agentDir, AUTH_PROFILES_FILENAME);
     if (!deps.existsSync(filePath)) continue;
 
@@ -263,8 +253,7 @@ export type AuthProfileBackupHardenReport = {
  */
 export function hardenAuthProfileMigrationBackups(
   rootDir: string,
-  deps: AuthProfilesMigrationDeps = defaultDeps,
-  extraAgentDirs: string[] = []
+  deps: AuthProfilesMigrationDeps = defaultDeps
 ): AuthProfileBackupHardenReport {
   const report: AuthProfileBackupHardenReport = {
     dirsScanned: 0,
@@ -272,7 +261,7 @@ export function hardenAuthProfileMigrationBackups(
     backupsFailed: 0,
   };
 
-  for (const agentDir of collectAgentDirs(rootDir, deps, extraAgentDirs)) {
+  for (const agentDir of collectAgentDirs(rootDir, deps)) {
     if (!deps.existsSync(agentDir)) continue;
 
     let entries: string[];

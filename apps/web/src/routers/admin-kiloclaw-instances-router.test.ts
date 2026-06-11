@@ -2935,6 +2935,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
       instance_id: instance.id,
       plan: 'trial',
       status: 'canceled',
+      current_period_end: '2026-03-15T12:00:00.000Z',
     });
 
     mockScanOrphanVolumes.mockResolvedValue({
@@ -2975,6 +2976,9 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
       instance_id: instance.id,
       volume_id: 'vol_findorphans00000',
       subscription_status: 'canceled',
+      // current_period_end is surfaced as the "subscription ended" timestamp,
+      // formatted as strict ISO 8601 by the scan query's to_char.
+      subscription_ended_at: '2026-03-15T12:00:00.000Z',
       classification: 'safe_destroy',
     });
   });

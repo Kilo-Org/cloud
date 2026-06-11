@@ -154,6 +154,7 @@ type OrphanVolumeRow = {
   organization_id: string | null;
   destroyed_at: string;
   subscription_status: string | null;
+  subscription_ended_at: string | null;
   fly_app: string;
   volume_id: string;
   volume_name: string;
@@ -666,6 +667,7 @@ function OrphanVolumesSection() {
                     <TableHead>DO Status</TableHead>
                     <TableHead>Destroyed</TableHead>
                     <TableHead>Subscription</TableHead>
+                    <TableHead>Sub. Ended</TableHead>
                     <TableHead>Classification</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -740,6 +742,20 @@ function OrphanVolumesSection() {
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell
+                        className="text-xs"
+                        title={
+                          volume.subscription_ended_at
+                            ? new Date(volume.subscription_ended_at).toLocaleString()
+                            : undefined
+                        }
+                      >
+                        {volume.subscription_ended_at ? (
+                          formatRelativeTime(volume.subscription_ended_at)
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell>

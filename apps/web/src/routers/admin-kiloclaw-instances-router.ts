@@ -3922,6 +3922,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       latest_sandbox_destroyed_at: string | null;
       user_email: string | null;
       subscription_status: string | null;
+      subscription_ended_at: string | null;
     };
 
     // 1. The latest destroyed row per (user, sandbox) inside the requested
@@ -3963,7 +3964,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         to_char(ranked.destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as destroyed_at,
         to_char(ranked.latest_sandbox_destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as latest_sandbox_destroyed_at,
         ranked.user_email,
-        ranked.subscription_status
+        ranked.subscription_status,
+        to_char(ranked.subscription_ended_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as subscription_ended_at
       from (
         select distinct on (i.user_id, i.sandbox_id)
           i.id,
@@ -3979,7 +3981,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               and latest.destroyed_at is not null
           ) as latest_sandbox_destroyed_at,
           u.google_user_email as user_email,
-          s.status as subscription_status
+          s.status as subscription_status,
+          -- End of the subscription's last paid period — the closest signal
+          -- for "when did this user's KiloClaw subscription end". Used by the
+          -- admin volume table to avoid nuking volumes whose subscription
+          -- ended (or ends) within the recent grace window.
+          s.current_period_end as subscription_ended_at
         from kiloclaw_instances i
         left join kilocode_users u on i.user_id = u.id
         left join kiloclaw_subscriptions s on i.id = s.instance_id
@@ -4014,6 +4021,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       organization_id: string | null;
       destroyed_at: string;
       subscription_status: string | null;
+      subscription_ended_at: string | null;
       fly_app: string;
       volume_id: string;
       volume_name: string;
@@ -4154,6 +4162,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             organization_id: instance.organization_id,
             destroyed_at: destroyedAt,
             subscription_status: instance.subscription_status,
+            subscription_ended_at: instance.subscription_ended_at,
             fly_app: scan.flyApp,
             volume_id: v.id,
             volume_name: v.name,

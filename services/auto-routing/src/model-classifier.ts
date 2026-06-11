@@ -62,22 +62,30 @@ export class ClassifierRunError extends Error {
 
 type ClassifierEnv = Pick<Env, 'AUTO_ROUTING_CONFIG' | 'OPENROUTER_API_KEY'>;
 
+export type ClassifierCallOptions = {
+  // Sticky routing key passed to OpenRouter so requests from the same
+  // session land on the same provider and reuse its prompt cache.
+  openrouterSessionId?: string;
+};
+
 export async function classifyNormalizedInput(
   env: ClassifierEnv,
-  input: NormalizedClassifierInput
+  input: NormalizedClassifierInput,
+  options: ClassifierCallOptions = {}
 ): Promise<ClassifierRunResult> {
   const [client, classifierModel] = await Promise.all([
     createOpenRouterClient(env),
     getClassifierModel(env),
   ]);
 
-  return classifyWithOpenRouter(client, input, classifierModel);
+  return classifyWithOpenRouter(client, input, classifierModel, options);
 }
 
 export async function classifyWithOpenRouter(
   client: OpenRouter,
   input: NormalizedClassifierInput,
-  classifierModel: string
+  classifierModel: string,
+  options: ClassifierCallOptions = {}
 ): Promise<ClassifierRunResult> {
   const result = await client.chat.send({
     chatRequest: {
@@ -87,6 +95,7 @@ export async function classifyWithOpenRouter(
       stream: false,
       temperature: 0,
       maxTokens: CLASSIFIER_MAX_TOKENS,
+      ...(options.openrouterSessionId ? { sessionId: options.openrouterSessionId } : {}),
     },
   });
 

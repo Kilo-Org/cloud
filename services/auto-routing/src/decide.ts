@@ -2,8 +2,10 @@ import type { AutoRoutingDecisionResponse } from '@kilocode/auto-routing-contrac
 import { formatError } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
+import { getClassifierModel } from './classifier-config';
 import { mirrorPayloadSchema, parseClassifierInput } from './classifier-input';
 import type { NormalizedClassifierInput } from './classifier-input';
+import { getCachedClassification, putCachedClassification } from './decision-cache';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierModelCallMeta, ClassifierRunFallbackMetadata } from './model-classifier';
 import type { HonoEnv } from './hono-env';
@@ -65,6 +67,7 @@ function logDecision({
   confidence,
   modelCallMeta,
   fallbackReason,
+  cacheHit,
 }: {
   status: string;
   classifierModel: string | null;
@@ -82,12 +85,14 @@ function logDecision({
   confidence?: number;
   modelCallMeta?: ClassifierModelCallMeta;
   fallbackReason?: string;
+  cacheHit?: boolean;
 }) {
   const includeText = Boolean(fallbackReason) || status.startsWith('classifier_error');
   console.log(
     JSON.stringify({
       event: 'auto_routing_decision',
       status,
+      cacheHit: cacheHit ?? false,
       classifierModel,
       requestedModel: classifierInput.requestedModel,
       apiKind: classifierInput.apiKind,
@@ -274,10 +279,73 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const reqSeq = isolateRequestSeq++;
   const colo = (c.req.raw.cf?.colo as string | undefined) ?? null;
   const startedAt = performance.now();
-  const hashes = await computeContentHashes(classifierInput.data);
-  try {
-    const classifier = await classifyNormalizedInput(c.env, classifierInput.data);
+  const [hashes, classifierModel] = await Promise.all([
+    computeContentHashes(classifierInput.data),
+    getClassifierModel(c.env),
+  ]);
+
+  const cached = await getCachedClassification(hashes.exact, classifierModel);
+  if (cached) {
     const classifierDurationMs = performance.now() - startedAt;
+    writeClassifierMetricsDataPoint(c.env, {
+      status: 'classified',
+      classifierModel,
+      sessionId: parsed.data.sessionId,
+      input: classifierInput.data,
+      classification: cached.classification,
+      classifierCostCredits: 0,
+      // Keep double1 as the model-call duration so cache hits do not skew
+      // the existing duration analytics.
+      classifierDurationMs: 0,
+      bodyBytes,
+      cacheHit: true,
+    });
+    logDecision({
+      status: 'classified',
+      cacheHit: true,
+      classifierModel,
+      classifierInput: classifierInput.data,
+      sessionId: parsed.data.sessionId,
+      headers: parsed.data.headers,
+      hashes,
+      reqSeq,
+      colo,
+      classifierDurationMs,
+      classifierCostCredits: 0,
+      bodyBytes,
+      taskType: cached.classification.taskType,
+      subtaskType: cached.classification.subtaskType,
+      confidence: cached.classification.confidence,
+    });
+    const response: AutoRoutingDecisionResponse = {
+      cost: 0,
+      decision: null,
+      classifierResult: {
+        classification: cached.classification,
+        normalized: classifierInput.data,
+      },
+    };
+    return c.json(response);
+  }
+
+  try {
+    const classifier = await classifyNormalizedInput(c.env, classifierInput.data, {
+      openrouterSessionId: parsed.data.sessionId ?? `content:${hashes.loose}`,
+    });
+    const classifierDurationMs = performance.now() - startedAt;
+    if (!classifier.fallback) {
+      const cacheWrite = putCachedClassification(
+        hashes.exact,
+        classifier.classifierModel,
+        classifier.classification
+      );
+      try {
+        c.executionCtx.waitUntil(cacheWrite);
+      } catch {
+        // No execution context outside the workers runtime; the write is
+        // already running and best effort.
+      }
+    }
     logDecision({
       status: classifier.fallback ? `fallback:${classifier.fallback.reason}` : 'classified',
       classifierModel: classifier.classifierModel,

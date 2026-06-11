@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearClassifierModelCache } from './classifier-config';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
 import type * as ModelClassifierModule from './model-classifier';
@@ -61,6 +62,7 @@ function localRequest(path: string, init: RequestInit = {}) {
 
 describe('auto routing worker', () => {
   beforeEach(() => {
+    clearClassifierModelCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
     writeDataPoint.mockReset();
@@ -150,20 +152,24 @@ describe('auto routing worker', () => {
         },
       },
     });
-    expect(classifyNormalizedInput).toHaveBeenCalledWith(env, {
-      apiKind: 'chat_completions',
-      requestedModel: 'anthropic/claude-sonnet-4',
-      systemPromptPrefix: 'You classify auto model routing requests.',
-      userPromptPrefix: 'Pick the best model for this request.',
-      latestUserPromptPrefix: null,
-      messageCount: 3,
-      hasTools: true,
-      stream: true,
-      providerHints: {
-        provider: { order: ['anthropic'] },
-        providerOptions: { openrouter: { sort: 'price', apiKey: '[REDACTED]' } },
+    expect(classifyNormalizedInput).toHaveBeenCalledWith(
+      env,
+      {
+        apiKind: 'chat_completions',
+        requestedModel: 'anthropic/claude-sonnet-4',
+        systemPromptPrefix: 'You classify auto model routing requests.',
+        userPromptPrefix: 'Pick the best model for this request.',
+        latestUserPromptPrefix: null,
+        messageCount: 3,
+        hasTools: true,
+        stream: true,
+        providerHints: {
+          provider: { order: ['anthropic'] },
+          providerOptions: { openrouter: { sort: 'price', apiKey: '[REDACTED]' } },
+        },
       },
-    });
+      { openrouterSessionId: 'task-123' }
+    );
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['google/gemini-2.5-flash-lite'],
       blobs: [
@@ -180,7 +186,7 @@ describe('auto routing worker', () => {
         '0.8-1.0',
         'task-123',
       ],
-      doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, expect.any(Number)],
+      doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, expect.any(Number), 0],
     });
     expect(infoSpy).not.toHaveBeenCalled();
   });
@@ -349,7 +355,7 @@ describe('auto routing worker', () => {
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['unknown'],
       blobs: ['unknown', '', '', 'invalid_body', '', '', '', '', '', '', '', ''],
-      doubles: [0, 0, -1, 0, 0, 9],
+      doubles: [0, 0, -1, 0, 0, 9, 0],
     });
   });
 
@@ -513,7 +519,7 @@ describe('auto routing worker', () => {
         '',
         '',
       ],
-      doubles: [expect.any(Number), 0.00000123, -1, 1, 0, expect.any(Number)],
+      doubles: [expect.any(Number), 0.00000123, -1, 1, 0, expect.any(Number), 0],
     });
   });
 

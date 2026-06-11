@@ -17,6 +17,7 @@ type ClassifierAnalyticsParams = {
   classifierDurationMs?: number;
   classifierCostCredits?: number | null;
   bodyBytes?: number;
+  cacheHit?: boolean;
 };
 
 type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS'>;
@@ -42,6 +43,7 @@ type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS'>;
  *   double4 = messageCount
  *   double5 = "1" if mirrored request includes tools, "0" if not
  *   double6 = mirrored body bytes
+ *   double7 = "1" if the classification was served from cache, "0" if not
  */
 export function writeClassifierMetricsDataPoint(
   env: ClassifierAnalyticsEnv,
@@ -75,6 +77,7 @@ export function writeClassifierMetricsDataPoint(
         input?.messageCount ?? 0,
         input?.hasTools ? 1 : 0,
         params.bodyBytes ?? 0,
+        params.cacheHit ? 1 : 0,
       ],
     });
   } catch {

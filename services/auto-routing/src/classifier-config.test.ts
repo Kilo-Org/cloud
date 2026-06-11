@@ -1,6 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
-import { CLASSIFIER_MODEL_CONFIG_KEY, getClassifierModel } from './classifier-config';
+import {
+  CLASSIFIER_MODEL_CONFIG_KEY,
+  clearClassifierModelCache,
+  getClassifierModel,
+} from './classifier-config';
 
 function createKv(value: string | null) {
   const get = vi.fn(async () => value);
@@ -11,6 +15,10 @@ function createKv(value: string | null) {
 }
 
 describe('classifier config', () => {
+  beforeEach(() => {
+    clearClassifierModelCache();
+  });
+
   it('falls back to the default classifier model when KV has no value', async () => {
     const { get, kv } = createKv(null);
 

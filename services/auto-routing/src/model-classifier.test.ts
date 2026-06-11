@@ -115,34 +115,31 @@ describe('OpenRouter classifier call', () => {
   });
 
   it('retries once and falls back while preserving classifier cost and model when output validation fails', async () => {
-    const client = {
-      chat: {
-        send: vi.fn(
-          async (): Promise<ChatResult> => ({
-            id: 'gen-test',
-            created: 1781010000,
-            model: DEFAULT_CLASSIFIER_MODEL,
-            object: 'chat.completion',
-            systemFingerprint: null,
-            choices: [
-              {
-                finishReason: 'stop',
-                index: 0,
-                message: { role: 'assistant', content: '{"taskType":"invalid"}' },
-              },
-            ],
-            usage: {
-              promptTokens: 100,
-              promptTokensDetails: { cachedTokens: 0 },
-              completionTokens: 20,
-              completionTokensDetails: { reasoningTokens: 0 },
-              totalTokens: 120,
-              cost: 0.00000123,
-            },
-          })
-        ),
-      },
-    } as unknown as OpenRouter;
+    const send = vi.fn(
+      async (): Promise<ChatResult> => ({
+        id: 'gen-test',
+        created: 1781010000,
+        model: DEFAULT_CLASSIFIER_MODEL,
+        object: 'chat.completion',
+        systemFingerprint: null,
+        choices: [
+          {
+            finishReason: 'stop',
+            index: 0,
+            message: { role: 'assistant', content: '{"taskType":"invalid"}' },
+          },
+        ],
+        usage: {
+          promptTokens: 100,
+          promptTokensDetails: { cachedTokens: 0 },
+          completionTokens: 20,
+          completionTokensDetails: { reasoningTokens: 0 },
+          totalTokens: 120,
+          cost: 0.00000123,
+        },
+      })
+    );
+    const client = { chat: { send } } as unknown as OpenRouter;
 
     await expect(
       classifyWithOpenRouter(client, normalizedInput, DEFAULT_CLASSIFIER_MODEL)
@@ -162,6 +159,6 @@ describe('OpenRouter classifier call', () => {
         confidence: 0,
       },
     });
-    expect(client.chat.send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(2);
   });
 });

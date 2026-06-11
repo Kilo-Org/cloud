@@ -8,7 +8,7 @@ export const DECISION_LOG_SAMPLE_RATE_CONFIG_KEY = 'decision_log_sample_rate';
 // and cache hit-rate percentiles, so they are sampled by default. The rate
 // is a KV value so it can be changed without a redeploy; fallbacks and
 // errors are always logged.
-const DEFAULT_DECISION_LOG_SAMPLE_RATE = 0.05;
+const DEFAULT_DECISION_LOG_SAMPLE_RATE = 0.01;
 
 // KV propagation for config writes already takes up to 60s, so a 60s
 // isolate-local cache adds no meaningful staleness while removing a KV

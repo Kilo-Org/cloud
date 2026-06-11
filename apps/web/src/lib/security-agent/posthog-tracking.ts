@@ -37,9 +37,11 @@ type SecurityAgentConfigSavedEvent = BaseSecurityAgentEvent & {
   autoRemediationEnabled?: boolean;
   autoRemediationMinSeverity?: string;
   autoRemediationIncludeExisting?: boolean;
+  slaEnabled?: boolean;
   slaNotificationsEnabled?: boolean;
   slaNotificationMinSeverity?: string;
   slaNotificationWarningDays?: number;
+  newFindingNotificationsEnabled?: boolean;
   newFindingNotificationMinSeverity?: string;
   repositorySelectionMode?: string;
   selectedRepoCount?: number;

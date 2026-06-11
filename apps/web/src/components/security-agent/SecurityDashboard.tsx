@@ -60,6 +60,7 @@ export function SecurityDashboard() {
     isLoadingPermission,
     isOrg,
     organizationId,
+    configData,
     filteredRepositories,
     handleSync,
     isSyncing,
@@ -71,6 +72,7 @@ export function SecurityDashboard() {
 
   // Build a query string suffix for drill-down links so the selected repo filter carries through
   const repoFilterParam = repoFullName ? `&repoFullName=${encodeURIComponent(repoFullName)}` : '';
+  const slaEnabled = configData?.slaEnabled ?? true;
 
   const { data, isLoading } = useQuery({
     ...(isOrg
@@ -171,13 +173,14 @@ export function SecurityDashboard() {
         </div>
       </div>
 
-      {/* SLA Compliance Hero */}
-      <SlaComplianceHero
-        sla={sla}
-        isLoading={isLoading}
-        basePath={basePath}
-        extraParams={repoFilterParam}
-      />
+      {slaEnabled && (
+        <SlaComplianceHero
+          sla={sla}
+          isLoading={isLoading}
+          basePath={basePath}
+          extraParams={repoFilterParam}
+        />
+      )}
 
       {/* Severity Breakdown + Status Overview */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -196,23 +199,24 @@ export function SecurityDashboard() {
       </div>
 
       {/* Analysis Coverage + MTTR */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className={slaEnabled ? 'grid grid-cols-1 gap-6 lg:grid-cols-2' : 'grid gap-6'}>
         <AnalysisCoverage
           analysis={analysis}
           isLoading={isLoading}
           basePath={basePath}
           extraParams={repoFilterParam}
         />
-        <MeanTimeToResolution mttr={mttr} isLoading={isLoading} />
+        {slaEnabled && <MeanTimeToResolution mttr={mttr} isLoading={isLoading} />}
       </div>
 
-      {/* Overdue Findings */}
-      <OverdueFindingsTable
-        findings={overdue}
-        isLoading={isLoading}
-        basePath={basePath}
-        extraParams={repoFilterParam}
-      />
+      {slaEnabled && (
+        <OverdueFindingsTable
+          findings={overdue}
+          isLoading={isLoading}
+          basePath={basePath}
+          extraParams={repoFilterParam}
+        />
+      )}
 
       {/* Repository Health */}
       <RepositoryHealthTable
@@ -220,6 +224,7 @@ export function SecurityDashboard() {
         isLoading={isLoading}
         basePath={basePath}
         extraParams={repoFilterParam}
+        showSla={slaEnabled}
       />
     </div>
   );

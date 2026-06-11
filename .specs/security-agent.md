@@ -447,19 +447,23 @@ Per-member organization overrides are outside v1.
 
 Users MUST be able to configure:
 
+- whether New-finding Notifications are enabled;
+- the minimum severity for New-finding Notifications;
+- whether SLA tracking is enabled;
 - whether SLA warning and breach notifications are enabled;
 - the minimum severity for SLA notifications;
-- the warning lead time in whole days;
-- the minimum severity for New-finding Notifications.
+- the warning lead time in whole days.
 
 The defaults MUST be:
 
 | Setting | Default |
 |---|---|
+| New-finding Notifications enabled | `false` |
+| New-finding minimum severity | `high` |
+| SLA tracking enabled | `true` |
 | SLA notifications enabled | `true` |
 | SLA minimum severity | `high` |
 | SLA warning lead time | `3` days |
-| New-finding minimum severity | `high` |
 
 Warning lead time MUST be a whole number from 1 through 365 days.
 
@@ -474,7 +478,7 @@ Notification severity settings MUST use `critical`, `high`, `medium`, and `low` 
 
 Unknown severity or malformed notification settings MUST NOT be interpreted as a less restrictive policy. Missing notification fields in a legacy configuration MUST use the defaults above. If a stored notification value is present but invalid, Security Agent MUST withhold notification work for that owner until valid settings are saved. This quarantine MUST NOT block finding sync or notification processing for other owners. It MUST NOT discard unsent notification history solely because the stored setting is malformed. If malformed policy is detected after notification work has started, Security Agent MUST retain that unsent event for later evaluation without cancelling it or counting a delivery failure.
 
-There is no new-finding enable switch in v1. The configured minimum severity determines which future inserted findings qualify.
+New-finding Notifications MUST be off by default. Enabling them affects only future inserted findings; enabling them later MUST NOT replay historical insertions.
 
 ### New-finding eligibility
 
@@ -483,6 +487,7 @@ A finding is eligible for a New-finding Notification only when all of these cond
 - the finding is first inserted into Kilo rather than updated;
 - its effective status is open;
 - Security Agent is enabled for its owner;
+- New-finding Notifications are enabled for its owner;
 - its severity meets the configured new-finding minimum;
 - it remains canonical after duplicate consolidation.
 
@@ -493,6 +498,7 @@ Security Agent MUST NOT create a New-finding Notification because an existing fi
 ### Scenario: First import counts as new
 
 Given an open source alert has not previously been stored in Kilo for an owner
+And New-finding Notifications are enabled for that owner
 And its severity meets that owner's new-finding threshold
 When Security Agent first imports the alert
 Then Security Agent MUST treat it as an eligible new finding.
@@ -508,6 +514,7 @@ Then Security Agent MUST NOT create another New-finding Notification for that fi
 An open finding is eligible for an SLA Warning Notification only when all of these conditions are true:
 
 - Security Agent is enabled for its owner;
+- SLA tracking is enabled for its owner;
 - SLA notifications are enabled;
 - `sla_due_at` is present;
 - severity meets configured SLA minimum;
@@ -521,6 +528,7 @@ Notification policy MUST use persisted `sla_due_at`. It MUST NOT recalculate dea
 An open finding is eligible for an SLA Breach Notification only when all of these conditions are true:
 
 - Security Agent is enabled for its owner;
+- SLA tracking is enabled for its owner;
 - SLA notifications are enabled;
 - `sla_due_at` is present;
 - severity meets configured SLA minimum;
@@ -565,6 +573,8 @@ Unsent notification work MUST be cancelled when it is no longer eligible, includ
 - finding is fixed, ignored, superseded, or deleted;
 - Security Agent is disabled;
 - relevant severity threshold is raised above finding severity;
+- New-finding Notifications are disabled for new-finding work;
+- SLA tracking is disabled for warning or breach work;
 - SLA notifications are disabled for warning or breach work;
 - recipient no longer owns personal finding or is no longer an organization owner.
 
@@ -583,7 +593,7 @@ When owner later restores policy while finding remains in corresponding SLA wind
 Then Security Agent MAY reactivate same notification event.
 
 Given a New-finding Notification was cancelled
-When owner later lowers new-finding threshold or re-enables Security Agent
+When owner later lowers new-finding threshold, enables New-finding Notifications, or re-enables Security Agent
 Then Security Agent MUST NOT reactivate historical New-finding Notification.
 
 ### Organization membership changes

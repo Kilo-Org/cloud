@@ -34,6 +34,7 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
     hasIntegration,
     hasPermission,
     isLoadingPermission,
+    isEnabled,
     reauthorizeUrl,
   } = useSecurityAgent();
 
@@ -41,7 +42,7 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
 
   const navItems = [
     { label: 'Dashboard', href: basePath, icon: LayoutDashboard },
-    { label: 'Findings', href: `${basePath}/findings`, icon: ListChecks },
+    ...(isEnabled ? [{ label: 'Findings', href: `${basePath}/findings`, icon: ListChecks }] : []),
     { label: 'Settings', href: `${basePath}/config`, icon: Settings2 },
   ];
 

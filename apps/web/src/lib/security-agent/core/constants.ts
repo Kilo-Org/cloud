@@ -3,6 +3,7 @@ import { DEFAULT_SECURITY_NOTIFICATION_POLICY } from '@kilocode/worker-utils/sec
 
 /** Order matters — first entry is the default. */
 export const SECURITY_AGENT_MODELS = [
+  { id: 'kilo-auto/balanced', name: 'Kilo Balanced', free: false },
   { id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6', free: false },
   { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5', free: false },
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', free: false },

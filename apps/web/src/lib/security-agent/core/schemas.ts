@@ -30,6 +30,7 @@ export const SaveSecurityConfigInputSchema = z.object({
   slaHighDays: z.number().min(1).max(365).optional(),
   slaMediumDays: z.number().min(1).max(365).optional(),
   slaLowDays: z.number().min(1).max(365).optional(),
+  slaEnabled: z.boolean().optional(),
   autoSyncEnabled: z.boolean().optional(),
   repositorySelectionMode: RepositorySelectionModeSchema.optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
@@ -49,6 +50,7 @@ export const SaveSecurityConfigInputSchema = z.object({
   slaNotificationsEnabled: z.boolean().optional(),
   slaNotificationMinSeverity: NotificationMinSeveritySchema.optional(),
   slaNotificationWarningDays: SecurityNotificationWarningDaysSchema.optional(),
+  newFindingNotificationsEnabled: z.boolean().optional(),
   newFindingNotificationMinSeverity: NotificationMinSeveritySchema.optional(),
 });
 

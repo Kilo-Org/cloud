@@ -12,6 +12,7 @@ import {
 import { db } from '@/lib/drizzle';
 import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
 import { send as sendEmail, type TemplateName } from '@/lib/email';
+import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
 import {
   SecurityNotificationPolicySchema,
   getEligibleSlaNotificationKind,
@@ -52,14 +53,33 @@ function formatDeadline(iso: string | null): string {
   );
 }
 
+function securityAgentUrl(
+  finding: {
+    ownedByOrganizationId: string | null;
+    ownedByUserId: string | null;
+  },
+  path: string
+): string {
+  if (finding.ownedByOrganizationId) {
+    return `${NEXTAUTH_URL}/organizations/${finding.ownedByOrganizationId}/security-agent/${path}`;
+  }
+  return `${NEXTAUTH_URL}/security-agent/${path}`;
+}
+
 function actionUrl(finding: {
   ownedByOrganizationId: string | null;
   ownedByUserId: string | null;
 }): string {
-  if (finding.ownedByOrganizationId) {
-    return `${NEXTAUTH_URL}/organizations/${finding.ownedByOrganizationId}/security-agent/findings`;
-  }
-  return `${NEXTAUTH_URL}/security-agent/findings`;
+  return securityAgentUrl(finding, 'findings');
+}
+
+function manageNotificationsUrl(finding: {
+  kind: 'new_finding' | 'sla_warning' | 'sla_breach';
+  ownedByOrganizationId: string | null;
+  ownedByUserId: string | null;
+}): string {
+  const tab = finding.kind === 'new_finding' ? 'notifications' : 'sla';
+  return securityAgentUrl(finding, `config?tab=${tab}`);
 }
 
 async function recipientStillAuthorized(row: {
@@ -127,15 +147,19 @@ function isNotificationStillEligible(
   if (row.findingStatus !== 'open') return false;
   if ((row.ignoredReason ?? '').startsWith('superseded:')) return false;
   if (row.kind === 'new_finding') {
-    return meetsSecurityNotificationSeverityMinimum(
-      row.severity,
-      policy.new_finding_notification_min_severity
+    return (
+      policy.new_finding_notifications_enabled &&
+      meetsSecurityNotificationSeverityMinimum(
+        row.severity,
+        policy.new_finding_notification_min_severity
+      )
     );
   }
 
   const kind = getEligibleSlaNotificationKind({
     status: row.findingStatus,
     isAgentEnabled: true,
+    slaEnabled: policy.sla_enabled,
     slaNotificationsEnabled: policy.sla_notifications_enabled,
     severity: row.severity,
     minimumSeverity: policy.sla_notification_min_severity,
@@ -174,6 +198,10 @@ export async function POST(req: NextRequest) {
       findingStatus: security_findings.status,
       severity: security_findings.severity,
       title: security_findings.title,
+      description: security_findings.description,
+      cveId: security_findings.cve_id,
+      ghsaId: security_findings.ghsa_id,
+      cvssScore: security_findings.cvss_score,
       slaDueAt: security_findings.sla_due_at,
       ignoredReason: security_findings.ignored_reason,
     })
@@ -232,13 +260,18 @@ export async function POST(req: NextRequest) {
   const result = await sendEmail({
     to: row.recipientEmail,
     templateName,
-    templateVars: {
+    templateVars: securityFindingTemplateVars({
       severity: row.severity,
-      repository_name: row.repoFullName,
-      finding_title: row.title,
-      sla_deadline: formatDeadline(row.slaDueAt),
-      action_url: actionUrl(row),
-    },
+      repositoryName: row.repoFullName,
+      findingTitle: row.title,
+      description: row.description,
+      cveId: row.cveId,
+      ghsaId: row.ghsaId,
+      cvssScore: row.cvssScore,
+      slaDeadline: formatDeadline(row.slaDueAt),
+      actionUrl: actionUrl(row),
+      manageNotificationsUrl: manageNotificationsUrl(row),
+    }),
   }).catch(() => null);
 
   if (!result) {

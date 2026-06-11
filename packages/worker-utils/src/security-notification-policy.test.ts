@@ -27,12 +27,13 @@ describe('security notification policy', () => {
     expect(meetsSecurityNotificationSeverityMinimum(severity, minimum)).toBe(expected);
   });
 
-  it('requires first inserted open findings for new-finding notifications', () => {
+  it('requires enabled notifications and first inserted open findings', () => {
     expect(
       isOpenFindingEligibleForNewFindingNotification({
         wasInserted: true,
         effectiveStatus: 'open',
         isAgentEnabled: true,
+        newFindingNotificationsEnabled: true,
         severity: SecuritySeverity.HIGH,
         minimumSeverity: SecuritySeverity.HIGH,
       })
@@ -40,9 +41,21 @@ describe('security notification policy', () => {
 
     expect(
       isOpenFindingEligibleForNewFindingNotification({
+        wasInserted: true,
+        effectiveStatus: 'open',
+        isAgentEnabled: true,
+        newFindingNotificationsEnabled: false,
+        severity: SecuritySeverity.CRITICAL,
+        minimumSeverity: SecuritySeverity.LOW,
+      })
+    ).toBe(false);
+
+    expect(
+      isOpenFindingEligibleForNewFindingNotification({
         wasInserted: false,
         effectiveStatus: 'open',
         isAgentEnabled: true,
+        newFindingNotificationsEnabled: true,
         severity: SecuritySeverity.CRITICAL,
         minimumSeverity: SecuritySeverity.LOW,
       })
@@ -82,6 +95,7 @@ describe('security notification policy', () => {
       getEligibleSlaNotificationKind({
         status: 'open',
         isAgentEnabled: true,
+        slaEnabled: true,
         slaNotificationsEnabled: false,
         severity: SecuritySeverity.CRITICAL,
         minimumSeverity: SecuritySeverity.HIGH,
@@ -95,6 +109,23 @@ describe('security notification policy', () => {
       getEligibleSlaNotificationKind({
         status: 'fixed',
         isAgentEnabled: true,
+        slaEnabled: true,
+        slaNotificationsEnabled: true,
+        severity: SecuritySeverity.CRITICAL,
+        minimumSeverity: SecuritySeverity.HIGH,
+        slaDueAt: '2026-06-11T12:00:00.000Z',
+        warningDays: 3,
+        now: '2026-06-10T12:00:00.000Z',
+      })
+    ).toBeNull();
+  });
+
+  it('rejects SLA notifications when SLA tracking is disabled', () => {
+    expect(
+      getEligibleSlaNotificationKind({
+        status: 'open',
+        isAgentEnabled: true,
+        slaEnabled: false,
         slaNotificationsEnabled: true,
         severity: SecuritySeverity.CRITICAL,
         minimumSeverity: SecuritySeverity.HIGH,

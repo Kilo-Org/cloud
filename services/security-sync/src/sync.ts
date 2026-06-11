@@ -1581,6 +1581,7 @@ async function syncRepo(params: {
             wasInserted: upserted.wasInserted,
             effectiveStatus: upserted.effectiveStatus,
             isAgentEnabled: true,
+            newFindingNotificationsEnabled: notificationPolicy.new_finding_notifications_enabled,
             severity: finding.severity,
             minimumSeverity: notificationPolicy.new_finding_notification_min_severity,
           })

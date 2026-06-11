@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
-import { send as sendEmail } from '@/lib/email';
+import { RawHtml, send as sendEmail } from '@/lib/email';
 import {
   agent_configs,
   kilocode_users,
@@ -21,9 +21,13 @@ jest.mock('@/lib/config.server', () => ({
   NEXTAUTH_URL: 'https://app.example.test',
 }));
 
-jest.mock('@/lib/email', () => ({
-  send: jest.fn(),
-}));
+jest.mock('@/lib/email', () => {
+  const actual = jest.requireActual('@/lib/email');
+  return {
+    ...actual,
+    send: jest.fn(),
+  };
+});
 
 import { POST } from './route';
 
@@ -63,7 +67,7 @@ async function insertPersonalNotification(params: {
     owned_by_user_id: user.id,
     agent_type: 'security_scan',
     platform: 'github',
-    config: params.config ?? {},
+    config: params.config ?? { new_finding_notifications_enabled: true },
     is_enabled: true,
     created_by: user.id,
   });
@@ -78,6 +82,10 @@ async function insertPersonalNotification(params: {
       package_name: 'lodash',
       package_ecosystem: 'npm',
       title: 'Prototype Pollution in lodash',
+      description: 'Lodash merge allows prototype pollution through crafted payloads.',
+      cve_id: 'CVE-2026-0001',
+      ghsa_id: 'GHSA-aaaa-bbbb-cccc',
+      cvss_score: '7.5',
       status: 'open',
       ...params.finding,
     })
@@ -119,7 +127,7 @@ async function insertOrganizationNotification(params: {
     owned_by_organization_id: organization.id,
     agent_type: 'security_scan',
     platform: 'github',
-    config: {},
+    config: { new_finding_notifications_enabled: true },
     is_enabled: true,
     created_by: owner.id,
   });
@@ -158,12 +166,12 @@ describe('POST /api/internal/security-agent/notifications', () => {
   });
 
   afterEach(async () => {
-    await db.delete(security_finding_notifications);
-    await db.delete(security_findings);
-    await db.delete(agent_configs);
-    await db.delete(organization_memberships);
-    await db.delete(organizations);
-    await db.delete(kilocode_users);
+    await db.delete(security_finding_notifications).where(sql`true`);
+    await db.delete(security_findings).where(sql`true`);
+    await db.delete(agent_configs).where(sql`true`);
+    await db.delete(organization_memberships).where(sql`true`);
+    await db.delete(organizations).where(sql`true`);
+    await db.delete(kilocode_users).where(sql`true`);
   });
 
   it('returns 401 when internal secret is wrong', async () => {
@@ -198,15 +206,43 @@ describe('POST /api/internal/security-agent/notifications', () => {
         severity: 'high',
         repository_name: 'acme/api',
         finding_title: 'Prototype Pollution in lodash',
+        finding_description: 'Lodash merge allows prototype pollution through crafted payloads.',
+        finding_details: expect.any(RawHtml),
         sla_deadline: '',
         action_url: 'https://app.example.test/security-agent/findings',
+        manage_notifications_url:
+          'https://app.example.test/security-agent/config?tab=notifications',
       },
     });
+    const sentEmail = mockSendEmail.mock.calls[0]?.[0];
+    const findingDetails = sentEmail?.templateVars.finding_details;
+    expect(findingDetails).toBeInstanceOf(RawHtml);
+    if (!(findingDetails instanceof RawHtml)) throw new Error('Expected finding details HTML');
+    expect(findingDetails.html).toContain('href="https://github.com/acme/api"');
+    expect(findingDetails.html).toContain('href="https://www.cve.org/CVERecord?id=CVE-2026-0001"');
+    expect(findingDetails.html).toContain(
+      'href="https://github.com/advisories/GHSA-AAAA-BBBB-CCCC"'
+    );
+    expect(findingDetails.html).toContain('CVSS 7.5');
+    expect(findingDetails.html).not.toContain('Lodash merge allows prototype pollution');
+  });
+
+  it('cancels new-finding notifications when they are disabled by default', async () => {
+    const { notification } = await insertPersonalNotification({ config: {} });
+
+    const response = await POST(createRequest(notification.id));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      outcome: 'cancelled',
+      reason: 'finding_ineligible',
+    });
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   it('defers when current notification config is malformed', async () => {
     const { notification } = await insertPersonalNotification({
-      config: { sla_notification_warning_days: 0 },
+      config: { new_finding_notifications_enabled: true, sla_notification_warning_days: 0 },
     });
 
     const response = await POST(createRequest(notification.id));
@@ -247,6 +283,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
         templateName: 'securityFindingNew',
         templateVars: expect.objectContaining({
           action_url: `https://app.example.test/organizations/${organization.id}/security-agent/findings`,
+          manage_notifications_url: `https://app.example.test/organizations/${organization.id}/security-agent/config?tab=notifications`,
         }),
       })
     );
@@ -267,6 +304,27 @@ describe('POST /api/internal/security-agent/notifications', () => {
       reason: 'finding_ineligible',
     });
     expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('sends SLA notification management links to the SLA tab', async () => {
+    const dueAt = new Date(Date.now() - 60_000).toISOString();
+    const { notification } = await insertPersonalNotification({
+      kind: SecurityFindingNotificationKind.SlaBreach,
+      finding: { sla_due_at: dueAt },
+    });
+
+    const response = await POST(createRequest(notification.id));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ outcome: 'sent' });
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        templateName: 'securityFindingSlaBreach',
+        templateVars: expect.objectContaining({
+          manage_notifications_url: 'https://app.example.test/security-agent/config?tab=sla',
+        }),
+      })
+    );
   });
 
   it('returns permanent failure when recipient email is unavailable', async () => {

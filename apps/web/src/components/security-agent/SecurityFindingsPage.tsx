@@ -125,6 +125,7 @@ export function SecurityFindingsPage() {
   const {
     organizationId,
     isOrg,
+    configData,
     hasIntegration,
     isEnabled,
     filteredRepositories,
@@ -145,6 +146,9 @@ export function SecurityFindingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [state, dispatch] = useReducer(pageReducer, searchParams, createInitialPageState);
+  const findingsEnabled = isEnabled === true;
+  const slaEnabled = configData?.slaEnabled ?? true;
+  const effectiveSortBy = slaEnabled ? state.sortBy : 'severity_desc';
 
   const findingIdParam = searchParams.get('findingId');
   const { data: deepLinkedFinding } = useQuery({
@@ -154,7 +158,7 @@ export function SecurityFindingsPage() {
           id: findingIdParam ?? '',
         })
       : trpc.securityAgent.getFinding.queryOptions({ id: findingIdParam ?? '' })),
-    enabled: Boolean(findingIdParam),
+    enabled: findingsEnabled && Boolean(findingIdParam),
   });
 
   const parsedStatus = SecurityFindingStatusSchema.safeParse(state.filters.status);
@@ -164,8 +168,8 @@ export function SecurityFindingsPage() {
     status: parsedStatus.success ? parsedStatus.data : undefined,
     severity: parsedSeverity.success ? parsedSeverity.data : undefined,
     outcomeFilter: parsedOutcome.success ? parsedOutcome.data : undefined,
-    overdue: state.filters.overdue,
-    sortBy: state.sortBy,
+    overdue: slaEnabled ? state.filters.overdue : undefined,
+    sortBy: effectiveSortBy,
     repoFullName: state.filters.repoFullName,
     limit: PAGE_SIZE,
     offset: (state.page - 1) * PAGE_SIZE,
@@ -178,6 +182,7 @@ export function SecurityFindingsPage() {
           ...findingsQueryParams,
         })
       : trpc.securityAgent.listFindings.queryOptions(findingsQueryParams)),
+    enabled: findingsEnabled,
     refetchInterval: query => {
       const result = query.state.data;
       if (!result) return false;
@@ -196,23 +201,25 @@ export function SecurityFindingsPage() {
     },
   });
 
-  const { data: statsData } = useQuery(
-    isOrg
+  const { data: statsData } = useQuery({
+    ...(isOrg
       ? trpc.organizations.securityAgent.getStats.queryOptions({
           organizationId: organizationId ?? '',
         })
-      : trpc.securityAgent.getStats.queryOptions()
-  );
-  const { data: lastSyncData } = useQuery(
-    isOrg
+      : trpc.securityAgent.getStats.queryOptions()),
+    enabled: findingsEnabled,
+  });
+  const { data: lastSyncData } = useQuery({
+    ...(isOrg
       ? trpc.organizations.securityAgent.getLastSyncTime.queryOptions({
           organizationId: organizationId ?? '',
           repoFullName: state.filters.repoFullName,
         })
       : trpc.securityAgent.getLastSyncTime.queryOptions({
           repoFullName: state.filters.repoFullName,
-        })
-  );
+        })),
+    enabled: findingsEnabled,
+  });
 
   const findings = findingsData?.findings ?? EMPTY_FINDINGS;
   const findingsById = new Map(findings.map(finding => [finding.id, finding]));
@@ -250,6 +257,22 @@ export function SecurityFindingsPage() {
   const installUrl = isOrg
     ? `/organizations/${organizationId}/integrations`
     : '/integrations/github';
+
+  if (isEnabled === false) {
+    return (
+      <Alert>
+        <AlertTriangle className="size-4" aria-hidden="true" />
+        <AlertTitle>Security Agent is off</AlertTitle>
+        <AlertDescription className="space-y-3">
+          <p>Turn on Security Agent before viewing findings.</p>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`${basePath}/config`}>Open settings</Link>
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   const stats = statsData ?? {
     total: 0,
     critical: 0,
@@ -312,8 +335,9 @@ export function SecurityFindingsPage() {
         onCancelRemediation={handleCancelRemediation}
         startingRemediationIds={startingRemediationIds}
         cancellingRemediationAttemptIds={cancellingRemediationAttemptIds}
-        sortBy={state.sortBy}
+        sortBy={effectiveSortBy}
         onSortByChange={sortBy => dispatch({ type: 'set-sort', sortBy })}
+        showSla={slaEnabled}
         runningCount={runningCount}
         concurrencyLimit={findingsData?.concurrencyLimit ?? 3}
       />
@@ -327,6 +351,7 @@ export function SecurityFindingsPage() {
         }}
         canDismiss={activeFinding?.status === 'open'}
         organizationId={organizationId}
+        showSla={slaEnabled}
       />
 
       <DismissFindingDialog

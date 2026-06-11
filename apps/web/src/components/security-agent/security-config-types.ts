@@ -23,6 +23,7 @@ export type SecurityRepository = {
 
 export type SecurityConfigFormState = {
   slaConfig: SlaConfig;
+  slaEnabled: boolean;
   repositorySelectionMode: RepositorySelectionMode;
   selectedRepositoryIds: number[];
   triageModelSlug: string;
@@ -40,6 +41,7 @@ export type SecurityConfigFormState = {
   slaNotificationsEnabled: boolean;
   slaNotificationMinSeverity: NotificationMinSeverity;
   slaNotificationWarningDays: number;
+  newFindingNotificationsEnabled: boolean;
   newFindingNotificationMinSeverity: NotificationMinSeverity;
 };
 

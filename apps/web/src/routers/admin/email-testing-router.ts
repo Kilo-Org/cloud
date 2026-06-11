@@ -11,6 +11,7 @@ import {
   renderTemplate,
   type TemplateName,
 } from '@/lib/email';
+import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
 import * as z from 'zod';
 import { format } from 'date-fns';
 
@@ -199,21 +200,33 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         manage_url: `${NEXTAUTH_URL}/claw/subscription`,
       };
     case 'securityFindingNew':
-      return {
+      return securityFindingTemplateVars({
         severity: 'high',
-        repository_name: 'acme/api',
-        finding_title: 'SQL injection in repository search endpoint',
-        action_url: `${NEXTAUTH_URL}/security-agent/findings`,
-      };
+        repositoryName: 'acme/api',
+        findingTitle: 'SQL injection in repository search endpoint',
+        description:
+          'Unsanitized repository search input can alter SQL query structure and expose repository metadata.',
+        cveId: 'CVE-2026-0001',
+        ghsaId: 'GHSA-abcd-1234-wxyz',
+        cvssScore: 8.1,
+        actionUrl: `${NEXTAUTH_URL}/security-agent/findings`,
+        manageNotificationsUrl: `${NEXTAUTH_URL}/security-agent/config?tab=notifications`,
+      });
     case 'securityFindingSlaWarning':
     case 'securityFindingSlaBreach':
-      return {
+      return securityFindingTemplateVars({
         severity: 'critical',
-        repository_name: 'acme/api',
-        finding_title: 'Unauthenticated access to admin token exchange',
-        sla_deadline: 'Jun 14, 2026, 17:00 UTC',
-        action_url: `${NEXTAUTH_URL}/security-agent/findings`,
-      };
+        repositoryName: 'acme/api',
+        findingTitle: 'Unauthenticated access to admin token exchange',
+        description:
+          'The admin token exchange endpoint accepts requests without a verified session token.',
+        cveId: 'CVE-2026-0002',
+        ghsaId: 'GHSA-wxyz-1234-abcd',
+        cvssScore: 9.8,
+        slaDeadline: 'Jun 14, 2026, 17:00 UTC',
+        actionUrl: `${NEXTAUTH_URL}/security-agent/findings`,
+        manageNotificationsUrl: `${NEXTAUTH_URL}/security-agent/config?tab=sla`,
+      });
   }
   throw new Error(`Unknown template: ${template}`);
 }

@@ -200,6 +200,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           slaHighDays: 30,
           slaMediumDays: 45,
           slaLowDays: 90,
+          slaEnabled: DEFAULT_SECURITY_AGENT_CONFIG.sla_enabled,
           autoSyncEnabled: true,
           repositorySelectionMode: 'selected' as const,
           selectedRepositoryIds: [] as number[],
@@ -220,6 +221,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           slaNotificationsEnabled: DEFAULT_SECURITY_AGENT_CONFIG.sla_notifications_enabled,
           slaNotificationMinSeverity: DEFAULT_SECURITY_AGENT_CONFIG.sla_notification_min_severity,
           slaNotificationWarningDays: DEFAULT_SECURITY_AGENT_CONFIG.sla_notification_warning_days,
+          newFindingNotificationsEnabled:
+            DEFAULT_SECURITY_AGENT_CONFIG.new_finding_notifications_enabled,
           newFindingNotificationMinSeverity:
             DEFAULT_SECURITY_AGENT_CONFIG.new_finding_notification_min_severity,
         };
@@ -247,6 +250,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         slaHighDays: result.config.sla_high_days,
         slaMediumDays: result.config.sla_medium_days,
         slaLowDays: result.config.sla_low_days,
+        slaEnabled: result.config.sla_enabled,
         autoSyncEnabled: result.config.auto_sync_enabled,
         repositorySelectionMode: result.config.repository_selection_mode || 'selected',
         selectedRepositoryIds: result.config.selected_repository_ids || [],
@@ -267,6 +271,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         slaNotificationsEnabled: result.config.sla_notifications_enabled,
         slaNotificationMinSeverity: result.config.sla_notification_min_severity,
         slaNotificationWarningDays: result.config.sla_notification_warning_days,
+        newFindingNotificationsEnabled: result.config.new_finding_notifications_enabled,
         newFindingNotificationMinSeverity: result.config.new_finding_notification_min_severity,
       };
     },
@@ -325,9 +330,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
               slaHighDays: existingConfig.config.sla_high_days,
               slaMediumDays: existingConfig.config.sla_medium_days,
               slaLowDays: existingConfig.config.sla_low_days,
+              slaEnabled: existingConfig.config.sla_enabled,
               slaNotificationsEnabled: existingConfig.config.sla_notifications_enabled,
               slaNotificationMinSeverity: existingConfig.config.sla_notification_min_severity,
               slaNotificationWarningDays: existingConfig.config.sla_notification_warning_days,
+              newFindingNotificationsEnabled:
+                existingConfig.config.new_finding_notifications_enabled,
               newFindingNotificationMinSeverity:
                 existingConfig.config.new_finding_notification_min_severity,
             }
@@ -359,6 +367,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             sla_high_days: input.slaHighDays,
             sla_medium_days: input.slaMediumDays,
             sla_low_days: input.slaLowDays,
+            sla_enabled: input.slaEnabled,
             auto_sync_enabled: input.autoSyncEnabled,
             repository_selection_mode: input.repositorySelectionMode,
             selected_repository_ids: input.selectedRepositoryIds,
@@ -378,6 +387,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             sla_notifications_enabled: input.slaNotificationsEnabled,
             sla_notification_min_severity: input.slaNotificationMinSeverity,
             sla_notification_warning_days: input.slaNotificationWarningDays,
+            new_finding_notifications_enabled: input.newFindingNotificationsEnabled,
             new_finding_notification_min_severity: input.newFindingNotificationMinSeverity,
           },
           ctx.user.id
@@ -473,9 +483,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           autoRemediationEnabled: input.autoRemediationEnabled,
           autoRemediationMinSeverity: input.autoRemediationMinSeverity,
           autoRemediationIncludeExisting: input.autoRemediationIncludeExisting,
+          slaEnabled: input.slaEnabled,
           slaNotificationsEnabled: input.slaNotificationsEnabled,
           slaNotificationMinSeverity: input.slaNotificationMinSeverity,
           slaNotificationWarningDays: input.slaNotificationWarningDays,
+          newFindingNotificationsEnabled: input.newFindingNotificationsEnabled,
           newFindingNotificationMinSeverity: input.newFindingNotificationMinSeverity,
           repositorySelectionMode: input.repositorySelectionMode,
           selectedRepoCount: input.selectedRepositoryIds?.length,
@@ -511,9 +523,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             slaHighDays: input.slaHighDays,
             slaMediumDays: input.slaMediumDays,
             slaLowDays: input.slaLowDays,
+            slaEnabled: input.slaEnabled,
             slaNotificationsEnabled: input.slaNotificationsEnabled,
             slaNotificationMinSeverity: input.slaNotificationMinSeverity,
             slaNotificationWarningDays: input.slaNotificationWarningDays,
+            newFindingNotificationsEnabled: input.newFindingNotificationsEnabled,
             newFindingNotificationMinSeverity: input.newFindingNotificationMinSeverity,
           },
         });

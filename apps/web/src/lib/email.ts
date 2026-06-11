@@ -62,7 +62,7 @@ export const subjects = {
 
 export type TemplateName = keyof typeof subjects;
 
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

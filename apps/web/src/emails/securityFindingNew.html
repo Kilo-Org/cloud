@@ -29,10 +29,10 @@
                   <p style="margin: 0; color: #1a1a1a; font-size: 14px; font-weight: 700">
                     {{ finding_title }}
                   </p>
-                  <p style="margin: 8px 0 0; color: #555; font-size: 13px">
-                    Repository: {{ repository_name }}<br />
-                    Severity: {{ severity }}
+                  <p style="margin: 8px 0 0; color: #555; font-size: 13px; line-height: 1.5">
+                    {{ finding_description }}
                   </p>
+                  <div style="margin: 10px 0 0">{{ finding_details }}</div>
                 </td>
               </tr>
             </table>
@@ -49,7 +49,14 @@
                   border-radius: 7px;
                   padding: 10px 20px;
                 "
-                >Review findings</a
+                >Resolve with Security Agent</a
+              >
+            </p>
+            <p style="margin: 0 0 24px; color: #555; font-size: 13px; line-height: 1.5">
+              <a
+                href="{{ manage_notifications_url }}"
+                style="color: #1a1a1a; text-decoration: underline"
+                >Manage your security agent notifications</a
               >
             </p>
           </td>

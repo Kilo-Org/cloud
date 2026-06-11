@@ -56,6 +56,7 @@ export const SecurityAgentConfigSchema = z
     sla_high_days: z.number().int().positive().default(30),
     sla_medium_days: z.number().int().positive().default(45),
     sla_low_days: z.number().int().positive().default(90),
+    sla_enabled: z.boolean().default(true),
     auto_sync_enabled: z.boolean().default(true),
     repository_selection_mode: z.enum(['all', 'selected']).default('all'),
     selected_repository_ids: z.array(z.number()).optional(),

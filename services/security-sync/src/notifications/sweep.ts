@@ -11,7 +11,7 @@ import {
   meetsSecurityNotificationSeverityMinimum,
   type SecurityNotificationPolicy,
 } from '@kilocode/worker-utils/security-notification-policy';
-import { and, eq, inArray, isNotNull, lte, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   isOrganizationNotificationOwner,
@@ -280,15 +280,19 @@ function notificationStillEligible(
   if (row.findingStatus !== 'open' || isSuperseded(row)) return false;
 
   if (row.kind === 'new_finding') {
-    return meetsSecurityNotificationSeverityMinimum(
-      row.severity,
-      policy.new_finding_notification_min_severity
+    return (
+      policy.new_finding_notifications_enabled &&
+      meetsSecurityNotificationSeverityMinimum(
+        row.severity,
+        policy.new_finding_notification_min_severity
+      )
     );
   }
 
   const eligibleKind = getEligibleSlaNotificationKind({
     status: row.findingStatus,
     isAgentEnabled: true,
+    slaEnabled: policy.sla_enabled,
     slaNotificationsEnabled: policy.sla_notifications_enabled,
     severity: row.severity,
     minimumSeverity: policy.sla_notification_min_severity,
@@ -530,6 +534,7 @@ async function materializeSlaNotifications(
 
   for (const [key, state] of states) {
     if (state.state !== 'enabled') continue;
+    if (!state.policy.sla_enabled) continue;
     if (!state.policy.sla_notifications_enabled) continue;
     const recipientIds = recipients.get(key);
     if (!recipientIds || recipientIds.size === 0) continue;
@@ -568,6 +573,7 @@ async function materializeSlaNotifications(
       const kind = getEligibleSlaNotificationKind({
         status: candidate.status,
         isAgentEnabled: true,
+        slaEnabled: state.policy.sla_enabled,
         slaNotificationsEnabled: state.policy.sla_notifications_enabled,
         severity: candidate.severity,
         minimumSeverity: state.policy.sla_notification_min_severity,

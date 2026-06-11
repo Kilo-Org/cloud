@@ -14,25 +14,31 @@ export type SecurityNotificationSeverity = z.infer<typeof SecurityNotificationSe
 export const SecurityNotificationWarningDaysSchema = z.number().int().min(1).max(365);
 
 export const DEFAULT_SECURITY_NOTIFICATION_POLICY = {
+  sla_enabled: true,
   sla_notifications_enabled: true,
   sla_notification_min_severity: SecuritySeverity.HIGH,
   sla_notification_warning_days: 3,
+  new_finding_notifications_enabled: false,
   new_finding_notification_min_severity: SecuritySeverity.HIGH,
 } as const satisfies SecurityNotificationPolicy;
 
 export const SecurityNotificationPolicySchema = z.object({
+  sla_enabled: z.boolean().default(true),
   sla_notifications_enabled: z.boolean().default(true),
   sla_notification_min_severity: SecurityNotificationSeveritySchema.default(SecuritySeverity.HIGH),
   sla_notification_warning_days: SecurityNotificationWarningDaysSchema.default(3),
+  new_finding_notifications_enabled: z.boolean().default(false),
   new_finding_notification_min_severity: SecurityNotificationSeveritySchema.default(
     SecuritySeverity.HIGH
   ),
 });
 
 export type SecurityNotificationPolicy = {
+  sla_enabled: boolean;
   sla_notifications_enabled: boolean;
   sla_notification_min_severity: SecurityNotificationSeverity;
   sla_notification_warning_days: number;
+  new_finding_notifications_enabled: boolean;
   new_finding_notification_min_severity: SecurityNotificationSeverity;
 };
 
@@ -42,6 +48,7 @@ export type OpenFindingNotificationParams = {
   wasInserted: boolean;
   effectiveStatus: string;
   isAgentEnabled: boolean;
+  newFindingNotificationsEnabled: boolean;
   severity: string | null;
   minimumSeverity: SecurityNotificationSeverity;
   isSuperseded?: boolean;
@@ -50,6 +57,7 @@ export type OpenFindingNotificationParams = {
 export type SlaNotificationEligibilityParams = {
   status: string;
   isAgentEnabled: boolean;
+  slaEnabled: boolean;
   slaNotificationsEnabled: boolean;
   severity: string | null;
   minimumSeverity: SecurityNotificationSeverity;
@@ -117,6 +125,7 @@ export function isOpenFindingEligibleForNewFindingNotification(
   return (
     params.wasInserted &&
     params.isAgentEnabled &&
+    params.newFindingNotificationsEnabled &&
     params.effectiveStatus === 'open' &&
     !params.isSuperseded &&
     meetsSecurityNotificationSeverityMinimum(params.severity, params.minimumSeverity)
@@ -128,6 +137,7 @@ export function getEligibleSlaNotificationKind(
 ): SlaNotificationKind | null {
   if (
     !params.isAgentEnabled ||
+    !params.slaEnabled ||
     !params.slaNotificationsEnabled ||
     params.status !== 'open' ||
     params.isSuperseded ||

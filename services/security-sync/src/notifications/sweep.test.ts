@@ -19,7 +19,9 @@ function createRecoveryOnlyDb() {
   };
 }
 
-function createStagedRecoveryDb() {
+function createStagedRecoveryDb(
+  config: Record<string, unknown> = { new_finding_notifications_enabled: true }
+) {
   const operations: string[] = [];
   let updateCount = 0;
   let selectCount = 0;
@@ -52,7 +54,7 @@ function createStagedRecoveryDb() {
                 ownedByOrganizationId: null,
                 ownedByUserId: 'user-1',
                 isEnabled: true,
-                config: {},
+                config,
               },
             ],
           }),
@@ -154,6 +156,21 @@ describe('runSecurityNotificationSweep', () => {
       '[security-notifications] malformed rollout flag; treating as disabled',
       { name: 'SECURITY_NOTIFICATION_DISPATCH_ENABLED' }
     );
+  });
+
+  it('cancels staged New-finding Notifications when they are disabled by default', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { db, operations } = createStagedRecoveryDb({});
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const result = await runSecurityNotificationSweep({
+      HYPERDRIVE: { connectionString: 'postgres://worker' },
+      SECURITY_NOTIFICATION_DISPATCH_ENABLED: 'true',
+    });
+
+    expect(result).toMatchObject({ stagedRecovered: 0, cancelled: 1 });
+    expect(operations.slice(0, 3)).toEqual(['recover-stuck-claims', 'canonicalize', 'update']);
   });
 
   it('canonicalizes owner-scoped duplicate findings before publishing staged notifications', async () => {

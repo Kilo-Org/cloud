@@ -19,7 +19,7 @@ import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import { isOpenCodeGoMessagesModel } from '@/lib/ai-gateway/providers/direct-byok/opencode-go';
+import { isOpenCodeGoAnthropicMessagesModel } from '@/lib/ai-gateway/providers/direct-byok/opencode-go';
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
@@ -138,7 +138,7 @@ export function getAiSdkProvider(
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
   }
-  if (isOpenCodeGoMessagesModel(model)) {
+  if (isOpenCodeGoAnthropicMessagesModel(model)) {
     return 'anthropic';
   }
   if (isClaudeModel(model)) {

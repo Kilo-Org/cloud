@@ -7,7 +7,7 @@ import {
   type AutoRoutingClassifierAnalyticsResponse,
   type AutoRoutingClassifierModelResponse,
 } from '@kilocode/auto-routing-contracts';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { BarChart3, Clock3, DollarSign, HelpCircle, RefreshCw, Route, Save } from 'lucide-react';
@@ -31,6 +31,7 @@ import {
   type OpenRouterModelsResponse,
 } from '@/lib/organizations/organization-types';
 import { cn } from '@/lib/utils';
+import { formatBodySizeKilobytes } from './auto-routing-format';
 
 const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
   { value: '1h', label: '1h' },
@@ -208,7 +209,7 @@ function EmptyTableRow({ colSpan }: { colSpan: number }) {
   );
 }
 
-function BreakdownTables({
+export function AutoRoutingBreakdownTables({
   analytics,
   loading,
 }: {
@@ -216,142 +217,148 @@ function BreakdownTables({
   loading: boolean;
 }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-4">
-      <BreakdownCard
-        title="Status"
-        help="Breakdown by raw classifier status, including classifier_error:<subtype> rows for classifier failures."
-        loading={loading}
-      >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Requests</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {analytics?.statusBreakdown.length ? (
-              analytics.statusBreakdown.map(row => (
-                <TableRow key={row.status}>
-                  <TableCell>
-                    <Badge variant="outline" className="max-w-56 truncate">
-                      {row.status || 'unknown'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(row.requests)}
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <EmptyTableRow colSpan={2} />
-            )}
-          </TableBody>
-        </Table>
-      </BreakdownCard>
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <BreakdownCard
+          title="Status"
+          help="Breakdown by raw classifier status, including classifier_error:<subtype> rows for classifier failures."
+          loading={loading}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Requests</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {analytics?.statusBreakdown.length ? (
+                analytics.statusBreakdown.map(row => (
+                  <TableRow key={row.status}>
+                    <TableCell>
+                      <Badge variant="outline" className="max-w-56 truncate">
+                        {row.status || 'unknown'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatNumber(row.requests)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <EmptyTableRow colSpan={2} />
+              )}
+            </TableBody>
+          </Table>
+        </BreakdownCard>
 
-      <BreakdownCard
-        title="Task Types"
-        help="Successful classifier task categories and their average classifier confidence."
-        loading={loading}
-      >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Task</TableHead>
-              <TableHead className="text-right">Requests</TableHead>
-              <TableHead className="text-right">Confidence</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {analytics?.taskTypeBreakdown.length ? (
-              analytics.taskTypeBreakdown.map(row => (
-                <TableRow key={row.taskType}>
-                  <TableCell className="capitalize">{row.taskType.replaceAll('_', ' ')}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(row.requests)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatPercent(row.avgConfidence)}
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <EmptyTableRow colSpan={3} />
-            )}
-          </TableBody>
-        </Table>
-      </BreakdownCard>
+        <BreakdownCard
+          title="Classifier Models"
+          help="Classifier model used for each request, or unknown when no classifier call happened."
+          loading={loading}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Model</TableHead>
+                <TableHead className="text-right">Requests</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {analytics?.classifierModelBreakdown.length ? (
+                analytics.classifierModelBreakdown.map(row => (
+                  <TableRow key={row.classifierModel}>
+                    <TableCell className="max-w-64 truncate font-mono text-xs">
+                      {row.classifierModel || 'unknown'}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatNumber(row.requests)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <EmptyTableRow colSpan={2} />
+              )}
+            </TableBody>
+          </Table>
+        </BreakdownCard>
+      </div>
 
-      <BreakdownCard
-        title="Task Subtypes"
-        help="Successful classifier task and subtask pairs with their average classifier confidence."
-        loading={loading}
-      >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Subtype</TableHead>
-              <TableHead className="text-right">Requests</TableHead>
-              <TableHead className="text-right">Confidence</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {analytics?.taskSubtypeBreakdown.length ? (
-              analytics.taskSubtypeBreakdown.map(row => (
-                <TableRow key={`${row.taskType}:${row.subtaskType}`}>
-                  <TableCell className="max-w-32 truncate capitalize">
-                    {row.taskType.replaceAll('_', ' ')}
-                  </TableCell>
-                  <TableCell className="max-w-40 truncate capitalize">
-                    {row.subtaskType.replaceAll('_', ' ')}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(row.requests)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatPercent(row.avgConfidence)}
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <EmptyTableRow colSpan={4} />
-            )}
-          </TableBody>
-        </Table>
-      </BreakdownCard>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <BreakdownCard
+          title="Task Types"
+          help="Successful classifier task categories and their average classifier confidence."
+          loading={loading}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Task</TableHead>
+                <TableHead className="text-right">Requests</TableHead>
+                <TableHead className="text-right">Confidence</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {analytics?.taskTypeBreakdown.length ? (
+                analytics.taskTypeBreakdown.map(row => (
+                  <TableRow key={row.taskType}>
+                    <TableCell className="capitalize">
+                      {row.taskType.replaceAll('_', ' ')}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatNumber(row.requests)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatPercent(row.avgConfidence)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <EmptyTableRow colSpan={3} />
+              )}
+            </TableBody>
+          </Table>
+        </BreakdownCard>
 
-      <BreakdownCard
-        title="Classifier Models"
-        help="Classifier model used for each request, or unknown when no classifier call happened."
-        loading={loading}
-      >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Model</TableHead>
-              <TableHead className="text-right">Requests</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {analytics?.classifierModelBreakdown.length ? (
-              analytics.classifierModelBreakdown.map(row => (
-                <TableRow key={row.classifierModel}>
-                  <TableCell className="max-w-64 truncate font-mono text-xs">
-                    {row.classifierModel || 'unknown'}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(row.requests)}
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <EmptyTableRow colSpan={2} />
-            )}
-          </TableBody>
-        </Table>
-      </BreakdownCard>
+        <BreakdownCard
+          title="Task Subtypes"
+          help="Successful classifier task and subtask pairs with their average classifier confidence."
+          loading={loading}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>Subtype</TableHead>
+                <TableHead className="text-right">Requests</TableHead>
+                <TableHead className="text-right">Confidence</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {analytics?.taskSubtypeBreakdown.length ? (
+                analytics.taskSubtypeBreakdown.map(row => (
+                  <TableRow key={`${row.taskType}:${row.subtaskType}`}>
+                    <TableCell className="max-w-32 truncate capitalize">
+                      {row.taskType.replaceAll('_', ' ')}
+                    </TableCell>
+                    <TableCell className="max-w-40 truncate capitalize">
+                      {row.subtaskType.replaceAll('_', ' ')}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatNumber(row.requests)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatPercent(row.avgConfidence)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <EmptyTableRow colSpan={4} />
+              )}
+            </TableBody>
+          </Table>
+        </BreakdownCard>
+      </div>
     </div>
   );
 }
@@ -576,15 +583,18 @@ export function AutoRoutingAdminContent() {
             />
             <MetricCard
               title="Body Size"
-              value={`${formatDecimal(summary?.avgBodyBytes ?? 0)} B`}
+              value={formatBodySizeKilobytes(summary?.avgBodyBytes ?? 0)}
               detail={`${formatPercent(summary?.avgConfidence ?? 0)} avg confidence`}
               icon={BarChart3}
               loading={analyticsQuery.isLoading}
-              help="Average mirrored body size in bytes. The detail shows average classifier confidence for successful classifications."
+              help="Average mirrored body size in KB. The detail shows average classifier confidence for successful classifications."
             />
           </div>
 
-          <BreakdownTables analytics={analyticsQuery.data} loading={analyticsQuery.isLoading} />
+          <AutoRoutingBreakdownTables
+            analytics={analyticsQuery.data}
+            loading={analyticsQuery.isLoading}
+          />
         </>
       )}
     </div>

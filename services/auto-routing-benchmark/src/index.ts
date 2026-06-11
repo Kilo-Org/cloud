@@ -17,9 +17,5 @@ export default {
     _env: Env,
     _ctx: ExecutionContext
   ): Promise<void> {},
-  async queue(
-    _batch: MessageBatch<unknown>,
-    _env: Env,
-    _ctx: ExecutionContext
-  ): Promise<void> {},
+  async queue(_batch: MessageBatch<unknown>, _env: Env, _ctx: ExecutionContext): Promise<void> {},
 };

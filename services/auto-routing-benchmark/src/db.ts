@@ -201,10 +201,7 @@ export async function markRunCompleted(db: D1Database, runId: string): Promise<v
     .run();
 }
 
-export async function markStaleRunsFailed(
-  db: D1Database,
-  olderThanIso: string
-): Promise<number> {
+export async function markStaleRunsFailed(db: D1Database, olderThanIso: string): Promise<number> {
   const result = await db
     .prepare(
       `UPDATE benchmark_runs SET status = 'failed', error = 'timed out'

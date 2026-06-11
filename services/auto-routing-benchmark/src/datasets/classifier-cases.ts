@@ -140,7 +140,7 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     id: 'debug-low-typo-import',
     input: chat(
       AGENT_TOOLS_SYSTEM,
-      "Running the app throws \"TypeError: formatDate is not a function\" from src/utils/date.ts line 12. The file exports formatDate as a named export but App.tsx imports it as a default. Fix the import.",
+      'Running the app throws "TypeError: formatDate is not a function" from src/utils/date.ts line 12. The file exports formatDate as a named export but App.tsx imports it as a default. Fix the import.',
       { messageCount: 4, hasTools: true }
     ),
     expected: {

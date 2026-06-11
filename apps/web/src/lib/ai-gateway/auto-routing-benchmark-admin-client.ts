@@ -3,7 +3,6 @@ import {
   BenchmarkConfigResponseSchema,
   BenchmarkRunsResponseSchema,
   StartBenchmarkRunResponseSchema,
-  RoutingTableSchema,
   type BenchmarkConfig,
   type BenchmarkKind,
 } from '@kilocode/auto-routing-contracts';

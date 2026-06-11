@@ -251,8 +251,8 @@ export async function sendAutoFixFeatureSunsetEmail(to: string): Promise<SendRes
     to,
     templateName: 'autoFixFeatureSunset',
     templateVars: {
-      disable_date: 'June 17, 2026',
-      github_app_url: 'https://github.com/apps/kilo-code',
+      disable_date: 'June 18, 2026',
+      github_docs_url: 'https://kilo.ai/docs/code-with-ai/platforms/github',
       contact_email: 'hi@kilocode.ai',
     },
   });

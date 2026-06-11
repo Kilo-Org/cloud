@@ -72,7 +72,7 @@ Every template must include this branding footer below the content table:
 | `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` | `16` |
 | `autoTopUpFailed.html` | `reason`, `credits_url`, `year` | `17` |
 | `codeReviewDisabled.html` | `reason`, `recovery_url`, `recovery_label`, `year` | — |
-| `autoFixFeatureSunset.html` | `disable_date`, `github_app_url`, `contact_email`, `year` | — |
+| `autoFixFeatureSunset.html` | `disable_date`, `github_docs_url`, `contact_email`, `year` | — |
 | `ossInviteNewUser.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `accept_invite_url`, `integrations_url`, `code_reviews_url`, `year` | `18` |
 | `ossInviteExistingUser.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year` | `19` |
 | `ossExistingOrgProvisioned.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year` | `20` |

@@ -7,11 +7,14 @@ set -euo pipefail
 # touchpoints, regenerates the lockfile, and opens a DRAFT PR.
 #
 # Create-once and terminal: it queries all PR states for the org-owned bump
-# branch. An open PR means nothing to do; a closed PR means the version was
+# branch. If an open PR exists the script does not bump again; instead it reports
+# how far that PR got so the caller can resume: action=resume-assessment when the
+# assessment is still pending, resume-notify when it is written but Slack has not
+# posted, skip-open-pr when it is fully done. A closed PR means the version was
 # already proposed and is not recreated (override with BUMP_FORCE_RECREATE=true).
-# A leftover branch with no PR is not auto-recovered; delete it and re-run.
-# There is no force push. Pin consistency is validated by
-# scripts/check-plugin-openclaw-pin.sh before publishing, and again by CI.
+# A leftover branch with no PR is not auto-recovered; delete it and re-run, or set
+# BUMP_FORCE_RECREATE=true to clear it. There is no force push. Pin consistency is
+# validated by scripts/check-plugin-openclaw-pin.sh before publishing, and by CI.
 #
 # Usage:
 #   services/kiloclaw/scripts/openclaw-bump.sh <TARGET_VERSION>
@@ -23,7 +26,10 @@ set -euo pipefail
 # Env:
 #   BUMP_ALLOW_DIRTY=true     local edits-only mode: edit + validate, never remote.
 #   BUMP_SIGN_COMMITS=false   disable commit signing (default is to require it).
-#   BUMP_FORCE_RECREATE=true  recreate even if a closed PR exists for the version.
+#   BUMP_FORCE_RECREATE=true  recreate even if a closed PR exists for the version,
+#                             and clear a leftover branch instead of stopping.
+#   NODE_OPTIONS              passed to the lockfile step; defaults to
+#                             --max-old-space-size=6144 if unset.
 
 TARGET="${1:-${TARGET_VERSION:-}}"
 REPO="${BUMP_REPO:-Kilo-Org/cloud}"
@@ -35,6 +41,9 @@ GIT_EMAIL="${BUMP_GIT_EMAIL:-github-actions[bot]@users.noreply.github.com}"
 # key; set BUMP_SIGN_COMMITS=false only for non-publishing local use.
 BUMP_SIGN="${BUMP_SIGN_COMMITS:-true}"
 ASSESSMENT_PLACEHOLDER="_Automated upgrade assessment pending._"
+# Marker the notifier appends to the PR body after Slack posts. Its presence means
+# the PR is fully handled; its absence on an assessed PR means notify is pending.
+SLACK_MARKER="<!-- openclaw-bump: slack-notified -->"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -147,7 +156,11 @@ prepare_bump() {
   echo "openclaw-bump: regenerating lockfile"
   # --no-frozen-lockfile because this is an intentional lockfile update; pnpm
   # defaults to frozen under CI=true, which would fail after the manifest edits.
-  pnpm install --lockfile-only --no-frozen-lockfile
+  # Give Node generous heap: resolving the whole workspace can exceed the ~2GB
+  # default and OOM (exit 134) in a constrained sandbox. Respect a caller-set
+  # NODE_OPTIONS, otherwise default the heap size.
+  NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=6144}" \
+    pnpm install --lockfile-only --no-frozen-lockfile
   echo "openclaw-bump: validating pin consistency"
   bash scripts/check-plugin-openclaw-pin.sh
 }
@@ -300,9 +313,24 @@ open_url="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open \
   --json url,headRefName,headRepositoryOwner \
   --jq "[.[] | select(.headRepositoryOwner.login == \"$OWNER\" and .headRefName == \"$BRANCH\")][0].url // \"\"")"
 if [ -n "$open_url" ]; then
-  emit action skip-open-pr
-  emit pr_url "$open_url"
-  echo "openclaw-bump: an open PR for $BRANCH already exists: $open_url. Nothing to do."
+  # An open PR exists, so do not bump again. Read how far it got from its body and
+  # report the resume point. Do not mask a read failure: a transient gh error must
+  # stop the run (the caller treats a non-zero exit as "stop, do not notify"),
+  # otherwise we could re-assess and re-post Slack on an already finished PR whose
+  # marker we simply failed to observe. Classify only after a successful read.
+  if ! open_body="$(gh pr view "$open_url" --repo "$REPO" --json body --jq .body)"; then
+    die "could not read the body of open PR $open_url; not classifying its state. Retry later."
+  fi
+  if printf '%s' "$open_body" | grep -qF "$SLACK_MARKER"; then
+    emit_pr_result skip-open-pr "$open_url"
+    echo "openclaw-bump: open PR $open_url is assessed and notified. Nothing to do."
+  elif printf '%s' "$open_body" | grep -qF "$ASSESSMENT_PLACEHOLDER"; then
+    emit_pr_result resume-assessment "$open_url"
+    echo "openclaw-bump: open PR $open_url still needs the assessment."
+  else
+    emit_pr_result resume-notify "$open_url"
+    echo "openclaw-bump: open PR $open_url is assessed but not notified."
+  fi
   exit 0
 fi
 
@@ -319,7 +347,14 @@ fi
 # failed after the push) is not auto-recovered; validating a stray branch is more
 # fragile than regenerating. Delete it and re-run for a clean, complete bump.
 if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-  die "branch $BRANCH exists on origin with no open PR. Delete it and re-run to regenerate a clean bump: git push origin --delete $BRANCH"
+  if [ "${BUMP_FORCE_RECREATE:-}" = "true" ]; then
+    echo "openclaw-bump: BUMP_FORCE_RECREATE=true; deleting leftover branch $BRANCH on origin before recreating."
+    # Let git's output flow to the log; on failure its error is the useful context.
+    git push origin --delete "$BRANCH" \
+      || die "could not delete leftover branch $BRANCH on origin (see the git error above); delete it manually and re-run: git push origin --delete $BRANCH"
+  else
+    die "branch $BRANCH exists on origin with no open PR. Delete it and re-run to regenerate a clean bump (git push origin --delete $BRANCH), or set BUMP_FORCE_RECREATE=true to clear it automatically."
+  fi
 fi
 
 prepare_bump

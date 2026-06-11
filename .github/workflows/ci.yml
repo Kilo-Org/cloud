@@ -58,13 +58,13 @@ jobs:
               - 'packages/encryption/**'
               - 'packages/trpc/**'
               - 'packages/worker-utils/**'
+              - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent:
               - 'services/cloud-agent/**'
             cloud_agent_next:
               - 'services/cloud-agent-next/**'
-
       - name: Detect changed workspaces with tests
         id: workspaces
         run: |
@@ -252,6 +252,9 @@ jobs:
 
       - name: Run tests
         run: pnpm run test
+
+      - name: Run builder Postgres repository tests
+        run: pnpm --filter kilo-deploy-builder test:postgres
 
   build:
     needs: [changes, typecheck, lint, format-check, drizzle-check]

@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ExternalLink } from 'lucide-react';
-import type { SecurityFinding } from '@kilocode/db/schema';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -17,10 +16,11 @@ import {
 import { DismissFindingDialog, type DismissReason } from './DismissFindingDialog';
 import { FindingDetailDialog } from './FindingDetailDialog';
 import { SecurityFindingsCard } from './SecurityFindingsCard';
+import type { SecurityFindingWithRemediation } from './SecurityFindingRow';
 import { useSecurityAgent } from './SecurityAgentContext';
 
 const PAGE_SIZE = 20;
-const EMPTY_FINDINGS: SecurityFinding[] = [];
+const EMPTY_FINDINGS: SecurityFindingWithRemediation[] = [];
 
 type Filters = {
   status?: string;
@@ -36,7 +36,7 @@ type PageState = {
   page: number;
   filters: Filters;
   sortBy: SortBy;
-  selectedFinding: SecurityFinding | null;
+  selectedFinding: SecurityFindingWithRemediation | null;
   detailDialogOpen: boolean;
   dismissDialogOpen: boolean;
   closedDeepLinkId: string | null;
@@ -46,9 +46,9 @@ type PageAction =
   | { type: 'set-page'; page: number }
   | { type: 'set-filters'; filters: Filters }
   | { type: 'set-sort'; sortBy: SortBy }
-  | { type: 'open-detail'; finding: SecurityFinding }
+  | { type: 'open-detail'; finding: SecurityFindingWithRemediation }
   | { type: 'set-detail-open'; open: boolean }
-  | { type: 'open-dismiss'; finding: SecurityFinding }
+  | { type: 'open-dismiss'; finding: SecurityFindingWithRemediation }
   | { type: 'set-dismiss-open'; open: boolean }
   | { type: 'close-deep-link'; findingId: string }
   | { type: 'finish-dismiss' };
@@ -131,9 +131,14 @@ export function SecurityFindingsPage() {
     handleSync,
     handleDismiss,
     handleStartAnalysis,
+    handleStartRemediation,
+    handleRetryRemediation,
+    handleCancelRemediation,
     isSyncing,
     isDismissing,
     startingAnalysisIds,
+    startingRemediationIds,
+    cancellingRemediationAttemptIds,
     gitHubError,
   } = useSecurityAgent();
   const trpc = useTRPC();
@@ -181,7 +186,13 @@ export function SecurityFindingsPage() {
         result.findings.some(
           finding => finding.analysis_status === 'pending' || finding.analysis_status === 'running'
         );
-      return hasActiveAnalysis ? 5000 : false;
+      const hasActiveRemediation = result.findings.some(
+        finding =>
+          finding.remediationSummary?.status === 'queued' ||
+          finding.remediationSummary?.status === 'launching' ||
+          finding.remediationSummary?.status === 'running'
+      );
+      return hasActiveAnalysis || hasActiveRemediation ? 5000 : false;
     },
   });
 
@@ -296,6 +307,11 @@ export function SecurityFindingsPage() {
         lastSyncTime={lastSyncData?.lastSyncTime}
         onStartAnalysis={handleStartAnalysis}
         startingAnalysisIds={startingAnalysisIds}
+        onStartRemediation={handleStartRemediation}
+        onRetryRemediation={handleRetryRemediation}
+        onCancelRemediation={handleCancelRemediation}
+        startingRemediationIds={startingRemediationIds}
+        cancellingRemediationAttemptIds={cancellingRemediationAttemptIds}
         sortBy={state.sortBy}
         onSortByChange={sortBy => dispatch({ type: 'set-sort', sortBy })}
         runningCount={runningCount}

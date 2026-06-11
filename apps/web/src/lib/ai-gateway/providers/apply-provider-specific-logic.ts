@@ -8,12 +8,16 @@ import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/prov
 import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  isClaudeModel,
+  isFableModel,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
+import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
@@ -87,6 +91,19 @@ function applyPreferredProvider(
   }
 }
 
+export function applyGatewayModelsFallback(
+  providerId: ProviderId,
+  requestedModel: string,
+  requestToMutate: GatewayRequest
+) {
+  if (isFableModel(requestedModel) && (providerId === 'openrouter' || providerId === 'vercel')) {
+    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_CURRENT_MODEL_ID];
+    return;
+  }
+
+  delete requestToMutate.body.models;
+}
+
 export function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
@@ -97,6 +114,7 @@ export function applyProviderSpecificLogic(
   userId: string,
   taskId: string | null
 ) {
+  applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

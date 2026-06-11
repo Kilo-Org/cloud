@@ -6,6 +6,7 @@ import { SecurityConfigForm } from './SecurityConfigForm';
 import { useSecurityAgent } from './SecurityAgentContext';
 import {
   DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
+  DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
   DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
 } from '@/lib/security-agent/core/constants';
 import type { SecurityConfigFormState } from './security-config-types';
@@ -56,6 +57,14 @@ export function SecurityConfigPage() {
     autoAnalysisEnabled: configData?.autoAnalysisEnabled ?? false,
     autoAnalysisMinSeverity: configData?.autoAnalysisMinSeverity ?? 'high',
     autoAnalysisIncludeExisting: configData?.autoAnalysisIncludeExisting ?? false,
+    autoRemediationEnabled: configData?.autoRemediationEnabled ?? false,
+    autoRemediationMinSeverity: configData?.autoRemediationMinSeverity ?? 'high',
+    autoRemediationIncludeExisting: configData?.autoRemediationIncludeExisting ?? false,
+    remediationModelSlug:
+      configData?.remediationModelSlug ??
+      configData?.analysisModelSlug ??
+      configData?.modelSlug ??
+      DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
   } satisfies SecurityConfigFormState;
 
   return (

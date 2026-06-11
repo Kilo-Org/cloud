@@ -36,6 +36,8 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   security_findings,
+  security_remediation_attempts,
+  security_remediations,
   security_analysis_queue,
   security_analysis_owner_state,
   security_agent_commands,
@@ -95,6 +97,7 @@ import {
   mcp_gateway_provider_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_oauth_clients,
+  deployments_ephemeral,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -139,6 +142,7 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    await db.delete(deployments_ephemeral);
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
@@ -178,6 +182,8 @@ describe('User', () => {
     await db.delete(kiloclaw_google_oauth_connections);
     await db.delete(kiloclaw_inbound_email_aliases);
     await db.delete(security_analysis_queue);
+    await db.delete(security_remediation_attempts);
+    await db.delete(security_remediations);
     await db.delete(security_agent_commands);
     await db.delete(security_agent_repository_sync_state);
     await db.delete(security_findings);
@@ -713,6 +719,87 @@ describe('User', () => {
       expect(userFeedbackCount?.value).toBe(0);
       expect(userProposalCount?.value).toBe(0);
       expect(orgProposalCount?.value).toBe(1);
+    });
+
+    it('should scrub ephemeral deployment ownership and schedule immediate cleanup', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'ephemeral-deployment-delete@example.com',
+      });
+      const otherUser = await insertTestUser({
+        google_user_email: 'ephemeral-deployment-delete-other@example.com',
+      });
+      const cleanupClaimToken = randomUUID();
+      const claimedUntil = '2026-06-03T18:00:00.000Z';
+      const originalCleanupAt = '2026-06-04T18:00:00.000Z';
+      const originalUpdatedAt = '2026-06-02T18:00:00.000Z';
+
+      await db.insert(deployments_ephemeral).values([
+        {
+          owned_by_user_id: user.id,
+          source_type: 'html',
+          internal_worker_name: `qdpl-${randomUUID()}`,
+          deployment_slug: 'soft-delete-ephemeral',
+          status: 'active',
+          expires_at: originalCleanupAt,
+          next_cleanup_at: originalCleanupAt,
+          cleanup_claim_token: cleanupClaimToken,
+          cleanup_claimed_until: claimedUntil,
+          updated_at: originalUpdatedAt,
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          source_type: 'html',
+          internal_worker_name: `qdpl-${randomUUID()}`,
+          deployment_slug: 'soft-delete-ephemeral-other',
+          status: 'active',
+          expires_at: originalCleanupAt,
+          next_cleanup_at: originalCleanupAt,
+          cleanup_claim_token: cleanupClaimToken,
+          cleanup_claimed_until: claimedUntil,
+          updated_at: originalUpdatedAt,
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+      const afterSoftDelete = Date.now();
+
+      const rows = await db
+        .select()
+        .from(deployments_ephemeral)
+        .orderBy(deployments_ephemeral.deployment_slug);
+      const otherDeployment = rows.find(row => row.owned_by_user_id === otherUser.id);
+      const scrubbedDeployment = rows.find(row => row.deployment_slug === 'soft-delete-ephemeral');
+
+      expect(scrubbedDeployment).toEqual(
+        expect.objectContaining({
+          owned_by_user_id: null,
+          status: 'cleanup_retry',
+          cleanup_claim_token: null,
+          cleanup_claimed_until: null,
+        })
+      );
+      if (!scrubbedDeployment) throw new Error('Expected scrubbed ephemeral deployment');
+      const nextCleanupAt = new Date(scrubbedDeployment.next_cleanup_at).getTime();
+      expect(nextCleanupAt).toBeGreaterThan(afterSoftDelete - 5_000);
+      expect(nextCleanupAt).toBeLessThanOrEqual(afterSoftDelete);
+      expect(new Date(scrubbedDeployment.updated_at).getTime()).toBe(nextCleanupAt);
+      expect(otherDeployment).toEqual(
+        expect.objectContaining({
+          owned_by_user_id: otherUser.id,
+          status: 'active',
+          cleanup_claim_token: cleanupClaimToken,
+        })
+      );
+      if (!otherDeployment) throw new Error('Expected untouched ephemeral deployment');
+      expect(new Date(otherDeployment.next_cleanup_at).getTime()).toBe(
+        new Date(originalCleanupAt).getTime()
+      );
+      expect(new Date(otherDeployment.cleanup_claimed_until ?? '').getTime()).toBe(
+        new Date(claimedUntil).getTime()
+      );
+      expect(new Date(otherDeployment.updated_at).getTime()).toBe(
+        new Date(originalUpdatedAt).getTime()
+      );
     });
 
     it('should rotate and scrub App Store account-linked Kilo Pass data', async () => {
@@ -1924,6 +2011,141 @@ describe('User', () => {
           .select({ count: count() })
           .from(security_analysis_queue)
           .where(eq(security_analysis_queue.finding_id, finding2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete user-owned remediations and scrub retained remediation actor references', async () => {
+      const user1 = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Security remediation GDPR org' })
+        .returning({ id: organizations.id });
+      if (!organization) throw new Error('Failed to create security remediation GDPR org');
+
+      const [userFinding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_user_id: user1.id,
+          repo_full_name: 'kilo-org/remediation-user',
+          source: 'dependabot',
+          source_id: `user-source-${randomUUID()}`,
+          severity: 'high',
+          package_name: 'zod',
+          package_ecosystem: 'npm',
+          title: 'User remediation finding',
+          analysis_status: 'completed',
+          analysis_completed_at: new Date().toISOString(),
+        })
+        .returning();
+      const [orgFinding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_organization_id: organization.id,
+          repo_full_name: 'kilo-org/remediation-org',
+          source: 'dependabot',
+          source_id: `org-source-${randomUUID()}`,
+          severity: 'critical',
+          package_name: 'drizzle-orm',
+          package_ecosystem: 'npm',
+          title: 'Org remediation finding',
+          analysis_status: 'completed',
+          analysis_completed_at: new Date().toISOString(),
+        })
+        .returning();
+      if (!userFinding || !orgFinding) throw new Error('Failed to create remediation findings');
+
+      const [userRemediation] = await db
+        .insert(security_remediations)
+        .values({
+          owned_by_user_id: user1.id,
+          finding_id: userFinding.id,
+          repo_full_name: userFinding.repo_full_name,
+          status: 'queued',
+        })
+        .returning({ id: security_remediations.id });
+      const [orgRemediation] = await db
+        .insert(security_remediations)
+        .values({
+          owned_by_organization_id: organization.id,
+          finding_id: orgFinding.id,
+          repo_full_name: orgFinding.repo_full_name,
+          status: 'running',
+        })
+        .returning({ id: security_remediations.id });
+      if (!userRemediation || !orgRemediation) {
+        throw new Error('Failed to create security remediations');
+      }
+
+      await db.insert(security_remediation_attempts).values([
+        {
+          remediation_id: userRemediation.id,
+          finding_id: userFinding.id,
+          owned_by_user_id: user1.id,
+          repo_full_name: userFinding.repo_full_name,
+          origin: 'manual',
+          status: 'queued',
+          attempt_number: 1,
+          requested_by_user_id: user1.id,
+          analysis_fingerprint: 'user-fingerprint',
+          analysis_completed_at: new Date().toISOString(),
+          remediation_model_slug: 'claude-sonnet-4-20250514',
+          branch_name: 'security/remediation-user',
+        },
+        {
+          remediation_id: orgRemediation.id,
+          finding_id: orgFinding.id,
+          owned_by_organization_id: organization.id,
+          repo_full_name: orgFinding.repo_full_name,
+          origin: 'manual',
+          status: 'running',
+          attempt_number: 1,
+          requested_by_user_id: user1.id,
+          cancellation_requested_by_user_id: user1.id,
+          analysis_fingerprint: 'org-fingerprint',
+          analysis_completed_at: new Date().toISOString(),
+          remediation_model_slug: 'claude-sonnet-4-20250514',
+          branch_name: 'security/remediation-org',
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_remediations)
+          .where(eq(security_remediations.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_remediation_attempts)
+          .where(eq(security_remediation_attempts.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+
+      const retainedAttempts = await db
+        .select()
+        .from(security_remediation_attempts)
+        .where(eq(security_remediation_attempts.remediation_id, orgRemediation.id));
+      expect(retainedAttempts).toHaveLength(1);
+      expect(retainedAttempts[0].requested_by_user_id).toBeNull();
+      expect(retainedAttempts[0].cancellation_requested_by_user_id).toBeNull();
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_remediations)
+          .where(eq(security_remediations.id, orgRemediation.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_findings)
+          .where(eq(security_findings.id, orgFinding.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

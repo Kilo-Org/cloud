@@ -99,13 +99,7 @@ const parseFromCodeBlock = (
   text: string,
   availableLabels: string[]
 ): ClassificationResult | null => {
-  const codeBlockRegex = /```(?:json|JSON)?\s*\r?\n([\s\S]*?)\r?\n\s*```/g;
-  const codeBlocks: string[] = [];
-  let match;
-
-  while ((match = codeBlockRegex.exec(text)) !== null) {
-    codeBlocks.push(match[1]);
-  }
+  const codeBlocks = extractCodeBlocks(text);
 
   // Try code blocks from last to first (most recent)
   for (let i = codeBlocks.length - 1; i >= 0; i--) {
@@ -119,8 +113,8 @@ const parseFromCodeBlock = (
   }
 
   // Fallback: direct tail search for the last code fence pair.
-  // The regex with lazy quantifier can miss the final block in very large texts
-  // with many ``` markers, so search backwards from the end instead.
+  // This can recover a final JSON block when earlier fenced content contains
+  // embedded fence markers that make forward scanning stop too early.
   const lastFenceEnd = text.lastIndexOf('```');
   if (lastFenceEnd !== -1) {
     const searchStart = Math.max(0, lastFenceEnd - 10_000);
@@ -143,6 +137,38 @@ const parseFromCodeBlock = (
   }
 
   return null;
+};
+
+const extractCodeBlocks = (text: string): string[] => {
+  const codeBlocks: string[] = [];
+  let searchStart = 0;
+
+  while (searchStart < text.length) {
+    const openingFence = text.indexOf('```', searchStart);
+    if (openingFence === -1) break;
+
+    const openingLineEnd = text.indexOf('\n', openingFence + 3);
+    if (openingLineEnd === -1) break;
+
+    const fenceInfo = text.substring(openingFence + 3, openingLineEnd).trim();
+    if (fenceInfo !== '' && fenceInfo.toLowerCase() !== 'json') {
+      searchStart = openingLineEnd + 1;
+      continue;
+    }
+
+    const closingFence = text.indexOf('```', openingLineEnd + 1);
+    if (closingFence === -1) break;
+
+    let blockEnd = closingFence;
+    if (text[blockEnd - 1] === '\n') {
+      blockEnd--;
+      if (text[blockEnd - 1] === '\r') blockEnd--;
+    }
+    codeBlocks.push(text.substring(openingLineEnd + 1, blockEnd));
+    searchStart = closingFence + 3;
+  }
+
+  return codeBlocks;
 };
 
 /**

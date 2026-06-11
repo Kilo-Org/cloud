@@ -9,6 +9,7 @@ import {
   AnalysisModeSection,
   AutoAnalysisSection,
   AutoDismissSection,
+  AutoRemediationSection,
   ModelSection,
   RepositorySection,
   SlaSection,
@@ -24,13 +25,11 @@ type SecurityConfigFormProps = {
   organizationId?: string;
   initialConfig: SecurityConfigFormState;
   repositories: SecurityRepository[];
-  repositoriesSyncedAt?: string | null;
   viewState: {
     enabled: boolean;
     isLoadingRepositories?: boolean;
     isSaving: boolean;
     isToggling: boolean;
-    isRefreshingRepositories?: boolean;
   };
   onSave: (config: SecurityConfigSavePayload) => void;
   onToggleEnabled: (
@@ -40,7 +39,6 @@ type SecurityConfigFormProps = {
       'repositorySelectionMode' | 'selectedRepositoryIds'
     >
   ) => void;
-  onRefreshRepositories?: () => void;
 };
 
 const DEFAULT_SLA_CONFIG: SlaConfig = {
@@ -70,6 +68,10 @@ function configFingerprint(config: SecurityConfigFormState) {
     config.autoAnalysisEnabled,
     config.autoAnalysisMinSeverity,
     config.autoAnalysisIncludeExisting,
+    config.autoRemediationEnabled,
+    config.autoRemediationMinSeverity,
+    config.autoRemediationIncludeExisting,
+    config.remediationModelSlug,
   ]);
 }
 
@@ -87,14 +89,11 @@ export function SecurityConfigForm({
   organizationId,
   initialConfig,
   repositories,
-  repositoriesSyncedAt,
   viewState,
   onSave,
   onToggleEnabled,
-  onRefreshRepositories,
 }: SecurityConfigFormProps) {
-  const { enabled, isLoadingRepositories, isSaving, isToggling, isRefreshingRepositories } =
-    viewState;
+  const { enabled, isLoadingRepositories, isSaving, isToggling } = viewState;
   const initialConfigFingerprint = configFingerprint(initialConfig);
   const [localConfig, setLocalConfig] = useState<LocalConfigState>(() => ({
     draft: initialConfig,
@@ -143,6 +142,10 @@ export function SecurityConfigForm({
       autoAnalysisEnabled: state.autoAnalysisEnabled,
       autoAnalysisMinSeverity: state.autoAnalysisMinSeverity,
       autoAnalysisIncludeExisting: state.autoAnalysisIncludeExisting,
+      autoRemediationEnabled: state.autoRemediationEnabled,
+      autoRemediationMinSeverity: state.autoRemediationMinSeverity,
+      autoRemediationIncludeExisting: state.autoRemediationIncludeExisting,
+      remediationModelSlug: state.remediationModelSlug,
     });
   };
 
@@ -151,10 +154,7 @@ export function SecurityConfigForm({
       <RepositorySection
         {...stateProps}
         repositories={repositories}
-        repositoriesSyncedAt={repositoriesSyncedAt}
         isLoading={isLoadingRepositories}
-        isRefreshing={isRefreshingRepositories}
-        onRefresh={onRefreshRepositories}
       />
       <AgentStatusSection
         enabled={enabled}
@@ -172,6 +172,7 @@ export function SecurityConfigForm({
           <ModelSection {...stateProps} models={modelOptions} isLoading={isLoadingModels} />
           <AnalysisModeSection {...stateProps} />
           <AutoAnalysisSection {...stateProps} />
+          <AutoRemediationSection {...stateProps} />
           <AutoDismissSection {...stateProps} />
           <SlaSection {...stateProps} />
           <div className="border-border flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-between">

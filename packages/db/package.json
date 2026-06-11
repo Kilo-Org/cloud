@@ -14,7 +14,8 @@
     "./kiloclaw-pricing-catalog": "./src/kiloclaw-pricing-catalog.ts",
     "./kiloclaw-commit-retirement": "./src/kiloclaw-commit-retirement.ts",
     "./kiloclaw-organization-trial-expiry-candidates": "./src/kiloclaw-organization-trial-expiry-candidates.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./user-soft-delete": "./src/user-soft-delete.ts"
   },
   "dependencies": {
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",

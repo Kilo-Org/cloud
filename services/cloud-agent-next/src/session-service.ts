@@ -269,6 +269,101 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'vitest',
 ];
 
+const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
+  'ls',
+  'cat',
+  'echo',
+  'pwd',
+  'find',
+  'grep',
+  'rg',
+  'wc',
+  'sort',
+  'uniq',
+  'cut',
+  'tr',
+  'nl',
+  'jq',
+  'git',
+  'git status',
+  'git diff',
+  'git branch',
+  'git checkout',
+  'git switch',
+  'git add',
+  'git commit',
+  'git push',
+  'gh pr create',
+  'gh pr view',
+  'gh pr diff',
+  'npm',
+  'npm install',
+  'npm run',
+  'npm test',
+  'pnpm',
+  'pnpm install',
+  'pnpm run',
+  'pnpm test',
+  'bun',
+  'bun install',
+  'bun run',
+  'bun test',
+  'yarn',
+  'yarn install',
+  'yarn run',
+  'yarn test',
+  'python',
+  'python3',
+  'python -m',
+  'python3 -m',
+  'pip',
+  'pip3',
+  'pytest',
+  'go',
+  'go test',
+  'mvn',
+  'gradle',
+  'bundle',
+  'vitest',
+  'sed',
+  'cd',
+  'mkdir',
+  'touch',
+  'cp',
+  'mv',
+  'rm',
+];
+
+const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
+  'git reset --hard',
+  'git clean',
+  'git push --force',
+  'git push -f',
+  'git push * --force',
+  'git push * -f',
+  'git push --mirror',
+  'git remote set-url',
+  'git tag',
+  'git worktree',
+  'git stash',
+  'gh pr merge',
+  'gh pr close',
+  'gh pr edit',
+  'gh pr checkout',
+  'gh auth',
+  'gh repo',
+  'gh secret',
+  'curl',
+  'wget',
+  'ssh',
+  'scp',
+  'rsync',
+  'docker',
+  'kubectl',
+  'wrangler',
+  'vercel',
+];
+
 export type CommandGuardPolicy = {
   policyName: string;
   allowed: string[];
@@ -276,15 +371,23 @@ export type CommandGuardPolicy = {
 };
 
 export function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy | null {
-  if (createdOnPlatform !== 'code-review') {
-    return null;
+  if (createdOnPlatform === 'security-remediation') {
+    return {
+      policyName: 'security-remediation-pr',
+      allowed: SECURITY_REMEDIATION_ALLOWED_COMMANDS,
+      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS],
+    };
   }
 
-  return {
-    policyName: 'code-review-read-only',
-    allowed: CODE_REVIEW_ALLOWED_COMMANDS,
-    denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
-  };
+  if (createdOnPlatform === 'code-review') {
+    return {
+      policyName: 'code-review-read-only',
+      allowed: CODE_REVIEW_ALLOWED_COMMANDS,
+      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
+    };
+  }
+
+  return null;
 }
 
 export function buildCommandGuardBashPermissions(
@@ -1103,7 +1206,7 @@ export class SessionService {
       //   question: handled above (line 564) for non-interactive sessions
       Object.assign(permission, {
         read: 'allow',
-        edit: 'deny',
+        edit: commandGuardPolicy.policyName === 'security-remediation-pr' ? 'allow' : 'deny',
         bash: bashPermissions,
         webfetch: 'deny',
         websearch: 'deny',

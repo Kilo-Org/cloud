@@ -3,11 +3,18 @@
  * These can be imported by clients for type-safe API calls.
  */
 
+import { slugSchema } from '@kilocode/worker-utils/deployment-slug';
 import { z } from 'zod';
 
 // --- Shared schemas ---
 
 export const workerNameSchema = z.string().regex(/^[a-zA-Z0-9-_]{1,64}$/);
+
+const privateQuickDeploymentWorkerNamePrefix = 'qdpl-';
+
+export function isPrivateQuickDeploymentWorkerName(name: string): boolean {
+  return name.startsWith(privateQuickDeploymentWorkerNamePrefix);
+}
 
 export const returnPathSchema = z
   .string()
@@ -26,11 +33,7 @@ export const setPasswordRequestSchema = z.object({
   password: z.string().min(1),
 });
 
-export const slugParamSchema = z
-  .string()
-  .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/)
-  .min(3)
-  .max(63);
+export const slugParamSchema = slugSchema;
 
 export const setSlugMappingRequestSchema = z.object({
   slug: slugParamSchema,

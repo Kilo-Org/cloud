@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertTriangle } from 'lucide-react';
 import type { SecurityFinding } from '@kilocode/db/schema';
+import { securityAgentCommandAdmissionCopy } from './security-agent-command-copy';
 
 // GitHub Dependabot dismiss reasons
 const DISMISS_REASONS = [
@@ -153,7 +154,9 @@ export function DismissFindingDialog({
             Keep finding
           </Button>
           <Button variant="destructive" onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Dismissing...' : 'Dismiss finding'}
+            {isLoading
+              ? `${securityAgentCommandAdmissionCopy.dismiss_finding.pendingLabel}...`
+              : 'Dismiss finding'}
           </Button>
         </DialogFooter>
       </DialogContent>

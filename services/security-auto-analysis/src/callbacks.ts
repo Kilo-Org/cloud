@@ -13,6 +13,7 @@ import { extractSandboxAnalysis as runSandboxExtraction } from './extraction.js'
 import { fetchLatestAssistantText as fetchSessionAssistantText } from './session-result.js';
 import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
 import { trackSecurityAnalysisCompleted } from './posthog.js';
+import { maybeAdmitAutoRemediationForCompletedAnalysis } from './remediation.js';
 import type {
   AutoAnalysisFailureCode,
   SecurityFindingAnalysis,
@@ -124,6 +125,12 @@ type TrackCompletedAnalysis = (params: {
   finding: NonNullable<Awaited<ReturnType<typeof getSecurityFindingById>>>;
 }) => Promise<void>;
 
+type MaybeAutoRemediateAnalysis = (params: {
+  findingId: string;
+  analysis: SecurityFindingAnalysis;
+  finding: NonNullable<Awaited<ReturnType<typeof getSecurityFindingById>>>;
+}) => Promise<void>;
+
 const COMPLETED_CALLBACK_MAX_ATTEMPTS = 3;
 const COMPLETED_CALLBACK_RETRY_DELAY_MS = 5000;
 
@@ -161,6 +168,7 @@ export async function finalizeCompletedAnalysisCallback(params: {
   payload: SecurityAnalysisCallbackPayload;
   extractSandboxAnalysis: ExtractSandboxAnalysis;
   maybeAutoDismissAnalysis?: MaybeAutoDismissAnalysis;
+  maybeAutoRemediateAnalysis?: MaybeAutoRemediateAnalysis;
   trackCompletedAnalysis?: TrackCompletedAnalysis;
   fetchLatestAssistantText?: FetchLatestAssistantText;
   sleep?: (ms: number) => Promise<void>;
@@ -280,6 +288,11 @@ export async function finalizeCompletedAnalysisCallback(params: {
     },
   });
   await params.maybeAutoDismissAnalysis?.({
+    findingId: params.findingId,
+    analysis: completedAnalysis,
+    finding,
+  });
+  await params.maybeAutoRemediateAnalysis?.({
     findingId: params.findingId,
     analysis: completedAnalysis,
     finding,
@@ -439,6 +452,13 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
         findingId,
         finding,
         analysis,
+      });
+    },
+    maybeAutoRemediateAnalysis: async ({ findingId }) => {
+      await maybeAdmitAutoRemediationForCompletedAnalysis({
+        db,
+        env: params.env,
+        findingId,
       });
     },
     trackCompletedAnalysis: async ({ findingId, finding, analysis }) => {

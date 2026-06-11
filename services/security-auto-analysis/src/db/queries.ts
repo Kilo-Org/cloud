@@ -69,6 +69,12 @@ export function parseSecurityConfig(config: unknown): SecurityAgentConfig {
     }
   }
 
+  resolvedConfig.remediation_model_slug =
+    parsed.data.remediation_model_slug ??
+    parsed.data.analysis_model_slug ??
+    parsed.data.model_slug ??
+    DEFAULT_SECURITY_AGENT_CONFIG.remediation_model_slug;
+
   return resolvedConfig;
 }
 

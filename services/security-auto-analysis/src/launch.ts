@@ -114,6 +114,7 @@ type StartSecurityAnalysisParams = {
   nextAuthSecret: string;
   internalApiSecret: string;
   callbackTokenSecret: string;
+  forceSandbox?: boolean;
   retrySandboxOnly?: boolean;
   lifecycleClaim: AnalysisStartLifecycleClaim;
 };
@@ -205,6 +206,7 @@ export async function startSecurityAnalysis(
         });
 
     const runSandbox =
+      params.forceSandbox === true ||
       skipTriage ||
       params.analysisMode === 'deep' ||
       (params.analysisMode === 'auto' && triage.needsSandboxAnalysis);

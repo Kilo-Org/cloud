@@ -7,6 +7,7 @@ import type {
 import { formatError } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
+import type { ClassifierAnalyticsStatus } from './classifier-analytics';
 import { getClassifierModel, getDecisionLogSampleRate } from './classifier-config';
 import type { ClassifierOutput } from './classifier-output';
 import {
@@ -101,7 +102,7 @@ type DecisionOutcome =
   | { kind: 'error'; error: unknown };
 
 type DecisionSummary = {
-  status: string;
+  status: ClassifierAnalyticsStatus;
   classifierModel: string | null;
   classification?: ClassifierOutput;
   cost: number | null;
@@ -198,7 +199,7 @@ function recordDecision(
   const summary = summarizeOutcome(outcome);
 
   writeClassifierMetricsDataPoint(env, {
-    status: outcome.kind === 'error' ? classifierErrorStatus(outcome.error) : 'classified',
+    status: summary.status,
     classifierModel: summary.classifierModel,
     sessionId: ctx.payload.sessionId,
     input: ctx.payload.input,

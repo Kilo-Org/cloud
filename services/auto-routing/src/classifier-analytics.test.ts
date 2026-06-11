@@ -34,7 +34,7 @@ describe('classifier analytics', () => {
 
     writeClassifierMetricsDataPoint(
       {
-        AUTO_ROUTING_CLASSIFIER_METRICS: { writeDataPoint },
+        AUTO_ROUTING_CLASSIFIER_METRICS_V2: { writeDataPoint },
       },
       {
         status: 'classified',

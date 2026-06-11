@@ -41,8 +41,8 @@
   ],
   "analytics_engine_datasets": [
     {
-      "binding": "AUTO_ROUTING_CLASSIFIER_METRICS",
-      "dataset": "auto_routing_classifier_metrics",
+      "binding": "AUTO_ROUTING_CLASSIFIER_METRICS_V2",
+      "dataset": "auto_routing_classifier_metrics_v2",
     },
   ],
   "kv_namespaces": [

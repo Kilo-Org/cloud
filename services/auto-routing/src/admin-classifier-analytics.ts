@@ -7,6 +7,13 @@ import type { Handler } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
 
+// The v2 dataset starts at the 2026-06-11 slim-mirror cutover (PR #3975).
+// The original auto_routing_classifier_metrics dataset holds old-schema rows
+// (mirrored full bodies, invalid_body statuses) that cannot be deleted from
+// Analytics Engine; it stops receiving writes and ages out of retention by
+// ~September 2026.
+const ANALYTICS_DATASET = 'auto_routing_classifier_metrics_v2';
+
 const PERIODS = {
   '1h': { interval: "INTERVAL '1' HOUR" },
   '24h': { interval: "INTERVAL '24' HOUR" },
@@ -23,17 +30,12 @@ const SummaryRowSchema = z.looseObject({
   total_requests: optionalAnalyticsNumberSchema,
   classified_requests: optionalAnalyticsNumberSchema,
   cached_requests: optionalAnalyticsNumberSchema,
+  fallback_requests: optionalAnalyticsNumberSchema,
   classifier_errors: optionalAnalyticsNumberSchema,
   invalid_requests: optionalAnalyticsNumberSchema,
   total_cost_credits: optionalAnalyticsNumberSchema,
   avg_duration_ms: optionalAnalyticsNumberSchema,
   p95_duration_ms: optionalAnalyticsNumberSchema,
-  avg_confidence: optionalAnalyticsNumberSchema,
-  with_session_id: optionalAnalyticsNumberSchema,
-  unique_sessions: optionalAnalyticsNumberSchema,
-  requires_tools: optionalAnalyticsNumberSchema,
-  mirrored_has_tools: optionalAnalyticsNumberSchema,
-  avg_body_bytes: optionalAnalyticsNumberSchema,
 });
 type SummaryRow = z.infer<typeof SummaryRowSchema>;
 
@@ -71,17 +73,12 @@ function emptyAnalyticsResponse(period: AnalyticsPeriod): AutoRoutingClassifierA
       totalRequests: 0,
       classifiedRequests: 0,
       cachedRequests: 0,
+      fallbackRequests: 0,
       classifierErrors: 0,
       invalidRequests: 0,
       totalCostCredits: 0,
       avgDurationMs: 0,
       p95DurationMs: 0,
-      avgConfidence: 0,
-      withSessionId: 0,
-      uniqueSessions: 0,
-      requiresTools: 0,
-      mirroredHasTools: 0,
-      avgBodyBytes: 0,
     },
     statusBreakdown: [],
     taskTypeBreakdown: [],
@@ -130,20 +127,15 @@ function buildSummaryQuery(period: AnalyticsPeriod): string {
   return `
     SELECT
       SUM(_sample_interval) AS total_requests,
-      SUM(_sample_interval * IF(blob4 = 'classified', 1, 0)) AS classified_requests,
+      SUM(_sample_interval * IF(blob4 = 'classified' OR startsWith(blob4, 'fallback:'), 1, 0)) AS classified_requests,
       SUM(_sample_interval * IF(double7 = 1, 1, 0)) AS cached_requests,
+      SUM(_sample_interval * IF(startsWith(blob4, 'fallback:'), 1, 0)) AS fallback_requests,
       SUM(_sample_interval * IF(blob4 = 'classifier_error' OR startsWith(blob4, 'classifier_error:'), 1, 0)) AS classifier_errors,
-      SUM(_sample_interval * IF(blob4 IN ('invalid_json', 'invalid_envelope', 'invalid_body'), 1, 0)) AS invalid_requests,
+      SUM(_sample_interval * IF(blob4 IN ('invalid_json', 'invalid_envelope'), 1, 0)) AS invalid_requests,
       SUM(_sample_interval * double2) AS total_cost_credits,
       avgIf(double1, double1 > 0) AS avg_duration_ms,
-      quantileExactWeighted(0.95)(double1, _sample_interval * IF(double1 > 0, 1, 0)) AS p95_duration_ms,
-      avgIf(double3, double3 >= 0) AS avg_confidence,
-      SUM(_sample_interval * IF(blob12 != '', 1, 0)) AS with_session_id,
-      COUNT(DISTINCT blob12) - IF(SUM(IF(blob12 = '', 1, 0)) > 0, 1, 0) AS unique_sessions,
-      SUM(_sample_interval * IF(blob10 = '1', 1, 0)) AS requires_tools,
-      SUM(_sample_interval * IF(double5 = 1, 1, 0)) AS mirrored_has_tools,
-      avgIf(double6, double6 > 0) AS avg_body_bytes
-    FROM auto_routing_classifier_metrics
+      quantileExactWeighted(0.95)(double1, _sample_interval * IF(double1 > 0, 1, 0)) AS p95_duration_ms
+    FROM ${ANALYTICS_DATASET}
     WHERE ${buildSinceClause(period)}
     FORMAT JSON
   `;
@@ -154,7 +146,7 @@ function buildStatusBreakdownQuery(period: AnalyticsPeriod): string {
     SELECT
       blob4 AS status,
       SUM(_sample_interval) AS requests
-    FROM auto_routing_classifier_metrics
+    FROM ${ANALYTICS_DATASET}
     WHERE ${buildSinceClause(period)}
     GROUP BY status
     ORDER BY requests DESC
@@ -169,7 +161,7 @@ function buildTaskTypeBreakdownQuery(period: AnalyticsPeriod): string {
       blob5 AS task_type,
       SUM(_sample_interval) AS requests,
       avgIf(double3, double3 >= 0) AS avg_confidence
-    FROM auto_routing_classifier_metrics
+    FROM ${ANALYTICS_DATASET}
     WHERE ${buildSinceClause(period)} AND blob5 != ''
     GROUP BY task_type
     ORDER BY requests DESC
@@ -185,7 +177,7 @@ function buildTaskSubtypeBreakdownQuery(period: AnalyticsPeriod): string {
       blob6 AS subtask_type,
       SUM(_sample_interval) AS requests,
       avgIf(double3, double3 >= 0) AS avg_confidence
-    FROM auto_routing_classifier_metrics
+    FROM ${ANALYTICS_DATASET}
     WHERE ${buildSinceClause(period)} AND blob5 != '' AND blob6 != ''
     GROUP BY task_type, subtask_type
     ORDER BY requests DESC
@@ -199,7 +191,7 @@ function buildClassifierModelBreakdownQuery(period: AnalyticsPeriod): string {
     SELECT
       blob1 AS classifier_model,
       SUM(_sample_interval) AS requests
-    FROM auto_routing_classifier_metrics
+    FROM ${ANALYTICS_DATASET}
     WHERE ${buildSinceClause(period)}
     GROUP BY classifier_model
     ORDER BY requests DESC
@@ -277,17 +269,12 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
       totalRequests: numberValue(summary.total_requests),
       classifiedRequests: numberValue(summary.classified_requests),
       cachedRequests: numberValue(summary.cached_requests),
+      fallbackRequests: numberValue(summary.fallback_requests),
       classifierErrors: numberValue(summary.classifier_errors),
       invalidRequests: numberValue(summary.invalid_requests),
       totalCostCredits: numberValue(summary.total_cost_credits),
       avgDurationMs: numberValue(summary.avg_duration_ms),
       p95DurationMs: numberValue(summary.p95_duration_ms),
-      avgConfidence: numberValue(summary.avg_confidence),
-      withSessionId: numberValue(summary.with_session_id),
-      uniqueSessions: numberValue(summary.unique_sessions),
-      requiresTools: numberValue(summary.requires_tools),
-      mirroredHasTools: numberValue(summary.mirrored_has_tools),
-      avgBodyBytes: numberValue(summary.avg_body_bytes),
     },
     statusBreakdown: statusRows.map(row => ({
       status: row.status,

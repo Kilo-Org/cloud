@@ -1,10 +1,11 @@
 import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 import type { ClassifierOutput } from './classifier-output';
 
-type ClassifierAnalyticsStatus =
+export type ClassifierAnalyticsStatus =
   | 'classified'
   | 'invalid_json'
   | 'invalid_envelope'
+  | `fallback:${string}`
   | `classifier_error:${string}`;
 
 type ClassifierAnalyticsParams = {
@@ -19,7 +20,7 @@ type ClassifierAnalyticsParams = {
   cacheHit?: boolean;
 };
 
-type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS'>;
+type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS_V2'>;
 
 /**
  * Analytics Engine schema:
@@ -27,7 +28,10 @@ type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS'>;
  *   blob1   = classifierModel
  *   blob2   = requestedModel
  *   blob3   = apiKind
- *   blob4   = status, classifier failures use classifier_error:<subtype>
+ *   blob4   = status; heuristic fallbacks use fallback:<reason>, classifier
+ *             failures use classifier_error:<subtype>. Fallbacks still carry
+ *             a classification, so "produced a classification" queries must
+ *             match both 'classified' and 'fallback:%'.
  *   blob5   = taskType
  *   blob6   = subtaskType
  *   blob7   = contextComplexity
@@ -57,7 +61,7 @@ export function writeClassifierMetricsDataPoint(
   const input = params.input;
 
   try {
-    env.AUTO_ROUTING_CLASSIFIER_METRICS.writeDataPoint({
+    env.AUTO_ROUTING_CLASSIFIER_METRICS_V2.writeDataPoint({
       indexes: [classifierModel],
       blobs: [
         classifierModel,

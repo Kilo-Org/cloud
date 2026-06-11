@@ -29,7 +29,7 @@ const env = {
     get: configGet,
     put: configPut,
   },
-  AUTO_ROUTING_CLASSIFIER_METRICS: {
+  AUTO_ROUTING_CLASSIFIER_METRICS_V2: {
     writeDataPoint,
   },
   AUTO_ROUTING_DECISION_CACHE: {
@@ -316,7 +316,7 @@ describe('auto routing worker', () => {
     });
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['google/gemini-2.5-flash-lite'],
-      blobs: expect.arrayContaining(['classified']),
+      blobs: expect.arrayContaining(['fallback:invalid_output']),
       doubles: expect.arrayContaining([0]),
     });
   });
@@ -494,17 +494,12 @@ describe('auto routing worker', () => {
               total_requests: 10,
               classified_requests: 8,
               cached_requests: 6,
+              fallback_requests: 2,
               classifier_errors: 1,
               invalid_requests: 1,
               total_cost_credits: 0.0000123,
               avg_duration_ms: 123.4,
               p95_duration_ms: 456.7,
-              avg_confidence: 0.82,
-              with_session_id: 9,
-              unique_sessions: '7',
-              requires_tools: 5,
-              mirrored_has_tools: 6,
-              avg_body_bytes: 2048,
             },
           ],
         }),
@@ -566,17 +561,12 @@ describe('auto routing worker', () => {
         totalRequests: 10,
         classifiedRequests: 8,
         cachedRequests: 6,
+        fallbackRequests: 2,
         classifierErrors: 1,
         invalidRequests: 1,
         totalCostCredits: 0.0000123,
         avgDurationMs: 123.4,
         p95DurationMs: 456.7,
-        avgConfidence: 0.82,
-        withSessionId: 9,
-        uniqueSessions: 7,
-        requiresTools: 5,
-        mirroredHasTools: 6,
-        avgBodyBytes: 2048,
       },
       statusBreakdown: [
         { status: 'classified', requests: 8 },
@@ -601,6 +591,10 @@ describe('auto routing worker', () => {
         headers: { Authorization: 'Bearer analytics-token' },
       })
     );
+    const summarySql = mockedFetch.mock.calls[0]?.[1]?.body as string;
+    expect(summarySql).toContain("startsWith(blob4, 'fallback:')");
+    expect(summarySql).toContain('FROM auto_routing_classifier_metrics_v2');
+    expect(summarySql).not.toContain('invalid_body');
   });
 
   it('returns empty analytics locally when the local Analytics Engine secret is absent', async () => {
@@ -617,17 +611,12 @@ describe('auto routing worker', () => {
         totalRequests: 0,
         classifiedRequests: 0,
         cachedRequests: 0,
+        fallbackRequests: 0,
         classifierErrors: 0,
         invalidRequests: 0,
         totalCostCredits: 0,
         avgDurationMs: 0,
         p95DurationMs: 0,
-        avgConfidence: 0,
-        withSessionId: 0,
-        uniqueSessions: 0,
-        requiresTools: 0,
-        mirroredHasTools: 0,
-        avgBodyBytes: 0,
       },
       statusBreakdown: [],
       taskTypeBreakdown: [],
@@ -646,17 +635,12 @@ describe('auto routing worker', () => {
               {
                 total_requests: 0,
                 classified_requests: 0,
+                fallback_requests: null,
                 classifier_errors: 0,
                 invalid_requests: 0,
                 total_cost_credits: 0,
                 avg_duration_ms: null,
                 p95_duration_ms: null,
-                avg_confidence: null,
-                with_session_id: 0,
-                unique_sessions: 0,
-                requires_tools: 0,
-                mirrored_has_tools: 0,
-                avg_body_bytes: null,
               },
             ],
           }),
@@ -677,8 +661,7 @@ describe('auto routing worker', () => {
       summary: {
         avgDurationMs: 0,
         p95DurationMs: 0,
-        avgConfidence: 0,
-        avgBodyBytes: 0,
+        fallbackRequests: 0,
       },
     });
   });

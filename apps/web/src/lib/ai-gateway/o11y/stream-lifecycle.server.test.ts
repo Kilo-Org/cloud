@@ -169,9 +169,12 @@ describe('event stream lifecycle observation', () => {
 
     await expect(new Response(body).text()).resolves.toBe('data: [DONE]\n\n');
     expect(source.locked).toBe(false);
-    expect(report).toHaveBeenCalledWith('AI stream lifecycle observer failed', {
-      error_type: 'Error',
-    });
+    expect(report).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'ai_stream_lifecycle_observer_failure',
+        error_type: 'Error',
+      })
+    );
     report.mockRestore();
   });
 
@@ -186,9 +189,12 @@ describe('event stream lifecycle observation', () => {
     await expect(reader.cancel('stop')).resolves.toBeUndefined();
     expect(cancel).toHaveBeenCalledWith('stop');
     expect(source.locked).toBe(false);
-    expect(report).toHaveBeenCalledWith('AI stream lifecycle observer failed', {
-      error_type: 'Error',
-    });
+    expect(report).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: 'ai_stream_lifecycle_observer_failure',
+        error_type: 'Error',
+      })
+    );
     report.mockRestore();
   });
 
@@ -263,6 +269,26 @@ describe('stream lifecycle correlation logging', () => {
     provider_id: 'provider',
     api_kind: 'responses',
   };
+
+  it('emits machine-readable structural records by default', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const tracker = createStreamLifecycleTracker(context);
+
+    tracker.observe('provider', outcome());
+    tracker.observe('final', outcome({ terminal_event: false }));
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toEqual(
+      expect.objectContaining({
+        event: 'ai_stream_lifecycle',
+        attempt_id: 'attempt',
+        provider_id: 'provider',
+        api_kind: 'responses',
+        classification: 'divergence',
+      })
+    );
+    warn.mockRestore();
+  });
 
   it('always logs confirmed divergence with structural outcomes', () => {
     const log = jest.fn();

@@ -68,20 +68,25 @@ export function createStreamLifecycleTracker(context: Context, options: TrackerO
           : classification === 'inconclusive'
             ? 'AI stream lifecycle inconclusive'
             : 'AI stream lifecycle anomaly';
-      const log =
-        options.log ??
-        ((name, data) =>
-          classification === 'control' || classification === 'inconclusive'
-            ? console.log(name, data)
-            : console.warn(name, data));
-      log(message, {
+      const data = {
         ...context,
         classification,
         vercel_deployment: process.env.VERCEL_DEPLOYMENT_ID ?? null,
         vercel_region: process.env.VERCEL_REGION ?? process.env.VERCEL_FUNCTION_REGION ?? null,
         provider,
         final,
-      });
+      };
+      if (options.log) {
+        options.log(message, data);
+        return;
+      }
+
+      const record = JSON.stringify({ event: 'ai_stream_lifecycle', ...data });
+      if (classification === 'control' || classification === 'inconclusive') {
+        console.log(record);
+        return;
+      }
+      console.warn(record);
     },
   };
 }
@@ -105,9 +110,12 @@ export function observeEventStream(
     retained = undefined;
   };
   const report = (error: unknown) => {
-    console.error('AI stream lifecycle observer failed', {
-      error_type: error instanceof Error ? error.name : typeof error,
-    });
+    console.error(
+      JSON.stringify({
+        event: 'ai_stream_lifecycle_observer_failure',
+        error_type: error instanceof Error ? error.name : typeof error,
+      })
+    );
   };
   const settle = (disposition: Disposition) => {
     if (settled) return;

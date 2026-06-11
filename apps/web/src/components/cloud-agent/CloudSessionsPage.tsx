@@ -81,6 +81,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
         id: model.id,
         name: model.name,
         isFree: model.isFree,
+        mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
       })),
     [allModels]

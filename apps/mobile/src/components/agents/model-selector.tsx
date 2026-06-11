@@ -5,7 +5,7 @@ import { BookOpenCheck, Brain, ChevronDown } from 'lucide-react-native';
 import { Text } from '@/components/ui/text';
 import {
   getFreeModelDataAccessibilityLabel,
-  isFreeModelOption,
+  mayTrainOnYourPrompts,
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -43,7 +43,7 @@ export function ModelSelector({
 
   const selectedModel = options.find(m => m.id === value);
   const label = selectedModel?.name ?? (value || 'Model');
-  const collectsData = isFreeModelOption(selectedModel);
+  const collectsData = mayTrainOnYourPrompts(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
   const compactVariantLabel = variant ? compactThinkingEffortLabel(variant) : '';

@@ -3,7 +3,7 @@ import type { OpenRouter } from '@openrouter/sdk';
 import type { ChatResult } from '@openrouter/sdk/models';
 import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
 import { ClassifierRunError, classifyWithOpenRouter } from './model-classifier';
-import type { NormalizedClassifierInput } from './classifier-input';
+import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 
 const normalizedInput = {
   apiKind: 'responses',

@@ -1,11 +1,10 @@
-import type { NormalizedClassifierInput } from './classifier-input';
+import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 import type { ClassifierOutput } from './classifier-output';
 
 type ClassifierAnalyticsStatus =
   | 'classified'
   | 'invalid_json'
   | 'invalid_envelope'
-  | 'invalid_body'
   | `classifier_error:${string}`;
 
 type ClassifierAnalyticsParams = {

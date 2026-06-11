@@ -97,6 +97,7 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { scheduleAutoRoutingMirror } from '@/lib/ai-gateway/auto-routing-mirror';
+import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import {
   createStreamLifecycleTracker,
   observeEventStream,
@@ -217,6 +218,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
+
+  // Captured for the auto-routing mirror before auto-model resolution and
+  // provider transforms mutate the parsed body.
+  const mirrorProviderHints = redactProviderHints(requestBodyParsed.body);
 
   const feature = validateFeatureHeader(
     request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
@@ -714,9 +719,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   scheduleAutoRoutingMirror({
-    request,
-    path,
-    bodyText: requestBodyText,
+    apiKind: requestBodyParsed.kind,
+    body: requestBodyParsed.body,
+    requestedModel,
+    providerHints: mirrorProviderHints,
+    bodyBytes: Buffer.byteLength(requestBodyText),
+    userId: user.id,
+    sessionId: taskId ?? sessionHeader,
+    machineId: machineIdHeader,
+    clientRequestId,
+    mode: modeHeader,
+    userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
     authContext: Promise.resolve({ organizationId }),
   });
 

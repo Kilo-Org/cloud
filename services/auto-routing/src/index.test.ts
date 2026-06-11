@@ -59,6 +59,35 @@ const mockClassifierResult = {
   classification: mockClassification,
 };
 
+const normalizedInput = {
+  apiKind: 'chat_completions',
+  requestedModel: 'anthropic/claude-sonnet-4',
+  systemPromptPrefix: 'You classify auto model routing requests.',
+  userPromptPrefix: 'Pick the best model for this request.',
+  latestUserPromptPrefix: null,
+  messageCount: 3,
+  hasTools: true,
+  stream: true,
+  providerHints: {
+    provider: { order: ['anthropic'] },
+    providerOptions: { openrouter: { sort: 'price', apiKey: '[REDACTED]' } },
+  },
+};
+
+function mirrorPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    input: normalizedInput,
+    userId: 'user-1',
+    sessionId: 'task-123',
+    machineId: 'machine-1',
+    clientRequestId: 'req-1',
+    mode: 'code',
+    userAgent: 'Kilo-Code/4.106.0',
+    bodyBytes: 2048,
+    ...overrides,
+  };
+}
+
 // Node-environment tests have no workers ExecutionContext; Hono accepts a
 // substitute so handler code can use c.executionCtx.waitUntil directly.
 const executionCtx = {
@@ -72,6 +101,17 @@ function request(path: string, init: RequestInit = {}) {
 
 function localRequest(path: string, init: RequestInit = {}) {
   return app.request(`http://localhost:8810${path}`, init, env, executionCtx);
+}
+
+function decideRequest(payload: unknown) {
+  return request('/decide', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer classifier-token',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 describe('auto routing worker', () => {
@@ -109,44 +149,11 @@ describe('auto routing worker', () => {
     });
   });
 
-  it('normalizes mirrored chat completion requests', async () => {
-    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+  it('classifies mirrored requests and logs the decision with caller context', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(Math, 'random').mockReturnValue(0);
 
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: 'task-123',
-        headers: {
-          authorization: 'Bearer user-token',
-          'x-kilocode-version': '1.2.3',
-        },
-        body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4',
-          stream: true,
-          provider: { order: ['anthropic'] },
-          providerOptions: { openrouter: { sort: 'price', apiKey: 'secret-key' } },
-          tools: [{ type: 'function', function: { name: 'search' } }],
-          messages: [
-            { role: 'system', content: 'You classify auto model routing requests.' },
-            { role: 'assistant', content: 'Ready.' },
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: 'Pick the best model for this request.' },
-                { type: 'image_url', image_url: { url: 'https://example.com/car.png' } },
-              ],
-            },
-          ],
-        }),
-      }),
-    });
+    const response = await decideRequest(mirrorPayload());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -154,40 +161,14 @@ describe('auto routing worker', () => {
       decision: null,
       classifierResult: {
         classification: mockClassification,
-        normalized: {
-          apiKind: 'chat_completions',
-          requestedModel: 'anthropic/claude-sonnet-4',
-          systemPromptPrefix: 'You classify auto model routing requests.',
-          userPromptPrefix: 'Pick the best model for this request.',
-          latestUserPromptPrefix: null,
-          messageCount: 3,
-          hasTools: true,
-          stream: true,
-          providerHints: {
-            provider: { order: ['anthropic'] },
-            providerOptions: { openrouter: { sort: 'price', apiKey: '[REDACTED]' } },
-          },
-        },
+        normalized: normalizedInput,
       },
     });
     expect(classifyNormalizedInput).toHaveBeenCalledWith(
       env,
-      {
-        apiKind: 'chat_completions',
-        requestedModel: 'anthropic/claude-sonnet-4',
-        systemPromptPrefix: 'You classify auto model routing requests.',
-        userPromptPrefix: 'Pick the best model for this request.',
-        latestUserPromptPrefix: null,
-        messageCount: 3,
-        hasTools: true,
-        stream: true,
-        providerHints: {
-          provider: { order: ['anthropic'] },
-          providerOptions: { openrouter: { sort: 'price', apiKey: '[REDACTED]' } },
-        },
-      },
+      normalizedInput,
       'google/gemini-2.5-flash-lite',
-      { openrouterSessionId: 'task-123' }
+      { openrouterSessionId: 'user:user-1:task:task-123' }
     );
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['google/gemini-2.5-flash-lite'],
@@ -205,31 +186,28 @@ describe('auto routing worker', () => {
         '0.8-1.0',
         'task-123',
       ],
-      doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, expect.any(Number), 0],
+      doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, 2048, 0],
     });
-    expect(infoSpy).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    const [logMessage] = logSpy.mock.calls[0] ?? [];
+    expect(JSON.parse(String(logMessage))).toMatchObject({
+      event: 'auto_routing_decision',
+      status: 'classified',
+      cacheHit: false,
+      userId: 'user-1',
+      sessionId: 'task-123',
+      clientRequestId: 'req-1',
+      hasMachineId: true,
+      mode: 'code',
+      uaPrefix: 'Kilo-Code/4.106.0',
+      bodyBytes: 2048,
+    });
   });
 
   it('serves a cached classification for the session without calling the classifier', async () => {
     cacheGetEntry.mockResolvedValueOnce(mockClassification);
 
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: 'task-123',
-        headers: {},
-        body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4',
-          messages: [{ role: 'user', content: 'Pick the best model.' }],
-        }),
-      }),
-    });
+    const response = await decideRequest(mirrorPayload());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -237,41 +215,39 @@ describe('auto routing worker', () => {
       decision: null,
       classifierResult: { classification: mockClassification },
     });
-    expect(cacheIdFromName).toHaveBeenCalledWith('task-123');
+    expect(cacheIdFromName).toHaveBeenCalledWith('user:user-1:task:task-123');
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
     expect(cachePutEntry).not.toHaveBeenCalled();
     expect(writeDataPoint).toHaveBeenCalledWith(
       expect.objectContaining({
-        doubles: [0, 0, mockClassification.confidence, 1, 0, expect.any(Number), 1],
+        doubles: [0, 0, mockClassification.confidence, 3, 1, 2048, 1],
       })
     );
   });
 
   it('caches fresh classifications for the conversation', async () => {
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: null,
-        headers: {},
-        body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4',
-          messages: [{ role: 'user', content: 'Pick the best model.' }],
-        }),
-      }),
-    });
+    const response = await decideRequest(mirrorPayload());
 
     expect(response.status).toBe(200);
-    // Without a session id the conversation key is derived from content.
-    expect(cacheIdFromName).toHaveBeenCalledWith(expect.stringMatching(/^content:[0-9a-f]{16}$/));
     expect(cachePutEntry).toHaveBeenCalledWith(
       expect.stringMatching(/^google\/gemini-2\.5-flash-lite:[0-9a-f]{16}$/),
       expect.objectContaining({ taskType: 'implementation' })
+    );
+  });
+
+  it('falls back to a machine-scoped conversation key without a session id', async () => {
+    const response = await decideRequest(mirrorPayload({ sessionId: null }));
+
+    expect(response.status).toBe(200);
+    expect(cacheIdFromName).toHaveBeenCalledWith('user:user-1:machine:machine-1');
+  });
+
+  it('falls back to a content-fingerprint conversation key without session or machine ids', async () => {
+    const response = await decideRequest(mirrorPayload({ sessionId: null, machineId: null }));
+
+    expect(response.status).toBe(200);
+    expect(cacheIdFromName).toHaveBeenCalledWith(
+      expect.stringMatching(/^user:user-1:content:[0-9a-f]{16}$/)
     );
   });
 
@@ -281,23 +257,7 @@ describe('auto routing worker', () => {
       classification: mockClassification,
     });
 
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: null,
-        headers: {},
-        body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4',
-          messages: [{ role: 'user', content: 'Pick the best model.' }],
-        }),
-      }),
-    });
+    const response = await decideRequest(mirrorPayload());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -305,167 +265,9 @@ describe('auto routing worker', () => {
       decision: null,
       classifierResult: {
         classification: mockClassification,
-        normalized: {
-          apiKind: 'chat_completions',
-          requestedModel: 'anthropic/claude-sonnet-4',
-          systemPromptPrefix: null,
-          userPromptPrefix: 'Pick the best model.',
-          latestUserPromptPrefix: null,
-          messageCount: 1,
-          hasTools: false,
-          stream: false,
-          providerHints: {
-            provider: null,
-            providerOptions: null,
-          },
-        },
+        normalized: normalizedInput,
       },
     });
-  });
-
-  it('normalizes mirrored responses requests', async () => {
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/responses',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: null,
-        headers: { 'x-kilocode-version': '1.2.3' },
-        body: JSON.stringify({
-          model: 'openai/gpt-5-mini',
-          input: [
-            { role: 'system', content: [{ type: 'input_text', text: 'Classify requests.' }] },
-            { role: 'user', content: 'Which model should handle a fast code edit?' },
-          ],
-        }),
-      }),
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      cost: 0.00000123,
-      decision: null,
-      classifierResult: {
-        classification: mockClassification,
-        normalized: {
-          apiKind: 'responses',
-          requestedModel: 'openai/gpt-5-mini',
-          systemPromptPrefix: 'Classify requests.',
-          userPromptPrefix: 'Which model should handle a fast code edit?',
-          latestUserPromptPrefix: null,
-          messageCount: 2,
-          hasTools: false,
-          stream: false,
-          providerHints: {
-            provider: null,
-            providerOptions: null,
-          },
-        },
-      },
-    });
-  });
-
-  it('normalizes mirrored Anthropic messages requests', async () => {
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/messages',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: null,
-        headers: { 'x-kilocode-version': '1.2.3' },
-        body: JSON.stringify({
-          model: 'anthropic/claude-opus-4',
-          system: [{ type: 'text', text: 'Prefer high reasoning models.' }],
-          messages: [{ role: 'user', content: [{ type: 'text', text: 'Plan a migration.' }] }],
-        }),
-      }),
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      cost: 0.00000123,
-      decision: null,
-      classifierResult: {
-        classification: mockClassification,
-        normalized: {
-          apiKind: 'messages',
-          requestedModel: 'anthropic/claude-opus-4',
-          systemPromptPrefix: 'Prefer high reasoning models.',
-          userPromptPrefix: 'Plan a migration.',
-          latestUserPromptPrefix: null,
-          messageCount: 1,
-          hasTools: false,
-          stream: false,
-          providerHints: {
-            provider: null,
-            providerOptions: null,
-          },
-        },
-      },
-    });
-  });
-
-  it('returns a null classifier result for invalid mirrored request bodies', async () => {
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: null,
-        headers: {},
-        body: '{"model":',
-      }),
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      cost: 0,
-      decision: null,
-      classifierResult: null,
-    });
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
-    expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ['unknown'],
-      blobs: ['unknown', '', '', 'invalid_body', '', '', '', '', '', '', '', ''],
-      doubles: [0, 0, -1, 0, 0, 9, 0],
-    });
-  });
-
-  it('returns a null classifier result when the mirrored request has no requested model', async () => {
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: null,
-        headers: {},
-        body: JSON.stringify({ messages: [] }),
-      }),
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      cost: 0,
-      decision: null,
-      classifierResult: null,
-    });
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('logs fallback decisions with failure diagnostics', async () => {
@@ -484,23 +286,7 @@ describe('auto routing worker', () => {
       },
     });
 
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: 'task-123',
-        headers: {},
-        body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4',
-          messages: [{ role: 'user', content: 'Pick the best model.' }],
-        }),
-      }),
-    });
+    const response = await decideRequest(mirrorPayload());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -548,23 +334,7 @@ describe('auto routing worker', () => {
       })
     );
 
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: null,
-        headers: {},
-        body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4',
-          messages: [{ role: 'user', content: 'Pick the best model.' }],
-        }),
-      }),
-    });
+    const response = await decideRequest(mirrorPayload({ sessionId: null, machineId: null }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -608,7 +378,7 @@ describe('auto routing worker', () => {
         '',
         '',
       ],
-      doubles: [expect.any(Number), 0.00000123, -1, 1, 0, expect.any(Number), 0],
+      doubles: [expect.any(Number), 0.00000123, -1, 3, 1, 2048, 0],
     });
   });
 
@@ -619,7 +389,7 @@ describe('auto routing worker', () => {
         authorization: 'Bearer classifier-token',
         'content-type': 'application/json',
       },
-      body: '{"path":',
+      body: '{"input":',
     });
 
     expect(response.status).toBe(400);
@@ -627,38 +397,19 @@ describe('auto routing worker', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
-  it('rejects invalid wrapper payloads', async () => {
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ path: '/chat/completions' }),
-    });
+  it('rejects wrapper payloads missing required fields', async () => {
+    const response = await decideRequest({ input: normalizedInput });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'Invalid classifier payload' });
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    expect(writeDataPoint).toHaveBeenCalledWith(
+      expect.objectContaining({ blobs: expect.arrayContaining(['invalid_envelope']) })
+    );
   });
 
-  it('rejects wrapper payloads without an explicit session id field', async () => {
-    const response = await request('/decide', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer classifier-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        headers: {},
-        body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4',
-          messages: [{ role: 'user', content: 'Pick the best model.' }],
-        }),
-      }),
-    });
+  it('rejects wrapper payloads with malformed classifier inputs', async () => {
+    const response = await decideRequest(mirrorPayload({ input: { apiKind: 'chat_completions' } }));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'Invalid classifier payload' });
@@ -669,13 +420,7 @@ describe('auto routing worker', () => {
     const response = await request('/decide', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        path: '/chat/completions',
-        receivedAt: '2026-06-09T10:00:00.000Z',
-        sessionId: null,
-        headers: {},
-        body: '{}',
-      }),
+      body: JSON.stringify(mirrorPayload()),
     });
 
     expect(response.status).toBe(401);

@@ -1,13 +1,24 @@
-import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
+import { normalizeClassifierInput } from '@kilocode/auto-routing-contracts';
+import type { ClassifierApiKind, MirrorPayload } from '@kilocode/auto-routing-contracts';
 import { after } from 'next/server';
-import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { warnExceptInTest } from '@/lib/utils.server';
 
 type ScheduleAutoRoutingMirrorParams = {
-  request: Request;
-  path: '/chat/completions' | '/responses' | '/messages';
-  bodyText: string;
+  apiKind: ClassifierApiKind;
+  // The parsed gateway request body. Provider transforms may mutate it after
+  // scheduling, which is why the requested model and provider hints are
+  // captured separately before any mutation.
+  body: unknown;
+  requestedModel: string;
+  providerHints: MirrorPayload['input']['providerHints'];
+  bodyBytes: number;
+  userId: string;
+  sessionId: string | null;
+  machineId: string | null;
+  clientRequestId: string | null;
+  mode: string | null;
+  userAgent: string | null;
   authContext?: Promise<{ organizationId?: string | null }>;
 };
 
@@ -19,39 +30,33 @@ type AutoRoutingMirrorOptions = {
   onError?: (message: string, data: { error: string }) => void;
 };
 
-function serializeHeaders(headers: Headers): Record<string, string> {
-  return Object.fromEntries(headers.entries());
-}
-
-function extractHeaderAndLimitLength(request: Request, name: string) {
-  return request.headers.get(name)?.slice(0, 500)?.trim() || null;
-}
-
-function extractSessionId(request: Request) {
-  return (
-    extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ??
-    extractHeaderAndLimitLength(request, 'x-kilo-session')
-  );
-}
-
-async function sendAutoRoutingMirror({
-  request,
-  path,
-  bodyText,
-  options,
-}: ScheduleAutoRoutingMirrorParams & {
-  options: AutoRoutingMirrorOptions;
-}): Promise<void> {
+async function sendAutoRoutingMirror(
+  params: ScheduleAutoRoutingMirrorParams,
+  options: AutoRoutingMirrorOptions
+): Promise<void> {
   const workerUrl = options.workerUrl ?? AUTO_ROUTING_WORKER_URL;
   const authToken = options.authToken ?? INTERNAL_API_SECRET;
   if (!workerUrl || !authToken) return;
 
+  // Normalizing here (in background work, off the request path) keeps the
+  // mirror payload at a few KB instead of the full request body, and lets
+  // requests the worker could not classify anyway skip the mirror call.
+  const normalizedInput = normalizeClassifierInput(params.apiKind, params.body);
+  if (!normalizedInput) return;
+
   const payload: MirrorPayload = {
-    path,
-    receivedAt: new Date().toISOString(),
-    sessionId: extractSessionId(request),
-    headers: redactSensitiveHeaders(serializeHeaders(request.headers)),
-    body: bodyText,
+    input: {
+      ...normalizedInput,
+      requestedModel: params.requestedModel,
+      providerHints: params.providerHints,
+    },
+    userId: params.userId,
+    sessionId: params.sessionId,
+    machineId: params.machineId,
+    clientRequestId: params.clientRequestId,
+    mode: params.mode,
+    userAgent: params.userAgent,
+    bodyBytes: params.bodyBytes,
   };
 
   const response = await fetch(`${workerUrl}/decide`, {
@@ -76,7 +81,7 @@ export function scheduleAutoRoutingMirror(
   schedule(async () => {
     try {
       if ((await params.authContext)?.organizationId) return;
-      await sendAutoRoutingMirror({ ...params, options });
+      await sendAutoRoutingMirror(params, options);
     } catch (error) {
       const onError = options.onError ?? warnExceptInTest;
       onError('Auto routing mirror request failed', {

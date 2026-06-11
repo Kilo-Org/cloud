@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeContentHashes } from './conversation-identity';
-import type { NormalizedClassifierInput } from './classifier-input';
+import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 
 const baseInput = {
   apiKind: 'responses',

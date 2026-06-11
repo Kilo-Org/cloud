@@ -9,23 +9,41 @@ import {
 
 describe('auto routing contracts', () => {
   it('validates the cross-service request and response contracts', () => {
+    const normalizedInput = {
+      apiKind: 'chat_completions',
+      requestedModel: 'kilo-auto/free',
+      systemPromptPrefix: 'You are Kilo Code.',
+      userPromptPrefix: 'Add parser tests.',
+      latestUserPromptPrefix: null,
+      messageCount: 2,
+      hasTools: false,
+      stream: true,
+      providerHints: { provider: null, providerOptions: null },
+    };
+
     expect(
       MirrorPayloadSchema.parse({
-        path: '/chat/completions',
-        receivedAt: '2026-06-10T12:00:00.000Z',
+        input: normalizedInput,
+        userId: 'user-1',
         sessionId: 'session-123',
-        headers: { 'content-type': 'application/json' },
-        body: '{"model":"auto","messages":[]}',
+        machineId: 'machine-1',
+        clientRequestId: 'req-1',
+        mode: 'code',
+        userAgent: 'Kilo-Code/4.106.0',
+        bodyBytes: 1234,
       })
-    ).toMatchObject({ sessionId: 'session-123' });
+    ).toMatchObject({ sessionId: 'session-123', userId: 'user-1' });
 
     expect(() =>
       MirrorPayloadSchema.parse({
-        path: '/chat/completions',
-        receivedAt: 'not-a-timestamp',
-        sessionId: 'session-123',
-        headers: { 'content-type': 'application/json' },
-        body: '{"model":"auto","messages":[]}',
+        input: { apiKind: 'chat_completions' },
+        userId: '',
+        sessionId: null,
+        machineId: null,
+        clientRequestId: null,
+        mode: null,
+        userAgent: null,
+        bodyBytes: 0,
       })
     ).toThrow();
 

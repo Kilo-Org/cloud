@@ -1,7 +1,7 @@
 import type { OpenRouter } from '@openrouter/sdk';
 import type { ChatResult } from '@openrouter/sdk/models';
 import { buildClassifierMessages, CLASSIFIER_MAX_TOKENS } from './classifier-prompt';
-import type { NormalizedClassifierInput } from './classifier-input';
+import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 import {
   ClassifierOutputParseError,
   parseClassifierOutput,

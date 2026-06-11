@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { NormalizedClassifierInput } from '../classifier-input';
+import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 import { fallbackClassifierOutput } from './fallback';
 
 const input = {

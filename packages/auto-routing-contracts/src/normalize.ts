@@ -1,10 +1,10 @@
-import {
-  MirrorPayloadSchema,
-  type JsonValue,
-  type MirrorPayload,
-  type NormalizedClassifierInput,
-} from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
+import type { JsonValue, NormalizedClassifierInput } from './index';
+
+// Reduces a full gateway request body to the compact classifier input. Lives
+// in the shared contracts package so the Next.js gateway can normalize before
+// mirroring (the full body averages hundreds of kilobytes; the normalized
+// input is ~2KB) while the worker keeps using the same shapes.
 
 const TEXT_PREFIX_MAX_LENGTH = 1000;
 const REDACTED_VALUE = '[REDACTED]';
@@ -24,7 +24,7 @@ const REDUNDANT_CONTENT_TYPES = new Set([
   'tool_result',
 ]);
 
-export const mirrorPayloadSchema = MirrorPayloadSchema;
+export type ClassifierApiKind = NormalizedClassifierInput['apiKind'];
 
 const modelSchema = z.string().trim().min(1);
 const messageSchema = z.looseObject({
@@ -57,93 +57,80 @@ const messagesBodySchema = z.looseObject({
   messages: z.array(messageSchema),
 });
 
-export type { NormalizedClassifierInput };
-
-export type ClassifierInputParseResult =
-  | { success: true; data: NormalizedClassifierInput }
-  | { success: false; error: 'Invalid mirrored request body' | 'Invalid classifier body' };
-
 type Message = z.infer<typeof messageSchema>;
 type ProviderHintSource = {
   provider?: unknown;
   providerOptions?: unknown;
 };
 
-export function parseClassifierInput(payload: MirrorPayload): ClassifierInputParseResult {
-  let mirroredBody: unknown;
-  try {
-    mirroredBody = JSON.parse(payload.body);
-  } catch {
-    return { success: false, error: 'Invalid mirrored request body' };
-  }
-
-  if (payload.path === '/chat/completions') {
-    const parsed = chatCompletionBodySchema.safeParse(mirroredBody);
-    if (!parsed.success) {
-      return { success: false, error: 'Invalid classifier body' };
-    }
+export function normalizeClassifierInput(
+  apiKind: ClassifierApiKind,
+  body: unknown
+): NormalizedClassifierInput | null {
+  if (apiKind === 'chat_completions') {
+    const parsed = chatCompletionBodySchema.safeParse(body);
+    if (!parsed.success) return null;
 
     return {
-      success: true,
-      data: {
-        apiKind: 'chat_completions',
-        requestedModel: parsed.data.model,
-        systemPromptPrefix: firstPromptPrefix(parsed.data.messages, 'system'),
-        userPromptPrefix: firstPromptPrefix(parsed.data.messages, 'user'),
-        latestUserPromptPrefix: latestPromptPrefix(parsed.data.messages, 'user'),
-        messageCount: parsed.data.messages.length,
-        hasTools: hasTools(parsed.data.tools),
-        stream: parsed.data.stream === true,
-        providerHints: providerHints(parsed.data),
-      },
-    };
-  }
-
-  if (payload.path === '/responses') {
-    const parsed = responsesBodySchema.safeParse(mirroredBody);
-    if (!parsed.success) {
-      return { success: false, error: 'Invalid classifier body' };
-    }
-
-    const inputMessages = inputToMessages(parsed.data.input);
-    const inputTextPrefix = textPrefix(parsed.data.input);
-
-    return {
-      success: true,
-      data: {
-        apiKind: 'responses',
-        requestedModel: parsed.data.model,
-        systemPromptPrefix:
-          textPrefix(parsed.data.instructions) ?? firstPromptPrefix(inputMessages, 'system'),
-        userPromptPrefix: firstPromptPrefix(inputMessages, 'user') ?? inputTextPrefix,
-        latestUserPromptPrefix: latestPromptPrefix(inputMessages, 'user'),
-        messageCount: messageCount(parsed.data.input),
-        hasTools: hasTools(parsed.data.tools),
-        stream: parsed.data.stream === true,
-        providerHints: providerHints(parsed.data),
-      },
-    };
-  }
-
-  const parsed = messagesBodySchema.safeParse(mirroredBody);
-  if (!parsed.success) {
-    return { success: false, error: 'Invalid classifier body' };
-  }
-
-  return {
-    success: true,
-    data: {
-      apiKind: 'messages',
+      apiKind,
       requestedModel: parsed.data.model,
-      systemPromptPrefix:
-        textPrefix(parsed.data.system) ?? firstPromptPrefix(parsed.data.messages, 'system'),
+      systemPromptPrefix: firstPromptPrefix(parsed.data.messages, 'system'),
       userPromptPrefix: firstPromptPrefix(parsed.data.messages, 'user'),
       latestUserPromptPrefix: latestPromptPrefix(parsed.data.messages, 'user'),
       messageCount: parsed.data.messages.length,
       hasTools: hasTools(parsed.data.tools),
       stream: parsed.data.stream === true,
-      providerHints: providerHints(parsed.data),
-    },
+      providerHints: redactProviderHints(parsed.data),
+    };
+  }
+
+  if (apiKind === 'responses') {
+    const parsed = responsesBodySchema.safeParse(body);
+    if (!parsed.success) return null;
+
+    const inputMessages = inputToMessages(parsed.data.input);
+    const inputTextPrefix = textPrefix(parsed.data.input);
+
+    return {
+      apiKind,
+      requestedModel: parsed.data.model,
+      systemPromptPrefix:
+        textPrefix(parsed.data.instructions) ?? firstPromptPrefix(inputMessages, 'system'),
+      userPromptPrefix: firstPromptPrefix(inputMessages, 'user') ?? inputTextPrefix,
+      latestUserPromptPrefix: latestPromptPrefix(inputMessages, 'user'),
+      messageCount: messageCount(parsed.data.input),
+      hasTools: hasTools(parsed.data.tools),
+      stream: parsed.data.stream === true,
+      providerHints: redactProviderHints(parsed.data),
+    };
+  }
+
+  const parsed = messagesBodySchema.safeParse(body);
+  if (!parsed.success) return null;
+
+  return {
+    apiKind,
+    requestedModel: parsed.data.model,
+    systemPromptPrefix:
+      textPrefix(parsed.data.system) ?? firstPromptPrefix(parsed.data.messages, 'system'),
+    userPromptPrefix: firstPromptPrefix(parsed.data.messages, 'user'),
+    latestUserPromptPrefix: latestPromptPrefix(parsed.data.messages, 'user'),
+    messageCount: parsed.data.messages.length,
+    hasTools: hasTools(parsed.data.tools),
+    stream: parsed.data.stream === true,
+    providerHints: redactProviderHints(parsed.data),
+  };
+}
+
+// Snapshots provider hints into a redacted JSON value. Exported so the
+// gateway can capture them before provider transforms mutate the body.
+export function redactProviderHints(source: ProviderHintSource): {
+  provider: JsonValue;
+  providerOptions: JsonValue;
+} {
+  return {
+    provider: toJsonValue(source.provider),
+    providerOptions: toJsonValue(source.providerOptions),
   };
 }
 
@@ -252,13 +239,6 @@ function textFromValue(value: unknown): string {
 
 function hasTools(tools: unknown[] | undefined) {
   return Array.isArray(tools) && tools.length > 0;
-}
-
-function providerHints(source: ProviderHintSource) {
-  return {
-    provider: toJsonValue(source.provider),
-    providerOptions: toJsonValue(source.providerOptions),
-  };
 }
 
 function toJsonValue(value: unknown): JsonValue {

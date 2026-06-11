@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildClassifierMessages, DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
-import type { NormalizedClassifierInput } from './classifier-input';
+import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 
 const input = {
   apiKind: 'chat_completions',

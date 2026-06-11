@@ -1,17 +1,5 @@
 import * as z from 'zod';
 
-export const MirrorPathSchema = z.enum(['/chat/completions', '/responses', '/messages']);
-export type MirrorPath = z.infer<typeof MirrorPathSchema>;
-
-export const MirrorPayloadSchema = z.object({
-  path: MirrorPathSchema,
-  receivedAt: z.string().datetime(),
-  sessionId: z.string().trim().min(1).nullable(),
-  headers: z.record(z.string(), z.string()),
-  body: z.string(),
-});
-export type MirrorPayload = z.infer<typeof MirrorPayloadSchema>;
-
 export type JsonValue =
   | string
   | number
@@ -46,6 +34,27 @@ export const NormalizedClassifierInputSchema = z.object({
   }),
 });
 export type NormalizedClassifierInput = z.infer<typeof NormalizedClassifierInputSchema>;
+
+// What the gateway mirrors to the auto-routing worker per request: the
+// already-normalized classifier input plus caller identity. The gateway
+// normalizes before sending so the multi-hundred-KB request body never
+// leaves it, and skips the mirror entirely when normalization fails.
+export const MirrorPayloadSchema = z.object({
+  input: NormalizedClassifierInputSchema,
+  // Authenticated user id, or the gateway's synthetic anonymous id
+  // ('anon:<ip>'). Scopes the worker's conversation identity.
+  userId: z.string().trim().min(1),
+  sessionId: z.string().trim().min(1).nullable(),
+  machineId: z.string().trim().min(1).nullable(),
+  // Per-message id from the kilocode client, joinable to PostHog feedback.
+  clientRequestId: z.string().trim().min(1).nullable(),
+  mode: z.string().trim().min(1).nullable(),
+  userAgent: z.string().nullable(),
+  // Size of the original request body, kept as an analytics dimension now
+  // that the body itself is no longer mirrored.
+  bodyBytes: z.number().int().nonnegative(),
+});
+export type MirrorPayload = z.infer<typeof MirrorPayloadSchema>;
 
 export const ClassifierTaskTypeSchema = z.enum([
   'implementation',
@@ -180,3 +189,5 @@ export const AutoRoutingClassifierAnalyticsResponseSchema = z.object({
 export type AutoRoutingClassifierAnalyticsResponse = z.infer<
   typeof AutoRoutingClassifierAnalyticsResponseSchema
 >;
+
+export { normalizeClassifierInput, redactProviderHints, type ClassifierApiKind } from './normalize';

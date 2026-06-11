@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
-import type { NormalizedClassifierInput } from './classifier-input';
+import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 import type { ClassifierOutput } from './classifier-output';
 
 const input = {

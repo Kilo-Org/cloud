@@ -7,19 +7,37 @@ import { scheduleAutoRoutingMirror } from './auto-routing-mirror';
 const originalFetch = globalThis.fetch;
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 
-function makeRequest() {
-  return new Request('http://localhost:3000/api/openrouter/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      authorization: 'Bearer user-token',
-      'content-type': 'application/json',
-      'x-kilocode-version': '1.2.3',
-      'x-kilocode-taskid': 'task-123',
-      'x-kilo-session': 'session-fallback',
+// body.model differs from requestedModel to mimic auto-model resolution
+// mutating the parsed body after the mirror was scheduled; the captured
+// requestedModel must win.
+function makeParams() {
+  return {
+    apiKind: 'chat_completions' as const,
+    body: {
+      model: 'anthropic/claude-sonnet-4',
+      stream: true,
+      provider: { order: ['google'] },
+      messages: [
+        { role: 'system', content: 'You are Kilo Code.' },
+        { role: 'user', content: 'Fix the parser bug.' },
+      ],
     },
-    body: JSON.stringify({ model: 'auto', messages: [] }),
-  });
+    requestedModel: 'kilo-auto/free',
+    providerHints: { provider: { order: ['anthropic'] }, providerOptions: null },
+    bodyBytes: 512,
+    userId: 'user-1',
+    sessionId: 'task-123',
+    machineId: 'machine-1',
+    clientRequestId: 'req-1',
+    mode: 'code',
+    userAgent: 'Kilo-Code/1.2.3',
+  };
 }
+
+const options = {
+  workerUrl: 'https://auto-routing.example.com',
+  authToken: 'classifier-token',
+};
 
 describe('scheduleAutoRoutingMirror', () => {
   let scheduledWork: Array<() => void | Promise<void>>;
@@ -35,21 +53,11 @@ describe('scheduleAutoRoutingMirror', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('schedules a background mirror request with headers and raw body', async () => {
-    scheduleAutoRoutingMirror(
-      {
-        request: makeRequest(),
-        path: '/chat/completions',
-        bodyText: '{"model":"auto","messages":[]}',
-      },
-      work => scheduledWork.push(work),
-      {
-        workerUrl: 'https://auto-routing.example.com',
-        authToken: 'classifier-token',
-      }
-    );
+  it('schedules a background mirror request with the normalized input and caller identity', async () => {
+    scheduleAutoRoutingMirror(makeParams(), work => scheduledWork.push(work), options);
 
     expect(scheduledWork).toHaveLength(1);
+    expect(mockedFetch).not.toHaveBeenCalled();
     await scheduledWork[0]();
 
     expect(mockedFetch).toHaveBeenCalledTimes(1);
@@ -57,67 +65,48 @@ describe('scheduleAutoRoutingMirror', () => {
     expect(url).toBe('https://auto-routing.example.com/decide');
     expect(init).toMatchObject({ method: 'POST' });
     const payload = JSON.parse(init?.body as string);
-    expect(payload).toMatchObject({
-      path: '/chat/completions',
-      sessionId: 'task-123',
-      headers: {
-        authorization: '[REDACTED]',
-        'content-type': 'application/json',
-        'x-kilo-session': 'session-fallback',
-        'x-kilocode-taskid': 'task-123',
-        'x-kilocode-version': '1.2.3',
+    expect(payload).toEqual({
+      input: {
+        apiKind: 'chat_completions',
+        requestedModel: 'kilo-auto/free',
+        systemPromptPrefix: 'You are Kilo Code.',
+        userPromptPrefix: 'Fix the parser bug.',
+        latestUserPromptPrefix: null,
+        messageCount: 2,
+        hasTools: false,
+        stream: true,
+        providerHints: { provider: { order: ['anthropic'] }, providerOptions: null },
       },
-      body: '{"model":"auto","messages":[]}',
+      userId: 'user-1',
+      sessionId: 'task-123',
+      machineId: 'machine-1',
+      clientRequestId: 'req-1',
+      mode: 'code',
+      userAgent: 'Kilo-Code/1.2.3',
+      bodyBytes: 512,
     });
-    expect(new Date(payload.receivedAt).toISOString()).toBe(payload.receivedAt);
 
     const headers = init?.headers as Headers;
     expect(headers.get('authorization')).toBe('Bearer classifier-token');
     expect(headers.get('content-type')).toBe('application/json');
   });
 
-  it('uses the fallback session header when task id is absent', async () => {
-    const request = new Request('http://localhost:3000/api/openrouter/v1/responses', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-kilo-session': 'session-456',
-      },
-      body: JSON.stringify({ model: 'auto', input: 'hi' }),
-    });
-
+  it('skips mirroring when the body cannot be normalized', async () => {
     scheduleAutoRoutingMirror(
-      {
-        request,
-        path: '/responses',
-        bodyText: '{"model":"auto","input":"hi"}',
-      },
+      { ...makeParams(), body: { stream: true } },
       work => scheduledWork.push(work),
-      {
-        workerUrl: 'https://auto-routing.example.com',
-        authToken: 'classifier-token',
-      }
+      options
     );
     await scheduledWork[0]();
 
-    const [, init] = mockedFetch.mock.calls[0];
-    const payload = JSON.parse(init?.body as string);
-    expect(payload.sessionId).toBe('session-456');
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('does not mirror organization-scoped requests', async () => {
     scheduleAutoRoutingMirror(
-      {
-        request: makeRequest(),
-        path: '/chat/completions',
-        bodyText: '{"model":"auto","messages":[]}',
-        authContext: Promise.resolve({ organizationId: 'org-123' }),
-      },
+      { ...makeParams(), authContext: Promise.resolve({ organizationId: 'org-123' }) },
       work => scheduledWork.push(work),
-      {
-        workerUrl: 'https://auto-routing.example.com',
-        authToken: 'classifier-token',
-      }
+      options
     );
 
     expect(scheduledWork).toHaveLength(1);
@@ -129,19 +118,10 @@ describe('scheduleAutoRoutingMirror', () => {
   it('swallows worker failures', async () => {
     mockedFetch.mockRejectedValueOnce(new Error('worker unavailable'));
 
-    scheduleAutoRoutingMirror(
-      {
-        request: makeRequest(),
-        path: '/chat/completions',
-        bodyText: '{"model":"auto","messages":[]}',
-      },
-      work => scheduledWork.push(work),
-      {
-        workerUrl: 'https://auto-routing.example.com',
-        authToken: 'classifier-token',
-        onError: (message, data) => mockedWarnExceptInTest(message, data),
-      }
-    );
+    scheduleAutoRoutingMirror(makeParams(), work => scheduledWork.push(work), {
+      ...options,
+      onError: (message, data) => mockedWarnExceptInTest(message, data),
+    });
     await scheduledWork[0]();
 
     expect(mockedWarnExceptInTest).toHaveBeenCalledWith('Auto routing mirror request failed', {

@@ -27,6 +27,7 @@ jobs:
     environment: production
 
     env:
+      DATABASE_CA: ${{ secrets.DATABASE_CA }}
       POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
 
     steps:
@@ -57,6 +58,7 @@ jobs:
     environment: production
 
     env:
+      DATABASE_CA: ${{ secrets.DATABASE_CA }}
       POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
 
     steps:

@@ -55,6 +55,9 @@ import { db } from '@/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
+import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
+
+const MIN_BALANCE_DOLLARS = 1;
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -565,6 +568,17 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return await client.getSession(input.cloudAgentSessionId);
     }),
 
+  checkEligibility: organizationMemberProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const { balance } = await getBalanceForOrganizationUser(input.organizationId, ctx.user.id);
+      return {
+        balance,
+        minBalance: MIN_BALANCE_DOLLARS,
+        isEligible: balance >= MIN_BALANCE_DOLLARS,
+      };
+    }),
+
   /**
    * List GitHub repositories available for cloud agent sessions (organization context).
    */
@@ -586,7 +600,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         errorMessage: z.string().optional(),
       })
     )
-    .query(async ({ ctx: _ctx, input }) => {
+    .query(async ({ input }) => {
       const result = await fetchGitHubRepositoriesForOrganization(
         input.organizationId,
         input.forceRefresh
@@ -619,7 +633,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         errorMessage: z.string().optional(),
       })
     )
-    .query(async ({ ctx: _ctx, input }) => {
+    .query(async ({ input }) => {
       const result = await fetchGitLabRepositoriesForOrganization(
         input.organizationId,
         input.forceRefresh

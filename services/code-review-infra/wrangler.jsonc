@@ -18,7 +18,6 @@
   "vars": {
     "ENVIRONMENT": "production",
     "API_URL": "https://app.kilo.ai",
-    "CLOUD_AGENT_URL": "https://cloud-agent.kilosessions.ai",
     "CLOUD_AGENT_NEXT_URL": "https://cloud-agent-next.kilosessions.ai",
   },
   // Durable Objects configuration

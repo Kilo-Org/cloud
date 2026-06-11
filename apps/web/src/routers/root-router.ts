@@ -9,7 +9,6 @@ import { codeIndexingRouter } from '@/routers/code-indexing/code-indexing-router
 import { deploymentsRouter } from '@/routers/deployments-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
-import { cloudAgentRouter } from '@/routers/cloud-agent-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
@@ -61,7 +60,6 @@ export const rootRouter = createTRPCRouter({
   linear: linearRouter,
   dolthub: dolthubRouter,
   discord: discordRouter,
-  cloudAgent: cloudAgentRouter,
   cloudAgentNext: cloudAgentNextRouter,
   codeReviews: codeReviewRouter,
   reviewMemory: reviewMemoryRouter,

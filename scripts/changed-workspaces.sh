@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # Usage:
 #   scripts/changed-workspaces.sh                                    # all changed workspaces with tests
-#   scripts/changed-workspaces.sh --exclude services/cloud-agent --exclude services/cloud-agent-next  # skip specific dirs
+#   scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web  # skip specific dirs
 
 excludes=()
 while [[ $# -gt 0 ]]; do

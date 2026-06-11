@@ -2,6 +2,7 @@ const mockCancelReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockGetBlobContent = jest.fn();
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -19,6 +20,10 @@ jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+}));
+
+jest.mock('@/lib/r2/cli-sessions', () => ({
+  getBlobContent: (...args: unknown[]) => mockGetBlobContent(...args),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -39,6 +44,7 @@ import {
   agent_configs,
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
+  cliSessions,
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -112,11 +118,13 @@ describe('codeReviewRouter.cancel', () => {
     await db
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
     await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, testUser.id));
     mockCancelReview.mockReset();
     mockTryDispatchPendingReviews.mockReset();
+    mockGetBlobContent.mockReset();
     mockUpdateCheckRun.mockReset();
   });
 
@@ -688,9 +696,11 @@ describe('codeReviewRouter attempts', () => {
     await db
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
     await db.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, testUser.id));
     mockCancelReview.mockReset();
     mockTryDispatchPendingReviews.mockReset();
+    mockGetBlobContent.mockReset();
   });
 
   afterAll(async () => {
@@ -896,5 +906,48 @@ describe('codeReviewRouter attempts', () => {
         attemptId: otherAttempt.id,
       })
     ).rejects.toThrow('Code review attempt not found');
+  });
+
+  it('loads a historical V1 review from PostgreSQL and R2 without a worker request', async () => {
+    const cliSessionId = crypto.randomUUID();
+    await db.insert(cliSessions).values({
+      session_id: cliSessionId,
+      kilo_user_id: testUser.id,
+      title: 'Historical V1 code review',
+      created_on_platform: 'vscode',
+      ui_messages_blob_url: `sessions/${cliSessionId}/ui_messages.json`,
+    });
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'completed', {
+          agent_version: 'v1',
+          cli_session_id: cliSessionId,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    mockGetBlobContent.mockResolvedValue([
+      {
+        type: 'say',
+        say: 'completion_result',
+        text: 'Historical review result',
+        ts: Date.now(),
+      },
+    ]);
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    try {
+      const caller = await createCallerForUser(testUser.id);
+      const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+      expect(result).toMatchObject({
+        success: true,
+        entries: [{ eventType: 'text', message: 'Historical review result' }],
+      });
+      expect(mockGetBlobContent).toHaveBeenCalledWith(`sessions/${cliSessionId}/ui_messages.json`);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

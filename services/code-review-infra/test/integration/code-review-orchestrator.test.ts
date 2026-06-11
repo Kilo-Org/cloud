@@ -56,7 +56,6 @@ function codeReview(overrides: Partial<CodeReview> = {}): CodeReview {
     },
     status: 'queued',
     updatedAt: new Date().toISOString(),
-    agentVersion: 'v2',
     ...overrides,
   };
 }
@@ -252,7 +251,6 @@ describe('CodeReviewOrchestrator recovery', () => {
       authToken: 'test-auth-token',
       sessionInput: sessionInput(),
       owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-      agentVersion: 'v2',
     });
 
     const alarm = await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) =>
@@ -270,6 +268,12 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
     expect(missingResponse.status).toBe(404);
 
+    const removedEventsResponse = await SELF.fetch(
+      `https://worker.test/reviews/${missingId}/events`,
+      { headers: workerAuthHeaders() }
+    );
+    expect(removedEventsResponse.status).toBe(404);
+
     const reviewId = crypto.randomUUID();
     const stub = getReviewStub(reviewId);
     await stub.start({
@@ -277,7 +281,6 @@ describe('CodeReviewOrchestrator recovery', () => {
       authToken: 'test-auth-token',
       sessionInput: sessionInput(),
       owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-      agentVersion: 'v2',
     });
 
     const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/status`, {
@@ -291,7 +294,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
   });
 
-  it('POST /review uses attempt-specific durable object names', async () => {
+  it('POST /review uses attempt-specific durable object names and ignores obsolete version input', async () => {
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = mockSuccessfulCloudAgentNextRun();
     const reviewId = crypto.randomUUID();
@@ -306,7 +309,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         authToken: 'test-auth-token',
         sessionInput: sessionInput(),
         owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-        agentVersion: 'v2',
+        agentVersion: 'obsolete',
         repositorySize: '100 MB',
       }),
     });
@@ -429,7 +432,6 @@ describe('CodeReviewOrchestrator recovery', () => {
           runtimeSkills: [{ name: 'caller-skill', rawMarkdown: 'untrusted caller skill' }],
         },
         owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-        agentVersion: 'v2',
       }),
     });
 
@@ -474,7 +476,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         authToken: 'test-auth-token',
         sessionInput: sessionInput(),
         owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-        agentVersion: 'v2',
       }),
     });
 
@@ -1216,6 +1217,35 @@ describe('CodeReviewOrchestrator recovery', () => {
       status: 'failed',
       sandboxRetryAttempted: true,
     });
+  });
+
+  it('cancels a running review through Cloud Agent Next interruption', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({ status: 'running', sessionId: 'agent-running' })
+      );
+    });
+
+    await expect(stub.cancel('superseded')).resolves.toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'Review cancelled: superseded',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
   });
 
   it('does not retry billing failures from prepareSession', async () => {
@@ -2144,7 +2174,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         codeReview({
           status: 'completed',
           completedAt: new Date().toISOString(),
-          events: [{ timestamp: new Date().toISOString(), eventType: 'test', message: 'stored' }],
         })
       );
       await state.storage.setAlarm(Date.now() + 60_000);

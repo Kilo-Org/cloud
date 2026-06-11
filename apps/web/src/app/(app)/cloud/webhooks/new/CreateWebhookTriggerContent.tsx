@@ -43,11 +43,11 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     error: repoError,
   } = useQuery(
     organizationId
-      ? trpc.organizations.cloudAgent.listGitHubRepositories.queryOptions({
+      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
           organizationId,
           forceRefresh: false,
         })
-      : trpc.cloudAgent.listGitHubRepositories.queryOptions({
+      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
           forceRefresh: false,
         })
   );

@@ -180,7 +180,6 @@
     },
     {
       "files": [
-        "services/cloud-agent/src/session/queries/*.ts",
         "services/cloud-agent-next/src/session/queries/*.ts",
         "services/gastown/**/*.ts",
         "services/wasteland/**/*.ts",

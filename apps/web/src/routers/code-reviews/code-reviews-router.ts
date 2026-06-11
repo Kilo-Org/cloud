@@ -588,65 +588,6 @@ export const codeReviewRouter = createTRPCRouter({
     }),
 
   /**
-   * Get events for a code review (SSE/cloud-agent flow, polling-based)
-   * Used when the review is NOT using cloud-agent-next.
-   * Verifies user has access to the review:
-   * - For org reviews: user must be org member
-   * - For personal reviews: user must be the owner
-   */
-  getReviewEvents: baseProcedure
-    .input(
-      z.object({
-        reviewId: z.string().uuid(),
-        attemptId: z.string().uuid().optional(),
-      })
-    )
-    .query(async ({ input, ctx }) => {
-      try {
-        const review = await getCodeReviewById(input.reviewId);
-
-        if (!review) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Code review not found',
-          });
-        }
-
-        // Authorization check based on owner type
-        if (review.owned_by_organization_id) {
-          await ensureOrganizationAccess(ctx, review.owned_by_organization_id);
-        } else if (review.owned_by_user_id) {
-          if (review.owned_by_user_id !== ctx.user.id) {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: 'You do not have access to this code review',
-            });
-          }
-        } else {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Invalid review ownership data',
-          });
-        }
-
-        // Fetch events from worker (server-side, auth token stays secure)
-        const events = await codeReviewWorkerClient.getReviewEvents(
-          input.reviewId,
-          input.attemptId
-        );
-
-        return successResult({ events });
-      } catch (error) {
-        if (error instanceof TRPCError) {
-          throw error;
-        }
-        return failureResult(
-          error instanceof Error ? error.message : 'Failed to fetch review events'
-        );
-      }
-    }),
-
-  /**
    * Get stream info for a code review (for WebSocket streaming via cloud-agent-next)
    * Returns the cloudAgentSessionId and organizationId so the frontend can
    * get a stream ticket and connect to cloud-agent-next's WebSocket.

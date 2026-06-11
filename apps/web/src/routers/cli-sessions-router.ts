@@ -29,8 +29,6 @@ import {
 } from '@/lib/r2/cli-sessions';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
-import { createCloudAgentClient } from '@/lib/cloud-agent/cloud-agent-client';
-import { generateApiToken } from '@/lib/tokens';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 
 export const BLOB_TYPES = [
@@ -478,13 +476,7 @@ export const cliSessionsRouter = createTRPCRouter({
   delete: baseProcedure.input(DeleteSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
 
-    const session = await getSessionWithExistsCheck(session_id, ctx.user.id);
-
-    if (session.cloud_agent_session_id) {
-      const authToken = generateApiToken(ctx.user);
-      const cloudAgentClient = createCloudAgentClient(authToken);
-      await cloudAgentClient.deleteSession(session.cloud_agent_session_id);
-    }
+    await getSessionWithExistsCheck(session_id, ctx.user.id);
 
     const blobsToDelete: { folderName: FolderName; filename: FileName }[] = BLOB_TYPES.map(
       filename => ({ folderName: 'sessions', filename })

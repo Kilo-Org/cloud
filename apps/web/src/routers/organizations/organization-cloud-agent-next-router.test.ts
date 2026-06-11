@@ -1,9 +1,11 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import { createCallerFactory } from '@/lib/trpc/init';
 import type * as TrpcInitModule from '@/lib/trpc/init';
+import type * as ZodModule from 'zod';
 import type { User } from '@kilocode/db/schema';
 import type * as BitbucketIntegrationHelpers from '@/lib/cloud-agent/bitbucket-integration-helpers';
 import type { BitbucketOrganizationRepositoryListResult } from '@/lib/cloud-agent/bitbucket-integration-helpers';
+import { TRPCError } from '@trpc/server';
 
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 
@@ -68,6 +70,29 @@ const mockFetchBitbucketRepositoriesForOrganization =
       kiloUserId: string
     ) => Promise<BitbucketOrganizationRepositoryListResult>
   >();
+const mockGetBalanceForOrganizationUser =
+  jest.fn<(organizationId: string, userId: string) => Promise<{ balance: number }>>();
+const mockFetchGitHubRepositoriesForOrganization = jest.fn<
+  (
+    organizationId: string,
+    forceRefresh: boolean
+  ) => Promise<{
+    repositories: unknown[];
+    integrationInstalled: boolean;
+    syncedAt: null;
+  }>
+>();
+const mockFetchGitLabRepositoriesForOrganization = jest.fn<
+  (
+    organizationId: string,
+    forceRefresh: boolean
+  ) => Promise<{
+    repositories: unknown[];
+    integrationInstalled: boolean;
+    syncedAt: null;
+  }>
+>();
+const mockEnsureOrganizationAccess = jest.fn<(userId: string, organizationId: string) => void>();
 
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
@@ -89,21 +114,42 @@ jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({
   fetchBitbucketRepositoriesForOrganization: mockFetchBitbucketRepositoriesForOrganization,
 }));
 
-jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
-  generateImageUploadUrl: jest.fn(),
-  generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
+jest.mock('@/lib/organizations/organization-usage', () => ({
+  getBalanceForOrganizationUser: mockGetBalanceForOrganizationUser,
+}));
+
+jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
+  fetchGitHubRepositoriesForOrganization: mockFetchGitHubRepositoriesForOrganization,
+}));
+
+jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
+  buildGitLabCloneUrl: jest.fn(),
+  fetchGitLabRepositoriesForOrganization: mockFetchGitLabRepositoriesForOrganization,
+  getGitLabInstanceUrlForOrganization: jest.fn(),
 }));
 
 jest.mock('@/lib/cloud-agent/session-ownership', () => ({
   verifyOrgOwnsSessionV2ByCloudAgentId: mockVerifyOrgOwnsSessionV2ByCloudAgentId,
 }));
 
+jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
+  generateImageUploadUrl: jest.fn(),
+  generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
+}));
+
 jest.mock('@/routers/organizations/utils', () => {
   const trpcInit = jest.requireActual<typeof TrpcInitModule>('@/lib/trpc/init');
+  const zod = jest.requireActual<typeof ZodModule>('zod');
+  const organizationProcedure = trpcInit.baseProcedure
+    .input(zod.object({ organizationId: zod.uuid() }))
+    .use(async ({ ctx, input, next }) => {
+      mockEnsureOrganizationAccess(ctx.user.id, input.organizationId);
+      return next();
+    });
 
   return {
-    organizationMemberProcedure: trpcInit.baseProcedure,
-    organizationMemberMutationProcedure: trpcInit.baseProcedure,
+    organizationMemberProcedure: organizationProcedure,
+    organizationMemberMutationProcedure: organizationProcedure,
   };
 });
 
@@ -143,11 +189,49 @@ let createCaller: (ctx: { user: User }) => {
   listBitbucketRepositories: (input: {
     organizationId: string;
   }) => Promise<BitbucketOrganizationRepositoryListResult>;
+  checkEligibility: (input: { organizationId: string }) => Promise<{
+    balance: number;
+    minBalance: number;
+    isEligible: boolean;
+  }>;
+  listGitHubRepositories: (input: {
+    organizationId: string;
+    forceRefresh: boolean;
+  }) => Promise<unknown>;
+  listGitLabRepositories: (input: {
+    organizationId: string;
+    forceRefresh: boolean;
+  }) => Promise<unknown>;
+  refreshTerminalTicket: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+    ptyId: string;
+  }) => Promise<{ ticket: string; wsUrl: string }>;
+  createTerminal: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<unknown>;
+  resizeTerminal: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+    ptyId: string;
+    cols: number;
+    rows: number;
+  }) => Promise<unknown>;
+  closeTerminal: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+    ptyId: string;
+  }) => Promise<unknown>;
 };
 
 beforeAll(async () => {
   const mod = await import('./organization-cloud-agent-next-router');
   createCaller = createCallerFactory(mod.organizationCloudAgentNextRouter);
+});
+
+beforeEach(() => {
+  mockEnsureOrganizationAccess.mockImplementation(() => undefined);
 });
 
 describe('organizationCloudAgentNextRouter attachment forwarding', () => {
@@ -228,6 +312,124 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
       contentType: 'text/markdown',
       contentLength: 42,
     });
+  });
+});
+
+describe('organizationCloudAgentNextRouter helper procedures', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+  });
+
+  it.each([
+    { balance: 1, isEligible: true },
+    { balance: 0.99, isEligible: false },
+  ])('reports organization eligibility for a $balance balance', async ({ balance, isEligible }) => {
+    mockGetBalanceForOrganizationUser.mockResolvedValue({ balance });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(caller.checkEligibility({ organizationId: ORGANIZATION_ID })).resolves.toEqual({
+      balance,
+      minBalance: 1,
+      isEligible,
+    });
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith('member-user', ORGANIZATION_ID);
+    expect(mockGetBalanceForOrganizationUser).toHaveBeenCalledWith(ORGANIZATION_ID, 'member-user');
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+
+  it('rejects eligibility checks before reading balance when membership is denied', async () => {
+    mockEnsureOrganizationAccess.mockImplementation(() => {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      });
+    });
+    const caller = createCaller({ user: { id: 'non-member', is_admin: false } as User });
+
+    await expect(caller.checkEligibility({ organizationId: ORGANIZATION_ID })).rejects.toThrow(
+      'You do not have access to this organization'
+    );
+    expect(mockGetBalanceForOrganizationUser).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['GitHub', 'listGitHubRepositories', mockFetchGitHubRepositoriesForOrganization],
+    ['GitLab', 'listGitLabRepositories', mockFetchGitLabRepositoriesForOrganization],
+  ] as const)(
+    'lists organization %s repositories without creating a runtime client',
+    async (_, method, fetchRepositories) => {
+      const repositories = {
+        repositories: [],
+        integrationInstalled: true,
+        syncedAt: null,
+      };
+      fetchRepositories.mockResolvedValue(repositories);
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await expect(
+        caller[method]({ organizationId: ORGANIZATION_ID, forceRefresh: true })
+      ).resolves.toEqual(repositories);
+      expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith('member-user', ORGANIZATION_ID);
+      expect(fetchRepositories).toHaveBeenCalledWith(ORGANIZATION_ID, true);
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe('organizationCloudAgentNextRouter terminal ownership', () => {
+  const organizationCloudAgentSessionId = 'agent_terminal_ticket_org_owned';
+  const personalCloudAgentSessionId = 'agent_terminal_ticket_org_personal';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+  });
+
+  it('issues a terminal ticket for a session owned by the organization', async () => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    const result = await caller.refreshTerminalTicket({
+      organizationId: ORGANIZATION_ID,
+      cloudAgentSessionId: organizationCloudAgentSessionId,
+      ptyId: 'pty_org_owned',
+    });
+
+    expect(result.ticket).toEqual(expect.any(String));
+    expect(result.wsUrl).toContain(`cloudAgentSessionId=${organizationCloudAgentSessionId}`);
+  });
+
+  it.each([
+    ['refreshing a ticket', 'refreshTerminalTicket'],
+    ['creating a terminal', 'createTerminal'],
+    ['resizing a terminal', 'resizeTerminal'],
+    ['closing a terminal', 'closeTerminal'],
+  ] as const)('rejects %s for a session outside the organization', async (_, method) => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue(null);
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+    const baseInput = {
+      organizationId: ORGANIZATION_ID,
+      cloudAgentSessionId: personalCloudAgentSessionId,
+    };
+
+    const call =
+      method === 'refreshTerminalTicket'
+        ? caller.refreshTerminalTicket({ ...baseInput, ptyId: 'pty_org_other' })
+        : method === 'createTerminal'
+          ? caller.createTerminal(baseInput)
+          : method === 'resizeTerminal'
+            ? caller.resizeTerminal({
+                ...baseInput,
+                ptyId: 'pty_org_other',
+                cols: 120,
+                rows: 32,
+              })
+            : caller.closeTerminal({ ...baseInput, ptyId: 'pty_org_other' });
+
+    await expect(call).rejects.toThrow('Organization does not own this session');
   });
 });
 

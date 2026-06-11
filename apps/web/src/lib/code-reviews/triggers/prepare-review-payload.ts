@@ -101,8 +101,6 @@ export type CodeReviewPayload = {
   sessionInput: SessionInput;
   owner: Owner;
   skipBalanceCheck?: boolean;
-  /** Which cloud agent backend to use: 'v1' (cloud-agent SSE) or 'v2' (cloud-agent-next) */
-  agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   /** Provider-reported repository storage size, formatted for log correlation. */

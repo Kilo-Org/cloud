@@ -1,21 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
-import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 import type { ClassifierOutput } from './classifier-output';
-
-const input = {
-  apiKind: 'chat_completions',
-  requestedModel: 'anthropic/claude-sonnet-4',
-  systemPromptPrefix: '',
-  userPromptPrefix: 'Fix the failing test.',
-  messageCount: 2,
-  hasTools: true,
-  stream: false,
-  providerHints: {
-    provider: null,
-    providerOptions: null,
-  },
-} satisfies NormalizedClassifierInput;
 
 const classification = {
   taskType: 'debugging',
@@ -39,7 +24,7 @@ describe('classifier analytics', () => {
       {
         status: 'classified',
         classifierModel: 'google/gemini-2.5-flash-lite',
-        requestedModel: input.requestedModel,
+        requestedModel: 'anthropic/claude-sonnet-4',
         classification,
         classifierDurationMs: 123.45,
         classifierCostCredits: 0.00000123,

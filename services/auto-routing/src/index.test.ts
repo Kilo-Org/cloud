@@ -313,8 +313,18 @@ describe('auto routing worker', () => {
     });
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['google/gemini-2.5-flash-lite'],
-      blobs: expect.arrayContaining(['fallback:invalid_output']),
-      doubles: expect.arrayContaining([0]),
+      blobs: [
+        'google/gemini-2.5-flash-lite',
+        'anthropic/claude-sonnet-4',
+        'fallback:invalid_output',
+        'implementation',
+        'feature_development',
+        'medium',
+        'medium',
+        'code_change',
+        '1',
+      ],
+      doubles: [expect.any(Number), 0.00000123, 0, 0],
     });
   });
 
@@ -388,6 +398,13 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'Invalid JSON body' });
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    // Status-only writes fill every other slot with its empty sentinel; the
+    // SQL queries rely on this exact layout.
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      indexes: ['unknown'],
+      blobs: ['unknown', '', 'invalid_json', '', '', '', '', '', ''],
+      doubles: [0, 0, -1, 0],
+    });
   });
 
   it('rejects wrapper payloads missing required fields', async () => {

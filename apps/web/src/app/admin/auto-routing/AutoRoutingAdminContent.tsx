@@ -117,6 +117,22 @@ function formatCredits(value: number) {
   }).format(value);
 }
 
+// Cache hits and fallbacks are both subsets of requests that produced a
+// classification, so their rates use classifiedRequests (not totalRequests)
+// as the denominator.
+export function summaryRates(
+  summary: AutoRoutingClassifierAnalyticsResponse['summary'] | undefined
+) {
+  const totalRequests = summary?.totalRequests ?? 0;
+  const classifiedRequests = summary?.classifiedRequests ?? 0;
+  return {
+    classifiedRate: totalRequests > 0 ? classifiedRequests / totalRequests : 0,
+    cacheHitRate: classifiedRequests > 0 ? (summary?.cachedRequests ?? 0) / classifiedRequests : 0,
+    fallbackRate:
+      classifiedRequests > 0 ? (summary?.fallbackRequests ?? 0) / classifiedRequests : 0,
+  };
+}
+
 function MetricHelp({ label, description }: { label: string; description: string }) {
   return (
     <Tooltip>
@@ -422,12 +438,7 @@ export function AutoRoutingAdminContent() {
     hasClassifierModelLoaded && selectedModel.trim().length > 0 && selectedModel !== currentModel;
   const summary = analyticsQuery.data?.summary;
   const totalRequests = summary?.totalRequests ?? 0;
-  const classifiedRate = totalRequests > 0 ? (summary?.classifiedRequests ?? 0) / totalRequests : 0;
-  const classifiedRequests = summary?.classifiedRequests ?? 0;
-  const cacheHitRate =
-    classifiedRequests > 0 ? (summary?.cachedRequests ?? 0) / classifiedRequests : 0;
-  const fallbackRate =
-    classifiedRequests > 0 ? (summary?.fallbackRequests ?? 0) / classifiedRequests : 0;
+  const { classifiedRate, cacheHitRate, fallbackRate } = summaryRates(summary);
   const analyticsErrorMessage =
     analyticsQuery.error instanceof Error
       ? analyticsQuery.error.message

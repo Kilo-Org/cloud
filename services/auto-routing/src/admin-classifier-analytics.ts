@@ -130,7 +130,7 @@ function buildSummaryQuery(period: AnalyticsPeriod): string {
       SUM(_sample_interval * IF(blob3 = 'classified' OR startsWith(blob3, 'fallback:'), 1, 0)) AS classified_requests,
       SUM(_sample_interval * IF(double4 = 1, 1, 0)) AS cached_requests,
       SUM(_sample_interval * IF(startsWith(blob3, 'fallback:'), 1, 0)) AS fallback_requests,
-      SUM(_sample_interval * IF(blob3 = 'classifier_error' OR startsWith(blob3, 'classifier_error:'), 1, 0)) AS classifier_errors,
+      SUM(_sample_interval * IF(startsWith(blob3, 'classifier_error:'), 1, 0)) AS classifier_errors,
       SUM(_sample_interval * IF(blob3 IN ('invalid_json', 'invalid_envelope'), 1, 0)) AS invalid_requests,
       SUM(_sample_interval * double2) AS total_cost_credits,
       avgIf(double1, double1 > 0) AS avg_duration_ms,

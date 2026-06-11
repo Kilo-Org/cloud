@@ -11,8 +11,10 @@ export type DeciderCase = {
   check: DeciderCheck;
 };
 
-const CODE_SYS = 'You are a precise coding assistant. Answer with only what is asked, no explanations.';
-const SYS_SYS = 'You are a precise systems engineer. Answer with only what is asked, no explanations.';
+const CODE_SYS =
+  'You are a precise coding assistant. Answer with only what is asked, no explanations.';
+const SYS_SYS =
+  'You are a precise systems engineer. Answer with only what is asked, no explanations.';
 
 // Golden answers below were each worked through by hand. Every case has a
 // single unambiguous, mechanically-checkable answer. Checks tolerate
@@ -105,7 +107,8 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     id: 'low-planning-http-created',
     tier: 'low',
     taskType: 'planning_design',
-    systemPrompt: 'You are a precise web API expert. Answer with only what is asked, no explanations.',
+    systemPrompt:
+      'You are a precise web API expert. Answer with only what is asked, no explanations.',
     userPrompt:
       'Which standard HTTP status code indicates that a new resource was successfully created? Answer with only the 3-digit number.',
     maxTokens: 512,
@@ -129,7 +132,7 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     taskType: 'debugging',
     systemPrompt: CODE_SYS,
     userPrompt:
-      'This binary search has a bug. Reply with JSON {"line": <1-based line number of the buggy line>, "fix": "<the corrected line, exactly, preserving original spacing>"}.\n\n1: function bsearch(a, t) {\n2:   let lo = 0, hi = a.length;\n3:   while (lo < hi) {\n4:     const mid = (lo + hi) >> 1;\n5:     if (a[mid] === t) return mid;\n6:     if (a[mid] < t) lo = mid;\n7:     else hi = mid;\n8:   }\n9:   return -1;\n10: }',
+      'This binary search has a bug. Reply with JSON {"line": <1-based line number of the buggy line>, "fix": "<the corrected line with leading whitespace removed>"}.\n\n1: function bsearch(a, t) {\n2:   let lo = 0, hi = a.length;\n3:   while (lo < hi) {\n4:     const mid = (lo + hi) >> 1;\n5:     if (a[mid] === t) return mid;\n6:     if (a[mid] < t) lo = mid;\n7:     else hi = mid;\n8:   }\n9:   return -1;\n10: }',
     maxTokens: 2048,
     check: { kind: 'json_equal', value: { line: 6, fix: 'if (a[mid] < t) lo = mid + 1;' } },
   },

@@ -1,4 +1,5 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, jest, test } from '@jest/globals';
+import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   applyCustomPricingToModel,
@@ -6,6 +7,8 @@ import {
   QWEN37_MAX_MODEL_ID,
   QWEN37_PLUS_MODEL_ID,
 } from './custom-pricing';
+
+jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -81,19 +84,32 @@ describe('custom model pricing', () => {
     ).toBe(Math.round(50_000 * 1.25 + 10_000 * 3.75 + 20_000 * 0.125 + 30_000 * 1.5625));
   });
 
-  test('calculates both Qwen3.7 Plus context tiers from token usage', () => {
+  test('starts Qwen3.7 Plus long-context pricing at exactly 262,144 input tokens', () => {
     expect(
-      calculateCustomCost_mUsd(
-        QWEN37_PLUS_MODEL_ID,
-        makeUsage({ inputTokens: 100_000, outputTokens: 10_000 })
-      )
-    ).toBe(Math.round(100_000 * 0.32 + 10_000 * 1.28));
+      calculateCustomCost_mUsd(QWEN37_PLUS_MODEL_ID, makeUsage({ inputTokens: 262_143 }))
+    ).toBe(Math.round(262_143 * 0.32));
     expect(
-      calculateCustomCost_mUsd(
-        QWEN37_PLUS_MODEL_ID,
-        makeUsage({ inputTokens: 300_000, outputTokens: 10_000 })
-      )
-    ).toBe(Math.round(300_000 * 0.96 + 10_000 * 3.84));
+      calculateCustomCost_mUsd(QWEN37_PLUS_MODEL_ID, makeUsage({ inputTokens: 262_144 }))
+    ).toBe(Math.round(262_144 * 0.96));
+  });
+
+  test('reports invalid negative uncached token counts', () => {
+    const captureMessageMock = jest.mocked(captureMessage);
+    captureMessageMock.mockClear();
+
+    const cost_mUsd = calculateCustomCost_mUsd(
+      QWEN37_MAX_MODEL_ID,
+      makeUsage({ inputTokens: 10, cacheHitTokens: 20 })
+    );
+
+    expect(cost_mUsd).toBe(Math.round(20 * 0.125));
+    expect(captureMessageMock).toHaveBeenCalledWith(
+      'SUSPICIOUS: negative uncached input tokens for custom pricing',
+      expect.objectContaining({
+        level: 'error',
+        extra: expect.objectContaining({ model: QWEN37_MAX_MODEL_ID }),
+      })
+    );
   });
 
   test('leaves models without custom pricing unchanged', () => {

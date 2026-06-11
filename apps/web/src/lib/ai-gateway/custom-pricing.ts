@@ -1,3 +1,4 @@
+import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
 import {
@@ -9,6 +10,7 @@ import {
 export const QWEN37_MAX_MODEL_ID = 'qwen/qwen3.7-max';
 export const QWEN37_PLUS_MODEL_ID = 'qwen/qwen3.7-plus';
 
+// Qwen long-context pricing starts at exactly 256 Ki tokens (262,144 tokens).
 const TOKENS_256K = 256 * 1024;
 
 export type CustomPricing = {
@@ -104,6 +106,14 @@ export function calculateCustomCost_mUsd(
   if (!customPricing) return undefined;
 
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
+  if (uncachedInputTokens < 0) {
+    captureMessage('SUSPICIOUS: negative uncached input tokens for custom pricing', {
+      level: 'error',
+      tags: { source: 'usage_processing' },
+      extra: { model: modelId, usage },
+    });
+  }
+
   return Math.round(
     calculateCost_mUsd(
       {

@@ -20,21 +20,11 @@ function emptyDecisionResponse(): AutoRoutingDecisionResponse {
 function getClassifierFailureMetadata(error: unknown): {
   cost?: number | null;
   classifierModel?: string;
-  failureStage?: string;
-  outputLength?: number;
-  schemaIssueSummary?: string[];
-  topLevelKeys?: string[];
-  fieldTypeSummary?: string[];
 } {
   if (error instanceof ClassifierRunError) {
     return {
       cost: error.cost,
       classifierModel: error.classifierModel,
-      failureStage: error.failureStage,
-      outputLength: error.outputLength,
-      schemaIssueSummary: error.schemaIssueSummary,
-      topLevelKeys: error.topLevelKeys,
-      fieldTypeSummary: error.fieldTypeSummary,
     };
   }
   return {};
@@ -53,11 +43,6 @@ function logClassifierError({
   classifierDurationMs,
   classifierCostCredits,
   classifierModel,
-  failureStage,
-  outputLength,
-  schemaIssueSummary,
-  topLevelKeys,
-  fieldTypeSummary,
   sessionId,
 }: {
   error: unknown;
@@ -65,11 +50,6 @@ function logClassifierError({
   classifierDurationMs: number;
   classifierCostCredits?: number | null;
   classifierModel?: string;
-  failureStage?: string;
-  outputLength?: number;
-  schemaIssueSummary?: string[];
-  topLevelKeys?: string[];
-  fieldTypeSummary?: string[];
   sessionId: string | null;
 }) {
   console.warn(
@@ -82,17 +62,6 @@ function logClassifierError({
       sessionId,
       classifierDurationMs,
       classifierCostCredits: classifierCostCredits ?? null,
-      ...(failureStage ? { classifierFailureStage: failureStage } : {}),
-      ...(typeof outputLength === 'number' ? { classifierOutputLength: outputLength } : {}),
-      ...(schemaIssueSummary && schemaIssueSummary.length > 0
-        ? { classifierSchemaIssueSummary: schemaIssueSummary }
-        : {}),
-      ...(topLevelKeys && topLevelKeys.length > 0
-        ? { classifierOutputTopLevelKeys: topLevelKeys }
-        : {}),
-      ...(fieldTypeSummary && fieldTypeSummary.length > 0
-        ? { classifierOutputFieldTypes: fieldTypeSummary }
-        : {}),
       ...formatError(error),
     })
   );
@@ -206,11 +175,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       classifierDurationMs,
       classifierCostCredits: classifierFailureMetadata.cost,
       classifierModel: classifierFailureMetadata.classifierModel,
-      failureStage: classifierFailureMetadata.failureStage,
-      outputLength: classifierFailureMetadata.outputLength,
-      schemaIssueSummary: classifierFailureMetadata.schemaIssueSummary,
-      topLevelKeys: classifierFailureMetadata.topLevelKeys,
-      fieldTypeSummary: classifierFailureMetadata.fieldTypeSummary,
       sessionId: parsed.data.sessionId,
     });
     writeClassifierMetricsDataPoint(c.env, {

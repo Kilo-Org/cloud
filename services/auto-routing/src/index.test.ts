@@ -397,11 +397,6 @@ describe('auto routing worker', () => {
       new ClassifierRunError('Classifier model returned invalid classification', {
         cost: 0.00000123,
         classifierModel: 'google/gemini-2.5-flash-lite',
-        failureStage: 'invalid_schema',
-        outputLength: 22,
-        schemaIssueSummary: ['taskType:invalid_value'],
-        topLevelKeys: ['taskType'],
-        fieldTypeSummary: ['taskType:string'],
       })
     );
 
@@ -441,11 +436,6 @@ describe('auto routing worker', () => {
       sessionId: null,
       classifierDurationMs: expect.any(Number),
       classifierCostCredits: 0.00000123,
-      classifierFailureStage: 'invalid_schema',
-      classifierOutputLength: 22,
-      classifierSchemaIssueSummary: ['taskType:invalid_value'],
-      classifierOutputTopLevelKeys: ['taskType'],
-      classifierOutputFieldTypes: ['taskType:string'],
       error: 'Classifier model returned invalid classification',
       stack: expect.any(String),
     });

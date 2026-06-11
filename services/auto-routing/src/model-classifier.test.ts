@@ -138,10 +138,6 @@ describe('OpenRouter classifier call', () => {
       message: 'Classifier model returned invalid classification',
       cost: 0.00000123,
       classifierModel: DEFAULT_CLASSIFIER_MODEL,
-      failureStage: 'invalid_schema',
-      outputLength: 22,
-      schemaIssueSummary: expect.arrayContaining(['taskType:invalid_value']),
-      fieldTypeSummary: expect.arrayContaining(['taskType:string']),
     } satisfies Partial<ClassifierRunError>);
   });
 });

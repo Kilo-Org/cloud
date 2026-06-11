@@ -9,6 +9,13 @@ export type ClassifierMessage = {
   content: string;
 };
 
+const classifierAxisKeys = [
+  'contextComplexity',
+  'reasoningComplexity',
+  'riskLevel',
+  'executionMode',
+] as const;
+
 const taskTypes = classifierTaxonomy.taskTypes.map(taskType => ({
   id: taskType.id,
   description: taskType.description,
@@ -18,38 +25,29 @@ const taskTypes = classifierTaxonomy.taskTypes.map(taskType => ({
   })),
 }));
 
+function axisIds(axisKey: (typeof classifierAxisKeys)[number]) {
+  return classifierTaxonomy.axes[axisKey].values.map(value => value.id);
+}
+
+function axisGuide(axisKey: (typeof classifierAxisKeys)[number]) {
+  return classifierTaxonomy.axes[axisKey].values.map(value => ({
+    id: value.id,
+    description: value.description,
+  }));
+}
+
 const allowedOutputValues = {
   taskType: taskTypes.map(taskType => taskType.id),
   subtaskTypeByTaskType: Object.fromEntries(
     taskTypes.map(taskType => [taskType.id, taskType.subtypes.map(subtype => subtype.id)])
   ),
-  contextComplexity: classifierTaxonomy.axes.contextComplexity.values.map(value => value.id),
-  reasoningComplexity: classifierTaxonomy.axes.reasoningComplexity.values.map(value => value.id),
-  riskLevel: classifierTaxonomy.axes.riskLevel.values.map(value => value.id),
-  executionMode: classifierTaxonomy.axes.executionMode.values.map(value => value.id),
+  ...Object.fromEntries(classifierAxisKeys.map(axisKey => [axisKey, axisIds(axisKey)])),
 };
 
 const compactTaxonomy = {
   decisionRules: classifierTaxonomy.decisionRules,
   taskTypes,
-  axes: {
-    contextComplexity: classifierTaxonomy.axes.contextComplexity.values.map(value => ({
-      id: value.id,
-      description: value.description,
-    })),
-    reasoningComplexity: classifierTaxonomy.axes.reasoningComplexity.values.map(value => ({
-      id: value.id,
-      description: value.description,
-    })),
-    riskLevel: classifierTaxonomy.axes.riskLevel.values.map(value => ({
-      id: value.id,
-      description: value.description,
-    })),
-    executionMode: classifierTaxonomy.axes.executionMode.values.map(value => ({
-      id: value.id,
-      description: value.description,
-    })),
-  },
+  axes: Object.fromEntries(classifierAxisKeys.map(axisKey => [axisKey, axisGuide(axisKey)])),
 };
 
 export function buildClassifierMessages(input: NormalizedClassifierInput): ClassifierMessage[] {

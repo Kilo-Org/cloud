@@ -724,7 +724,7 @@ export async function fetchGitHubRepositorySize(params: {
     return null;
   }
 
-  return `${Math.round(data.size / 1024)} MB`;
+  return `${Math.round(data.size / 1024)} MiB`;
 }
 
 export async function createGitHubBranch(params: {

@@ -31,9 +31,9 @@ function decisionResponse(
   };
 }
 
-function emptyDecisionResponse(): AutoRoutingDecisionResponse {
+function emptyDecisionResponse(cost = 0): AutoRoutingDecisionResponse {
   return {
-    cost: 0,
+    cost,
     decision: null,
     classifierResult: null,
   };
@@ -323,6 +323,9 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     );
   } catch (error) {
     recordDecision(c.env, ctx, performance.now() - startedAt, { kind: 'error', error });
-    return c.json(emptyDecisionResponse());
+    // A failed run can still have billed the first attempt (e.g. a valid-but-
+    // invalid response followed by a throwing retry), so report that cost
+    // even though there is no usable classifier result.
+    return c.json(emptyDecisionResponse(getClassifierFailureMetadata(error).cost ?? 0));
   }
 };

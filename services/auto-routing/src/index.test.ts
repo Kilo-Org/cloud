@@ -568,7 +568,7 @@ describe('auto routing worker', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      cost: 0,
+      cost: 0.00000123,
       decision: null,
       classifierResult: null,
     });

@@ -164,6 +164,13 @@ jobs:
       - name: Promote Vercel deployment
         run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
+  deploy-workers:
+    needs: [check-production-db-startup, run-migrations]
+    uses: ./.github/workflows/deploy-workers.yml
+    with:
+      base_sha: ${{ github.event.before }}
+    secrets: inherit
+
   deploy-kiloclaw:
     needs: [check-production-db-startup, run-migrations]
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot

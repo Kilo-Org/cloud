@@ -11,6 +11,7 @@ import {
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataAccessibilityLabel,
   isFreeModelOption,
+  mayTrainOnYourPrompts,
 } from '@/lib/free-model-data-disclosure';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
@@ -202,7 +203,7 @@ export default function ModelPickerScreen() {
         const modelOption = item.model;
         const selected = modelOption.id === selectedModel;
         const free = isFreeModelOption(modelOption);
-        const collectsData = isFreeModelOption(modelOption);
+        const collectsData = mayTrainOnYourPrompts(modelOption);
         const hasVariants = modelOption.variants.length > 1;
 
         return (
@@ -218,16 +219,18 @@ export default function ModelPickerScreen() {
               <View className="flex-1">
                 <Text className="text-base text-foreground">{modelOption.name}</Text>
                 <Text className="text-xs text-muted-foreground">{modelOption.id}</Text>
-                {free ? (
+                {free || collectsData ? (
                   <View className="mt-1 flex-row items-center gap-1 self-start">
-                    <View
-                      className="rounded-full px-2 py-0.5"
-                      style={{ backgroundColor: colors.good }}
-                    >
-                      <Text className="text-[11px] font-medium text-white" numberOfLines={1}>
-                        {FREE_MODEL_FREE_LABEL}
-                      </Text>
-                    </View>
+                    {free ? (
+                      <View
+                        className="rounded-full px-2 py-0.5"
+                        style={{ backgroundColor: colors.good }}
+                      >
+                        <Text className="text-[11px] font-medium text-white" numberOfLines={1}>
+                          {FREE_MODEL_FREE_LABEL}
+                        </Text>
+                      </View>
+                    ) : null}
                     {collectsData ? (
                       <BookOpenCheck
                         accessibilityLabel={FREE_MODEL_DATA_LABEL}

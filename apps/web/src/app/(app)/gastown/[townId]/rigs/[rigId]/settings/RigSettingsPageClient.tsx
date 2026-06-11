@@ -101,6 +101,7 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
         id: model.id,
         name: model.name,
         isFree: model.isFree,
+        mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
       })) ?? [],
     [modelsData]
   );

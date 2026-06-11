@@ -425,6 +425,9 @@ export function AutoRoutingAdminContent() {
   const totalRequests = summary?.totalRequests ?? 0;
   const classifiedRate = totalRequests > 0 ? (summary?.classifiedRequests ?? 0) / totalRequests : 0;
   const sessionRate = totalRequests > 0 ? (summary?.withSessionId ?? 0) / totalRequests : 0;
+  const classifiedRequests = summary?.classifiedRequests ?? 0;
+  const cacheHitRate =
+    classifiedRequests > 0 ? (summary?.cachedRequests ?? 0) / classifiedRequests : 0;
   const analyticsErrorMessage =
     analyticsQuery.error instanceof Error
       ? analyticsQuery.error.message
@@ -544,7 +547,7 @@ export function AutoRoutingAdminContent() {
               detail={`p95 ${formatDecimal(summary?.p95DurationMs ?? 0)} ms`}
               icon={Clock3}
               loading={analyticsQuery.isLoading}
-              help="Average classifier runtime for requests that reached classifier execution. The detail shows p95 latency."
+              help="Average classifier model call runtime for requests that reached classifier execution. Decisions served from the cache are excluded. The detail shows p95 latency."
             />
             <MetricCard
               title="Classifier Cost"
@@ -564,7 +567,15 @@ export function AutoRoutingAdminContent() {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              title="Cache Hit Rate"
+              value={formatPercent(cacheHitRate)}
+              detail={`${formatNumber(summary?.cachedRequests ?? 0)} served from cache`}
+              icon={Clock3}
+              loading={analyticsQuery.isLoading}
+              help="Percent of classified requests served from the per-conversation decision cache instead of a classifier model call. Cached decisions cost no credits."
+            />
             <MetricCard
               title="Classifier Errors"
               value={formatNumber(summary?.classifierErrors ?? 0)}

@@ -64,7 +64,7 @@ describe('wrapInSafeNextResponse', () => {
       status: 0,
       signal: null,
       error: undefined,
-      stdout: process.version === 'v24.14.1' ? '' : `skipped on ${process.version}\n`,
+      stdout: '',
       stderr: '',
     });
   });
@@ -125,6 +125,22 @@ describe('wrapInSafeNextResponse', () => {
 
     await wrapped.body?.cancel(reason);
 
+    expect(cancelled).toHaveBeenCalledWith(reason);
+    expect(source.locked).toBe(false);
+  });
+
+  it('does not close an already cancelled stream when a pending pull settles', async () => {
+    const cancelled = jest.fn();
+    const reason = new Error('consumer stopped during pull');
+    const source = new ReadableStream<Uint8Array>({ cancel: cancelled });
+    const wrapped = wrapInSafeNextResponse(new Response(source));
+    const reader = wrapped.body?.getReader();
+    const pending = reader?.read();
+
+    await Promise.resolve();
+    await reader?.cancel(reason);
+
+    await expect(pending).resolves.toEqual({ done: true, value: undefined });
     expect(cancelled).toHaveBeenCalledWith(reason);
     expect(source.locked).toBe(false);
   });

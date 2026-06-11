@@ -298,19 +298,23 @@ export function wrapInSafeNextResponse(response: Response) {
   const source = response.body;
   let owner: Response | undefined = response;
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let cancelled = false;
   const release = () => {
     if (!owner) return;
-    reader?.releaseLock();
+    const active = reader;
     reader = undefined;
     owner = undefined;
+    active?.releaseLock();
   };
   const body = source
     ? new ReadableStream<Uint8Array>({
         async pull(controller) {
           reader ??= owner?.body?.getReader();
-          if (!reader) return;
+          const active = reader;
+          if (!active) return;
           try {
-            const result = await reader.read();
+            const result = await active.read();
+            if (cancelled) return;
             if (result.done) {
               controller.close();
               release();
@@ -318,11 +322,13 @@ export function wrapInSafeNextResponse(response: Response) {
             }
             controller.enqueue(result.value);
           } catch (error) {
+            if (cancelled) return;
             release();
             controller.error(error);
           }
         },
         async cancel(reason) {
+          cancelled = true;
           try {
             if (reader) await reader.cancel(reason);
             else await source.cancel(reason);

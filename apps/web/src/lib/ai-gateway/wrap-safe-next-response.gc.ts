@@ -3,12 +3,6 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 async function main() {
-  if (process.version !== 'v24.14.1') {
-    process.stdout.write(`skipped on ${process.version}\n`);
-    return;
-  }
-
-  assert.equal(process.versions.undici, '7.24.4');
   assert.ok(global.gc);
 
   const { wrapInSafeNextResponse } = await import('./llm-proxy-helpers');

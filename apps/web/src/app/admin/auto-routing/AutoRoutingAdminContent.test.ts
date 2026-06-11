@@ -9,6 +9,7 @@ const analytics: AutoRoutingClassifierAnalyticsResponse = {
   summary: {
     totalRequests: 10,
     classifiedRequests: 8,
+    cachedRequests: 6,
     classifierErrors: 1,
     invalidRequests: 1,
     totalCostCredits: 0.0000123,

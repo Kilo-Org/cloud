@@ -15,7 +15,7 @@ const LATEST_USER_PROMPT_PREFIX_MAX_LENGTH = 500;
 type ClassifierPromptSummary = {
   apiKind: NormalizedClassifierInput['apiKind'];
   systemPromptPrefix: string | null;
-  userPromptPrefix: string | null;
+  initialUserPromptPrefix: string | null;
   latestUserPromptPrefix: string | null;
   messageCount: number | null;
   hasTools: boolean;
@@ -73,7 +73,7 @@ function buildClassifierPromptSummary(input: NormalizedClassifierInput): Classif
   return {
     apiKind: input.apiKind,
     systemPromptPrefix: input.systemPromptPrefix?.slice(0, SYSTEM_PROMPT_PREFIX_MAX_LENGTH) ?? null,
-    userPromptPrefix: input.userPromptPrefix,
+    initialUserPromptPrefix: input.userPromptPrefix,
     latestUserPromptPrefix:
       input.latestUserPromptPrefix && input.latestUserPromptPrefix !== input.userPromptPrefix
         ? input.latestUserPromptPrefix.slice(0, LATEST_USER_PROMPT_PREFIX_MAX_LENGTH)
@@ -93,6 +93,8 @@ export function buildClassifierMessages(input: NormalizedClassifierInput): Class
         'Required keys: taskType, subtaskType, contextComplexity, reasoningComplexity, riskLevel, executionMode, requiresTools, confidence.',
         'Use only the exact string IDs listed in allowedOutputValues. subtaskType must be listed under the selected taskType.',
         'Classify the primary user intent from the request summary, not the requested model.',
+        'initialUserPromptPrefix is the first user turn; latestUserPromptPrefix can redirect or refine the current request.',
+        'If initial and latest user prompts conflict, prefer latestUserPromptPrefix for the current request.',
         `allowedOutputValues: ${JSON.stringify(allowedOutputValues)}`,
         `taxonomyGuide: ${JSON.stringify(compactTaxonomy)}`,
       ].join('\n'),

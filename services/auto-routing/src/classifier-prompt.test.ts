@@ -35,6 +35,10 @@ describe('classifier prompt', () => {
     expect(messages[0].content).toContain('"taskTypes"');
     expect(messages[0].content).toContain('"implementation"');
     expect(messages[0].content).toContain('Return exactly one minified JSON object');
+    expect(messages[0].content).toContain(
+      'latestUserPromptPrefix can redirect or refine the current request'
+    );
+    expect(messages[0].content).toContain('If initial and latest user prompts conflict');
     expect(messages[0].content).toContain('allowedOutputValues');
     expect(messages[0].content).not.toContain('"examples"');
     expect(messages[0].content.length).toBeLessThan(12_000);
@@ -43,7 +47,7 @@ describe('classifier prompt', () => {
       content: `Request summary:\n${JSON.stringify({
         apiKind: 'chat_completions',
         systemPromptPrefix: 'You are a coding agent.',
-        userPromptPrefix: 'Fix the failing worker test and commit the change.',
+        initialUserPromptPrefix: 'Fix the failing worker test and commit the change.',
         latestUserPromptPrefix: 'Actually focus on reducing classifier latency.',
         messageCount: 4,
         hasTools: true,

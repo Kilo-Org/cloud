@@ -31,6 +31,7 @@ import {
   type OpenRouterModelsResponse,
 } from '@/lib/organizations/organization-types';
 import { cn } from '@/lib/utils';
+import { BenchmarksSection } from './BenchmarksSection';
 
 const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
   { value: '1h', label: '1h' },
@@ -600,6 +601,8 @@ export function AutoRoutingAdminContent() {
           />
         </>
       )}
+
+      <BenchmarksSection />
     </div>
   );
 }

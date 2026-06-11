@@ -20,7 +20,11 @@ const configResponse = {
     deciderModels: [
       {
         id: 'anthropic/claude-sonnet-4',
-        supportedApiKinds: ['chat_completions' as const] as ('chat_completions' | 'responses' | 'messages')[],
+        supportedApiKinds: ['chat_completions' as const] as (
+          | 'chat_completions'
+          | 'responses'
+          | 'messages'
+        )[],
       },
     ],
     minAccuracy: 0.8,
@@ -33,7 +37,11 @@ const configResponse = {
     deciderModels: [
       {
         id: 'anthropic/claude-sonnet-4',
-        supportedApiKinds: ['chat_completions' as const] as ('chat_completions' | 'responses' | 'messages')[],
+        supportedApiKinds: ['chat_completions' as const] as (
+          | 'chat_completions'
+          | 'responses'
+          | 'messages'
+        )[],
       },
     ],
     minAccuracy: 0.8,
@@ -74,15 +82,12 @@ describe('auto routing benchmark admin client', () => {
       body: configResponse,
     });
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://benchmark-worker.example.com/admin/config',
-      {
-        method: 'GET',
-        headers: {
-          authorization: 'Bearer test-internal-secret',
-        },
-      }
-    );
+    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/config', {
+      method: 'GET',
+      headers: {
+        authorization: 'Bearer test-internal-secret',
+      },
+    });
   });
 
   it('propagates error body when upstream responds with a non-OK status', async () => {
@@ -107,18 +112,15 @@ describe('auto routing benchmark admin client', () => {
 
     await updateBenchmarkConfig(configResponse.config, 'admin@kilocode.ai');
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://benchmark-worker.example.com/admin/config',
-      {
-        method: 'PUT',
-        headers: {
-          authorization: 'Bearer test-internal-secret',
-          'content-type': 'application/json',
-          'x-updated-by': 'admin@kilocode.ai',
-        },
-        body: JSON.stringify(configResponse.config),
-      }
-    );
+    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/config', {
+      method: 'PUT',
+      headers: {
+        authorization: 'Bearer test-internal-secret',
+        'content-type': 'application/json',
+        'x-updated-by': 'admin@kilocode.ai',
+      },
+      body: JSON.stringify(configResponse.config),
+    });
   });
 
   it('lists benchmark runs', async () => {
@@ -133,15 +135,12 @@ describe('auto routing benchmark admin client', () => {
       body: runsResponse,
     });
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://benchmark-worker.example.com/admin/runs',
-      {
-        method: 'GET',
-        headers: {
-          authorization: 'Bearer test-internal-secret',
-        },
-      }
-    );
+    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
+      method: 'GET',
+      headers: {
+        authorization: 'Bearer test-internal-secret',
+      },
+    });
   });
 
   it('propagates error body from listBenchmarkRuns on non-OK status', async () => {
@@ -169,17 +168,14 @@ describe('auto routing benchmark admin client', () => {
       body: { runId: 'run-2', enqueuedModels: 3 },
     });
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://benchmark-worker.example.com/admin/runs',
-      {
-        method: 'POST',
-        headers: {
-          authorization: 'Bearer test-internal-secret',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ kind: 'classifier' }),
-      }
-    );
+    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer test-internal-secret',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ kind: 'classifier' }),
+    });
   });
 
   it('gets the benchmark routing table', async () => {

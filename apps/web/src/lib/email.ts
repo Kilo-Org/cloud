@@ -18,6 +18,7 @@ export const subjects = {
   balanceAlert: 'Kilo: Low Balance Alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
   codeReviewDisabled: 'Action Required: Code Reviewer Disabled',
+  autoFixFeatureSunset: 'Kilo: Auto-Fix Feature Sunset',
   ossInviteNewUser: 'Kilo: OSS Sponsorship Offer',
   ossInviteExistingUser: 'Kilo: OSS Sponsorship Offer',
   ossExistingOrgProvisioned: 'Kilo: OSS Sponsorship Offer',
@@ -241,6 +242,18 @@ export async function sendCodeReviewDisabledEmail(
       reason: props.reason,
       recovery_url: props.recoveryUrl,
       recovery_label: props.recoveryLabel,
+    },
+  });
+}
+
+export async function sendAutoFixFeatureSunsetEmail(to: string): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'autoFixFeatureSunset',
+    templateVars: {
+      disable_date: 'June 17, 2026',
+      github_app_url: 'https://github.com/apps/kilo-code',
+      contact_email: 'hi@kilocode.ai',
     },
   });
 }

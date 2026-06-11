@@ -13,6 +13,7 @@ concurrency:
 
 env:
   VERCEL_VERSION: '53.3.1'
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
 
 jobs:
   check-production-db-startup:
@@ -82,7 +83,6 @@ jobs:
     environment: production
 
     env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_APP }}
 
     steps:
@@ -91,15 +91,11 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - run: npx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - name: Install Vercel CLI
+        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
 
       - name: Deploy to Vercel
-        run: npx vercel@${{ env.VERCEL_VERSION }} deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-global-app:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -108,7 +104,6 @@ jobs:
     environment: production
 
     env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_GLOBAL_APP }}
 
     steps:
@@ -117,15 +112,11 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - run: npx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - name: Install Vercel CLI
+        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
 
       - name: Deploy to Vercel
-        run: npx vercel@${{ env.VERCEL_VERSION }} deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-kiloclaw:
     needs: [check-production-db-startup, run-migrations]

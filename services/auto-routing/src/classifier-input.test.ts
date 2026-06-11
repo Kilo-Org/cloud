@@ -95,4 +95,42 @@ describe('classifier input parsing', () => {
       },
     });
   });
+
+  it('ignores trailing Anthropic tool results when selecting the latest user prompt', () => {
+    expect(
+      parseClassifierInput(
+        payload(
+          {
+            model: 'anthropic/claude-sonnet-4',
+            messages: [
+              { role: 'user', content: 'Write a migration plan.' },
+              { role: 'assistant', content: [{ type: 'text', text: 'I will inspect the repo.' }] },
+              { role: 'user', content: 'Actually debug the failing worker test.' },
+              {
+                role: 'assistant',
+                content: [{ type: 'tool_use', id: 'tool-1', name: 'read_file', input: {} }],
+              },
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'tool_result',
+                    tool_use_id: 'tool-1',
+                    content: 'file contents that should not classify the task',
+                  },
+                ],
+              },
+            ],
+          },
+          '/messages'
+        )
+      )
+    ).toMatchObject({
+      success: true,
+      data: {
+        userPromptPrefix: 'Write a migration plan.',
+        latestUserPromptPrefix: 'Actually debug the failing worker test.',
+      },
+    });
+  });
 });

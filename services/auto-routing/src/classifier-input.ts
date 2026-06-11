@@ -174,19 +174,26 @@ function messageCount(input: unknown) {
 }
 
 function firstPromptPrefix(messages: Message[], role: string) {
-  const message = messages.find(item => item.role === role);
-  return textPrefix(message?.content);
+  return promptPrefixes(messages, role)[0] ?? null;
 }
 
 function latestPromptPrefix(messages: Message[], role: string) {
-  const first = messages.find(item => item.role === role);
-  const latest = messages.findLast(item => item.role === role);
-  if (!latest || latest === first) {
-    return null;
-  }
+  const prefixes = promptPrefixes(messages, role);
+  const first = prefixes[0] ?? null;
+  const latest = prefixes.at(-1) ?? null;
 
-  const latestPrefix = textPrefix(latest.content);
-  return latestPrefix && latestPrefix !== textPrefix(first?.content) ? latestPrefix : null;
+  return latest && latest !== first ? latest : null;
+}
+
+function promptPrefixes(messages: Message[], role: string) {
+  return messages.flatMap(item => {
+    if (item.role !== role) {
+      return [];
+    }
+
+    const prefix = textPrefix(item.content);
+    return prefix ? [prefix] : [];
+  });
 }
 
 function textPrefix(value: unknown): string | null {

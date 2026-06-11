@@ -180,16 +180,25 @@ export async function prepareReviewPayload(
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
 
-        repositorySize = await lookupRepositorySize({
-          platform,
-          repoFullName: review.repo_full_name,
-          fetchSize: () =>
-            fetchGitHubRepositorySize({
-              token: installationToken,
-              owner: repoOwner,
-              repo: repoName,
-            }),
-        });
+        try {
+          repositorySize = await fetchGitHubRepositorySize({
+            token: installationToken,
+            owner: repoOwner,
+            repo: repoName,
+          });
+          logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
+            platform,
+            repoFullName: review.repo_full_name,
+            repositorySize,
+            repositorySizeKnown: repositorySize !== null,
+          });
+        } catch (error) {
+          warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
+            platform,
+            repoFullName: review.repo_full_name,
+            error: getReviewInstructionsFetchErrorMetadata(error),
+          });
+        }
 
         const repositoryReviewInstructionsPromise =
           shouldUseReviewMd && repoOwner && repoName
@@ -305,12 +314,25 @@ export async function prepareReviewPayload(
         }
         const projectAccessToken = gitlabToken;
 
-        repositorySize = await lookupRepositorySize({
-          platform,
-          repoFullName: review.repo_full_name,
-          fetchSize: () =>
-            fetchGitLabRepositorySize(projectAccessToken, review.repo_full_name, instanceUrl),
-        });
+        try {
+          repositorySize = await fetchGitLabRepositorySize(
+            projectAccessToken,
+            review.repo_full_name,
+            instanceUrl
+          );
+          logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
+            platform,
+            repoFullName: review.repo_full_name,
+            repositorySize,
+            repositorySizeKnown: repositorySize !== null,
+          });
+        } catch (error) {
+          warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
+            platform,
+            repoFullName: review.repo_full_name,
+            error: getReviewInstructionsFetchErrorMetadata(error),
+          });
+        }
 
         const repositoryReviewInstructionsPromise = shouldUseReviewMd
           ? fetchRepositoryReviewInstructions({
@@ -570,30 +592,6 @@ export async function prepareReviewPayload(
       extra: { reviewId, owner, platform },
     });
     throw error;
-  }
-}
-
-async function lookupRepositorySize(params: {
-  platform: CodeReviewPlatform;
-  repoFullName: string;
-  fetchSize: () => Promise<string | null>;
-}): Promise<string | null> {
-  try {
-    const repositorySize = await params.fetchSize();
-    logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
-      platform: params.platform,
-      repoFullName: params.repoFullName,
-      repositorySize,
-      repositorySizeKnown: repositorySize !== null,
-    });
-    return repositorySize;
-  } catch (error) {
-    warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
-      platform: params.platform,
-      repoFullName: params.repoFullName,
-      error: getReviewInstructionsFetchErrorMetadata(error),
-    });
-    return null;
   }
 }
 

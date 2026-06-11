@@ -31,7 +31,6 @@ const WORKSPACE_CLEANUP_TIMEOUT_MS = 60_000;
 const SHORT_GIT_COMMAND_TIMEOUT_MS = 120_000;
 const PROGRESS_UPDATE_INTERVAL_MS = 5_000;
 const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
-const BOOTSTRAP_PENDING_MARKER = '.kilo-bootstrap-pending';
 const MAX_ATTACHMENT_BYTES = 5_242_880;
 
 export type BootstrapProgressStep =
@@ -177,35 +176,16 @@ function gitBootstrapMarkerPath(workspacePath: string): string {
   return path.join(workspacePath, '.git', GIT_BOOTSTRAP_MARKER);
 }
 
-function bootstrapPendingMarkerPath(sessionHome: string): string {
-  return path.join(sessionHome, BOOTSTRAP_PENDING_MARKER);
-}
-
 function sessionAuthFilePath(sessionHome: string): string {
   return path.join(sessionHome, '.local/share/kilo/auth.json');
 }
 
-async function isCompleteGitWorkspace(
-  request: WrapperSessionReadyRequest,
-  runGit: GitRunner
-): Promise<boolean> {
-  const { workspacePath, sessionHome } = request.workspace;
-  if (!(await exists(path.join(workspacePath, '.git')))) return false;
-  if (await exists(gitBootstrapMarkerPath(workspacePath))) return true;
-  if (await exists(bootstrapPendingMarkerPath(sessionHome))) return false;
-  if (!(await exists(sessionAuthFilePath(sessionHome)))) return false;
-
-  const result = await runGit(['rev-parse', '--is-inside-work-tree'], {
-    cwd: workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
-  if (result.exitCode !== 0 || result.stdout.trim() !== 'true') return false;
-
-  await fs.writeFile(gitBootstrapMarkerPath(workspacePath), 'ready\n');
-  logToFile(
-    `bootstrap migrated legacy workspace kiloSessionId=${request.kiloSessionId} workspacePath=${workspacePath}`
-  );
-  return true;
+// The marker is removed before re-bootstrapping and written only after restore
+// and setup commands finish, so its presence is the sole evidence that a
+// workspace completed bootstrap. Anything else (a bare .git, auth.json) can be
+// left behind by an interrupted bootstrap and must be rebuilt.
+async function isCompleteGitWorkspace(workspacePath: string): Promise<boolean> {
+  return exists(gitBootstrapMarkerPath(workspacePath));
 }
 
 async function ensureWorkspaceDirectories(request: WrapperSessionReadyRequest): Promise<void> {
@@ -657,7 +637,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   let workspaceNeedsBootstrap = true;
 
   try {
-    workspaceWasWarm = await isCompleteGitWorkspace(request, runGit);
+    workspaceWasWarm = await isCompleteGitWorkspace(request.workspace.workspacePath);
     workspaceNeedsBootstrap = !workspaceWasWarm || !request.workspace.preferSnapshot;
     logToFile(
       `bootstrap workspace plan kiloSessionId=${request.kiloSessionId} preferSnapshot=${request.workspace.preferSnapshot} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} workspacePath=${request.workspace.workspacePath} sessionHome=${request.workspace.sessionHome} home=${process.env.HOME ?? '(unset)'} homeMatchesSessionHome=${process.env.HOME === request.workspace.sessionHome} repoKind=${request.repo?.kind ?? '(none)'} setupCommandCount=${request.materialized.setupCommands?.length ?? 0} runtimeSkillCount=${request.materialized.runtimeSkills?.length ?? 0}`
@@ -671,7 +651,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
 
     if (workspaceNeedsBootstrap) {
       await fs.rm(gitBootstrapMarkerPath(request.workspace.workspacePath), { force: true });
-      await fs.writeFile(bootstrapPendingMarkerPath(request.workspace.sessionHome), 'pending\n');
     }
 
     await writeCloudAgentRules(request);
@@ -717,7 +696,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
 
       signal.throwIfAborted();
       await fs.writeFile(gitBootstrapMarkerPath(request.workspace.workspacePath), 'ready\n');
-      await fs.rm(bootstrapPendingMarkerPath(request.workspace.sessionHome), { force: true });
     }
 
     signal.throwIfAborted();

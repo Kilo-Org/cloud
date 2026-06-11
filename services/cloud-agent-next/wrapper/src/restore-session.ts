@@ -2,7 +2,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
-import { createSafeProcessDiagnostic, logToFile, runProcess } from './utils.js';
+import {
+  createSafeProcessDiagnostic,
+  isTimeoutTermination,
+  logToFile,
+  runProcess,
+} from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -593,7 +598,7 @@ export async function restoreSession(
     });
     const importElapsedMs = Date.now() - importStartedAt;
 
-    if (importResult.terminationReason === 'timeout') {
+    if (isTimeoutTermination(importResult)) {
       log(
         `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
       );

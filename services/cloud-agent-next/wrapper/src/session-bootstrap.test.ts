@@ -396,9 +396,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
-    expect(fs.existsSync(path.join(request.workspace.sessionHome, '.kilo-bootstrap-pending'))).toBe(
-      false
-    );
     expect(progress).toHaveBeenCalledWith(
       'setup_commands',
       'Setup command 1 of 1 is still running...'
@@ -806,43 +803,11 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     });
   });
 
-  it('wraps the error and cleans up when warm workspace detection fails', async () => {
+  it('reclones legacy markerless workspaces instead of trusting auth.json', async () => {
     const request = makeRequest(tmpDir);
     request.workspace.preferSnapshot = true;
-    // A `.git` file (not a directory) makes the migration marker write fail.
-    await fsp.mkdir(request.workspace.workspacePath, { recursive: true });
-    await fsp.writeFile(path.join(request.workspace.workspacePath, '.git'), 'gitdir: elsewhere');
-    const authPath = path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json');
-    await fsp.mkdir(path.dirname(authPath), { recursive: true });
-    await fsp.writeFile(authPath, '{}');
-
-    let caughtError: unknown;
-    try {
-      await prepareWrapperBootstrapWorkspace(request, undefined, {
-        git: async args => {
-          if (args.join(' ') === 'rev-parse --is-inside-work-tree') {
-            return { stdout: 'true\n', stderr: '', exitCode: 0 };
-          }
-          throw new Error(`Unexpected git command: ${args.join(' ')}`);
-        },
-      });
-    } catch (error) {
-      caughtError = error;
-    }
-
-    expect(caughtError).toMatchObject({
-      code: 'WORKSPACE_SETUP_FAILED',
-      subtype: 'workspace_setup_unknown',
-      retryable: true,
-      message: 'Workspace setup failed',
-    });
-    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
-    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
-  });
-
-  it('migrates a valid legacy warm workspace without recloning it', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.preferSnapshot = true;
+    // The legacy flow wrote auth.json before restore and setup commands ran,
+    // so its presence does not prove bootstrap completed.
     await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
     const authPath = path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json');
     await fsp.mkdir(path.dirname(authPath), { recursive: true });
@@ -852,21 +817,25 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     const result = await prepareWrapperBootstrapWorkspace(request, undefined, {
       git: async args => {
         gitCalls.push(args);
-        if (args.join(' ') === 'rev-parse --is-inside-work-tree') {
-          return { stdout: 'true\n', stderr: '', exitCode: 0 };
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
         }
-        throw new Error(`Unexpected git command: ${args.join(' ')}`);
+        if (args[0] === 'rev-parse') {
+          return { stdout: '', stderr: '', exitCode: 1 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
       },
-      runProcess: async () => {
-        throw new Error('setup commands should not run for a migrated warm workspace');
-      },
-      restoreSession: async () => {
-        throw new Error('restore should not run for a migrated warm workspace');
-      },
+      runProcess: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: false,
+        imported: true,
+        diffs: { applied: 0, skipped: 0, total: 0 },
+      }),
     });
 
-    expect(result.workspaceWasWarm).toBe(true);
-    expect(gitCalls).toEqual([['rev-parse', '--is-inside-work-tree']]);
+    expect(result.workspaceWasWarm).toBe(false);
+    expect(gitCalls.some(args => args[0] === 'clone')).toBe(true);
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
@@ -879,10 +848,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     const authPath = path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json');
     await fsp.mkdir(path.dirname(authPath), { recursive: true });
     await fsp.writeFile(authPath, '{}');
-    await fsp.writeFile(
-      path.join(request.workspace.sessionHome, '.kilo-bootstrap-pending'),
-      'pending\n'
-    );
 
     const gitCalls: string[][] = [];
     const setupCalls: string[][] = [];

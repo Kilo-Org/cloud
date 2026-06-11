@@ -76,14 +76,13 @@ jobs:
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate
 
-  deploy-app:
+  stage-app:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
-    needs: [check-production-db-startup, run-migrations]
     environment: production
 
-    env:
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_APP }}
+    outputs:
+      deployment_url: ${{ steps.deploy.outputs.deployment_url }}
 
     steps:
       - name: Checkout code
@@ -94,17 +93,22 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel@${{ env.VERCEL_VERSION }}
 
-      - name: Deploy to Vercel
-        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Link Vercel project
+        run: vercel link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
 
-  deploy-global-app:
+      - name: Stage Vercel deployment
+        id: deploy
+        run: |
+          deployment_url=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+  stage-global-app:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
-    needs: [check-production-db-startup, run-migrations]
     environment: production
 
-    env:
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_GLOBAL_APP }}
+    outputs:
+      deployment_url: ${{ steps.deploy.outputs.deployment_url }}
 
     steps:
       - name: Checkout code
@@ -115,8 +119,40 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel@${{ env.VERCEL_VERSION }}
 
-      - name: Deploy to Vercel
-        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Link Vercel project
+        run: vercel link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+
+      - name: Stage Vercel deployment
+        id: deploy
+        run: |
+          deployment_url=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+  promote-app:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    needs: [stage-app, check-production-db-startup, run-migrations]
+    environment: production
+
+    steps:
+      - name: Install Vercel CLI
+        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
+
+      - name: Promote Vercel deployment
+        run: vercel promote "${{ needs.stage-app.outputs.deployment_url }}" --token=${{ secrets.VERCEL_TOKEN }} --yes
+
+  promote-global-app:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    needs: [stage-global-app, check-production-db-startup, run-migrations]
+    environment: production
+
+    steps:
+      - name: Install Vercel CLI
+        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
+
+      - name: Promote Vercel deployment
+        run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --token=${{ secrets.VERCEL_TOKEN }} --yes
 
   deploy-kiloclaw:
     needs: [check-production-db-startup, run-migrations]

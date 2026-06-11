@@ -10,7 +10,11 @@ export default {
   base_url: 'https://opencode.ai/zen/go/v1',
   supported_chat_apis: ['chat_completions', 'messages'],
   default_ai_sdk_provider: 'openai-compatible',
-  transformRequest() {},
+  transformRequest(context) {
+    if (context.request.kind === 'messages') {
+      context.extraHeaders['x-api-key'] = context.provider.apiKey;
+    }
+  },
   models: cachedEnhancedDirectByokModelList({
     providerId: 'opencode-go',
     recommendedModels: [

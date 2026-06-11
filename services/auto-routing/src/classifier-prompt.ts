@@ -36,12 +36,19 @@ function axisGuide(axisKey: (typeof classifierAxisKeys)[number]) {
   }));
 }
 
+const axisOutputValues = {
+  contextComplexity: axisIds('contextComplexity'),
+  reasoningComplexity: axisIds('reasoningComplexity'),
+  riskLevel: axisIds('riskLevel'),
+  executionMode: axisIds('executionMode'),
+};
+
 const allowedOutputValues = {
   taskType: taskTypes.map(taskType => taskType.id),
   subtaskTypeByTaskType: Object.fromEntries(
     taskTypes.map(taskType => [taskType.id, taskType.subtypes.map(subtype => subtype.id)])
   ),
-  ...Object.fromEntries(classifierAxisKeys.map(axisKey => [axisKey, axisIds(axisKey)])),
+  ...axisOutputValues,
 };
 
 const compactTaxonomy = {

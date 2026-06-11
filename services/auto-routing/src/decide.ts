@@ -5,6 +5,7 @@ import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import { mirrorPayloadSchema, parseClassifierInput } from './classifier-input';
 import type { NormalizedClassifierInput } from './classifier-input';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
+import type { ClassifierRunFallbackMetadata } from './model-classifier';
 import type { HonoEnv } from './hono-env';
 
 const CLASSIFIER_SUCCESS_LOG_SAMPLE_RATE = 0.01;
@@ -20,11 +21,17 @@ function emptyDecisionResponse(): AutoRoutingDecisionResponse {
 function getClassifierFailureMetadata(error: unknown): {
   cost?: number | null;
   classifierModel?: string;
+  failureStage?: string;
+  schemaIssueSummary?: string[];
+  topLevelKeys?: string[];
 } {
   if (error instanceof ClassifierRunError) {
     return {
       cost: error.cost,
       classifierModel: error.classifierModel,
+      failureStage: error.failureStage,
+      schemaIssueSummary: error.schemaIssueSummary,
+      topLevelKeys: error.topLevelKeys,
     };
   }
   return {};
@@ -43,6 +50,9 @@ function logClassifierError({
   classifierDurationMs,
   classifierCostCredits,
   classifierModel,
+  failureStage,
+  schemaIssueSummary,
+  topLevelKeys,
   sessionId,
 }: {
   error: unknown;
@@ -50,6 +60,9 @@ function logClassifierError({
   classifierDurationMs: number;
   classifierCostCredits?: number | null;
   classifierModel?: string;
+  failureStage?: string;
+  schemaIssueSummary?: string[];
+  topLevelKeys?: string[];
   sessionId: string | null;
 }) {
   console.warn(
@@ -62,6 +75,13 @@ function logClassifierError({
       sessionId,
       classifierDurationMs,
       classifierCostCredits: classifierCostCredits ?? null,
+      ...(failureStage ? { classifierFailureStage: failureStage } : {}),
+      ...(schemaIssueSummary && schemaIssueSummary.length > 0
+        ? { classifierSchemaIssueSummary: schemaIssueSummary }
+        : {}),
+      ...(topLevelKeys && topLevelKeys.length > 0
+        ? { classifierOutputTopLevelKeys: topLevelKeys }
+        : {}),
       ...formatError(error),
     })
   );
@@ -106,6 +126,42 @@ function logClassifierSuccessSample({
   );
 }
 
+function logClassifierFallback({
+  classifierInput,
+  classifierDurationMs,
+  classifierCostCredits,
+  classifierModel,
+  sessionId,
+  fallback,
+}: {
+  classifierInput: NormalizedClassifierInput;
+  classifierDurationMs: number;
+  classifierCostCredits: number | null;
+  classifierModel: string;
+  sessionId: string | null;
+  fallback: ClassifierRunFallbackMetadata;
+}) {
+  console.warn(
+    JSON.stringify({
+      event: 'auto_routing_classifier_fallback',
+      reason: fallback.reason,
+      classifierModel,
+      requestedModel: classifierInput.requestedModel,
+      apiKind: classifierInput.apiKind,
+      sessionId,
+      classifierDurationMs,
+      classifierCostCredits: classifierCostCredits ?? null,
+      ...(fallback.failureStage ? { classifierFailureStage: fallback.failureStage } : {}),
+      ...(fallback.schemaIssueSummary && fallback.schemaIssueSummary.length > 0
+        ? { classifierSchemaIssueSummary: fallback.schemaIssueSummary }
+        : {}),
+      ...(fallback.topLevelKeys && fallback.topLevelKeys.length > 0
+        ? { classifierOutputTopLevelKeys: fallback.topLevelKeys }
+        : {}),
+    })
+  );
+}
+
 export const decideHandler: Handler<HonoEnv> = async c => {
   let rawBody: unknown;
   try {
@@ -146,6 +202,16 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       classifierDurationMs,
       bodyBytes,
     });
+    if (classifier.fallback) {
+      logClassifierFallback({
+        classifierInput: classifierInput.data,
+        classifierDurationMs,
+        classifierCostCredits: classifier.cost,
+        classifierModel: classifier.classifierModel,
+        sessionId: parsed.data.sessionId,
+        fallback: classifier.fallback,
+      });
+    }
     logClassifierSuccessSample({
       classifierInput: classifierInput.data,
       classifierDurationMs,
@@ -175,6 +241,9 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       classifierDurationMs,
       classifierCostCredits: classifierFailureMetadata.cost,
       classifierModel: classifierFailureMetadata.classifierModel,
+      failureStage: classifierFailureMetadata.failureStage,
+      schemaIssueSummary: classifierFailureMetadata.schemaIssueSummary,
+      topLevelKeys: classifierFailureMetadata.topLevelKeys,
       sessionId: parsed.data.sessionId,
     });
     writeClassifierMetricsDataPoint(c.env, {

@@ -391,12 +391,80 @@ describe('auto routing worker', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
+  it('logs classifier fallback results separately from classifier errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    classifyNormalizedInput.mockResolvedValueOnce({
+      ...mockClassifierResult,
+      classification: {
+        ...mockClassification,
+        confidence: 0,
+      },
+      fallback: {
+        reason: 'invalid_output',
+        failureStage: 'invalid_schema',
+        schemaIssueSummary: ['taskType:invalid_value'],
+        topLevelKeys: ['minecraft'],
+      },
+    });
+
+    const response = await request('/decide', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        path: '/chat/completions',
+        receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: 'task-123',
+        headers: {},
+        body: JSON.stringify({
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content: 'Pick the best model.' }],
+        }),
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: 0.00000123,
+      classifierResult: {
+        classification: {
+          confidence: 0,
+        },
+      },
+    });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [logMessage] = warnSpy.mock.calls[0] ?? [];
+    expect(JSON.parse(String(logMessage))).toEqual({
+      event: 'auto_routing_classifier_fallback',
+      reason: 'invalid_output',
+      classifierModel: 'google/gemini-2.5-flash-lite',
+      requestedModel: 'anthropic/claude-sonnet-4',
+      apiKind: 'chat_completions',
+      sessionId: 'task-123',
+      classifierDurationMs: expect.any(Number),
+      classifierCostCredits: 0.00000123,
+      classifierFailureStage: 'invalid_schema',
+      classifierSchemaIssueSummary: ['taskType:invalid_value'],
+      classifierOutputTopLevelKeys: ['minecraft'],
+    });
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      indexes: ['google/gemini-2.5-flash-lite'],
+      blobs: expect.arrayContaining(['classified']),
+      doubles: expect.arrayContaining([0]),
+    });
+  });
+
   it('returns a null classifier result when the classifier request fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     classifyNormalizedInput.mockRejectedValueOnce(
       new ClassifierRunError('Classifier model returned invalid classification', {
         cost: 0.00000123,
         classifierModel: 'google/gemini-2.5-flash-lite',
+        failureStage: 'invalid_schema',
+        schemaIssueSummary: ['taskType:invalid_value'],
+        topLevelKeys: ['confidence'],
       })
     );
 
@@ -436,6 +504,9 @@ describe('auto routing worker', () => {
       sessionId: null,
       classifierDurationMs: expect.any(Number),
       classifierCostCredits: 0.00000123,
+      classifierFailureStage: 'invalid_schema',
+      classifierSchemaIssueSummary: ['taskType:invalid_value'],
+      classifierOutputTopLevelKeys: ['confidence'],
       error: 'Classifier model returned invalid classification',
       stack: expect.any(String),
     });

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { OpenRouter } from '@openrouter/sdk';
 import type { ChatResult } from '@openrouter/sdk/models';
 import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
-import { classifyWithOpenRouter, type ClassifierRunError } from './model-classifier';
+import { classifyWithOpenRouter } from './model-classifier';
 import type { NormalizedClassifierInput } from './classifier-input';
 
 const normalizedInput = {
@@ -77,7 +77,7 @@ describe('OpenRouter classifier call', () => {
     });
   });
 
-  it('rejects classifier responses without assistant text', async () => {
+  it('falls back when classifier responses have no assistant text', async () => {
     const client = {
       chat: {
         send: vi.fn(
@@ -95,14 +95,19 @@ describe('OpenRouter classifier call', () => {
 
     await expect(
       classifyWithOpenRouter(client, normalizedInput, DEFAULT_CLASSIFIER_MODEL)
-    ).rejects.toMatchObject({
-      message: 'Classifier model returned no text',
+    ).resolves.toMatchObject({
       cost: null,
       classifierModel: DEFAULT_CLASSIFIER_MODEL,
-    } satisfies Partial<ClassifierRunError>);
+      fallback: { reason: 'no_text' },
+      classification: {
+        taskType: 'planning_design',
+        subtaskType: 'technical_planning',
+        confidence: 0,
+      },
+    });
   });
 
-  it('preserves classifier cost and model when output validation fails', async () => {
+  it('falls back while preserving classifier cost and model when output validation fails', async () => {
     const client = {
       chat: {
         send: vi.fn(
@@ -134,10 +139,20 @@ describe('OpenRouter classifier call', () => {
 
     await expect(
       classifyWithOpenRouter(client, normalizedInput, DEFAULT_CLASSIFIER_MODEL)
-    ).rejects.toMatchObject({
-      message: 'Classifier model returned invalid classification',
+    ).resolves.toMatchObject({
       cost: 0.00000123,
       classifierModel: DEFAULT_CLASSIFIER_MODEL,
-    } satisfies Partial<ClassifierRunError>);
+      fallback: {
+        reason: 'invalid_output',
+        failureStage: 'invalid_schema',
+        schemaIssueSummary: expect.arrayContaining(['subtaskType:invalid_value']),
+        topLevelKeys: ['taskType'],
+      },
+      classification: {
+        taskType: 'planning_design',
+        subtaskType: 'technical_planning',
+        confidence: 0,
+      },
+    });
   });
 });

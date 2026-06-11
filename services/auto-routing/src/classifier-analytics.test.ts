@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import type { NormalizedClassifierInput } from './classifier-input';
-import type { ClassifierOutput } from './classification';
+import type { ClassifierOutput } from './classifier-output';
 
 const input = {
   apiKind: 'chat_completions',

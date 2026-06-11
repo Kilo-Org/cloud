@@ -1,5 +1,5 @@
 import type { NormalizedClassifierInput } from './classifier-input';
-import type { ClassifierOutput } from './classification';
+import type { ClassifierOutput } from './classifier-output';
 
 type ClassifierAnalyticsStatus =
   | 'classified'

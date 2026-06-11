@@ -37,6 +37,7 @@ import {
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import SidebarMenuList from './SidebarMenuList';
+import SidebarPromoBanner from './SidebarPromoBanner';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
@@ -372,6 +373,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
         )}
       </SidebarContent>
 
+      <SidebarPromoBanner />
       <SidebarUserFooter user={user} isLoading={isLoading} />
     </Sidebar>
   );

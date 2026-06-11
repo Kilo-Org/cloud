@@ -36,6 +36,7 @@ import HeaderLogo from '@/components/HeaderLogo';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useOrgKiloClawNavState } from '@/hooks/useOrgKiloClaw';
 import SidebarMenuList from './SidebarMenuList';
+import SidebarPromoBanner from './SidebarPromoBanner';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
@@ -418,6 +419,7 @@ export default function OrganizationAppSidebar({
         )}
       </SidebarContent>
 
+      <SidebarPromoBanner />
       <SidebarUserFooter user={user} isLoading={isLoading} />
     </Sidebar>
   );

@@ -1183,6 +1183,53 @@ describe('runOnboardOrDoctor', () => {
     expect(renameOrder).toBeLessThan(doctorCallOrder);
   });
 
+  it('migrates a plaintext key in an OPENCLAW_AGENT_DIR env-selected dir before doctor', () => {
+    // A user-supplied OPENCLAW_AGENT_DIR lands in the machine env; doctor migrates
+    // auth profiles there, but `openclaw agents list` does not report it. The
+    // pre-doctor migration must still cover it so the plaintext never reaches SQLite.
+    const ENV_DIR = '/root/env-selected-agent';
+    const ENV_AUTH = `${ENV_DIR}/auth-profiles.json`;
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p.endsWith('openclaw.json') || p === ENV_AUTH
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === ENV_AUTH) {
+        return JSON.stringify({
+          version: 1,
+          profiles: {
+            'kilocode:default': { type: 'api_key', provider: 'kilocode', key: 'env-dir-plaintext' },
+          },
+        });
+      }
+      if (p.endsWith('openclaw.json')) return JSON.stringify({ gateway: { port: 3001 } });
+      return '{}';
+    });
+
+    runOnboardOrDoctor(
+      {
+        KILOCODE_API_KEY: 'test-key',
+        OPENCLAW_GATEWAY_TOKEN: 'test-token',
+        AUTO_APPROVE_DEVICES: 'true',
+        OPENCLAW_AGENT_DIR: ENV_DIR,
+      },
+      harness.deps
+    );
+
+    // The env-dir profile was rewritten to a keyRef (atomic write → rename into ENV_AUTH).
+    const rewrite = harness.renameCalls.find(call => call.to === ENV_AUTH);
+    if (!rewrite) throw new Error('expected the env-selected dir auth-profiles to be migrated');
+    const tempWrite = harness.writeCalls.find(call => call.path === rewrite.from);
+    if (!tempWrite) throw new Error('expected a write to the migration temp path');
+    const rewritten = JSON.parse(tempWrite.data) as {
+      profiles: Record<string, Record<string, unknown>>;
+    };
+    expect(rewritten.profiles['kilocode:default']).toHaveProperty('keyRef');
+    expect(tempWrite.data).not.toContain('env-dir-plaintext');
+  });
+
   it('does not auto-assign kilo-exa on doctor path when BRAVE_API_KEY is configured', () => {
     const harness = fakeDeps();
     (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {

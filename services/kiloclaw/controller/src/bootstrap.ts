@@ -735,41 +735,57 @@ function toAuthProfilesMigrationDeps(deps: BootstrapDeps): AuthProfilesMigration
   };
 }
 
+// OpenClaw resolves the active agent directory from these env vars too. KiloClaw
+// lets users set arbitrary instance env vars (only the KILOCLAW_ prefix is
+// reserved), so a user-supplied value lands in the machine env, and doctor
+// migrates auth profiles in that directory — but `openclaw agents list` (which
+// is config-derived) does not report it.
+const ENV_SELECTED_AGENT_DIR_VARS = ['OPENCLAW_AGENT_DIR', 'PI_CODING_AGENT_DIR'];
+
 /**
- * Resolve the absolute `agentDir`s OpenClaw has configured, via the offline
- * `openclaw agents list --json`. KiloClaw allows custom (arbitrary absolute)
- * agent directories, and OpenClaw doctor migrates auth profiles in those too —
- * so the keyRef migration and backup hardening must cover the same candidates,
- * not just `<state>/agents/<id>/agent`. Returns [] if enumeration or parsing
- * fails; callers still cover the conventional layout.
+ * Resolve the absolute `agentDir`s OpenClaw migrates auth profiles in, so the
+ * keyRef migration and backup hardening cover the same candidates doctor does
+ * (not just `<state>/agents/<id>/agent`). Two sources:
+ *   - config-derived agents via the offline `openclaw agents list --json`
+ *     (covers custom `agentDir`s set at create time), and
+ *   - env-selected agent dirs (`OPENCLAW_AGENT_DIR` / `PI_CODING_AGENT_DIR`),
+ *     which doctor processes but `agents list` does not report.
+ * Returns whatever it can resolve; callers still cover the conventional layout.
  */
-function resolveConfiguredAgentDirs(deps: BootstrapDeps): string[] {
-  let raw: string;
+function resolveConfiguredAgentDirs(env: EnvLike, deps: BootstrapDeps): string[] {
+  const dirs = new Set<string>();
+
+  for (const name of ENV_SELECTED_AGENT_DIR_VARS) {
+    const value = env[name];
+    if (typeof value === 'string' && value.trim().length > 0) dirs.add(value.trim());
+  }
+
+  let raw: string | undefined;
   try {
     raw = deps.execFileSync('openclaw', ['agents', 'list', '--json']);
   } catch (error) {
     console.warn(
-      '[controller] could not enumerate agent dirs; auth migration uses the conventional layout only:',
+      '[controller] could not enumerate config agent dirs; auth migration uses the conventional layout and env-selected dirs only:',
       error
     );
-    return [];
   }
-  if (!raw || !raw.trim()) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const dirs: string[] = [];
-    for (const entry of parsed) {
-      if (entry && typeof entry === 'object') {
-        const agentDir = (entry as { agentDir?: unknown }).agentDir;
-        if (typeof agentDir === 'string' && agentDir.length > 0) dirs.push(agentDir);
+  if (raw && raw.trim()) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const entry of parsed) {
+          if (entry && typeof entry === 'object') {
+            const agentDir = (entry as { agentDir?: unknown }).agentDir;
+            if (typeof agentDir === 'string' && agentDir.length > 0) dirs.add(agentDir);
+          }
+        }
       }
+    } catch (error) {
+      console.warn('[controller] could not parse agent list for auth migration:', error);
     }
-    return dirs;
-  } catch (error) {
-    console.warn('[controller] could not parse agent list for auth migration:', error);
-    return [];
   }
+
+  return [...dirs];
 }
 
 function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
@@ -825,7 +841,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   // keyRef migration and backup hardening below cover the same candidates, not
   // just the conventional `<state>/agents/<id>/agent` layout. Empty on fresh
   // installs (no agents yet) and when enumeration is unavailable.
-  const configuredAgentDirs = configExists ? resolveConfiguredAgentDirs(deps) : [];
+  const configuredAgentDirs = configExists ? resolveConfiguredAgentDirs(env, deps) : [];
 
   if (!configExists) {
     console.log('No existing config found, running openclaw onboard...');

@@ -29,3 +29,78 @@ export function gradeClassifierOutput(
   }
   return Number(score.toFixed(4));
 }
+
+export type DeciderCheck =
+  | { kind: 'exact'; value: string }
+  | { kind: 'contains_all'; values: readonly string[] }
+  | { kind: 'regex'; pattern: string; flags?: string }
+  | { kind: 'json_equal'; value: unknown };
+
+// Mechanical pass/fail grading keeps the decider benchmark deterministic:
+// no LLM judges. Normalization tolerates formatting noise (whitespace,
+// case, markdown fences) without weakening the assertion.
+export function normalizeAnswer(text: string): string {
+  return text
+    .replace(/```[a-z]*\n?/gi, '')
+    .replace(/```/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+// Balance-scan from the first `{`/`[` to its matching close so trailing prose
+// after the JSON payload doesn't break parsing. String-aware so braces inside
+// string literals are ignored.
+function extractJson(text: string): unknown {
+  const stripped = text.replace(/```(?:json)?\n?/gi, '').replace(/```/g, '');
+  const start = stripped.search(/[[{]/);
+  if (start === -1) throw new Error('no JSON found');
+
+  const open = stripped[start];
+  const close = open === '{' ? '}' : ']';
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < stripped.length; i++) {
+    const ch = stripped[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === open) {
+      depth++;
+    } else if (ch === close) {
+      depth--;
+      if (depth === 0) {
+        return JSON.parse(stripped.slice(start, i + 1));
+      }
+    }
+  }
+  throw new Error('unbalanced JSON');
+}
+
+export function runDeciderCheck(check: DeciderCheck, output: string): boolean {
+  switch (check.kind) {
+    case 'exact':
+      return normalizeAnswer(output) === normalizeAnswer(check.value);
+    case 'contains_all':
+      return check.values.every(v => normalizeAnswer(output).includes(normalizeAnswer(v)));
+    case 'regex':
+      return new RegExp(check.pattern, check.flags).test(output);
+    case 'json_equal': {
+      try {
+        return JSON.stringify(extractJson(output)) === JSON.stringify(check.value);
+      } catch {
+        return false;
+      }
+    }
+  }
+}

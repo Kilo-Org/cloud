@@ -728,6 +728,7 @@ describe('auto routing worker', () => {
             {
               total_requests: 10,
               classified_requests: 8,
+              cached_requests: 6,
               classifier_errors: 1,
               invalid_requests: 1,
               total_cost_credits: 0.0000123,
@@ -799,6 +800,7 @@ describe('auto routing worker', () => {
       summary: {
         totalRequests: 10,
         classifiedRequests: 8,
+        cachedRequests: 6,
         classifierErrors: 1,
         invalidRequests: 1,
         totalCostCredits: 0.0000123,
@@ -849,6 +851,7 @@ describe('auto routing worker', () => {
       summary: {
         totalRequests: 0,
         classifiedRequests: 0,
+        cachedRequests: 0,
         classifierErrors: 0,
         invalidRequests: 0,
         totalCostCredits: 0,

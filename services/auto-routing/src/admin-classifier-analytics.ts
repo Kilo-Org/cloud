@@ -22,6 +22,7 @@ const optionalAnalyticsNumberSchema = analyticsNumberSchema.optional();
 const SummaryRowSchema = z.looseObject({
   total_requests: optionalAnalyticsNumberSchema,
   classified_requests: optionalAnalyticsNumberSchema,
+  cached_requests: optionalAnalyticsNumberSchema,
   classifier_errors: optionalAnalyticsNumberSchema,
   invalid_requests: optionalAnalyticsNumberSchema,
   total_cost_credits: optionalAnalyticsNumberSchema,
@@ -69,6 +70,7 @@ function emptyAnalyticsResponse(period: AnalyticsPeriod): AutoRoutingClassifierA
     summary: {
       totalRequests: 0,
       classifiedRequests: 0,
+      cachedRequests: 0,
       classifierErrors: 0,
       invalidRequests: 0,
       totalCostCredits: 0,
@@ -129,6 +131,7 @@ function buildSummaryQuery(period: AnalyticsPeriod): string {
     SELECT
       SUM(_sample_interval) AS total_requests,
       SUM(_sample_interval * IF(blob4 = 'classified', 1, 0)) AS classified_requests,
+      SUM(_sample_interval * IF(double7 = 1, 1, 0)) AS cached_requests,
       SUM(_sample_interval * IF(blob4 = 'classifier_error' OR startsWith(blob4, 'classifier_error:'), 1, 0)) AS classifier_errors,
       SUM(_sample_interval * IF(blob4 IN ('invalid_json', 'invalid_envelope', 'invalid_body'), 1, 0)) AS invalid_requests,
       SUM(_sample_interval * double2) AS total_cost_credits,
@@ -273,6 +276,7 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
     summary: {
       totalRequests: numberValue(summary.total_requests),
       classifiedRequests: numberValue(summary.classified_requests),
+      cachedRequests: numberValue(summary.cached_requests),
       classifierErrors: numberValue(summary.classifier_errors),
       invalidRequests: numberValue(summary.invalid_requests),
       totalCostCredits: numberValue(summary.total_cost_credits),

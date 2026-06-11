@@ -92,6 +92,7 @@ describe('auto routing contracts', () => {
         summary: {
           totalRequests: 0,
           classifiedRequests: 0,
+          cachedRequests: 0,
           classifierErrors: 0,
           invalidRequests: 0,
           totalCostCredits: 0,

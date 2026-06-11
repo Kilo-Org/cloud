@@ -148,6 +148,7 @@ export const AutoRoutingClassifierAnalyticsResponseSchema = z.object({
   summary: z.object({
     totalRequests: z.number(),
     classifiedRequests: z.number(),
+    cachedRequests: z.number(),
     classifierErrors: z.number(),
     invalidRequests: z.number(),
     totalCostCredits: z.number(),

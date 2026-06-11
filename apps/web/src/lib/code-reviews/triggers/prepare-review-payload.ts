@@ -180,26 +180,16 @@ export async function prepareReviewPayload(
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
 
-        if (repoOwner && repoName) {
-          repositorySize = await lookupRepositorySize({
-            platform,
-            repoFullName: review.repo_full_name,
-            fetchSize: () =>
-              fetchGitHubRepositorySize({
-                token: installationToken,
-                owner: repoOwner,
-                repo: repoName,
-              }),
-          });
-        } else {
-          warnExceptInTest(
-            '[prepareReviewPayload] Cannot fetch repository size for invalid GitHub repo',
-            {
-              platform,
-              repoFullName: review.repo_full_name,
-            }
-          );
-        }
+        repositorySize = await lookupRepositorySize({
+          platform,
+          repoFullName: review.repo_full_name,
+          fetchSize: () =>
+            fetchGitHubRepositorySize({
+              token: installationToken,
+              owner: repoOwner,
+              repo: repoName,
+            }),
+        });
 
         const repositoryReviewInstructionsPromise =
           shouldUseReviewMd && repoOwner && repoName

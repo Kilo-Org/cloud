@@ -18,6 +18,11 @@ const SENSITIVE_KEY_PATTERNS = [
   'secret',
   'token',
 ];
+const REDUNDANT_CONTENT_TYPES = new Set([
+  'function_call_output',
+  'tool_call_output',
+  'tool_result',
+]);
 
 export const mirrorPayloadSchema = MirrorPayloadSchema;
 
@@ -185,13 +190,29 @@ function latestPromptPrefix(messages: Message[], role: string) {
 }
 
 function textPrefix(value: unknown): string | null {
-  const text = textFromValue(value).replace(/\s+/g, ' ').trim();
+  const text = cleanPromptText(textFromValue(value));
 
   if (text.length === 0) {
     return null;
   }
 
   return text.slice(0, TEXT_PREFIX_MAX_LENGTH);
+}
+
+function cleanPromptText(text: string): string {
+  const taskText = text.match(/<task>\s*([\s\S]*?)\s*<\/task>/i)?.[1] ?? text;
+
+  return taskText
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, ' ')
+    .replace(/<environment_details>[\s\S]*?<\/environment_details>/gi, ' ')
+    .replace(/<file(?:\s[^>]*)?>[\s\S]*?<\/file>/gi, ' ')
+    .replace(/<file_content(?:\s[^>]*)?>[\s\S]*?<\/file_content>/gi, ' ')
+    .replace(/<read_file>[\s\S]*?<\/read_file>/gi, ' ')
+    .replace(/<search_files>[\s\S]*?<\/search_files>/gi, ' ')
+    .replace(/^\[[^\]]+\]\s+Result:\s*/i, ' ')
+    .replace(/\[ERROR\][\s\S]*/i, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function textFromValue(value: unknown): string {
@@ -204,6 +225,10 @@ function textFromValue(value: unknown): string {
   }
 
   if (!isRecord(value)) {
+    return '';
+  }
+
+  if (typeof value.type === 'string' && REDUNDANT_CONTENT_TYPES.has(value.type)) {
     return '';
   }
 

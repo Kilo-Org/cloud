@@ -45,4 +45,18 @@ describe('fallback classifier output', () => {
       confidence: 0,
     });
   });
+
+  it('uses latest user prompt text for redirected long sessions', () => {
+    expect(
+      fallbackClassifierOutput({
+        ...input,
+        userPromptPrefix: 'Write a technical plan for the migration.',
+        latestUserPromptPrefix: 'Actually debug and fix the failing worker test.',
+        hasTools: false,
+      })
+    ).toMatchObject({
+      taskType: 'debugging',
+      subtaskType: 'bug_fixing',
+    });
+  });
 });

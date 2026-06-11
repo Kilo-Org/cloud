@@ -29,8 +29,45 @@ describe('classifier input parsing', () => {
     ).toMatchObject({
       success: true,
       data: {
-        userPromptPrefix: '<task>Add tests for the parser.</task>',
+        userPromptPrefix: 'Add tests for the parser.',
         latestUserPromptPrefix: 'Actually focus on latency instead.',
+      },
+    });
+  });
+
+  it('strips redundant tool result content from prompt prefixes', () => {
+    expect(
+      parseClassifierInput(
+        payload({
+          model: 'anthropic/claude-sonnet-4',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: '<task>Fix the webhook retry bug.</task>' },
+                {
+                  type: 'tool_result',
+                  content: 'unneeded file contents and command output',
+                },
+              ],
+            },
+            {
+              role: 'assistant',
+              content: '<read_file><path>src/webhook.ts</path></read_file>',
+            },
+            {
+              role: 'user',
+              content:
+                'Actually simplify the retry parser. <read_file><path>src/retry.ts</path></read_file> [ERROR] stack trace',
+            },
+          ],
+        })
+      )
+    ).toMatchObject({
+      success: true,
+      data: {
+        userPromptPrefix: 'Fix the webhook retry bug.',
+        latestUserPromptPrefix: 'Actually simplify the retry parser.',
       },
     });
   });

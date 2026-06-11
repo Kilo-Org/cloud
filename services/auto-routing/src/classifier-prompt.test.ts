@@ -67,6 +67,21 @@ describe('classifier prompt', () => {
     expect(summary.systemPromptPrefix).toHaveLength(200);
   });
 
+  it('caps first and latest user prompt text evenly in the classifier request summary', () => {
+    const messages = buildClassifierMessages({
+      ...input,
+      userPromptPrefix: `${'first '.repeat(220)}end`,
+      latestUserPromptPrefix: `${'latest '.repeat(220)}end`,
+    });
+    const summary = JSON.parse(messages[1].content.replace('Request summary:\n', '')) as {
+      initialUserPromptPrefix: string;
+      latestUserPromptPrefix: string;
+    };
+
+    expect(summary.initialUserPromptPrefix).toHaveLength(800);
+    expect(summary.latestUserPromptPrefix).toHaveLength(800);
+  });
+
   it('does not duplicate the latest user prompt when it matches the first user prompt', () => {
     const messages = buildClassifierMessages({
       ...input,

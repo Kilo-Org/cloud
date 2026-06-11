@@ -10,7 +10,7 @@ export type ClassifierMessage = {
 };
 
 const SYSTEM_PROMPT_PREFIX_MAX_LENGTH = 200;
-const LATEST_USER_PROMPT_PREFIX_MAX_LENGTH = 500;
+const USER_PROMPT_PREFIX_MAX_LENGTH = 800;
 
 type ClassifierPromptSummary = {
   apiKind: NormalizedClassifierInput['apiKind'];
@@ -73,10 +73,11 @@ function buildClassifierPromptSummary(input: NormalizedClassifierInput): Classif
   return {
     apiKind: input.apiKind,
     systemPromptPrefix: input.systemPromptPrefix?.slice(0, SYSTEM_PROMPT_PREFIX_MAX_LENGTH) ?? null,
-    initialUserPromptPrefix: input.userPromptPrefix,
+    initialUserPromptPrefix:
+      input.userPromptPrefix?.slice(0, USER_PROMPT_PREFIX_MAX_LENGTH) ?? null,
     latestUserPromptPrefix:
       input.latestUserPromptPrefix && input.latestUserPromptPrefix !== input.userPromptPrefix
-        ? input.latestUserPromptPrefix.slice(0, LATEST_USER_PROMPT_PREFIX_MAX_LENGTH)
+        ? input.latestUserPromptPrefix.slice(0, USER_PROMPT_PREFIX_MAX_LENGTH)
         : null,
     messageCount: input.messageCount,
     hasTools: input.hasTools,

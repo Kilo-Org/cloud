@@ -36,7 +36,10 @@ const intentRules: IntentRule[] = [
 ];
 
 export function fallbackClassifierOutput(input: NormalizedClassifierInput): ClassifierOutput {
-  const text = `${input.systemPromptPrefix ?? ''}\n${input.userPromptPrefix ?? ''}`.toLowerCase();
+  const text = [input.latestUserPromptPrefix ?? input.userPromptPrefix, input.systemPromptPrefix]
+    .filter(Boolean)
+    .join('\n')
+    .toLowerCase();
   const intent = intentRules.find(rule =>
     rule.keywords.some(keyword => text.includes(keyword))
   ) ?? {

@@ -13,12 +13,12 @@ const ENTRY_TTL_MS = 30 * 60 * 1000;
 const IDLE_CLEANUP_MS = 2 * 60 * 60 * 1000;
 
 type StoredEntry = {
-  value: unknown;
+  value: ClassifierOutput;
   storedAt: number;
 };
 
 export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
-  async getEntry(key: string): Promise<unknown> {
+  async getEntry(key: string): Promise<ClassifierOutput | null> {
     const entry = await this.ctx.storage.get<StoredEntry>(key);
     if (!entry) return null;
     if (Date.now() - entry.storedAt > ENTRY_TTL_MS) {
@@ -28,7 +28,7 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
     return entry.value;
   }
 
-  async putEntry(key: string, value: unknown): Promise<void> {
+  async putEntry(key: string, value: ClassifierOutput): Promise<void> {
     // One alarm per conversation, pushed out on every write: the whole
     // object is wiped once the conversation goes idle.
     await Promise.all([

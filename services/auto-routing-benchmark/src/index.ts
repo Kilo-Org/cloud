@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { authMiddleware } from './auth';
 import type { HonoEnv } from './hono-env';
+import { processJob, startRun, type BenchmarkJobMessage } from './run';
 
 export const app = new Hono<HonoEnv>();
 app.use('*', authMiddleware);
@@ -9,13 +10,18 @@ app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing-benchmark'
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler());
 
+const DECIDER_CRON = '10 5 * * 1';
+
 export default {
   fetch: app.fetch,
-  // Wired up in later tasks (run orchestration + admin endpoints).
-  async scheduled(
-    _controller: ScheduledController,
-    _env: Env,
-    _ctx: ExecutionContext
-  ): Promise<void> {},
-  async queue(_batch: MessageBatch<unknown>, _env: Env, _ctx: ExecutionContext): Promise<void> {},
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const kind = controller.cron === DECIDER_CRON ? 'decider' : 'classifier';
+    ctx.waitUntil(startRun(env, kind));
+  },
+  async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
+    for (const message of batch.messages) {
+      await processJob(env, message.body);
+      message.ack();
+    }
+  },
 };

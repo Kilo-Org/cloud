@@ -71,13 +71,35 @@ const ModeIdInputSchema = OrganizationIdInputSchema.extend({
   modeId: z.uuid(),
 });
 
-function hasDefaultModelUpdate(config: ModeUpdateConfigInput | undefined): boolean {
+function hasDefaultModelUpdate(config: DefaultModelConfig | undefined): boolean {
   return !!config && Object.prototype.hasOwnProperty.call(config, 'defaultModel');
+}
+
+function hasDefaultModelValue(
+  config: DefaultModelConfig | undefined
+): config is DefaultModelConfig & { defaultModel: string } {
+  return !!config && hasDefaultModelUpdate(config) && typeof config.defaultModel === 'string';
+}
+
+function ensureDefaultModelCanBeSet(
+  organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>,
+  config: DefaultModelConfig | undefined
+): void {
+  if (!hasDefaultModelValue(config)) {
+    return;
+  }
+
+  if (organization.plan !== 'enterprise') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Model access configuration is not available for this organization.',
+    });
+  }
 }
 
 async function ensureDefaultModelConfigEnabled(
   userId: string,
-  config: ModeUpdateConfigInput | undefined
+  config: DefaultModelConfig | undefined
 ): Promise<void> {
   if (!hasDefaultModelUpdate(config)) {
     return;
@@ -155,8 +177,11 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
+      ensureDefaultModelCanBeSet(organization, config);
       await ensureDefaultModelConfigEnabled(ctx.user.id, config);
-      await validateDefaultModel(organization, config);
+      if (hasDefaultModelValue(config)) {
+        await validateDefaultModel(organization, config);
+      }
 
       const mode = await createOrganizationMode(
         organizationId,
@@ -230,12 +255,12 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
+      ensureDefaultModelCanBeSet(organization, updates.config);
       await ensureDefaultModelConfigEnabled(ctx.user.id, updates.config);
+      if (hasDefaultModelValue(updates.config)) {
+        await validateDefaultModel(organization, updates.config);
+      }
       const normalizedConfig = normalizeModeConfig(updates.config);
-      const effectiveConfig = normalizedConfig
-        ? { ...existingMode.config, ...normalizedConfig }
-        : existingMode.config;
-      await validateDefaultModel(organization, effectiveConfig);
 
       const mode = await updateOrganizationMode(organizationId, modeId, {
         ...updates,

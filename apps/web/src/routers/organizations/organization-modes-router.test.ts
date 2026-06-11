@@ -3,7 +3,10 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
+import { db } from '@/lib/drizzle';
+import { organizations } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 jest.mock('@/lib/posthog-feature-flags', () => ({
@@ -161,6 +164,30 @@ describe('organization modes tRPC router', () => {
       });
 
       expect(result.mode.config.defaultModel).toBe('openai/gpt-4o');
+    });
+
+    it('should reject an organization mode default for a non-enterprise organization', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const organization = await createTestOrganization(
+        'Teams Default Model Org',
+        owner.id,
+        0,
+        {},
+        true
+      );
+
+      await expect(
+        caller.organizations.modes.create({
+          organizationId: organization.id,
+          name: 'Code Mode',
+          slug: 'code',
+          config: {
+            roleDefinition: 'You are a coding assistant',
+            groups: ['read'],
+            defaultModel: 'openai/gpt-4o',
+          },
+        })
+      ).rejects.toThrow('Model access configuration is not available for this organization.');
     });
 
     it('should reject an organization mode default that is denied', async () => {
@@ -512,6 +539,36 @@ describe('organization modes tRPC router', () => {
       ).rejects.toThrow();
     });
 
+    it('should reject an organization mode default on update for a non-enterprise organization', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const organization = await createTestOrganization(
+        'Teams Update Default Model Org',
+        owner.id,
+        0,
+        {},
+        true
+      );
+      const created = await caller.organizations.modes.create({
+        organizationId: organization.id,
+        name: 'Code Mode',
+        slug: 'code',
+        config: {
+          roleDefinition: 'You are a coding assistant',
+          groups: ['read'],
+        },
+      });
+
+      await expect(
+        caller.organizations.modes.update({
+          organizationId: organization.id,
+          modeId: created.mode.id,
+          config: {
+            defaultModel: 'openai/gpt-4o',
+          },
+        })
+      ).rejects.toThrow('Model access configuration is not available for this organization.');
+    });
+
     it('should reject a denied organization mode default on update', async () => {
       const caller = await createCallerForUser(owner.id);
       const organization = await createTestOrganization(
@@ -588,6 +645,89 @@ describe('organization modes tRPC router', () => {
           },
         })
       ).rejects.toThrow("Default model 'openai/*:free' is not a concrete model identifier");
+    });
+
+    it('should allow unrelated mode edits after a stored default becomes denied', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const organization = await createTestOrganization(
+        'Stale Default Model Org',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      const created = await caller.organizations.modes.create({
+        organizationId: organization.id,
+        name: 'Code Mode',
+        slug: 'stale-default-model',
+        config: {
+          roleDefinition: 'You are a coding assistant',
+          groups: ['read'],
+          defaultModel: 'openai/gpt-4o',
+        },
+      });
+      await db
+        .update(organizations)
+        .set({ settings: { model_deny_list: ['openai/gpt-4o'] } })
+        .where(eq(organizations.id, organization.id));
+
+      await expect(
+        caller.organizations.modes.update({
+          organizationId: organization.id,
+          modeId: created.mode.id,
+          config: {
+            description: 'Updated description',
+          },
+        })
+      ).resolves.toMatchObject({
+        mode: {
+          config: {
+            description: 'Updated description',
+            defaultModel: 'openai/gpt-4o',
+          },
+        },
+      });
+    });
+
+    it('should allow clearing a mode default after an enterprise organization downgrades', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const organization = await createTestOrganization(
+        'Downgraded Default Model Org',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      const created = await caller.organizations.modes.create({
+        organizationId: organization.id,
+        name: 'Code Mode',
+        slug: 'downgraded-clear-default-model',
+        config: {
+          roleDefinition: 'You are a coding assistant',
+          groups: ['read'],
+          defaultModel: 'openai/gpt-4o',
+        },
+      });
+      await db
+        .update(organizations)
+        .set({ plan: 'teams' })
+        .where(eq(organizations.id, organization.id));
+
+      await expect(
+        caller.organizations.modes.update({
+          organizationId: organization.id,
+          modeId: created.mode.id,
+          config: {
+            defaultModel: null,
+          },
+        })
+      ).resolves.toMatchObject({
+        mode: {
+          config: {
+            roleDefinition: 'You are a coding assistant',
+          },
+        },
+      });
     });
 
     it('should reject clearing a mode default when the release flag is disabled', async () => {

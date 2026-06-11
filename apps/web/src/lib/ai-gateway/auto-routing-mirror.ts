@@ -41,15 +41,20 @@ async function sendAutoRoutingMirror(
   // Normalizing here (in background work, off the request path) keeps the
   // mirror payload at a few KB instead of the full request body, and lets
   // requests the worker could not classify anyway skip the mirror call.
-  const normalizedInput = normalizeClassifierInput(params.apiKind, params.body);
-  if (!normalizedInput) return;
+  const normalizedInput = normalizeClassifierInput(params.apiKind, params.body, {
+    requestedModel: params.requestedModel,
+    providerHints: params.providerHints,
+  });
+  if (!normalizedInput) {
+    const onError = options.onError ?? warnExceptInTest;
+    onError('Auto routing mirror skipped unclassifiable request body', {
+      error: 'normalize_failed',
+    });
+    return;
+  }
 
   const payload: MirrorPayload = {
-    input: {
-      ...normalizedInput,
-      requestedModel: params.requestedModel,
-      providerHints: params.providerHints,
-    },
+    input: normalizedInput,
     userId: params.userId,
     sessionId: params.sessionId,
     machineId: params.machineId,

@@ -1,6 +1,7 @@
 import { MirrorPayloadSchema } from '@kilocode/auto-routing-contracts';
 import type {
   AutoRoutingDecisionResponse,
+  MirrorPayload,
   NormalizedClassifierInput,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
@@ -8,7 +9,11 @@ import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import { getClassifierModel, getDecisionLogSampleRate } from './classifier-config';
 import type { ClassifierOutput } from './classifier-output';
-import { computeContentHashes, deriveConversationKey } from './conversation-identity';
+import {
+  computeContentHashes,
+  deriveConversationKey,
+  deriveOutboundSessionId,
+} from './conversation-identity';
 import type { ContentHashes } from './conversation-identity';
 import { getCachedClassification, putCachedClassification } from './decision-cache';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
@@ -76,20 +81,13 @@ function classifierErrorStatus(error: unknown): `classifier_error:${string}` {
 }
 
 // Per-request fields shared by every metrics write and log line for the
-// decision, assembled once after the mirrored payload is parsed.
+// decision: the validated payload plus everything derived from it once.
 type DecisionContext = {
-  classifierInput: NormalizedClassifierInput;
-  userId: string;
-  sessionId: string | null;
-  machineId: string | null;
-  clientRequestId: string | null;
-  mode: string | null;
-  userAgent: string | null;
+  payload: MirrorPayload;
   hashes: ContentHashes;
   conversationKey: string;
   reqSeq: number;
   colo: string | null;
-  bodyBytes: number;
   successSampleRate: number;
 };
 
@@ -198,12 +196,12 @@ function recordDecision(
   writeClassifierMetricsDataPoint(env, {
     status: outcome.kind === 'error' ? classifierErrorStatus(outcome.error) : 'classified',
     classifierModel: summary.classifierModel,
-    sessionId: ctx.sessionId,
-    input: ctx.classifierInput,
+    sessionId: ctx.payload.sessionId,
+    input: ctx.payload.input,
     classification: summary.classification,
     classifierCostCredits: summary.cost,
     classifierDurationMs: durationMs,
-    bodyBytes: ctx.bodyBytes,
+    bodyBytes: ctx.payload.bodyBytes,
     cacheHit: summary.cacheHit,
   });
 
@@ -222,25 +220,25 @@ function recordDecision(
       cacheHit: summary.cacheHit,
       retried: summary.retried,
       classifierModel: summary.classifierModel,
-      requestedModel: ctx.classifierInput.requestedModel,
-      apiKind: ctx.classifierInput.apiKind,
-      sessionId: ctx.sessionId,
+      requestedModel: ctx.payload.input.requestedModel,
+      apiKind: ctx.payload.input.apiKind,
+      sessionId: ctx.payload.sessionId,
       hashExact: ctx.hashes.exact,
       hashLoose: ctx.hashes.loose,
       reqSeq: ctx.reqSeq,
       colo: ctx.colo,
       classifierDurationMs: Math.round(durationMs),
       classifierCostCredits: summary.cost,
-      messageCount: ctx.classifierInput.messageCount,
-      bodyBytes: ctx.bodyBytes,
+      messageCount: ctx.payload.input.messageCount,
+      bodyBytes: ctx.payload.bodyBytes,
       taskType: summary.classification?.taskType ?? null,
       subtaskType: summary.classification?.subtaskType ?? null,
       confidence: summary.classification?.confidence ?? null,
-      userId: ctx.userId,
-      clientRequestId: ctx.clientRequestId,
-      hasMachineId: ctx.machineId !== null,
-      mode: ctx.mode,
-      uaPrefix: ctx.userAgent?.slice(0, 40) ?? null,
+      userId: ctx.payload.userId,
+      clientRequestId: ctx.payload.clientRequestId,
+      hasMachineId: ctx.payload.machineId !== null,
+      mode: ctx.payload.mode,
+      uaPrefix: ctx.payload.userAgent?.slice(0, 40) ?? null,
       ...summary.details,
     })
   );
@@ -269,18 +267,11 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     getDecisionLogSampleRate(c.env),
   ]);
   const ctx: DecisionContext = {
-    classifierInput: payload.input,
-    userId: payload.userId,
-    sessionId: payload.sessionId,
-    machineId: payload.machineId,
-    clientRequestId: payload.clientRequestId,
-    mode: payload.mode,
-    userAgent: payload.userAgent,
+    payload,
     hashes,
     conversationKey: deriveConversationKey(payload, hashes),
     reqSeq: isolateRequestSeq++,
     colo: (c.req.raw.cf?.colo as string | undefined) ?? null,
-    bodyBytes: payload.bodyBytes,
     successSampleRate,
   };
 
@@ -301,7 +292,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
 
   try {
     const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel, {
-      openrouterSessionId: ctx.conversationKey,
+      openrouterSessionId: await deriveOutboundSessionId(ctx.conversationKey),
     });
     if (!classifier.fallback) {
       c.executionCtx.waitUntil(

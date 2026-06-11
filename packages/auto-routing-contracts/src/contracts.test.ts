@@ -21,30 +21,30 @@ describe('auto routing contracts', () => {
       providerHints: { provider: null, providerOptions: null },
     };
 
-    expect(
-      MirrorPayloadSchema.parse({
-        input: normalizedInput,
-        userId: 'user-1',
-        sessionId: 'session-123',
-        machineId: 'machine-1',
-        clientRequestId: 'req-1',
-        mode: 'code',
-        userAgent: 'Kilo-Code/4.106.0',
-        bodyBytes: 1234,
-      })
-    ).toMatchObject({ sessionId: 'session-123', userId: 'user-1' });
+    const mirrorPayload = {
+      input: normalizedInput,
+      userId: 'user-1',
+      sessionId: 'session-123',
+      machineId: 'machine-1',
+      clientRequestId: 'req-1',
+      mode: 'code',
+      userAgent: 'Kilo-Code/4.106.0',
+      bodyBytes: 1234,
+    };
 
+    expect(MirrorPayloadSchema.parse(mirrorPayload)).toMatchObject({
+      sessionId: 'session-123',
+      userId: 'user-1',
+    });
+
+    // One broken constraint per case: identity fields are null-or-nonempty,
+    // never empty strings.
+    expect(() => MirrorPayloadSchema.parse({ ...mirrorPayload, userId: '' })).toThrow();
+    expect(() => MirrorPayloadSchema.parse({ ...mirrorPayload, sessionId: '' })).toThrow();
+    expect(() => MirrorPayloadSchema.parse({ ...mirrorPayload, mode: '   ' })).toThrow();
+    expect(() => MirrorPayloadSchema.parse({ ...mirrorPayload, bodyBytes: -1 })).toThrow();
     expect(() =>
-      MirrorPayloadSchema.parse({
-        input: { apiKind: 'chat_completions' },
-        userId: '',
-        sessionId: null,
-        machineId: null,
-        clientRequestId: null,
-        mode: null,
-        userAgent: null,
-        bodyBytes: 0,
-      })
+      MirrorPayloadSchema.parse({ ...mirrorPayload, input: { apiKind: 'chat_completions' } })
     ).toThrow();
 
     expect(

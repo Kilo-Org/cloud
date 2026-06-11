@@ -8,6 +8,10 @@ import type { JsonValue, NormalizedClassifierInput } from './index';
 
 const TEXT_PREFIX_MAX_LENGTH = 1000;
 const REDACTED_VALUE = '[REDACTED]';
+// Provider hints are client-supplied JSON of unbounded size; cap how many
+// nodes the redacting copy visits so a pathological payload cannot turn the
+// snapshot into an O(body) walk on the gateway request path.
+const PROVIDER_HINTS_MAX_NODES = 512;
 const SENSITIVE_KEY_PATTERNS = [
   'authorization',
   'api_key',
@@ -62,25 +66,39 @@ type ProviderHintSource = {
   provider?: unknown;
   providerOptions?: unknown;
 };
+type CommonBody = {
+  model: string;
+  stream?: boolean | undefined;
+  provider?: unknown;
+  providerOptions?: unknown;
+  tools?: unknown[] | undefined;
+};
+
+// Values the caller captured before the body was mutated (the gateway
+// rewrites `model` and provider fields in place during routing). When
+// provided they are used verbatim and the body's own values are ignored.
+type NormalizeOverrides = {
+  requestedModel: string;
+  providerHints: NormalizedClassifierInput['providerHints'];
+};
 
 export function normalizeClassifierInput(
   apiKind: ClassifierApiKind,
-  body: unknown
+  body: unknown,
+  overrides?: NormalizeOverrides
 ): NormalizedClassifierInput | null {
   if (apiKind === 'chat_completions') {
     const parsed = chatCompletionBodySchema.safeParse(body);
     if (!parsed.success) return null;
 
+    const userPrompts = firstAndLatestPromptPrefix(parsed.data.messages, 'user');
     return {
       apiKind,
-      requestedModel: parsed.data.model,
       systemPromptPrefix: firstPromptPrefix(parsed.data.messages, 'system'),
-      userPromptPrefix: firstPromptPrefix(parsed.data.messages, 'user'),
-      latestUserPromptPrefix: latestPromptPrefix(parsed.data.messages, 'user'),
+      userPromptPrefix: userPrompts.first,
+      latestUserPromptPrefix: userPrompts.latest,
       messageCount: parsed.data.messages.length,
-      hasTools: hasTools(parsed.data.tools),
-      stream: parsed.data.stream === true,
-      providerHints: redactProviderHints(parsed.data),
+      ...commonFields(parsed.data, overrides),
     };
   }
 
@@ -89,36 +107,39 @@ export function normalizeClassifierInput(
     if (!parsed.success) return null;
 
     const inputMessages = inputToMessages(parsed.data.input);
-    const inputTextPrefix = textPrefix(parsed.data.input);
-
+    const userPrompts = firstAndLatestPromptPrefix(inputMessages, 'user');
     return {
       apiKind,
-      requestedModel: parsed.data.model,
       systemPromptPrefix:
         textPrefix(parsed.data.instructions) ?? firstPromptPrefix(inputMessages, 'system'),
-      userPromptPrefix: firstPromptPrefix(inputMessages, 'user') ?? inputTextPrefix,
-      latestUserPromptPrefix: latestPromptPrefix(inputMessages, 'user'),
+      userPromptPrefix: userPrompts.first ?? textPrefix(parsed.data.input),
+      latestUserPromptPrefix: userPrompts.latest,
       messageCount: messageCount(parsed.data.input),
-      hasTools: hasTools(parsed.data.tools),
-      stream: parsed.data.stream === true,
-      providerHints: redactProviderHints(parsed.data),
+      ...commonFields(parsed.data, overrides),
     };
   }
 
   const parsed = messagesBodySchema.safeParse(body);
   if (!parsed.success) return null;
 
+  const userPrompts = firstAndLatestPromptPrefix(parsed.data.messages, 'user');
   return {
     apiKind,
-    requestedModel: parsed.data.model,
     systemPromptPrefix:
       textPrefix(parsed.data.system) ?? firstPromptPrefix(parsed.data.messages, 'system'),
-    userPromptPrefix: firstPromptPrefix(parsed.data.messages, 'user'),
-    latestUserPromptPrefix: latestPromptPrefix(parsed.data.messages, 'user'),
+    userPromptPrefix: userPrompts.first,
+    latestUserPromptPrefix: userPrompts.latest,
     messageCount: parsed.data.messages.length,
-    hasTools: hasTools(parsed.data.tools),
-    stream: parsed.data.stream === true,
-    providerHints: redactProviderHints(parsed.data),
+    ...commonFields(parsed.data, overrides),
+  };
+}
+
+function commonFields(data: CommonBody, overrides: NormalizeOverrides | undefined) {
+  return {
+    requestedModel: overrides?.requestedModel ?? data.model,
+    hasTools: hasTools(data.tools),
+    stream: data.stream === true,
+    providerHints: overrides?.providerHints ?? redactProviderHints(data),
   };
 }
 
@@ -128,9 +149,10 @@ export function redactProviderHints(source: ProviderHintSource): {
   provider: JsonValue;
   providerOptions: JsonValue;
 } {
+  const budget = { remaining: PROVIDER_HINTS_MAX_NODES };
   return {
-    provider: toJsonValue(source.provider),
-    providerOptions: toJsonValue(source.providerOptions),
+    provider: toJsonValue(source.provider, budget),
+    providerOptions: toJsonValue(source.providerOptions, budget),
   };
 }
 
@@ -160,27 +182,35 @@ function messageCount(input: unknown) {
   return null;
 }
 
-function firstPromptPrefix(messages: Message[], role: string) {
-  return promptPrefixes(messages, role)[0] ?? null;
+// Prefix extraction scans stop at the first usable message from each end:
+// running the clean-text regexes over every message of a multi-hundred-turn
+// agent conversation would dominate normalization cost for no extra signal.
+function firstPromptPrefix(messages: Message[], role: string): string | null {
+  for (const message of messages) {
+    if (message.role !== role) continue;
+    const prefix = textPrefix(message.content);
+    if (prefix) return prefix;
+  }
+  return null;
 }
 
-function latestPromptPrefix(messages: Message[], role: string) {
-  const prefixes = promptPrefixes(messages, role);
-  const first = prefixes[0] ?? null;
-  const latest = prefixes.at(-1) ?? null;
-
-  return latest && latest !== first ? latest : null;
+function lastPromptPrefix(messages: Message[], role: string): string | null {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (message.role !== role) continue;
+    const prefix = textPrefix(message.content);
+    if (prefix) return prefix;
+  }
+  return null;
 }
 
-function promptPrefixes(messages: Message[], role: string) {
-  return messages.flatMap(item => {
-    if (item.role !== role) {
-      return [];
-    }
-
-    const prefix = textPrefix(item.content);
-    return prefix ? [prefix] : [];
-  });
+function firstAndLatestPromptPrefix(
+  messages: Message[],
+  role: string
+): { first: string | null; latest: string | null } {
+  const first = firstPromptPrefix(messages, role);
+  const latest = first === null ? null : lastPromptPrefix(messages, role);
+  return { first, latest: latest && latest !== first ? latest : null };
 }
 
 function textPrefix(value: unknown): string | null {
@@ -241,7 +271,11 @@ function hasTools(tools: unknown[] | undefined) {
   return Array.isArray(tools) && tools.length > 0;
 }
 
-function toJsonValue(value: unknown): JsonValue {
+function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
+  if (budget.remaining-- <= 0) {
+    return REDACTED_VALUE;
+  }
+
   if (value === null || typeof value === 'undefined') {
     return null;
   }
@@ -255,7 +289,7 @@ function toJsonValue(value: unknown): JsonValue {
   }
 
   if (Array.isArray(value)) {
-    return value.map(toJsonValue);
+    return value.map(item => toJsonValue(item, budget));
   }
 
   if (!isRecord(value)) {
@@ -264,7 +298,7 @@ function toJsonValue(value: unknown): JsonValue {
 
   const result: { [key: string]: JsonValue } = {};
   for (const [key, nestedValue] of Object.entries(value)) {
-    result[key] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(nestedValue);
+    result[key] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(nestedValue, budget);
   }
 
   return result;

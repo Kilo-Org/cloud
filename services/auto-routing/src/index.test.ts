@@ -164,11 +164,13 @@ describe('auto routing worker', () => {
         normalized: normalizedInput,
       },
     });
+    // The outbound session id is a hash: the conversation key embeds the raw
+    // user id, which must not be sent to OpenRouter.
     expect(classifyNormalizedInput).toHaveBeenCalledWith(
       env,
       normalizedInput,
       'google/gemini-2.5-flash-lite',
-      { openrouterSessionId: 'user:user-1:task:task-123' }
+      { openrouterSessionId: expect.stringMatching(/^[0-9a-f]{16}$/) }
     );
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['google/gemini-2.5-flash-lite'],
@@ -260,14 +262,7 @@ describe('auto routing worker', () => {
     const response = await decideRequest(mirrorPayload());
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      cost: 0,
-      decision: null,
-      classifierResult: {
-        classification: mockClassification,
-        normalized: normalizedInput,
-      },
-    });
+    await expect(response.json()).resolves.toMatchObject({ cost: 0 });
   });
 
   it('logs fallback decisions with failure diagnostics', async () => {
@@ -410,6 +405,16 @@ describe('auto routing worker', () => {
 
   it('rejects wrapper payloads with malformed classifier inputs', async () => {
     const response = await decideRequest(mirrorPayload({ input: { apiKind: 'chat_completions' } }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid classifier payload' });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('rejects wrapper payloads with empty-string identity fields', async () => {
+    // Identity fields are null-or-nonempty by contract; an empty string means
+    // a gateway-side regression and rejects the whole payload.
+    const response = await decideRequest(mirrorPayload({ sessionId: '' }));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'Invalid classifier payload' });

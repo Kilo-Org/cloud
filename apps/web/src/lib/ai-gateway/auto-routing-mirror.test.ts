@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { MirrorPayloadSchema } from '@kilocode/auto-routing-contracts';
 
 const mockedWarnExceptInTest = jest.fn();
 
@@ -85,21 +86,28 @@ describe('scheduleAutoRoutingMirror', () => {
       userAgent: 'Kilo-Code/1.2.3',
       bodyBytes: 512,
     });
+    // TypeScript cannot see the schema's runtime refinements (.trim().min(1)
+    // etc.), so round-trip the built payload through the worker's validator.
+    expect(() => MirrorPayloadSchema.parse(payload)).not.toThrow();
 
     const headers = init?.headers as Headers;
     expect(headers.get('authorization')).toBe('Bearer classifier-token');
     expect(headers.get('content-type')).toBe('application/json');
   });
 
-  it('skips mirroring when the body cannot be normalized', async () => {
+  it('skips mirroring when the body cannot be normalized, with a log for visibility', async () => {
     scheduleAutoRoutingMirror(
       { ...makeParams(), body: { stream: true } },
       work => scheduledWork.push(work),
-      options
+      { ...options, onError: (message, data) => mockedWarnExceptInTest(message, data) }
     );
     await scheduledWork[0]();
 
     expect(mockedFetch).not.toHaveBeenCalled();
+    expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+      'Auto routing mirror skipped unclassifiable request body',
+      { error: 'normalize_failed' }
+    );
   });
 
   it('does not mirror organization-scoped requests', async () => {

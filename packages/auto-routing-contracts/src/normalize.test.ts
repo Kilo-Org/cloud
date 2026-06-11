@@ -114,4 +114,34 @@ describe('classifier input normalization', () => {
       providerOptions: null,
     });
   });
+
+  it('caps the provider-hint snapshot for pathologically large values', () => {
+    const huge = Array.from({ length: 10_000 }, (_, index) => `entry-${index}`);
+
+    const hints = redactProviderHints({ provider: huge, providerOptions: undefined });
+
+    expect(Array.isArray(hints.provider)).toBe(true);
+    expect((hints.provider as unknown[]).slice(0, 3)).toEqual(['entry-0', 'entry-1', 'entry-2']);
+    expect(hints.provider as unknown[]).toContain('[REDACTED]');
+  });
+
+  it('uses caller-captured requestedModel and providerHints over the body values', () => {
+    expect(
+      normalizeClassifierInput(
+        'chat_completions',
+        {
+          model: 'anthropic/claude-sonnet-4',
+          provider: { order: ['google'] },
+          messages: [{ role: 'user', content: 'Fix the bug.' }],
+        },
+        {
+          requestedModel: 'kilo-auto/free',
+          providerHints: { provider: { order: ['anthropic'] }, providerOptions: null },
+        }
+      )
+    ).toMatchObject({
+      requestedModel: 'kilo-auto/free',
+      providerHints: { provider: { order: ['anthropic'] }, providerOptions: null },
+    });
+  });
 });

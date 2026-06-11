@@ -43,8 +43,9 @@ type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS'>;
  *   double2 = classifierCostCredits
  *   double3 = confidence, or -1 if unavailable
  *   double4 = messageCount
- *   double5 = "1" if mirrored request includes tools, "0" if not
- *   double6 = mirrored body bytes
+ *   double5 = "1" if the original gateway request includes tools, "0" if not
+ *   double6 = original gateway request body bytes (reported by the gateway;
+ *             the body itself is no longer mirrored)
  *   double7 = "1" if the classification was served from cache, "0" if not
  */
 export function writeClassifierMetricsDataPoint(

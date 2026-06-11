@@ -1230,6 +1230,83 @@ describe('runOnboardOrDoctor', () => {
     expect(tempWrite.data).not.toContain('env-dir-plaintext');
   });
 
+  it('expands ~ in OPENCLAW_AGENT_DIR (resolveUserPath semantics) before migrating', () => {
+    // OpenClaw expands `~/custom-agent` to `<HOME>/custom-agent`; we must match
+    // or we'd scan the literal `~/custom-agent` and miss the migrated dir.
+    const RESOLVED_AUTH = '/root/custom-agent/auth-profiles.json';
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p.endsWith('openclaw.json') || p === RESOLVED_AUTH
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === RESOLVED_AUTH) {
+        return JSON.stringify({
+          version: 1,
+          profiles: {
+            'kilocode:default': { type: 'api_key', provider: 'kilocode', key: 'tilde-plaintext' },
+          },
+        });
+      }
+      if (p.endsWith('openclaw.json')) return JSON.stringify({ gateway: { port: 3001 } });
+      return '{}';
+    });
+
+    runOnboardOrDoctor(
+      {
+        KILOCODE_API_KEY: 'test-key',
+        OPENCLAW_GATEWAY_TOKEN: 'test-token',
+        AUTO_APPROVE_DEVICES: 'true',
+        HOME: '/root',
+        OPENCLAW_AGENT_DIR: '~/custom-agent',
+      },
+      harness.deps
+    );
+
+    const rewrite = harness.renameCalls.find(call => call.to === RESOLVED_AUTH);
+    if (!rewrite) throw new Error('expected the ~-expanded env dir to be migrated');
+    const tempWrite = harness.writeCalls.find(call => call.path === rewrite.from);
+    if (!tempWrite) throw new Error('expected a write to the migration temp path');
+    expect(JSON.parse(tempWrite.data).profiles['kilocode:default']).toHaveProperty('keyRef');
+  });
+
+  it('hardens credential backups even when doctor exits nonzero', () => {
+    const AGENT_DIR = '/root/.openclaw/agents/main/agent';
+    const BAK = `${AGENT_DIR}/auth-profiles.json.sqlite-import.9.bak`;
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (cmd: string, args: string[]) => {
+        if (cmd === 'openclaw' && Array.isArray(args) && args.includes('doctor')) {
+          throw new Error('doctor exited 1');
+        }
+        return '';
+      }
+    );
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) =>
+        p.endsWith('openclaw.json') || p === '/root/.openclaw/agents' || p === AGENT_DIR
+    );
+    (harness.deps.readdirSync as ReturnType<typeof vi.fn>).mockImplementation((dir: string) => {
+      if (dir === '/root/.openclaw/agents') return ['main'];
+      if (dir === AGENT_DIR) return ['auth-profiles.json.sqlite-import.9.bak'];
+      return [];
+    });
+    (harness.deps.statSync as ReturnType<typeof vi.fn>).mockReturnValue({
+      isDirectory: () => true,
+    });
+
+    expect(() =>
+      runOnboardOrDoctor(
+        { KILOCODE_API_KEY: 'k', OPENCLAW_GATEWAY_TOKEN: 't', AUTO_APPROVE_DEVICES: 'true' },
+        harness.deps
+      )
+    ).toThrow('doctor exited 1');
+
+    // The finally hardened the backup despite the doctor failure.
+    expect(harness.chmodCalls).toContainEqual({ path: BAK, mode: 0o600 });
+  });
+
   it('does not auto-assign kilo-exa on doctor path when BRAVE_API_KEY is configured', () => {
     const harness = fakeDeps();
     (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {

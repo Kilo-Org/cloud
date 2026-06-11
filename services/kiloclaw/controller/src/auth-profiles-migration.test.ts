@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   migrateKilocodeAuthProfilesToKeyRef,
-  hardenAuthProfileSqliteImportBackups,
+  hardenAuthProfileMigrationBackups,
   type AuthProfilesMigrationDeps,
 } from './auth-profiles-migration';
 
@@ -329,7 +329,7 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
   });
 });
 
-describe('hardenAuthProfileSqliteImportBackups', () => {
+describe('hardenAuthProfileMigrationBackups', () => {
   const ROOT = '/root/.openclaw';
   const AGENT_DIR = `${ROOT}/agents/main/agent`;
   const BAK = `${AGENT_DIR}/auth-profiles.json.sqlite-import.1781117548412.bak`;
@@ -346,7 +346,7 @@ describe('hardenAuthProfileSqliteImportBackups', () => {
     seedFile(fs, BAK, JSON.stringify(plaintextStore()));
     const chmodSync = vi.fn();
 
-    const report = hardenAuthProfileSqliteImportBackups(ROOT, { ...fsDeps(fs), chmodSync });
+    const report = hardenAuthProfileMigrationBackups(ROOT, { ...fsDeps(fs), chmodSync });
 
     expect(report).toEqual({ dirsScanned: 1, backupsHardened: 1, backupsFailed: 0 });
     expect(chmodSync).toHaveBeenCalledWith(BAK, 0o600);
@@ -354,25 +354,34 @@ describe('hardenAuthProfileSqliteImportBackups', () => {
     expect(fs.files.has(BAK)).toBe(true);
   });
 
-  it('only targets *.sqlite-import.<ts>.bak — leaves other files untouched', () => {
+  it('hardens every known migration backup suffix and leaves unrelated files alone', () => {
     const fs = createFs();
     seedAgentDir(fs);
-    for (const f of [
+    const backups = [
+      `${AGENT_DIR}/auth-profiles.json.sqlite-import.1.bak`,
+      `${AGENT_DIR}/auth-profiles.json.legacy-flat.2.bak`,
+      `${AGENT_DIR}/auth-profiles.json.api-key-alias.3.bak`,
+      `${AGENT_DIR}/auth-profiles.json.aws-sdk-profile.4.bak`,
+      `${AGENT_DIR}/auth-profiles.json.openai-provider-unification.5.bak`,
+      `${AGENT_DIR}/auth-profiles.json.oauth-ref.6.bak`,
+    ];
+    for (const b of backups) seedFile(fs, b, JSON.stringify(plaintextStore()));
+    // Not migration backups — must be left untouched.
+    for (const keep of [
       `${AGENT_DIR}/openclaw-agent.sqlite`,
-      `${AGENT_DIR}/openclaw-agent.sqlite-wal`,
       `${AGENT_DIR}/models.json`,
       `${AGENT_DIR}/unrelated.bak`,
+      `${AGENT_DIR}/auth-profiles.json.unknown-migration.7.bak`,
     ]) {
-      seedFile(fs, f, 'x');
+      seedFile(fs, keep, 'x');
     }
-    seedFile(fs, BAK, JSON.stringify(plaintextStore()));
     const chmodSync = vi.fn();
 
-    const report = hardenAuthProfileSqliteImportBackups(ROOT, { ...fsDeps(fs), chmodSync });
+    const report = hardenAuthProfileMigrationBackups(ROOT, { ...fsDeps(fs), chmodSync });
 
-    expect(report.backupsHardened).toBe(1);
-    expect(chmodSync).toHaveBeenCalledTimes(1);
-    expect(chmodSync).toHaveBeenCalledWith(BAK, 0o600);
+    expect(report.backupsHardened).toBe(backups.length);
+    expect(chmodSync).toHaveBeenCalledTimes(backups.length);
+    for (const b of backups) expect(chmodSync).toHaveBeenCalledWith(b, 0o600);
   });
 
   it('counts a failure when chmod throws, without throwing', () => {
@@ -387,7 +396,7 @@ describe('hardenAuthProfileSqliteImportBackups', () => {
       },
     };
 
-    const report = hardenAuthProfileSqliteImportBackups(ROOT, deps);
+    const report = hardenAuthProfileMigrationBackups(ROOT, deps);
 
     expect(report).toEqual({ dirsScanned: 1, backupsHardened: 0, backupsFailed: 1 });
     warnSpy.mockRestore();
@@ -401,9 +410,7 @@ describe('hardenAuthProfileSqliteImportBackups', () => {
     seedFile(fs, customBak, JSON.stringify(plaintextStore()));
     const chmodSync = vi.fn();
 
-    const report = hardenAuthProfileSqliteImportBackups(ROOT, { ...fsDeps(fs), chmodSync }, [
-      CUSTOM,
-    ]);
+    const report = hardenAuthProfileMigrationBackups(ROOT, { ...fsDeps(fs), chmodSync }, [CUSTOM]);
 
     expect(report.backupsHardened).toBe(1);
     expect(chmodSync).toHaveBeenCalledWith(customBak, 0o600);
@@ -419,7 +426,7 @@ describe('hardenAuthProfileSqliteImportBackups', () => {
     }
     const chmodSync = vi.fn();
 
-    const report = hardenAuthProfileSqliteImportBackups(ROOT, { ...fsDeps(fs), chmodSync });
+    const report = hardenAuthProfileMigrationBackups(ROOT, { ...fsDeps(fs), chmodSync });
 
     expect(report).toEqual({ dirsScanned: 2, backupsHardened: 2, backupsFailed: 0 });
   });
@@ -427,7 +434,7 @@ describe('hardenAuthProfileSqliteImportBackups', () => {
   it('is a no-op when no agent dirs exist', () => {
     const fs = createFs();
 
-    const report = hardenAuthProfileSqliteImportBackups(ROOT, fsDeps(fs));
+    const report = hardenAuthProfileMigrationBackups(ROOT, fsDeps(fs));
 
     expect(report).toEqual({ dirsScanned: 0, backupsHardened: 0, backupsFailed: 0 });
   });

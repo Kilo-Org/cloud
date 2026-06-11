@@ -31,10 +31,12 @@ const AGENT_SUBDIR = 'agent';
 const KILOCODE_PROVIDER = 'kilocode';
 const KILOCODE_ENV_VAR = 'KILOCODE_API_KEY';
 
-// OpenClaw's auth-profile SQLite migration (2026.6.1+) backs each legacy JSON
-// up as `<original>.sqlite-import.<epoch-ms>.bak` before importing it into the
-// per-agent SQLite store and removing the original.
-const SQLITE_IMPORT_BACKUP_RE = /\.sqlite-import\.\d+\.bak$/;
+// OpenClaw's auth-profile migrations (2026.6.x) back each store up as
+// `<original>.<migration>.<epoch-ms>.bak` (via copyFileSync, so 0o644) before
+// rewriting/removing the original. The backups can hold provider credentials.
+// This allow-list covers every known migration suffix doctor produces.
+const AUTH_MIGRATION_BACKUP_RE =
+  /\.(sqlite-import|legacy-flat|api-key-alias|aws-sdk-profile|openai-provider-unification|oauth-ref)\.\d+\.bak$/;
 
 export type AuthProfilesMigrationDeps = {
   existsSync: (p: string) => boolean;
@@ -242,24 +244,24 @@ export type AuthProfileBackupHardenReport = {
 };
 
 /**
- * Tighten the permissions of the plaintext backups OpenClaw's auth-profile
- * SQLite migration leaves behind under each resolved agent directory.
+ * Tighten the permissions of the credential backups OpenClaw's auth-profile
+ * migrations leave behind under each resolved agent directory.
  *
- * Since 2026.6.1, `openclaw doctor --fix` imports legacy `auth-profiles.json`
- * (and its state/legacy siblings) into a per-agent SQLite store and backs the
- * original up as `<name>.sqlite-import.<epoch-ms>.bak` before deleting it. That
- * backup is produced with `fs.copyFileSync`, which does NOT preserve the
- * source's `0o600` mode — it lands at `0o644`, leaving a world-readable copy of
- * any credential the pre-doctor migration could not convert to a keyRef.
+ * Since 2026.6.x, `openclaw doctor --fix` rewrites/imports auth stores and backs
+ * the original up as `<name>.<migration>.<epoch-ms>.bak` (sqlite-import,
+ * legacy-flat, api-key-alias, aws-sdk-profile, openai-provider-unification,
+ * oauth-ref) before removing it. Each backup is produced with `fs.copyFileSync`,
+ * which does NOT preserve the source's `0o600` mode — it lands at `0o644`,
+ * leaving a world-readable copy of whatever credential the original held.
  *
- * We deliberately do NOT delete these backups: OpenClaw 2026.6.5 can silently
- * skip a malformed profile while importing its siblings, and the backup is the
- * only recovery copy of the source. Instead we strip the world/group bits so
- * the credential is owner-only (matching `/root/.openclaw` at `0o700` and the
- * `0o600` auth files), preserving the recovery copy without the over-broad
- * exposure. Never throws; individual failures are logged and skipped.
+ * We deliberately do NOT delete these backups: OpenClaw can silently skip a
+ * malformed profile while importing its siblings, and the backup is the only
+ * recovery copy. Instead we strip the world/group bits so the credential is
+ * owner-only (matching `/root/.openclaw` at `0o700` and the `0o600` auth files),
+ * preserving recovery without the over-broad exposure. Never throws; individual
+ * failures are logged and skipped.
  */
-export function hardenAuthProfileSqliteImportBackups(
+export function hardenAuthProfileMigrationBackups(
   rootDir: string,
   deps: AuthProfilesMigrationDeps = defaultDeps,
   extraAgentDirs: string[] = []
@@ -283,7 +285,7 @@ export function hardenAuthProfileSqliteImportBackups(
     report.dirsScanned += 1;
 
     for (const entry of entries) {
-      if (!SQLITE_IMPORT_BACKUP_RE.test(entry)) continue;
+      if (!AUTH_MIGRATION_BACKUP_RE.test(entry)) continue;
       const backupPath = path.join(agentDir, entry);
       try {
         deps.chmodSync(backupPath, 0o600);

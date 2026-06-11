@@ -24,7 +24,7 @@ import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
 import {
   migrateKilocodeAuthProfilesToKeyRef,
-  hardenAuthProfileSqliteImportBackups,
+  hardenAuthProfileMigrationBackups,
 } from './auth-profiles-migration';
 import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 
@@ -743,6 +743,21 @@ function toAuthProfilesMigrationDeps(deps: BootstrapDeps): AuthProfilesMigration
 const ENV_SELECTED_AGENT_DIR_VARS = ['OPENCLAW_AGENT_DIR', 'PI_CODING_AGENT_DIR'];
 
 /**
+ * Resolve a path the way OpenClaw's `resolveUserPath` does: trim, expand a
+ * leading `~`/`~/` to the home dir, then make absolute. OpenClaw applies this to
+ * env-selected agent dirs, so we must match it or we'd scan a different path
+ * (e.g. literal `~/custom-agent`) than the one doctor actually migrates.
+ */
+function resolveUserPath(input: string, env: EnvLike): string {
+  const trimmed = input.trim();
+  const home = env.HOME && env.HOME.length > 0 ? env.HOME : '/root';
+  if (trimmed === '~') return path.resolve(home);
+  if (trimmed.startsWith('~/')) return path.resolve(home, trimmed.slice(2));
+  if (trimmed.startsWith('~')) return path.resolve(home + trimmed.slice(1));
+  return path.resolve(trimmed);
+}
+
+/**
  * Resolve the absolute `agentDir`s OpenClaw migrates auth profiles in, so the
  * keyRef migration and backup hardening cover the same candidates doctor does
  * (not just `<state>/agents/<id>/agent`). Two sources:
@@ -757,7 +772,9 @@ function resolveConfiguredAgentDirs(env: EnvLike, deps: BootstrapDeps): string[]
 
   for (const name of ENV_SELECTED_AGENT_DIR_VARS) {
     const value = env[name];
-    if (typeof value === 'string' && value.trim().length > 0) dirs.add(value.trim());
+    if (typeof value === 'string' && value.trim().length > 0) {
+      dirs.add(resolveUserPath(value, env));
+    }
   }
 
   let raw: string | undefined;
@@ -878,9 +895,26 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
       );
     }
 
-    deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
-      stdio: 'inherit',
-    });
+    try {
+      deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
+        stdio: 'inherit',
+      });
+    } finally {
+      // Harden any credential backups doctor created — even on a nonzero doctor
+      // exit, which would otherwise throw past this into degraded mode leaving
+      // world-readable (0o644) plaintext backups on disk. Kept (not deleted) as
+      // OpenClaw's recovery copy; tightened to owner-only.
+      const backupHarden = hardenAuthProfileMigrationBackups(
+        CONFIG_DIR,
+        toAuthProfilesMigrationDeps(deps),
+        configuredAgentDirs
+      );
+      if (backupHarden.backupsHardened > 0 || backupHarden.backupsFailed > 0) {
+        console.log(
+          `[controller] auth-profile backup hardening: hardened ${backupHarden.backupsHardened}, failed ${backupHarden.backupsFailed}`
+        );
+      }
+    }
 
     // Patch the config with env-var-derived fields
     const config = generateBaseConfig(env, CONFIG_PATH, cwDeps);
@@ -925,22 +959,8 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     );
   }
 
-  // OpenClaw 2026.6.1+ `doctor` imports auth-profiles.json into a per-agent
-  // SQLite store and leaves a world-readable (0o644) `*.sqlite-import.<ts>.bak`
-  // behind that can still hold a plaintext credential the pre-doctor migration
-  // could not convert. Keep the backup (it is OpenClaw's only recovery copy if
-  // the import silently skipped a profile) but tighten it to 0o600 so the
-  // credential is owner-only. No-op when there is nothing to harden.
-  const backupHarden = hardenAuthProfileSqliteImportBackups(
-    CONFIG_DIR,
-    toAuthProfilesMigrationDeps(deps),
-    configuredAgentDirs
-  );
-  if (backupHarden.backupsHardened > 0 || backupHarden.backupsFailed > 0) {
-    console.log(
-      `[controller] auth-profile backup hardening: hardened ${backupHarden.backupsHardened}, failed ${backupHarden.backupsFailed}`
-    );
-  }
+  // Backup hardening runs in the doctor finally above (so it also covers a
+  // nonzero doctor exit); nothing to do here.
 
   writeBotIdentityFile(env, deps);
   writeUserProfileFile(env, deps);

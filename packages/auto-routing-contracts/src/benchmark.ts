@@ -20,6 +20,9 @@ export const BenchmarkConfigSchema = z.object({
   minAccuracy: z.number().min(0).max(1),
   // Parallel OpenRouter calls per queue message.
   maxConcurrency: z.number().int().min(1).max(16),
+  // The Kilo user whose identity/billing the decider CLI runs execute under.
+  // Null until an admin configures it; decider runs fail fast while null.
+  benchmarkUserId: z.string().trim().min(1).nullable(),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });

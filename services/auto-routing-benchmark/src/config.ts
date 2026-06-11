@@ -20,6 +20,7 @@ export const DEFAULT_BENCHMARK_CONFIG: BenchmarkConfig = {
   ],
   minAccuracy: 0.7,
   maxConcurrency: 4,
+  benchmarkUserId: null,
   updatedAt: null,
   updatedBy: null,
 };

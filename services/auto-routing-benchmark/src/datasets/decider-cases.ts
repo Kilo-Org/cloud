@@ -7,6 +7,8 @@ export type DeciderCase = {
   taskType: ClassifierTaskType;
   systemPrompt: string;
   userPrompt: string;
+  // Retained as metadata only. The decider now runs cases through the kilo CLI
+  // (no chat-completions maxTokens knob), so this field is no longer consumed.
   maxTokens: number;
   check: DeciderCheck;
 };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CaseResultRow } from './db';
-import { runCasesWithConcurrency, summarize } from './run';
+import { chunkArray, runCasesWithConcurrency, summarize } from './run';
 
 function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
   return {
@@ -201,5 +201,33 @@ describe('runCasesWithConcurrency', () => {
         throw new Error('test error');
       })
     ).rejects.toThrow('test error');
+  });
+});
+
+describe('chunkArray', () => {
+  it('splits into 10-per-chunk with a partial final chunk', () => {
+    const items = Array.from({ length: 23 }, (_, i) => i);
+    const chunks = chunkArray(items, 10);
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0]).toHaveLength(10);
+    expect(chunks[1]).toHaveLength(10);
+    expect(chunks[2]).toHaveLength(3);
+  });
+
+  it('round-trips caseIds: flatten equals the original order', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'];
+    const chunks = chunkArray(ids, 10);
+    expect(chunks).toHaveLength(2);
+    expect(chunks.flat()).toEqual(ids);
+  });
+
+  it('returns a single full chunk when items fit exactly', () => {
+    const chunks = chunkArray([1, 2, 3, 4, 5], 5);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('returns no chunks for an empty array', () => {
+    expect(chunkArray([], 10)).toEqual([]);
   });
 });

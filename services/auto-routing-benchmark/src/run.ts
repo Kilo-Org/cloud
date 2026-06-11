@@ -26,14 +26,38 @@ import {
 import { gradeClassifierOutput, runDeciderCheck } from './grading';
 import { createOpenRouterClient } from './openrouter';
 import { buildRoutingTable } from './routing-table-builder';
+import { runDeciderCaseViaCli } from './cli-runner';
 
-export type BenchmarkJobMessage = { runId: string; kind: BenchmarkKind; model: string };
+export type BenchmarkJobMessage = {
+  runId: string;
+  kind: BenchmarkKind;
+  model: string;
+  // Decider only: the case ids this message is responsible for, plus the chunk
+  // index used to key the container instance. Absent for classifier messages.
+  caseIds?: string[];
+  chunk?: number;
+};
 
 export const BenchmarkJobMessageSchema = z.object({
   runId: z.string().min(1),
   kind: z.enum(['classifier', 'decider']),
   model: z.string().min(1),
+  caseIds: z.array(z.string().min(1)).optional(),
+  chunk: z.number().int().min(0).optional(),
 });
+
+// Decider cases run through the real `kilo` CLI in a container (up to ~3 min
+// each). Chunking caps how many cases a single queue invocation processes so
+// each stays well under CF's wall-clock limit.
+const DECIDER_CHUNK_SIZE = 10;
+
+export function chunkArray<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
 
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 
@@ -51,6 +75,16 @@ export async function startRun(
   const config = await getBenchmarkConfig(env.BENCH_DB);
   const models =
     kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id);
+
+  // Decider runs execute through the kilo CLI under a real Kilo user's
+  // identity/billing. Fail fast (before inserting the run) when that user
+  // isn't configured so the admin POST surfaces the misconfiguration.
+  if (kind === 'decider' && !config.benchmarkUserId) {
+    throw new Error(
+      'benchmark user not configured: set benchmarkUserId before running the decider benchmark'
+    );
+  }
+
   const runId = `${kind}-${new Date().toISOString().replace(/[:.]/g, '-')}`;
   await insertRun(env.BENCH_DB, {
     id: runId,
@@ -58,10 +92,33 @@ export async function startRun(
     startedAt: new Date().toISOString(),
     configJson: JSON.stringify(config),
   });
-  await env.BENCH_QUEUE.sendBatch(
-    models.map(model => ({ body: { runId, kind, model } satisfies BenchmarkJobMessage }))
+
+  if (kind === 'classifier') {
+    await env.BENCH_QUEUE.sendBatch(
+      models.map(model => ({ body: { runId, kind, model } satisfies BenchmarkJobMessage }))
+    );
+    console.log(JSON.stringify({ event: 'benchmark_run_started', runId, kind, models }));
+    return { runId, enqueuedModels: models.length };
+  }
+
+  // Decider: one message per (model, chunk) so each queue invocation stays
+  // bounded. finalizeRunIfComplete still expects models × DECIDER_CASES rows.
+  const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
+  const messages = models.flatMap(model =>
+    chunks.map((chunkCases, chunk) => ({
+      body: {
+        runId,
+        kind,
+        model,
+        chunk,
+        caseIds: chunkCases.map(c => c.id),
+      } satisfies BenchmarkJobMessage,
+    }))
   );
-  console.log(JSON.stringify({ event: 'benchmark_run_started', runId, kind, models }));
+  await env.BENCH_QUEUE.sendBatch(messages);
+  console.log(
+    JSON.stringify({ event: 'benchmark_run_started', runId, kind, models, chunks: chunks.length })
+  );
   return { runId, enqueuedModels: models.length };
 }
 
@@ -82,10 +139,10 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
 
   const message = parsed.data;
   const config = await getRunConfig(env, message.runId);
-  // Create the OpenRouter client inside processJob — no module-scope transport clients.
-  const client = await createOpenRouterClient(env);
 
   if (message.kind === 'classifier') {
+    // Create the OpenRouter client inside processJob — no module-scope transport clients.
+    const client = await createOpenRouterClient(env);
     await runCasesWithConcurrency(CLASSIFIER_CASES, config.maxConcurrency, async benchCase => {
       const startedAt = performance.now();
       try {
@@ -116,51 +173,111 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
       }
     });
   } else {
-    // Determinism note: temperature 0, fixed maxTokens, pinned prompts, mechanical checks.
-    // Provider-side nondeterminism can't be fully eliminated, which is why grading is
-    // binary on a single canonical answer.
-    await runCasesWithConcurrency(DECIDER_CASES, config.maxConcurrency, async benchCase => {
-      const startedAt = performance.now();
-      try {
-        const result = await client.chat.send({
-          chatRequest: {
-            model: message.model,
-            messages: [
-              { role: 'system', content: benchCase.systemPrompt },
-              { role: 'user', content: benchCase.userPrompt },
-            ],
-            stream: false,
-            temperature: 0,
-            maxTokens: benchCase.maxTokens,
-          },
-        });
-        const content: unknown = result.choices[0]?.message.content;
-        const text = typeof content === 'string' ? content : '';
-        const passed = text.length > 0 && runDeciderCheck(benchCase.check, text);
-        await upsertCaseResult(env.BENCH_DB, {
-          run_id: message.runId,
-          model: message.model,
-          case_id: benchCase.id,
-          tier: benchCase.tier,
-          score: passed ? 1 : 0,
-          latency_ms: Math.round(performance.now() - startedAt),
-          cost_usd: result.usage?.cost ?? null,
-          detail_json: JSON.stringify({
-            finishReason: result.choices[0]?.finishReason ?? null,
-            outputPrefix: text.slice(0, 200),
-          }),
-          error: null,
-        });
-      } catch (error) {
-        await upsertCaseResult(
-          env.BENCH_DB,
-          failedRow(message, benchCase.id, benchCase.tier, startedAt, error)
-        );
-      }
-    });
+    await processDeciderJob(env, message, config);
   }
 
   await finalizeRunIfComplete(env, message.runId, message.kind);
+}
+
+async function processDeciderJob(
+  env: Env,
+  message: BenchmarkJobMessage,
+  config: BenchmarkConfig
+): Promise<void> {
+  // Only the cases this message owns (chunked); fall back to the full set for
+  // legacy/un-chunked messages.
+  const cases =
+    message.caseIds && message.caseIds.length > 0
+      ? DECIDER_CASES.filter(c => message.caseIds?.includes(c.id))
+      : DECIDER_CASES;
+
+  // Defensive guard mirroring the startRun fail-fast: if the run snapshot has
+  // no benchmark user, every case in this chunk fails with a clear error so
+  // the run still completes and surfaces the misconfiguration.
+  if (!config.benchmarkUserId) {
+    for (const benchCase of cases) {
+      await upsertCaseResult(env.BENCH_DB, {
+        run_id: message.runId,
+        model: message.model,
+        case_id: benchCase.id,
+        tier: benchCase.tier,
+        score: 0,
+        latency_ms: 0,
+        cost_usd: null,
+        detail_json: null,
+        error: 'benchmark user not configured',
+      });
+    }
+    return;
+  }
+
+  // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
+  // queue retries the message. The token is never logged.
+  const kiloToken = await fetchBenchmarkUserToken(env, config.benchmarkUserId);
+  const instanceName = `${message.runId}:${message.model}:${message.chunk ?? 0}`;
+
+  await runCasesWithConcurrency(cases, config.maxConcurrency, async benchCase => {
+    const startedAt = performance.now();
+    try {
+      const result = await runDeciderCaseViaCli(env, {
+        instanceName,
+        model: message.model,
+        benchCase,
+        kiloToken,
+      });
+      const succeeded =
+        result.exitCode === 0 &&
+        result.text.length > 0 &&
+        runDeciderCheck(benchCase.check, result.text);
+      await upsertCaseResult(env.BENCH_DB, {
+        run_id: message.runId,
+        model: message.model,
+        case_id: benchCase.id,
+        tier: benchCase.tier,
+        score: succeeded ? 1 : 0,
+        latency_ms: result.latencyMs,
+        cost_usd: result.costUsd,
+        detail_json: JSON.stringify({
+          exitCode: result.exitCode,
+          outputPrefix: result.text.slice(0, 200),
+        }),
+        error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
+      });
+    } catch (error) {
+      await upsertCaseResult(
+        env.BENCH_DB,
+        failedRow(message, benchCase.id, benchCase.tier, startedAt, error)
+      );
+    }
+  });
+}
+
+const TokenResponseSchema = z.object({ token: z.string().min(1), expiresAt: z.string() });
+
+// Calls apps/web's internal endpoint to mint a short-lived user API token for
+// the decider CLI. Never logs the token.
+async function fetchBenchmarkUserToken(env: Env, userId: string): Promise<string> {
+  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const response = await fetch(
+    `${env.KILO_WEB_API_BASE_URL}/api/internal/auto-routing-benchmark/token`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${secret}`,
+      },
+      body: JSON.stringify({ userId }),
+    }
+  );
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => '')).slice(0, 200);
+    throw new Error(`token mint failed: HTTP ${response.status} ${detail}`);
+  }
+  const parsed = TokenResponseSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    throw new Error('token mint returned unexpected response shape');
+  }
+  return parsed.data.token;
 }
 
 function failedRow(

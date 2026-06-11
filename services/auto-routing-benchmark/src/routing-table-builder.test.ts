@@ -11,6 +11,7 @@ const BASE_CONFIG: BenchmarkConfig = {
   ],
   minAccuracy: 0.7,
   maxConcurrency: 4,
+  benchmarkUserId: null,
   updatedAt: null,
   updatedBy: null,
 };

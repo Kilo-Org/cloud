@@ -11,6 +11,9 @@ import {
 import type { HonoEnv } from './hono-env';
 import { processJob, startRun, type BenchmarkJobMessage } from './run';
 
+// Re-exported so the Durable Object class binding (BENCH_RUNNER) can find it.
+export { BenchRunnerContainer } from './bench-runner-container';
+
 export const app = new Hono<HonoEnv>();
 app.use('*', authMiddleware);
 app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing-benchmark' }));

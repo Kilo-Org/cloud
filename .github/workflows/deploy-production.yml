@@ -3,11 +3,6 @@ name: Deploy to Production
 on:
   push:
     branches: [main]
-  pull_request:
-    paths:
-      - '.github/workflows/deploy-production.yml'
-      - 'scripts/check-production-db-startup.ts'
-      - 'packages/db/src/database-url.ts'
 
 permissions:
   contents: read

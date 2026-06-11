@@ -47,7 +47,6 @@ jobs:
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
 
   run-migrations:
-    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -78,7 +77,6 @@ jobs:
         run: NODE_ENV=production pnpm run drizzle migrate
 
   stage-app:
-    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     environment: production
@@ -110,7 +108,6 @@ jobs:
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
 
   stage-global-app:
-    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     environment: production
@@ -142,7 +139,6 @@ jobs:
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
 
   promote-app:
-    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs: [stage-app, check-production-db-startup, run-migrations]
@@ -156,7 +152,6 @@ jobs:
         run: vercel promote "${{ needs.stage-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
   promote-global-app:
-    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs: [stage-global-app, check-production-db-startup, run-migrations]
@@ -170,7 +165,6 @@ jobs:
         run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-kiloclaw:
-    if: github.event_name == 'push'
     needs: [check-production-db-startup, run-migrations]
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
     # exceed the caller). The reusable workflow restricts further per job — only

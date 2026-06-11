@@ -3982,11 +3982,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           ) as latest_sandbox_destroyed_at,
           u.google_user_email as user_email,
           s.status as subscription_status,
-          -- End of the subscription's last paid period — the closest signal
-          -- for "when did this user's KiloClaw subscription end". Used by the
-          -- admin volume table to avoid nuking volumes whose subscription
-          -- ended (or ends) within the recent grace window.
-          s.current_period_end as subscription_ended_at
+          -- When this user's KiloClaw subscription ended, shown in the admin
+          -- volume table. There is no dedicated canceled_at column, so prefer
+          -- the paid billing-period boundary and fall back to the trial end —
+          -- otherwise a never-converted trial (no current_period_end) would
+          -- render a blank "Sub. Ended" as if no subscription existed.
+          coalesce(s.current_period_end, s.trial_ends_at) as subscription_ended_at
         from kiloclaw_instances i
         left join kilocode_users u on i.user_id = u.id
         left join kiloclaw_subscriptions s on i.id = s.instance_id

@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
+import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
@@ -32,7 +34,108 @@ import {
   parseEmbeddingUsageFromResponse,
   parseEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
+  wrapInSafeNextResponse,
 } from './llm-proxy-helpers';
+
+describe('wrapInSafeNextResponse', () => {
+  it('keeps a fetched response alive until its returned body is consumed', () => {
+    const tsx = require.resolve('tsx/cli');
+    const fixture = join(__dirname, 'wrap-safe-next-response.gc.ts');
+    const result = spawnSync(process.execPath, ['--conditions=react-server', tsx, fixture], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        NODE_OPTIONS:
+          `${process.env.NODE_OPTIONS ?? ''} --expose-gc --conditions=react-server`.trim(),
+        UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN ?? 'test',
+        UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL ?? 'http://127.0.0.1',
+      },
+      timeout: 30_000,
+    });
+
+    expect({
+      status: result.status,
+      signal: result.signal,
+      error: result.error?.message,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    }).toEqual({
+      status: 0,
+      signal: null,
+      error: undefined,
+      stdout: process.version === 'v24.14.1' ? '' : `skipped on ${process.version}\n`,
+      stderr: '',
+    });
+  });
+
+  it('preserves exact bytes without locking the source eagerly', async () => {
+    const bytes = Uint8Array.from([0, 255, 1, 128, 13, 10]);
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.subarray(0, 2));
+        controller.enqueue(bytes.subarray(2));
+        controller.close();
+      },
+    });
+    const wrapped = wrapInSafeNextResponse(new Response(source));
+
+    expect(source.locked).toBe(false);
+    expect(new Uint8Array(await wrapped.arrayBuffer())).toEqual(bytes);
+    expect(source.locked).toBe(false);
+  });
+
+  it('propagates source errors', async () => {
+    const error = new Error('source failed');
+    const source = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.error(error);
+      },
+    });
+    const wrapped = wrapInSafeNextResponse(new Response(source));
+
+    await expect(wrapped.text()).rejects.toBe(error);
+    expect(source.locked).toBe(false);
+  });
+
+  it('propagates cancellation to the source', async () => {
+    const cancelled = jest.fn();
+    const reason = new Error('consumer stopped');
+    const source = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(Uint8Array.of(1));
+      },
+      cancel: cancelled,
+    });
+    const wrapped = wrapInSafeNextResponse(new Response(source));
+    const reader = wrapped.body?.getReader();
+
+    await reader?.read();
+    await reader?.cancel(reason);
+
+    expect(cancelled).toHaveBeenCalledWith(reason);
+    expect(source.locked).toBe(false);
+  });
+
+  it('propagates cancellation before the first pull', async () => {
+    const cancelled = jest.fn();
+    const reason = new Error('consumer stopped early');
+    const source = new ReadableStream<Uint8Array>({ cancel: cancelled });
+    const wrapped = wrapInSafeNextResponse(new Response(source));
+
+    await wrapped.body?.cancel(reason);
+
+    expect(cancelled).toHaveBeenCalledWith(reason);
+    expect(source.locked).toBe(false);
+  });
+
+  it('preserves bodyless responses', () => {
+    const wrapped = wrapInSafeNextResponse(new Response(null, { status: 204 }));
+
+    expect(wrapped.status).toBe(204);
+    expect(wrapped.body).toBeNull();
+  });
+});
 
 describe('checkOrganizationModelRestrictions', () => {
   describe('enterprise plan - model deny list restrictions', () => {

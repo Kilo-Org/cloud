@@ -295,7 +295,45 @@ export function getOutputHeaders(response: Response) {
 }
 
 export function wrapInSafeNextResponse(response: Response) {
-  return new NextResponse(response.body, {
+  const source = response.body;
+  let owner: Response | undefined = response;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  const release = () => {
+    if (!owner) return;
+    reader?.releaseLock();
+    reader = undefined;
+    owner = undefined;
+  };
+  const body = source
+    ? new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          reader ??= owner?.body?.getReader();
+          if (!reader) return;
+          try {
+            const result = await reader.read();
+            if (result.done) {
+              controller.close();
+              release();
+              return;
+            }
+            controller.enqueue(result.value);
+          } catch (error) {
+            release();
+            controller.error(error);
+          }
+        },
+        async cancel(reason) {
+          try {
+            if (reader) await reader.cancel(reason);
+            else await source.cancel(reason);
+          } finally {
+            release();
+          }
+        },
+      })
+    : null;
+
+  return new NextResponse(body, {
     status: response.status,
     statusText: response.statusText,
     headers: getOutputHeaders(response),

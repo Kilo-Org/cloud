@@ -99,6 +99,11 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['gh api']).toBeUndefined();
     expect(bashPermissions['gh api *']).toBeUndefined();
 
+    for (const textInspectionCommand of ['awk', 'rg']) {
+      expect(bashPermissions[textInspectionCommand]).toBe('allow');
+      expect(bashPermissions[`${textInspectionCommand} *`]).toBe('allow');
+    }
+
     expect(bashPermissions['glab mr diff']).toBe('allow');
     expect(bashPermissions['glab mr diff *']).toBe('allow');
     expect(bashPermissions['glab api --method POST *merge_requests/*/notes*']).toBe('allow');
@@ -129,6 +134,11 @@ describe('code-review command guard policy', () => {
     }
     expect(bashPermissions['gh api repos/*/pulls/*/comments --input*']).toBe('deny');
     expect(bashPermissions['gh api repos/*/pulls/*/comments --input* *']).toBe('deny');
+
+    for (const riskyAwkCommand of ['awk * -i*', 'awk * --in-place*', 'awk *system(*']) {
+      expect(bashPermissions[riskyAwkCommand]).toBe('deny');
+      expect(bashPermissions[`${riskyAwkCommand} *`]).toBe('deny');
+    }
 
     expect(bashPermissions['git']).toBe('allow');
     expect(bashPermissions['git *']).toBe('allow');

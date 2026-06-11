@@ -31,7 +31,7 @@ export function MiniMaxCodingPlansBanner() {
         <Banner.Title>New! Purchase MiniMax token plans with your Kilo Credits.</Banner.Title>
       </Banner.Content>
       <Banner.Action>
-        <Banner.Button href="https://app.kilo.ai/subscriptions#coding-plans">
+        <Banner.Button href="/subscriptions#coding-plans">
           Learn more
         </Banner.Button>
       </Banner.Action>

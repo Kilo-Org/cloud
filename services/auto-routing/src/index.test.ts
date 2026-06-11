@@ -196,7 +196,8 @@ describe('auto routing worker', () => {
       event: 'auto_routing_decision',
       status: 'classified',
       cacheHit: false,
-      userId: 'user-1',
+      userIdHash: expect.stringMatching(/^[0-9a-f]{16}$/),
+      isAnonymousUser: false,
       sessionId: 'task-123',
       clientRequestId: 'req-1',
       hasMachineId: true,
@@ -204,6 +205,9 @@ describe('auto routing worker', () => {
       uaPrefix: 'Kilo-Code/4.106.0',
       bodyBytes: 2048,
     });
+    // The raw user id (which embeds the client IP for anonymous users) must
+    // never reach persisted logs.
+    expect(String(logMessage)).not.toContain('user-1');
   });
 
   it('serves a cached classification for the session without calling the classifier', async () => {

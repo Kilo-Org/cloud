@@ -115,14 +115,28 @@ describe('classifier input normalization', () => {
     });
   });
 
-  it('caps the provider-hint snapshot for pathologically large values', () => {
+  it('stops walking pathologically large arrays once the budget is exhausted', () => {
     const huge = Array.from({ length: 10_000 }, (_, index) => `entry-${index}`);
 
     const hints = redactProviderHints({ provider: huge, providerOptions: undefined });
+    const provider = hints.provider as unknown[];
 
-    expect(Array.isArray(hints.provider)).toBe(true);
-    expect((hints.provider as unknown[]).slice(0, 3)).toEqual(['entry-0', 'entry-1', 'entry-2']);
-    expect(hints.provider as unknown[]).toContain('[REDACTED]');
+    expect(provider.length).toBeLessThan(600);
+    expect(provider.slice(0, 3)).toEqual(['entry-0', 'entry-1', 'entry-2']);
+    expect(provider.at(-1)).toBe('[TRUNCATED]');
+  });
+
+  it('stops walking pathologically key-dense objects once the budget is exhausted', () => {
+    const huge = Object.fromEntries(
+      Array.from({ length: 10_000 }, (_, index) => [`key-${index}`, index])
+    );
+
+    const hints = redactProviderHints({ provider: huge, providerOptions: undefined });
+    const provider = hints.provider as Record<string, unknown>;
+
+    expect(Object.keys(provider).length).toBeLessThan(600);
+    expect(provider['key-0']).toBe(0);
+    expect(provider['[truncated]']).toBe('[TRUNCATED]');
   });
 
   it('uses caller-captured requestedModel and providerHints over the body values', () => {

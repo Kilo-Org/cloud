@@ -8,9 +8,13 @@ import type { JsonValue, NormalizedClassifierInput } from './input';
 
 const TEXT_PREFIX_MAX_LENGTH = 1000;
 const REDACTED_VALUE = '[REDACTED]';
-// Provider hints are client-supplied JSON of unbounded size; cap how many
-// nodes the redacting copy visits so a pathological payload cannot turn the
-// snapshot into an O(body) walk on the gateway request path.
+const TRUNCATED_VALUE = '[TRUNCATED]';
+const TRUNCATED_KEY = '[truncated]';
+// Provider hints are client-supplied JSON of unbounded size; cap how much
+// work the redacting copy does so a pathological payload cannot turn the
+// snapshot into an O(body) walk on the gateway request path. The budget is
+// consumed per visited node and per object property, and traversal stops
+// (with a truncation sentinel) the moment it runs out.
 const PROVIDER_HINTS_MAX_NODES = 512;
 const SENSITIVE_KEY_PATTERNS = [
   'authorization',
@@ -272,9 +276,10 @@ function hasTools(tools: unknown[] | undefined) {
 }
 
 function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
-  if (budget.remaining-- <= 0) {
-    return REDACTED_VALUE;
+  if (budget.remaining <= 0) {
+    return TRUNCATED_VALUE;
   }
+  budget.remaining -= 1;
 
   if (value === null || typeof value === 'undefined') {
     return null;
@@ -289,7 +294,15 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
   }
 
   if (Array.isArray(value)) {
-    return value.map(item => toJsonValue(item, budget));
+    const result: JsonValue[] = [];
+    for (const item of value) {
+      if (budget.remaining <= 0) {
+        result.push(TRUNCATED_VALUE);
+        break;
+      }
+      result.push(toJsonValue(item, budget));
+    }
+    return result;
   }
 
   if (!isRecord(value)) {
@@ -297,8 +310,16 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
   }
 
   const result: { [key: string]: JsonValue } = {};
-  for (const [key, nestedValue] of Object.entries(value)) {
-    result[key] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(nestedValue, budget);
+  // for-in (not Object.entries) so a huge object does not materialize every
+  // entry up front; the loop breaks as soon as the budget runs out.
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
+    if (budget.remaining <= 0) {
+      result[TRUNCATED_KEY] = TRUNCATED_VALUE;
+      break;
+    }
+    budget.remaining -= 1;
+    result[key] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(value[key], budget);
   }
 
   return result;

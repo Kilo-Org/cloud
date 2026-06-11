@@ -46,6 +46,14 @@ export function deriveOutboundSessionId(conversationKey: string): Promise<string
   return sha256Hex16(conversationKey);
 }
 
+// One-way hash for identifiers that appear in telemetry (logs, analytics):
+// preserves correlation across events without persisting the raw id, which
+// for anonymous users embeds the client IP. Raw identity stays confined to
+// cache scoping.
+export function hashIdentifierForTelemetry(value: string): Promise<string> {
+  return sha256Hex16(value);
+}
+
 export async function computeContentHashes(
   input: NormalizedClassifierInput
 ): Promise<ContentHashes> {

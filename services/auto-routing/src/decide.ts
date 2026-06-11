@@ -13,6 +13,7 @@ import {
   computeContentHashes,
   deriveConversationKey,
   deriveOutboundSessionId,
+  hashIdentifierForTelemetry,
 } from './conversation-identity';
 import type { ContentHashes } from './conversation-identity';
 import { getCachedClassification, putCachedClassification } from './decision-cache';
@@ -86,6 +87,9 @@ type DecisionContext = {
   payload: MirrorPayload;
   hashes: ContentHashes;
   conversationKey: string;
+  // One-way hash of the user id: anonymous ids embed the client IP, so logs
+  // get a stable correlator instead of the raw value.
+  userIdHash: string;
   reqSeq: number;
   colo: string | null;
   successSampleRate: number;
@@ -234,7 +238,8 @@ function recordDecision(
       taskType: summary.classification?.taskType ?? null,
       subtaskType: summary.classification?.subtaskType ?? null,
       confidence: summary.classification?.confidence ?? null,
-      userId: ctx.payload.userId,
+      userIdHash: ctx.userIdHash,
+      isAnonymousUser: ctx.payload.userId.startsWith('anon:'),
       clientRequestId: ctx.payload.clientRequestId,
       hasMachineId: ctx.payload.machineId !== null,
       mode: ctx.payload.mode,
@@ -261,8 +266,9 @@ export const decideHandler: Handler<HonoEnv> = async c => {
 
   const payload = parsed.data;
   const startedAt = performance.now();
-  const [hashes, classifierModel, successSampleRate] = await Promise.all([
+  const [hashes, userIdHash, classifierModel, successSampleRate] = await Promise.all([
     computeContentHashes(payload.input),
+    hashIdentifierForTelemetry(payload.userId),
     getClassifierModel(c.env),
     getDecisionLogSampleRate(c.env),
   ]);
@@ -270,6 +276,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     payload,
     hashes,
     conversationKey: deriveConversationKey(payload, hashes),
+    userIdHash,
     reqSeq: isolateRequestSeq++,
     colo: (c.req.raw.cf?.colo as string | undefined) ?? null,
     successSampleRate,

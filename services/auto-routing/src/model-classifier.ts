@@ -16,6 +16,15 @@ export type ClassifierRunResult = {
   classifierModel: string;
   classification: ClassifierOutput;
   fallback?: ClassifierRunFallbackMetadata;
+  modelCallMeta?: ClassifierModelCallMeta;
+};
+
+export type ClassifierModelCallMeta = {
+  finishReason: string | null;
+  completionTokens: number | null;
+  reasoningTokens: number | null;
+  textHead: string | null;
+  textTail: string | null;
 };
 
 export type ClassifierRunFailureMetadata = {
@@ -83,8 +92,11 @@ export async function classifyWithOpenRouter(
 
   const cost = result.usage?.cost ?? null;
   const text = extractClassifierText(result);
+  const modelCallMeta = extractModelCallMeta(result, text);
   if (!text) {
-    return fallbackClassifierResult(input, classifierModel, cost, { reason: 'no_text' });
+    return fallbackClassifierResult(input, classifierModel, cost, modelCallMeta, {
+      reason: 'no_text',
+    });
   }
 
   try {
@@ -92,9 +104,10 @@ export async function classifyWithOpenRouter(
       cost,
       classifierModel,
       classification: parseClassifierOutput(text),
+      modelCallMeta,
     };
   } catch (error) {
-    return fallbackClassifierResult(input, classifierModel, cost, {
+    return fallbackClassifierResult(input, classifierModel, cost, modelCallMeta, {
       reason: 'invalid_output',
       ...(error instanceof ClassifierOutputParseError
         ? {
@@ -107,10 +120,21 @@ export async function classifyWithOpenRouter(
   }
 }
 
+function extractModelCallMeta(result: ChatResult, text: string | null): ClassifierModelCallMeta {
+  return {
+    finishReason: result.choices[0]?.finishReason ?? null,
+    completionTokens: result.usage?.completionTokens ?? null,
+    reasoningTokens: result.usage?.completionTokensDetails?.reasoningTokens ?? null,
+    textHead: text?.slice(0, 200) ?? null,
+    textTail: text && text.length > 200 ? text.slice(-100) : null,
+  };
+}
+
 function fallbackClassifierResult(
   input: NormalizedClassifierInput,
   classifierModel: string,
   cost: number | null,
+  modelCallMeta: ClassifierModelCallMeta,
   fallback: ClassifierRunFallbackMetadata
 ): ClassifierRunResult {
   return {
@@ -118,6 +142,7 @@ function fallbackClassifierResult(
     classifierModel,
     classification: fallbackClassifierOutput(input),
     fallback,
+    modelCallMeta,
   };
 }
 

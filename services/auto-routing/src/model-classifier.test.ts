@@ -64,6 +64,13 @@ describe('OpenRouter classifier call', () => {
       cost: 0.00000123,
       classifierModel: 'openai/gpt-5-mini',
       classification: modelOutput,
+      modelCallMeta: {
+        finishReason: 'stop',
+        completionTokens: 20,
+        reasoningTokens: 0,
+        textHead: JSON.stringify(modelOutput).slice(0, 200),
+        textTail: JSON.stringify(modelOutput).slice(-100),
+      },
     });
     expect(send).toHaveBeenCalledWith({
       chatRequest: {

@@ -23,6 +23,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { kilocode_users } from '@kilocode/db/schema';
@@ -44,9 +45,17 @@ function extractBearerToken(authHeader: string | null): string | null {
   return trimmed.slice(7).trim() || null;
 }
 
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const bufA = encoder.encode(a);
+  const bufB = encoder.encode(b);
+  if (bufA.byteLength !== bufB.byteLength) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
 export async function POST(req: NextRequest) {
   const token = extractBearerToken(req.headers.get('authorization'));
-  if (!INTERNAL_API_SECRET || token !== INTERNAL_API_SECRET) {
+  if (!INTERNAL_API_SECRET || !token || !timingSafeStringEqual(token, INTERNAL_API_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -75,7 +84,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  const apiToken = generateApiToken(user, undefined, { expiresIn: SIX_HOURS_IN_SECONDS });
+  const apiToken = generateApiToken(
+    user,
+    { tokenSource: 'auto-routing-benchmark' },
+    { expiresIn: SIX_HOURS_IN_SECONDS }
+  );
   const expiresAt = new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString();
 
   return NextResponse.json({ token: apiToken, expiresAt });

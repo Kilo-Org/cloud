@@ -76,8 +76,12 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
     const json = (await res.json()) as { token: string; expiresAt: string };
     expect(json.token).toBe('minted-token');
     expect(typeof json.expiresAt).toBe('string');
-    expect(mockGenerateApiToken).toHaveBeenCalledWith(user, undefined, {
-      expiresIn: 6 * 60 * 60,
-    });
+    expect(mockGenerateApiToken).toHaveBeenCalledWith(
+      user,
+      { tokenSource: 'auto-routing-benchmark' },
+      {
+        expiresIn: 6 * 60 * 60,
+      }
+    );
   });
 });

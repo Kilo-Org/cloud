@@ -235,7 +235,10 @@ async function processDeciderJob(
     kiloToken,
   }).catch(() => {});
 
-  await runCasesWithConcurrency(cases, config.maxConcurrency, async benchCase => {
+  // Concurrency 1: the CLI's sqlite state in the container is not safe under
+  // concurrent sessions (partial-migration crashes); the container serializes
+  // too, so higher concurrency here would only hold HTTP requests open.
+  await runCasesWithConcurrency(cases, 1, async benchCase => {
     const startedAt = performance.now();
     try {
       let result = await runDeciderCaseViaCli(env, {

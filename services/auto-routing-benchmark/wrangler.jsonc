@@ -22,7 +22,7 @@
       "class_name": "BenchRunnerContainer",
       "image": "./container/Dockerfile",
       "instance_type": "standard-2",
-      "max_instances": 25
+      "max_instances": 40
     }
   ],
   "durable_objects": {
@@ -48,7 +48,8 @@
         "queue": "auto-routing-benchmark-jobs",
         "max_batch_size": 1,
         "max_retries": 2,
-        "max_concurrency": 4
+        "max_concurrency": 4,
+        "dead_letter_queue": "auto-routing-benchmark-dlq"
       }
     ]
   },

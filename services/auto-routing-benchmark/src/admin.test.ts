@@ -268,7 +268,20 @@ describe('GET /admin/routing-table', () => {
   });
 
   it('returns the parsed table and publishedAt when a row exists', async () => {
-    const tableData = { version: 'test-v1', tiers: {} };
+    const candidate = {
+      model: 'm',
+      accuracy: 1,
+      avgCostUsd: 0.1,
+      meetsThreshold: true,
+      supportedApiKinds: ['chat_completions'],
+    };
+    const tableData = {
+      version: 'test-v1',
+      generatedAt: '2026-06-01T10:00:00.000Z',
+      minAccuracy: 0.7,
+      source: 'benchmark',
+      tiers: { low: [candidate], medium: [candidate], high: [candidate] },
+    };
     dbFirst.mockResolvedValueOnce({
       run_id: 'run-123',
       published_at: '2026-06-01T10:00:00.000Z',

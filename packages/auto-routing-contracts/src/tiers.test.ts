@@ -43,6 +43,25 @@ describe('deriveDifficultyTier', () => {
       )
     ).toBe('high');
   });
+  it('high risk tips an otherwise-low request to medium', () => {
+    expect(
+      deriveDifficultyTier(
+        classification({ executionMode: 'multi_step_project', riskLevel: 'high' })
+      )
+    ).toBe('medium');
+  });
+  it('high risk tips an otherwise-medium request to high', () => {
+    expect(
+      deriveDifficultyTier(
+        classification({
+          reasoningComplexity: 'medium',
+          contextComplexity: 'large',
+          executionMode: 'code_change',
+          riskLevel: 'high',
+        })
+      )
+    ).toBe('high');
+  });
   it('is monotonic: bumping reasoning complexity never lowers the tier', () => {
     const tiers = ['low', 'medium', 'high'] as const;
     for (const ctx of ['small', 'medium', 'large'] as const) {

@@ -30,6 +30,16 @@ async function readBody(req) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+// The CLI's one-time sqlite migration (and its state dir generally) is not
+// safe under concurrent first runs; serialize every CLI execution in this
+// instance. Callers see requests queue, which is fine for benchmark traffic.
+let runChain = Promise.resolve();
+function runCaseSerialized(params) {
+  const next = runChain.then(() => runCase(params));
+  runChain = next.catch(() => {});
+  return next;
+}
+
 function runCase({ model, prompt, kiloToken, timeoutMs }) {
   return new Promise(resolve => {
     void (async () => {
@@ -77,11 +87,13 @@ function runCase({ model, prompt, kiloToken, timeoutMs }) {
         clearTimeout(killTimer);
         await rm(dir, { recursive: true, force: true }).catch(() => {});
         const stdoutLines = stdout.split('\n').filter(line => line.length > 0);
+        // Defense in case a future CLI version echoes auth material to stderr.
+        const redactedStderrTail = stderrTail.split(kiloToken).join('[redacted]');
         resolve({
           exitCode,
           durationMs: Date.now() - startedAt,
           stdoutLines,
-          stderrTail,
+          stderrTail: redactedStderrTail,
         });
       };
 
@@ -124,7 +136,7 @@ const server = createServer((req, res) => {
       }
 
       try {
-        const result = await runCase({ model, prompt, kiloToken, timeoutMs });
+        const result = await runCaseSerialized({ model, prompt, kiloToken, timeoutMs });
         sendJson(res, 200, result);
       } catch (err) {
         sendJson(res, 500, { error: err instanceof Error ? err.message : 'run failed' });

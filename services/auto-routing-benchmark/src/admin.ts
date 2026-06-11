@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import {
   BenchmarkConfigSchema,
+  RoutingTableSchema,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
 } from '@kilocode/auto-routing-contracts';
@@ -52,9 +53,12 @@ export const startRunHandler: Handler<HonoEnv> = async c => {
 
 export const getRoutingTableHandler: Handler<HonoEnv> = async c => {
   const latest = await getLatestRoutingTable(c.env.BENCH_DB);
+  // Validated at publish time, but re-validate before crossing the contract
+  // boundary so a schema change can never surface a stale incompatible table.
+  const parsed = latest ? RoutingTableSchema.safeParse(JSON.parse(latest.table_json)) : null;
   return c.json({
-    table: latest ? (JSON.parse(latest.table_json) as unknown) : null,
-    publishedAt: latest?.published_at ?? null,
+    table: parsed?.success ? parsed.data : null,
+    publishedAt: parsed?.success ? (latest?.published_at ?? null) : null,
   });
 };
 

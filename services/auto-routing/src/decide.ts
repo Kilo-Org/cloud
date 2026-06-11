@@ -2,7 +2,7 @@ import type { AutoRoutingDecisionResponse } from '@kilocode/auto-routing-contrac
 import { formatError } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
-import { getClassifierModel } from './classifier-config';
+import { getClassifierModel, getDecisionLogSampleRate } from './classifier-config';
 import { mirrorPayloadSchema, parseClassifierInput } from './classifier-input';
 import type { NormalizedClassifierInput } from './classifier-input';
 import { getCachedClassification, putCachedClassification } from './decision-cache';
@@ -52,6 +52,7 @@ async function computeContentHashes(input: NormalizedClassifierInput): Promise<C
 
 function logDecision({
   status,
+  successSampleRate,
   classifierModel,
   classifierInput,
   sessionId,
@@ -68,8 +69,10 @@ function logDecision({
   modelCallMeta,
   fallbackReason,
   cacheHit,
+  retried,
 }: {
   status: string;
+  successSampleRate: number;
   classifierModel: string | null;
   classifierInput: NormalizedClassifierInput;
   sessionId: string | null;
@@ -86,13 +89,18 @@ function logDecision({
   modelCallMeta?: ClassifierModelCallMeta;
   fallbackReason?: string;
   cacheHit?: boolean;
+  retried?: boolean;
 }) {
-  const includeText = Boolean(fallbackReason) || status.startsWith('classifier_error');
+  const isFailure = Boolean(fallbackReason) || status.startsWith('classifier_error');
+  if (!isFailure && Math.random() >= successSampleRate) {
+    return;
+  }
   console.log(
     JSON.stringify({
       event: 'auto_routing_decision',
       status,
       cacheHit: cacheHit ?? false,
+      retried: retried ?? false,
       classifierModel,
       requestedModel: classifierInput.requestedModel,
       apiKind: classifierInput.apiKind,
@@ -118,7 +126,7 @@ function logDecision({
             finishReason: modelCallMeta.finishReason,
             completionTokens: modelCallMeta.completionTokens,
             reasoningTokens: modelCallMeta.reasoningTokens,
-            ...(includeText
+            ...(isFailure
               ? { textHead: modelCallMeta.textHead, textTail: modelCallMeta.textTail }
               : {}),
           }
@@ -279,9 +287,10 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const reqSeq = isolateRequestSeq++;
   const colo = (c.req.raw.cf?.colo as string | undefined) ?? null;
   const startedAt = performance.now();
-  const [hashes, classifierModel] = await Promise.all([
+  const [hashes, classifierModel, successSampleRate] = await Promise.all([
     computeContentHashes(classifierInput.data),
     getClassifierModel(c.env),
+    getDecisionLogSampleRate(c.env),
   ]);
   // Stable conversation identity even when the client sends no session id:
   // the first user prompt and system prompt do not change within a
@@ -311,6 +320,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     });
     logDecision({
       status: 'classified',
+      successSampleRate,
       cacheHit: true,
       classifierModel,
       classifierInput: classifierInput.data,
@@ -359,6 +369,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     }
     logDecision({
       status: classifier.fallback ? `fallback:${classifier.fallback.reason}` : 'classified',
+      successSampleRate,
+      retried: classifier.retried,
       classifierModel: classifier.classifierModel,
       classifierInput: classifierInput.data,
       sessionId: parsed.data.sessionId,
@@ -411,6 +423,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const classifierFailureMetadata = getClassifierFailureMetadata(error);
     logDecision({
       status: classifierErrorStatus(error),
+      successSampleRate,
       classifierModel: classifierFailureMetadata.classifierModel ?? null,
       classifierInput: classifierInput.data,
       sessionId: parsed.data.sessionId,

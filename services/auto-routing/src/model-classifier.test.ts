@@ -114,7 +114,7 @@ describe('OpenRouter classifier call', () => {
     });
   });
 
-  it('falls back while preserving classifier cost and model when output validation fails', async () => {
+  it('retries once and falls back while preserving classifier cost and model when output validation fails', async () => {
     const client = {
       chat: {
         send: vi.fn(
@@ -147,8 +147,9 @@ describe('OpenRouter classifier call', () => {
     await expect(
       classifyWithOpenRouter(client, normalizedInput, DEFAULT_CLASSIFIER_MODEL)
     ).resolves.toMatchObject({
-      cost: 0.00000123,
+      cost: 0.00000246,
       classifierModel: DEFAULT_CLASSIFIER_MODEL,
+      retried: true,
       fallback: {
         reason: 'invalid_output',
         failureStage: 'invalid_schema',
@@ -161,5 +162,6 @@ describe('OpenRouter classifier call', () => {
         confidence: 0,
       },
     });
+    expect(client.chat.send).toHaveBeenCalledTimes(2);
   });
 });

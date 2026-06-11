@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearClassifierModelCache } from './classifier-config';
+import { clearClassifierConfigCache } from './classifier-config';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
 import type * as ModelClassifierModule from './model-classifier';
@@ -69,7 +69,7 @@ function localRequest(path: string, init: RequestInit = {}) {
 
 describe('auto routing worker', () => {
   beforeEach(() => {
-    clearClassifierModelCache();
+    clearClassifierConfigCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
     writeDataPoint.mockReset();

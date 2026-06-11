@@ -17,6 +17,7 @@ export type ClassifierRunResult = {
   classification: ClassifierOutput;
   fallback?: ClassifierRunFallbackMetadata;
   modelCallMeta?: ClassifierModelCallMeta;
+  retried?: boolean;
 };
 
 export type ClassifierModelCallMeta = {
@@ -86,6 +87,33 @@ export async function classifyWithOpenRouter(
   input: NormalizedClassifierInput,
   classifierModel: string,
   options: ClassifierCallOptions = {}
+): Promise<ClassifierRunResult> {
+  // Invalid output is usually a transient provider glitch (responses cut
+  // off after a handful of tokens with a "stop" finish reason), so one
+  // retry recovers most of those classifications.
+  const firstAttempt = await runClassifierAttempt(client, input, classifierModel, options);
+  if (!firstAttempt.fallback) {
+    return firstAttempt;
+  }
+
+  const retryAttempt = await runClassifierAttempt(client, input, classifierModel, options);
+  const cost = sumCosts(firstAttempt.cost, retryAttempt.cost);
+  if (!retryAttempt.fallback) {
+    return { ...retryAttempt, cost, retried: true };
+  }
+  return { ...retryAttempt, cost, retried: true, fallback: retryAttempt.fallback };
+}
+
+function sumCosts(first: number | null, second: number | null): number | null {
+  if (first === null && second === null) return null;
+  return (first ?? 0) + (second ?? 0);
+}
+
+async function runClassifierAttempt(
+  client: OpenRouter,
+  input: NormalizedClassifierInput,
+  classifierModel: string,
+  options: ClassifierCallOptions
 ): Promise<ClassifierRunResult> {
   const result = await client.chat.send({
     chatRequest: {

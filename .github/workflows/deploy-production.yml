@@ -152,15 +152,12 @@ jobs:
     needs: [stage-app, check-production-db-startup, run-migrations]
     environment: production
 
-    env:
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_APP }}
-
     steps:
       - name: Install Vercel CLI
         run: npm install -g vercel@${{ env.VERCEL_VERSION }}
 
       - name: Promote Vercel deployment
-        run: vercel promote "${{ needs.stage-app.outputs.deployment_url }}" --scope=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+        run: vercel promote "${{ needs.stage-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
   promote-global-app:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -168,15 +165,12 @@ jobs:
     needs: [stage-global-app, check-production-db-startup, run-migrations]
     environment: production
 
-    env:
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_GLOBAL_APP }}
-
     steps:
       - name: Install Vercel CLI
         run: npm install -g vercel@${{ env.VERCEL_VERSION }}
 
       - name: Promote Vercel deployment
-        run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+        run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-kiloclaw:
     needs: [check-production-db-startup, run-migrations]

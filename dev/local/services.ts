@@ -72,11 +72,19 @@ type ServiceMeta = {
 
 const serviceMeta: Record<string, ServiceMeta> = {
   // core
-  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'redis-http', 'stripe'] },
+  nextjs: {
+    group: 'core',
+    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe', 'auto-routing'],
+  },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
   stripe: { group: 'core', dependsOn: [] },
+  'auto-routing': {
+    group: 'core',
+    dependsOn: [],
+    dir: 'services/auto-routing',
+  },
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
@@ -550,7 +558,10 @@ export function resolveTransitiveDeps(targets: string[]): string[] {
   const stack = [...targets];
 
   while (stack.length > 0) {
-    const name = stack.pop()!;
+    const name = stack.pop();
+    if (name === undefined) {
+      break;
+    }
     if (result.has(name)) continue;
     const svc = services.get(name);
     if (!svc) throw new Error(`Unknown service: ${name}`);
@@ -581,7 +592,11 @@ export function topologicalSort(serviceNames: string[]): string[] {
     if (!svc) throw new Error(`Unknown service: ${name}`);
     for (const dep of svc.dependsOn) {
       if (!nameSet.has(dep)) continue;
-      adjacency.get(dep)!.push(name);
+      const neighbors = adjacency.get(dep);
+      if (!neighbors) {
+        throw new Error(`Unknown dependency in service graph: ${dep}`);
+      }
+      neighbors.push(name);
       inDegree.set(name, (inDegree.get(name) ?? 0) + 1);
     }
   }
@@ -593,7 +608,10 @@ export function topologicalSort(serviceNames: string[]): string[] {
 
   const sorted: string[] = [];
   while (queue.length > 0) {
-    const current = queue.shift()!;
+    const current = queue.shift();
+    if (current === undefined) {
+      break;
+    }
     sorted.push(current);
     for (const neighbor of adjacency.get(current) ?? []) {
       const newDegree = (inDegree.get(neighbor) ?? 1) - 1;
@@ -615,11 +633,11 @@ export function resolveTargets(targets: string[]): string[] {
   const groupIdsToExpand: string[] = [];
   for (const target of targets) {
     if (target in shortcuts) {
-      groupIdsToExpand.push(...shortcuts[target].map(name => services.get(name)!.group));
+      groupIdsToExpand.push(...shortcuts[target].map(name => getService(name).group));
     } else if (groupIds.has(target)) {
       groupIdsToExpand.push(target);
     } else if (services.has(target)) {
-      groupIdsToExpand.push(services.get(target)!.group);
+      groupIdsToExpand.push(getService(target).group);
     } else {
       const validTargets = [...services.keys(), ...groupIds, ...Object.keys(shortcuts)].join(', ');
       throw new Error(`Unknown target: ${target}. Valid targets: ${validTargets}`);
@@ -668,7 +686,10 @@ export function resolveGroupTransitiveDeps(groupIds: string[]): string[] {
   const result = new Set<string>();
   const stack = [...groupIds];
   while (stack.length > 0) {
-    const id = stack.pop()!;
+    const id = stack.pop();
+    if (id === undefined) {
+      break;
+    }
     if (result.has(id)) continue;
     const group = groups.find(g => g.id === id);
     if (!group) throw new Error(`Unknown group: ${id}`);

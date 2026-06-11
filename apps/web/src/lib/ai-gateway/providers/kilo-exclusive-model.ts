@@ -192,6 +192,7 @@ function formatPricePerMillionAsPerToken(price: number | null | undefined): stri
 
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
   const cheapestPricing = model.pricing?.[0].pricing;
+  const isFree = !model.pricing;
   return {
     id: model.public_id,
     canonical_slug: model.public_id,
@@ -231,5 +232,7 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       model.flags.includes('reasoning') ? ['reasoning', 'include_reasoning'] : []
     ),
     default_parameters: {},
+    isFree,
+    mayTrainOnYourPrompts: isFree || model.flags.includes('requires-data-collection'),
   };
 }

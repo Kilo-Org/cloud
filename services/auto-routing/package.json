@@ -1,0 +1,29 @@
+{
+  "name": "auto-routing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "types": "wrangler types --include-runtime=false",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/auto-routing/src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kilocode/auto-routing-contracts": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "@openrouter/sdk": "^0.12.79",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

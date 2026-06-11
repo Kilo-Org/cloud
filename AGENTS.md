@@ -127,6 +127,7 @@ Business-rule specs live in `.specs/`. Before making **any** changes to a domain
 | `.specs/kiloclaw-controller.md` | KiloClaw controller/machine lifecycle, bootstrap, Docker image |
 | `.specs/kiloclaw-datamodel.md` | KiloClaw data model — instance/subscription tables, invariants |
 | `.specs/model-experiments.md` | Model experiment routing, bucketing, lifecycle, prompt retention, and reporting rules |
+| `.specs/security-agent.md` | Security Agent Auto Remediation business rules and user-facing outcomes |
 | `.specs/subscription-center.md` | Subscription Center ownership, states, and user-facing behavior |
 | `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management |
 | `.specs/impact-affiliate-tracking.md` | Impact.com affiliate conversion tracking |

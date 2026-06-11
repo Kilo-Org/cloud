@@ -26,6 +26,7 @@ describe('model validation', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     global.fetch = originalFetch;
   });
 
@@ -68,29 +69,88 @@ describe('model validation', () => {
       code: 'BAD_REQUEST',
       message: 'Selected model is not available for this cloud agent session',
     });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('fails closed with a retryable service error for malformed validation responses', async () => {
+  it('retries transient validation failures twice with exponential backoff', async () => {
+    vi.useFakeTimers();
+    fetchMock
+      .mockRejectedValueOnce(new Error('catalog unavailable'))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ valid: true }));
+
+    const validation = assertKiloModelAvailable({
+      env: officialEnv,
+      submittedModel: 'available/model',
+      originalToken: 'stored-token',
+      procedure: 'send',
+    });
+
+    await vi.advanceTimersByTimeAsync(99);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(199);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(validation).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails closed after exhausting retries for malformed validation responses', async () => {
+    vi.useFakeTimers();
     fetchMock.mockResolvedValue(Response.json({ unexpected: true }));
 
-    try {
-      await assertKiloModelAvailable({
+    const errorPromise = assertKiloModelAvailable({
+      env: officialEnv,
+      submittedModel: 'available/model',
+      originalToken: 'stored-token',
+      procedure: 'send',
+    }).catch((error: unknown) => error);
+    await vi.runAllTimersAsync();
+    const error: unknown = await errorPromise;
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect(error).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    if (error instanceof TRPCError) {
+      expect(error.cause).toMatchObject({
+        error: 'MODEL_VALIDATION_UNAVAILABLE',
+        retryable: true,
+      });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries a rate-limited validation response', async () => {
+    vi.useFakeTimers();
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+      .mockResolvedValueOnce(Response.json({ valid: true }));
+
+    const validation = assertKiloModelAvailable({
+      env: officialEnv,
+      submittedModel: 'available/model',
+      procedure: 'send',
+    });
+    await vi.runAllTimersAsync();
+
+    await expect(validation).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a definitive client error', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 400 }));
+
+    await expect(
+      assertKiloModelAvailable({
         env: officialEnv,
         submittedModel: 'available/model',
-        originalToken: 'stored-token',
         procedure: 'send',
-      });
-      throw new Error('Expected validation failure');
-    } catch (error) {
-      expect(error).toBeInstanceOf(TRPCError);
-      expect(error).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
-      if (error instanceof TRPCError) {
-        expect(error.cause).toMatchObject({
-          error: 'MODEL_VALIDATION_UNAVAILABLE',
-          retryable: true,
-        });
-      }
-    }
+      })
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('skips personal official validation when the validation route is not deployed yet', async () => {
@@ -201,15 +261,17 @@ describe('model validation', () => {
   });
 
   it('fails closed when an override validation endpoint returns a malformed response', async () => {
+    vi.useFakeTimers();
     fetchMock.mockResolvedValue(Response.json({ unexpected: true }));
 
-    await expect(
-      assertKiloModelAvailable({
-        env: { KILO_OPENROUTER_BASE: 'http://localhost:8811/api' } as Env,
-        submittedModel: 'available/model',
-        procedure: 'start',
-      })
-    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    const validation = assertKiloModelAvailable({
+      env: { KILO_OPENROUTER_BASE: 'http://localhost:8811/api' } as Env,
+      submittedModel: 'available/model',
+      procedure: 'start',
+    }).catch((error: unknown) => error);
+    await vi.runAllTimersAsync();
+
+    await expect(validation).resolves.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
   });
 
   it('calls the organization-scoped override validation endpoint', async () => {

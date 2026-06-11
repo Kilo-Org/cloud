@@ -102,6 +102,63 @@ async function expectStorePurchaseConstraintViolation(
   });
 }
 
+type EphemeralDeploymentInsert = typeof schema.deployments_ephemeral.$inferInsert;
+
+async function withEphemeralTestUser(
+  testFn: (params: { userId: string }) => Promise<void>
+): Promise<void> {
+  const userId = `schema-ephemeral-${crypto.randomUUID()}`;
+
+  await schemaTestDb.db.insert(schema.kilocode_users).values({
+    id: userId,
+    google_user_email: `${userId}@example.com`,
+    google_user_name: 'Schema Test User',
+    google_user_image_url: 'https://example.com/avatar.png',
+    stripe_customer_id: `cus_${crypto.randomUUID()}`,
+  });
+
+  try {
+    await testFn({ userId });
+  } finally {
+    await schemaTestDb.db
+      .delete(schema.deployments_ephemeral)
+      .where(eq(schema.deployments_ephemeral.owned_by_user_id, userId));
+    await schemaTestDb.db.delete(schema.kilocode_users).where(eq(schema.kilocode_users.id, userId));
+  }
+}
+
+async function insertEphemeralDeployment(
+  overrides: Partial<EphemeralDeploymentInsert> = {}
+): Promise<typeof schema.deployments_ephemeral.$inferSelect> {
+  const [deployment] = await schemaTestDb.db
+    .insert(schema.deployments_ephemeral)
+    .values({
+      source_type: 'html',
+      internal_worker_name: `qdpl-${crypto.randomUUID()}`,
+      status: 'pending',
+      next_cleanup_at: '2026-06-03T00:00:00.000Z',
+      ...overrides,
+    })
+    .returning();
+
+  if (!deployment) {
+    throw new Error('Failed to insert ephemeral deployment');
+  }
+
+  return deployment;
+}
+
+async function expectEphemeralConstraintViolation(
+  insertPromise: Promise<unknown>,
+  constraint: string
+): Promise<void> {
+  await expect(insertPromise).rejects.toMatchObject({
+    cause: {
+      constraint,
+    },
+  });
+}
+
 describe('database schema', () => {
   it("should be up to date with migrations (run 'pnpm drizzle generate' if this fails)", async () => {
     const migrationsDir = path.join(__dirname, 'migrations');
@@ -314,6 +371,16 @@ describe('database schema', () => {
       ImpactReferralPaymentProvider: ['stripe', 'credits', 'app_store', 'google_play'],
       ImpactConversionReportState: ['queued', 'retrying', 'delivered', 'failed'],
       ImpactAdvocateRewardRedemptionState: ['queued', 'retrying', 'redeemed', 'failed'],
+      BYOKManagementSource: ['user', 'coding_plan'],
+      CodingPlanCredentialStatus: [
+        'available',
+        'assigned',
+        'revocation_pending',
+        'revoked',
+        'revocation_failed',
+      ],
+      CodingPlanSubscriptionStatus: ['active', 'past_due', 'canceled'],
+      CodingPlanTermKind: ['activation', 'extension', 'renewal'],
     };
 
     const actualEnumValues: Record<string, string[]> = {};
@@ -365,6 +432,107 @@ describe('database schema', () => {
   it('exposes provider-aware Kilo Pass store tables', () => {
     expect(Object.hasOwn(schema, 'kilo_pass_store_events')).toBe(true);
     expect(Object.hasOwn(schema, 'kilo_pass_store_purchases')).toBe(true);
+  });
+
+  describe('ephemeral deployments', () => {
+    it('allows pending rows with null slug and expiry', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        const deployment = await insertEphemeralDeployment({ owned_by_user_id: userId });
+
+        expect(deployment.deployment_slug).toBeNull();
+        expect(deployment.expires_at).toBeNull();
+      });
+    });
+
+    it.each([
+      { deployment_slug: null, expires_at: '2026-06-04T00:00:00.000Z' },
+      { deployment_slug: `schema-${crypto.randomUUID()}`, expires_at: null },
+    ])('rejects active rows without both slug and expiry', async values => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, status: 'active', ...values }),
+          'deployments_ephemeral_active_fields_check'
+        );
+      });
+    });
+
+    it('allows active rows with both slug and expiry', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await insertEphemeralDeployment({
+          owned_by_user_id: userId,
+          status: 'active',
+          deployment_slug: `schema-${crypto.randomUUID()}`,
+          expires_at: '2026-06-04T00:00:00.000Z',
+        });
+      });
+    });
+
+    it.each([
+      { cleanup_claim_token: crypto.randomUUID(), cleanup_claimed_until: null },
+      { cleanup_claim_token: null, cleanup_claimed_until: '2026-06-03T00:01:00.000Z' },
+    ])('rejects rows with only one claim field', async values => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, ...values }),
+          'deployments_ephemeral_claim_fields_check'
+        );
+      });
+    });
+
+    it('allows rows with both claim fields present', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await insertEphemeralDeployment({
+          owned_by_user_id: userId,
+          cleanup_claim_token: crypto.randomUUID(),
+          cleanup_claimed_until: '2026-06-03T00:01:00.000Z',
+        });
+      });
+    });
+
+    it('rejects unsupported source types', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, source_type: 'git' as 'html' }),
+          'deployments_ephemeral_source_type_check'
+        );
+      });
+    });
+
+    it('rejects unsupported statuses', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, status: 'completed' as 'pending' }),
+          'deployments_ephemeral_status_check'
+        );
+      });
+    });
+
+    it('rejects duplicate internal worker names', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        const internal_worker_name = `qdpl-${crypto.randomUUID()}`;
+        await insertEphemeralDeployment({ owned_by_user_id: userId, internal_worker_name });
+
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, internal_worker_name }),
+          'UQ_deployments_ephemeral_internal_worker_name'
+        );
+      });
+    });
+
+    it('rejects duplicate non-null slugs while allowing multiple null slugs', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await insertEphemeralDeployment({ owned_by_user_id: userId });
+        await insertEphemeralDeployment({ owned_by_user_id: userId });
+
+        const deployment_slug = `schema-${crypto.randomUUID()}`;
+        await insertEphemeralDeployment({ owned_by_user_id: userId, deployment_slug });
+
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, deployment_slug }),
+          'UQ_deployments_ephemeral_deployment_slug'
+        );
+      });
+    });
   });
 
   describe('Kilo Pass subscription provider IDs', () => {

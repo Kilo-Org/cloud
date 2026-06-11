@@ -4,6 +4,7 @@
  */
 
 import { WorkerNotFoundError, type CloudflareAPI } from './cloudflare-api';
+import { DEPLOY_DISPATCH_NAMESPACE } from './dispatch-namespace';
 import type { DeploymentArtifacts } from './types';
 import { calculateSHA256, getByteSize, validateWorkerName } from './utils';
 import type { PlaintextEnvVar } from '../../../../apps/web/src/lib/user-deployments/env-vars-validation';
@@ -54,7 +55,13 @@ export class Deployer {
     /** Optional environment variables (decrypted) */
     envVars?: PlaintextEnvVar[];
   }): Promise<void> {
-    const { artifacts, workerName, logger, dispatchNamespace = 'kilo-deploy', envVars } = params;
+    const {
+      artifacts,
+      workerName,
+      logger,
+      dispatchNamespace = DEPLOY_DISPATCH_NAMESPACE,
+      envVars,
+    } = params;
     validateWorkerName(workerName);
 
     const workerScript = artifacts.workerScript;

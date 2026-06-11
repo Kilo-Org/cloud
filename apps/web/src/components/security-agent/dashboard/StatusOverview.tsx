@@ -1,10 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { useRouter } from 'next/navigation';
 
 type StatusOverviewProps = {
   status: { open: number; fixed: number; ignored: number };
@@ -17,27 +16,22 @@ const statusConfig = [
   {
     key: 'open',
     label: 'Open',
-    color: '#eab308',
-    textClass: 'text-yellow-400',
+    barClass: 'bg-yellow-500',
     dotClass: 'bg-yellow-400',
   },
   {
     key: 'fixed',
     label: 'Fixed',
-    color: '#22c55e',
-    textClass: 'text-green-400',
+    barClass: 'bg-green-500',
     dotClass: 'bg-green-400',
   },
   {
     key: 'ignored',
-    label: 'Ignored',
-    color: '#6b7280',
-    textClass: 'text-gray-400',
-    dotClass: 'bg-gray-400',
+    label: 'Dismissed',
+    barClass: 'bg-zinc-500',
+    dotClass: 'bg-zinc-400',
   },
 ] as const;
-
-type StatusKey = (typeof statusConfig)[number]['key'];
 
 export function StatusOverview({
   status,
@@ -45,91 +39,63 @@ export function StatusOverview({
   basePath,
   extraParams = '',
 }: StatusOverviewProps) {
-  const router = useRouter();
   const total = status.open + status.fixed + status.ignored;
 
-  const data = statusConfig
-    .filter(s => status[s.key] > 0)
-    .map(s => ({ name: s.label, value: status[s.key], color: s.color, key: s.key }));
-
-  const handleClick = (statusKey: StatusKey) => {
-    router.push(`${basePath}/findings?status=${statusKey}${extraParams}`);
-  };
-
   return (
-    <Card className="border border-gray-800 bg-gray-900/50">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Finding Status</CardTitle>
+        <CardTitle className="text-sm font-medium">Finding status</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex flex-col items-center gap-4">
-            <Skeleton className="h-40 w-40 rounded-full" />
-            <div className="flex gap-4">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-4 w-16" />
-            </div>
+          <div className="block space-y-4" aria-live="polite">
+            <span className="sr-only">Loading finding status</span>
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
           </div>
         ) : total === 0 ? (
-          <div className="text-muted-foreground flex flex-col items-center py-8 text-sm">
-            No findings
-          </div>
+          <p className="text-muted-foreground py-8 text-center text-sm">
+            No findings synced yet. Refresh GitHub data to check your repositories.
+          </p>
         ) : (
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative h-44 w-44">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
-                    paddingAngle={2}
-                    dataKey="value"
-                    strokeWidth={0}
-                    onClick={(_, index) => {
-                      const entry = data[index];
-                      if (entry) {
-                        handleClick(entry.key);
-                      }
-                    }}
-                    className="cursor-pointer"
-                  >
-                    {data.map(entry => (
-                      <Cell key={entry.key} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1f2937',
-                      border: '1px solid #374151',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                    itemStyle={{ color: '#e5e7eb' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold text-white">{total}</span>
-                <span className="text-muted-foreground text-xs">Total</span>
-              </div>
+          <div className="space-y-4">
+            <div>
+              <span className="font-mono text-3xl font-bold tabular-nums">{total}</span>
+              <span className="text-muted-foreground ml-2 text-sm">total findings</span>
             </div>
-            <div className="flex flex-wrap justify-center gap-4">
-              {statusConfig.map(s => (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => handleClick(s.key)}
-                  className="flex items-center gap-1.5 text-sm hover:opacity-80"
-                >
-                  <span className={cn('h-2.5 w-2.5 rounded-full', s.dotClass)} />
-                  <span className="text-muted-foreground">{s.label}</span>
-                  <span className="text-muted-foreground">({status[s.key]})</span>
-                </button>
-              ))}
+            <div className="space-y-2">
+              {statusConfig.map(item => {
+                const count = status[item.key];
+                const percentage = Math.round((count / total) * 100);
+                return (
+                  <Link
+                    key={item.key}
+                    href={`${basePath}/findings?status=${item.key}${extraParams}`}
+                    className="hover:bg-muted focus-visible:ring-ring group block rounded-md px-2 py-2 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    <span className="flex items-center justify-between gap-4 text-sm">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn('size-2 rounded-full', item.dotClass)}
+                          aria-hidden="true"
+                        />
+                        <span>{item.label}</span>
+                      </span>
+                      <span className="font-mono text-muted-foreground tabular-nums">
+                        {count} ({percentage}%)
+                      </span>
+                    </span>
+                    <span className="bg-muted mt-2 block h-1.5 overflow-hidden rounded-full">
+                      <span
+                        className={cn('block h-full rounded-full', item.barClass)}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

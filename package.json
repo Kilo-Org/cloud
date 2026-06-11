@@ -13,7 +13,7 @@
     "test": "pnpm --filter web test",
     "test:setup-smoke": "pnpm --filter web run test:setup-smoke",
     "lint": "scripts/lint-all.sh",
-    "format": "oxfmt .",
+    "format": "oxfmt",
     "format:check": "oxfmt --list-different .",
     "format:changed": "git diff --name-only $(git merge-base origin/main HEAD) --diff-filter=ACMR -- '**/*.js' '**/*.jsx' '**/*.ts' '**/*.tsx' '**/*.json' '**/*.css' '**/*.md' | xargs -r oxfmt --no-error-on-unmatched-pattern",
     "validate": "pnpm run typecheck && pnpm run lint && pnpm run test",

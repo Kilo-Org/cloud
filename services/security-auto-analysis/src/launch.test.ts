@@ -324,6 +324,55 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(clearAnalysisStatus).not.toHaveBeenCalled();
   });
 
+  it('launches sandbox analysis when explicitly forced by remediation', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue({
+      ...existingTriage,
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'No relevant runtime path.',
+      suggestedAction: 'manual_review',
+    });
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ result: { data: { executionId: 'exec-123', status: 'running' } } }),
+          { status: 200 }
+        )
+      );
+
+    await expect(
+      startSecurityAnalysis({
+        ...createParams(false, cloudAgentFetch as never),
+        forceSandbox: true,
+      })
+    ).resolves.toEqual({
+      started: true,
+      triageOnly: false,
+    });
+
+    expect(cloudAgentFetch).toHaveBeenCalledTimes(2);
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', claimToken: 'manual-claim-token' }),
+        outcome: {
+          type: 'sandbox-running',
+          cloudAgentSessionId: 'agent-session',
+          kiloSessionId: 'ses-123',
+        },
+      })
+    );
+  });
+
   it('auto-dismisses triage-only dismiss recommendations after durable Worker completion', async () => {
     const { db, updates, auditRows } = createAutoDismissDb();
     const fetchSpy = vi.fn().mockResolvedValue(new Response('', { status: 200 }));

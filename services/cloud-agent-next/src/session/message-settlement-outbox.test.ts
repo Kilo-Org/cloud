@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  CALLBACK_QUEUE_MAX_SERIALIZED_BYTES,
+  serializedCallbackJobByteLength,
+} from '../callbacks/queue-payload.js';
 import type { CallbackJob } from '../callbacks/types.js';
 import type {
   SendCloudAgentSessionNotificationParams,
@@ -601,6 +605,47 @@ describe('MessageSettlementOutbox', () => {
     });
   });
 
+  it('omits oversized assistant output before enqueueing the callback job', async () => {
+    const assistantText = '😀"\\\n'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
+    const harness = createHarness({
+      assistantMessage: {
+        eventId: 1 as LatestAssistantMessage['eventId'],
+        timestamp: 1,
+        info: { id: 'assistant_large', role: 'assistant' },
+        parts: [
+          {
+            id: 'part_large',
+            messageID: 'assistant_large',
+            type: 'text',
+            text: assistantText,
+          },
+        ],
+      },
+    });
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/large-callback' })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(serializedCallbackJobByteLength(harness.callbackJobs[0])).toBeLessThanOrEqual(
+      CALLBACK_QUEUE_MAX_SERIALIZED_BYTES
+    );
+    expect(harness.callbackJobs[0].payload.lastAssistantMessageText).toBeUndefined();
+    expect(harness.callbackJobs[0].payload.lastAssistantMessageTextTruncation).toEqual({
+      originalUtf8ByteLength: new TextEncoder().encode(assistantText.trim()).byteLength,
+      retainedUtf8ByteLength: 0,
+    });
+    const persisted = await getSessionMessageState(harness.storage, firstMessageId);
+    expect(persisted?.callbackEnqueuedAt).toBeDefined();
+    expect(persisted?.callbackRetryAt).toBeUndefined();
+  });
+
   it('reports a late wrapper gate result once without allowing replay to replace it', async () => {
     const harness = createHarness({
       metadata: { ...metadata, finalization: { gateThreshold: 'warning' } },
@@ -663,6 +708,44 @@ describe('MessageSettlementOutbox', () => {
       status: 'completed',
     });
     expect(harness.callbackJobs[0].payload.gateResult).toBeUndefined();
+  });
+
+  it('abandons a callback whose fixed fields cannot fit instead of retrying forever', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, {
+        url: 'https://example.com/oversized-fixed-fields',
+        headers: {
+          'x-callback-context': 'x'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES * 2),
+        },
+      })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    const persisted = await getSessionMessageState(harness.storage, firstMessageId);
+    expect(harness.callbackJobs).toHaveLength(0);
+    expect(persisted).toMatchObject({
+      callbackAttempts: 1,
+      callbackAbandonedAt: expect.any(Number),
+      callbackEnqueuedAt: expect.any(Number),
+    });
+    expect(persisted?.callbackEnqueuedAt).toBe(persisted?.callbackAbandonedAt);
+    expect(persisted?.callbackLastError).toContain('maximum is');
+    expect(persisted?.callbackRetryAt).toBeUndefined();
+    await expect(harness.outbox.nextCallbackDeadline()).resolves.toBeUndefined();
+
+    await harness.outbox.repairTerminalMessageEffects(firstMessageId);
+    await harness.outbox.repairTerminalEffects();
+    await harness.outbox.retryPendingCallbacks(Date.now() + 60_000);
+
+    const afterRetry = await getSessionMessageState(harness.storage, firstMessageId);
+    expect(afterRetry).toMatchObject({ callbackAttempts: 1 });
+    expect(harness.callbackJobs).toHaveLength(0);
   });
 
   it('persists enqueue retry state and exposes the next callback deadline', async () => {

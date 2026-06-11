@@ -99,8 +99,9 @@ export function SecurityDashboard() {
 
   if (isLoadingPermission) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
+        <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        Loading security dashboard...
       </div>
     );
   }
@@ -110,14 +111,17 @@ export function SecurityDashboard() {
       ? `/organizations/${organizationId}/integrations`
       : '/integrations/github';
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-700 py-16">
-        <Shield className="text-muted-foreground mb-4 h-12 w-12 opacity-40" />
+      <div className="border-border flex flex-col items-center justify-center rounded-xl border border-dashed px-6 py-16 text-center">
+        <Shield className="text-muted-foreground mb-4 size-12 opacity-40" aria-hidden="true" />
         <h3 className="text-lg font-medium">Connect GitHub to get started</h3>
         <p className="text-muted-foreground mt-2 max-w-md text-center text-sm">
           Install the Kilo GitHub App to automatically sync Dependabot alerts and manage security
           findings across your repositories.
         </p>
-        <Button asChild className="mt-6">
+        <Button
+          asChild
+          className="bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 mt-6"
+        >
           <Link href={installUrl}>Install GitHub App</Link>
         </Button>
       </div>
@@ -147,7 +151,7 @@ export function SecurityDashboard() {
           onValueChange={setRepoFullName}
           isLoading={isLoading}
         />
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:justify-end">
           {lastUpdated && <span className="text-muted-foreground text-xs">{lastUpdated}</span>}
           <Button
             variant="outline"
@@ -158,8 +162,11 @@ export function SecurityDashboard() {
             }}
             disabled={isSyncing || isLoading}
           >
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Syncing...' : 'Refresh'}
+            <RefreshCw
+              className={`size-3.5 ${isSyncing ? 'animate-spin motion-reduce:animate-none' : ''}`}
+              aria-hidden="true"
+            />
+            {isSyncing ? 'Syncing...' : 'Sync findings'}
           </Button>
         </div>
       </div>

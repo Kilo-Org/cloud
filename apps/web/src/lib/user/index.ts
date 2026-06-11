@@ -7,6 +7,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
+import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
@@ -40,6 +41,8 @@ import {
   webhook_events,
   agent_environment_profiles,
   security_findings,
+  security_remediation_attempts,
+  security_remediations,
   security_audit_log,
   auto_triage_tickets,
   auto_fix_tickets,
@@ -87,6 +90,7 @@ import {
   stripe_early_fraud_warning_cases,
   coding_plan_availability_intents,
   coding_plan_subscriptions,
+  deployments_ephemeral,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -826,11 +830,14 @@ export class SoftDeletePreconditionError extends Error {
  * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
  * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
+ * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
+ *   immediate cleanup scheduled)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
- *   security_agent_repository_sync_state,
+ *   security_agent_repository_sync_state, security_remediations,
+ *   security_remediation_attempts actor references,
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, review memory feedback/proposals,
@@ -934,7 +941,7 @@ export async function softDeleteUser(userId: string) {
         web_session_pepper: randomUUID(),
         app_store_account_token: randomUUID(),
         default_model: null,
-        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+        blocked_reason: createSoftDeletedBlockedReason(),
         blocked_at: null,
         blocked_by_kilo_user_id: null,
         auto_top_up_enabled: false,
@@ -1093,6 +1100,21 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(security_agent_repository_sync_state)
       .where(eq(security_agent_repository_sync_state.owned_by_user_id, userId));
+    await tx
+      .update(security_remediation_attempts)
+      .set({
+        requested_by_user_id: null,
+        cancellation_requested_by_user_id: null,
+      })
+      .where(
+        or(
+          eq(security_remediation_attempts.requested_by_user_id, userId),
+          eq(security_remediation_attempts.cancellation_requested_by_user_id, userId)
+        )
+      );
+    await tx
+      .delete(security_remediations)
+      .where(eq(security_remediations.owned_by_user_id, userId));
     await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
     await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
     await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
@@ -1358,6 +1380,17 @@ export async function softDeleteUser(userId: string) {
       .update(stripe_dispute_cases)
       .set({ accepted_by_kilo_user_id: null })
       .where(eq(stripe_dispute_cases.accepted_by_kilo_user_id, userId));
+    await tx
+      .update(deployments_ephemeral)
+      .set({
+        owned_by_user_id: null,
+        status: 'cleanup_retry',
+        next_cleanup_at: sql`now()`,
+        cleanup_claim_token: null,
+        cleanup_claimed_until: null,
+        updated_at: sql`now()`,
+      })
+      .where(eq(deployments_ephemeral.owned_by_user_id, userId));
     await tx
       .update(security_advisor_scans)
       .set({ kilo_user_id: 'deleted', public_ip: null })

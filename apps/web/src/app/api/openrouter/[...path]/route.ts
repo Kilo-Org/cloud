@@ -96,6 +96,7 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { scheduleAutoRoutingMirror } from '@/lib/ai-gateway/auto-routing-mirror';
 
 export const maxDuration = 800;
 
@@ -166,6 +167,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
+  const authPromise = getUserFromAuth({ adminOnly: false });
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: GatewayRequest;
   try {
@@ -215,7 +217,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
   );
 
-  const authPromise = getUserFromAuth({ adminOnly: false });
   const balanceAndSettingsPromise = authPromise.then(res =>
     res.user
       ? getBalanceAndOrgSettings(res.organizationId, res.user)
@@ -706,6 +707,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (rulesEngineDecision.delayMs > 0) {
     await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
   }
+
+  scheduleAutoRoutingMirror({
+    request,
+    path,
+    bodyText: requestBodyText,
+    authContext: Promise.resolve({ organizationId }),
+  });
 
   const response = await upstreamRequest({
     path,

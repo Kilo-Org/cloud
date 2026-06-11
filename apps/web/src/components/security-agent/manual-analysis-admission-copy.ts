@@ -1,5 +1,1 @@
-export const manualAnalysisAdmissionCopy = {
-  successTitle: 'Analysis queued',
-  failureTitle: 'Failed to queue analysis',
-  pendingLabel: 'Queueing',
-};
+export { manualAnalysisAdmissionCopy } from './security-agent-command-copy';

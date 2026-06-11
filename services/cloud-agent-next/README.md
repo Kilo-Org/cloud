@@ -36,7 +36,7 @@ By default, the script looks for kilo-cli at `$HOME/projects/kilo-cli`. Override
 
 **What's in Dockerfile.dev:**
 
-- Base image: `cloudflare/sandbox:0.10.3`
+- Base image: `cloudflare/sandbox:0.11.0`
 - Pre-built `kilo` binary (from `cloud-agent-build.sh`)
 - GitHub CLI (`gh`) and GitLab CLI (`glab`)
 - Wrapper bundle built inside the container

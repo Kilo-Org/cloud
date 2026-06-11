@@ -48,7 +48,16 @@ type SessionPrepareHandlers = {
   updateSession: typeof updateSessionHandler;
 };
 
-const CLOUD_AGENT_WEB_PLATFORM = 'cloud-agent-web';
+const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
+  'cloud-agent-web',
+  'slack',
+  'github',
+  'linear',
+  'discord',
+  'app-builder',
+  'webhook',
+  'scheduled',
+]);
 
 export type ProfileResolutionPolicy = {
   defaultProfileResolution: 'explicit-profile-only' | 'include-web-defaults';
@@ -59,7 +68,7 @@ export function profileResolutionPolicyForSessionCreateOrigin(
 ): ProfileResolutionPolicy {
   return {
     defaultProfileResolution:
-      createdOnPlatform === CLOUD_AGENT_WEB_PLATFORM
+      createdOnPlatform !== undefined && IMPLICIT_PROFILE_RESOLUTION_ORIGINS.has(createdOnPlatform)
         ? 'include-web-defaults'
         : 'explicit-profile-only',
   };
@@ -70,7 +79,8 @@ type PrepareInput = z.infer<typeof PrepareSessionInput>;
 function repoFullNameForBindingLookup(input: SessionCreateRequest): string | undefined {
   if (input.repository.type === 'github') return input.repository.repo;
   if (input.repository.type === 'gitlab') {
-    return repoFullNameFromGitUrl(input.repository.url);
+    // The repository discriminator establishes this host as GitLab, including self-hosted instances.
+    return repoFullNameFromGitUrl(input.repository.url, input.repository.url);
   }
   return undefined;
 }

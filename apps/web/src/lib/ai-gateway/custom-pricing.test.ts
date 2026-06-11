@@ -52,6 +52,21 @@ describe('custom model pricing', () => {
     });
   });
 
+  test('replaces upstream Qwen3.7 Plus pricing in the model list', () => {
+    const model = applyCustomPricingToModel({
+      ...makeModel(QWEN37_PLUS_MODEL_ID),
+      name: 'Qwen: Qwen3.7 Plus',
+    });
+
+    expect(model.name).toBe('Qwen: Qwen3.7 Plus (20% off)');
+    expect(model.pricing).toEqual({
+      prompt: '0.000000320000',
+      completion: '0.000001280000',
+      input_cache_read: '0.000000032000',
+      input_cache_write: '0.000000400000',
+    });
+  });
+
   test('calculates Qwen3.7 Max usage without relying on upstream cost', () => {
     expect(
       calculateCustomCost_mUsd(

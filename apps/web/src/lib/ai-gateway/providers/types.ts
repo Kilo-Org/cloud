@@ -22,6 +22,7 @@ export type BYOKResult = {
 };
 
 export type TransformRequestContext = {
+  provider: Provider;
   model: string;
   request: GatewayRequest;
   originalHeaders: FraudDetectionHeaders;

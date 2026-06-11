@@ -9,8 +9,8 @@ import { logger } from '../logger.js';
 import { AttachmentsSchema, CallbackTargetSchema } from '../persistence/schemas.js';
 import { Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
+import { isWorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 import {
-  isWorkspaceFailureSubtype,
   WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH,
   type WorkspaceFailureSubtype,
 } from '../shared/wrapper-bootstrap.js';

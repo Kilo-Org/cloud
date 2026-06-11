@@ -7,6 +7,7 @@ import kimiCoding from './kimi-coding';
 import martian from './martian';
 import neuralwatt from './neurowatt';
 import ollamaCloud from './ollama-cloud';
+import openCodeGo from './opencode-go';
 import orcarouter from './orcarouter';
 import synthetic from './synthetic';
 import xiaomiTokenPlanAms from './xiaomi-token-plan-ams';
@@ -22,6 +23,7 @@ export default [
   martian,
   neuralwatt,
   ollamaCloud,
+  openCodeGo,
   orcarouter,
   synthetic,
   xiaomiTokenPlanAms,

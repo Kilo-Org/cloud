@@ -7,7 +7,7 @@ import {
 import { logger } from '../logger.js';
 import { workspaceFailureMessage } from '../session/safe-failure-projection.js';
 import type { SessionMessageState } from '../session/session-message-state.js';
-import { isWorkspaceFailureSubtype } from '../shared/wrapper-bootstrap.js';
+import { isWorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 
 type ReportQueue = {
   send(report: CloudAgentQueueReport): Promise<unknown>;

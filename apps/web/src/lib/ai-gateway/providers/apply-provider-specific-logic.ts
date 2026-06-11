@@ -163,6 +163,7 @@ export function applyProviderSpecificLogic(
   }
 
   provider.transformRequest({
+    provider,
     model: requestedModel,
     request: requestToMutate,
     originalHeaders,

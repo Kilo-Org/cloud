@@ -129,6 +129,7 @@ function configToFormState(config: BenchmarkConfig): {
   deciderModels: DeciderModelRow[];
   minAccuracy: number;
   maxConcurrency: number;
+  benchmarkUserId: string;
 } {
   return {
     classifierModels: config.classifierModels.join('\n'),
@@ -140,6 +141,7 @@ function configToFormState(config: BenchmarkConfig): {
     })),
     minAccuracy: config.minAccuracy,
     maxConcurrency: config.maxConcurrency,
+    benchmarkUserId: config.benchmarkUserId ?? '',
   };
 }
 
@@ -163,11 +165,13 @@ function formStateToConfig(
         supportedApiKinds: kinds.length ? kinds : ['chat_completions' as const],
       };
     });
+  const benchmarkUserId = state.benchmarkUserId.trim();
   return {
     classifierModels,
     deciderModels,
     minAccuracy: state.minAccuracy,
     maxConcurrency: state.maxConcurrency,
+    benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
     updatedAt: base.updatedAt,
     updatedBy: base.updatedBy,
   };
@@ -379,6 +383,23 @@ function BenchmarkConfigEditor({
               className="h-8 w-40 tabular-nums"
             />
           </div>
+        </div>
+
+        {/* Benchmark user id */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="benchmark-user-id" className="text-sm font-medium">
+            Benchmark user id
+          </Label>
+          <Input
+            id="benchmark-user-id"
+            value={form.benchmarkUserId}
+            onChange={e => setForm(prev => ({ ...prev, benchmarkUserId: e.target.value }))}
+            className="h-8 font-mono text-xs"
+            placeholder="(unset)"
+          />
+          <p className="text-muted-foreground text-xs">
+            Kilo user the decider CLI runs bill to; decider runs fail until set.
+          </p>
         </div>
 
         {/* Actions + metadata */}

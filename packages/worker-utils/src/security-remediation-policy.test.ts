@@ -181,6 +181,24 @@ describe('decideSecurityRemediationEligibility', () => {
     expect(decision).toMatchObject({ eligible: false, reason: 'duplicate_analysis_result' });
   });
 
+  it('allows manual retry of retryable terminal outcomes for same analysis fingerprint', () => {
+    const decision = decideSecurityRemediationEligibility({
+      finding: baseFinding,
+      config: baseConfig,
+      isAgentEnabled: true,
+      repoFullNamesInScope: ['kilo/repo'],
+      origin: 'manual',
+      blockState: {
+        ...emptyBlockState,
+        hasAutomaticTerminalForFingerprint: true,
+        hasRetryableTerminalForFinding: true,
+      },
+      allowManualRetry: true,
+    });
+
+    expect(decision).toMatchObject({ eligible: true, reason: 'eligible' });
+  });
+
   it('gates automatic policy by threshold and enablement time', () => {
     const belowThreshold = decideSecurityRemediationEligibility({
       finding: { ...baseFinding, severity: 'medium' },

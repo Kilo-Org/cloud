@@ -260,14 +260,14 @@ Do not create a separate batch table.
 
 ## Reconciler
 
-Add a narrow scheduled reconciler in `services/security-auto-analysis`.
+Deferred from v1. Manual remediation remains the fallback when an automatic admission is missed.
 
 Purpose:
 
 - recover missed `auto_policy` admissions after callback/admission failures
 - when include-existing is enabled, recover missed older eligible admissions too
 
-Rules:
+Future implementation rules:
 
 - create remediation attempts directly in small batches
 - use the shared eligibility function

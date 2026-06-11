@@ -35,6 +35,7 @@ import { generateApiToken } from './token.js';
 import { type QueueOwner, type SecurityAgentConfig } from './types.js';
 
 const REMEDIATION_LAUNCH_MAX_ATTEMPTS = 3;
+const APPLY_AUTO_REMEDIATION_SCAN_LIMIT = 200;
 const ACTIVE_ATTEMPT_STATUSES = ['queued', 'launching', 'running'] as const;
 const AUTOMATIC_DEDUPE_STATUSES = [
   'queued',
@@ -184,6 +185,16 @@ type AdmissionResult =
       admitted: false;
       reason: SecurityRemediationCapabilityReason;
     };
+
+type ApplyAutoRemediationCommandResult = {
+  scanned: number;
+  admitted: number;
+  skipped: number;
+  failed: number;
+  candidateCount: number;
+  scanLimit: number;
+  truncated: boolean;
+};
 
 function commandOwner(owner: z.infer<typeof RemediationOwnerSchema>): QueueOwner {
   return owner.organizationId
@@ -506,6 +517,7 @@ export async function admitRemediationAttempt(params: {
   owner?: QueueOwner;
   requestedByUserId?: string | null;
   allowManualRetry?: boolean;
+  runtimeConfig?: RuntimeConfig;
 }): Promise<AdmissionResult> {
   const finding = await getSecurityFindingById(params.db, params.findingId);
   if (!finding) return { admitted: false, reason: 'analysis_required' };
@@ -514,7 +526,7 @@ export async function admitRemediationAttempt(params: {
     return { admitted: false, reason: 'repo_not_in_scope' };
   }
 
-  const runtime = await getRuntimeConfig(params.db, owner);
+  const runtime = params.runtimeConfig ?? (await getRuntimeConfig(params.db, owner));
   const analysisFingerprint = computeSecurityRemediationAnalysisFingerprint(finding);
   const blockState = await getBlockState(params.db, finding.id, analysisFingerprint);
   const decision = decideSecurityRemediationEligibility({
@@ -781,6 +793,63 @@ async function actorForAttempt(params: {
   return resolved?.user ?? null;
 }
 
+async function getAttemptCancellationRequestedAt(
+  db: WorkerDb,
+  attemptId: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ cancellationRequestedAt: security_remediation_attempts.cancellation_requested_at })
+    .from(security_remediation_attempts)
+    .where(eq(security_remediation_attempts.id, attemptId))
+    .limit(1);
+  return row?.cancellationRequestedAt ?? null;
+}
+
+async function interruptCloudAgentSession(params: {
+  env: CloudflareEnv;
+  authToken: string;
+  cloudAgentSessionId: string;
+}): Promise<void> {
+  try {
+    const response = await params.env.CLOUD_AGENT_NEXT.fetch(
+      new Request('https://cloud-agent-next/trpc/interruptSession', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${params.authToken}`,
+        },
+        body: JSON.stringify({ sessionId: params.cloudAgentSessionId }),
+      })
+    );
+    if (!response.ok) {
+      logger.warn('Cloud Agent remediation interrupt returned non-OK status', {
+        cloud_agent_session_id: params.cloudAgentSessionId,
+        status: response.status,
+      });
+    }
+  } catch (error) {
+    logger.warn('Cloud Agent remediation interrupt failed', {
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function finalizeAttemptCancellation(params: {
+  db: WorkerDb;
+  finding: SecurityFindingRecord;
+  attempt: SecurityRemediationAttempt;
+  summary: string;
+}): Promise<void> {
+  await finalizeAttemptOutcome({
+    db: params.db,
+    finding: params.finding,
+    attempt: params.attempt,
+    result: { status: 'cancelled', summary: params.summary, validation: [] },
+    finalAssistantMessage: undefined,
+  });
+}
+
 function buildRemediationCallbackTarget(
   env: CloudflareEnv,
   attemptId: string,
@@ -866,6 +935,15 @@ async function launchAttempt(params: {
   const prepare = PrepareSessionResponseSchema.safeParse(await prepareResponse.json());
   if (!prepare.success) throw new Error('Invalid prepareSession response shape');
   const { cloudAgentSessionId, kiloSessionId } = prepare.data.result.data;
+  if (await getAttemptCancellationRequestedAt(params.db, params.attempt.id)) {
+    await finalizeAttemptCancellation({
+      db: params.db,
+      finding: params.finding,
+      attempt: params.attempt,
+      summary: 'Cancelled before Cloud Agent initiation',
+    });
+    return;
+  }
   await params.db.transaction(async tx => {
     await tx
       .update(security_remediation_attempts)
@@ -888,6 +966,21 @@ async function launchAttempt(params: {
       .set({ status: 'running', updated_at: sql`now()` })
       .where(eq(security_remediations.id, params.attempt.remediation_id));
   });
+
+  if (await getAttemptCancellationRequestedAt(params.db, params.attempt.id)) {
+    await interruptCloudAgentSession({
+      env: params.env,
+      authToken,
+      cloudAgentSessionId,
+    });
+    await finalizeAttemptCancellation({
+      db: params.db,
+      finding: params.finding,
+      attempt: params.attempt,
+      summary: 'Cancelled before Cloud Agent initiation',
+    });
+    return;
+  }
 
   const initiateResponse = await params.env.CLOUD_AGENT_NEXT.fetch(
     new Request('https://cloud-agent-next/trpc/initiateFromKilocodeSessionV2', {
@@ -1405,12 +1498,7 @@ export async function startManualRemediation(params: {
 export async function applyAutoRemediationCommand(params: {
   env: CloudflareEnv;
   command: ApplyAutoRemediationCommand;
-}): Promise<{
-  scanned: number;
-  admitted: number;
-  skipped: number;
-  failed: number;
-}> {
+}): Promise<ApplyAutoRemediationCommandResult> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const owner = commandOwner(params.command.owner);
   await transitionSecurityAgentCommand(db, {
@@ -1422,13 +1510,33 @@ export async function applyAutoRemediationCommand(params: {
     owner.type === 'org'
       ? eq(security_findings.owned_by_organization_id, owner.id)
       : eq(security_findings.owned_by_user_id, owner.id);
-  const findings = await db
+  const runtime = await getRuntimeConfig(db, owner);
+  const candidateRows = await db
     .select({ id: security_findings.id })
     .from(security_findings)
     .where(and(ownerCondition, eq(security_findings.status, 'open')))
     .orderBy(asc(security_findings.created_at))
-    .limit(200);
-  const counts = { scanned: 0, admitted: 0, skipped: 0, failed: 0 };
+    .limit(APPLY_AUTO_REMEDIATION_SCAN_LIMIT + 1);
+  const truncated = candidateRows.length > APPLY_AUTO_REMEDIATION_SCAN_LIMIT;
+  const findings = candidateRows.slice(0, APPLY_AUTO_REMEDIATION_SCAN_LIMIT);
+  if (truncated) {
+    logger.warn('Apply auto remediation scan reached finding limit', {
+      command_id: params.command.commandId,
+      owner_type: owner.type,
+      owner_id: owner.id,
+      scan_limit: APPLY_AUTO_REMEDIATION_SCAN_LIMIT,
+      candidate_count: candidateRows.length,
+    });
+  }
+  const counts = {
+    scanned: 0,
+    admitted: 0,
+    skipped: 0,
+    failed: 0,
+    candidateCount: candidateRows.length,
+    scanLimit: APPLY_AUTO_REMEDIATION_SCAN_LIMIT,
+    truncated,
+  };
   for (const row of findings) {
     counts.scanned += 1;
     try {
@@ -1438,6 +1546,7 @@ export async function applyAutoRemediationCommand(params: {
         origin: 'bulk_existing',
         owner,
         requestedByUserId: params.command.actorUserId,
+        runtimeConfig: runtime,
       });
       if (result.admitted) {
         counts.admitted += 1;
@@ -1560,16 +1669,11 @@ export async function cancelRemediation(params: {
     if (actor) {
       const nextAuthSecret = await params.env.NEXTAUTH_SECRET.get();
       const authToken = await generateApiToken(actor, nextAuthSecret, params.env.ENVIRONMENT);
-      await params.env.CLOUD_AGENT_NEXT.fetch(
-        new Request('https://cloud-agent-next/trpc/interruptSession', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({ sessionId: attempt.cloud_agent_session_id }),
-        })
-      );
+      await interruptCloudAgentSession({
+        env: params.env,
+        authToken,
+        cloudAgentSessionId: attempt.cloud_agent_session_id,
+      });
     }
   }
   return { success: true, status: 'cancellation_requested' };

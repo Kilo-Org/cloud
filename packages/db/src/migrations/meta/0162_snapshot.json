@@ -1,5 +1,5 @@
 {
-  "id": "65a898f7-b97f-4055-8671-61f6556ad85a",
+  "id": "534bd4b9-fae7-404b-bf1d-b91383cd388c",
   "prevId": "8f214be4-3c0f-443d-952e-632aade6efb5",
   "version": "7",
   "dialect": "postgresql",
@@ -26103,7 +26103,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"security_remediation_attempts\".\"status\" IN ('queued', 'launching', 'running', 'pr_opened', 'blocked', 'no_changes_needed')",
+          "where": "\"security_remediation_attempts\".\"status\" IN ('queued', 'launching', 'running', 'pr_opened')",
           "concurrently": false,
           "method": "btree",
           "with": {}

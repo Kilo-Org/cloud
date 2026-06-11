@@ -5143,9 +5143,7 @@ export const security_remediation_attempts = pgTable(
       .where(sql`${table.status} IN ('queued', 'launching', 'running')`),
     uniqueIndex('UQ_security_remediation_attempts_finding_fingerprint_terminal')
       .on(table.finding_id, table.analysis_fingerprint)
-      .where(
-        sql`${table.status} IN ('queued', 'launching', 'running', 'pr_opened', 'blocked', 'no_changes_needed')`
-      ),
+      .where(sql`${table.status} IN ('queued', 'launching', 'running', 'pr_opened')`),
     index('idx_security_remediation_attempts_org_claim')
       .on(
         table.owned_by_organization_id,

@@ -165,7 +165,7 @@ jobs:
         run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-workers:
-    needs: [check-production-db-startup, run-migrations]
+    needs: [promote-app]
     uses: ./.github/workflows/deploy-workers.yml
     with:
       base_sha: ${{ github.event.before }}

@@ -1,6 +1,5 @@
 import type { OpenRouter } from '@openrouter/sdk';
 import type { ChatResult } from '@openrouter/sdk/models';
-import { getClassifierModel } from './classifier-config';
 import { buildClassifierMessages, CLASSIFIER_MAX_TOKENS } from './classifier-prompt';
 import type { NormalizedClassifierInput } from './classifier-input';
 import {
@@ -61,7 +60,7 @@ export class ClassifierRunError extends Error {
   }
 }
 
-type ClassifierEnv = Pick<Env, 'AUTO_ROUTING_CONFIG' | 'OPENROUTER_API_KEY'>;
+type ClassifierEnv = Pick<Env, 'OPENROUTER_API_KEY'>;
 
 export type ClassifierCallOptions = {
   // Sticky routing key passed to OpenRouter so requests from the same
@@ -72,13 +71,10 @@ export type ClassifierCallOptions = {
 export async function classifyNormalizedInput(
   env: ClassifierEnv,
   input: NormalizedClassifierInput,
+  classifierModel: string,
   options: ClassifierCallOptions = {}
 ): Promise<ClassifierRunResult> {
-  const [client, classifierModel] = await Promise.all([
-    createOpenRouterClient(env),
-    getClassifierModel(env),
-  ]);
-
+  const client = await createOpenRouterClient(env);
   return classifyWithOpenRouter(client, input, classifierModel, options);
 }
 
@@ -97,11 +93,7 @@ export async function classifyWithOpenRouter(
   }
 
   const retryAttempt = await runClassifierAttempt(client, input, classifierModel, options);
-  const cost = sumCosts(firstAttempt.cost, retryAttempt.cost);
-  if (!retryAttempt.fallback) {
-    return { ...retryAttempt, cost, retried: true };
-  }
-  return { ...retryAttempt, cost, retried: true, fallback: retryAttempt.fallback };
+  return { ...retryAttempt, cost: sumCosts(firstAttempt.cost, retryAttempt.cost), retried: true };
 }
 
 function sumCosts(first: number | null, second: number | null): number | null {

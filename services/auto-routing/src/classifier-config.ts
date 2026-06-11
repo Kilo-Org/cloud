@@ -1,4 +1,5 @@
 import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
+import { ttlCached } from './ttl-cache';
 
 export const CLASSIFIER_MODEL_CONFIG_KEY = 'classifier_model';
 export const DECISION_LOG_SAMPLE_RATE_CONFIG_KEY = 'decision_log_sample_rate';
@@ -14,41 +15,39 @@ const DEFAULT_DECISION_LOG_SAMPLE_RATE = 0.05;
 // read from every classification.
 const CONFIG_CACHE_TTL_MS = 60_000;
 
-let cachedClassifierModel: { model: string; expiresAt: number } | null = null;
-let cachedDecisionLogSampleRate: { rate: number; expiresAt: number } | null = null;
-
 type ClassifierConfigEnv = Pick<Env, 'AUTO_ROUTING_CONFIG'>;
 
-export function clearClassifierConfigCache(): void {
-  cachedClassifierModel = null;
-  cachedDecisionLogSampleRate = null;
-}
-
-export async function getClassifierModel(env: ClassifierConfigEnv): Promise<string> {
-  if (cachedClassifierModel && cachedClassifierModel.expiresAt > Date.now()) {
-    return cachedClassifierModel.model;
-  }
-
+const classifierModelCache = ttlCached(CONFIG_CACHE_TTL_MS, async (env: ClassifierConfigEnv) => {
   const configuredModel = await env.AUTO_ROUTING_CONFIG.get(CLASSIFIER_MODEL_CONFIG_KEY);
   const trimmedModel = configuredModel?.trim();
-  const model = trimmedModel && trimmedModel.length > 0 ? trimmedModel : DEFAULT_CLASSIFIER_MODEL;
-  cachedClassifierModel = { model, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS };
-  return model;
-}
+  return trimmedModel && trimmedModel.length > 0 ? trimmedModel : DEFAULT_CLASSIFIER_MODEL;
+});
 
-export async function getDecisionLogSampleRate(env: ClassifierConfigEnv): Promise<number> {
-  if (cachedDecisionLogSampleRate && cachedDecisionLogSampleRate.expiresAt > Date.now()) {
-    return cachedDecisionLogSampleRate.rate;
-  }
-
-  const configuredRate = await env.AUTO_ROUTING_CONFIG.get(DECISION_LOG_SAMPLE_RATE_CONFIG_KEY);
-  const parsedRate = Number(configuredRate?.trim());
-  const rate =
-    configuredRate !== null && Number.isFinite(parsedRate) && parsedRate >= 0 && parsedRate <= 1
+const decisionLogSampleRateCache = ttlCached(
+  CONFIG_CACHE_TTL_MS,
+  async (env: ClassifierConfigEnv) => {
+    const configuredRate = await env.AUTO_ROUTING_CONFIG.get(DECISION_LOG_SAMPLE_RATE_CONFIG_KEY);
+    const parsedRate = Number(configuredRate?.trim());
+    return configuredRate !== null &&
+      Number.isFinite(parsedRate) &&
+      parsedRate >= 0 &&
+      parsedRate <= 1
       ? parsedRate
       : DEFAULT_DECISION_LOG_SAMPLE_RATE;
-  cachedDecisionLogSampleRate = { rate, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS };
-  return rate;
+  }
+);
+
+export function clearClassifierConfigCache(): void {
+  classifierModelCache.clear();
+  decisionLogSampleRateCache.clear();
+}
+
+export function getClassifierModel(env: ClassifierConfigEnv): Promise<string> {
+  return classifierModelCache.get(env);
+}
+
+export function getDecisionLogSampleRate(env: ClassifierConfigEnv): Promise<number> {
+  return decisionLogSampleRateCache.get(env);
 }
 
 export async function setClassifierModel(
@@ -61,6 +60,6 @@ export async function setClassifierModel(
   }
 
   await env.AUTO_ROUTING_CONFIG.put(CLASSIFIER_MODEL_CONFIG_KEY, trimmedModel);
-  cachedClassifierModel = null;
+  classifierModelCache.clear();
   return trimmedModel;
 }

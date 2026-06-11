@@ -22,6 +22,12 @@ const longSystemPromptInput = {
   systemPromptPrefix: `${'system '.repeat(80)}end`,
 } satisfies NormalizedClassifierInput;
 
+function parseRequestSummary(messages: ReturnType<typeof buildClassifierMessages>): unknown {
+  const match = messages[1].content.match(/<request_summary>\n([\s\S]*?)\n<\/request_summary>/);
+  if (!match) throw new Error('request summary markers not found');
+  return JSON.parse(match[1]);
+}
+
 describe('classifier prompt', () => {
   it('defaults to Gemini Flash Lite as the classifier model', () => {
     expect(DEFAULT_CLASSIFIER_MODEL).toBe('google/gemini-2.5-flash-lite');
@@ -65,7 +71,7 @@ describe('classifier prompt', () => {
 
   it('caps system prompt text in the classifier request summary', () => {
     const messages = buildClassifierMessages(longSystemPromptInput);
-    const summary = JSON.parse(messages[1].content.split('\n')[2]) as {
+    const summary = parseRequestSummary(messages) as {
       systemPromptPrefix: string;
     };
 
@@ -78,7 +84,7 @@ describe('classifier prompt', () => {
       userPromptPrefix: `${'first '.repeat(220)}end`,
       latestUserPromptPrefix: `${'latest '.repeat(220)}end`,
     });
-    const summary = JSON.parse(messages[1].content.split('\n')[2]) as {
+    const summary = parseRequestSummary(messages) as {
       initialUserPromptPrefix: string;
       latestUserPromptPrefix: string;
     };
@@ -92,7 +98,7 @@ describe('classifier prompt', () => {
       ...input,
       latestUserPromptPrefix: input.userPromptPrefix,
     });
-    const summary = JSON.parse(messages[1].content.split('\n')[2]) as {
+    const summary = parseRequestSummary(messages) as {
       latestUserPromptPrefix: string | null;
     };
 

@@ -37,7 +37,10 @@ type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS'>;
  *   blob10  = "1" if classified request requires tools, "0" if not, "" if unknown
  *   blob11  = confidence bucket
  *   blob12  = sessionId, or "" when absent/unavailable
- *   double1 = classifierDurationMs
+ *   double1 = classifier model-call duration ms; forced to 0 for cache hits
+ *             so existing duration queries (which filter double1 > 0) keep
+ *             measuring model calls only — filter on double7, not the 0
+ *             sentinel, to select cache hits
  *   double2 = classifierCostCredits
  *   double3 = confidence, or -1 if unavailable
  *   double4 = messageCount
@@ -71,7 +74,7 @@ export function writeClassifierMetricsDataPoint(
         params.sessionId ?? '',
       ],
       doubles: [
-        params.classifierDurationMs ?? 0,
+        params.cacheHit ? 0 : (params.classifierDurationMs ?? 0),
         params.classifierCostCredits ?? 0,
         classification?.confidence ?? -1,
         input?.messageCount ?? 0,

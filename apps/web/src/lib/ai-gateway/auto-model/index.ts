@@ -164,9 +164,26 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   opencode_settings: undefined,
 };
 
+export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
+  id: 'kilo-auto/efficient',
+  name: 'Auto Efficient',
+  description:
+    'Routes each request to the cheapest model that gets the job done, based on continuously benchmarked accuracy and cost.',
+  context_length: 262_144,
+  max_completion_tokens: 32_768,
+  prompt_price: '0.000000325',
+  completion_price: '0.00000195',
+  input_cache_read_price: undefined,
+  input_cache_write_price: undefined,
+  supports_images: false,
+  supports_pdf: false,
+  opencode_settings: undefined,
+};
+
 export const AUTO_MODELS = [
   KILO_AUTO_FRONTIER_MODEL,
   KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
 ];

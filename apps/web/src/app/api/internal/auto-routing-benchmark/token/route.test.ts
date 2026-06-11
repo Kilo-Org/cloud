@@ -49,9 +49,7 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
   });
 
   it('returns 401 with the wrong bearer secret', async () => {
-    const res = await POST(
-      createRequest({ userId: 'user-1' }, { authorization: 'Bearer wrong' })
-    );
+    const res = await POST(createRequest({ userId: 'user-1' }, { authorization: 'Bearer wrong' }));
     expect(res.status).toBe(401);
   });
 

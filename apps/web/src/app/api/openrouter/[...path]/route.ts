@@ -89,8 +89,13 @@ import {
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import {
+  isKiloAutoModel,
+  KILO_AUTO_FREE_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
+} from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
+import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import {
   getMaxTokens,
@@ -263,6 +268,25 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
+    const efficientDecision =
+      requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id
+        ? async () => {
+            const user = (await authPromise).user;
+            return fetchEfficientAutoDecision({
+              apiKind: requestBodyParsed.kind,
+              body: requestBodyParsed.body,
+              requestedModel,
+              providerHints: mirrorProviderHints,
+              bodyBytes: Buffer.byteLength(requestBodyText),
+              userId: user?.id ?? `anon:${ipAddress ?? 'unknown'}`,
+              sessionId: taskId ?? sessionHeader,
+              machineId: machineIdHeader,
+              clientRequestId,
+              mode: modeHeader,
+              userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+            });
+          }
+        : undefined;
     const autoResult = await applyResolvedAutoModel(
       {
         model: requestedModelLowerCased,
@@ -271,6 +295,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         sessionId: taskId ?? null,
         apiKind: requestBodyParsed.kind,
         clientIp: ipAddress ?? null,
+        efficientDecision,
       },
       requestBodyParsed,
       authPromise.then(res => res.user),
@@ -718,20 +743,22 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
   }
 
-  scheduleAutoRoutingMirror({
-    apiKind: requestBodyParsed.kind,
-    body: requestBodyParsed.body,
-    requestedModel,
-    providerHints: mirrorProviderHints,
-    bodyBytes: Buffer.byteLength(requestBodyText),
-    userId: user.id,
-    sessionId: taskId ?? sessionHeader,
-    machineId: machineIdHeader,
-    clientRequestId,
-    mode: modeHeader,
-    userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
-    authContext: Promise.resolve({ organizationId }),
-  });
+  if (autoModel !== KILO_AUTO_EFFICIENT_MODEL.id) {
+    scheduleAutoRoutingMirror({
+      apiKind: requestBodyParsed.kind,
+      body: requestBodyParsed.body,
+      requestedModel,
+      providerHints: mirrorProviderHints,
+      bodyBytes: Buffer.byteLength(requestBodyText),
+      userId: user.id,
+      sessionId: taskId ?? sessionHeader,
+      machineId: machineIdHeader,
+      clientRequestId,
+      mode: modeHeader,
+      userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+      authContext: Promise.resolve({ organizationId }),
+    });
+  }
 
   const observesProvider = effectiveProviderContext.provider.id === 'custom';
   const attemptId = observesProvider ? crypto.randomUUID() : null;

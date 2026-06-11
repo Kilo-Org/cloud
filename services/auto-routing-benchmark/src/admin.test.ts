@@ -194,7 +194,8 @@ describe('PUT /admin/config', () => {
     expect(dbRun).toHaveBeenCalled();
     // The SQL should be an INSERT OR REPLACE into benchmark_config.
     const insertCall = dbPrepare.mock.calls.find(
-      (args: unknown[]) => typeof args[0] === 'string' && (args[0] as string).includes('benchmark_config')
+      (args: unknown[]) =>
+        typeof args[0] === 'string' && (args[0] as string).includes('benchmark_config')
     );
     expect(insertCall).toBeDefined();
     // The updatedBy value was forwarded via bind.

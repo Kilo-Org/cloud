@@ -201,12 +201,10 @@ function recordDecision(
   writeClassifierMetricsDataPoint(env, {
     status: summary.status,
     classifierModel: summary.classifierModel,
-    sessionId: ctx.payload.sessionId,
-    input: ctx.payload.input,
+    requestedModel: ctx.payload.input.requestedModel,
     classification: summary.classification,
     classifierCostCredits: summary.cost,
     classifierDurationMs: durationMs,
-    bodyBytes: ctx.payload.bodyBytes,
     cacheHit: summary.cacheHit,
   });
 

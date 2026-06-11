@@ -177,7 +177,6 @@ describe('auto routing worker', () => {
       blobs: [
         'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
-        'chat_completions',
         'classified',
         'implementation',
         'feature_development',
@@ -185,10 +184,8 @@ describe('auto routing worker', () => {
         'medium',
         'code_change',
         '1',
-        '0.8-1.0',
-        'task-123',
       ],
-      doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, 2048, 0],
+      doubles: [expect.any(Number), 0.00000123, 0.82, 0],
     });
     expect(logSpy).toHaveBeenCalledTimes(1);
     const [logMessage] = logSpy.mock.calls[0] ?? [];
@@ -226,7 +223,7 @@ describe('auto routing worker', () => {
     expect(cachePutEntry).not.toHaveBeenCalled();
     expect(writeDataPoint).toHaveBeenCalledWith(
       expect.objectContaining({
-        doubles: [0, 0, mockClassification.confidence, 3, 1, 2048, 1],
+        doubles: [0, 0, mockClassification.confidence, 1],
       })
     );
   });
@@ -366,7 +363,6 @@ describe('auto routing worker', () => {
       blobs: [
         'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
-        'chat_completions',
         'classifier_error:invalid_schema',
         '',
         '',
@@ -374,10 +370,8 @@ describe('auto routing worker', () => {
         '',
         '',
         '',
-        '',
-        '',
       ],
-      doubles: [expect.any(Number), 0.00000123, -1, 3, 1, 2048, 0],
+      doubles: [expect.any(Number), 0.00000123, -1, 0],
     });
   });
 
@@ -592,7 +586,7 @@ describe('auto routing worker', () => {
       })
     );
     const summarySql = mockedFetch.mock.calls[0]?.[1]?.body as string;
-    expect(summarySql).toContain("startsWith(blob4, 'fallback:')");
+    expect(summarySql).toContain("startsWith(blob3, 'fallback:')");
     expect(summarySql).toContain('FROM auto_routing_classifier_metrics_v2');
     expect(summarySql).not.toContain('invalid_body');
   });

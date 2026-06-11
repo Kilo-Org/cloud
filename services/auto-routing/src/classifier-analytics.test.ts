@@ -39,12 +39,10 @@ describe('classifier analytics', () => {
       {
         status: 'classified',
         classifierModel: 'google/gemini-2.5-flash-lite',
-        input,
+        requestedModel: input.requestedModel,
         classification,
-        sessionId: 'task-123',
         classifierDurationMs: 123.45,
         classifierCostCredits: 0.00000123,
-        bodyBytes: 456,
       }
     );
 
@@ -53,7 +51,6 @@ describe('classifier analytics', () => {
       blobs: [
         'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
-        'chat_completions',
         'classified',
         'debugging',
         'test_repair',
@@ -61,10 +58,8 @@ describe('classifier analytics', () => {
         'medium',
         'code_change',
         '1',
-        '0.6-0.8',
-        'task-123',
       ],
-      doubles: [123.45, 0.00000123, 0.74, 2, 1, 456, 0],
+      doubles: [123.45, 0.00000123, 0.74, 0],
     });
   });
 });

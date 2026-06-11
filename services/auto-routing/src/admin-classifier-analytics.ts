@@ -127,11 +127,11 @@ function buildSummaryQuery(period: AnalyticsPeriod): string {
   return `
     SELECT
       SUM(_sample_interval) AS total_requests,
-      SUM(_sample_interval * IF(blob4 = 'classified' OR startsWith(blob4, 'fallback:'), 1, 0)) AS classified_requests,
-      SUM(_sample_interval * IF(double7 = 1, 1, 0)) AS cached_requests,
-      SUM(_sample_interval * IF(startsWith(blob4, 'fallback:'), 1, 0)) AS fallback_requests,
-      SUM(_sample_interval * IF(blob4 = 'classifier_error' OR startsWith(blob4, 'classifier_error:'), 1, 0)) AS classifier_errors,
-      SUM(_sample_interval * IF(blob4 IN ('invalid_json', 'invalid_envelope'), 1, 0)) AS invalid_requests,
+      SUM(_sample_interval * IF(blob3 = 'classified' OR startsWith(blob3, 'fallback:'), 1, 0)) AS classified_requests,
+      SUM(_sample_interval * IF(double4 = 1, 1, 0)) AS cached_requests,
+      SUM(_sample_interval * IF(startsWith(blob3, 'fallback:'), 1, 0)) AS fallback_requests,
+      SUM(_sample_interval * IF(blob3 = 'classifier_error' OR startsWith(blob3, 'classifier_error:'), 1, 0)) AS classifier_errors,
+      SUM(_sample_interval * IF(blob3 IN ('invalid_json', 'invalid_envelope'), 1, 0)) AS invalid_requests,
       SUM(_sample_interval * double2) AS total_cost_credits,
       avgIf(double1, double1 > 0) AS avg_duration_ms,
       quantileExactWeighted(0.95)(double1, _sample_interval * IF(double1 > 0, 1, 0)) AS p95_duration_ms
@@ -144,7 +144,7 @@ function buildSummaryQuery(period: AnalyticsPeriod): string {
 function buildStatusBreakdownQuery(period: AnalyticsPeriod): string {
   return `
     SELECT
-      blob4 AS status,
+      blob3 AS status,
       SUM(_sample_interval) AS requests
     FROM ${ANALYTICS_DATASET}
     WHERE ${buildSinceClause(period)}
@@ -158,11 +158,11 @@ function buildStatusBreakdownQuery(period: AnalyticsPeriod): string {
 function buildTaskTypeBreakdownQuery(period: AnalyticsPeriod): string {
   return `
     SELECT
-      blob5 AS task_type,
+      blob4 AS task_type,
       SUM(_sample_interval) AS requests,
       avgIf(double3, double3 >= 0) AS avg_confidence
     FROM ${ANALYTICS_DATASET}
-    WHERE ${buildSinceClause(period)} AND blob5 != ''
+    WHERE ${buildSinceClause(period)} AND blob4 != ''
     GROUP BY task_type
     ORDER BY requests DESC
     LIMIT 20
@@ -173,12 +173,12 @@ function buildTaskTypeBreakdownQuery(period: AnalyticsPeriod): string {
 function buildTaskSubtypeBreakdownQuery(period: AnalyticsPeriod): string {
   return `
     SELECT
-      blob5 AS task_type,
-      blob6 AS subtask_type,
+      blob4 AS task_type,
+      blob5 AS subtask_type,
       SUM(_sample_interval) AS requests,
       avgIf(double3, double3 >= 0) AS avg_confidence
     FROM ${ANALYTICS_DATASET}
-    WHERE ${buildSinceClause(period)} AND blob5 != '' AND blob6 != ''
+    WHERE ${buildSinceClause(period)} AND blob4 != '' AND blob5 != ''
     GROUP BY task_type, subtask_type
     ORDER BY requests DESC
     LIMIT 20

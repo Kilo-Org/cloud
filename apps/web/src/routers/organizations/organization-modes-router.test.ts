@@ -126,6 +126,90 @@ describe('organization modes tRPC router', () => {
         })
       ).rejects.toThrow();
     });
+
+    it('should allow an organization mode default that is not denied', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const organization = await createTestOrganization(
+        'Allowed Default Model Org',
+        owner.id,
+        0,
+        { model_deny_list: ['anthropic/claude-3-opus'] },
+        false
+      );
+
+      const result = await caller.organizations.modes.create({
+        organizationId: organization.id,
+        name: 'Code Mode',
+        slug: 'code',
+        config: {
+          roleDefinition: 'You are a coding assistant',
+          groups: ['read'],
+          defaultModel: 'openai/gpt-4o',
+        },
+      });
+
+      expect(result.mode.config.defaultModel).toBe('openai/gpt-4o');
+    });
+
+    it('should reject an organization mode default that is denied', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const organization = await createTestOrganization(
+        'Denied Default Model Org',
+        owner.id,
+        0,
+        { model_deny_list: ['openai/gpt-4o'] },
+        false
+      );
+
+      await expect(
+        caller.organizations.modes.create({
+          organizationId: organization.id,
+          name: 'Code Mode',
+          slug: 'code',
+          config: {
+            roleDefinition: 'You are a coding assistant',
+            groups: ['read'],
+            defaultModel: 'openai/gpt-4o',
+          },
+        })
+      ).rejects.toThrow(
+        "Default model 'openai/gpt-4o' is not in the organization's allowed models list"
+      );
+    });
+
+    it('should reject an empty organization mode default', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.modes.create({
+          organizationId: testOrganization.id,
+          name: 'Code Mode',
+          slug: 'empty-default-model',
+          config: {
+            roleDefinition: 'You are a coding assistant',
+            groups: ['read'],
+            defaultModel: '',
+          },
+        })
+      ).rejects.toThrow();
+    });
+
+    it('should reject a wildcard organization mode default', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.modes.create({
+          organizationId: testOrganization.id,
+          name: 'Code Mode',
+          slug: 'wildcard-default-model',
+          config: {
+            roleDefinition: 'You are a coding assistant',
+            groups: ['read'],
+            defaultModel: 'openai/*',
+          },
+        })
+      ).rejects.toThrow("Default model 'openai/*' is not a concrete model identifier");
+    });
   });
 
   describe('list procedure', () => {
@@ -347,6 +431,90 @@ describe('organization modes tRPC router', () => {
           slug: 'slug-a',
         })
       ).rejects.toThrow();
+    });
+
+    it('should reject a denied organization mode default on update', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const organization = await createTestOrganization(
+        'Denied Update Default Model Org',
+        owner.id,
+        0,
+        { model_deny_list: ['openai/gpt-4o'] },
+        false
+      );
+      const created = await caller.organizations.modes.create({
+        organizationId: organization.id,
+        name: 'Code Mode',
+        slug: 'code',
+        config: {
+          roleDefinition: 'You are a coding assistant',
+          groups: ['read'],
+        },
+      });
+
+      await expect(
+        caller.organizations.modes.update({
+          organizationId: organization.id,
+          modeId: created.mode.id,
+          config: {
+            defaultModel: 'openai/gpt-4o',
+          },
+        })
+      ).rejects.toThrow(
+        "Default model 'openai/gpt-4o' is not in the organization's allowed models list"
+      );
+    });
+
+    it('should reject a wildcard organization mode default on update', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const created = await caller.organizations.modes.create({
+        organizationId: testOrganization.id,
+        name: 'Code Mode',
+        slug: 'wildcard-update-default-model',
+        config: {
+          roleDefinition: 'You are a coding assistant',
+          groups: ['read'],
+        },
+      });
+
+      await expect(
+        caller.organizations.modes.update({
+          organizationId: testOrganization.id,
+          modeId: created.mode.id,
+          config: {
+            defaultModel: 'openai/*',
+          },
+        })
+      ).rejects.toThrow("Default model 'openai/*' is not a concrete model identifier");
+    });
+
+    it('should clear an organization mode default on update', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const created = await caller.organizations.modes.create({
+        organizationId: testOrganization.id,
+        name: 'Code Mode',
+        slug: 'clear-default-model',
+        config: {
+          roleDefinition: 'You are a coding assistant',
+          description: 'Write code',
+          groups: ['read'],
+          defaultModel: 'openai/gpt-4o',
+        },
+      });
+
+      const result = await caller.organizations.modes.update({
+        organizationId: testOrganization.id,
+        modeId: created.mode.id,
+        config: {
+          defaultModel: null,
+        },
+      });
+
+      expect(result.mode.config).toEqual({
+        roleDefinition: 'You are a coding assistant',
+        description: 'Write code',
+        groups: ['read'],
+      });
     });
   });
 

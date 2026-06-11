@@ -765,6 +765,7 @@ export const OrganizationModeConfigSchema = z.object({
   description: z.string().optional(),
   customInstructions: z.string().optional(),
   groups: z.array(GroupEntrySchema),
+  defaultModel: z.string().min(1, 'Default model cannot be empty').optional(),
 });
 
 export type OrganizationModeConfig = z.infer<typeof OrganizationModeConfigSchema>;

@@ -79,7 +79,19 @@ export async function updateOrganizationMode(
     updateData.slug = updates.slug;
   }
   if (updates.config !== undefined) {
-    updateData.config = mergeToSatisfy(updates.config);
+    const [existingMode] = await db
+      .select()
+      .from(orgnaization_modes)
+      .where(eq(orgnaization_modes.id, modeId));
+
+    if (!existingMode) {
+      return null;
+    }
+
+    updateData.config = mergeToSatisfy({
+      ...mergeToSatisfy(existingMode.config),
+      ...updates.config,
+    });
   }
 
   try {

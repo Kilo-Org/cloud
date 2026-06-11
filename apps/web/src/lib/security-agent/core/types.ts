@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { SecurityNotificationPolicySchema } from '@kilocode/worker-utils/security-notification-policy';
 export {
   DependabotAlertState,
   SecuritySeverity,
@@ -73,6 +74,7 @@ export const SecurityAgentConfigSchema = z
     auto_remediation_enabled_at: z.string().nullable().default(null),
     remediation_model_slug: z.string().optional(),
   })
+  .merge(SecurityNotificationPolicySchema)
   .passthrough();
 
 export type SecurityAgentConfig = z.infer<typeof SecurityAgentConfigSchema>;

@@ -1,4 +1,8 @@
 import * as z from 'zod';
+import {
+  SecurityNotificationSeveritySchema,
+  SecurityNotificationWarningDaysSchema,
+} from '@kilocode/worker-utils/security-notification-policy';
 
 // 'closed' is a UI-only filter that maps to status IN ('fixed', 'ignored').
 export const SecurityFindingStatusSchema = z.enum(['open', 'fixed', 'ignored', 'closed']);
@@ -19,6 +23,7 @@ export const AutoDismissConfidenceThresholdSchema = z.enum(['high', 'medium', 'l
 export const AnalysisModeSchema = z.enum(['auto', 'shallow', 'deep']);
 export const AutoAnalysisMinSeveritySchema = z.enum(['critical', 'high', 'medium', 'all']);
 export const AutoRemediationMinSeveritySchema = z.enum(['critical', 'high', 'medium', 'all']);
+export const NotificationMinSeveritySchema = SecurityNotificationSeveritySchema;
 
 export const SaveSecurityConfigInputSchema = z.object({
   slaCriticalDays: z.number().min(1).max(365).optional(),
@@ -41,6 +46,10 @@ export const SaveSecurityConfigInputSchema = z.object({
   autoRemediationMinSeverity: AutoRemediationMinSeveritySchema.optional(),
   autoRemediationIncludeExisting: z.boolean().optional(),
   remediationModelSlug: z.string().optional(),
+  slaNotificationsEnabled: z.boolean().optional(),
+  slaNotificationMinSeverity: NotificationMinSeveritySchema.optional(),
+  slaNotificationWarningDays: SecurityNotificationWarningDaysSchema.optional(),
+  newFindingNotificationMinSeverity: NotificationMinSeveritySchema.optional(),
 });
 
 export const OutcomeFilterSchema = z.enum([

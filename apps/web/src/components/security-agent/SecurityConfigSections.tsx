@@ -8,6 +8,7 @@ import {
   Clock,
   GitPullRequest,
   Info,
+  Mail,
   ScanSearch,
   Settings,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ import type {
   AutoAnalysisMinSeverity,
   AutoDismissConfidenceThreshold,
   AutoRemediationMinSeverity,
+  NotificationMinSeverity,
   SecurityConfigFormState,
   SecurityRepository,
   SlaConfig,
@@ -109,12 +111,14 @@ function OptionGrid<Value extends string>({
   value,
   options,
   columns,
+  disabled,
   onChange,
 }: {
   name: string;
   value: Value;
   options: RadioOption<Value>[];
   columns: string;
+  disabled?: boolean;
   onChange: (value: Value) => void;
 }) {
   return (
@@ -125,10 +129,16 @@ function OptionGrid<Value extends string>({
           htmlFor={`${name}-${option.value}`}
           className={cn(
             'border-border bg-background hover:bg-muted flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-            value === option.value && 'bg-muted ring-ring ring-1'
+            value === option.value && 'bg-muted ring-ring ring-1',
+            disabled && 'cursor-not-allowed opacity-60 hover:bg-background'
           )}
         >
-          <RadioGroupItem value={option.value} id={`${name}-${option.value}`} className="mt-0.5" />
+          <RadioGroupItem
+            value={option.value}
+            id={`${name}-${option.value}`}
+            className="mt-0.5"
+            disabled={disabled}
+          />
           <span className="space-y-1">
             <span className="block font-medium">{option.label}</span>
             <span className="text-muted-foreground block text-xs font-normal">
@@ -191,6 +201,17 @@ const AUTO_REMEDIATION_OPTIONS: RadioOption<AutoRemediationMinSeverity>[] = [
     label: 'All severities',
     description: 'Open remediation PRs for every eligible exploitable finding.',
   },
+];
+
+const NOTIFICATION_SEVERITY_OPTIONS: RadioOption<NotificationMinSeverity>[] = [
+  { value: 'critical', label: 'Critical only', description: 'Email for critical findings.' },
+  { value: 'high', label: 'High and above', description: 'Email for high and critical findings.' },
+  {
+    value: 'medium',
+    label: 'Medium and above',
+    description: 'Email for medium, high, and critical findings.',
+  },
+  { value: 'low', label: 'Low and above', description: 'Email for every open severity.' },
 ];
 
 const DISMISS_OPTIONS: RadioOption<AutoDismissConfidenceThreshold>[] = [
@@ -522,6 +543,107 @@ export function AutoDismissSection({ state, setState }: StateProps) {
               }
             />
           </fieldset>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function NotificationSection({
+  state,
+  setState,
+  isOrganization,
+  disabled,
+}: StateProps & { isOrganization: boolean; disabled?: boolean }) {
+  const newFindingLabel = isOrganization
+    ? 'Email organization owners about new findings'
+    : 'Email me about new findings';
+  const slaLabel = isOrganization
+    ? 'Email organization owners before and when findings breach SLA.'
+    : 'Email me before and when findings breach SLA.';
+
+  return (
+    <Card>
+      <SectionHeader
+        icon={Mail}
+        title="Notifications"
+        description="Send Security Agent email notifications for new and SLA-sensitive findings."
+      />
+      <CardContent className="space-y-5">
+        <div className="bg-muted/40 border-border rounded-lg border p-4 text-sm">
+          <p className="text-foreground font-medium">{newFindingLabel}</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Existing alerts imported on first sync count as new. New-finding notifications use
+            minimum severity only.
+          </p>
+        </div>
+
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium">New-finding minimum severity</legend>
+          <OptionGrid
+            name="new-finding-notification-severity"
+            value={state.newFindingNotificationMinSeverity}
+            options={NOTIFICATION_SEVERITY_OPTIONS}
+            columns="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+            disabled={disabled}
+            onChange={newFindingNotificationMinSeverity =>
+              setState(current => ({ ...current, newFindingNotificationMinSeverity }))
+            }
+          />
+        </fieldset>
+
+        <SwitchRow
+          id="sla-notifications-enabled"
+          label={slaLabel}
+          description="SLA notifications are enabled by default and send warning and breach emails."
+          checked={state.slaNotificationsEnabled}
+          disabled={disabled}
+          onCheckedChange={slaNotificationsEnabled =>
+            setState(current => ({ ...current, slaNotificationsEnabled }))
+          }
+        />
+
+        {state.slaNotificationsEnabled && (
+          <>
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-medium">SLA notification minimum severity</legend>
+              <OptionGrid
+                name="sla-notification-severity"
+                value={state.slaNotificationMinSeverity}
+                options={NOTIFICATION_SEVERITY_OPTIONS}
+                columns="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+                disabled={disabled}
+                onChange={slaNotificationMinSeverity =>
+                  setState(current => ({ ...current, slaNotificationMinSeverity }))
+                }
+              />
+            </fieldset>
+
+            <div className="bg-background border-border space-y-2 rounded-lg border p-4">
+              <Label htmlFor="sla-notification-warning-days">SLA warning lead time</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="sla-notification-warning-days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={state.slaNotificationWarningDays}
+                  disabled={disabled}
+                  onChange={event => {
+                    const value = Number.parseInt(event.target.value, 10);
+                    if (Number.isNaN(value) || value < 1 || value > 365) return;
+                    setState(current => ({ ...current, slaNotificationWarningDays: value }));
+                  }}
+                  className="w-24 text-center"
+                  aria-describedby="sla-notification-warning-days-help"
+                />
+                <span className="text-muted-foreground text-sm">days</span>
+              </div>
+              <p id="sla-notification-warning-days-help" className="text-muted-foreground text-xs">
+                Send SLA Warning Notifications this many whole days before persisted deadline.
+              </p>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

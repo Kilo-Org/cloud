@@ -11,6 +11,7 @@ import {
   AutoDismissSection,
   AutoRemediationSection,
   ModelSection,
+  NotificationSection,
   RepositorySection,
   SlaSection,
 } from './SecurityConfigSections';
@@ -48,6 +49,13 @@ const DEFAULT_SLA_CONFIG: SlaConfig = {
   low: 90,
 };
 
+const DEFAULT_NOTIFICATION_CONFIG = {
+  slaNotificationsEnabled: true,
+  slaNotificationMinSeverity: 'high',
+  slaNotificationWarningDays: 3,
+  newFindingNotificationMinSeverity: 'high',
+} as const;
+
 function sortedIds(ids: number[]) {
   return ids.toSorted((left, right) => left - right);
 }
@@ -72,6 +80,10 @@ function configFingerprint(config: SecurityConfigFormState) {
     config.autoRemediationMinSeverity,
     config.autoRemediationIncludeExisting,
     config.remediationModelSlug,
+    config.slaNotificationsEnabled,
+    config.slaNotificationMinSeverity,
+    config.slaNotificationWarningDays,
+    config.newFindingNotificationMinSeverity,
   ]);
 }
 
@@ -146,6 +158,10 @@ export function SecurityConfigForm({
       autoRemediationMinSeverity: state.autoRemediationMinSeverity,
       autoRemediationIncludeExisting: state.autoRemediationIncludeExisting,
       remediationModelSlug: state.remediationModelSlug,
+      slaNotificationsEnabled: state.slaNotificationsEnabled,
+      slaNotificationMinSeverity: state.slaNotificationMinSeverity,
+      slaNotificationWarningDays: state.slaNotificationWarningDays,
+      newFindingNotificationMinSeverity: state.newFindingNotificationMinSeverity,
     });
   };
 
@@ -174,12 +190,23 @@ export function SecurityConfigForm({
           <AutoAnalysisSection {...stateProps} />
           <AutoRemediationSection {...stateProps} />
           <AutoDismissSection {...stateProps} />
+          <NotificationSection
+            {...stateProps}
+            isOrganization={Boolean(organizationId)}
+            disabled={isSaving}
+          />
           <SlaSection {...stateProps} />
           <div className="border-border flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-between">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setState(current => ({ ...current, slaConfig: DEFAULT_SLA_CONFIG }))}
+              onClick={() =>
+                setState(current => ({
+                  ...current,
+                  slaConfig: DEFAULT_SLA_CONFIG,
+                  ...DEFAULT_NOTIFICATION_CONFIG,
+                }))
+              }
               disabled={isSaving}
             >
               Reset to defaults

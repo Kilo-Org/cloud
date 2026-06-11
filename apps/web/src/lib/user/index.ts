@@ -41,6 +41,7 @@ import {
   webhook_events,
   agent_environment_profiles,
   security_findings,
+  security_finding_notifications,
   security_remediation_attempts,
   security_remediations,
   security_audit_log,
@@ -838,6 +839,7 @@ export class SoftDeletePreconditionError extends Error {
  *   security_findings, security_analysis_owner_state, security_agent_commands,
  *   security_agent_repository_sync_state, security_remediations,
  *   security_remediation_attempts actor references,
+ *   security_finding_notifications addressed to the user,
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, review memory feedback/proposals,
@@ -923,6 +925,12 @@ export async function softDeleteUser(userId: string) {
 
     // ── Gateway cleanup ───────────────────────────────────────────────────
     await revokeGatewayStateForUser(tx, userId);
+
+    // Remove recipient-addressed Security Agent notifications before user
+    // anonymization and org membership removal. Org-owned findings can remain.
+    await tx
+      .delete(security_finding_notifications)
+      .where(eq(security_finding_notifications.recipient_user_id, userId));
 
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx

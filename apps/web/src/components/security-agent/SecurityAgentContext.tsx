@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
-import type { SlaConfig } from './SecurityConfigForm';
+import type { SlaConfig } from './security-config-types';
 import {
   getSecurityAgentCommandFailureTitle,
   getSecurityAgentDismissalTerminalTitle,
@@ -59,6 +59,10 @@ type SecurityAgentContextValue = {
         autoRemediationIncludeExisting: boolean;
         autoRemediationEnabledAt: string | null;
         remediationModelSlug?: string;
+        slaNotificationsEnabled: boolean;
+        slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+        slaNotificationWarningDays: number;
+        newFindingNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
       }
     | undefined;
   refetchConfig: () => Promise<unknown>;
@@ -92,6 +96,10 @@ type SecurityAgentContextValue = {
       autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
       autoRemediationIncludeExisting: boolean;
       remediationModelSlug: string;
+      slaNotificationsEnabled: boolean;
+      slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+      slaNotificationWarningDays: number;
+      newFindingNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
     }
   ) => void;
   handleToggleEnabled: (
@@ -1145,6 +1153,10 @@ function useSecurityAgentProviderValue(
         autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoRemediationIncludeExisting: boolean;
         remediationModelSlug: string;
+        slaNotificationsEnabled: boolean;
+        slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+        slaNotificationWarningDays: number;
+        newFindingNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
       }
     ) => {
       const modelConfigPayload = {
@@ -1172,6 +1184,10 @@ function useSecurityAgentProviderValue(
           autoRemediationEnabled: config.autoRemediationEnabled,
           autoRemediationMinSeverity: config.autoRemediationMinSeverity,
           autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+          slaNotificationsEnabled: config.slaNotificationsEnabled,
+          slaNotificationMinSeverity: config.slaNotificationMinSeverity,
+          slaNotificationWarningDays: config.slaNotificationWarningDays,
+          newFindingNotificationMinSeverity: config.newFindingNotificationMinSeverity,
           ...modelConfigPayload,
         });
       } else {
@@ -1191,6 +1207,10 @@ function useSecurityAgentProviderValue(
           autoRemediationEnabled: config.autoRemediationEnabled,
           autoRemediationMinSeverity: config.autoRemediationMinSeverity,
           autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+          slaNotificationsEnabled: config.slaNotificationsEnabled,
+          slaNotificationMinSeverity: config.slaNotificationMinSeverity,
+          slaNotificationWarningDays: config.slaNotificationWarningDays,
+          newFindingNotificationMinSeverity: config.newFindingNotificationMinSeverity,
           ...modelConfigPayload,
         });
       }

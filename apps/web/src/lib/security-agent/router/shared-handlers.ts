@@ -217,6 +217,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           autoRemediationIncludeExisting: false,
           autoRemediationEnabledAt: null,
           remediationModelSlug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
+          slaNotificationsEnabled: DEFAULT_SECURITY_AGENT_CONFIG.sla_notifications_enabled,
+          slaNotificationMinSeverity: DEFAULT_SECURITY_AGENT_CONFIG.sla_notification_min_severity,
+          slaNotificationWarningDays: DEFAULT_SECURITY_AGENT_CONFIG.sla_notification_warning_days,
+          newFindingNotificationMinSeverity:
+            DEFAULT_SECURITY_AGENT_CONFIG.new_finding_notification_min_severity,
         };
       }
 
@@ -259,6 +264,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         autoRemediationIncludeExisting: result.config.auto_remediation_include_existing ?? false,
         autoRemediationEnabledAt: result.config.auto_remediation_enabled_at ?? null,
         remediationModelSlug,
+        slaNotificationsEnabled: result.config.sla_notifications_enabled,
+        slaNotificationMinSeverity: result.config.sla_notification_min_severity,
+        slaNotificationWarningDays: result.config.sla_notification_warning_days,
+        newFindingNotificationMinSeverity: result.config.new_finding_notification_min_severity,
       };
     },
 
@@ -316,6 +325,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
               slaHighDays: existingConfig.config.sla_high_days,
               slaMediumDays: existingConfig.config.sla_medium_days,
               slaLowDays: existingConfig.config.sla_low_days,
+              slaNotificationsEnabled: existingConfig.config.sla_notifications_enabled,
+              slaNotificationMinSeverity: existingConfig.config.sla_notification_min_severity,
+              slaNotificationWarningDays: existingConfig.config.sla_notification_warning_days,
+              newFindingNotificationMinSeverity:
+                existingConfig.config.new_finding_notification_min_severity,
             }
           : undefined;
 
@@ -361,6 +375,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             auto_remediation_min_severity: input.autoRemediationMinSeverity,
             auto_remediation_include_existing: input.autoRemediationIncludeExisting,
             remediation_model_slug: remediationModelSlug,
+            sla_notifications_enabled: input.slaNotificationsEnabled,
+            sla_notification_min_severity: input.slaNotificationMinSeverity,
+            sla_notification_warning_days: input.slaNotificationWarningDays,
+            new_finding_notification_min_severity: input.newFindingNotificationMinSeverity,
           },
           ctx.user.id
         );
@@ -455,6 +473,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           autoRemediationEnabled: input.autoRemediationEnabled,
           autoRemediationMinSeverity: input.autoRemediationMinSeverity,
           autoRemediationIncludeExisting: input.autoRemediationIncludeExisting,
+          slaNotificationsEnabled: input.slaNotificationsEnabled,
+          slaNotificationMinSeverity: input.slaNotificationMinSeverity,
+          slaNotificationWarningDays: input.slaNotificationWarningDays,
+          newFindingNotificationMinSeverity: input.newFindingNotificationMinSeverity,
           repositorySelectionMode: input.repositorySelectionMode,
           selectedRepoCount: input.selectedRepositoryIds?.length,
         });
@@ -489,6 +511,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             slaHighDays: input.slaHighDays,
             slaMediumDays: input.slaMediumDays,
             slaLowDays: input.slaLowDays,
+            slaNotificationsEnabled: input.slaNotificationsEnabled,
+            slaNotificationMinSeverity: input.slaNotificationMinSeverity,
+            slaNotificationWarningDays: input.slaNotificationWarningDays,
+            newFindingNotificationMinSeverity: input.newFindingNotificationMinSeverity,
           },
         });
 

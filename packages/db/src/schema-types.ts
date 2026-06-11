@@ -1050,6 +1050,27 @@ export const SecuritySeverity = {
 
 export type SecuritySeverity = (typeof SecuritySeverity)[keyof typeof SecuritySeverity];
 
+export const SecurityFindingNotificationKind = {
+  NewFinding: 'new_finding',
+  SlaWarning: 'sla_warning',
+  SlaBreach: 'sla_breach',
+} as const;
+
+export type SecurityFindingNotificationKind =
+  (typeof SecurityFindingNotificationKind)[keyof typeof SecurityFindingNotificationKind];
+
+export const SecurityFindingNotificationStatus = {
+  Staged: 'staged',
+  Pending: 'pending',
+  Sending: 'sending',
+  Sent: 'sent',
+  Failed: 'failed',
+  Cancelled: 'cancelled',
+} as const;
+
+export type SecurityFindingNotificationStatus =
+  (typeof SecurityFindingNotificationStatus)[keyof typeof SecurityFindingNotificationStatus];
+
 export type DependabotAlertRaw = {
   number: number;
   state: DependabotAlertState;

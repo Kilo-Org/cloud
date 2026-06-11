@@ -198,6 +198,22 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         next_billing_date: formatDate(new Date(Date.now() + 30 * 86_400_000)),
         manage_url: `${NEXTAUTH_URL}/claw/subscription`,
       };
+    case 'securityFindingNew':
+      return {
+        severity: 'high',
+        repository_name: 'acme/api',
+        finding_title: 'SQL injection in repository search endpoint',
+        action_url: `${NEXTAUTH_URL}/security-agent/findings`,
+      };
+    case 'securityFindingSlaWarning':
+    case 'securityFindingSlaBreach':
+      return {
+        severity: 'critical',
+        repository_name: 'acme/api',
+        finding_title: 'Unauthenticated access to admin token exchange',
+        sla_deadline: 'Jun 14, 2026, 17:00 UTC',
+        action_url: `${NEXTAUTH_URL}/security-agent/findings`,
+      };
   }
   throw new Error(`Unknown template: ${template}`);
 }

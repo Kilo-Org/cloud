@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { DifficultyTierSchema } from './tiers';
 
 export const ClassifierApiKindSchema = z.enum(['chat_completions', 'responses', 'messages']);
 

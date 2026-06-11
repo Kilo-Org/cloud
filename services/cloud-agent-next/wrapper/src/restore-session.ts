@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { logToFile, runProcess } from './utils.js';
+import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
+import { createSafeProcessDiagnostic, logToFile, runProcess } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,7 +15,14 @@ export type RestoreResult =
       imported: true;
       diffs: { applied: number; skipped: number; total: number };
     }
-  | { ok: false; error: string; code: number | null; step: 'download' | 'import' | 'diffs' };
+  | {
+      ok: false;
+      error: string;
+      code: number | null;
+      step: 'download' | 'import' | 'diffs';
+      subtype?: WorkspaceFailureSubtype;
+      detail?: string;
+    };
 
 type SnapshotDiff = {
   file: string;
@@ -43,9 +51,18 @@ function log(msg: string): void {
 function fail(
   error: string,
   code: number | null,
-  step: Extract<RestoreResult, { ok: false }>['step']
+  step: Extract<RestoreResult, { ok: false }>['step'],
+  subtype?: WorkspaceFailureSubtype,
+  detail?: string
 ): RestoreResult {
-  return { ok: false, error, code, step };
+  return {
+    ok: false,
+    error,
+    code,
+    step,
+    ...(subtype ? { subtype } : {}),
+    ...(detail ? { detail } : {}),
+  };
 }
 
 function tryUnlink(filePath: string): void {
@@ -360,23 +377,21 @@ export async function extractDiffs(snapshotPath: string): Promise<SnapshotDiff[]
   try {
     const proc = Bun.spawn(['jq', '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
       stdout: 'pipe',
-      stderr: 'pipe',
+      stderr: 'ignore',
     });
     const exitCode = await proc.exited;
     if (exitCode === 0) {
       const stdout = await new Response(proc.stdout).text();
       try {
         return JSON.parse(stdout) as SnapshotDiff[];
-      } catch (err) {
-        log(`jq output parse failed: ${err instanceof Error ? err.message : String(err)}`);
+      } catch {
+        log('jq_output_invalid');
         return null;
       }
     }
-    const stderr = await new Response(proc.stderr).text();
-    log(`jq failed exitCode=${exitCode} stderr=${stderr.trim()}; falling back to bun parser`);
-  } catch (err) {
-    // `Bun.spawn` rejects with ENOENT when jq isn't installed.
-    log(`jq not available (${err instanceof Error ? err.message : String(err)}); using bun parser`);
+    log(`jq_unavailable exitCode=${exitCode}`);
+  } catch {
+    log('jq_unavailable');
   }
 
   return extractDiffsWithBun(snapshotPath);
@@ -399,8 +414,8 @@ async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[]
   let parsed: SnapshotShape;
   try {
     parsed = (await Bun.file(snapshotPath).json()) as SnapshotShape;
-  } catch (err) {
-    log(`bun snapshot parse failed: ${err instanceof Error ? err.message : String(err)}`);
+  } catch {
+    log('snapshot_parse_failed');
     return null;
   }
   const dedup = new Map<string, SnapshotDiff>();
@@ -432,8 +447,7 @@ function applyPatch(workspacePath: string, diff: SnapshotDiff): boolean {
       stderr: 'pipe',
     });
     if (proc.exitCode === 0) return true;
-    const stderr = new TextDecoder().decode(proc.stderr).trim();
-    log(`git apply failed file=${diff.file} stderr=${stderr}`);
+    log(`git apply failed file=${diff.file} exitCode=${proc.exitCode}`);
     return false;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -463,9 +477,8 @@ export async function restoreSession(
     let token: string | undefined;
     try {
       token = resolveKilocodeToken();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return fail(`failed to read KILOCODE_TOKEN_FILE: ${message}`, null, 'download');
+    } catch {
+      return fail('failed to read KILOCODE_TOKEN_FILE', null, 'download');
     }
 
     if (!ingestUrl || !token) {
@@ -519,10 +532,9 @@ export async function restoreSession(
           'download'
         );
       }
-    } catch (err) {
+    } catch {
       tryUnlink(tmpPath);
-      const message = err instanceof Error ? err.message : String(err);
-      return fail(message, null, 'download');
+      return fail('snapshot download failed', null, 'download');
     }
   } else {
     log(`using provided file=${filePath}`);
@@ -531,10 +543,8 @@ export async function restoreSession(
       log(
         `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
       );
-    } catch (err) {
-      log(
-        `provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId} error=${err instanceof Error ? err.message : String(err)}`
-      );
+    } catch {
+      log(`provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId}`);
     }
   }
 
@@ -555,14 +565,26 @@ export async function restoreSession(
       log(
         `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
       );
-      return fail(`kilo import timed out after ${importTimeoutMs}ms`, null, 'import');
+      return fail(
+        `kilo import timed out after ${importTimeoutMs}ms`,
+        null,
+        'import',
+        'kilo_import_timeout',
+        createSafeProcessDiagnostic(importResult)
+      );
     }
 
     if (importResult.exitCode !== 0) {
       log(
         `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
       );
-      return fail(`kilo import failed exitCode=${importResult.exitCode}`, null, 'import');
+      return fail(
+        `kilo import failed exitCode=${importResult.exitCode}`,
+        null,
+        'import',
+        'kilo_import_failed',
+        createSafeProcessDiagnostic(importResult)
+      );
     }
     log(
       `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`

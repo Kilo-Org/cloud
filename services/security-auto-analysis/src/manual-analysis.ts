@@ -49,6 +49,7 @@ export const ManualAnalysisStartCommandSchema = z.object({
       analysisModel: z.string().optional(),
     })
     .optional(),
+  forceSandbox: z.boolean().optional(),
   retrySandboxOnly: z.boolean().optional(),
 });
 
@@ -152,6 +153,7 @@ export async function processManualAnalysisStart(params: {
       nextAuthSecret,
       internalApiSecret,
       callbackTokenSecret,
+      forceSandbox: params.command.forceSandbox,
       retrySandboxOnly: params.command.retrySandboxOnly,
       lifecycleClaim: {
         source: 'manual',

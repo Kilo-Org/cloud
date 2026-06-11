@@ -988,6 +988,8 @@ export function createSessionReadyHandler(deps: ServerDependencies) {
         {
           error: result.error.code,
           message: result.error.message,
+          ...(result.error.subtype ? { subtype: result.error.subtype } : {}),
+          ...(result.error.detail ? { detail: result.error.detail } : {}),
           ...(result.error.retryable !== undefined ? { retryable: result.error.retryable } : {}),
           ...(result.error.wrapperRunId ? { wrapperRunId: result.error.wrapperRunId } : {}),
         },

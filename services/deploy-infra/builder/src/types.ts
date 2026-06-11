@@ -170,6 +170,7 @@ export type Env = {
   CF_VERSION_METADATA: { id: string; tag: string; timestamp: string };
 
   BACKEND_AUTH_TOKEN: string;
+  DISPATCHER_AUTH_TOKEN: string;
 
   /** URL endpoint where build events will be sent (REQUIRED) */
   BACKEND_EVENTS_URL: string;

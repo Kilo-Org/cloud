@@ -6,6 +6,8 @@
  * - 4xx/5xx: Non-retryable errors
  */
 
+import type { WorkspaceFailureSubtype } from '../shared/wrapper-bootstrap.js';
+
 /**
  * Error codes for transient/retryable failures (503).
  * Client should retry with backoff.
@@ -38,6 +40,8 @@ export type ExecutionErrorOptions = {
   retryable: boolean;
   /** Original error that caused this (for logging/debugging) */
   cause?: unknown;
+  workspaceFailureSubtype?: WorkspaceFailureSubtype;
+  safeFailureMessage?: string;
 };
 
 /**
@@ -47,12 +51,16 @@ export type ExecutionErrorOptions = {
 export class ExecutionError extends Error {
   readonly code: ExecutionErrorCode;
   readonly retryable: boolean;
+  readonly workspaceFailureSubtype?: WorkspaceFailureSubtype;
+  readonly safeFailureMessage?: string;
 
   constructor(code: ExecutionErrorCode, message: string, options: ExecutionErrorOptions) {
     super(message, { cause: options.cause });
     this.name = 'ExecutionError';
     this.code = code;
     this.retryable = options.retryable;
+    this.workspaceFailureSubtype = options.workspaceFailureSubtype;
+    this.safeFailureMessage = options.safeFailureMessage;
   }
 
   /**
@@ -65,8 +73,21 @@ export class ExecutionError extends Error {
   /**
    * Create a retryable error for workspace setup failures.
    */
-  static workspaceSetupFailed(message: string, cause?: unknown): ExecutionError {
-    return new ExecutionError('WORKSPACE_SETUP_FAILED', message, { retryable: true, cause });
+  static workspaceSetupFailed(
+    message: string,
+    cause?: unknown,
+    options?: {
+      subtype?: WorkspaceFailureSubtype;
+      safeFailureMessage?: string;
+      retryable?: boolean;
+    }
+  ): ExecutionError {
+    return new ExecutionError('WORKSPACE_SETUP_FAILED', message, {
+      retryable: options?.retryable ?? true,
+      cause,
+      workspaceFailureSubtype: options?.subtype,
+      safeFailureMessage: options?.safeFailureMessage,
+    });
   }
 
   /**

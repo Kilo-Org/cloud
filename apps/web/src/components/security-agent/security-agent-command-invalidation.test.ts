@@ -28,6 +28,16 @@ describe('getSecurityAgentInvalidationScopesForCommand', () => {
     expect(scopes).not.toContain('permissionStatus');
   });
 
+  it('refreshes remediation terminals without repository freshness data', () => {
+    const scopes = getSecurityAgentInvalidationScopesForCommand('apply_auto_remediation');
+
+    expect(scopes).toEqual(
+      expect.arrayContaining(['findings', 'findingDetails', 'stats', 'dashboardStats'])
+    );
+    expect(scopes).not.toContain('repositories');
+    expect(scopes).not.toContain('permissionStatus');
+  });
+
   it('refreshes cached finding details after bulk delete', () => {
     expect(deletedSecurityAgentFindingsScopes).toEqual(
       expect.arrayContaining(['findings', 'findingDetails', 'orphanedRepositories'])

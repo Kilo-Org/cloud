@@ -25,11 +25,13 @@ import {
 import { KILO_AGENT_SESSION_LABEL, type DevContainerHandle } from './devcontainer.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import { shellQuote, validShellEnvEntries } from './utils.js';
-import type {
-  WrapperCommandRequest,
-  WrapperPromptRequest,
-  WrapperSessionReadyRequest,
-  WrapperSessionReadySuccessResponse,
+import {
+  parseWrapperSessionReadyErrorResponse,
+  type WorkspaceFailureSubtype,
+  type WrapperCommandRequest,
+  type WrapperPromptRequest,
+  type WrapperSessionReadyRequest,
+  type WrapperSessionReadySuccessResponse,
 } from '../shared/wrapper-bootstrap.js';
 
 // ---------------------------------------------------------------------------
@@ -156,15 +158,28 @@ export type WrapperTransport = {
 // Error Classes
 // ---------------------------------------------------------------------------
 
+export type WrapperErrorOptions = ErrorOptions & {
+  workspaceFailureSubtype?: WorkspaceFailureSubtype;
+  safeDetail?: string;
+  retryable?: boolean;
+};
+
 export class WrapperError extends Error {
+  readonly workspaceFailureSubtype?: WorkspaceFailureSubtype;
+  readonly safeDetail?: string;
+  readonly retryable?: boolean;
+
   constructor(
     message: string,
     public readonly code: string,
     public readonly statusCode: number,
-    options?: ErrorOptions
+    options?: WrapperErrorOptions
   ) {
     super(message, options);
     this.name = 'WrapperError';
+    this.workspaceFailureSubtype = options?.workspaceFailureSubtype;
+    this.safeDetail = options?.safeDetail;
+    this.retryable = options?.retryable;
   }
 }
 
@@ -179,8 +194,8 @@ export class WrapperFinalizingError extends WrapperError {
 }
 
 export class WrapperNotReadyError extends WrapperError {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, 'NOT_READY', 503, options);
+  constructor(message: string) {
+    super(message, 'NOT_READY', 503);
     this.name = 'WrapperNotReadyError';
   }
 }
@@ -479,13 +494,17 @@ export class WrapperClient {
       const parsed = JSON.parse(responseText) as T & {
         error?: string;
         message?: string;
-        retryable?: boolean;
         wrapperRunId?: string;
       };
 
       // Check for error response
       if (parsed.error || !response.ok) {
-        const errorCode = parsed.error ?? `HTTP_${response.status}`;
+        const readyError =
+          path === '/session/ready' ? parseWrapperSessionReadyErrorResponse(parsed) : undefined;
+        if (path === '/session/ready' && parsed.error && !readyError) {
+          throw new Error('Invalid wrapper session-ready error response');
+        }
+        const errorCode = readyError?.error ?? parsed.error ?? `HTTP_${response.status}`;
         const statusCode = ERROR_STATUS_CODES[errorCode] ?? response.status ?? 500;
         logger
           .withFields({ method, path, port: this.port, errorCode, statusCode })
@@ -499,12 +518,21 @@ export class WrapperClient {
         }
         if (errorCode === 'WRAPPER_FINALIZING') {
           throw new WrapperFinalizingError(
-            parsed.message ?? 'Wrapper batch is finalizing',
-            parsed.wrapperRunId
+            readyError?.message ?? parsed.message ?? 'Wrapper batch is finalizing',
+            readyError?.wrapperRunId ?? parsed.wrapperRunId
           );
         }
 
-        throw new WrapperError(parsed.message ?? errorCode, errorCode, statusCode);
+        throw new WrapperError(
+          readyError?.message ?? parsed.message ?? errorCode,
+          errorCode,
+          statusCode,
+          {
+            workspaceFailureSubtype: readyError?.subtype,
+            safeDetail: readyError?.detail,
+            retryable: readyError?.retryable,
+          }
+        );
       }
 
       return parsed;
@@ -675,58 +703,17 @@ export class WrapperClient {
 
       logger.debug('WrapperClient: wrapper is ready', { port: this.port, processId: proc.id });
       return { started: true };
-    } catch (error) {
-      const startupError = error instanceof Error ? error : new Error(String(error));
-
+    } catch {
       if (envFileWritten && envFilePath) {
         try {
           await this.session.exec(`rm -f ${shellQuote(envFilePath)}`);
-        } catch (cleanupError) {
-          logger.warn('Failed to clean up wrapper env file after startup failure', {
-            envFilePath,
-            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-          });
-        }
-      }
-
-      // Capture process stdout/stderr for diagnostics (best-effort)
-      let stdout: string | undefined;
-      let stderr: string | undefined;
-      if (proc) {
-        try {
-          let logsTimeoutId: ReturnType<typeof setTimeout> | undefined;
-          const logs = await Promise.race([
-            proc.getLogs(),
-            new Promise<never>((_, reject) => {
-              logsTimeoutId = setTimeout(() => reject(new Error('getLogs timed out')), 5_000);
-            }),
-          ]);
-          clearTimeout(logsTimeoutId);
-          stdout = logs.stdout;
-          stderr = logs.stderr;
-        } catch (logError) {
-          logger.debug('Failed to read wrapper process logs', {
+        } catch {
+          logger.warn('Wrapper startup env cleanup failed', {
             port: this.port,
-            processId: proc.id,
-            error: logError instanceof Error ? logError.message : String(logError),
+            processId: proc?.id,
+            timeoutMs: maxWaitMs,
           });
         }
-      }
-
-      // Read the wrapper's own log file for richer diagnostics (logToFile output)
-      let wrapperFileLog: string | undefined;
-      try {
-        const quotedWrapperLogPath = `'${wrapperLogPath.replace(/'/g, "'\\''")}'`;
-        const logResult = await this.session.exec(`cat ${quotedWrapperLogPath} 2>/dev/null`);
-        const content = logResult.stdout?.trim();
-        if (content) {
-          wrapperFileLog = content;
-        }
-      } catch (logFileError) {
-        logger.debug('Failed to read wrapper log file', {
-          wrapperLogPath,
-          error: logFileError instanceof Error ? logFileError.message : String(logFileError),
-        });
       }
 
       // Kill the failed process (proc.kill() is unreliable in the sandbox SDK,
@@ -737,27 +724,13 @@ export class WrapperClient {
         // Process may already be dead - ignore
       }
 
-      const diagParts = [
-        startupError.message,
-        stdout ? `stdout: ${stdout}` : undefined,
-        stderr ? `stderr: ${stderr}` : undefined,
-        wrapperFileLog ? `wrapperFileLog: ${wrapperFileLog}` : undefined,
-      ]
-        .filter(Boolean)
-        .join(' | ');
-
       logger.error('Wrapper startup failed', {
         port: this.port,
-        error: startupError.message,
-        stdout,
-        stderr,
-        wrapperFileLog,
+        processId: proc?.id,
+        timeoutMs: maxWaitMs,
       });
 
-      throw new WrapperNotReadyError(
-        `Wrapper did not become ready on port ${this.port} within ${maxWaitMs}ms: ${diagParts}`,
-        { cause: startupError }
-      );
+      throw new WrapperNotReadyError('Wrapper did not become ready');
     }
   }
 

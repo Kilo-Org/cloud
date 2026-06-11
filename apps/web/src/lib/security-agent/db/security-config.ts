@@ -59,6 +59,19 @@ export async function upsertSecurityAgentConfig(
 
   const wasAutoAnalysisEnabled = existingConfig?.config.auto_analysis_enabled ?? false;
   const isNowAutoAnalysisEnabled = fullConfig.auto_analysis_enabled;
+  const wasAutoRemediationEnabled = existingConfig?.config.auto_remediation_enabled ?? false;
+  const isNowAutoRemediationEnabled = fullConfig.auto_remediation_enabled;
+
+  if (
+    isNowAutoRemediationEnabled &&
+    (!wasAutoRemediationEnabled || !fullConfig.auto_remediation_enabled_at)
+  ) {
+    fullConfig.auto_remediation_enabled_at = new Date().toISOString();
+  }
+  if (!fullConfig.remediation_model_slug) {
+    fullConfig.remediation_model_slug =
+      fullConfig.analysis_model_slug ?? fullConfig.model_slug ?? fullConfig.triage_model_slug;
+  }
 
   await upsertAgentConfigForOwner({
     owner,

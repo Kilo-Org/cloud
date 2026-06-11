@@ -15,6 +15,7 @@
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   },
   "dependencies": {

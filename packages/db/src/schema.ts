@@ -4971,8 +4971,236 @@ export const security_analysis_owner_state = pgTable(
 
 export type SecurityAnalysisOwnerState = typeof security_analysis_owner_state.$inferSelect;
 
-export type SecurityAgentCommandType = 'sync' | 'dismiss_finding' | 'start_analysis';
-export type SecurityAgentCommandOrigin = 'manual' | 'dashboard_refresh' | 'enable_initial_sync';
+export type SecurityRemediationStatus =
+  | 'queued'
+  | 'running'
+  | 'pr_opened'
+  | 'failed'
+  | 'blocked'
+  | 'no_changes_needed'
+  | 'cancelled';
+export type SecurityRemediationAttemptStatus =
+  | 'queued'
+  | 'launching'
+  | 'running'
+  | 'pr_opened'
+  | 'failed'
+  | 'blocked'
+  | 'no_changes_needed'
+  | 'cancelled';
+export type SecurityRemediationOrigin = 'auto_policy' | 'bulk_existing' | 'manual';
+
+export const security_remediations = pgTable(
+  'security_remediations',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    finding_id: uuid()
+      .notNull()
+      .references(() => security_findings.id, { onDelete: 'cascade' }),
+    repo_full_name: text().notNull(),
+    status: text().$type<SecurityRemediationStatus>().notNull().default('queued'),
+    latest_attempt_id: uuid(),
+    latest_analysis_fingerprint: text(),
+    latest_analysis_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    pr_url: text(),
+    pr_number: integer(),
+    pr_draft: boolean(),
+    pr_head_branch: text(),
+    pr_base_branch: text(),
+    failure_code: text(),
+    blocked_reason: text(),
+    outcome_summary: text(),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_security_remediations_finding_id').on(table.finding_id),
+    check(
+      'security_remediations_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'security_remediations_status_check',
+      sql`${table.status} IN ('queued', 'running', 'pr_opened', 'failed', 'blocked', 'no_changes_needed', 'cancelled')`
+    ),
+    index('idx_security_remediations_org_status').on(table.owned_by_organization_id, table.status),
+    index('idx_security_remediations_user_status').on(table.owned_by_user_id, table.status),
+    index('idx_security_remediations_repo_status').on(table.repo_full_name, table.status),
+    index('idx_security_remediations_latest_attempt').on(table.latest_attempt_id),
+  ]
+);
+
+export type SecurityRemediation = typeof security_remediations.$inferSelect;
+export type NewSecurityRemediation = typeof security_remediations.$inferInsert;
+
+export const security_remediation_attempts = pgTable(
+  'security_remediation_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    remediation_id: uuid()
+      .notNull()
+      .references(() => security_remediations.id, { onDelete: 'cascade' }),
+    finding_id: uuid()
+      .notNull()
+      .references(() => security_findings.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+    }),
+    repo_full_name: text().notNull(),
+    origin: text().$type<SecurityRemediationOrigin>().notNull(),
+    status: text().$type<SecurityRemediationAttemptStatus>().notNull().default('queued'),
+    attempt_number: integer().notNull(),
+    retry_of_attempt_id: uuid(),
+    requested_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+    }),
+    analysis_fingerprint: text().notNull(),
+    analysis_completed_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    remediation_model_slug: text().notNull(),
+    branch_name: text().notNull(),
+    cloud_agent_session_id: text(),
+    kilo_session_id: text(),
+    execution_id: text(),
+    priority: smallint().notNull().default(50),
+    claim_token: text(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_by_job_id: text(),
+    launch_attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    callback_attempt_token_hash: text(),
+    failure_code: text(),
+    blocked_reason: text(),
+    last_error_redacted: text(),
+    structured_result: jsonb().$type<Record<string, unknown>>(),
+    final_assistant_message: text(),
+    validation_evidence: jsonb().$type<Record<string, unknown>[]>(),
+    risk_notes: text(),
+    draft_reason: text(),
+    pr_url: text(),
+    pr_number: integer(),
+    pr_draft: boolean(),
+    pr_head_branch: text(),
+    pr_base_branch: text(),
+    cancellation_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
+    cancellation_requested_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+    }),
+    queued_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    launched_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_remediation_attempts_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'security_remediation_attempts_status_check',
+      sql`${table.status} IN ('queued', 'launching', 'running', 'pr_opened', 'failed', 'blocked', 'no_changes_needed', 'cancelled')`
+    ),
+    check(
+      'security_remediation_attempts_origin_check',
+      sql`${table.origin} IN ('auto_policy', 'bulk_existing', 'manual')`
+    ),
+    check('security_remediation_attempts_attempt_number_check', sql`${table.attempt_number} >= 1`),
+    check(
+      'security_remediation_attempts_launch_attempt_count_check',
+      sql`${table.launch_attempt_count} >= 0`
+    ),
+    uniqueIndex('UQ_security_remediation_attempts_number').on(
+      table.remediation_id,
+      table.attempt_number
+    ),
+    uniqueIndex('UQ_security_remediation_attempts_active_finding')
+      .on(table.finding_id)
+      .where(sql`${table.status} IN ('queued', 'launching', 'running')`),
+    uniqueIndex('UQ_security_remediation_attempts_active_remediation')
+      .on(table.remediation_id)
+      .where(sql`${table.status} IN ('queued', 'launching', 'running')`),
+    uniqueIndex('UQ_security_remediation_attempts_finding_fingerprint_terminal')
+      .on(table.finding_id, table.analysis_fingerprint)
+      .where(sql`${table.status} IN ('queued', 'launching', 'running', 'pr_opened')`),
+    index('idx_security_remediation_attempts_org_claim')
+      .on(
+        table.owned_by_organization_id,
+        sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+        table.priority,
+        table.queued_at,
+        table.id
+      )
+      .where(sql`${table.status} = 'queued'`),
+    index('idx_security_remediation_attempts_user_claim')
+      .on(
+        table.owned_by_user_id,
+        sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+        table.priority,
+        table.queued_at,
+        table.id
+      )
+      .where(sql`${table.status} = 'queued'`),
+    index('idx_security_remediation_attempts_repo_claim')
+      .on(
+        table.repo_full_name,
+        sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+        table.priority,
+        table.queued_at,
+        table.id
+      )
+      .where(sql`${table.status} = 'queued'`),
+    index('idx_security_remediation_attempts_org_inflight')
+      .on(table.owned_by_organization_id, table.status, table.claimed_at, table.id)
+      .where(sql`${table.status} IN ('launching', 'running')`),
+    index('idx_security_remediation_attempts_user_inflight')
+      .on(table.owned_by_user_id, table.status, table.claimed_at, table.id)
+      .where(sql`${table.status} IN ('launching', 'running')`),
+    index('idx_security_remediation_attempts_repo_inflight')
+      .on(table.repo_full_name, table.status, table.claimed_at, table.id)
+      .where(sql`${table.status} IN ('launching', 'running')`),
+    index('idx_security_remediation_attempts_cloud_agent_session').on(table.cloud_agent_session_id),
+    index('idx_security_remediation_attempts_finding_fingerprint').on(
+      table.finding_id,
+      table.analysis_fingerprint
+    ),
+  ]
+);
+
+export type SecurityRemediationAttempt = typeof security_remediation_attempts.$inferSelect;
+export type NewSecurityRemediationAttempt = typeof security_remediation_attempts.$inferInsert;
+
+export type SecurityAgentCommandType =
+  | 'sync'
+  | 'dismiss_finding'
+  | 'start_analysis'
+  | 'apply_auto_remediation';
+export type SecurityAgentCommandOrigin =
+  | 'manual'
+  | 'dashboard_refresh'
+  | 'enable_initial_sync'
+  | 'settings_include_existing';
 export type SecurityAgentCommandStatus = 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
 
 export const security_agent_commands = pgTable(
@@ -4991,6 +5219,7 @@ export const security_agent_commands = pgTable(
     repo_full_name: text(),
     status: text().$type<SecurityAgentCommandStatus>().notNull().default('accepted'),
     result_code: text(),
+    result_metadata: jsonb().$type<Record<string, unknown>>(),
     last_error_redacted: text(),
     accepted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -5011,11 +5240,11 @@ export const security_agent_commands = pgTable(
     ),
     check(
       'security_agent_commands_type_check',
-      sql`${table.command_type} IN ('sync', 'dismiss_finding', 'start_analysis')`
+      sql`${table.command_type} IN ('sync', 'dismiss_finding', 'start_analysis', 'apply_auto_remediation')`
     ),
     check(
       'security_agent_commands_origin_check',
-      sql`${table.origin} IN ('manual', 'dashboard_refresh', 'enable_initial_sync')`
+      sql`${table.origin} IN ('manual', 'dashboard_refresh', 'enable_initial_sync', 'settings_include_existing')`
     ),
     check(
       'security_agent_commands_status_check',

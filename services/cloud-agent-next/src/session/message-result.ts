@@ -6,11 +6,10 @@ import {
 import {
   lookupSessionMessageState,
   type SessionMessageCompletionSource,
-  type SessionMessageFailureCode,
-  type SessionMessageFailureStage,
   type SessionMessageState,
   type SessionMessageStorage,
 } from './session-message-state.js';
+import { projectSafeFailure, type SafeFailureProjection } from './safe-failure-projection.js';
 
 export type SafeMessageResult = {
   messageId: string;
@@ -20,11 +19,7 @@ export type SafeMessageResult = {
   acceptedAt?: number;
   terminalAt?: number;
   completionSource?: SessionMessageCompletionSource;
-  failure?: {
-    stage?: SessionMessageFailureStage;
-    code?: SessionMessageFailureCode;
-    attempts?: number;
-  };
+  failure?: SafeFailureProjection;
   gateResult?: 'pass' | 'fail';
 };
 
@@ -50,23 +45,8 @@ type ResolvedSessionMessageResult =
 
 type MessageResultStorage = SessionMessageStorage & SessionQueueStorage;
 
-function projectFailure(state: SessionMessageState): SafeMessageResult['failure'] {
-  if (
-    state.failureStage === undefined &&
-    state.failureCode === undefined &&
-    state.attempts === undefined
-  ) {
-    return undefined;
-  }
-  return {
-    stage: state.failureStage,
-    code: state.failureCode,
-    attempts: state.attempts,
-  };
-}
-
 function projectLifecycleState(state: SessionMessageState): ResolvedSessionMessageResult {
-  const failure = projectFailure(state);
+  const failure = projectSafeFailure(state);
   const assistantLookup: AssistantLookup | undefined =
     state.status === 'completed' && state.assistantMessageId
       ? {

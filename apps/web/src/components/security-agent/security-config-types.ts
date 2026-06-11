@@ -10,6 +10,7 @@ export type SlaConfig = {
 export type AnalysisMode = 'auto' | 'shallow' | 'deep';
 export type AutoDismissConfidenceThreshold = 'high' | 'medium' | 'low';
 export type AutoAnalysisMinSeverity = 'critical' | 'high' | 'medium' | 'all';
+export type AutoRemediationMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 export type RepositorySelectionMode = 'all' | 'selected';
 
 export type SecurityRepository = {
@@ -31,6 +32,10 @@ export type SecurityConfigFormState = {
   autoAnalysisEnabled: boolean;
   autoAnalysisMinSeverity: AutoAnalysisMinSeverity;
   autoAnalysisIncludeExisting: boolean;
+  autoRemediationEnabled: boolean;
+  autoRemediationMinSeverity: AutoRemediationMinSeverity;
+  autoRemediationIncludeExisting: boolean;
+  remediationModelSlug: string;
 };
 
 export type SecurityConfigSavePayload = SlaConfig &

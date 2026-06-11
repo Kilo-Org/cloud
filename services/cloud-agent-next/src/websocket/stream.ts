@@ -25,6 +25,7 @@ import type {
 } from '../shared/protocol.js';
 import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
+import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 
 /**
  * Approximate byte budget per replay round.
@@ -88,14 +89,7 @@ export type QueuedMessageSnapshot = {
   messageId: string;
   content: string;
   timestamp: number;
-  terminalFailure?: {
-    status: 'failed' | 'interrupted';
-    completionSource?: string;
-    reason?: string;
-    error?: string;
-    attempts?: number;
-    timestamp: number;
-  };
+  terminalFailure?: CloudMessageFailedPayload & { timestamp: number };
 };
 
 /** Options for deriving current session state in the `connected` event. */
@@ -283,14 +277,8 @@ export function createStreamHandler(
               streamEventType: 'cloud.message.failed' as const,
               timestamp: new Date(msg.terminalFailure.timestamp).toISOString(),
               data: {
-                messageId: msg.messageId,
-                status: msg.terminalFailure.status,
-                delivery: 'queued',
-                accepted: false,
-                completionSource: msg.terminalFailure.completionSource,
-                reason: msg.terminalFailure.reason,
-                attempts: msg.terminalFailure.attempts,
-                error: msg.terminalFailure.error,
+                ...msg.terminalFailure,
+                timestamp: undefined,
               },
             })
           );

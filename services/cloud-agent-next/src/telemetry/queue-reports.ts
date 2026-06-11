@@ -5,7 +5,9 @@ import {
   type CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { logger } from '../logger.js';
+import { workspaceFailureMessage } from '../session/safe-failure-projection.js';
 import type { SessionMessageState } from '../session/session-message-state.js';
+import { isWorkspaceFailureSubtype } from '../shared/wrapper-bootstrap.js';
 
 type ReportQueue = {
   send(report: CloudAgentQueueReport): Promise<unknown>;
@@ -68,11 +70,10 @@ function diagnosticForFailedRun(
 
   let errorMessageRedacted =
     state.failureCode === undefined ? undefined : FAILED_RUN_DIAGNOSTIC_MESSAGES[state.failureCode];
-  if (
-    state.failureCode === 'workspace_setup_failed' &&
-    state.error?.toLowerCase().includes('no space left on device')
-  ) {
-    errorMessageRedacted = 'Workspace setup failed: sandbox storage full';
+  if (state.failureCode === 'workspace_setup_failed') {
+    errorMessageRedacted = isWorkspaceFailureSubtype(state.failureSubtype)
+      ? workspaceFailureMessage(state.failureSubtype)
+      : 'Workspace setup failed';
   } else if (isKnownInsufficientCreditFailure(state)) {
     errorMessageRedacted = 'Model request failed: insufficient credits';
   }

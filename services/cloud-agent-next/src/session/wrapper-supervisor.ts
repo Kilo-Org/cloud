@@ -9,6 +9,7 @@ import type {
 import type { AgentRuntime } from './agent-runtime.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS, WRAPPER_PING_INTERVAL_MS } from './agent-runtime.js';
 import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
+import { classifyAssistantFailureMessage } from './safe-failure-projection.js';
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
 import type { SessionMessageQueue } from './session-message-queue.js';
 import {
@@ -87,6 +88,8 @@ export type WrapperTerminalEvent = {
   wrapperRunId: string;
   status: 'completed' | 'failed' | 'interrupted';
   error?: string;
+  errorSource?: 'assistant';
+  interruptionSource?: 'container_shutdown';
   gateResult?: 'pass' | 'fail';
   messageIds?: string[];
 };
@@ -199,6 +202,18 @@ function getAssistantErrorMessage(error: unknown): string | undefined {
     }
   }
   return 'Assistant message failed';
+}
+
+function getWrapperInterruptionFailureCode(
+  interruptionSource: WrapperTerminalEvent['interruptionSource'],
+  error: string | undefined
+): 'container_shutdown' | 'system_interrupt' {
+  if (interruptionSource === 'container_shutdown') return 'container_shutdown';
+
+  // Preserve classification for wrappers already running during deployment.
+  return error === 'Container shutdown: SIGTERM' || error === 'Container shutdown: SIGINT'
+    ? 'container_shutdown'
+    : 'system_interrupt';
 }
 
 export function createWrapperSupervisor(
@@ -752,6 +767,7 @@ export function createWrapperSupervisor(
           completionSource: 'idle_reconciliation',
           failureStage: 'agent_activity',
           failureCode: 'assistant_error',
+          safeFailureMessage: classifyAssistantFailureMessage(assistantError),
         });
       } else if (assistantMessage) {
         await observeCorrelatedAgentActivity?.(messageId);
@@ -910,7 +926,8 @@ export function createWrapperSupervisor(
   }
 
   async function onTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
-    const { wrapperRunId, status, error, gateResult, messageIds } = params;
+    const { wrapperRunId, status, error, errorSource, interruptionSource, gateResult, messageIds } =
+      params;
     const sessionId = getSessionIdForLogs();
     const state = await getWrapperRuntimeState(storage);
     if (
@@ -930,7 +947,8 @@ export function createWrapperSupervisor(
         sessionId,
         wrapperRunId,
         status,
-        error,
+        errorSource,
+        interruptionSource,
         gateResult,
         messageCount: messageIds?.length,
       })
@@ -946,6 +964,19 @@ export function createWrapperSupervisor(
       const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
       for (const message of acceptedMessages) {
         if (status === 'failed') {
+          if (errorSource === 'assistant') {
+            await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
+              kind: 'failed',
+              reason: 'assistant_error',
+              error: error ?? 'Assistant request failed',
+              completionSource: 'wrapper_failure',
+              failureStage: 'agent_activity',
+              failureCode: 'assistant_error',
+              safeFailureMessage: classifyAssistantFailureMessage(error),
+            });
+            continue;
+          }
+
           const activityObserved = message.agentActivityObservedAt !== undefined;
           await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
             kind: 'failed',
@@ -965,7 +996,7 @@ export function createWrapperSupervisor(
           error: error ?? 'Wrapper interrupted',
           completionSource: 'interrupt',
           failureStage: 'interruption',
-          failureCode: 'system_interrupt',
+          failureCode: getWrapperInterruptionFailureCode(interruptionSource, error),
         });
       }
     }

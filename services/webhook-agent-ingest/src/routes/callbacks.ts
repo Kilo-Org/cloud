@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { HonoContext } from '../index';
 import { logger } from '../util/logger';
 import { resError, resSuccess, verifyCallbackToken } from '@kilocode/worker-utils';
+import { CloudAgentCallbackFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { withDORetry } from '../util/do-retry';
 
 const callbacks = new Hono<HonoContext>();
@@ -13,6 +14,7 @@ const ExecutionCallbackPayloadSchema = z.object({
   executionId: z.string(),
   status: z.enum(['completed', 'failed', 'interrupted']),
   errorMessage: z.string().optional(),
+  failure: CloudAgentCallbackFailureSchema,
   lastSeenBranch: z.string().optional(),
   kiloSessionId: z.string().optional(),
 });
@@ -95,7 +97,7 @@ callbacks.post('/execution', async c => {
       doStub.updateRequest(requestId, {
         process_status: payload.status === 'completed' ? 'success' : 'failed',
         completed_at: new Date().toISOString(),
-        error_message: payload.errorMessage,
+        error_message: payload.failure?.message ?? payload.errorMessage,
       }),
     'updateRequest'
   );

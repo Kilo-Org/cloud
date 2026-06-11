@@ -57,16 +57,11 @@ describe('sandbox recovery', () => {
     expect(isSandboxInternalServerError(error)).toBe(true);
   });
 
-  it('classifies wrapper not-ready errors caused by sandbox startup 500s', () => {
-    const cause = new Error('Process exited before ready');
-    Object.assign(cause, {
-      name: 'ProcessExitedBeforeReadyError',
-      httpStatus: 500,
-    });
+  it('does not attach sandbox startup failures to wrapper not-ready errors', () => {
+    const error = new WrapperNotReadyError('Wrapper did not become ready');
 
-    const error = new WrapperNotReadyError('Wrapper did not become ready', { cause });
-
-    expect(isSandboxInternalServerError(error)).toBe(true);
+    expect(error.cause).toBeUndefined();
+    expect(isSandboxInternalServerError(error)).toBe(false);
   });
 
   it('does not classify execution errors by wrapper message alone', () => {

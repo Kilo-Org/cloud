@@ -14,6 +14,7 @@ type ManualAnalysisStartParams = {
     triageModel?: string;
     analysisModel?: string;
   };
+  forceSandbox?: boolean;
   retrySandboxOnly?: boolean;
 };
 
@@ -48,6 +49,7 @@ export async function submitManualAnalysisStart(
         owner: params.owner,
         actorUserId: params.actorUserId,
         requestedModels: params.requestedModels,
+        forceSandbox: params.forceSandbox,
         retrySandboxOnly: params.retrySandboxOnly,
       }),
     }

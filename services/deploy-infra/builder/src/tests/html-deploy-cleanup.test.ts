@@ -179,6 +179,44 @@ describe('HTML deployment expiry cleanup', () => {
     expect(completeUnclaimed).toHaveBeenCalledWith(db, { internalWorkerName: 'qdpl-uuid' });
   });
 
+  it('authenticates dispatcher cleanup with the dedicated dispatcher token', async () => {
+    jest.spyOn(dbClient, 'getWorkerDb').mockReturnValue(db);
+    jest.spyOn(repository, 'claimDueEphemeralDeployments').mockResolvedValue([
+      {
+        id: 'deployment-uuid',
+        internalWorkerName: 'qdpl-uuid',
+        deploymentSlug: 'friendly-slug',
+      },
+    ]);
+    jest.spyOn(repository, 'completeClaimedEphemeralDeploymentCleanup').mockResolvedValue(true);
+    jest.spyOn(repository, 'retryClaimedEphemeralDeploymentCleanup').mockResolvedValue(true);
+    jest.spyOn(CloudflareAPI.prototype, 'deleteWorker').mockResolvedValue();
+    const dispatcherRequests: Request[] = [];
+    const deployDispatcher = {
+      fetch: jest.fn(async (request: Request) => {
+        dispatcherRequests.push(request);
+        return new Response(null, { status: 204 });
+      }),
+    } as unknown as Fetcher;
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://cleanup' },
+      CLOUDFLARE_ACCOUNT_ID: 'account-id',
+      CLOUDFLARE_API_TOKEN: 'api-token',
+      BACKEND_AUTH_TOKEN: 'backend-token',
+      DISPATCHER_AUTH_TOKEN: 'dispatcher-token',
+      DeployDispatcher: deployDispatcher,
+      DEPLOY_HOSTNAME_BASE: 'd.kiloapps.io',
+    } as unknown as Env;
+
+    await runEphemeralDeploymentCleanup(env);
+
+    expect(dispatcherRequests).toHaveLength(2);
+    expect(dispatcherRequests.map(request => request.headers.get('Authorization'))).toEqual([
+      'Bearer dispatcher-token',
+      'Bearer dispatcher-token',
+    ]);
+  });
+
   it('claims a batch and continues cleanup after a partial teardown failure', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(1_000);
     const claimToken = '00000000-0000-4000-8000-000000000001';
@@ -221,6 +259,7 @@ describe('HTML deployment expiry cleanup', () => {
       CLOUDFLARE_ACCOUNT_ID: 'account-id',
       CLOUDFLARE_API_TOKEN: 'api-token',
       BACKEND_AUTH_TOKEN: 'backend-token',
+      DISPATCHER_AUTH_TOKEN: 'dispatcher-token',
       DeployDispatcher: {},
       DEPLOY_HOSTNAME_BASE: 'd.kiloapps.io',
     } as unknown as Env;

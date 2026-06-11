@@ -18,12 +18,24 @@ import {
   type SessionMessageStorage,
   type TerminalizeParams,
 } from './session-message-state.js';
+import { projectSafeFailure, type SafeFailureProjection } from './safe-failure-projection.js';
 import type { AssistantMessagePart, LatestAssistantMessage } from './types.js';
 
 const CURRENT_IDLE_BATCH_CALLBACK_KEY = 'idle_batch_callback_current';
 const IDLE_BATCH_CALLBACK_PREFIX = 'idle_batch_callback:';
 const CALLBACK_ENQUEUE_RETRY_DELAY_MS = 30_000;
 const PUSH_DISPATCH_RETRY_DELAY_MS = 30_000;
+const LEGACY_FAILURE_REASONS = new Set([
+  'exhausted',
+  'wrapper_failure',
+  'wrapper_disconnected',
+  'wrapper_protocol_error',
+  'assistant_error',
+  'missing_assistant_reply',
+  'startup-failed',
+  'wrapper_error',
+  'interrupted',
+]);
 
 type IdleBatchCallbackState = {
   batchId: string;
@@ -47,6 +59,45 @@ type PersistedMessageEvent = {
   timestamp: number;
   entityId: string;
 };
+
+export type CloudMessageFailedPayload = {
+  messageId: string;
+  status: 'failed' | 'interrupted';
+  delivery: 'sent' | 'queued';
+  accepted: boolean;
+  completionSource?: string;
+  reason?: string;
+  attempts?: number;
+  error?: string;
+  failure?: SafeFailureProjection;
+};
+
+export function buildCloudMessageFailedPayload(
+  state: SessionMessageState
+): CloudMessageFailedPayload {
+  const wasAccepted = state.status === 'accepted' || state.acceptedAt !== undefined;
+  if (state.status !== 'failed' && state.status !== 'interrupted') {
+    throw new Error(`Cannot build failure payload for ${state.status} message`);
+  }
+  const failure = projectSafeFailure(state);
+  const fallbackMessage =
+    state.status === 'failed' ? 'The message failed' : 'The message was interrupted';
+  const reason =
+    state.failureReason && LEGACY_FAILURE_REASONS.has(state.failureReason)
+      ? state.failureReason
+      : fallbackMessage;
+  return {
+    messageId: state.messageId,
+    status: state.status,
+    delivery: wasAccepted ? 'sent' : 'queued',
+    accepted: wasAccepted,
+    completionSource: state.completionSource,
+    reason,
+    attempts: state.attempts,
+    error: failure?.message ?? fallbackMessage,
+    failure,
+  };
+}
 
 export type MessageSettlementOutboxStorage = SessionQueueStorage & SessionMessageStorage;
 
@@ -320,28 +371,9 @@ export function createMessageSettlementOutbox(
     });
   }
 
-  async function emitSessionMessageFailed(
-    state: SessionMessageState,
-    extra?: { error?: string }
-  ): Promise<void> {
+  async function emitSessionMessageFailed(state: SessionMessageState): Promise<void> {
     const sessionId = await requireSessionId();
-    const wasAccepted = state.status === 'accepted' || state.acceptedAt !== undefined;
-    const payload: Record<string, unknown> = {
-      messageId: state.messageId,
-      status: state.status,
-      delivery: wasAccepted ? 'sent' : 'queued',
-      accepted: wasAccepted,
-      completionSource: state.completionSource,
-      reason: state.failureReason,
-    };
-    if (state.attempts !== undefined) {
-      payload.attempts = state.attempts;
-    }
-    if (extra?.error !== undefined) {
-      payload.error = extra.error;
-    } else if (state.error) {
-      payload.error = state.error;
-    }
+    const payload = buildCloudMessageFailedPayload(state);
     ensureTerminalMessageEvent({
       entityId: `terminal-message/${state.messageId}`,
       sessionId,
@@ -403,13 +435,20 @@ export function createMessageSettlementOutbox(
       }
     }
 
+    const failure = projectSafeFailure(state);
+    const legacyErrorMessage =
+      status === 'completed'
+        ? undefined
+        : (failure?.message ??
+          (status === 'failed' ? 'The message failed' : 'The message was interrupted'));
     const payload: CallbackJob['payload'] = {
       sessionId,
       cloudAgentSessionId: sessionId,
       executionId: state.messageId,
       messageId: state.messageId,
       status,
-      errorMessage: state.error,
+      errorMessage: legacyErrorMessage,
+      failure,
       lastSeenBranch: metadata?.repository?.upstreamBranch,
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,
@@ -510,12 +549,17 @@ export function createMessageSettlementOutbox(
     }
 
     try {
+      const failureMessage =
+        state.status === 'completed'
+          ? undefined
+          : (projectSafeFailure(state)?.message ??
+            (state.status === 'failed' ? 'The message failed' : 'The message was interrupted'));
       const result = await sendPushNotification({
         userId: metadata.identity.userId,
         cliSessionId,
         executionId: state.messageId,
         status: state.status,
-        body: buildCloudAgentPushBody(state.status, lastAssistantMessageText, state.error),
+        body: buildCloudAgentPushBody(state.status, lastAssistantMessageText, failureMessage),
       });
       if (result.dispatched) {
         return 'accounted';
@@ -666,7 +710,7 @@ export function createMessageSettlementOutbox(
       if (state.status === 'completed') {
         await emitSessionMessageCompleted(state, { gateResult: state.gateResult });
       } else if (state.status === 'failed' || state.status === 'interrupted') {
-        await emitSessionMessageFailed(state, { error: state.error });
+        await emitSessionMessageFailed(state);
       }
       await putSessionMessageState(storage, {
         ...state,

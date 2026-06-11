@@ -569,6 +569,48 @@ describe('terminalizeMessageOnce', () => {
     expect(result.state?.failureReason).toBe('interrupted');
   });
 
+  it('stores validated workspace failure diagnostics without changing the raw error', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000)
+    );
+
+    const result = await terminalizeMessageOnce(storage, VALID_MESSAGE_ID, {
+      kind: 'failed',
+      reason: 'exhausted',
+      error: 'raw compatibility error',
+      completionSource: 'delivery_failure',
+      failureCode: 'workspace_setup_failed',
+      failureSubtype: 'git_clone_timeout',
+      safeFailureMessage: 'Repository clone timed out',
+    });
+
+    expect(result.state).toMatchObject({
+      error: 'raw compatibility error',
+      failureSubtype: 'git_clone_timeout',
+      safeFailureMessage: 'Repository clone timed out',
+    });
+  });
+
+  it('rejects workspace failure subtypes on non-workspace failures', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000)
+    );
+
+    await expect(
+      terminalizeMessageOnce(storage, VALID_MESSAGE_ID, {
+        kind: 'failed',
+        reason: 'exhausted',
+        completionSource: 'delivery_failure',
+        failureCode: 'wrapper_start_failed',
+        failureSubtype: 'git_clone_timeout',
+      })
+    ).rejects.toThrow('Workspace failure subtype requires workspace_setup_failed failure code');
+  });
+
   it('returns changed=false for unknown messageId', async () => {
     const storage = createFakeStorage();
     const result = await terminalizeMessageOnce(

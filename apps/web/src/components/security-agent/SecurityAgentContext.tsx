@@ -54,6 +54,11 @@ type SecurityAgentContextValue = {
         autoAnalysisEnabled: boolean;
         autoAnalysisMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoAnalysisIncludeExisting: boolean;
+        autoRemediationEnabled: boolean;
+        autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
+        autoRemediationIncludeExisting: boolean;
+        autoRemediationEnabledAt: string | null;
+        remediationModelSlug?: string;
       }
     | undefined;
   refetchConfig: () => Promise<unknown>;
@@ -83,6 +88,10 @@ type SecurityAgentContextValue = {
       autoAnalysisEnabled: boolean;
       autoAnalysisMinSeverity: 'critical' | 'high' | 'medium' | 'all';
       autoAnalysisIncludeExisting: boolean;
+      autoRemediationEnabled: boolean;
+      autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
+      autoRemediationIncludeExisting: boolean;
+      remediationModelSlug: string;
     }
   ) => void;
   handleToggleEnabled: (
@@ -92,7 +101,13 @@ type SecurityAgentContextValue = {
       selectedRepositoryIds: number[];
     }
   ) => void;
-  handleStartAnalysis: (findingId: string, options?: { retrySandboxOnly?: boolean }) => void;
+  handleStartAnalysis: (
+    findingId: string,
+    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean }
+  ) => void;
+  handleStartRemediation: (findingId: string) => void;
+  handleRetryRemediation: (findingId: string) => void;
+  handleCancelRemediation: (attemptId: string, findingId?: string) => void;
   handleDeleteFindings: (repoFullName: string, onSuccess?: () => void) => void;
 
   // Mutation states
@@ -104,6 +119,8 @@ type SecurityAgentContextValue = {
 
   // Analysis tracking
   startingAnalysisIds: Set<string>;
+  startingRemediationIds: Set<string>;
+  cancellingRemediationAttemptIds: Set<string>;
 
   // GitHub error
   gitHubError: string | null;
@@ -137,7 +154,7 @@ const EMPTY_ORPHANED_REPOSITORIES: SecurityAgentContextValue['orphanedRepositori
 
 export type SecurityAgentCommand = {
   id: string;
-  commandType: 'sync' | 'dismiss_finding' | 'start_analysis';
+  commandType: 'sync' | 'dismiss_finding' | 'start_analysis' | 'apply_auto_remediation';
   findingId: string | null;
   status: 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
   resultCode: string | null;
@@ -203,6 +220,8 @@ export function shouldRunSecurityAgentCommandSuccessCallback(
 
 type SecurityAgentProviderState = {
   optimisticStartingAnalysisIds: Set<string>;
+  optimisticStartingRemediationIds: Set<string>;
+  optimisticCancellingRemediationAttemptIds: Set<string>;
   trackedCommandIds: Set<string>;
   processedTerminalCommandIds: Set<string>;
   gitHubError: string | null;
@@ -212,6 +231,10 @@ type SecurityAgentProviderAction =
   | { type: 'track-command'; commandId: string }
   | { type: 'add-optimistic-analysis'; findingId: string }
   | { type: 'remove-optimistic-analysis'; findingId: string }
+  | { type: 'add-optimistic-remediation'; findingId: string }
+  | { type: 'remove-optimistic-remediation'; findingId: string }
+  | { type: 'add-cancelling-remediation'; attemptId: string }
+  | { type: 'remove-cancelling-remediation'; attemptId: string }
   | { type: 'settle-commands'; commands: SecurityAgentCommand[]; gitHubError?: string }
   | { type: 'prune-processed-commands'; polledCommandIds: Set<string> }
   | { type: 'set-github-error'; error: string | null };
@@ -219,6 +242,8 @@ type SecurityAgentProviderAction =
 function createSecurityAgentProviderState(): SecurityAgentProviderState {
   return {
     optimisticStartingAnalysisIds: new Set(),
+    optimisticStartingRemediationIds: new Set(),
+    optimisticCancellingRemediationAttemptIds: new Set(),
     trackedCommandIds: new Set(),
     processedTerminalCommandIds: new Set(),
     gitHubError: null,
@@ -247,17 +272,49 @@ function securityAgentProviderReducer(
       optimisticStartingAnalysisIds.delete(action.findingId);
       return { ...state, optimisticStartingAnalysisIds };
     }
+    case 'add-optimistic-remediation':
+      return {
+        ...state,
+        optimisticStartingRemediationIds: new Set(state.optimisticStartingRemediationIds).add(
+          action.findingId
+        ),
+      };
+    case 'remove-optimistic-remediation': {
+      const optimisticStartingRemediationIds = new Set(state.optimisticStartingRemediationIds);
+      optimisticStartingRemediationIds.delete(action.findingId);
+      return { ...state, optimisticStartingRemediationIds };
+    }
+    case 'add-cancelling-remediation':
+      return {
+        ...state,
+        optimisticCancellingRemediationAttemptIds: new Set(
+          state.optimisticCancellingRemediationAttemptIds
+        ).add(action.attemptId),
+      };
+    case 'remove-cancelling-remediation': {
+      const optimisticCancellingRemediationAttemptIds = new Set(
+        state.optimisticCancellingRemediationAttemptIds
+      );
+      optimisticCancellingRemediationAttemptIds.delete(action.attemptId);
+      return { ...state, optimisticCancellingRemediationAttemptIds };
+    }
     case 'settle-commands': {
       const optimisticStartingAnalysisIds = new Set(state.optimisticStartingAnalysisIds);
+      const optimisticStartingRemediationIds = new Set(state.optimisticStartingRemediationIds);
       const trackedCommandIds = new Set(state.trackedCommandIds);
       const processedTerminalCommandIds = new Set(state.processedTerminalCommandIds);
       for (const command of action.commands) {
-        if (command.findingId) optimisticStartingAnalysisIds.delete(command.findingId);
+        if (command.findingId) {
+          optimisticStartingAnalysisIds.delete(command.findingId);
+          optimisticStartingRemediationIds.delete(command.findingId);
+        }
         trackedCommandIds.delete(command.id);
         processedTerminalCommandIds.add(command.id);
       }
       return {
         optimisticStartingAnalysisIds,
+        optimisticStartingRemediationIds,
+        optimisticCancellingRemediationAttemptIds: state.optimisticCancellingRemediationAttemptIds,
         trackedCommandIds,
         processedTerminalCommandIds,
         gitHubError: action.gitHubError ?? state.gitHubError,
@@ -293,6 +350,8 @@ function commandFailureDescription(command: SecurityAgentCommand): string {
       return 'Finding cannot be dismissed because its Dependabot target is invalid.';
     case 'COMMAND_STALLED':
       return 'Queued action did not finish in time. Retry action.';
+    case 'QUEUE_ADMISSION_FAILED':
+      return command.lastErrorRedacted ?? 'Queued action could not be admitted. Retry action.';
     default:
       return command.lastErrorRedacted ?? 'Queued action failed. Retry action.';
   }
@@ -499,6 +558,12 @@ function useSecurityAgentProviderValue(
     );
   }
 
+  function invalidateRemediationQueries() {
+    invalidateSecurityAgentQueryScopes(
+      getSecurityAgentInvalidationScopesForCommand('apply_auto_remediation')
+    );
+  }
+
   // Permission status query
   const { data: permissionData, isLoading: isLoadingPermission } = useQuery(
     isOrg
@@ -608,6 +673,12 @@ function useSecurityAgentProviderValue(
         successCallback?.();
         if (command.commandType === 'dismiss_finding') {
           toast.success(getSecurityAgentDismissalTerminalTitle(command.status));
+        } else if (command.commandType === 'apply_auto_remediation') {
+          toast.success(
+            command.status === 'no_op'
+              ? 'No existing findings queued'
+              : 'Existing remediations queued'
+          );
         }
       }
     }
@@ -670,6 +741,14 @@ function useSecurityAgentProviderValue(
           toast.warning(securityAgentCommandAdmissionCopy.existing_findings_backlog.failureTitle, {
             description: data.backlogAdmissionWarning,
           });
+        }
+        if (data.remediationBacklogAdmissionWarning) {
+          toast.warning('Existing remediations not queued', {
+            description: data.remediationBacklogAdmissionWarning,
+          });
+        }
+        if (data.existingRemediationCommandId) {
+          trackCommand(data.existingRemediationCommandId);
         }
         await refetchConfig();
         invalidateSecurityAgentQueryScopes([
@@ -744,6 +823,66 @@ function useSecurityAgentProviderValue(
     })
   );
 
+  const { mutate: orgStartRemediationMutate } = useMutation(
+    trpc.organizations.securityAgent.startRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation queued');
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to queue remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: orgRetryRemediationMutate } = useMutation(
+    trpc.organizations.securityAgent.retryRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation retry queued');
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to retry remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: orgCancelRemediationMutate } = useMutation(
+    trpc.organizations.securityAgent.cancelRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation cancellation requested');
+        dispatchProviderState({
+          type: 'remove-cancelling-remediation',
+          attemptId: variables.attemptId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to cancel remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-cancelling-remediation',
+          attemptId: variables.attemptId,
+        });
+      },
+    })
+  );
+
   const { mutate: orgDeleteFindingsMutate, isPending: isOrgDeleteFindingsPending } = useMutation(
     trpc.organizations.securityAgent.deleteFindingsByRepository.mutationOptions({
       onSuccess: data => {
@@ -802,6 +941,14 @@ function useSecurityAgentProviderValue(
           toast.warning(securityAgentCommandAdmissionCopy.existing_findings_backlog.failureTitle, {
             description: data.backlogAdmissionWarning,
           });
+        }
+        if (data.remediationBacklogAdmissionWarning) {
+          toast.warning('Existing remediations not queued', {
+            description: data.remediationBacklogAdmissionWarning,
+          });
+        }
+        if (data.existingRemediationCommandId) {
+          trackCommand(data.existingRemediationCommandId);
         }
         await refetchConfig();
         invalidateSecurityAgentQueryScopes([
@@ -876,6 +1023,66 @@ function useSecurityAgentProviderValue(
     })
   );
 
+  const { mutate: personalStartRemediationMutate } = useMutation(
+    trpc.securityAgent.startRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation queued');
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to queue remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: personalRetryRemediationMutate } = useMutation(
+    trpc.securityAgent.retryRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation retry queued');
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to retry remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: personalCancelRemediationMutate } = useMutation(
+    trpc.securityAgent.cancelRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation cancellation requested');
+        dispatchProviderState({
+          type: 'remove-cancelling-remediation',
+          attemptId: variables.attemptId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to cancel remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-cancelling-remediation',
+          attemptId: variables.attemptId,
+        });
+      },
+    })
+  );
+
   const { mutate: personalDeleteFindingsMutate, isPending: isPersonalDeleteFindingsPending } =
     useMutation(
       trpc.securityAgent.deleteFindingsByRepository.mutationOptions({
@@ -934,11 +1141,16 @@ function useSecurityAgentProviderValue(
         autoAnalysisEnabled: boolean;
         autoAnalysisMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoAnalysisIncludeExisting: boolean;
+        autoRemediationEnabled: boolean;
+        autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
+        autoRemediationIncludeExisting: boolean;
+        remediationModelSlug: string;
       }
     ) => {
       const modelConfigPayload = {
         triageModelSlug: config.triageModelSlug,
         analysisModelSlug: config.analysisModelSlug,
+        remediationModelSlug: config.remediationModelSlug,
         modelSlug: config.modelSlug,
       };
 
@@ -957,6 +1169,9 @@ function useSecurityAgentProviderValue(
           autoAnalysisEnabled: config.autoAnalysisEnabled,
           autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
           autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
+          autoRemediationEnabled: config.autoRemediationEnabled,
+          autoRemediationMinSeverity: config.autoRemediationMinSeverity,
+          autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
           ...modelConfigPayload,
         });
       } else {
@@ -973,6 +1188,9 @@ function useSecurityAgentProviderValue(
           autoAnalysisEnabled: config.autoAnalysisEnabled,
           autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
           autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
+          autoRemediationEnabled: config.autoRemediationEnabled,
+          autoRemediationMinSeverity: config.autoRemediationMinSeverity,
+          autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
           ...modelConfigPayload,
         });
       }
@@ -1003,15 +1221,63 @@ function useSecurityAgentProviderValue(
   );
 
   const handleStartAnalysis = useCallback(
-    (findingId: string, { retrySandboxOnly }: { retrySandboxOnly?: boolean } = {}) => {
+    (
+      findingId: string,
+      {
+        forceSandbox,
+        retrySandboxOnly,
+      }: { forceSandbox?: boolean; retrySandboxOnly?: boolean } = {}
+    ) => {
       dispatchProviderState({ type: 'add-optimistic-analysis', findingId });
       if (isOrg && organizationId) {
-        orgStartAnalysisMutate({ organizationId, findingId, retrySandboxOnly });
+        orgStartAnalysisMutate({ organizationId, findingId, forceSandbox, retrySandboxOnly });
       } else {
-        personalStartAnalysisMutate({ findingId, retrySandboxOnly });
+        personalStartAnalysisMutate({ findingId, forceSandbox, retrySandboxOnly });
       }
     },
     [isOrg, organizationId, orgStartAnalysisMutate, personalStartAnalysisMutate]
+  );
+
+  const handleStartRemediation = useCallback(
+    (findingId: string) => {
+      dispatchProviderState({ type: 'add-optimistic-remediation', findingId });
+      if (isOrg && organizationId) {
+        orgStartRemediationMutate({ organizationId, findingId });
+      } else {
+        personalStartRemediationMutate({ findingId });
+      }
+    },
+    [isOrg, organizationId, orgStartRemediationMutate, personalStartRemediationMutate]
+  );
+
+  const handleRetryRemediation = useCallback(
+    (findingId: string) => {
+      dispatchProviderState({ type: 'add-optimistic-remediation', findingId });
+      if (isOrg && organizationId) {
+        orgRetryRemediationMutate({ organizationId, findingId });
+      } else {
+        personalRetryRemediationMutate({ findingId });
+      }
+    },
+    [isOrg, organizationId, orgRetryRemediationMutate, personalRetryRemediationMutate]
+  );
+
+  const handleCancelRemediation = useCallback(
+    (attemptId: string, findingId?: string) => {
+      if (findingId) {
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId,
+        });
+      }
+      dispatchProviderState({ type: 'add-cancelling-remediation', attemptId });
+      if (isOrg && organizationId) {
+        orgCancelRemediationMutate({ organizationId, attemptId });
+      } else {
+        personalCancelRemediationMutate({ attemptId });
+      }
+    },
+    [isOrg, organizationId, orgCancelRemediationMutate, personalCancelRemediationMutate]
   );
 
   const handleDeleteFindings = useCallback(
@@ -1043,6 +1309,7 @@ function useSecurityAgentProviderValue(
 
   const triageModelSlug = getOptionalStringField(configData, 'triageModelSlug');
   const analysisModelSlug = getOptionalStringField(configData, 'analysisModelSlug');
+  const remediationModelSlug = getOptionalStringField(configData, 'remediationModelSlug');
 
   const value = useMemo<SecurityAgentContextValue>(
     () => ({
@@ -1067,6 +1334,11 @@ function useSecurityAgentProviderValue(
             autoAnalysisEnabled: configData.autoAnalysisEnabled ?? false,
             autoAnalysisMinSeverity: configData.autoAnalysisMinSeverity ?? 'high',
             autoAnalysisIncludeExisting: configData.autoAnalysisIncludeExisting ?? false,
+            autoRemediationEnabled: configData.autoRemediationEnabled ?? false,
+            autoRemediationMinSeverity: configData.autoRemediationMinSeverity ?? 'high',
+            autoRemediationIncludeExisting: configData.autoRemediationIncludeExisting ?? false,
+            autoRemediationEnabledAt: configData.autoRemediationEnabledAt ?? null,
+            remediationModelSlug,
           }
         : undefined,
       refetchConfig,
@@ -1077,6 +1349,9 @@ function useSecurityAgentProviderValue(
       handleSaveConfig,
       handleToggleEnabled,
       handleStartAnalysis,
+      handleStartRemediation,
+      handleRetryRemediation,
+      handleCancelRemediation,
       handleDeleteFindings,
       isSyncing: hasActiveSyncCommand || (isOrg ? isOrgSyncPending : isPersonalSyncPending),
       isDismissing:
@@ -1085,6 +1360,8 @@ function useSecurityAgentProviderValue(
       isTogglingEnabled: isOrg ? isOrgSetEnabledPending : isPersonalSetEnabledPending,
       isDeletingFindings: isOrg ? isOrgDeleteFindingsPending : isPersonalDeleteFindingsPending,
       startingAnalysisIds,
+      startingRemediationIds: providerState.optimisticStartingRemediationIds,
+      cancellingRemediationAttemptIds: providerState.optimisticCancellingRemediationAttemptIds,
       gitHubError: providerState.gitHubError,
       orphanedRepositories: orphanedReposData ?? EMPTY_ORPHANED_REPOSITORIES,
     }),
@@ -1106,6 +1383,9 @@ function useSecurityAgentProviderValue(
       handleSaveConfig,
       handleToggleEnabled,
       handleStartAnalysis,
+      handleStartRemediation,
+      handleRetryRemediation,
+      handleCancelRemediation,
       handleDeleteFindings,
       isOrgSyncPending,
       isPersonalSyncPending,
@@ -1120,10 +1400,13 @@ function useSecurityAgentProviderValue(
       isOrgDeleteFindingsPending,
       isPersonalDeleteFindingsPending,
       startingAnalysisIds,
+      providerState.optimisticStartingRemediationIds,
+      providerState.optimisticCancellingRemediationAttemptIds,
       providerState.gitHubError,
       orphanedReposData,
       triageModelSlug,
       analysisModelSlug,
+      remediationModelSlug,
     ]
   );
 

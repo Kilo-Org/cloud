@@ -81,7 +81,7 @@ export async function runEphemeralDeploymentCleanup(env: Env): Promise<void> {
   const cloudflareApi = new CloudflareAPI(env.CLOUDFLARE_ACCOUNT_ID, env.CLOUDFLARE_API_TOKEN);
   const dispatcher = new HtmlDeployDispatcherClient(
     env.DeployDispatcher,
-    env.BACKEND_AUTH_TOKEN,
+    env.DISPATCHER_AUTH_TOKEN,
     env.DEPLOY_HOSTNAME_BASE
   );
 

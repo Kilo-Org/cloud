@@ -293,7 +293,71 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
 
-  it('uses shared command watchdogs and generic progress for setup commands', async () => {
+  it('aborts active work and cleans up when the wrapper shuts down', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    const shutdownController = new AbortController();
+    let commandSignal: AbortSignal | undefined;
+    let notifyCloneStarted: (() => void) | undefined;
+    const cloneStarted = new Promise<void>(resolve => {
+      notifyCloneStarted = resolve;
+    });
+
+    const bootstrap = prepareWrapperBootstrapWorkspace(
+      request,
+      undefined,
+      {
+        workspacePreparationTimeoutMs: 100,
+        git: async (args, opts) => {
+          if (args[0] !== 'clone') {
+            return { stdout: '', stderr: '', exitCode: 0 };
+          }
+
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+          commandSignal = opts?.signal;
+          notifyCloneStarted?.();
+          if (!commandSignal) {
+            return { stdout: '', stderr: 'missing workspace signal', exitCode: 1 };
+          }
+          if (!commandSignal.aborted) {
+            await new Promise<void>(resolve =>
+              commandSignal?.addEventListener('abort', () => resolve(), { once: true })
+            );
+          }
+          await Bun.sleep(120);
+          return {
+            stdout: '',
+            stderr: 'exec aborted',
+            exitCode: 124,
+            terminationReason: 'abort',
+          };
+        },
+      },
+      shutdownController.signal
+    );
+
+    await cloneStarted;
+    shutdownController.abort();
+
+    let caughtError: unknown;
+    try {
+      await bootstrap;
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'workspace_setup_unknown',
+      retryable: true,
+      message: 'Repository clone failed',
+    });
+    expect(commandSignal?.aborted).toBe(true);
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+  });
+
+  it('uses a lenient inactivity watchdog and generic progress for setup commands', async () => {
     const request = makeRequest(tmpDir);
     const progress = mock(() => {});
     let setupOptions: Parameters<NonNullable<WrapperBootstrapDeps['runProcess']>>[2];
@@ -326,7 +390,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       }),
     });
 
-    expect(setupOptions?.inactivityTimeoutMs).toBe(120_000);
+    expect(setupOptions?.inactivityTimeoutMs).toBe(240_000);
     expect(setupOptions?.hardTimeoutMs).toBe(300_000);
     expect(markerExistedDuringSetup).toBe(false);
     expect(
@@ -740,6 +804,40 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       code: 'WORKSPACE_SETUP_FAILED',
       subtype: 'workspace_setup_unknown',
     });
+  });
+
+  it('wraps the error and cleans up when warm workspace detection fails', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.preferSnapshot = true;
+    // A `.git` file (not a directory) makes the migration marker write fail.
+    await fsp.mkdir(request.workspace.workspacePath, { recursive: true });
+    await fsp.writeFile(path.join(request.workspace.workspacePath, '.git'), 'gitdir: elsewhere');
+    const authPath = path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json');
+    await fsp.mkdir(path.dirname(authPath), { recursive: true });
+    await fsp.writeFile(authPath, '{}');
+
+    let caughtError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args.join(' ') === 'rev-parse --is-inside-work-tree') {
+            return { stdout: 'true\n', stderr: '', exitCode: 0 };
+          }
+          throw new Error(`Unexpected git command: ${args.join(' ')}`);
+        },
+      });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'workspace_setup_unknown',
+      retryable: true,
+      message: 'Workspace setup failed',
+    });
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
 
   it('migrates a valid legacy warm workspace without recloning it', async () => {

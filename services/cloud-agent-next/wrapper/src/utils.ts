@@ -45,6 +45,14 @@ const TRUNCATION_MARKER = 'output truncated';
 
 export type TerminationReason = 'timeout' | 'inactivity_timeout' | 'hard_timeout' | 'abort';
 
+export function isTimeoutTermination(result: ExecResult): boolean {
+  return (
+    result.terminationReason === 'timeout' ||
+    result.terminationReason === 'inactivity_timeout' ||
+    result.terminationReason === 'hard_timeout'
+  );
+}
+
 function utf8Tail(value: string, maxBytes: number): string {
   const bytes = Buffer.from(value);
   if (bytes.length <= maxBytes) return value;

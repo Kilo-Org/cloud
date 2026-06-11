@@ -10,6 +10,7 @@ export const STALE_QUEUED_CODE_REVIEW_MINUTES = 5;
 export const STALE_RUNNING_CODE_REVIEW_MINUTES = 90;
 export const CRON_PENDING_CODE_REVIEW_MIN_AGE_MINUTES = 60;
 export const CRON_PENDING_CODE_REVIEW_MAX_AGE_MINUTES = 75;
+export const CRON_STALE_CODE_REVIEW_EXPIRY_MINUTES = CRON_PENDING_CODE_REVIEW_MAX_AGE_MINUTES;
 
 export type PendingCodeReviewCreatedAtWindow = {
   createdAtAfter: SQL;
@@ -29,6 +30,10 @@ export function cronPendingCodeReviewCreatedAtWindowSql(): PendingCodeReviewCrea
     createdAtAfter: sql`now() - interval '${sql.raw(String(CRON_PENDING_CODE_REVIEW_MAX_AGE_MINUTES))} minutes'`,
     createdAtBefore: sql`now() - interval '${sql.raw(String(CRON_PENDING_CODE_REVIEW_MIN_AGE_MINUTES))} minutes'`,
   };
+}
+
+export function cronStaleCodeReviewExpiryCutoffSql() {
+  return sql`now() - interval '${sql.raw(String(CRON_STALE_CODE_REVIEW_EXPIRY_MINUTES))} minutes'`;
 }
 
 export function reconsiderableCodeReviewWorkCondition(

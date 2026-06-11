@@ -1414,6 +1414,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'selected_model_unavailable',
   'user_cancelled',
   'superseded',
+  'dispatch_expired',
   'interrupted',
   'timeout',
   'upstream_error',
@@ -1442,6 +1443,7 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'selected_model_unavailable',
   'user_cancelled',
   'superseded',
+  'dispatch_expired',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

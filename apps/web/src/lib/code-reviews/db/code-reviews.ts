@@ -28,6 +28,7 @@ import {
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
+  cronStaleCodeReviewExpiryCutoffSql,
   type PendingCodeReviewCreatedAtWindow,
 } from '../dispatch/dispatch-constants';
 
@@ -113,6 +114,14 @@ export type CancelledReviewRow = {
   platform: 'github' | 'gitlab';
   platformProjectId: number | null;
   platformIntegrationId: string | null;
+};
+
+export const DISPATCH_EXPIRED_CODE_REVIEW_ERROR_MESSAGE =
+  'Code review expired before dispatch. Please retry manually.';
+
+export type ExpiredCodeReviewCancellationSummary = {
+  reviewsCancelled: number;
+  attemptsCancelled: number;
 };
 
 const RETRYABLE_PARENT_REVIEW_STATUSES = ['queued', 'running'];
@@ -1448,6 +1457,67 @@ export async function cancelSupersededReviewsForPR(
     captureException(error, {
       tags: { operation: 'cancelSupersededReviewsForPR' },
       extra: { repoFullName, prNumber, excludeSha },
+    });
+    throw error;
+  }
+}
+
+export async function cancelExpiredPendingAndRunningCodeReviews(): Promise<ExpiredCodeReviewCancellationSummary> {
+  const expiryCutoff = cronStaleCodeReviewExpiryCutoffSql();
+
+  try {
+    const result = await db.execute<{
+      reviews_cancelled: number;
+      attempts_cancelled: number;
+    }>(sql`
+      WITH cancelled_reviews AS (
+        UPDATE ${cloud_agent_code_reviews} AS reviews
+        SET
+          status = 'cancelled',
+          terminal_reason = 'dispatch_expired',
+          error_message = ${DISPATCH_EXPIRED_CODE_REVIEW_ERROR_MESSAGE},
+          completed_at = now(),
+          updated_at = now()
+        WHERE reviews.status IN ('pending', 'running')
+          AND reviews.created_at < ${expiryCutoff}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM ${cloud_agent_code_review_attempts} AS fresh_attempts
+            WHERE fresh_attempts.code_review_id = reviews.id
+              AND fresh_attempts.status IN ('pending', 'queued', 'running')
+              AND COALESCE(
+                fresh_attempts.started_at,
+                fresh_attempts.updated_at,
+                fresh_attempts.created_at
+              ) >= ${expiryCutoff}
+          )
+        RETURNING reviews.id
+      ), cancelled_attempts AS (
+        UPDATE ${cloud_agent_code_review_attempts} AS attempts
+        SET
+          status = 'cancelled',
+          terminal_reason = 'dispatch_expired',
+          error_message = ${DISPATCH_EXPIRED_CODE_REVIEW_ERROR_MESSAGE},
+          completed_at = now(),
+          updated_at = now()
+        FROM cancelled_reviews
+        WHERE attempts.code_review_id = cancelled_reviews.id
+          AND attempts.status IN ('pending', 'queued', 'running')
+        RETURNING attempts.id
+      )
+      SELECT
+        (SELECT COUNT(*) FROM cancelled_reviews)::int AS reviews_cancelled,
+        (SELECT COUNT(*) FROM cancelled_attempts)::int AS attempts_cancelled
+    `);
+
+    const row = result.rows[0];
+    return {
+      reviewsCancelled: Number(row?.reviews_cancelled ?? 0),
+      attemptsCancelled: Number(row?.attempts_cancelled ?? 0),
+    };
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'cancelExpiredPendingAndRunningCodeReviews' },
     });
     throw error;
   }

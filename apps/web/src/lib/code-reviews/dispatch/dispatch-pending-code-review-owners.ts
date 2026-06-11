@@ -2,6 +2,7 @@ import pLimit from 'p-limit';
 import { captureException } from '@sentry/nextjs';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {
+  cancelExpiredPendingAndRunningCodeReviews,
   listDispatchableCodeReviewOwnerCandidates,
   type DispatchableCodeReviewOwnerCandidate,
 } from '../db/code-reviews';
@@ -23,6 +24,8 @@ export type DispatchPendingCodeReviewOwnersSummary = {
   ownersSkippedMissingBotUsers: number;
   coordinatorFailures: number;
   reviewsDispatched: number;
+  staleReviewsCancelled: number;
+  staleAttemptsCancelled: number;
   hasMoreCandidateOwners: boolean;
 };
 
@@ -68,6 +71,7 @@ async function drainOwner(
 }
 
 export async function dispatchPendingCodeReviewOwners(): Promise<DispatchPendingCodeReviewOwnersSummary> {
+  const staleCancellationSummary = await cancelExpiredPendingAndRunningCodeReviews();
   const pendingCreatedAtWindow = cronPendingCodeReviewCreatedAtWindowSql();
   const candidates = await listDispatchableCodeReviewOwnerCandidates({
     limit: OWNER_SCAN_LIMIT,
@@ -85,6 +89,8 @@ export async function dispatchPendingCodeReviewOwners(): Promise<DispatchPending
     ownersSkippedMissingBotUsers: 0,
     coordinatorFailures: 0,
     reviewsDispatched: 0,
+    staleReviewsCancelled: staleCancellationSummary.reviewsCancelled,
+    staleAttemptsCancelled: staleCancellationSummary.attemptsCancelled,
     hasMoreCandidateOwners: candidates.hasMore,
   };
 

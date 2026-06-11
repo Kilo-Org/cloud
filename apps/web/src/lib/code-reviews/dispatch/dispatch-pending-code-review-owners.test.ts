@@ -17,13 +17,17 @@ jest.mock('@sentry/nextjs', () => ({
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
   organizations,
   type User,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { listDispatchableCodeReviewOwnerCandidates } from '../db/code-reviews';
+import {
+  DISPATCH_EXPIRED_CODE_REVIEW_ERROR_MESSAGE,
+  listDispatchableCodeReviewOwnerCandidates,
+} from '../db/code-reviews';
 import { cronPendingCodeReviewCreatedAtWindowSql } from './dispatch-constants';
 import { dispatchPendingCodeReviewOwners } from './dispatch-pending-code-review-owners';
 
@@ -103,6 +107,25 @@ describe('dispatch pending code review owners', () => {
       updated_at: params.updatedAt ?? params.createdAt,
       started_at: params.startedAt ?? null,
     };
+  }
+
+  async function getReview(reviewId: string) {
+    const review = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+
+    if (!review) {
+      throw new Error(`Expected review ${reviewId} to exist`);
+    }
+
+    return review;
+  }
+
+  async function listAttempts(reviewId: string) {
+    return await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, reviewId));
   }
 
   it('discovers unique eligible owners oldest-first with truncation and capacity prefiltering', async () => {
@@ -250,6 +273,8 @@ describe('dispatch pending code review owners', () => {
       ownersSkippedMissingBotUsers: 0,
       coordinatorFailures: 0,
       reviewsDispatched: 1,
+      staleReviewsCancelled: 1,
+      staleAttemptsCancelled: 0,
       hasMoreCandidateOwners: false,
     });
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
@@ -261,6 +286,157 @@ describe('dispatch pending code review owners', () => {
       },
       expect.objectContaining({ pendingCreatedAtWindow: expect.anything() })
     );
+  });
+
+  it('cancels expired pending and running reviews before draining cron-window owners', async () => {
+    const expiredTimestamp = minutesAgo(76);
+    const oldParentTimestamp = minutesAgo(120);
+    const freshAttemptTimestamp = minutesAgo(10);
+    const dispatchWindowTimestamp = minutesAgo(65);
+
+    const [stalePendingReview, staleRunningReview, retryParentReview, dispatchWindowReview] =
+      await db
+        .insert(cloud_agent_code_reviews)
+        .values([
+          reviewValues({
+            owner: { type: 'user', id: firstUser.id },
+            status: 'pending',
+            createdAt: expiredTimestamp,
+            updatedAt: expiredTimestamp,
+          }),
+          reviewValues({
+            owner: { type: 'user', id: firstUser.id },
+            status: 'running',
+            createdAt: expiredTimestamp,
+            updatedAt: expiredTimestamp,
+            startedAt: expiredTimestamp,
+          }),
+          reviewValues({
+            owner: { type: 'user', id: firstUser.id },
+            status: 'running',
+            createdAt: oldParentTimestamp,
+            updatedAt: oldParentTimestamp,
+            startedAt: oldParentTimestamp,
+          }),
+          reviewValues({
+            owner: { type: 'user', id: secondUser.id },
+            status: 'pending',
+            createdAt: dispatchWindowTimestamp,
+            updatedAt: dispatchWindowTimestamp,
+          }),
+        ])
+        .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!stalePendingReview || !staleRunningReview || !retryParentReview || !dispatchWindowReview) {
+      throw new Error('Expected stale cancellation test reviews to be inserted');
+    }
+
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: staleRunningReview.id,
+      attempt_number: 1,
+      status: 'running',
+      started_at: expiredTimestamp,
+      created_at: expiredTimestamp,
+      updated_at: expiredTimestamp,
+    });
+
+    const [failedAttempt] = await db
+      .insert(cloud_agent_code_review_attempts)
+      .values({
+        code_review_id: retryParentReview.id,
+        attempt_number: 1,
+        status: 'failed',
+        terminal_reason: 'sandbox_error',
+        error_message: 'Sandbox failed before retry',
+        completed_at: expiredTimestamp,
+        created_at: expiredTimestamp,
+        updated_at: expiredTimestamp,
+      })
+      .returning({ id: cloud_agent_code_review_attempts.id });
+
+    if (!failedAttempt) {
+      throw new Error('Expected failed retry source attempt to be inserted');
+    }
+
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: retryParentReview.id,
+      attempt_number: 2,
+      retry_of_attempt_id: failedAttempt.id,
+      retry_reason: 'infra_failure',
+      status: 'pending',
+      created_at: freshAttemptTimestamp,
+      updated_at: freshAttemptTimestamp,
+    });
+
+    mockTryDispatchPendingReviews.mockResolvedValue({
+      dispatched: 1,
+      notDispatched: 0,
+      activeCount: 1,
+    });
+
+    const summary = await dispatchPendingCodeReviewOwners();
+
+    expect(summary).toEqual({
+      ownersConsidered: 1,
+      ownersProcessed: 1,
+      ownersWithNoNewDispatch: 0,
+      ownersSkippedMissingBotUsers: 0,
+      coordinatorFailures: 0,
+      reviewsDispatched: 1,
+      staleReviewsCancelled: 2,
+      staleAttemptsCancelled: 1,
+      hasMoreCandidateOwners: false,
+    });
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith(
+      {
+        type: 'user',
+        id: secondUser.id,
+        userId: secondUser.id,
+      },
+      expect.objectContaining({ pendingCreatedAtWindow: expect.anything() })
+    );
+
+    const storedStalePendingReview = await getReview(stalePendingReview.id);
+    const storedStaleRunningReview = await getReview(staleRunningReview.id);
+    const storedRetryParentReview = await getReview(retryParentReview.id);
+    const storedDispatchWindowReview = await getReview(dispatchWindowReview.id);
+    const staleRunningAttempts = await listAttempts(staleRunningReview.id);
+    const retryParentAttempts = await listAttempts(retryParentReview.id);
+
+    expect(storedStalePendingReview).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        terminal_reason: 'dispatch_expired',
+        error_message: DISPATCH_EXPIRED_CODE_REVIEW_ERROR_MESSAGE,
+      })
+    );
+    expect(storedStalePendingReview.completed_at).toEqual(expect.any(String));
+    expect(storedStaleRunningReview).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        terminal_reason: 'dispatch_expired',
+        error_message: DISPATCH_EXPIRED_CODE_REVIEW_ERROR_MESSAGE,
+      })
+    );
+    expect(storedStaleRunningReview.completed_at).toEqual(expect.any(String));
+    expect(staleRunningAttempts).toEqual([
+      expect.objectContaining({
+        status: 'cancelled',
+        terminal_reason: 'dispatch_expired',
+        error_message: DISPATCH_EXPIRED_CODE_REVIEW_ERROR_MESSAGE,
+        completed_at: expect.any(String),
+      }),
+    ]);
+    expect(storedRetryParentReview.status).toBe('running');
+    expect(storedRetryParentReview.terminal_reason).toBeNull();
+    expect(retryParentAttempts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: 'failed', terminal_reason: 'sandbox_error' }),
+        expect.objectContaining({ status: 'pending', retry_reason: 'infra_failure' }),
+      ])
+    );
+    expect(storedDispatchWindowReview.status).toBe('pending');
   });
 
   it('summarizes dispatch, recovered bot owners, no-op owners, and isolated owner failures', async () => {
@@ -309,6 +485,8 @@ describe('dispatch pending code review owners', () => {
       ownersSkippedMissingBotUsers: 0,
       coordinatorFailures: 1,
       reviewsDispatched: 2,
+      staleReviewsCancelled: 0,
+      staleAttemptsCancelled: 0,
       hasMoreCandidateOwners: false,
     });
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(4);

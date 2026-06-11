@@ -126,6 +126,7 @@ export type CloudAgentTerminalReason =
   | 'selected_model_unavailable'
   | 'user_cancelled'
   | 'superseded'
+  | 'dispatch_expired'
   | 'interrupted'
   | 'timeout'
   | 'upstream_error'

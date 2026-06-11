@@ -51,6 +51,8 @@ describe('GET /api/cron/dispatch-pending-code-reviews', () => {
       ownersSkippedMissingBotUsers: 1,
       coordinatorFailures: 0,
       reviewsDispatched: 5,
+      staleReviewsCancelled: 2,
+      staleAttemptsCancelled: 1,
       hasMoreCandidateOwners: true,
     });
 
@@ -72,6 +74,8 @@ describe('GET /api/cron/dispatch-pending-code-reviews', () => {
         ownersSkippedMissingBotUsers: 1,
         coordinatorFailures: 0,
         reviewsDispatched: 5,
+        staleReviewsCancelled: 2,
+        staleAttemptsCancelled: 1,
         hasMoreCandidateOwners: true,
       },
       timestamp: expect.any(String),

@@ -36,6 +36,7 @@ const classifierAnalyticsResponse = {
   },
   statusBreakdown: [],
   taskTypeBreakdown: [],
+  taskSubtypeBreakdown: [],
   classifierModelBreakdown: [],
 };
 

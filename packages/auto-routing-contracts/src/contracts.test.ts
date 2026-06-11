@@ -70,6 +70,7 @@ describe('auto routing contracts', () => {
         },
         statusBreakdown: [],
         taskTypeBreakdown: [],
+        taskSubtypeBreakdown: [],
         classifierModelBreakdown: [],
       })
     ).toMatchObject({ period: '24h' });

@@ -6,7 +6,7 @@ type ClassifierAnalyticsStatus =
   | 'invalid_json'
   | 'invalid_envelope'
   | 'invalid_body'
-  | 'classifier_error';
+  | `classifier_error:${string}`;
 
 type ClassifierAnalyticsParams = {
   status: ClassifierAnalyticsStatus;
@@ -27,7 +27,7 @@ type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS'>;
  *   blob1   = classifierModel
  *   blob2   = requestedModel
  *   blob3   = apiKind
- *   blob4   = status
+ *   blob4   = status, classifier failures use classifier_error:<subtype>
  *   blob5   = taskType
  *   blob6   = subtaskType
  *   blob7   = contextComplexity

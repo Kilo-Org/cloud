@@ -516,7 +516,7 @@ describe('auto routing worker', () => {
         'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
         'chat_completions',
-        'classifier_error',
+        'classifier_error:invalid_schema',
         '',
         '',
         '',
@@ -680,7 +680,7 @@ describe('auto routing worker', () => {
           JSON.stringify({
             data: [
               { status: 'classified', requests: 8 },
-              { status: 'classifier_error', requests: 1 },
+              { status: 'classifier_error:invalid_schema', requests: 1 },
             ],
           }),
           { status: 200 }
@@ -690,6 +690,21 @@ describe('auto routing worker', () => {
         new Response(
           JSON.stringify({
             data: [{ task_type: 'implementation', requests: 5, avg_confidence: 0.9 }],
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                task_type: 'implementation',
+                subtask_type: 'feature_development',
+                requests: 4,
+                avg_confidence: 0.88,
+              },
+            ],
           }),
           { status: 200 }
         )
@@ -727,9 +742,17 @@ describe('auto routing worker', () => {
       },
       statusBreakdown: [
         { status: 'classified', requests: 8 },
-        { status: 'classifier_error', requests: 1 },
+        { status: 'classifier_error:invalid_schema', requests: 1 },
       ],
       taskTypeBreakdown: [{ taskType: 'implementation', requests: 5, avgConfidence: 0.9 }],
+      taskSubtypeBreakdown: [
+        {
+          taskType: 'implementation',
+          subtaskType: 'feature_development',
+          requests: 4,
+          avgConfidence: 0.88,
+        },
+      ],
       classifierModelBreakdown: [{ classifierModel: 'google/gemini-2.5-flash-lite', requests: 10 }],
     });
     expect(analyticsTokenGet).toHaveBeenCalled();
@@ -769,6 +792,7 @@ describe('auto routing worker', () => {
       },
       statusBreakdown: [],
       taskTypeBreakdown: [],
+      taskSubtypeBreakdown: [],
       classifierModelBreakdown: [],
     });
     expect(mockedFetch).not.toHaveBeenCalled();
@@ -800,6 +824,7 @@ describe('auto routing worker', () => {
           { status: 200 }
         )
       )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));

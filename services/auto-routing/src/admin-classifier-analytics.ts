@@ -49,6 +49,14 @@ const TaskTypeBreakdownRowSchema = z.looseObject({
 });
 type TaskTypeBreakdownRow = z.infer<typeof TaskTypeBreakdownRowSchema>;
 
+const TaskSubtypeBreakdownRowSchema = z.looseObject({
+  task_type: z.string(),
+  subtask_type: z.string(),
+  requests: analyticsNumberSchema,
+  avg_confidence: optionalAnalyticsNumberSchema,
+});
+type TaskSubtypeBreakdownRow = z.infer<typeof TaskSubtypeBreakdownRowSchema>;
+
 const ClassifierModelBreakdownRowSchema = z.looseObject({
   classifier_model: z.string(),
   requests: analyticsNumberSchema,
@@ -75,6 +83,7 @@ function emptyAnalyticsResponse(period: AnalyticsPeriod): AutoRoutingClassifierA
     },
     statusBreakdown: [],
     taskTypeBreakdown: [],
+    taskSubtypeBreakdown: [],
     classifierModelBreakdown: [],
   };
 }
@@ -120,7 +129,7 @@ function buildSummaryQuery(period: AnalyticsPeriod): string {
     SELECT
       SUM(_sample_interval) AS total_requests,
       SUM(_sample_interval * IF(blob4 = 'classified', 1, 0)) AS classified_requests,
-      SUM(_sample_interval * IF(blob4 = 'classifier_error', 1, 0)) AS classifier_errors,
+      SUM(_sample_interval * IF(blob4 = 'classifier_error' OR startsWith(blob4, 'classifier_error:'), 1, 0)) AS classifier_errors,
       SUM(_sample_interval * IF(blob4 IN ('invalid_json', 'invalid_envelope', 'invalid_body'), 1, 0)) AS invalid_requests,
       SUM(_sample_interval * double2) AS total_cost_credits,
       avgIf(double1, double1 > 0) AS avg_duration_ms,
@@ -166,6 +175,22 @@ function buildTaskTypeBreakdownQuery(period: AnalyticsPeriod): string {
   `;
 }
 
+function buildTaskSubtypeBreakdownQuery(period: AnalyticsPeriod): string {
+  return `
+    SELECT
+      blob5 AS task_type,
+      blob6 AS subtask_type,
+      SUM(_sample_interval) AS requests,
+      avgIf(double3, double3 >= 0) AS avg_confidence
+    FROM auto_routing_classifier_metrics
+    WHERE ${buildSinceClause(period)} AND blob5 != '' AND blob6 != ''
+    GROUP BY task_type, subtask_type
+    ORDER BY requests DESC
+    LIMIT 20
+    FORMAT JSON
+  `;
+}
+
 function buildClassifierModelBreakdownQuery(period: AnalyticsPeriod): string {
   return `
     SELECT
@@ -202,11 +227,12 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
   let summaryRows: SummaryRow[];
   let statusRows: StatusBreakdownRow[];
   let taskRows: TaskTypeBreakdownRow[];
+  let subtypeRows: TaskSubtypeBreakdownRow[];
   let modelRows: ClassifierModelBreakdownRow[];
 
   try {
     const apiToken = await c.env.O11Y_CF_AE_API_TOKEN.get();
-    [summaryRows, statusRows, taskRows, modelRows] = await Promise.all([
+    [summaryRows, statusRows, taskRows, subtypeRows, modelRows] = await Promise.all([
       queryAnalyticsEngine(c.env, apiToken, buildSummaryQuery(period), SummaryRowSchema),
       queryAnalyticsEngine(
         c.env,
@@ -219,6 +245,12 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
         apiToken,
         buildTaskTypeBreakdownQuery(period),
         TaskTypeBreakdownRowSchema
+      ),
+      queryAnalyticsEngine(
+        c.env,
+        apiToken,
+        buildTaskSubtypeBreakdownQuery(period),
+        TaskSubtypeBreakdownRowSchema
       ),
       queryAnalyticsEngine(
         c.env,
@@ -259,6 +291,12 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
     })),
     taskTypeBreakdown: taskRows.map(row => ({
       taskType: row.task_type,
+      requests: numberValue(row.requests),
+      avgConfidence: numberValue(row.avg_confidence),
+    })),
+    taskSubtypeBreakdown: subtypeRows.map(row => ({
+      taskType: row.task_type,
+      subtaskType: row.subtask_type,
       requests: numberValue(row.requests),
       avgConfidence: numberValue(row.avg_confidence),
     })),

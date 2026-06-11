@@ -216,10 +216,10 @@ function BreakdownTables({
   loading: boolean;
 }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-3">
+    <div className="grid gap-4 xl:grid-cols-4">
       <BreakdownCard
         title="Status"
-        help="Breakdown by raw classifier status: classified, classifier_error, invalid_json, invalid_envelope, and invalid_body."
+        help="Breakdown by raw classifier status, including classifier_error:<subtype> rows for classifier failures."
         loading={loading}
       >
         <Table>
@@ -234,7 +234,9 @@ function BreakdownTables({
               analytics.statusBreakdown.map(row => (
                 <TableRow key={row.status}>
                   <TableCell>
-                    <Badge variant="outline">{row.status || 'unknown'}</Badge>
+                    <Badge variant="outline" className="max-w-56 truncate">
+                      {row.status || 'unknown'}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatNumber(row.requests)}
@@ -276,6 +278,45 @@ function BreakdownTables({
               ))
             ) : (
               <EmptyTableRow colSpan={3} />
+            )}
+          </TableBody>
+        </Table>
+      </BreakdownCard>
+
+      <BreakdownCard
+        title="Task Subtypes"
+        help="Successful classifier task and subtask pairs with their average classifier confidence."
+        loading={loading}
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Type</TableHead>
+              <TableHead>Subtype</TableHead>
+              <TableHead className="text-right">Requests</TableHead>
+              <TableHead className="text-right">Confidence</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {analytics?.taskSubtypeBreakdown.length ? (
+              analytics.taskSubtypeBreakdown.map(row => (
+                <TableRow key={`${row.taskType}:${row.subtaskType}`}>
+                  <TableCell className="max-w-32 truncate capitalize">
+                    {row.taskType.replaceAll('_', ' ')}
+                  </TableCell>
+                  <TableCell className="max-w-40 truncate capitalize">
+                    {row.subtaskType.replaceAll('_', ' ')}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(row.requests)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatPercent(row.avgConfidence)}
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <EmptyTableRow colSpan={4} />
             )}
           </TableBody>
         </Table>

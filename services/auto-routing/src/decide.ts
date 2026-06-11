@@ -44,6 +44,16 @@ function getClassifierFailureReason(error: unknown): string {
   return 'unexpected_error';
 }
 
+function classifierErrorStatus(error: unknown): `classifier_error:${string}` {
+  if (error instanceof ClassifierRunError) {
+    return `classifier_error:${error.failureStage ?? 'run_error'}`;
+  }
+  if (error instanceof Error && error.message.startsWith('Secrets Worker:')) {
+    return 'classifier_error:secret_error';
+  }
+  return 'classifier_error:unexpected_error';
+}
+
 function logClassifierError({
   error,
   classifierInput,
@@ -247,7 +257,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       sessionId: parsed.data.sessionId,
     });
     writeClassifierMetricsDataPoint(c.env, {
-      status: 'classifier_error',
+      status: classifierErrorStatus(error),
       classifierModel: classifierFailureMetadata.classifierModel,
       sessionId: parsed.data.sessionId,
       input: classifierInput.data,

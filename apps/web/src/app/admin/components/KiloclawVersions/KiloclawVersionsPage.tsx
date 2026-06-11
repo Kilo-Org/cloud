@@ -506,6 +506,11 @@ function InstanceDistributionPanel() {
   const otherPinned = collapsedTail.reduce((sum, s) => sum + s.pinnedCount, 0);
   const otherPct = collapsedTail.reduce((sum, s) => sum + s.pct, 0);
   const hasOther = collapsedTail.length > 0;
+  // Count only real versions for the "N versions" label — the "no tag yet"
+  // bucket is unreconciled instances, not a version, so folding it into the
+  // tally would overstate how many image tags "Other" represents. Its
+  // instances still contribute to otherCount / otherPct.
+  const otherVersions = collapsedTail.filter(s => !s.isUnknown).length;
 
   // Bar order mirrors the legend: headline buckets, then the biggest shares,
   // then the single aggregated "Other" segment.
@@ -583,7 +588,7 @@ function InstanceDistributionPanel() {
                 <div
                   className="bg-zinc-500"
                   style={{ width: `${otherPct}%`, minWidth: otherCount > 0 ? '3px' : 0 }}
-                  title={`Other (${collapsedTail.length} versions): ${otherCount} (${Math.round(otherPct)}%)`}
+                  title={`Other (${otherVersions} version${otherVersions === 1 ? '' : 's'}): ${otherCount} (${Math.round(otherPct)}%)`}
                 />
               )}
             </div>
@@ -602,7 +607,7 @@ function InstanceDistributionPanel() {
                 >
                   <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-zinc-500" />
                   <span>
-                    Other ({collapsedTail.length} version{collapsedTail.length === 1 ? '' : 's'})
+                    Other ({otherVersions} version{otherVersions === 1 ? '' : 's'})
                   </span>
                   <span className="font-medium tabular-nums">{Math.round(otherPct)}%</span>
                   <span className="tabular-nums">({otherCount})</span>

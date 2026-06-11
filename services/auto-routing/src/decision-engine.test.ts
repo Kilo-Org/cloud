@@ -20,14 +20,38 @@ const table: RoutingTable = {
   source: 'benchmark',
   tiers: {
     low: [
-      { model: 'cheap/messages-only', accuracy: 0.9, avgCostUsd: 0.001, meetsThreshold: true, supportedApiKinds: ['messages'] },
-      { model: 'cheap/chat', accuracy: 0.85, avgCostUsd: 0.002, meetsThreshold: true, supportedApiKinds: ['chat_completions'] },
+      {
+        model: 'cheap/messages-only',
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        meetsThreshold: true,
+        supportedApiKinds: ['messages'],
+      },
+      {
+        model: 'cheap/chat',
+        accuracy: 0.85,
+        avgCostUsd: 0.002,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions'],
+      },
     ],
     medium: [
-      { model: 'mid/chat', accuracy: 0.8, avgCostUsd: 0.01, meetsThreshold: true, supportedApiKinds: ['chat_completions', 'messages'] },
+      {
+        model: 'mid/chat',
+        accuracy: 0.8,
+        avgCostUsd: 0.01,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions', 'messages'],
+      },
     ],
     high: [
-      { model: 'big/chat', accuracy: 0.9, avgCostUsd: 0.1, meetsThreshold: true, supportedApiKinds: ['chat_completions'] },
+      {
+        model: 'big/chat',
+        accuracy: 0.9,
+        avgCostUsd: 0.1,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions'],
+      },
     ],
   },
 };
@@ -35,10 +59,20 @@ const table: RoutingTable = {
 describe('computeDecision', () => {
   it('picks the first candidate supporting the request api kind', () => {
     const decision = computeDecision(classification, 'chat_completions', table);
-    expect(decision).toEqual({ model: 'cheap/chat', tier: 'low', source: 'benchmark', tableVersion: 'run-1' });
+    expect(decision).toEqual({
+      model: 'cheap/chat',
+      tier: 'low',
+      source: 'benchmark',
+      tableVersion: 'run-1',
+    });
   });
   it('uses the tier derived from the classification', () => {
-    const hard: ClassifierOutput = { ...classification, reasoningComplexity: 'high', contextComplexity: 'large', executionMode: 'multi_step_project' };
+    const hard: ClassifierOutput = {
+      ...classification,
+      reasoningComplexity: 'high',
+      contextComplexity: 'large',
+      executionMode: 'multi_step_project',
+    };
     expect(computeDecision(hard, 'chat_completions', table)?.model).toBe('big/chat');
   });
   it('returns null when no candidate supports the api kind', () => {

@@ -16,14 +16,38 @@ export const DEFAULT_ROUTING_TABLE: RoutingTable = {
   source: 'default',
   tiers: {
     low: [
-      { model: 'google/gemini-2.5-flash', accuracy: 1, avgCostUsd: 0, meetsThreshold: true, supportedApiKinds: ['chat_completions'] },
+      {
+        model: 'google/gemini-2.5-flash',
+        accuracy: 1,
+        avgCostUsd: 0,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions'],
+      },
     ],
     medium: [
-      { model: 'qwen/qwen3.7-plus', accuracy: 1, avgCostUsd: 0, meetsThreshold: true, supportedApiKinds: ['chat_completions'] },
-      { model: 'anthropic/claude-sonnet-4.6', accuracy: 1, avgCostUsd: 0, meetsThreshold: true, supportedApiKinds: ['chat_completions', 'messages', 'responses'] },
+      {
+        model: 'qwen/qwen3.7-plus',
+        accuracy: 1,
+        avgCostUsd: 0,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions'],
+      },
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        accuracy: 1,
+        avgCostUsd: 0,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions', 'messages', 'responses'],
+      },
     ],
     high: [
-      { model: 'anthropic/claude-sonnet-4.6', accuracy: 1, avgCostUsd: 0, meetsThreshold: true, supportedApiKinds: ['chat_completions', 'messages', 'responses'] },
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        accuracy: 1,
+        avgCostUsd: 0,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions', 'messages', 'responses'],
+      },
     ],
   },
 };

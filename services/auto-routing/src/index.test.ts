@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearClassifierConfigCache } from './classifier-config';
+import { clearRoutingTableCache } from './routing-table';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
 import type * as ModelClassifierModule from './model-classifier';
@@ -117,6 +118,7 @@ function decideRequest(payload: unknown) {
 describe('auto routing worker', () => {
   beforeEach(() => {
     clearClassifierConfigCache();
+    clearRoutingTableCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
     writeDataPoint.mockReset();
@@ -158,7 +160,12 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       cost: 0.00000123,
-      decision: null,
+      decision: {
+        model: expect.any(String),
+        tier: expect.stringMatching(/^(low|medium|high)$/),
+        source: 'default',
+        tableVersion: 'default',
+      },
       classifierResult: {
         classification: mockClassification,
         normalized: normalizedInput,
@@ -215,7 +222,12 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       cost: 0,
-      decision: null,
+      decision: {
+        model: expect.any(String),
+        tier: expect.stringMatching(/^(low|medium|high)$/),
+        source: 'default',
+        tableVersion: 'default',
+      },
       classifierResult: { classification: mockClassification },
     });
     expect(cacheIdFromName).toHaveBeenCalledWith('user:user-1:task:task-123');

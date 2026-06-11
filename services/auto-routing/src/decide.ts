@@ -1,5 +1,6 @@
 import { MirrorPayloadSchema } from '@kilocode/auto-routing-contracts';
 import type {
+  AutoRoutingDecision,
   AutoRoutingDecisionResponse,
   MirrorPayload,
   NormalizedClassifierInput,
@@ -18,8 +19,10 @@ import {
 } from './conversation-identity';
 import type { ContentHashes } from './conversation-identity';
 import { getCachedClassification, putCachedClassification } from './decision-cache';
+import { computeDecision } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
+import { getRoutingTable } from './routing-table';
 import type { HonoEnv } from './hono-env';
 
 // Isolate-scoped request counter, used to correlate latency with isolate
@@ -29,11 +32,12 @@ let isolateRequestSeq = 0;
 function decisionResponse(
   cost: number,
   classification: ClassifierOutput,
-  normalized: NormalizedClassifierInput
+  normalized: NormalizedClassifierInput,
+  decision: AutoRoutingDecision | null
 ): AutoRoutingDecisionResponse {
   return {
     cost,
-    decision: null,
+    decision,
     classifierResult: { classification, normalized },
   };
 }
@@ -194,7 +198,8 @@ function recordDecision(
   env: Env,
   ctx: DecisionContext,
   durationMs: number,
-  outcome: DecisionOutcome
+  outcome: DecisionOutcome,
+  decision: AutoRoutingDecision | null = null
 ): void {
   const summary = summarizeOutcome(outcome);
 
@@ -243,6 +248,9 @@ function recordDecision(
       hasMachineId: ctx.payload.machineId !== null,
       mode: ctx.payload.mode,
       uaPrefix: ctx.payload.userAgent?.slice(0, 40) ?? null,
+      decidedModel: decision?.model ?? null,
+      decidedTier: decision?.tier ?? null,
+      decisionSource: decision?.source ?? null,
       ...summary.details,
     })
   );
@@ -265,11 +273,12 @@ export const decideHandler: Handler<HonoEnv> = async c => {
 
   const payload = parsed.data;
   const startedAt = performance.now();
-  const [hashes, userIdHash, classifierModel, successSampleRate] = await Promise.all([
+  const [hashes, userIdHash, classifierModel, successSampleRate, routingTable] = await Promise.all([
     computeContentHashes(payload.input),
     hashIdentifierForTelemetry(payload.userId),
     getClassifierModel(c.env),
     getDecisionLogSampleRate(c.env),
+    getRoutingTable(c.env),
   ]);
   const ctx: DecisionContext = {
     payload,
@@ -288,12 +297,15 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     classifierModel
   );
   if (cached) {
-    recordDecision(c.env, ctx, performance.now() - startedAt, {
-      kind: 'cache_hit',
-      classifierModel,
-      classification: cached,
-    });
-    return c.json(decisionResponse(0, cached, payload.input));
+    const decision = computeDecision(cached, payload.input.apiKind, routingTable);
+    recordDecision(
+      c.env,
+      ctx,
+      performance.now() - startedAt,
+      { kind: 'cache_hit', classifierModel, classification: cached },
+      decision
+    );
+    return c.json(decisionResponse(0, cached, payload.input, decision));
   }
 
   try {
@@ -311,10 +323,21 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         )
       );
     }
-    recordDecision(c.env, ctx, performance.now() - startedAt, { kind: 'model', classifier });
-    // When routing decisions are implemented, include the prior decision for
-    // this session as an input alongside classifier output.
-    return c.json(decisionResponse(classifier.cost ?? 0, classifier.classification, payload.input));
+    const decision = computeDecision(
+      classifier.classification,
+      payload.input.apiKind,
+      routingTable
+    );
+    recordDecision(
+      c.env,
+      ctx,
+      performance.now() - startedAt,
+      { kind: 'model', classifier },
+      decision
+    );
+    return c.json(
+      decisionResponse(classifier.cost ?? 0, classifier.classification, payload.input, decision)
+    );
   } catch (error) {
     recordDecision(c.env, ctx, performance.now() - startedAt, { kind: 'error', error });
     // A failed run can still have billed the first attempt (e.g. a valid-but-

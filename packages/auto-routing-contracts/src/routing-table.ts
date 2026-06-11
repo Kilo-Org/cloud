@@ -46,4 +46,3 @@ export function rankCandidates(
     return b.accuracy - a.accuracy || a.avgCostUsd - b.avgCostUsd;
   });
 }
-

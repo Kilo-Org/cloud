@@ -99,8 +99,8 @@ import {
 import { scheduleAutoRoutingMirror } from '@/lib/ai-gateway/auto-routing-mirror';
 import {
   createStreamLifecycleTracker,
-  isEventStreamContentType,
   observeEventStream,
+  shouldObserveEventStream,
   STREAM_ATTEMPT_HEADER,
 } from '@/lib/ai-gateway/o11y/stream-lifecycle.server';
 
@@ -721,7 +721,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     authContext: Promise.resolve({ organizationId }),
   });
 
-  const attemptId = crypto.randomUUID();
+  const observesProvider = effectiveProviderContext.provider.id === 'custom';
+  const attemptId = observesProvider ? crypto.randomUUID() : null;
   const response = await upstreamRequest({
     path,
     search: url.search,
@@ -770,7 +771,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
     // Return a service unavailable error instead of the 402
     const errorResponse = temporarilyUnavailableResponse();
-    errorResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
+    if (attemptId) errorResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
     return errorResponse;
   }
 
@@ -787,18 +788,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   let clonedReponse = response.clone(); // reading from body is side-effectful
-  const observesStream =
-    response.status >= 200 &&
-    response.status < 300 &&
-    response.body !== null &&
-    isEventStreamContentType(response.headers.get('content-type'));
-  const streamTracker = observesStream
-    ? createStreamLifecycleTracker({
-        attempt_id: attemptId,
-        provider_id: effectiveProviderContext.provider.id,
-        api_kind: requestBodyParsed.kind,
-      })
-    : null;
+  const observesStream = shouldObserveEventStream({
+    provider_id: effectiveProviderContext.provider.id,
+    status: response.status,
+    has_body: response.body !== null,
+    content_type: response.headers.get('content-type'),
+  });
+  const streamTracker =
+    observesStream && attemptId
+      ? createStreamLifecycleTracker({
+          attempt_id: attemptId,
+          provider_id: effectiveProviderContext.provider.id,
+          api_kind: requestBodyParsed.kind,
+        })
+      : null;
   if (streamTracker && clonedReponse.body) {
     const owner = clonedReponse;
     const body = clonedReponse.body;
@@ -843,7 +846,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
-      errorResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
+      if (attemptId) errorResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
       return errorResponse;
     }
   }
@@ -856,12 +859,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
   if (rewrittenResponse) {
     // Rewritten streams are excluded because their final bytes cannot be compared to the source.
-    rewrittenResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
+    if (attemptId) rewrittenResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
     return rewrittenResponse;
   }
 
   const finalResponse = wrapInSafeNextResponse(response);
-  finalResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
+  if (attemptId) finalResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
   if (!streamTracker || !finalResponse.body) return finalResponse;
 
   return new NextResponse(

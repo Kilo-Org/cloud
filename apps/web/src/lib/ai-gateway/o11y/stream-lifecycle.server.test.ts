@@ -4,6 +4,7 @@ import {
   createStreamLifecycleTracker,
   isEventStreamContentType,
   observeEventStream,
+  shouldObserveEventStream,
   type StreamOutcome,
 } from './stream-lifecycle.server';
 
@@ -159,7 +160,8 @@ describe('event stream lifecycle observation', () => {
     expect(outcomes[0]?.disposition).toBe('error');
   });
 
-  it('does not let a throwing EOF callback alter byte delivery or cleanup', async () => {
+  it('reports a throwing EOF callback without altering byte delivery or cleanup', async () => {
+    const report = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const source = stream(['data: [DONE]\n\n']);
     const body = observeEventStream(source, () => {
       throw new Error('callback failed');
@@ -167,9 +169,14 @@ describe('event stream lifecycle observation', () => {
 
     await expect(new Response(body).text()).resolves.toBe('data: [DONE]\n\n');
     expect(source.locked).toBe(false);
+    expect(report).toHaveBeenCalledWith('AI stream lifecycle observer failed', {
+      error_type: 'Error',
+    });
+    report.mockRestore();
   });
 
-  it('does not let a throwing cancellation callback block source cancellation', async () => {
+  it('reports a throwing cancellation callback without blocking source cancellation', async () => {
+    const report = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const cancel = jest.fn<(reason?: unknown) => void>();
     const source = new ReadableStream<Uint8Array>({ cancel });
     const reader = observeEventStream(source, () => {
@@ -179,6 +186,26 @@ describe('event stream lifecycle observation', () => {
     await expect(reader.cancel('stop')).resolves.toBeUndefined();
     expect(cancel).toHaveBeenCalledWith('stop');
     expect(source.locked).toBe(false);
+    expect(report).toHaveBeenCalledWith('AI stream lifecycle observer failed', {
+      error_type: 'Error',
+    });
+    report.mockRestore();
+  });
+
+  it('does not close an already cancelled stream when a pending pull settles', async () => {
+    const cancel = jest.fn<(reason?: unknown) => void>();
+    const outcomes: StreamOutcome[] = [];
+    const source = new ReadableStream<Uint8Array>({ cancel });
+    const reader = observeEventStream(source, outcome => outcomes.push(outcome)).getReader();
+    const pending = reader.read();
+
+    await Promise.resolve();
+    await reader.cancel('stop');
+
+    await expect(pending).resolves.toEqual({ done: true, value: undefined });
+    expect(cancel).toHaveBeenCalledWith('stop');
+    expect(source.locked).toBe(false);
+    expect(outcomes).toEqual([expect.objectContaining({ disposition: 'cancel' })]);
   });
 });
 
@@ -198,6 +225,36 @@ describe('event stream content type', () => {
       expect(isEventStreamContentType(contentType)).toBe(false);
     }
   );
+});
+
+describe('event stream observation scope', () => {
+  it('observes successful direct-provider event streams', () => {
+    expect(
+      shouldObserveEventStream({
+        provider_id: 'custom',
+        status: 200,
+        has_body: true,
+        content_type: 'Text/Event-Stream; charset=utf-8',
+      })
+    ).toBe(true);
+  });
+
+  it.each([
+    ['non-custom provider', { provider_id: 'openrouter' }],
+    ['unsuccessful response', { status: 500 }],
+    ['bodyless response', { has_body: false }],
+    ['non-event response', { content_type: 'application/json' }],
+  ])('does not observe %s', (_name, override) => {
+    expect(
+      shouldObserveEventStream({
+        provider_id: 'custom',
+        status: 200,
+        has_body: true,
+        content_type: 'text/event-stream',
+        ...override,
+      })
+    ).toBe(false);
+  });
 });
 
 describe('stream lifecycle correlation logging', () => {
@@ -256,6 +313,19 @@ describe('stream lifecycle correlation logging', () => {
     );
   });
 
+  it('always logs final cancellation after a complete provider stream', () => {
+    const log = jest.fn();
+    const tracker = createStreamLifecycleTracker(context, { random: () => 1, log });
+
+    tracker.observe('provider', outcome());
+    tracker.observe('final', outcome({ disposition: 'cancel' }));
+
+    expect(log).toHaveBeenCalledWith(
+      'AI stream lifecycle anomaly',
+      expect.objectContaining({ classification: 'final_cancelled' })
+    );
+  });
+
   it('keeps provider cancellation sampled as inconclusive', () => {
     const log = jest.fn();
     const tracker = createStreamLifecycleTracker(context, { random: () => 1, log });
@@ -266,14 +336,14 @@ describe('stream lifecycle correlation logging', () => {
     expect(log).not.toHaveBeenCalled();
   });
 
-  it('samples cancellation and other inconclusive pairs at 0.01%', () => {
+  it('samples provider cancellation and other inconclusive pairs at 0.01%', () => {
     const sampled = jest.fn();
     const skipped = jest.fn();
     const included = createStreamLifecycleTracker(context, { random: () => 0.00009, log: sampled });
     const excluded = createStreamLifecycleTracker(context, { random: () => 0.0001, log: skipped });
 
     for (const tracker of [included, excluded]) {
-      tracker.observe('provider', outcome());
+      tracker.observe('provider', outcome({ disposition: 'cancel' }));
       tracker.observe('final', outcome({ disposition: 'cancel' }));
     }
 

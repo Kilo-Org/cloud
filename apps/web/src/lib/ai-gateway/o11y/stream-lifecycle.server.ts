@@ -28,7 +28,13 @@ type Context = {
   api_kind: string;
 };
 
-type Classification = 'control' | 'divergence' | 'error' | 'source_incomplete' | 'inconclusive';
+type Classification =
+  | 'control'
+  | 'divergence'
+  | 'error'
+  | 'final_cancelled'
+  | 'source_incomplete'
+  | 'inconclusive';
 
 type TrackerOptions = {
   random?: () => number;
@@ -92,13 +98,22 @@ export function observeEventStream(
   let bytes = 0;
   let chunks = 0;
   let settled = false;
+  let cancelled = false;
 
+  const releaseOwner = () => {
+    if (retained === undefined) return;
+    retained = undefined;
+  };
+  const report = (error: unknown) => {
+    console.error('AI stream lifecycle observer failed', {
+      error_type: error instanceof Error ? error.name : typeof error,
+    });
+  };
   const settle = (disposition: Disposition) => {
     if (settled) return;
     settled = true;
-    const ending = scanner.finish();
-    void retained;
     try {
+      const ending = scanner.finish();
       done({
         bytes,
         chunks,
@@ -106,23 +121,30 @@ export function observeEventStream(
         ...ending,
         disposition,
       });
-    } catch {
-      // Observation is best-effort and must never affect the source stream.
+    } catch (error) {
+      report(error);
     } finally {
-      retained = undefined;
+      releaseOwner();
     }
+  };
+  const release = () => {
+    const active = reader;
+    reader = null;
+    active?.releaseLock();
   };
 
   return new ReadableStream<Uint8Array>(
     {
       async pull(controller) {
         reader ??= source.getReader();
+        const active = reader;
         try {
-          const result = await reader.read();
+          const result = await active.read();
+          if (cancelled) return;
           if (result.done) {
             settle('eof');
             controller.close();
-            reader.releaseLock();
+            release();
             return;
           }
           bytes += result.value.byteLength;
@@ -131,19 +153,21 @@ export function observeEventStream(
           scanner.push(result.value);
           controller.enqueue(result.value);
         } catch (error) {
+          if (cancelled) return;
           settle('error');
+          release();
           controller.error(error);
-          reader.releaseLock();
         }
       },
       async cancel(reason) {
+        cancelled = true;
         settle('cancel');
-        if (reader) {
-          await reader.cancel(reason);
-          reader.releaseLock();
-          return;
+        try {
+          if (reader) await reader.cancel(reason);
+          else await source.cancel(reason);
+        } finally {
+          release();
         }
-        await source.cancel(reason);
       },
     },
     { highWaterMark: 0 }
@@ -152,9 +176,10 @@ export function observeEventStream(
 
 function classify(provider: StreamOutcome, final: StreamOutcome): Classification {
   if (provider.disposition === 'error' || final.disposition === 'error') return 'error';
-  if (provider.disposition === 'eof' && !isClean(provider)) return 'source_incomplete';
-
   const providerClean = isClean(provider);
+  if (provider.disposition === 'eof' && !providerClean) return 'source_incomplete';
+  if (providerClean && final.disposition === 'cancel') return 'final_cancelled';
+
   const finalClean = isClean(final);
   if (providerClean && final.disposition === 'eof') {
     if (!finalClean || provider.sha256 !== final.sha256 || provider.bytes !== final.bytes) {
@@ -177,6 +202,21 @@ function isClean(outcome: StreamOutcome) {
 export function isEventStreamContentType(contentType: string | null) {
   if (!contentType) return false;
   return contentType.split(';', 1)[0]?.trim().toLowerCase() === 'text/event-stream';
+}
+
+export function shouldObserveEventStream(input: {
+  provider_id: string;
+  status: number;
+  has_body: boolean;
+  content_type: string | null;
+}) {
+  return (
+    input.provider_id === 'custom' &&
+    input.status >= 200 &&
+    input.status < 300 &&
+    input.has_body &&
+    isEventStreamContentType(input.content_type)
+  );
 }
 
 function createScanner() {

@@ -736,6 +736,30 @@ describe('WrapperSupervisor', () => {
     }
   );
 
+  it.each([
+    { failureCode: 'payment_required' as const, error: 'Insufficient credits' },
+    { failureCode: 'model_missing' as const, error: 'Model not found' },
+  ])('preserves $failureCode after agent activity', async failure => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      agentActivityObservedAt: 9_000,
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'failed',
+      errorSource: 'assistant',
+      ...failure,
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'agent_activity',
+      failureCode: failure.failureCode,
+    });
+  });
+
   it('persists physical stop obligation before reading messages for a failed terminal event', async () => {
     const storageRef: { current?: MemoryStorage } = {};
     let observedStopBeforeEffects = false;

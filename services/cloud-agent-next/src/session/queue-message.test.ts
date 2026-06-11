@@ -210,30 +210,57 @@ describe('queueMessage', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'nope' });
   });
 
-  it('maps PENDING_QUEUE_FULL to TOO_MANY_REQUESTS', async () => {
+  it('maps PENDING_QUEUE_FULL to a retryable TOO_MANY_REQUESTS error', async () => {
     const { stub } = makeDoStub({ success: false, code: 'PENDING_QUEUE_FULL', error: 'full' });
-    await expect(
-      queueMessage(
-        {
-          cloudAgentSessionId: 'agent_x' as SessionId,
-          turn: { type: 'prompt', prompt: 'x' },
-        },
-        { env: makeEnv(stub) as Env, userId: 'u' }
-      )
-    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS', message: 'full' });
+    const error = await queueMessage(
+      {
+        cloudAgentSessionId: 'agent_x' as SessionId,
+        turn: { type: 'prompt', prompt: 'x' },
+      },
+      { env: makeEnv(stub) as Env, userId: 'u' }
+    ).catch(error => error);
+
+    expect(error).toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+      message: 'full',
+      cause: { error: 'PENDING_QUEUE_FULL', retryable: true },
+    });
   });
 
-  it('maps INTERNAL to 500', async () => {
+  it('maps INTERNAL to an explicitly retryable 500 error', async () => {
     const { stub } = makeDoStub({ success: false, code: 'INTERNAL', error: 'boom' });
-    await expect(
-      queueMessage(
-        {
-          cloudAgentSessionId: 'agent_x' as SessionId,
-          turn: { type: 'prompt', prompt: 'x' },
-        },
-        { env: makeEnv(stub) as Env, userId: 'u' }
-      )
-    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'boom' });
+    const error = await queueMessage(
+      {
+        cloudAgentSessionId: 'agent_x' as SessionId,
+        turn: { type: 'prompt', prompt: 'x' },
+      },
+      { env: makeEnv(stub) as Env, userId: 'u' }
+    ).catch(error => error);
+
+    expect(error).toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'boom',
+      cause: { error: 'INTERNAL', retryable: true },
+    });
+  });
+
+  it.each([
+    ['NOT_FOUND', 'NOT_FOUND'],
+    ['BAD_REQUEST', 'BAD_REQUEST'],
+  ] as const)('marks permanent %s admission errors non-retryable', async (resultCode, trpcCode) => {
+    const { stub } = makeDoStub({ success: false, code: resultCode, error: 'permanent' });
+    const error = await queueMessage(
+      {
+        cloudAgentSessionId: 'agent_x' as SessionId,
+        turn: { type: 'prompt', prompt: 'x' },
+      },
+      { env: makeEnv(stub) as Env, userId: 'u' }
+    ).catch(error => error);
+
+    expect(error).toMatchObject({
+      code: trpcCode,
+      cause: { error: resultCode, retryable: false },
+    });
   });
 
   it('maps retryable SANDBOX_CONNECT_FAILED to SERVICE_UNAVAILABLE with retryable cause', async () => {

@@ -24,7 +24,12 @@ import {
   handleCommandsAvailable,
   extractEntityId,
 } from '../session/ingest-handlers/index.js';
-import type { CompleteEventData, KilocodeEventData, CloudStatusData } from '../shared/protocol.js';
+import {
+  WrapperTerminalFailureCodes,
+  type CompleteEventData,
+  type KilocodeEventData,
+  type CloudStatusData,
+} from '../shared/protocol.js';
 import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
@@ -63,6 +68,7 @@ const errorEventSchema = z.object({
   error: z.string().optional(),
   message: z.string().optional(),
   errorSource: z.literal('assistant').optional(),
+  failureCode: z.enum(WrapperTerminalFailureCodes).optional(),
 });
 
 const cloudMessageCompletedEventSchema = z.object({
@@ -839,6 +845,7 @@ export function createIngestHandler(
               status: 'failed',
               error: fatalMessage,
               errorSource: errorData.errorSource,
+              failureCode: errorData.failureCode,
             });
             logger
               .withFields({

@@ -23,7 +23,8 @@
     "./security-auto-analysis-policy": "./src/security-auto-analysis-policy.ts",
     "./security-remediation-policy": "./src/security-remediation-policy.ts",
     "./security-notification-policy": "./src/security-notification-policy.ts",
-    "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts"
+    "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts",
+    "./client-error": "./src/client-error.ts"
   },
   "scripts": {
     "test": "vitest run",

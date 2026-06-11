@@ -392,11 +392,16 @@ async function main() {
       state,
       { kiloClient: nextKiloClient },
       {
-        onTerminalError: terminalError => {
-          logToFile(`terminal error: ${terminalError.error}`);
+        onTerminalError: failure => {
+          logToFile(`terminal error: ${failure.message}`);
           state.sendToIngest({
             streamEventType: 'error',
-            data: { ...terminalError, fatal: true },
+            data: {
+              error: failure.message,
+              errorSource: failure.errorSource,
+              fatal: true,
+              ...(failure.code ? { failureCode: failure.code } : {}),
+            },
             timestamp: new Date().toISOString(),
           });
           const session = state.currentSession;

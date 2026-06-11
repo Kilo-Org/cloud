@@ -10,6 +10,7 @@ import {
   type SessionMessageStorage,
 } from './session-message-state.js';
 import { projectSafeFailure, type SafeFailureProjection } from './safe-failure-projection.js';
+import { isTerminalFailureRetryable } from './terminal-error-projector.js';
 
 export type SafeMessageResult = {
   messageId: string;
@@ -19,7 +20,7 @@ export type SafeMessageResult = {
   acceptedAt?: number;
   terminalAt?: number;
   completionSource?: SessionMessageCompletionSource;
-  failure?: SafeFailureProjection;
+  failure?: SafeFailureProjection & { retryable: boolean };
   gateResult?: 'pass' | 'fail';
 };
 
@@ -45,8 +46,19 @@ type ResolvedSessionMessageResult =
 
 type MessageResultStorage = SessionMessageStorage & SessionQueueStorage;
 
+function projectFailure(state: SessionMessageState): SafeMessageResult['failure'] {
+  if (state.status !== 'failed' && state.status !== 'interrupted') return undefined;
+  return {
+    ...projectSafeFailure(state),
+    retryable: isTerminalFailureRetryable({
+      failureStage: state.failureStage,
+      failureCode: state.failureCode,
+    }),
+  };
+}
+
 function projectLifecycleState(state: SessionMessageState): ResolvedSessionMessageResult {
-  const failure = projectSafeFailure(state);
+  const failure = projectFailure(state);
   const assistantLookup: AssistantLookup | undefined =
     state.status === 'completed' && state.assistantMessageId
       ? {

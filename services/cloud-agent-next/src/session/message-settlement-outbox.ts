@@ -19,6 +19,7 @@ import {
   type TerminalizeParams,
 } from './session-message-state.js';
 import { projectSafeFailure, type SafeFailureProjection } from './safe-failure-projection.js';
+import { projectTerminalClientError } from './terminal-error-projector.js';
 import type { AssistantMessagePart, LatestAssistantMessage } from './types.js';
 
 const CURRENT_IDLE_BATCH_CALLBACK_KEY = 'idle_batch_callback_current';
@@ -449,6 +450,17 @@ export function createMessageSettlementOutbox(
       status,
       errorMessage: legacyErrorMessage,
       failure,
+      ...(status === 'completed'
+        ? {}
+        : {
+            failureStage: state.failureStage,
+            clientError: projectTerminalClientError({
+              status,
+              failureStage: state.failureStage,
+              failureCode: state.failureCode,
+              error: failure?.message ?? legacyErrorMessage,
+            }),
+          }),
       lastSeenBranch: metadata?.repository?.upstreamBranch,
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,

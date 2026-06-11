@@ -14,7 +14,7 @@
   "vars": {
     // Base URL for reaching apps/web's /api/internal/* routes. Other workers
     // that call apps/web internal endpoints use app.kilo.ai.
-    "KILO_WEB_API_BASE_URL": "https://app.kilo.ai"
+    "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
   },
   "containers": [
     {
@@ -22,24 +22,24 @@
       "class_name": "BenchRunnerContainer",
       "image": "./container/Dockerfile",
       "instance_type": "standard-2",
-      "max_instances": 40
-    }
+      "max_instances": 40,
+    },
   ],
   "durable_objects": {
-    "bindings": [{ "name": "BENCH_RUNNER", "class_name": "BenchRunnerContainer" }]
+    "bindings": [{ "name": "BENCH_RUNNER", "class_name": "BenchRunnerContainer" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BenchRunnerContainer"] }],
   "triggers": {
     // 04:10 UTC daily: classifier benchmark. 05:10 UTC Monday: decider benchmark.
-    "crons": ["10 4 * * *", "10 5 * * 1"]
+    "crons": ["10 4 * * *", "10 5 * * 1"],
   },
   "d1_databases": [
     {
       "binding": "BENCH_DB",
       "database_name": "auto-routing-benchmark",
       "database_id": "92f2c88a-5ee6-4fd0-b118-75bd141b5cac",
-      "migrations_dir": "migrations"
-    }
+      "migrations_dir": "migrations",
+    },
   ],
   "queues": {
     "producers": [{ "binding": "BENCH_QUEUE", "queue": "auto-routing-benchmark-jobs" }],
@@ -49,25 +49,25 @@
         "max_batch_size": 1,
         "max_retries": 2,
         "max_concurrency": 4,
-        "dead_letter_queue": "auto-routing-benchmark-dlq"
-      }
-    ]
+        "dead_letter_queue": "auto-routing-benchmark-dlq",
+      },
+    ],
   },
   "kv_namespaces": [
     // Shared with the auto-routing worker: the decider benchmark publishes
     // the routing table here and auto-routing reads it on /decide.
-    { "binding": "AUTO_ROUTING_CONFIG", "id": "4316b8db31e347e19cfadad1b6386ad5" }
+    { "binding": "AUTO_ROUTING_CONFIG", "id": "4316b8db31e347e19cfadad1b6386ad5" },
   ],
   "secrets_store_secrets": [
     {
       "binding": "INTERNAL_API_SECRET_PROD",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "INTERNAL_API_SECRET_PROD"
+      "secret_name": "INTERNAL_API_SECRET_PROD",
     },
     {
       "binding": "OPENROUTER_API_KEY",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "OPENROUTER_API_KEY"
-    }
-  ]
+      "secret_name": "OPENROUTER_API_KEY",
+    },
+  ],
 }

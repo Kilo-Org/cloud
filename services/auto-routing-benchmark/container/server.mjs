@@ -83,7 +83,7 @@ function runCase({ model, prompt, kiloToken, timeoutMs }) {
         stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_CAP_BYTES);
       });
 
-      const finish = async (exitCode) => {
+      const finish = async exitCode => {
         clearTimeout(killTimer);
         await rm(dir, { recursive: true, force: true }).catch(() => {});
         const stdoutLines = stdout.split('\n').filter(line => line.length > 0);
@@ -130,7 +130,11 @@ const server = createServer((req, res) => {
           ? parsed.timeoutMs
           : DEFAULT_TIMEOUT_MS;
 
-      if (typeof model !== 'string' || typeof prompt !== 'string' || typeof kiloToken !== 'string') {
+      if (
+        typeof model !== 'string' ||
+        typeof prompt !== 'string' ||
+        typeof kiloToken !== 'string'
+      ) {
         sendJson(res, 400, { error: 'model, prompt and kiloToken are required strings' });
         return;
       }

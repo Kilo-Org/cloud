@@ -13,7 +13,7 @@ concurrency:
 
 env:
   VERCEL_VERSION: '53.3.1'
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
 
 jobs:
   check-production-db-startup:
@@ -84,6 +84,9 @@ jobs:
     outputs:
       deployment_url: ${{ steps.deploy.outputs.deployment_url }}
 
+    env:
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_APP }}
+
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -92,9 +95,6 @@ jobs:
 
       - name: Install Vercel CLI
         run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - name: Link Vercel project
-        run: vercel link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
 
       - name: Stage Vercel deployment
         id: deploy
@@ -110,6 +110,9 @@ jobs:
     outputs:
       deployment_url: ${{ steps.deploy.outputs.deployment_url }}
 
+    env:
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_GLOBAL_APP }}
+
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -118,9 +121,6 @@ jobs:
 
       - name: Install Vercel CLI
         run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - name: Link Vercel project
-        run: vercel link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
 
       - name: Stage Vercel deployment
         id: deploy

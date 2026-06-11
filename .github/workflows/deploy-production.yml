@@ -3,6 +3,11 @@ name: Deploy to Production
 on:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - '.github/workflows/deploy-production.yml'
+      - 'scripts/check-production-db-startup.ts'
+      - 'packages/db/src/database-url.ts'
 
 permissions:
   contents: read
@@ -22,7 +27,7 @@ jobs:
     environment: production
 
     env:
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_APP }}
+      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
 
     steps:
       - name: Checkout code
@@ -41,22 +46,18 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - run: vercel env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Check production DB startup path
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
 
   run-migrations:
+    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
 
     env:
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_APP }}
+      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
 
     steps:
       - name: Checkout code
@@ -76,15 +77,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - run: vercel env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate
 
   stage-app:
+    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     environment: production
@@ -116,6 +113,7 @@ jobs:
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
 
   stage-global-app:
+    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     environment: production
@@ -147,6 +145,7 @@ jobs:
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
 
   promote-app:
+    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs: [stage-app, check-production-db-startup, run-migrations]
@@ -160,6 +159,7 @@ jobs:
         run: vercel promote "${{ needs.stage-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
   promote-global-app:
+    if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs: [stage-global-app, check-production-db-startup, run-migrations]
@@ -173,6 +173,7 @@ jobs:
         run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-kiloclaw:
+    if: github.event_name == 'push'
     needs: [check-production-db-startup, run-migrations]
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
     # exceed the caller). The reusable workflow restricts further per job — only

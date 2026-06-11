@@ -146,9 +146,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   input_cache_write_price: '0.00000040625',
   supports_images: true,
   supports_pdf: false,
-  opencode_settings: {
-    ai_sdk_provider: 'alibaba',
-  },
+  opencode_settings: undefined,
 };
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {

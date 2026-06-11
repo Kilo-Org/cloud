@@ -667,7 +667,9 @@ function OrphanVolumesSection() {
                     <TableHead>DO Status</TableHead>
                     <TableHead>Destroyed</TableHead>
                     <TableHead>Subscription</TableHead>
-                    <TableHead>Sub. Ended</TableHead>
+                    <TableHead title="End of the subscription's current paid or trial period — the closest available proxy for when the user's access ended, not an authoritative cancellation timestamp.">
+                      Period End
+                    </TableHead>
                     <TableHead>Classification</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>

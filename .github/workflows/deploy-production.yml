@@ -21,6 +21,9 @@ jobs:
     timeout-minutes: 15
     environment: production
 
+    env:
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_APP }}
+
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -38,10 +41,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      # Setup Vercel ENV — link from repo root; Vercel rootDirectory (apps/web) is set on the dashboard
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Check production DB startup path
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
@@ -51,6 +50,9 @@ jobs:
     timeout-minutes: 15
     environment: production
 
+    env:
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_APP }}
+
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -68,10 +70,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      # Setup Vercel ENV — link from repo root; Vercel rootDirectory (apps/web) is set on the dashboard
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate

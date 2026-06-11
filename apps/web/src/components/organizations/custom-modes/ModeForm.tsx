@@ -1,7 +1,7 @@
 'use client';
 
 import type { FormEvent } from 'react';
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ import type { OrganizationMode } from '@/lib/organizations/organization-modes';
 import type { EditGroupConfig } from '@/lib/organizations/organization-types';
 import { Save, FileText } from 'lucide-react';
 import { useModeTemplates } from './useModeTemplates';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 
 const availableGroups = [
   { value: 'read', label: 'Read Files' },
@@ -27,6 +28,8 @@ const availableGroups = [
   { value: 'command', label: 'Run Commands' },
   { value: 'mcp', label: 'Use MCP' },
 ] as const;
+
+const noDefaultModelValue = '__no-mode-specific-default__';
 
 const modeFormSchema = z.object({
   name: z
@@ -43,15 +46,18 @@ const modeFormSchema = z.object({
   whenToUse: z.string().optional(),
   groups: z.any(), // Will be validated separately
   customInstructions: z.string().optional(),
+  defaultModel: z.string().min(1, 'Default model cannot be empty').optional(),
 });
 
 export type ModeFormData = z.infer<typeof modeFormSchema>;
 
 type ModeFormProps = {
+  organizationId: string;
   mode?: OrganizationMode;
   onSubmit: (data: ModeFormData) => Promise<void>;
   isSubmitting: boolean;
   isEditingBuiltIn?: boolean;
+  isDefaultModelConfigEnabled?: boolean;
   existingModes?: OrganizationMode[];
   onCancel?: () => void;
   renderButtons?: (props: { isDirty: boolean; isSubmitting: boolean }) => React.ReactNode;
@@ -91,10 +97,12 @@ function denormalizeGroups(
 }
 
 export function ModeForm({
+  organizationId,
   mode,
   onSubmit,
   isSubmitting,
   isEditingBuiltIn = false,
+  isDefaultModelConfigEnabled = false,
   existingModes = [],
   onCancel,
   renderButtons,
@@ -106,6 +114,7 @@ export function ModeForm({
     description: mode?.config?.description || '',
     whenToUse: mode?.config?.whenToUse || '',
     customInstructions: mode?.config?.customInstructions || '',
+    defaultModel: mode?.config?.defaultModel || '',
   });
   const [selectedGroups, setSelectedGroups] = useState<string[]>(() => {
     const { simpleGroups } = normalizeGroups(mode?.config?.groups || []);
@@ -123,6 +132,7 @@ export function ModeForm({
     description: mode?.config?.description || '',
     whenToUse: mode?.config?.whenToUse || '',
     customInstructions: mode?.config?.customInstructions || '',
+    defaultModel: mode?.config?.defaultModel || '',
   });
   const [initialGroups, setInitialGroups] = useState<string[]>(() => {
     const { simpleGroups } = normalizeGroups(mode?.config?.groups || []);
@@ -136,6 +146,17 @@ export function ModeForm({
 
   // Fetch mode templates
   const { data: templates, isLoading: templatesLoading } = useModeTemplates();
+  const {
+    data: modelsData,
+    isLoading: modelsLoading,
+    error: modelsError,
+  } = useModelSelectorList(organizationId, isDefaultModelConfigEnabled);
+  const modelOptions = useMemo(() => modelsData?.data || [], [modelsData?.data]);
+  const hasCurrentDefaultModelOption =
+    !!formData.defaultModel && modelOptions.some(model => model.id === formData.defaultModel);
+  const shouldRenderCurrentDefaultModel = !!formData.defaultModel && !hasCurrentDefaultModelOption;
+  const hasUnavailableDefaultModel =
+    shouldRenderCurrentDefaultModel && !modelsLoading && !modelsError;
 
   // Update form data when mode prop changes
   useEffect(() => {
@@ -147,6 +168,7 @@ export function ModeForm({
         description: mode.config?.description || '',
         whenToUse: mode.config?.whenToUse || '',
         customInstructions: mode.config?.customInstructions || '',
+        defaultModel: mode.config?.defaultModel || '',
       };
       const { simpleGroups, editConfig } = normalizeGroups(mode.config?.groups || []);
       const newEditConfig = editConfig || { fileRegex: '', description: '' };
@@ -168,6 +190,7 @@ export function ModeForm({
     formData.description !== initialFormData.description ||
     formData.whenToUse !== initialFormData.whenToUse ||
     formData.customInstructions !== initialFormData.customInstructions ||
+    formData.defaultModel !== initialFormData.defaultModel ||
     JSON.stringify(selectedGroups.sort()) !== JSON.stringify(initialGroups.sort()) ||
     editGroupConfig.fileRegex !== initialEditConfig.fileRegex ||
     editGroupConfig.description !== initialEditConfig.description;
@@ -205,6 +228,7 @@ export function ModeForm({
       description: template.config.description || '',
       whenToUse: template.config.whenToUse || '',
       customInstructions: template.config.customInstructions || '',
+      defaultModel: '',
     };
 
     const { simpleGroups, editConfig } = normalizeGroups(template.config.groups || []);
@@ -237,6 +261,10 @@ export function ModeForm({
       newErrors.slug = `A mode with the slug "${formData.slug}" already exists`;
     }
 
+    if (isDefaultModelConfigEnabled && hasUnavailableDefaultModel) {
+      newErrors.defaultModel = 'Choose an allowed model or clear this value.';
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -249,6 +277,7 @@ export function ModeForm({
 
     const result = modeFormSchema.safeParse({
       ...formData,
+      defaultModel: formData.defaultModel || undefined,
       groups,
     });
 
@@ -417,6 +446,74 @@ export function ModeForm({
               Add behavioral guidelines specific to this mode
             </p>
           </div>
+
+          {isDefaultModelConfigEnabled && (
+            <div className="space-y-2">
+              <Label htmlFor="defaultModel">Mode Default Model</Label>
+              <Select
+                value={formData.defaultModel || noDefaultModelValue}
+                onValueChange={value =>
+                  setFormData(prev => ({
+                    ...prev,
+                    defaultModel: value === noDefaultModelValue ? '' : value,
+                  }))
+                }
+                disabled={isSubmitting || modelsLoading}
+              >
+                <SelectTrigger
+                  id="defaultModel"
+                  className="w-full"
+                  aria-describedby="defaultModel-help"
+                >
+                  <SelectValue
+                    placeholder={modelsLoading ? 'Loading models...' : 'No default model'}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={noDefaultModelValue}>No mode-specific default</SelectItem>
+                  {shouldRenderCurrentDefaultModel && (
+                    <SelectItem value={formData.defaultModel} disabled>
+                      <div className="flex flex-col">
+                        <span className="font-mono text-sm">{formData.defaultModel}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {modelsLoading
+                            ? 'Checking organization policy...'
+                            : modelsError
+                              ? 'Unable to verify organization policy'
+                              : 'Unavailable under current organization policy'}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  )}
+                  {modelOptions.map(model => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex flex-col">
+                        <span className="font-mono text-sm">{model.id}</span>
+                        {model.name !== model.id && (
+                          <span className="text-muted-foreground text-xs">{model.name}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p id="defaultModel-help" className="text-muted-foreground text-xs">
+                {modelsLoading
+                  ? 'Loading organization-allowed models...'
+                  : modelsError
+                    ? 'Unable to load organization models.'
+                    : modelOptions.length === 0
+                      ? 'No organization-allowed models are available.'
+                      : 'Members can still override this locally in Kilo Code.'}
+              </p>
+              {hasUnavailableDefaultModel && (
+                <p className="text-sm text-amber-600">
+                  Choose an allowed model or clear this value before saving.
+                </p>
+              )}
+              {errors.defaultModel && <p className="text-sm text-red-600">{errors.defaultModel}</p>}
+            </div>
+          )}
 
           {/* Available Tools */}
           <div className="space-y-4">

@@ -22,6 +22,10 @@ import { getOrganizationById } from '@/lib/organizations/organizations';
 import { successResult } from '@/lib/maybe-result';
 import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
+
+const ORGANIZATION_MODE_DEFAULT_MODEL_FLAG = 'org-default-model-config';
 
 const ModeConfigInputSchema = OrganizationModeConfigSchema.partial();
 
@@ -30,6 +34,9 @@ const ModeUpdateConfigInputSchema = ModeConfigInputSchema.extend({
 });
 
 type ModeUpdateConfigInput = z.infer<typeof ModeUpdateConfigInputSchema>;
+type DefaultModelConfig = {
+  defaultModel?: string | null;
+};
 
 const CreateModeInputSchema = OrganizationIdInputSchema.extend({
   name: z
@@ -64,6 +71,29 @@ const ModeIdInputSchema = OrganizationIdInputSchema.extend({
   modeId: z.uuid(),
 });
 
+function hasDefaultModelUpdate(config: ModeUpdateConfigInput | undefined): boolean {
+  return !!config && Object.prototype.hasOwnProperty.call(config, 'defaultModel');
+}
+
+async function ensureDefaultModelConfigEnabled(
+  userId: string,
+  config: ModeUpdateConfigInput | undefined
+): Promise<void> {
+  if (!hasDefaultModelUpdate(config)) {
+    return;
+  }
+
+  if (
+    process.env.NODE_ENV !== 'development' &&
+    !(await isReleaseToggleEnabled(ORGANIZATION_MODE_DEFAULT_MODEL_FLAG, userId))
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Mode default model configuration is not available',
+    });
+  }
+}
+
 function normalizeModeConfig(
   config: ModeUpdateConfigInput | undefined
 ): Partial<OrganizationModeConfig> | undefined {
@@ -84,14 +114,15 @@ function normalizeModeConfig(
 
 async function validateDefaultModel(
   organization: Awaited<ReturnType<typeof getOrganizationById>>,
-  config: ModeUpdateConfigInput | undefined
+  config: DefaultModelConfig | undefined
 ): Promise<void> {
   const defaultModel = config?.defaultModel;
   if (!organization || defaultModel === undefined || defaultModel === null) {
     return;
   }
 
-  if (defaultModel.endsWith('/*')) {
+  const normalizedDefaultModel = normalizeModelId(defaultModel);
+  if (normalizedDefaultModel.endsWith('/*')) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: `Default model '${defaultModel}' is not a concrete model identifier`,
@@ -102,7 +133,7 @@ async function validateDefaultModel(
     getEffectiveModelRestrictions(organization)
   );
 
-  if (!(await isAllowed(defaultModel))) {
+  if (!(await isAllowed(normalizedDefaultModel))) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: `Default model '${defaultModel}' is not in the organization's allowed models list`,
@@ -124,6 +155,7 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
+      await ensureDefaultModelConfigEnabled(ctx.user.id, config);
       await validateDefaultModel(organization, config);
 
       const mode = await createOrganizationMode(
@@ -198,11 +230,16 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
-      await validateDefaultModel(organization, updates.config);
+      await ensureDefaultModelConfigEnabled(ctx.user.id, updates.config);
+      const normalizedConfig = normalizeModeConfig(updates.config);
+      const effectiveConfig = normalizedConfig
+        ? { ...existingMode.config, ...normalizedConfig }
+        : existingMode.config;
+      await validateDefaultModel(organization, effectiveConfig);
 
-      const mode = await updateOrganizationMode(modeId, {
+      const mode = await updateOrganizationMode(organizationId, modeId, {
         ...updates,
-        config: normalizeModeConfig(updates.config),
+        config: normalizedConfig,
       });
 
       if (!mode) {

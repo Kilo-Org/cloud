@@ -168,7 +168,7 @@ describe('updateOrganizationMode', () => {
       groups: ['read', 'edit'],
     });
 
-    const updatedMode = await updateOrganizationMode(mode!.id, {
+    const updatedMode = await updateOrganizationMode(organization.id, mode!.id, {
       config: { defaultModel: 'openai/gpt-4o' },
     });
 
@@ -190,7 +190,7 @@ describe('updateOrganizationMode', () => {
       defaultModel: 'openai/gpt-4o',
     });
 
-    const updatedMode = await updateOrganizationMode(mode!.id, {
+    const updatedMode = await updateOrganizationMode(organization.id, mode!.id, {
       config: { defaultModel: undefined },
     });
 
@@ -199,6 +199,22 @@ describe('updateOrganizationMode', () => {
       description: 'Write code',
       groups: ['read', 'edit'],
     });
+  });
+
+  test('should not update a mode through another organization', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Test Org', user.id);
+    const otherOrganization = await createOrganization('Other Org', user.id);
+    const mode = await createOrganizationMode(organization.id, user.id, 'Code Mode', 'code', {
+      roleDefinition: 'You are a coding assistant',
+      groups: ['read'],
+    });
+
+    const updatedMode = await updateOrganizationMode(otherOrganization.id, mode!.id, {
+      config: { defaultModel: 'openai/gpt-4o' },
+    });
+
+    expect(updatedMode).toBeNull();
   });
 });
 

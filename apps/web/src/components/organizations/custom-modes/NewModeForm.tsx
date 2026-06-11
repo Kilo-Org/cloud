@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 type NewModeFormProps = {
   organizationId: string;
   defaultModeSlug?: string;
+  isDefaultModelConfigEnabled?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 };
@@ -17,6 +18,7 @@ type NewModeFormProps = {
 export function NewModeForm({
   organizationId,
   defaultModeSlug: propDefaultModeSlug,
+  isDefaultModelConfigEnabled = false,
   onSuccess,
   onCancel,
 }: NewModeFormProps) {
@@ -58,6 +60,7 @@ export function NewModeForm({
           whenToUse: data.whenToUse,
           groups: data.groups as ('read' | 'edit' | 'browser' | 'command' | 'mcp')[],
           customInstructions: data.customInstructions,
+          ...(data.defaultModel ? { defaultModel: data.defaultModel } : {}),
         },
       });
       toast.success(`Mode "${data.name}" created successfully`);
@@ -71,10 +74,12 @@ export function NewModeForm({
 
   return (
     <ModeForm
+      organizationId={organizationId}
       mode={initialMode}
       onSubmit={handleSubmit}
       isSubmitting={createMutation.isPending}
       isEditingBuiltIn={!!defaultMode}
+      isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
       existingModes={modesData?.modes || []}
       onCancel={onCancel}
       renderButtons={() => null}

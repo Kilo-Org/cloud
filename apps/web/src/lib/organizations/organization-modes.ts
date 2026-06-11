@@ -63,6 +63,7 @@ export async function getOrganizationModeById(
 }
 
 export async function updateOrganizationMode(
+  organizationId: string,
   modeId: string,
   updates: {
     name?: string;
@@ -82,7 +83,12 @@ export async function updateOrganizationMode(
     const [existingMode] = await db
       .select()
       .from(orgnaization_modes)
-      .where(eq(orgnaization_modes.id, modeId));
+      .where(
+        and(
+          eq(orgnaization_modes.id, modeId),
+          eq(orgnaization_modes.organization_id, organizationId)
+        )
+      );
 
     if (!existingMode) {
       return null;
@@ -98,7 +104,12 @@ export async function updateOrganizationMode(
     const [mode] = await db
       .update(orgnaization_modes)
       .set(updateData)
-      .where(eq(orgnaization_modes.id, modeId))
+      .where(
+        and(
+          eq(orgnaization_modes.id, modeId),
+          eq(orgnaization_modes.organization_id, organizationId)
+        )
+      )
       .returning();
 
     return mode ? { ...mode, config: mergeToSatisfy(mode.config) } : null;

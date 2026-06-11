@@ -6,5 +6,5 @@ import { Container } from '@cloudflare/containers';
 // (runId, model, chunk) so concurrent chunks/models don't share state.
 export class BenchRunnerContainer extends Container<Env> {
   defaultPort = 3000;
-  sleepAfter = '5m';
+  sleepAfter = '2m';
 }

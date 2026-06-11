@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
+import { DifficultyTierSchema } from './tiers';
 
 export {
   NormalizedClassifierInputSchema,
@@ -96,9 +97,19 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
+export const AutoRoutingDecisionSchema = z.object({
+  model: z.string(),
+  tier: DifficultyTierSchema,
+  source: z.enum(['benchmark', 'default']),
+  tableVersion: z.string(),
+});
+export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
+
 export const AutoRoutingDecisionResponseSchema = z.object({
   cost: z.number(),
-  decision: z.null(),
+  // Null when classification failed or no table candidate supports the
+  // request's API kind; the gateway then falls back to its static default.
+  decision: AutoRoutingDecisionSchema.nullable(),
   classifierResult: z
     .object({
       classification: ClassifierOutputSchema,
@@ -158,3 +169,7 @@ export type AutoRoutingClassifierAnalyticsResponse = z.infer<
 >;
 
 export { normalizeClassifierInput, redactProviderHints, type ClassifierApiKind } from './normalize';
+
+export * from './tiers';
+export * from './routing-table';
+export * from './benchmark';

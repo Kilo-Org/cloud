@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import type { Env, DeployRequest, DeployResponse, StatusResponse } from './types';
+import type { Env, HonoEnv, DeployRequest, DeployResponse, StatusResponse } from './types';
 import {
   backendAuthMiddleware,
   createErrorHandler,
@@ -12,6 +12,8 @@ import * as Sentry from '@sentry/cloudflare';
 // Import base Durable Objects
 import { DeploymentOrchestrator as DeploymentOrchestratorBase } from './deployment-orchestrator';
 import { EventsManager as EventsManagerBase } from './events-manager';
+import { htmlDeployHandler } from './html-deploy/handler';
+import { runEphemeralDeploymentCleanup } from './html-deploy/ephemeral-cleanup';
 export { Sandbox } from '@cloudflare/sandbox';
 
 // Export Sentry-instrumented Durable Objects
@@ -19,7 +21,7 @@ export const DeploymentOrchestrator = Sentry.instrumentDurableObjectWithSentry(
   (env: Env) => ({
     dsn: env.SENTRY_DSN,
     release: env.CF_VERSION_METADATA.id,
-    sendDefaultPii: true,
+    sendDefaultPii: false,
     environment: env.ENVIRONMENT || 'production',
   }),
   DeploymentOrchestratorBase
@@ -29,7 +31,7 @@ export const EventsManager = Sentry.instrumentDurableObjectWithSentry(
   (env: Env) => ({
     dsn: env.SENTRY_DSN,
     release: env.CF_VERSION_METADATA.id,
-    sendDefaultPii: true,
+    sendDefaultPii: false,
     environment: env.ENVIRONMENT || 'production',
   }),
   EventsManagerBase
@@ -40,8 +42,13 @@ function createDurableObjectBuilderID() {
 }
 
 // Create Hono app with Env type
-type HonoEnv = { Bindings: Env };
 const app = new Hono<HonoEnv>();
+
+// ── /deploy-html — Kilo JWT auth, no sandbox, synchronous ─────────────────
+
+app.post('/deploy-html', htmlDeployHandler);
+
+// ── Backend-authenticated routes ───────────────────────────────────────────
 
 // Authentication middleware
 app.use(
@@ -293,13 +300,33 @@ app.onError((err, c) => {
 // 404 handler
 app.notFound(createNotFoundHandler());
 
-export default Sentry.withSentry((env: Env) => {
-  const { id: versionId } = env.CF_VERSION_METADATA;
+export default Sentry.withSentry(
+  (env: Env) => {
+    const { id: versionId } = env.CF_VERSION_METADATA;
 
-  return {
-    dsn: env.SENTRY_DSN,
-    release: versionId,
-    sendDefaultPii: true,
-    environment: env.ENVIRONMENT || 'production',
-  };
-}, app);
+    return {
+      dsn: env.SENTRY_DSN,
+      release: versionId,
+      sendDefaultPii: false,
+      environment: env.ENVIRONMENT || 'production',
+    };
+  },
+  {
+    fetch: app.fetch,
+
+    // ── Scheduled handler: minute-scale ephemeral cleanup ───────────────────
+    async scheduled(
+      _controller: ScheduledController,
+      env: Env,
+      ctx: ExecutionContext
+    ): Promise<void> {
+      ctx.waitUntil(
+        runEphemeralDeploymentCleanup(env).catch(error => {
+          Sentry.captureException(error, {
+            extra: { action: 'html-deploy-postgres-cleanup-sweep' },
+          });
+        })
+      );
+    },
+  } satisfies ExportedHandler<Env>
+);

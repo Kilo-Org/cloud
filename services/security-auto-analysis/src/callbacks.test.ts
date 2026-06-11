@@ -7,6 +7,7 @@ import {
   finalizeFailedAnalysisCallback,
   mapAnalysisCallbackFailure,
   resolveCompletedCallbackMarkdown,
+  SecurityAnalysisCallbackPayloadSchema,
   type SecurityAnalysisCallbackPayload,
 } from './callbacks.js';
 
@@ -647,6 +648,57 @@ describe('finalizeFailedAnalysisCallback', () => {
     });
   });
 
+  it('persists a valid structured safe message instead of the raw legacy error', async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              {
+                session_id: 'agent-123',
+                cli_session_id: null,
+                ignored_reason: null,
+                analysis_status: 'running',
+                claimToken: ATTEMPT_TOKEN,
+              },
+            ],
+          }),
+        }),
+      }),
+    };
+
+    await expect(
+      finalizeFailedAnalysisCallback({
+        db: db as never,
+        findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptToken: ATTEMPT_TOKEN,
+        payload: {
+          ...failedPayload,
+          errorMessage: 'legacy raw token=secret',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'workspace_setup_failed',
+            subtype: 'git_clone_timeout',
+            message: 'Repository clone timed out',
+          },
+        },
+      })
+    ).resolves.toEqual({ status: 'failed-finalized' });
+
+    expect(transitionAnalysisCallbackLifecycle).toHaveBeenCalledWith(db, {
+      findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attemptToken: ATTEMPT_TOKEN,
+      outcome: {
+        type: 'failed',
+        errorMessage: 'Repository clone timed out',
+        failureCode: 'NETWORK_TIMEOUT',
+      },
+    });
+    expect(
+      JSON.stringify(vi.mocked(transitionAnalysisCallbackLifecycle).mock.calls.at(-1))
+    ).not.toContain('token=secret');
+  });
+
   it('resolves the active claim token for legacy failed callback messages', async () => {
     const db = {
       select: () => ({
@@ -686,6 +738,45 @@ describe('finalizeFailedAnalysisCallback', () => {
   });
 });
 
+describe('SecurityAnalysisCallbackPayloadSchema', () => {
+  it('accepts structured failure payloads and completed callbacks without failure', () => {
+    expect(
+      SecurityAnalysisCallbackPayloadSchema.safeParse({
+        ...failedPayload,
+        failure: {
+          stage: 'pre_dispatch',
+          code: 'workspace_setup_failed',
+          subtype: 'git_clone_timeout',
+          attempts: 2,
+          message: 'Repository clone timed out',
+        },
+      }).success
+    ).toBe(true);
+    expect(
+      SecurityAnalysisCallbackPayloadSchema.safeParse({
+        ...failedPayload,
+        status: 'completed',
+        errorMessage: undefined,
+      }).success
+    ).toBe(true);
+  });
+
+  it.each([
+    { failure: { code: 'future_failure_code' } },
+    { failure: { subtype: 'unknown_workspace_failure' } },
+    { failure: { extra: true } },
+    { failure: { attempts: -1 } },
+    { failure: { message: 'x'.repeat(4_097) } },
+  ])('discards incompatible failure while retaining the legacy payload: %o', extension => {
+    expect(SecurityAnalysisCallbackPayloadSchema.parse({ ...failedPayload, ...extension })).toEqual(
+      {
+        ...failedPayload,
+        failure: undefined,
+      }
+    );
+  });
+});
+
 describe('mapAnalysisCallbackFailure', () => {
   it('maps interrupted callbacks to state guard rejection', () => {
     expect(
@@ -696,7 +787,25 @@ describe('mapAnalysisCallbackFailure', () => {
     });
   });
 
-  it('maps transient upstream failures to UPSTREAM_5XX', () => {
+  it('prefers structured timeout classification and message', () => {
+    expect(
+      mapAnalysisCallbackFailure({
+        ...failedPayload,
+        errorMessage: 'legacy upstream 503',
+        failure: {
+          stage: 'pre_dispatch',
+          code: 'workspace_setup_failed',
+          subtype: 'git_clone_timeout',
+          message: 'Repository clone timed out',
+        },
+      })
+    ).toEqual({
+      errorMessage: 'Repository clone timed out',
+      failureCode: 'NETWORK_TIMEOUT',
+    });
+  });
+
+  it('preserves legacy text classification when failure is absent', () => {
     expect(mapAnalysisCallbackFailure(failedPayload)).toEqual({
       errorMessage: 'upstream 503',
       failureCode: 'UPSTREAM_5XX',

@@ -280,6 +280,7 @@ describe('processManualAnalysisStart', () => {
         command: {
           ...command,
           requestedModels: { triageModel: 'request/triage', analysisModel: 'request/analysis' },
+          forceSandbox: true,
           retrySandboxOnly: true,
         },
       })
@@ -292,6 +293,7 @@ describe('processManualAnalysisStart', () => {
         analysisModel: 'request/analysis',
         analysisMode: 'deep',
         callbackTokenSecret: 'callback-token-secret',
+        forceSandbox: true,
         retrySandboxOnly: true,
         lifecycleClaim: expect.objectContaining({
           source: 'manual',

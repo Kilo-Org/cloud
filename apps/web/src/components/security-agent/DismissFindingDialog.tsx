@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertTriangle } from 'lucide-react';
 import type { SecurityFinding } from '@kilocode/db/schema';
+import { securityAgentCommandAdmissionCopy } from './security-agent-command-copy';
 
 // GitHub Dependabot dismiss reasons
 const DISMISS_REASONS = [
@@ -92,7 +93,7 @@ export function DismissFindingDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-yellow-500" />
-            Dismiss Finding
+            Dismiss finding
           </DialogTitle>
           <DialogDescription>
             This will dismiss the Dependabot alert on GitHub. Choose a reason for dismissing this
@@ -102,7 +103,7 @@ export function DismissFindingDialog({
 
         <div className="space-y-4 py-4">
           {/* Finding Summary */}
-          <div className="bg-muted/50 rounded-lg border p-3">
+          <div className="bg-muted/50 border-border rounded-lg border p-3">
             <p className="text-sm font-medium">{finding.title}</p>
             <p className="text-muted-foreground text-xs">
               {finding.package_name} • {finding.severity}
@@ -140,7 +141,7 @@ export function DismissFindingDialog({
             <Label htmlFor="comment">Comment (optional)</Label>
             <Textarea
               id="comment"
-              placeholder="Add additional context for this dismissal..."
+              placeholder="Add context for this dismissal"
               value={comment}
               onChange={e => setComment(e.target.value)}
               rows={3}
@@ -150,10 +151,12 @@ export function DismissFindingDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isLoading}>
-            Cancel
+            Keep finding
           </Button>
           <Button variant="destructive" onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Dismissing...' : 'Dismiss Alert'}
+            {isLoading
+              ? `${securityAgentCommandAdmissionCopy.dismiss_finding.pendingLabel}...`
+              : 'Dismiss finding'}
           </Button>
         </DialogFooter>
       </DialogContent>

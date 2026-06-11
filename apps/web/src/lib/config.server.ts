@@ -366,6 +366,9 @@ export const MODEL_EVAL_INGEST_URL = getEnvVariable('MODEL_EVAL_INGEST_URL') || 
 // Session ingest worker (public share proxy)
 export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_URL') || '';
 
+// Auto routing worker
+export const AUTO_ROUTING_WORKER_URL = getEnvVariable('AUTO_ROUTING_WORKER_URL') || '';
+
 // Security Agent sync Worker command ingress
 export const SECURITY_SYNC_WORKER_URL = getEnvVariable('SECURITY_SYNC_WORKER_URL') || '';
 // Security Agent auto-analysis Worker command ingress

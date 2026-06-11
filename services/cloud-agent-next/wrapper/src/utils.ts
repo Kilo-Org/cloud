@@ -5,7 +5,10 @@ export type ExecResult = {
   stdout: string;
   stderr: string;
   exitCode: number;
+  elapsedMs?: number;
   terminationReason?: TerminationReason;
+  stdoutTruncated?: boolean;
+  stderrTruncated?: boolean;
 };
 
 export type ProcessOptions = {
@@ -13,6 +16,7 @@ export type ProcessOptions = {
   timeoutMs?: number;
   signal?: AbortSignal;
   terminationGraceMs?: number;
+  maxOutputBytes?: number;
 };
 
 export type GitOptions = ProcessOptions;
@@ -29,11 +33,45 @@ const EXEC_TERMINATION_GRACE_MS = 2_000;
 const EXEC_TERMINATION_POLL_MS = 25;
 const EXEC_TIMEOUT_MESSAGE = 'exec timeout reached';
 const EXEC_ABORTED_MESSAGE = 'exec aborted';
+const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1_024;
+const TRUNCATION_MARKER = 'output truncated';
 
 export type TerminationReason = 'timeout' | 'abort';
 
-function withStderrSuffix(stderr: string, suffix: string): string {
-  return `${stderr}${stderr.endsWith('\n') || stderr.length === 0 ? '' : '\n'}${suffix}`;
+function utf8Tail(value: string, maxBytes: number): string {
+  const bytes = Buffer.from(value);
+  if (bytes.length <= maxBytes) return value;
+  return bytes
+    .subarray(bytes.length - maxBytes)
+    .toString('utf8')
+    .replace(/^\uFFFD/, '');
+}
+
+function appendBoundedTail(
+  current: string,
+  chunk: Buffer | string,
+  maxBytes: number
+): { value: string; truncated: boolean } {
+  const next = current + chunk.toString();
+  const truncated = Buffer.byteLength(next) > maxBytes;
+  return { value: truncated ? utf8Tail(next, maxBytes) : next, truncated };
+}
+
+export function createSafeProcessDiagnostic(result: ExecResult): string {
+  const termination =
+    result.terminationReason ?? (result.exitCode === 0 ? 'completed' : 'nonzero exit');
+  return [
+    `termination ${termination}`,
+    result.terminationReason === undefined && result.exitCode !== 0
+      ? `exit code ${result.exitCode}`
+      : undefined,
+    result.elapsedMs === undefined ? undefined : `elapsed ${result.elapsedMs}ms`,
+    result.stdoutTruncated === true || result.stderrTruncated === true
+      ? TRUNCATION_MARKER
+      : undefined,
+  ]
+    .filter(value => value !== undefined)
+    .join(', ');
 }
 
 export function runProcess(
@@ -41,11 +79,13 @@ export function runProcess(
   args: string[],
   opts?: ProcessOptions
 ): Promise<ExecResult> {
+  const startedAt = Date.now();
   if (opts?.signal?.aborted) {
     return Promise.resolve({
       stdout: '',
       stderr: EXEC_ABORTED_MESSAGE,
       exitCode: EXEC_TIMEOUT_EXIT_CODE,
+      elapsedMs: 0,
       terminationReason: 'abort',
     });
   }
@@ -58,6 +98,9 @@ export function runProcess(
     });
     let stdout = '';
     let stderr = '';
+    let stdoutTruncated = false;
+    let stderrTruncated = false;
+    const maxOutputBytes = opts?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     let settled = false;
     let terminationReason: TerminationReason | null = null;
     let terminationTimer: ReturnType<typeof setTimeout> | undefined;
@@ -89,14 +132,19 @@ export function runProcess(
       clearTimers();
       removeAbortHandler();
       if (destroyOpenPipes) destroyPipes();
+      const boundedStderr = appendBoundedTail(
+        stderr,
+        `${stderr.endsWith('\n') || stderr.length === 0 ? '' : '\n'}${reason === 'timeout' ? EXEC_TIMEOUT_MESSAGE : EXEC_ABORTED_MESSAGE}`,
+        maxOutputBytes
+      );
       resolve({
         stdout,
-        stderr: withStderrSuffix(
-          stderr,
-          reason === 'timeout' ? EXEC_TIMEOUT_MESSAGE : EXEC_ABORTED_MESSAGE
-        ),
+        stderr: boundedStderr.value,
         exitCode: EXEC_TIMEOUT_EXIT_CODE,
+        elapsedMs: Date.now() - startedAt,
         terminationReason: reason,
+        ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
+        ...(stderrTruncated || boundedStderr.truncated ? { stderrTruncated: true } : {}),
       });
     };
 
@@ -145,8 +193,16 @@ export function runProcess(
         ? setTimeout(() => terminate('timeout'), opts.timeoutMs)
         : undefined;
 
-    proc.stdout.on('data', d => (stdout += d));
-    proc.stderr.on('data', d => (stderr += d));
+    proc.stdout.on('data', (chunk: Buffer) => {
+      const bounded = appendBoundedTail(stdout, chunk, maxOutputBytes);
+      stdout = bounded.value;
+      stdoutTruncated ||= bounded.truncated;
+    });
+    proc.stderr.on('data', (chunk: Buffer) => {
+      const bounded = appendBoundedTail(stderr, chunk, maxOutputBytes);
+      stderr = bounded.value;
+      stderrTruncated ||= bounded.truncated;
+    });
 
     if (opts?.signal) {
       if (opts.signal.aborted) {
@@ -164,7 +220,14 @@ export function runProcess(
       settled = true;
       clearTimers();
       removeAbortHandler();
-      resolve({ stdout, stderr, exitCode: code ?? (signal === null ? 0 : 1) });
+      resolve({
+        stdout,
+        stderr,
+        exitCode: code ?? (signal === null ? 0 : 1),
+        elapsedMs: Date.now() - startedAt,
+        ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
+        ...(stderrTruncated ? { stderrTruncated: true } : {}),
+      });
     });
     proc.on('error', err => {
       if (!settled) {

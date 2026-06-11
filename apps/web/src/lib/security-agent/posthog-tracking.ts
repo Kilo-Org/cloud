@@ -33,6 +33,10 @@ type SecurityAgentConfigSavedEvent = BaseSecurityAgentEvent & {
   modelSlug?: string;
   triageModelSlug?: string;
   analysisModelSlug?: string;
+  remediationModelSlug?: string;
+  autoRemediationEnabled?: boolean;
+  autoRemediationMinSeverity?: string;
+  autoRemediationIncludeExisting?: boolean;
   repositorySelectionMode?: string;
   selectedRepoCount?: number;
 };

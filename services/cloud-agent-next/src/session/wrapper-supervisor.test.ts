@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CallbackJob } from '../callbacks/types.js';
+import { WRAPPER_NO_OUTPUT_TIMEOUT_MS } from './agent-runtime.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import {
   createMessageSettlementOutbox,
@@ -573,6 +574,134 @@ describe('WrapperSupervisor', () => {
   );
 
   it.each([
+    'Payment Required',
+    'usage_limit_exceeded',
+    'Too Many Requests',
+    'Model not found: kilo/anthropic/claude-haiku-4.5',
+  ])('classifies an explicit assistant request failure as assistant_error: %s', async error => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'failed',
+      error,
+      errorSource: 'assistant',
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'assistant_error',
+      error,
+      completionSource: 'wrapper_failure',
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      safeFailureMessage:
+        error === 'Payment Required' || error === 'usage_limit_exceeded'
+          ? 'Assistant request failed: insufficient credits'
+          : error === 'Too Many Requests'
+            ? 'Assistant request was rate limited'
+            : 'Assistant request failed: model not found',
+    });
+  });
+
+  it.each([
+    {
+      label: 'before activity',
+      message: acceptedMessage(),
+      failureStage: 'post_dispatch_no_activity' as const,
+      failureCode: 'wrapper_error_before_activity' as const,
+    },
+    {
+      label: 'after activity',
+      message: { ...acceptedMessage(), agentActivityObservedAt: 2_500 },
+      failureStage: 'agent_activity' as const,
+      failureCode: 'wrapper_error_after_activity' as const,
+    },
+  ])(
+    'keeps a genuine wrapper terminal failure classified as wrapper error $label',
+    async testCase => {
+      const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+      await putSessionMessageState(harness.storage, testCase.message);
+
+      await harness.supervisor.onTerminalEvent({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        error: 'Wrapper process exited unexpectedly',
+      });
+
+      await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+        status: 'failed',
+        failureReason: 'wrapper_error',
+        failureStage: testCase.failureStage,
+        failureCode: testCase.failureCode,
+      });
+    }
+  );
+
+  it.each(['SIGTERM', 'SIGINT'])(
+    'classifies container shutdown %s separately from other system interruptions',
+    async signal => {
+      const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+      await putSessionMessageState(harness.storage, acceptedMessage());
+
+      await harness.supervisor.onTerminalEvent({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'interrupted',
+        error: `Container shutdown: ${signal}`,
+      });
+
+      await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+        status: 'interrupted',
+        error: `Container shutdown: ${signal}`,
+        completionSource: 'interrupt',
+        failureStage: 'interruption',
+        failureCode: 'container_shutdown',
+      });
+    }
+  );
+
+  it('classifies structured container shutdown without parsing the error text', async () => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'interrupted',
+      error: 'Wrapper received a termination signal',
+      interruptionSource: 'container_shutdown',
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'interrupted',
+      error: 'Wrapper received a termination signal',
+      failureStage: 'interruption',
+      failureCode: 'container_shutdown',
+    });
+  });
+
+  it.each(['aborted via API', 'Session stopped'])(
+    'keeps unrelated wrapper interruption as system_interrupt: %s',
+    async error => {
+      const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+      await putSessionMessageState(harness.storage, acceptedMessage());
+
+      await harness.supervisor.onTerminalEvent({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'interrupted',
+        error,
+      });
+
+      await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+        status: 'interrupted',
+        error,
+        failureStage: 'interruption',
+        failureCode: 'system_interrupt',
+      });
+    }
+  );
+
+  it.each([
     { status: 'failed' as const, expected: 'failed' as const },
     { status: 'interrupted' as const, expected: 'interrupted' as const },
   ])(
@@ -640,14 +769,64 @@ describe('WrapperSupervisor', () => {
     expect(observedStopBeforeEffects).toBe(true);
   });
 
-  it('fails accepted current work and requests durable cleanup on liveness expiry', async () => {
+  it('lets stable-idle assistant failure settle before no-output maintenance can overwrite it', async () => {
+    const acceptedAt = 2_000;
+    const providerErrorAt = acceptedAt + 300_800;
+    const stableIdleAt = providerErrorAt + 3_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
     const harness = createHarness([
-      liveRuntimeState({ noOutputDeadlineAt: 9_000, nextPingAt: 30_000 }),
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
       OWNED_WRAPPER_LEASE,
     ]);
     await putSessionMessageState(harness.storage, acceptedMessage());
 
-    await harness.supervisor.runMaintenance(10_000);
+    await harness.supervisor.runMaintenance(providerErrorAt);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+
+    await harness.supervisor.runMaintenance(stableIdleAt - 1);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'failed',
+      error: 'Provider request timed out',
+      errorSource: 'assistant',
+    });
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'assistant_error',
+      error: 'Provider request timed out',
+      failureCode: 'assistant_error',
+    });
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'assistant_error',
+      error: 'Provider request timed out',
+      failureCode: 'assistant_error',
+    });
+  });
+
+  it('fails genuinely silent accepted work at the no-output deadline', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt - 1);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
 
     const state = await getSessionMessageState(harness.storage, MESSAGE_ID);
     const runtimeState = await getWrapperRuntimeState(harness.storage);
@@ -667,6 +846,24 @@ describe('WrapperSupervisor', () => {
     expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
     expect(harness.stops).toEqual([]);
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
+  });
+
+  it('terminates an unresponsive wrapper on ping timeout before no-output expires', async () => {
+    const pingDeadlineAt = 92_000;
+    const noOutputDeadlineAt = 332_000;
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt, noOutputDeadlineAt }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(pingDeadlineAt);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      error: 'Wrapper did not respond to liveness ping',
+      failureCode: 'wrapper_ping_timeout',
+    });
   });
 
   it('releases a finalizing callback on liveness expiry but holds a queued follow-up until physical absence', async () => {
@@ -732,6 +929,18 @@ describe('WrapperSupervisor', () => {
       nextInstanceGeneration: 2,
     });
     expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+  });
+
+  it('schedules the updated no-output deadline when it is the next liveness deadline', async () => {
+    const noOutputDeadlineAt = 332_000;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toContain(
+      noOutputDeadlineAt
+    );
   });
 
   it('aggregates concurrent physical, liveness, disconnect, and cleanup deadlines', async () => {
@@ -1355,7 +1564,7 @@ describe('WrapperSupervisor', () => {
       finalizingWrapperRunId: WRAPPER_RUN_ID,
       wrapperIdleDeadlineAt: 50_000,
       lastWrapperMessageAt: 2_000,
-      noOutputDeadlineAt: 302_000,
+      noOutputDeadlineAt: 332_000,
     });
   });
 

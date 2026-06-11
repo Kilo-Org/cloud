@@ -49,6 +49,7 @@ import {
   type SessionMessageState,
 } from './session-message-state.js';
 import type { QueuedMessageSnapshot } from '../websocket/stream.js';
+import { buildCloudMessageFailedPayload } from './message-settlement-outbox.js';
 
 export const PENDING_FLUSH_DEBOUNCE_MS = 1_000;
 
@@ -207,7 +208,7 @@ function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
 }
 
 function knownPreDispatchExecutionFailureCode(error: unknown): RetryableResultCode | undefined {
-  if (!isExecutionError(error) || !error.retryable) return undefined;
+  if (!isExecutionError(error)) return undefined;
   switch (error.code) {
     case 'SANDBOX_CONNECT_FAILED':
     case 'WORKSPACE_SETUP_FAILED':
@@ -472,7 +473,13 @@ export async function flushNextPendingSessionMessage(params: {
       message,
       error instanceof Error ? error.message : String(error),
       Date.now(),
-      { policy, code: code ?? 'UNKNOWN' }
+      {
+        policy,
+        code: code ?? 'UNKNOWN',
+        subtype: isExecutionError(error) ? error.workspaceFailureSubtype : undefined,
+        safeFailureMessage: isExecutionError(error) ? error.safeFailureMessage : undefined,
+        retryable: isExecutionError(error) ? error.retryable : undefined,
+      }
     );
     return toFailureResult(failure, totalCount);
   }
@@ -954,6 +961,8 @@ export function createSessionMessageQueue(
           error: flushResult.message.lastFlushError ?? 'Pending message delivery failed',
           completionSource: 'delivery_failure',
           ...failure,
+          failureSubtype: flushResult.message.lastFlushFailureSubtype,
+          safeFailureMessage: flushResult.message.safeFailureMessage,
           attempts: flushResult.attempts,
         },
         { allowIdleBatchWithoutObservedIdle: true }
@@ -1011,11 +1020,7 @@ export function createSessionMessageQueue(
           content: state.prompt,
           timestamp: state.queuedAt ?? state.createdAt,
           terminalFailure: {
-            status: state.status,
-            completionSource: state.completionSource,
-            reason: state.failureReason,
-            error: state.error,
-            attempts: state.attempts,
+            ...buildCloudMessageFailedPayload(state),
             timestamp: state.terminalAt ?? state.createdAt,
           },
         })),

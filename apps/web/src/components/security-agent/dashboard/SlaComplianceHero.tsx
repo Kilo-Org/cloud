@@ -50,7 +50,7 @@ const severities: Severity[] = ['critical', 'high', 'medium', 'low'];
 function computeCompliance(sla: SlaData) {
   if (sla.overall.total === 0) {
     if (sla.untrackedCount > 0) {
-      return { label: 'N/A', hint: 'No SLA data', dotColor: 'bg-gray-400' };
+      return { label: 'N/A', hint: 'No SLA data', dotColor: 'bg-zinc-400' };
     }
     return { label: '100%', hint: 'No open findings with SLA', dotColor: 'bg-green-400' };
   }
@@ -67,7 +67,7 @@ export function SlaComplianceHero({
 }: SlaComplianceHeroProps) {
   if (isLoading) {
     return (
-      <Card className="border border-gray-800 bg-gray-900/50">
+      <Card>
         <CardContent className="p-6">
           <div className="flex flex-col items-center gap-4 md:flex-row md:items-start md:gap-8">
             <div className="flex flex-col items-center gap-2">
@@ -89,14 +89,14 @@ export function SlaComplianceHero({
   const compliance = computeCompliance(sla);
 
   return (
-    <Card className="border border-gray-800 bg-gray-900/50">
+    <Card>
       <CardContent className="p-6">
         <div className="flex flex-col items-center gap-4 md:flex-row md:items-start md:gap-8">
           <div className="flex flex-col items-center gap-1">
-            <span className="text-muted-foreground text-sm font-medium">SLA Compliance</span>
+            <span className="text-muted-foreground text-sm font-medium">SLA compliance</span>
             <span className="flex items-center gap-2">
               <span className={cn('h-3 w-3 rounded-full', compliance.dotColor)} />
-              <span className="text-foreground text-3xl font-bold tracking-tight">
+              <span className="text-foreground font-mono text-3xl font-bold tracking-tight tabular-nums">
                 {compliance.label}
               </span>
             </span>
@@ -106,7 +106,7 @@ export function SlaComplianceHero({
             {sla.overall.overdue > 0 && (
               <Link
                 href={`${basePath}/findings?status=open&overdue=true${extraParams}`}
-                className="mt-1 flex items-center gap-1 text-sm text-red-400 hover:text-red-300"
+                className="focus-visible:ring-ring mt-1 flex items-center gap-1 rounded-sm text-sm text-red-400 underline decoration-red-400/40 underline-offset-4 hover:text-red-300 focus-visible:ring-2 focus-visible:outline-none"
               >
                 <AlertCircle className="h-3.5 w-3.5" />
                 {sla.overall.overdue} overdue
@@ -122,7 +122,7 @@ export function SlaComplianceHero({
 
           <div className="flex-1 space-y-2">
             <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-              By Severity
+              By severity
             </span>
             {severities.map(sev => {
               const sevData = sla.bySeverity[sev];
@@ -135,10 +135,10 @@ export function SlaComplianceHero({
                     <span className={meta.colorClass}>{meta.icon}</span>
                     <span className="text-muted-foreground w-16 font-medium">{meta.label}</span>
                   </span>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-800">
+                  <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
                     <div
                       className={cn(
-                        'h-full rounded-full transition-all',
+                        'h-full rounded-full',
                         sevPct >= 90
                           ? 'bg-emerald-500/40'
                           : sevPct >= 70
@@ -148,7 +148,7 @@ export function SlaComplianceHero({
                       style={{ width: `${sevPct}%` }}
                     />
                   </div>
-                  <span className="text-muted-foreground w-28 text-right text-xs">
+                  <span className="text-muted-foreground w-28 text-right font-mono text-xs tabular-nums">
                     {sevPct}% ({sevData.withinSla} of {sevData.total})
                   </span>
                 </div>

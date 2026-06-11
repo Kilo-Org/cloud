@@ -1,7 +1,9 @@
 import { db } from '@/lib/drizzle';
 import {
+  createSecurityAgentCommand,
   getSecurityAgentCommandForOwner,
   listActiveSecurityAgentCommandsForOwner,
+  markSecurityAgentCommandQueueAdmissionFailed,
   type SecurityAgentCommandOwner,
 } from '@kilocode/db';
 import type { SecurityAgentCommand } from '@kilocode/db/schema';
@@ -32,6 +34,7 @@ function serializeSecurityAgentCommand(command: SecurityAgentCommand) {
     repoFullName: command.repo_full_name,
     status: command.status,
     resultCode: command.result_code,
+    resultMetadata: command.result_metadata,
     lastErrorRedacted: command.last_error_redacted,
     acceptedAt: toIsoString(command.accepted_at),
     startedAt: toIsoString(command.started_at),
@@ -53,4 +56,20 @@ export async function listActiveSecurityAgentCommands(
 ): Promise<SecurityAgentCommandStatusResponse[]> {
   const commands = await listActiveSecurityAgentCommandsForOwner(db, toCommandOwner(owner));
   return commands.map(serializeSecurityAgentCommand);
+}
+
+export async function createApplyAutoRemediationCommand(owner: SecurityReviewOwner) {
+  const command = await createSecurityAgentCommand(db, {
+    commandType: 'apply_auto_remediation',
+    origin: 'settings_include_existing',
+    owner: toCommandOwner(owner),
+  });
+  return serializeSecurityAgentCommand(command);
+}
+
+export async function markApplyAutoRemediationCommandAdmissionFailed(
+  commandId: string,
+  lastErrorRedacted?: string
+) {
+  await markSecurityAgentCommandQueueAdmissionFailed(db, commandId, lastErrorRedacted);
 }

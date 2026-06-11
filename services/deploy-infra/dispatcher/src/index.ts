@@ -7,6 +7,7 @@ import { injectBanner } from './banner/inject-banner';
 import { validateAuthCookie } from './auth/jwt';
 import { api } from './routes/api';
 import { auth } from './routes/auth';
+import { isPrivateQuickDeploymentWorkerName } from './schemas';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -63,6 +64,13 @@ subdomainApp.use('*', async (c, next) => {
   const mappedWorkerName = await c.env.DEPLOY_KV.get(`slug2worker:${slug}`);
 
   if (mappedWorkerName !== null && !validateWorkerName(mappedWorkerName)) {
+    return c.text('Not Found', 404);
+  }
+
+  if (
+    isPrivateQuickDeploymentWorkerName(slug) &&
+    (mappedWorkerName === null || isPrivateQuickDeploymentWorkerName(mappedWorkerName))
+  ) {
     return c.text('Not Found', 404);
   }
 

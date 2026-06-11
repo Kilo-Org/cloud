@@ -19,8 +19,8 @@ export type StreamEventType =
   | 'status' // Status message (e.g., "Auto-committing...")
   | 'heartbeat' // Keep-alive during idle periods
   | 'pong' // Response to ping command from DO
-  | 'error' // Error occurred { error: string, fatal: boolean }
-  | 'interrupted' // User/signal interrupt
+  | 'error' // Error occurred { error: string, fatal: boolean, errorSource?: 'assistant' }
+  | 'interrupted' // User/signal interrupt { reason?: string, interruptionSource?: 'container_shutdown' }
   | 'complete' // Execution finished { exitCode, currentBranch?, messageIds }
   | 'wrapper_finalizing' // Wrapper sealed the current run batch before post-processing
   | 'wrapper_resumed' // Wrapper reconnected after disconnect (may have lost events)

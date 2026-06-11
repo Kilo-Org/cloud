@@ -68,6 +68,7 @@ function createMessage(params: { id: string; text: string; author?: string }): M
     },
     attachments: [],
     links: [],
+    subject: Promise.resolve(null),
     toJSON: () => {
       throw new Error('not implemented');
     },

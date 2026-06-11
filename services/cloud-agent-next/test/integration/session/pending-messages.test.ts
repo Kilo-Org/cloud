@@ -744,10 +744,16 @@ describe('pending session messages', () => {
     const payload = failedEvent?.payload ?? {};
     expect(payload).toMatchObject({
       messageId: 'msg_018f1e2d3c4bAAAAAAAAAAAAAA',
-      error: 'wrapper still unavailable',
+      error: 'The message could not be delivered',
       delivery: 'queued',
       accepted: false,
       completionSource: 'delivery_failure',
+      failure: {
+        stage: 'pre_dispatch',
+        code: 'delivery_failure_unknown',
+        attempts: 2,
+        message: 'The message could not be delivered',
+      },
     });
   });
 
@@ -822,7 +828,12 @@ describe('pending session messages', () => {
         accepted: false,
         completionSource: 'interrupt',
         reason: 'interrupted',
-        error: 'Pending queued message interrupted by user',
+        error: 'The message was interrupted by the user',
+        failure: {
+          stage: 'interruption',
+          code: 'user_interrupt',
+          message: 'The message was interrupted by the user',
+        },
       },
       {
         messageId: 'msg_018f1e2d3c4bIntrBMsgAbCdEf',
@@ -831,7 +842,12 @@ describe('pending session messages', () => {
         accepted: false,
         completionSource: 'interrupt',
         reason: 'interrupted',
-        error: 'Pending queued message interrupted by user',
+        error: 'The message was interrupted by the user',
+        failure: {
+          stage: 'interruption',
+          code: 'user_interrupt',
+          message: 'The message was interrupted by the user',
+        },
       },
     ]);
   });

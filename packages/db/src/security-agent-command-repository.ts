@@ -19,6 +19,7 @@ export type CreateSecurityAgentCommandInput = {
   owner: SecurityAgentCommandOwner;
   findingId?: string;
   repoFullName?: string;
+  resultMetadata?: Record<string, unknown>;
 };
 
 export type TransitionSecurityAgentCommandInput = {
@@ -27,6 +28,7 @@ export type TransitionSecurityAgentCommandInput = {
   status: SecurityAgentCommandStatus;
   resultCode?: string | null;
   lastErrorRedacted?: string | null;
+  resultMetadata?: Record<string, unknown> | null;
 };
 
 export type SecurityAgentCommandTransitionOutcome =
@@ -80,6 +82,7 @@ export async function createSecurityAgentCommand(
       ...ownerValues(input.owner),
       finding_id: input.findingId,
       repo_full_name: input.repoFullName,
+      result_metadata: input.resultMetadata,
       status: 'accepted',
     })
     .returning();
@@ -99,6 +102,7 @@ export async function transitionSecurityAgentCommand(
     .set({
       status: input.status,
       result_code: input.resultCode,
+      result_metadata: input.resultMetadata,
       last_error_redacted: input.lastErrorRedacted,
       started_at:
         input.status === 'running'

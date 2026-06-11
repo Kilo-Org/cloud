@@ -38,7 +38,8 @@ import {
   type WrapperLease,
 } from './wrapper-runtime-state.js';
 
-export const WRAPPER_NO_OUTPUT_TIMEOUT_MS = 5 * 60 * 1000;
+// Allow the five-minute provider timeout to finish event delivery and stable-idle handling before our watchdog fires.
+export const WRAPPER_NO_OUTPUT_TIMEOUT_MS = 330_000;
 export const WRAPPER_PING_INTERVAL_MS = 60_000;
 export const WRAPPER_STARTUP_TIMEOUT_MS = 10 * 60 * 1000;
 

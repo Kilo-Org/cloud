@@ -18,11 +18,8 @@ import {
 } from '../persistence/schemas.js';
 import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
-import {
-  SessionMessageCompletionSourceSchema,
-  SessionMessageFailureCodeSchema,
-  SessionMessageFailureStageSchema,
-} from '../session/session-message-state.js';
+import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
+import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 
 // Re-export schemas from types.ts and persistence/schemas.ts for convenience
 export { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema };
@@ -873,14 +870,7 @@ export const GetMessageResultOutput = z
     acceptedAt: z.number().optional(),
     terminalAt: z.number().optional(),
     completionSource: SessionMessageCompletionSourceSchema.optional(),
-    failure: z
-      .object({
-        stage: SessionMessageFailureStageSchema.optional(),
-        code: SessionMessageFailureCodeSchema.optional(),
-        attempts: z.number().int().nonnegative().optional(),
-      })
-      .strict()
-      .optional(),
+    failure: SafeFailureProjectionSchema.optional(),
     gateResult: z.enum(['pass', 'fail']).optional(),
     assistant: z
       .object({

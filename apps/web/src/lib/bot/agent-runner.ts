@@ -286,7 +286,6 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             modelSlug,
             params.platformIntegration,
             authToken,
-            params.user.id,
             params.botRequestId,
             ({ kiloSessionId, cloudAgentSessionId }) => {
               startedCloudAgentSession = true;

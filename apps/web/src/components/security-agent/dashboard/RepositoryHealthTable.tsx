@@ -32,9 +32,9 @@ type RepositoryHealthTableProps = {
 
 function countCell(count: number) {
   if (count === 0) {
-    return <span className="text-muted-foreground">-</span>;
+    return <span className="text-muted-foreground font-mono">-</span>;
   }
-  return <span className="text-foreground font-medium">{count}</span>;
+  return <span className="text-foreground font-mono font-medium tabular-nums">{count}</span>;
 }
 
 function complianceColor(pct: number): string {
@@ -50,9 +50,9 @@ export function RepositoryHealthTable({
   extraParams = '',
 }: RepositoryHealthTableProps) {
   return (
-    <Card className="border border-gray-800 bg-gray-900/50">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Repository Health</CardTitle>
+        <CardTitle className="text-sm font-medium">Repository health</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -72,23 +72,23 @@ export function RepositoryHealthTable({
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-gray-800 hover:bg-transparent">
+                  <TableRow className="border-border hover:bg-transparent">
                     <TableHead>Repository</TableHead>
                     <TableHead className="text-center">Critical</TableHead>
                     <TableHead className="text-center">High</TableHead>
                     <TableHead className="text-center">Medium</TableHead>
                     <TableHead className="text-center">Low</TableHead>
                     <TableHead className="text-center">Overdue</TableHead>
-                    <TableHead className="text-right">SLA %</TableHead>
+                    <TableHead className="text-right">SLA compliance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {repos.map(repo => (
-                    <TableRow key={repo.repoFullName} className="border-gray-800">
+                    <TableRow key={repo.repoFullName} className="border-border">
                       <TableCell>
                         <Link
                           href={`${basePath}/findings?repoFullName=${encodeURIComponent(repo.repoFullName)}${extraParams}`}
-                          className="text-sm text-gray-300 hover:text-white"
+                          className="focus-visible:ring-ring rounded-sm text-sm text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground focus-visible:ring-2 focus-visible:outline-none"
                         >
                           {repo.repoFullName}
                         </Link>
@@ -100,7 +100,10 @@ export function RepositoryHealthTable({
                       <TableCell className="text-center">{countCell(repo.overdue)}</TableCell>
                       <TableCell className="text-right">
                         <span
-                          className={cn('font-medium', complianceColor(repo.slaCompliancePercent))}
+                          className={cn(
+                            'font-mono font-medium tabular-nums',
+                            complianceColor(repo.slaCompliancePercent)
+                          )}
                         >
                           {repo.slaCompliancePercent}%
                         </span>
@@ -114,9 +117,9 @@ export function RepositoryHealthTable({
               <div className="mt-3 text-right">
                 <Link
                   href={`${basePath}/findings?status=open${extraParams}`}
-                  className="text-xs text-blue-400 hover:text-blue-300"
+                  className="focus-visible:ring-ring rounded-sm text-xs text-blue-400 underline decoration-blue-400/40 underline-offset-4 hover:text-blue-300 focus-visible:ring-2 focus-visible:outline-none"
                 >
-                  View all &rarr;
+                  View all findings
                 </Link>
               </div>
             )}

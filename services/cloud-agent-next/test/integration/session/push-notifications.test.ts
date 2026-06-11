@@ -179,7 +179,7 @@ describe('CloudAgentSession push notification producer', () => {
           cliSessionId: KILO_SESSION_ID,
           executionId: FAILED_MESSAGE_ID,
           status: 'failed',
-          body: 'Failed: Provider unavailable',
+          body: 'Failed: The message failed',
         },
       ]);
   });
@@ -246,14 +246,14 @@ describe('CloudAgentSession push notification producer', () => {
           cliSessionId: KILO_SESSION_ID,
           executionId: RETRY_MESSAGE_ID,
           status: 'failed',
-          body: 'Failed: Transient provider failure',
+          body: 'Failed: The message failed',
         },
         {
           userId,
           cliSessionId: KILO_SESSION_ID,
           executionId: RETRY_MESSAGE_ID,
           status: 'failed',
-          body: 'Failed: Transient provider failure',
+          body: 'Failed: The message failed',
         },
       ]);
   });

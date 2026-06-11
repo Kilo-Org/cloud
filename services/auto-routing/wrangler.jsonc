@@ -1,0 +1,57 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "name": "auto-routing",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "auto-routing.kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "dev": {
+    "port": 8810,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+  },
+  "analytics_engine_datasets": [
+    {
+      "binding": "AUTO_ROUTING_CLASSIFIER_METRICS",
+      "dataset": "auto_routing_classifier_metrics",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "AUTO_ROUTING_CONFIG",
+      "id": "4316b8db31e347e19cfadad1b6386ad5",
+    },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "INTERNAL_API_SECRET_PROD",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+    {
+      "binding": "OPENROUTER_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "OPENROUTER_API_KEY",
+    },
+    {
+      "binding": "O11Y_CF_AE_API_TOKEN",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "O11Y_CF_AE_API_TOKEN",
+    },
+  ],
+}

@@ -63,13 +63,17 @@ function callbackHeaders(headers: CallbackHeaders): HeadersInit {
   return result;
 }
 
-async function requestCallback(env: Env, headers: CallbackHeaders) {
+async function requestCallback(
+  env: Env,
+  headers: CallbackHeaders,
+  payload: Record<string, unknown> = callbackPayload
+) {
   return callbacks.request(
     '/execution',
     {
       method: 'POST',
       headers: callbackHeaders(headers),
-      body: JSON.stringify(callbackPayload),
+      body: JSON.stringify(payload),
     },
     env
   );
@@ -94,6 +98,95 @@ describe('webhook execution callback auth', () => {
     expect(updateRequest).toHaveBeenCalledWith(
       REQUEST_ID,
       expect.objectContaining({ process_status: 'success' })
+    );
+  });
+
+  it('prefers a validated structured failure message over the legacy message', async () => {
+    const { env, updateRequest } = createRouteHarness();
+    const callbackToken = await deriveCallbackToken({
+      secret: CALLBACK_SECRET,
+      scope: 'webhook-execution-callback',
+      resourceParts: [NAMESPACE, TRIGGER_ID, REQUEST_ID],
+    });
+
+    const response = await requestCallback(
+      env,
+      { callbackToken },
+      {
+        ...callbackPayload,
+        status: 'failed',
+        errorMessage: 'legacy error',
+        failure: {
+          stage: 'pre_dispatch',
+          code: 'workspace_setup_failed',
+          subtype: 'git_clone_timeout',
+          attempts: 2,
+          message: 'Repository clone timed out',
+        },
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateRequest).toHaveBeenCalledWith(
+      REQUEST_ID,
+      expect.objectContaining({ error_message: 'Repository clone timed out' })
+    );
+  });
+
+  it('falls back to the legacy error message when failure is absent', async () => {
+    const { env, updateRequest } = createRouteHarness();
+    const callbackToken = await deriveCallbackToken({
+      secret: CALLBACK_SECRET,
+      scope: 'webhook-execution-callback',
+      resourceParts: [NAMESPACE, TRIGGER_ID, REQUEST_ID],
+    });
+
+    const response = await requestCallback(
+      env,
+      { callbackToken },
+      {
+        ...callbackPayload,
+        status: 'failed',
+        errorMessage: 'legacy error',
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateRequest).toHaveBeenCalledWith(
+      REQUEST_ID,
+      expect.objectContaining({ error_message: 'legacy error' })
+    );
+  });
+
+  it.each([
+    { failure: { code: 'future_failure_code' } },
+    { failure: { subtype: 'unknown_workspace_failure' } },
+    { failure: { extra: true } },
+    { failure: { attempts: -1 } },
+    { failure: { message: 'x'.repeat(4_097) } },
+  ])('discards incompatible failure and uses the legacy message: %o', async payloadExtension => {
+    const { env, updateRequest } = createRouteHarness();
+    const callbackToken = await deriveCallbackToken({
+      secret: CALLBACK_SECRET,
+      scope: 'webhook-execution-callback',
+      resourceParts: [NAMESPACE, TRIGGER_ID, REQUEST_ID],
+    });
+
+    const response = await requestCallback(
+      env,
+      { callbackToken },
+      {
+        ...callbackPayload,
+        status: 'failed',
+        errorMessage: 'legacy error',
+        ...payloadExtension,
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateRequest).toHaveBeenCalledWith(
+      REQUEST_ID,
+      expect.objectContaining({ error_message: 'legacy error' })
     );
   });
 

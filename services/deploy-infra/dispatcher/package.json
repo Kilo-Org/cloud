@@ -8,18 +8,24 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/deploy-infra/dispatcher/src",
-    "test": "jest"
+    "test": "pnpm run test:unit && pnpm run test:integration",
+    "test:unit": "jest",
+    "test:integration": "vitest run --config vitest.entrypoint.workers.config.mts"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
     "@swc/jest": "0.2.39",
     "@types/jest": "30.0.0",
     "@types/jsonwebtoken": "catalog:",
     "@typescript/native-preview": "catalog:",
     "jest": "30.3.0",
     "typescript": "catalog:",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/worker-utils": "workspace:*",
     "hono": "catalog:",
     "hono-rate-limiter": "0.5.3",
     "jsonwebtoken": "catalog:",

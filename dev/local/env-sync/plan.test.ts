@@ -98,6 +98,30 @@ test('overrides the pulled web attachment bucket for nextjs development-local ou
   }
 });
 
+test('generates the auto routing worker URL for local Next.js', () => {
+  const repo = createRepo({
+    '.env.local': '',
+    'apps/web/.env.development.local.example': fs.readFileSync(
+      new URL('../../../apps/web/.env.development.local.example', import.meta.url),
+      'utf-8'
+    ),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+
+    assert.deepEqual(
+      plan.envDevLocalChanges.find(change => change.key === 'AUTO_ROUTING_WORKER_URL'),
+      {
+        key: 'AUTO_ROUTING_WORKER_URL',
+        oldValue: undefined,
+        newValue: 'http://localhost:8810',
+      }
+    );
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('reconciles an incorrect generated web override to its template literal', () => {
   const repo = createRepo({
     '.env.local': 'ATTACHMENTS_BUCKET=production-bucket\n',

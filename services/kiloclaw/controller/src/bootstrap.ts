@@ -818,6 +818,15 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
         `[controller] pre-doctor auth-profiles migration: ${preDoctorMigration.profilesMigrated} profile(s) across ${preDoctorMigration.filesModified} file(s)`
       );
     }
+    // Fail closed: if a detected plaintext profile could not be rewritten, abort
+    // BEFORE doctor — otherwise doctor would import that plaintext into SQLite
+    // and defeat key rotation. The post-doctor self-healing call stays
+    // best-effort. (Onboard, the fresh-install path, never reaches this branch.)
+    if (preDoctorMigration.filesFailed > 0) {
+      throw new Error(
+        `pre-doctor auth-profiles migration failed to rewrite ${preDoctorMigration.filesFailed} file(s) with a plaintext kilocode key; aborting before doctor to keep plaintext out of SQLite`
+      );
+    }
 
     try {
       deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {

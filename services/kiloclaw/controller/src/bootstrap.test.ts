@@ -1220,6 +1220,53 @@ describe('runOnboardOrDoctor', () => {
     expect(harness.chmodCalls).toContainEqual({ path: BAK, mode: 0o600 });
   });
 
+  it('aborts before doctor when a detected plaintext profile cannot be rewritten', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const MAIN_AUTH = '/root/.openclaw/agents/main/agent/auth-profiles.json';
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) =>
+        p.endsWith('openclaw.json') || p === '/root/.openclaw/agents' || p === MAIN_AUTH
+    );
+    (harness.deps.readdirSync as ReturnType<typeof vi.fn>).mockImplementation((dir: string) =>
+      dir === '/root/.openclaw/agents' ? ['main'] : []
+    );
+    (harness.deps.statSync as ReturnType<typeof vi.fn>).mockReturnValue({
+      isDirectory: () => true,
+    });
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === MAIN_AUTH) {
+        return JSON.stringify({
+          version: 1,
+          profiles: {
+            'kilocode:default': { type: 'api_key', provider: 'kilocode', key: 'plaintext' },
+          },
+        });
+      }
+      if (p.endsWith('openclaw.json')) return JSON.stringify({ gateway: { port: 3001 } });
+      return '{}';
+    });
+    // The pre-doctor rewrite fails (e.g. read-only fs) when writing the auth file.
+    (harness.deps.writeFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.includes('auth-profiles.json')) throw new Error('EROFS');
+    });
+
+    expect(() =>
+      runOnboardOrDoctor(
+        { KILOCODE_API_KEY: 'k', OPENCLAW_GATEWAY_TOKEN: 't', AUTO_APPROVE_DEVICES: 'true' },
+        harness.deps
+      )
+    ).toThrow(/aborting before doctor/);
+
+    // doctor must NOT have run — the plaintext would otherwise be imported.
+    const doctorRan = harness.execCalls.some(
+      c => c.cmd === 'openclaw' && c.args.includes('doctor')
+    );
+    expect(doctorRan).toBe(false);
+    warnSpy.mockRestore();
+  });
+
   it('does not auto-assign kilo-exa on doctor path when BRAVE_API_KEY is configured', () => {
     const harness = fakeDeps();
     (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {

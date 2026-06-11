@@ -64,6 +64,10 @@ export type AuthProfilesMigrationReport = {
   filesScanned: number;
   filesModified: number;
   profilesMigrated: number;
+  // Files where a kilocode profile needed rewriting but the write failed. The
+  // plaintext is still on disk; the pre-doctor caller treats this as fatal so
+  // doctor does not import that plaintext into SQLite.
+  filesFailed: number;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -138,15 +142,19 @@ function migrateProfile(profile: UnknownRecord): boolean {
  * Migrate one `auth-profiles.json` file. Returns the list of profile ids that
  * were rewritten (empty when nothing changed). Swallows parse errors,
  * unreadable files, missing `profiles` maps, and write errors — the migration
- * never throws.
+ * never throws. `writeFailed` is true only when a kilocode profile needed
+ * rewriting but the write threw (the plaintext is still on disk).
  */
-function migrateOneFile(filePath: string, deps: AuthProfilesMigrationDeps): string[] {
+function migrateOneFile(
+  filePath: string,
+  deps: AuthProfilesMigrationDeps
+): { migratedIds: string[]; writeFailed: boolean } {
   let raw: string;
   try {
     raw = deps.readFileSync(filePath, 'utf8');
   } catch (error) {
     console.warn(`[auth-profiles-migration] Failed to read ${filePath}:`, error);
-    return [];
+    return { migratedIds: [], writeFailed: false };
   }
 
   let parsed: unknown;
@@ -154,11 +162,11 @@ function migrateOneFile(filePath: string, deps: AuthProfilesMigrationDeps): stri
     parsed = JSON.parse(raw);
   } catch (error) {
     console.warn(`[auth-profiles-migration] Failed to parse ${filePath}:`, error);
-    return [];
+    return { migratedIds: [], writeFailed: false };
   }
 
   if (!isRecord(parsed) || !isRecord(parsed.profiles)) {
-    return [];
+    return { migratedIds: [], writeFailed: false };
   }
 
   const migratedIds: string[] = [];
@@ -169,7 +177,7 @@ function migrateOneFile(filePath: string, deps: AuthProfilesMigrationDeps): stri
     }
   }
 
-  if (migratedIds.length === 0) return [];
+  if (migratedIds.length === 0) return { migratedIds: [], writeFailed: false };
 
   const serialized = JSON.stringify(parsed, null, 2);
   try {
@@ -185,11 +193,13 @@ function migrateOneFile(filePath: string, deps: AuthProfilesMigrationDeps): stri
       { mode: 0o600 }
     );
   } catch (error) {
+    // The plaintext is still on disk. Signal a failure so the pre-doctor caller
+    // can abort before doctor imports it into SQLite.
     console.warn(`[auth-profiles-migration] Failed to write ${filePath}:`, error);
-    return [];
+    return { migratedIds: [], writeFailed: true };
   }
 
-  return migratedIds;
+  return { migratedIds, writeFailed: false };
 }
 
 /**
@@ -207,6 +217,7 @@ export function migrateKilocodeAuthProfilesToKeyRef(
     filesScanned: 0,
     filesModified: 0,
     profilesMigrated: 0,
+    filesFailed: 0,
   };
 
   for (const agentDir of collectAgentDirs(rootDir, deps)) {
@@ -214,7 +225,8 @@ export function migrateKilocodeAuthProfilesToKeyRef(
     if (!deps.existsSync(filePath)) continue;
 
     report.filesScanned += 1;
-    const migratedIds = migrateOneFile(filePath, deps);
+    const { migratedIds, writeFailed } = migrateOneFile(filePath, deps);
+    if (writeFailed) report.filesFailed += 1;
     if (migratedIds.length > 0) {
       report.filesModified += 1;
       report.profilesMigrated += migratedIds.length;

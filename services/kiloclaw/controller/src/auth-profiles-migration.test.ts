@@ -114,7 +114,12 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
 
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 1, filesModified: 1, profilesMigrated: 1 });
+    expect(report).toEqual({
+      filesScanned: 1,
+      filesModified: 1,
+      profilesMigrated: 1,
+      filesFailed: 0,
+    });
 
     const written = parseStore(fs.files.get(MAIN));
     expect(written.profiles['kilocode:default']).toEqual({
@@ -134,7 +139,12 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
     const before = fs.files.get(MAIN);
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 1, filesModified: 0, profilesMigrated: 0 });
+    expect(report).toEqual({
+      filesScanned: 1,
+      filesModified: 0,
+      profilesMigrated: 0,
+      filesFailed: 0,
+    });
     expect(fs.files.get(MAIN)).toBe(before);
   });
 
@@ -206,7 +216,12 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
 
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 2, filesModified: 2, profilesMigrated: 2 });
+    expect(report).toEqual({
+      filesScanned: 2,
+      filesModified: 2,
+      profilesMigrated: 2,
+      filesFailed: 0,
+    });
   });
 
   it('skips malformed JSON with a warning but does not throw', () => {
@@ -218,7 +233,12 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
 
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 1, filesModified: 0, profilesMigrated: 0 });
+    expect(report).toEqual({
+      filesScanned: 1,
+      filesModified: 0,
+      profilesMigrated: 0,
+      filesFailed: 0,
+    });
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
@@ -244,7 +264,38 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
 
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 0, filesModified: 0, profilesMigrated: 0 });
+    expect(report).toEqual({
+      filesScanned: 0,
+      filesModified: 0,
+      profilesMigrated: 0,
+      filesFailed: 0,
+    });
+  });
+
+  it('reports filesFailed (and migrates nothing) when the rewrite throws', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fs = createFs();
+    seedDir(fs, `${ROOT}/agents`);
+    seedDir(fs, `${ROOT}/agents/main`);
+    seedFile(fs, MAIN, JSON.stringify(plaintextStore()));
+    const deps: AuthProfilesMigrationDeps = {
+      ...fsDeps(fs),
+      writeFileSync: () => {
+        throw new Error('ENOSPC');
+      },
+    };
+
+    const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, deps);
+
+    expect(report).toEqual({
+      filesScanned: 1,
+      filesModified: 0,
+      profilesMigrated: 0,
+      filesFailed: 1,
+    });
+    // The plaintext is still on disk because the write failed.
+    expect(fs.files.get(MAIN)).toContain('secret-literal-key');
+    warnSpy.mockRestore();
   });
 
   it('preserves unrelated profile fields when migrating', () => {

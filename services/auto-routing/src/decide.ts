@@ -120,13 +120,18 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
     case 'model': {
       const { classifier } = outcome;
       const meta = classifier.modelCallMeta;
-      const callDetails = meta
-        ? {
-            finishReason: meta.finishReason,
-            completionTokens: meta.completionTokens,
-            reasoningTokens: meta.reasoningTokens,
-          }
-        : {};
+      const callDetails = {
+        ...(meta
+          ? {
+              finishReason: meta.finishReason,
+              completionTokens: meta.completionTokens,
+              reasoningTokens: meta.reasoningTokens,
+            }
+          : {}),
+        ...(classifier.firstAttemptFailure
+          ? { firstAttemptFailure: classifier.firstAttemptFailure }
+          : {}),
+      };
       const fallback = classifier.fallback;
       return {
         status: fallback ? `fallback:${fallback.reason}` : 'classified',
@@ -198,8 +203,11 @@ function recordDecision(
     cacheHit: summary.cacheHit,
   });
 
+  // Retried decisions are rare and diagnostically valuable, so they bypass
+  // sampling along with failures.
   const isFailure = summary.status !== 'classified';
-  if (!isFailure && Math.random() >= ctx.successSampleRate) {
+  const alwaysLog = isFailure || summary.retried;
+  if (!alwaysLog && Math.random() >= ctx.successSampleRate) {
     return;
   }
   const log = isFailure ? console.warn : console.log;

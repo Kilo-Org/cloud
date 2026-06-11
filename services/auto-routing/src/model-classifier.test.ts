@@ -147,6 +147,11 @@ describe('OpenRouter classifier call', () => {
       cost: 0.00000246,
       classifierModel: DEFAULT_CLASSIFIER_MODEL,
       retried: true,
+      firstAttemptFailure: {
+        reason: 'invalid_output',
+        failureStage: 'invalid_schema',
+        finishReason: 'stop',
+      },
       fallback: {
         reason: 'invalid_output',
         failureStage: 'invalid_schema',

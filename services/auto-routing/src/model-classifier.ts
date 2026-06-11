@@ -17,6 +17,12 @@ export type ClassifierRunResult = {
   fallback?: ClassifierRunFallbackMetadata;
   modelCallMeta?: ClassifierModelCallMeta;
   retried?: boolean;
+  // Why the first attempt was retried; present only when retried is true.
+  firstAttemptFailure?: {
+    reason: string;
+    failureStage: string | null;
+    finishReason: string | null;
+  };
 };
 
 export type ClassifierModelCallMeta = {
@@ -93,7 +99,16 @@ export async function classifyWithOpenRouter(
   }
 
   const retryAttempt = await runClassifierAttempt(client, input, classifierModel, options);
-  return { ...retryAttempt, cost: sumCosts(firstAttempt.cost, retryAttempt.cost), retried: true };
+  return {
+    ...retryAttempt,
+    cost: sumCosts(firstAttempt.cost, retryAttempt.cost),
+    retried: true,
+    firstAttemptFailure: {
+      reason: firstAttempt.fallback.reason,
+      failureStage: firstAttempt.fallback.failureStage ?? null,
+      finishReason: firstAttempt.modelCallMeta?.finishReason ?? null,
+    },
+  };
 }
 
 function sumCosts(first: number | null, second: number | null): number | null {

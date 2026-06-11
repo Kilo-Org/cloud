@@ -10,7 +10,8 @@ import { DurableObject } from 'cloudflare:workers';
 // conversation-identity.ts), which gives read-after-write consistency for
 // the bursts of identical requests a single session produces.
 const ENTRY_TTL_MS = 30 * 60 * 1000;
-const IDLE_CLEANUP_MS = 2 * 60 * 60 * 1000;
+// Cloudflare caps storage.delete() at 128 keys per call.
+const DELETE_BATCH_SIZE = 128;
 
 type StoredEntry = {
   value: ClassifierOutput;
@@ -29,16 +30,33 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
   }
 
   async putEntry(key: string, value: ClassifierOutput): Promise<void> {
-    // One alarm per conversation, pushed out on every write: the whole
-    // object is wiped once the conversation goes idle.
-    await Promise.all([
-      this.ctx.storage.put(key, { value, storedAt: Date.now() } satisfies StoredEntry),
-      this.ctx.storage.setAlarm(Date.now() + IDLE_CLEANUP_MS),
-    ]);
+    await this.ctx.storage.put(key, { value, storedAt: Date.now() } satisfies StoredEntry);
+    // A fixed-period sweep (rather than an idle alarm pushed out on every
+    // write) so storage stays bounded even when distinct conversations
+    // share this object and keep it permanently busy.
+    if ((await this.ctx.storage.getAlarm()) === null) {
+      await this.ctx.storage.setAlarm(Date.now() + ENTRY_TTL_MS);
+    }
   }
 
   async alarm(): Promise<void> {
-    await this.ctx.storage.deleteAll();
+    const entries = await this.ctx.storage.list<StoredEntry>();
+    const now = Date.now();
+    const expiredKeys: string[] = [];
+    let liveEntries = 0;
+    for (const [key, entry] of entries) {
+      if (now - entry.storedAt > ENTRY_TTL_MS) {
+        expiredKeys.push(key);
+      } else {
+        liveEntries++;
+      }
+    }
+    for (let start = 0; start < expiredKeys.length; start += DELETE_BATCH_SIZE) {
+      await this.ctx.storage.delete(expiredKeys.slice(start, start + DELETE_BATCH_SIZE));
+    }
+    if (liveEntries > 0) {
+      await this.ctx.storage.setAlarm(now + ENTRY_TTL_MS);
+    }
   }
 }
 

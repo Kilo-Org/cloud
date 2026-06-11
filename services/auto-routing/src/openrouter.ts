@@ -6,20 +6,21 @@ type OpenRouterEnv = Pick<Env, 'OPENROUTER_API_KEY'>;
 export const OPENROUTER_HTTP_REFERER = 'https://kilocode.ai';
 export const OPENROUTER_APP_TITLE = 'Kilo Code';
 
-// Isolate-local client cache so each classification does not re-read the
-// API key from the secrets store. The TTL keeps key rotations effective.
-const CLIENT_CACHE_TTL_MS = 300_000;
+// Only the API key string is cached at module scope (plain value, not a
+// transport-owning SDK object), so each classification skips the
+// secrets-store read. The client itself is constructed per request; that is
+// just object setup around global fetch. The TTL keeps key rotations
+// effective within five minutes.
+const API_KEY_CACHE_TTL_MS = 300_000;
 
-const clientCache = ttlCached(
-  CLIENT_CACHE_TTL_MS,
-  async (env: OpenRouterEnv) =>
-    new OpenRouter({
-      apiKey: await env.OPENROUTER_API_KEY.get(),
-      httpReferer: OPENROUTER_HTTP_REFERER,
-      appTitle: OPENROUTER_APP_TITLE,
-    })
+const apiKeyCache = ttlCached(API_KEY_CACHE_TTL_MS, (env: OpenRouterEnv) =>
+  env.OPENROUTER_API_KEY.get()
 );
 
-export function createOpenRouterClient(env: OpenRouterEnv): Promise<OpenRouter> {
-  return clientCache.get(env);
+export async function createOpenRouterClient(env: OpenRouterEnv): Promise<OpenRouter> {
+  return new OpenRouter({
+    apiKey: await apiKeyCache.get(env),
+    httpReferer: OPENROUTER_HTTP_REFERER,
+    appTitle: OPENROUTER_APP_TITLE,
+  });
 }

@@ -11,6 +11,7 @@
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { parse } from 'jsonc-parser';
 import { describe, expect, it, vi } from 'vitest';
 import {
   bringUpDevContainer,
@@ -77,17 +78,32 @@ describe('sandbox image versions', () => {
       fileURLToPath(new URL('../../Dockerfile.dind', import.meta.url).href),
       'utf8'
     );
-    const wranglerConfig = readFileSync(
-      fileURLToPath(new URL('../../wrangler.jsonc', import.meta.url).href),
-      'utf8'
-    );
-    const imageVar = `"KILOCODE_CLI_VERSION": "${KILO_CLI_VERSION}"`;
+    const wranglerConfig = parse(
+      readFileSync(fileURLToPath(new URL('../../wrangler.jsonc', import.meta.url).href), 'utf8')
+    ) as {
+      containers?: Array<{ image_vars?: { KILOCODE_CLI_VERSION?: string } }>;
+      env?: {
+        dev?: { containers?: Array<{ image_vars?: { KILOCODE_CLI_VERSION?: string } }> };
+        staging?: { containers?: Array<{ image_vars?: { KILOCODE_CLI_VERSION?: string } }> };
+      };
+    };
 
     expect(wrapperPackageJson.dependencies['@kilocode/sdk']).toBe(KILO_CLI_VERSION);
     expect(dockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(devDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(dindDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
-    expect(wranglerConfig.split(imageVar)).toHaveLength(7);
+    for (const containers of [
+      wranglerConfig.containers,
+      wranglerConfig.env?.dev?.containers,
+      wranglerConfig.env?.staging?.containers,
+    ]) {
+      expect(containers).toHaveLength(3);
+      expect(containers?.map(container => container.image_vars?.KILOCODE_CLI_VERSION)).toEqual([
+        KILO_CLI_VERSION,
+        KILO_CLI_VERSION,
+        KILO_CLI_VERSION,
+      ]);
+    }
     expect(DEFAULT_SLASH_COMMANDS_SOURCE).toBe(`kilo@${KILO_CLI_VERSION}`);
   });
 });

@@ -150,8 +150,8 @@ export type PersistenceEnv = {
   /** Worker base URL for building wrapper ingest WebSocket endpoints */
   WORKER_URL?: string;
 
-  /** Shared secret for internal service-to-service authentication */
-  INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
+  /** Optional production Secrets Store binding; staging uses the direct Worker secret. */
+  INTERNAL_API_SECRET_PROD?: SecretsStoreSecret;
 
   R2_ENDPOINT?: string;
   R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;

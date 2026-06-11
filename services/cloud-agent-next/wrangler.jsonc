@@ -403,5 +403,145 @@
         ],
       },
     },
+    "staging": {
+      "name": "cloud-agent-next-staging",
+      "workers_dev": false,
+      "preview_urls": false,
+      "triggers": {
+        "crons": [],
+      },
+      "routes": [
+        {
+          "pattern": "cloud-agent-next-staging.kilosessions.ai",
+          "custom_domain": true,
+        },
+      ],
+      "vars": {
+        "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
+        "KILO_OPENROUTER_BASE": "https://api.kilo.ai/api",
+        "GITHUB_APP_SLUG": "kiloconnect",
+        "GITHUB_APP_BOT_USER_ID": "240665456",
+        "GITHUB_LITE_APP_SLUG": "kiloconnect-lite",
+        "GITHUB_LITE_APP_BOT_USER_ID": "257753004",
+        "WORKER_URL": "https://cloud-agent-next-staging.kilosessions.ai",
+        "CLI_TIMEOUT_SECONDS": "900",
+        "REAPER_INTERVAL_MS": "300000",
+        "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
+        "R2_ENDPOINT": "https://e115e769bcdd4c3d66af59d3332cb394.r2.cloudflarestorage.com",
+        "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai,https://cloud-agent-next-staging.kilosessions.ai",
+        "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
+        "PER_SESSION_SANDBOX_ORG_IDS": "*",
+      },
+      "placement": { "mode": "smart" },
+      "services": [
+        {
+          "binding": "SESSION_INGEST",
+          "service": "session-ingest",
+          "entrypoint": "SessionIngestRPC",
+        },
+        {
+          "binding": "GIT_TOKEN_SERVICE",
+          "service": "git-token-service",
+          "entrypoint": "GitTokenRPCEntrypoint",
+        },
+        {
+          "binding": "NOTIFICATIONS",
+          "service": "notifications",
+          "entrypoint": "NotificationsService",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "R2_BUCKET",
+          "bucket_name": "kilocode-sessions-staging",
+        },
+      ],
+      "containers": [
+        {
+          "class_name": "Sandbox",
+          "image": "./Dockerfile",
+          "instance_type": "standard-4",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.21",
+          },
+          "max_instances": 10,
+          "rollout_active_grace_period": 60,
+        },
+        {
+          "class_name": "SandboxSmall",
+          "image": "./Dockerfile",
+          "instance_type": "standard-3",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.21",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 60,
+        },
+        {
+          "class_name": "SandboxDIND",
+          "image": "./Dockerfile.dind",
+          "instance_type": "standard-3",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.21",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 60,
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "class_name": "Sandbox",
+            "name": "Sandbox",
+          },
+          {
+            "class_name": "SandboxSmall",
+            "name": "SandboxSmall",
+          },
+          {
+            "class_name": "SandboxDIND",
+            "name": "SandboxDIND",
+          },
+          {
+            "class_name": "CloudAgentSession",
+            "name": "CLOUD_AGENT_SESSION",
+          },
+          {
+            "class_name": "UserKiloFacade",
+            "name": "USER_KILO_FACADE",
+          },
+        ],
+      },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+        },
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "CALLBACK_QUEUE",
+            "queue": "cloud-agent-next-callback-queue-staging",
+          },
+          {
+            "binding": "CLOUD_AGENT_REPORT_QUEUE",
+            "queue": "cloud-agent-next-report-queue-staging",
+          },
+        ],
+        "consumers": [
+          {
+            "queue": "cloud-agent-next-callback-queue-staging",
+            "max_batch_size": 5,
+            "max_retries": 4,
+          },
+          {
+            "queue": "cloud-agent-next-report-queue-staging",
+            "max_retries": 3,
+            "dead_letter_queue": "cloud-agent-next-report-queue-dlq-staging",
+          },
+        ],
+      },
+    },
   },
 }

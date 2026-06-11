@@ -1,0 +1,450 @@
+name: Deploy Cloud Agent Next staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Same-repository pull request to deploy'
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: deploy-cloud-agent-next-staging
+  cancel-in-progress: false
+
+jobs:
+  authorize-and-test:
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
+    timeout-minutes: 30
+    outputs:
+      merge_sha: ${{ steps.authorize.outputs.merge_sha }}
+      pr_url: ${{ steps.authorize.outputs.pr_url }}
+    steps:
+      - name: Verify trusted workflow ref
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow must be dispatched from main. Got: $GITHUB_REF"
+            exit 1
+          fi
+
+      - name: Authorize pull request merge commit
+        id: authorize
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid pull request number"
+            exit 1
+          fi
+
+          PR_META=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            --jq '{state: .state, head_repo: (.head.repo.full_name // ""), base_repo: (.base.repo.full_name // ""), html_url: .html_url}')
+          if [ "$(jq -r '.state' <<< "$PR_META")" != "open" ]; then
+            echo "::error::Pull request #${PR_NUMBER} is not open"
+            exit 1
+          fi
+          if [ "$(jq -r '.head_repo' <<< "$PR_META")" != "$GITHUB_REPOSITORY" ] || \
+             [ "$(jq -r '.base_repo' <<< "$PR_META")" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::Pull request #${PR_NUMBER} must originate from this repository"
+            exit 1
+          fi
+
+          MERGE_REFS=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/pull/${PR_NUMBER}/merge")
+          MERGE_SHA=$(jq -r --arg ref "refs/pull/${PR_NUMBER}/merge" \
+            'map(select(.ref == $ref)) | .[0].object.sha // empty' <<< "$MERGE_REFS")
+          if [[ ! "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Pull request #${PR_NUMBER} does not have a current merge commit"
+            exit 1
+          fi
+
+          echo "merge_sha=$MERGE_SHA" >> "$GITHUB_OUTPUT"
+          echo "pr_url=$(jq -r '.html_url' <<< "$PR_META")" >> "$GITHUB_OUTPUT"
+          echo "Authorized pull request #${PR_NUMBER} merge commit $MERGE_SHA"
+
+      - name: Checkout authorized merge commit
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ steps.authorize.outputs.merge_sha }}
+          lfs: true
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24.14.1
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - name: Install candidate dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build wrapper bundle
+        working-directory: services/cloud-agent-next/wrapper
+        run: bun run build.ts
+
+      - name: Typecheck Cloud Agent Next
+        run: pnpm --filter cloud-agent-next typecheck
+
+      - name: Test Cloud Agent Next
+        run: pnpm --filter cloud-agent-next test:all
+
+  deploy:
+    needs: authorize-and-test
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout authorized merge commit
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ needs.authorize-and-test.outputs.merge_sha }}
+          lfs: true
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24.14.1
+
+      - name: Install candidate dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install trusted deployment tools
+        env:
+          TRUSTED_TOOLS_DIR: ${{ runner.temp }}/cloud-agent-next-staging-tools
+          npm_config_userconfig: /dev/null
+        run: |
+          set -euo pipefail
+          mkdir -p "$TRUSTED_TOOLS_DIR"
+          printf '{"private":true}\n' > "$TRUSTED_TOOLS_DIR/package.json"
+          pnpm --dir "$TRUSTED_TOOLS_DIR" add --ignore-workspace --save-exact \
+            jsonc-parser@3.3.1 wrangler@4.90.1
+
+      - name: Validate exact staging deployment configuration
+        env:
+          TRUSTED_TOOLS_DIR: ${{ runner.temp }}/cloud-agent-next-staging-tools
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const { isDeepStrictEqual } = require('node:util');
+          const { parse, printParseErrorCode } = require(
+            path.join(process.env.TRUSTED_TOOLS_DIR, 'node_modules/jsonc-parser')
+          );
+
+          const configPath = path.join(
+            process.env.GITHUB_WORKSPACE,
+            'services/cloud-agent-next/wrangler.jsonc'
+          );
+          const parseErrors = [];
+          const config = parse(fs.readFileSync(configPath, 'utf8'), parseErrors, {
+            allowTrailingComma: true,
+          });
+          if (parseErrors.length > 0) {
+            const descriptions = parseErrors.map(error =>
+              `${printParseErrorCode(error.error)} at offset ${error.offset}`
+            );
+            throw new Error(`Invalid Wrangler JSONC: ${descriptions.join(', ')}`);
+          }
+
+          const expectedTopLevelKeys = [
+            '$schema',
+            'account_id',
+            'compatibility_date',
+            'compatibility_flags',
+            'containers',
+            'dev',
+            'durable_objects',
+            'env',
+            'hyperdrive',
+            'logpush',
+            'main',
+            'migrations',
+            'name',
+            'observability',
+            'placement',
+            'preview_urls',
+            'queues',
+            'r2_buckets',
+            'routes',
+            'rules',
+            'secrets_store_secrets',
+            'services',
+            'triggers',
+            'vars',
+            'workers_dev',
+          ];
+          const actualTopLevelKeys = Object.keys(config).sort();
+          if (!isDeepStrictEqual(actualTopLevelKeys, expectedTopLevelKeys)) {
+            throw new Error(
+              `Wrangler top-level keys differ from the allowlist: ${JSON.stringify(actualTopLevelKeys)}`
+            );
+          }
+
+          const expectedInheritedConfig = {
+            name: 'cloud-agent-next',
+            account_id: 'e115e769bcdd4c3d66af59d3332cb394',
+            main: 'src/index.ts',
+            compatibility_date: '2025-09-15',
+            compatibility_flags: ['nodejs_compat'],
+            preview_urls: false,
+            workers_dev: true,
+            rules: [{ type: 'Text', globs: ['**/*.sql'], fallthrough: true }],
+            observability: {
+              enabled: false,
+              head_sampling_rate: 1,
+              logs: {
+                enabled: true,
+                head_sampling_rate: 1,
+                persist: true,
+                invocation_logs: true,
+              },
+              traces: { enabled: true, persist: true, head_sampling_rate: 1 },
+            },
+            logpush: true,
+            placement: { mode: 'smart' },
+            secrets_store_secrets: [
+              {
+                binding: 'INTERNAL_API_SECRET_PROD',
+                store_id: '342a86d9e3a94da698e82d0c6e2a36f0',
+                secret_name: 'INTERNAL_API_SECRET_PROD',
+              },
+            ],
+            migrations: [
+              { new_sqlite_classes: ['Sandbox'], tag: 'v1' },
+              { new_sqlite_classes: ['CloudAgentSession'], tag: 'v2' },
+              { new_sqlite_classes: ['SandboxSmall'], tag: 'v3' },
+              { new_sqlite_classes: ['SandboxDIND'], tag: 'v4' },
+              { new_sqlite_classes: ['UserKiloFacade'], tag: 'v5' },
+            ],
+          };
+          const actualInheritedConfig = Object.fromEntries(
+            Object.keys(expectedInheritedConfig).map(key => [key, config[key]])
+          );
+          if (!isDeepStrictEqual(actualInheritedConfig, expectedInheritedConfig)) {
+            throw new Error('Inherited Wrangler configuration differs from the staging allowlist');
+          }
+
+          const expectedStaging = {
+            name: 'cloud-agent-next-staging',
+            workers_dev: false,
+            preview_urls: false,
+            triggers: { crons: [] },
+            routes: [
+              {
+                pattern: 'cloud-agent-next-staging.kilosessions.ai',
+                custom_domain: true,
+              },
+            ],
+            vars: {
+              KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
+              KILO_OPENROUTER_BASE: 'https://api.kilo.ai/api',
+              GITHUB_APP_SLUG: 'kiloconnect',
+              GITHUB_APP_BOT_USER_ID: '240665456',
+              GITHUB_LITE_APP_SLUG: 'kiloconnect-lite',
+              GITHUB_LITE_APP_BOT_USER_ID: '257753004',
+              WORKER_URL: 'https://cloud-agent-next-staging.kilosessions.ai',
+              CLI_TIMEOUT_SECONDS: '900',
+              REAPER_INTERVAL_MS: '300000',
+              R2_ATTACHMENTS_BUCKET: 'cloud-agent-attachments',
+              R2_ENDPOINT:
+                'https://e115e769bcdd4c3d66af59d3332cb394.r2.cloudflarestorage.com',
+              WS_ALLOWED_ORIGINS:
+                'https://app.kilo.ai,https://api.kilo.ai,https://cloud-agent-next-staging.kilosessions.ai',
+              KILO_SESSION_INGEST_URL: 'https://ingest.kilosessions.ai',
+              PER_SESSION_SANDBOX_ORG_IDS: '*',
+            },
+            placement: { mode: 'smart' },
+            services: [
+              {
+                binding: 'SESSION_INGEST',
+                service: 'session-ingest',
+                entrypoint: 'SessionIngestRPC',
+              },
+              {
+                binding: 'GIT_TOKEN_SERVICE',
+                service: 'git-token-service',
+                entrypoint: 'GitTokenRPCEntrypoint',
+              },
+              {
+                binding: 'NOTIFICATIONS',
+                service: 'notifications',
+                entrypoint: 'NotificationsService',
+              },
+            ],
+            r2_buckets: [
+              { binding: 'R2_BUCKET', bucket_name: 'kilocode-sessions-staging' },
+            ],
+            containers: [
+              {
+                class_name: 'Sandbox',
+                image: './Dockerfile',
+                instance_type: 'standard-4',
+                image_vars: { KILOCODE_CLI_VERSION: '7.3.21' },
+                max_instances: 10,
+                rollout_active_grace_period: 60,
+              },
+              {
+                class_name: 'SandboxSmall',
+                image: './Dockerfile',
+                instance_type: 'standard-3',
+                image_vars: { KILOCODE_CLI_VERSION: '7.3.21' },
+                max_instances: 2,
+                rollout_active_grace_period: 60,
+              },
+              {
+                class_name: 'SandboxDIND',
+                image: './Dockerfile.dind',
+                instance_type: 'standard-3',
+                image_vars: { KILOCODE_CLI_VERSION: '7.3.21' },
+                max_instances: 2,
+                rollout_active_grace_period: 60,
+              },
+            ],
+            durable_objects: {
+              bindings: [
+                { class_name: 'Sandbox', name: 'Sandbox' },
+                { class_name: 'SandboxSmall', name: 'SandboxSmall' },
+                { class_name: 'SandboxDIND', name: 'SandboxDIND' },
+                { class_name: 'CloudAgentSession', name: 'CLOUD_AGENT_SESSION' },
+                { class_name: 'UserKiloFacade', name: 'USER_KILO_FACADE' },
+              ],
+            },
+            hyperdrive: [
+              {
+                binding: 'HYPERDRIVE',
+                id: '624ec80650dd414199349f4e217ddb10',
+              },
+            ],
+            queues: {
+              producers: [
+                {
+                  binding: 'CALLBACK_QUEUE',
+                  queue: 'cloud-agent-next-callback-queue-staging',
+                },
+                {
+                  binding: 'CLOUD_AGENT_REPORT_QUEUE',
+                  queue: 'cloud-agent-next-report-queue-staging',
+                },
+              ],
+              consumers: [
+                {
+                  queue: 'cloud-agent-next-callback-queue-staging',
+                  max_batch_size: 5,
+                  max_retries: 4,
+                },
+                {
+                  queue: 'cloud-agent-next-report-queue-staging',
+                  max_retries: 3,
+                  dead_letter_queue: 'cloud-agent-next-report-queue-dlq-staging',
+                },
+              ],
+            },
+          };
+          if (!isDeepStrictEqual(config.env?.staging, expectedStaging)) {
+            throw new Error('env.staging differs from the exact deployment allowlist');
+          }
+
+          console.log('Staging Wrangler configuration matches the exact allowlist');
+          NODE
+
+      - name: Revalidate authorized merge commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          AUTHORIZED_SHA: ${{ needs.authorize-and-test.outputs.merge_sha }}
+        run: |
+          set -euo pipefail
+          PR_META=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            --jq '{state: .state, head_repo: (.head.repo.full_name // ""), base_repo: (.base.repo.full_name // "")}')
+          if [ "$(jq -r '.state' <<< "$PR_META")" != "open" ] || \
+             [ "$(jq -r '.head_repo' <<< "$PR_META")" != "$GITHUB_REPOSITORY" ] || \
+             [ "$(jq -r '.base_repo' <<< "$PR_META")" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::Pull request authorization changed after testing"
+            exit 1
+          fi
+
+          MERGE_REFS=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/pull/${PR_NUMBER}/merge")
+          CURRENT_SHA=$(jq -r --arg ref "refs/pull/${PR_NUMBER}/merge" \
+            'map(select(.ref == $ref)) | .[0].object.sha // empty' <<< "$MERGE_REFS")
+          if [ "$CURRENT_SHA" != "$AUTHORIZED_SHA" ]; then
+            echo "::error::Pull request merge commit changed after testing"
+            exit 1
+          fi
+
+      - name: Deploy authorized candidate to staging
+        id: deploy
+        working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: e115e769bcdd4c3d66af59d3332cb394
+          TRUSTED_TOOLS_DIR: ${{ runner.temp }}/cloud-agent-next-staging-tools
+          WRANGLER_SEND_METRICS: false
+        run: |
+          set -euo pipefail
+          "$TRUSTED_TOOLS_DIR/node_modules/.bin/wrangler" deploy --env staging
+
+      - name: Verify authenticated staging smoke path
+        id: health
+        env:
+          STAGING_SMOKE_TOKEN: ${{ secrets.CLOUD_AGENT_STAGING_SMOKE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$STAGING_SMOKE_TOKEN" ]; then
+            echo "::error::CLOUD_AGENT_STAGING_SMOKE_TOKEN is not configured"
+            exit 1
+          fi
+
+          for attempt in $(seq 1 12); do
+            if body=$(curl --fail-with-body --silent --show-error \
+              --connect-timeout 10 --max-time 30 \
+              --header "Authorization: Bearer ${STAGING_SMOKE_TOKEN}" \
+              "https://cloud-agent-next-staging.kilosessions.ai/kilo/session?limit=1"); then
+              if jq -e 'type == "array"' >/dev/null <<< "$body"; then
+                echo "Authenticated staging smoke check passed"
+                exit 0
+              fi
+            fi
+            echo "Smoke check attempt ${attempt} failed; retrying"
+            sleep 10
+          done
+          echo "::error::Authenticated staging smoke check did not pass"
+          exit 1
+
+      - name: Write deployment summary
+        if: always()
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_URL: ${{ needs.authorize-and-test.outputs.pr_url }}
+          MERGE_SHA: ${{ needs.authorize-and-test.outputs.merge_sha }}
+          RESULT: ${{ job.status }}
+        run: |
+          {
+            echo "## Cloud Agent Next staging"
+            echo ""
+            echo "- **Pull request:** [#${PR_NUMBER}](${PR_URL})"
+            echo "- **Merge commit:** \`${MERGE_SHA}\`"
+            echo "- **Staging URL:** https://cloud-agent-next-staging.kilosessions.ai"
+            echo "- **Result:** ${RESULT}"
+          } >> "$GITHUB_STEP_SUMMARY"

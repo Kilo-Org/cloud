@@ -59,6 +59,7 @@ vi.mock('./telemetry/report-consumer.js', () => ({
   CLOUD_AGENT_REPORT_QUEUE_NAMES: new Set([
     'cloud-agent-next-report-queue',
     'cloud-agent-next-report-queue-dev',
+    'cloud-agent-next-report-queue-staging',
     'cloud-agent-next-report-queue-test',
   ]),
   consumeCloudAgentReportBatch: consumeCloudAgentReportBatchMock,
@@ -190,6 +191,18 @@ describe('server background reporting', () => {
     const env = createEnv();
     const batch = {
       queue: 'cloud-agent-next-report-queue-dev',
+      messages: [],
+    } as unknown as MessageBatch<unknown>;
+
+    await worker.queue(batch, env as unknown as Env);
+
+    expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
+  });
+
+  it('routes isolated staging report queue batches to the Cloud Agent report consumer', async () => {
+    const env = createEnv();
+    const batch = {
+      queue: 'cloud-agent-next-report-queue-staging',
       messages: [],
     } as unknown as MessageBatch<unknown>;
 

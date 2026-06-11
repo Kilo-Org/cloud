@@ -152,6 +152,9 @@ jobs:
     needs: [stage-app, check-production-db-startup, run-migrations]
     environment: production
 
+    env:
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_APP }}
+
     steps:
       - name: Install Vercel CLI
         run: npm install -g vercel@${{ env.VERCEL_VERSION }}
@@ -164,6 +167,9 @@ jobs:
     timeout-minutes: 15
     needs: [stage-global-app, check-production-db-startup, run-migrations]
     environment: production
+
+    env:
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_GLOBAL_APP }}
 
     steps:
       - name: Install Vercel CLI

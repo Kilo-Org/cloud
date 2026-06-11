@@ -12,7 +12,8 @@ export type ChangelogEntry = {
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-06-10',
-    description: 'Updated OpenClaw to 2026.6.5.',
+    description:
+      'OpenClaw 2026.6.5 is available now as an Early Access upgrade. This release includes a new OpenClaw feature that migrates some credentials stored in JSON files into a SQLite database. The migration runs automatically the first time you upgrade — and once your instance has migrated, there is no automatic way to revert to the previous format.',
     category: 'feature',
     deployHint: 'upgrade_required',
   },

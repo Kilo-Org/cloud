@@ -1880,7 +1880,7 @@ export async function fetchGitLabRepositorySize(
     return null;
   }
 
-  return `${Math.round(repositorySizeBytes / (1024 * 1024))} MB`;
+  return `${Math.round(repositorySizeBytes / (1024 * 1024))} MiB`;
 }
 
 function readGitLabRepositorySizeBytes(data: unknown): number | null {

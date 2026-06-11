@@ -25,6 +25,20 @@
   "vars": {
     "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
   },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTO_ROUTING_DECISION_CACHE",
+        "class_name": "AutoRoutingDecisionCacheDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AutoRoutingDecisionCacheDO"],
+    },
+  ],
   "analytics_engine_datasets": [
     {
       "binding": "AUTO_ROUTING_CLASSIFIER_METRICS",

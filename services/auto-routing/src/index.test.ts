@@ -15,6 +15,9 @@ const writeDataPoint = vi.fn();
 const configGet = vi.fn();
 const configPut = vi.fn();
 const analyticsTokenGet = vi.fn();
+const cacheGetEntry = vi.fn();
+const cachePutEntry = vi.fn();
+const cacheIdFromName = vi.fn(() => 'cache-do-id');
 const originalFetch = globalThis.fetch;
 const mockedFetch = vi.fn<typeof globalThis.fetch>();
 
@@ -28,6 +31,10 @@ const env = {
   },
   AUTO_ROUTING_CLASSIFIER_METRICS: {
     writeDataPoint,
+  },
+  AUTO_ROUTING_DECISION_CACHE: {
+    idFromName: cacheIdFromName,
+    get: () => ({ getEntry: cacheGetEntry, putEntry: cachePutEntry }),
   },
   O11Y_CF_ACCOUNT_ID: 'test-account-id',
   O11Y_CF_AE_API_TOKEN: {
@@ -70,6 +77,10 @@ describe('auto routing worker', () => {
     configPut.mockReset();
     analyticsTokenGet.mockReset();
     analyticsTokenGet.mockResolvedValue('analytics-token');
+    cacheGetEntry.mockReset();
+    cacheGetEntry.mockResolvedValue(null);
+    cachePutEntry.mockReset();
+    cachePutEntry.mockResolvedValue(undefined);
     mockedFetch.mockReset();
     globalThis.fetch = mockedFetch;
   });
@@ -189,6 +200,73 @@ describe('auto routing worker', () => {
       doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, expect.any(Number), 0],
     });
     expect(infoSpy).not.toHaveBeenCalled();
+  });
+
+  it('serves a cached classification for the session without calling the classifier', async () => {
+    cacheGetEntry.mockResolvedValueOnce(
+      JSON.stringify({ classification: mockClassification, cachedAt: '2026-06-11T10:00:00.000Z' })
+    );
+
+    const response = await request('/decide', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        path: '/chat/completions',
+        receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: 'task-123',
+        headers: {},
+        body: JSON.stringify({
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content: 'Pick the best model.' }],
+        }),
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: 0,
+      decision: null,
+      classifierResult: { classification: mockClassification },
+    });
+    expect(cacheIdFromName).toHaveBeenCalledWith('task-123');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    expect(cachePutEntry).not.toHaveBeenCalled();
+    expect(writeDataPoint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        doubles: [0, 0, mockClassification.confidence, 1, 0, expect.any(Number), 1],
+      })
+    );
+  });
+
+  it('caches fresh classifications for the conversation', async () => {
+    const response = await request('/decide', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        path: '/chat/completions',
+        receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: null,
+        headers: {},
+        body: JSON.stringify({
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content: 'Pick the best model.' }],
+        }),
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    // Without a session id the conversation key is derived from content.
+    expect(cacheIdFromName).toHaveBeenCalledWith(expect.stringMatching(/^content:[0-9a-f]{16}$/));
+    expect(cachePutEntry).toHaveBeenCalledWith(
+      expect.stringMatching(/^google\/gemini-2\.5-flash-lite:[0-9a-f]{16}$/),
+      expect.stringContaining('"taskType":"implementation"')
+    );
   });
 
   it('uses a zero cost when the classifier result has no usage cost', async () => {

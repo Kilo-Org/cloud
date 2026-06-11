@@ -79,7 +79,7 @@ describe('OpenRouter classifier call', () => {
         responseFormat: { type: 'json_object' },
         stream: false,
         temperature: 0,
-        maxTokens: 160,
+        maxTokens: 256,
       },
     });
   });

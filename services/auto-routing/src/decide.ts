@@ -283,8 +283,17 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     computeContentHashes(classifierInput.data),
     getClassifierModel(c.env),
   ]);
+  // Stable conversation identity even when the client sends no session id:
+  // the first user prompt and system prompt do not change within a
+  // conversation, so their fingerprint identifies it.
+  const conversationKey = parsed.data.sessionId ?? `content:${hashes.loose}`;
 
-  const cached = await getCachedClassification(hashes.exact, classifierModel);
+  const cached = await getCachedClassification(
+    c.env,
+    conversationKey,
+    hashes.exact,
+    classifierModel
+  );
   if (cached) {
     const classifierDurationMs = performance.now() - startedAt;
     writeClassifierMetricsDataPoint(c.env, {
@@ -330,11 +339,13 @@ export const decideHandler: Handler<HonoEnv> = async c => {
 
   try {
     const classifier = await classifyNormalizedInput(c.env, classifierInput.data, {
-      openrouterSessionId: parsed.data.sessionId ?? `content:${hashes.loose}`,
+      openrouterSessionId: conversationKey,
     });
     const classifierDurationMs = performance.now() - startedAt;
     if (!classifier.fallback) {
       const cacheWrite = putCachedClassification(
+        c.env,
+        conversationKey,
         hashes.exact,
         classifier.classifierModel,
         classifier.classification

@@ -1,4 +1,4 @@
-import type { ClassifierOutput } from './classifier-output';
+import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
 
 export type ClassifierAnalyticsStatus =
   | 'classified'

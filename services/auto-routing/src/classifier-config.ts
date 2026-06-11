@@ -1,5 +1,5 @@
 import { formatError } from '@kilocode/worker-utils';
-import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
+import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/classifier';
 import { ttlCached } from './ttl-cache';
 
 export const CLASSIFIER_MODEL_CONFIG_KEY = 'classifier_model';

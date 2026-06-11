@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
+import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/classifier';
 import {
   CLASSIFIER_MODEL_CONFIG_KEY,
   clearClassifierConfigCache,

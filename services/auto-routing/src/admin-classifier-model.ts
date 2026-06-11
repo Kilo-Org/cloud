@@ -3,7 +3,7 @@ import {
   type AutoRoutingClassifierModelResponse,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
-import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
+import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/classifier';
 import { getClassifierModel, setClassifierModel } from './classifier-config';
 import type { HonoEnv } from './hono-env';
 

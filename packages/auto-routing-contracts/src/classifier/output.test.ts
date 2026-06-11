@@ -4,7 +4,7 @@ import {
   parseClassifierOutput,
   type ClassifierOutputParseError,
   type ClassifierOutput,
-} from './index';
+} from './output';
 
 const validOutput = {
   taskType: 'debugging',

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ClassifierOutput } from './classifier-output';
+import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
 import { AutoRoutingDecisionCacheDO } from './decision-cache';
 
 const classification = {

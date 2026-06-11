@@ -9,7 +9,7 @@ import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import type { ClassifierAnalyticsStatus } from './classifier-analytics';
 import { getClassifierModel, getDecisionLogSampleRate } from './classifier-config';
-import type { ClassifierOutput } from './classifier-output';
+import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
 import {
   computeContentHashes,
   deriveConversationKey,

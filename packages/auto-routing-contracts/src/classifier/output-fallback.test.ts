@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
-import { fallbackClassifierOutput } from './fallback';
+import type { NormalizedClassifierInput } from '../index';
+import { fallbackClassifierOutput } from './output-fallback';
 
 const input = {
   apiKind: 'chat_completions',

@@ -1,5 +1,5 @@
-import classifierTaxonomy from './classifier-taxonomy.json';
-import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
+import classifierTaxonomy from './taxonomy.json';
+import type { NormalizedClassifierInput } from '../index';
 
 export const DEFAULT_CLASSIFIER_MODEL = 'google/gemini-2.5-flash-lite';
 // The classification JSON needs ~60 tokens; the headroom avoids truncated

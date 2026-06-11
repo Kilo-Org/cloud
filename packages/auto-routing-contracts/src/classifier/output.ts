@@ -1,5 +1,5 @@
-import { ClassifierOutputSchema, type ClassifierOutput } from '@kilocode/auto-routing-contracts';
-import classifierTaxonomy from '../classifier-taxonomy.json';
+import { ClassifierOutputSchema, type ClassifierOutput } from '../index';
+import classifierTaxonomy from './taxonomy.json';
 
 export const classifierOutputSchema = ClassifierOutputSchema;
 export type { ClassifierOutput };

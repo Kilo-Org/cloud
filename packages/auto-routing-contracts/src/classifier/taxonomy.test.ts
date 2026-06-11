@@ -46,7 +46,7 @@ const TaxonomySchema = z.object({
 });
 
 async function readTaxonomy() {
-  const file = await readFile(join(__dirname, 'classifier-taxonomy.json'), 'utf8');
+  const file = await readFile(join(__dirname, 'taxonomy.json'), 'utf8');
   return TaxonomySchema.parse(JSON.parse(file));
 }
 

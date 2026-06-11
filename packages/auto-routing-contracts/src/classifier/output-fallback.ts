@@ -1,5 +1,5 @@
-import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
-import type { ClassifierOutput } from './index';
+import type { NormalizedClassifierInput } from '../index';
+import type { ClassifierOutput } from './output';
 
 type IntentRule = {
   taskType: ClassifierOutput['taskType'];

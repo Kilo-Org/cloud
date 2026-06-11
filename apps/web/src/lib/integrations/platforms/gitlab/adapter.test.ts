@@ -20,6 +20,7 @@ import {
   searchGitLabProjects,
   normalizeGitLabSearchQuery,
   fetchGitLabRootTextFileAtRef,
+  fetchGitLabRepositorySize,
 } from './adapter';
 
 // Mock fetch globally
@@ -767,6 +768,40 @@ describe('fetchGitLabRootTextFileAtRef', () => {
     await expect(
       fetchGitLabRootTextFileAtRef('test-token', 'group/project', 'REVIEW.md', 'main')
     ).rejects.toThrow('GitLab repository file fetch failed: 500');
+  });
+});
+
+describe('fetchGitLabRepositorySize', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('fetches project statistics and formats repository_size bytes as MiB', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ statistics: { repository_size: 104_857_600 } }),
+    });
+
+    const result = await fetchGitLabRepositorySize('test-token', 'group/project');
+
+    expect(result).toBe('100 MiB');
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.com/api/v4/projects/group%2Fproject?statistics=true',
+      expect.objectContaining({
+        headers: {
+          Authorization: 'Bearer test-token',
+        },
+      })
+    );
+  });
+
+  it('formats zero-sized repositories explicitly', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ statistics: { repository_size: 0 } }),
+    });
+
+    await expect(fetchGitLabRepositorySize('test-token', 'group/project')).resolves.toBe('0 MiB');
   });
 });
 

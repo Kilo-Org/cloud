@@ -11,14 +11,19 @@ process.env.GITHUB_LITE_APP_ID = 'test-lite-app-id';
 process.env.GITHUB_LITE_APP_PRIVATE_KEY = 'test-lite-private-key';
 
 const mockGetContent = jest.fn();
+const mockGet = jest.fn();
 
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
-    repos: { getContent: mockGetContent },
+    repos: { getContent: mockGetContent, get: mockGet },
   })),
 }));
 
-import { decodeGitHubBase64Content, fetchGitHubRootTextFileAtRef } from './adapter';
+import {
+  decodeGitHubBase64Content,
+  fetchGitHubRepositorySize,
+  fetchGitHubRootTextFileAtRef,
+} from './adapter';
 
 function httpError(status: number) {
   return Object.assign(new Error(`HTTP ${status}`), { status });
@@ -26,6 +31,7 @@ function httpError(status: number) {
 
 beforeEach(() => {
   mockGetContent.mockReset();
+  mockGet.mockReset();
 });
 
 describe('decodeGitHubBase64Content', () => {
@@ -96,5 +102,26 @@ describe('fetchGitHubRootTextFileAtRef', () => {
     mockGetContent.mockRejectedValueOnce(error);
 
     await expect(fetchGitHubRootTextFileAtRef(params)).rejects.toBe(error);
+  });
+});
+
+describe('fetchGitHubRepositorySize', () => {
+  const params = {
+    token: 'mock-token',
+    owner: 'acme',
+    repo: 'widgets',
+  };
+
+  it('fetches and formats the repository size reported in KiB', async () => {
+    mockGet.mockResolvedValueOnce({ data: { size: 102_400 } });
+
+    await expect(fetchGitHubRepositorySize(params)).resolves.toBe('100 MiB');
+    expect(mockGet).toHaveBeenCalledWith({ owner: 'acme', repo: 'widgets' });
+  });
+
+  it('formats zero-sized repositories explicitly', async () => {
+    mockGet.mockResolvedValueOnce({ data: { size: 0 } });
+
+    await expect(fetchGitHubRepositorySize(params)).resolves.toBe('0 MiB');
   });
 });

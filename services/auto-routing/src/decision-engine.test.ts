@@ -64,6 +64,7 @@ describe('computeDecision', () => {
       tier: 'low',
       source: 'benchmark',
       tableVersion: 'run-1',
+      reasoningEffort: null,
     });
   });
   it('uses the tier derived from the classification', () => {

@@ -94,6 +94,8 @@ describe('auto routing contracts', () => {
     expect(
       AutoRoutingClassifierModelResponseSchema.parse({
         model: 'google/gemini-2.5-flash-lite',
+        override: null,
+        benchmarkWinner: 'google/gemini-2.5-flash-lite',
         defaultModel: 'google/gemini-2.5-flash-lite',
       })
     ).toMatchObject({ model: 'google/gemini-2.5-flash-lite' });

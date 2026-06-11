@@ -102,6 +102,8 @@ export const AutoRoutingDecisionSchema = z.object({
   tier: DifficultyTierSchema,
   source: z.enum(['benchmark', 'default']),
   tableVersion: z.string(),
+  // Mirrors the effort the chosen model was benchmarked with, when set.
+  reasoningEffort: z.enum(['minimal', 'low', 'medium', 'high']).nullable().optional(),
 });
 export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 
@@ -119,13 +121,17 @@ export const AutoRoutingDecisionResponseSchema = z.object({
 });
 export type AutoRoutingDecisionResponse = z.infer<typeof AutoRoutingDecisionResponseSchema>;
 
+// model: null clears the admin override (benchmark winner takes effect).
 export const UpdateClassifierModelRequestSchema = z.object({
-  model: z.string().trim().min(1),
+  model: z.string().trim().min(1).nullable(),
 });
 export type UpdateClassifierModelRequest = z.infer<typeof UpdateClassifierModelRequestSchema>;
 
 export const AutoRoutingClassifierModelResponseSchema = z.object({
+  // Effective model used by /decide: override ?? benchmark winner ?? default.
   model: z.string(),
+  override: z.string().nullable(),
+  benchmarkWinner: z.string().nullable(),
   defaultModel: z.string(),
 });
 export type AutoRoutingClassifierModelResponse = z.infer<

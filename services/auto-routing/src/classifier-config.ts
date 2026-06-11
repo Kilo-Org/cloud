@@ -1,4 +1,5 @@
 import { formatError } from '@kilocode/worker-utils';
+import { CLASSIFIER_WINNER_KV_KEY, ClassifierWinnerSchema } from '@kilocode/auto-routing-contracts';
 import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/classifier';
 import { ttlCached } from './ttl-cache';
 
@@ -18,10 +19,35 @@ const CONFIG_CACHE_TTL_MS = 60_000;
 
 type ClassifierConfigEnv = Pick<Env, 'AUTO_ROUTING_CONFIG'>;
 
+export type ClassifierModelInfo = {
+  // Effective model used by /decide: override ?? benchmark winner ?? default.
+  model: string;
+  override: string | null;
+  benchmarkWinner: string | null;
+};
+
+function parseBenchmarkWinner(raw: string | null): string | null {
+  if (raw === null) return null;
+  try {
+    const parsed = ClassifierWinnerSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data.model : null;
+  } catch {
+    return null;
+  }
+}
+
 const classifierModelCache = ttlCached(CONFIG_CACHE_TTL_MS, async (env: ClassifierConfigEnv) => {
-  const configuredModel = await env.AUTO_ROUTING_CONFIG.get(CLASSIFIER_MODEL_CONFIG_KEY);
-  const trimmedModel = configuredModel?.trim();
-  return trimmedModel && trimmedModel.length > 0 ? trimmedModel : DEFAULT_CLASSIFIER_MODEL;
+  const [configuredModel, winnerRaw] = await Promise.all([
+    env.AUTO_ROUTING_CONFIG.get(CLASSIFIER_MODEL_CONFIG_KEY),
+    env.AUTO_ROUTING_CONFIG.get(CLASSIFIER_WINNER_KV_KEY),
+  ]);
+  const override = configuredModel?.trim() || null;
+  const benchmarkWinner = parseBenchmarkWinner(winnerRaw);
+  return {
+    model: override ?? benchmarkWinner ?? DEFAULT_CLASSIFIER_MODEL,
+    override,
+    benchmarkWinner,
+  } satisfies ClassifierModelInfo;
 });
 
 const decisionLogSampleRateCache = ttlCached(
@@ -57,10 +83,20 @@ function failClosed<T>(key: string, fallback: T): (error: unknown) => T {
   };
 }
 
-export function getClassifierModel(env: ClassifierConfigEnv): Promise<string> {
+const DEFAULT_CLASSIFIER_MODEL_INFO: ClassifierModelInfo = {
+  model: DEFAULT_CLASSIFIER_MODEL,
+  override: null,
+  benchmarkWinner: null,
+};
+
+export function getClassifierModelInfo(env: ClassifierConfigEnv): Promise<ClassifierModelInfo> {
   return classifierModelCache
     .get(env)
-    .catch(failClosed(CLASSIFIER_MODEL_CONFIG_KEY, DEFAULT_CLASSIFIER_MODEL));
+    .catch(failClosed(CLASSIFIER_MODEL_CONFIG_KEY, DEFAULT_CLASSIFIER_MODEL_INFO));
+}
+
+export async function getClassifierModel(env: ClassifierConfigEnv): Promise<string> {
+  return (await getClassifierModelInfo(env)).model;
 }
 
 export function getDecisionLogSampleRate(env: ClassifierConfigEnv): Promise<number> {
@@ -69,16 +105,22 @@ export function getDecisionLogSampleRate(env: ClassifierConfigEnv): Promise<numb
     .catch(failClosed(DECISION_LOG_SAMPLE_RATE_CONFIG_KEY, DEFAULT_DECISION_LOG_SAMPLE_RATE));
 }
 
+// model: null clears the admin override so the benchmark winner (or the
+// built-in default) takes effect.
 export async function setClassifierModel(
   env: ClassifierConfigEnv,
-  model: string
-): Promise<string | null> {
+  model: string | null
+): Promise<ClassifierModelInfo | null> {
+  if (model === null) {
+    await env.AUTO_ROUTING_CONFIG.delete(CLASSIFIER_MODEL_CONFIG_KEY);
+    classifierModelCache.clear();
+    return getClassifierModelInfo(env);
+  }
   const trimmedModel = model.trim();
   if (trimmedModel.length === 0) {
     return null;
   }
-
   await env.AUTO_ROUTING_CONFIG.put(CLASSIFIER_MODEL_CONFIG_KEY, trimmedModel);
   classifierModelCache.clear();
-  return trimmedModel;
+  return getClassifierModelInfo(env);
 }

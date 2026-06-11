@@ -14,6 +14,7 @@ vi.mock('./model-classifier', async importOriginal => {
 
 const writeDataPoint = vi.fn();
 const configGet = vi.fn();
+const configDelete = vi.fn();
 const configPut = vi.fn();
 const analyticsTokenGet = vi.fn();
 const cacheGetEntry = vi.fn();
@@ -28,6 +29,7 @@ const env = {
   },
   AUTO_ROUTING_CONFIG: {
     get: configGet,
+    delete: configDelete,
     put: configPut,
   },
   AUTO_ROUTING_CLASSIFIER_METRICS_V2: {
@@ -126,6 +128,8 @@ describe('auto routing worker', () => {
     // Real KV returns null for missing keys; an undefined here would send the
     // routing-table loader down the JSON.parse-throw path instead.
     configGet.mockResolvedValue(null);
+    configDelete.mockReset();
+    configDelete.mockResolvedValue(undefined);
     configPut.mockReset();
     analyticsTokenGet.mockReset();
     analyticsTokenGet.mockResolvedValue('analytics-token');
@@ -168,6 +172,7 @@ describe('auto routing worker', () => {
         tier: expect.stringMatching(/^(low|medium|high)$/),
         source: 'default',
         tableVersion: 'default',
+        reasoningEffort: null,
       },
       classifierResult: {
         classification: mockClassification,
@@ -230,6 +235,7 @@ describe('auto routing worker', () => {
         tier: expect.stringMatching(/^(low|medium|high)$/),
         source: 'default',
         tableVersion: 'default',
+        reasoningEffort: null,
       },
       classifierResult: { classification: mockClassification },
     });
@@ -463,8 +469,10 @@ describe('auto routing worker', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
-  it('returns the configured classifier model', async () => {
-    configGet.mockResolvedValueOnce('google/gemini-2.5-flash-lite');
+  it('returns the override as the effective classifier model', async () => {
+    configGet.mockImplementation(key =>
+      Promise.resolve(key === 'classifier_model' ? 'google/gemini-2.5-flash-lite' : null)
+    );
 
     const response = await request('/admin/classifier-model', {
       headers: { authorization: 'Bearer classifier-token' },
@@ -473,12 +481,48 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       model: 'google/gemini-2.5-flash-lite',
+      override: 'google/gemini-2.5-flash-lite',
+      benchmarkWinner: null,
       defaultModel: 'google/gemini-2.5-flash-lite',
     });
     expect(configGet).toHaveBeenCalledWith('classifier_model');
   });
 
-  it('updates the configured classifier model', async () => {
+  it('falls back to the benchmark winner when no override is set', async () => {
+    configGet.mockImplementation(key =>
+      Promise.resolve(
+        key === 'classifier_benchmark_winner'
+          ? JSON.stringify({
+              model: 'qwen/qwen3.7-plus',
+              runId: 'classifier-run-1',
+              accuracy: 0.93,
+              generatedAt: '2026-06-12T00:00:00.000Z',
+            })
+          : null
+      )
+    );
+
+    const response = await request('/admin/classifier-model', {
+      headers: { authorization: 'Bearer classifier-token' },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      model: 'qwen/qwen3.7-plus',
+      override: null,
+      benchmarkWinner: 'qwen/qwen3.7-plus',
+      defaultModel: 'google/gemini-2.5-flash-lite',
+    });
+  });
+
+  it('updates the classifier model override', async () => {
+    const stored = new Map<string, string>();
+    configGet.mockImplementation(key => Promise.resolve(stored.get(key) ?? null));
+    configPut.mockImplementation((key, value) => {
+      stored.set(key, value);
+      return Promise.resolve();
+    });
+
     const response = await request('/admin/classifier-model', {
       method: 'PUT',
       headers: {
@@ -491,9 +535,31 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       model: 'google/gemini-2.5-flash-lite:free',
+      override: 'google/gemini-2.5-flash-lite:free',
+      benchmarkWinner: null,
       defaultModel: 'google/gemini-2.5-flash-lite',
     });
     expect(configPut).toHaveBeenCalledWith('classifier_model', 'google/gemini-2.5-flash-lite:free');
+  });
+
+  it('clears the override when model is null', async () => {
+    const response = await request('/admin/classifier-model', {
+      method: 'PUT',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ model: null }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      model: 'google/gemini-2.5-flash-lite',
+      override: null,
+      benchmarkWinner: null,
+      defaultModel: 'google/gemini-2.5-flash-lite',
+    });
+    expect(configDelete).toHaveBeenCalledWith('classifier_model');
   });
 
   it('rejects blank classifier model updates', async () => {

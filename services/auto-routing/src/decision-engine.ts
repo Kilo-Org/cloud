@@ -14,5 +14,11 @@ export function computeDecision(
   const tier = deriveDifficultyTier(classification);
   const candidate = table.tiers[tier].find(c => c.supportedApiKinds.includes(apiKind));
   if (!candidate) return null;
-  return { model: candidate.model, tier, source: table.source, tableVersion: table.version };
+  return {
+    model: candidate.model,
+    tier,
+    source: table.source,
+    tableVersion: table.version,
+    reasoningEffort: candidate.reasoningEffort ?? null,
+  };
 }

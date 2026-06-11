@@ -8,8 +8,6 @@ import { ClassifierRunError, classifyNormalizedInput } from './model-classifier'
 import type { ClassifierRunFallbackMetadata } from './model-classifier';
 import type { HonoEnv } from './hono-env';
 
-const CLASSIFIER_SUCCESS_LOG_SAMPLE_RATE = 0.01;
-
 function emptyDecisionResponse(): AutoRoutingDecisionResponse {
   return {
     cost: 0,
@@ -93,45 +91,6 @@ function logClassifierError({
         ? { classifierOutputTopLevelKeys: topLevelKeys }
         : {}),
       ...formatError(error),
-    })
-  );
-}
-
-function logClassifierSuccessSample({
-  classifierInput,
-  classifierDurationMs,
-  classifierCostCredits,
-  classifierModel,
-  sessionId,
-  bodyBytes,
-  classification,
-}: {
-  classifierInput: NormalizedClassifierInput;
-  classifierDurationMs: number;
-  classifierCostCredits: number | null;
-  classifierModel: string;
-  sessionId: string | null;
-  bodyBytes: number;
-  classification: NonNullable<AutoRoutingDecisionResponse['classifierResult']>['classification'];
-}) {
-  if (Math.random() >= CLASSIFIER_SUCCESS_LOG_SAMPLE_RATE) return;
-
-  console.info(
-    JSON.stringify({
-      event: 'auto_routing_classifier_sample',
-      status: 'classified',
-      classifierModel,
-      requestedModel: classifierInput.requestedModel,
-      apiKind: classifierInput.apiKind,
-      sessionId,
-      classifierDurationMs,
-      classifierCostCredits: classifierCostCredits ?? null,
-      confidence: classification.confidence,
-      taskType: classification.taskType,
-      subtaskType: classification.subtaskType,
-      executionMode: classification.executionMode,
-      messageCount: classifierInput.messageCount,
-      bodyBytes,
     })
   );
 }
@@ -222,15 +181,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         fallback: classifier.fallback,
       });
     }
-    logClassifierSuccessSample({
-      classifierInput: classifierInput.data,
-      classifierDurationMs,
-      classifierCostCredits: classifier.cost,
-      classifierModel: classifier.classifierModel,
-      sessionId: parsed.data.sessionId,
-      bodyBytes,
-      classification: classifier.classification,
-    });
     // When routing decisions are implemented, include the prior decision for
     // this session as an input alongside classifier output.
     const response: AutoRoutingDecisionResponse = {

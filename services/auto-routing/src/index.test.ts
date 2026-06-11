@@ -180,25 +180,7 @@ describe('auto routing worker', () => {
       ],
       doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, expect.any(Number)],
     });
-    expect(infoSpy).toHaveBeenCalledTimes(1);
-    const [logMessage] = infoSpy.mock.calls[0] ?? [];
-    expect(typeof logMessage).toBe('string');
-    expect(JSON.parse(String(logMessage))).toEqual({
-      event: 'auto_routing_classifier_sample',
-      status: 'classified',
-      classifierModel: 'google/gemini-2.5-flash-lite',
-      requestedModel: 'anthropic/claude-sonnet-4',
-      apiKind: 'chat_completions',
-      sessionId: 'task-123',
-      classifierDurationMs: expect.any(Number),
-      classifierCostCredits: 0.00000123,
-      confidence: 0.82,
-      taskType: 'implementation',
-      subtaskType: 'feature_development',
-      executionMode: 'code_change',
-      messageCount: 3,
-      bodyBytes: expect.any(Number),
-    });
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 
   it('uses a zero cost when the classifier result has no usage cost', async () => {

@@ -158,7 +158,10 @@ function formStateToConfig(
       if (row.chat_completions) kinds.push('chat_completions');
       if (row.responses) kinds.push('responses');
       if (row.messages) kinds.push('messages');
-      return { id: row.id.trim(), supportedApiKinds: kinds.length ? kinds : ['chat_completions' as const] };
+      return {
+        id: row.id.trim(),
+        supportedApiKinds: kinds.length ? kinds : ['chat_completions' as const],
+      };
     });
   return {
     classifierModels,
@@ -226,17 +229,12 @@ function BenchmarkConfigEditor({
     }));
   }, []);
 
-  const handleDeciderRowChange = useCallback(
-    (index: number, patch: Partial<DeciderModelRow>) => {
-      setForm(prev => ({
-        ...prev,
-        deciderModels: prev.deciderModels.map((row, i) =>
-          i === index ? { ...row, ...patch } : row
-        ),
-      }));
-    },
-    []
-  );
+  const handleDeciderRowChange = useCallback((index: number, patch: Partial<DeciderModelRow>) => {
+    setForm(prev => ({
+      ...prev,
+      deciderModels: prev.deciderModels.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    }));
+  }, []);
 
   const handleSave = useCallback(() => {
     saveMutation.mutate(formStateToConfig(form, config));
@@ -386,11 +384,7 @@ function BenchmarkConfigEditor({
         {/* Actions + metadata */}
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={saveMutation.isPending}
-            >
+            <Button type="button" onClick={handleSave} disabled={saveMutation.isPending}>
               <Save className="size-4" />
               Save config
             </Button>
@@ -491,7 +485,9 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
 // Runs table
 // ---------------------------------------------------------------------------
 
-function statusBadgeVariant(status: BenchmarkRun['status']): 'default' | 'secondary' | 'destructive' {
+function statusBadgeVariant(
+  status: BenchmarkRun['status']
+): 'default' | 'secondary' | 'destructive' {
   if (status === 'completed') return 'default';
   if (status === 'running') return 'secondary';
   return 'destructive';
@@ -547,9 +543,7 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
                 </Badge>
               </TableCell>
               <TableCell className="py-2 text-xs tabular-nums">{run.startedAt}</TableCell>
-              <TableCell className="py-2 text-xs tabular-nums">
-                {run.completedAt ?? '—'}
-              </TableCell>
+              <TableCell className="py-2 text-xs tabular-nums">{run.completedAt ?? '—'}</TableCell>
               <TableCell className="py-2 text-xs text-destructive max-w-48 truncate">
                 {run.error ?? ''}
               </TableCell>
@@ -566,15 +560,9 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
 // Routing table view
 // ---------------------------------------------------------------------------
 
-function RoutingTableView({
-  data,
-}: {
-  data: BenchmarkRoutingTableResponse;
-}) {
+function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
   if (!data.table) {
-    return (
-      <p className="text-muted-foreground text-sm">No routing table published yet.</p>
-    );
+    return <p className="text-muted-foreground text-sm">No routing table published yet.</p>;
   }
 
   const { table } = data;
@@ -587,10 +575,14 @@ function RoutingTableView({
   return (
     <div className="flex flex-col gap-3">
       <div className="text-muted-foreground text-xs flex flex-wrap gap-x-4 gap-y-1">
-        <span>Version: <span className="font-mono">{table.version}</span></span>
+        <span>
+          Version: <span className="font-mono">{table.version}</span>
+        </span>
         <span>Generated: {table.generatedAt}</span>
         <span>Min accuracy: {formatAccuracy(table.minAccuracy)}</span>
-        <span>Source: <span className="capitalize">{table.source}</span></span>
+        <span>
+          Source: <span className="capitalize">{table.source}</span>
+        </span>
       </div>
 
       {tierEntries.map(({ tier, candidates }) => (
@@ -666,13 +658,14 @@ export function BenchmarksSection() {
 
   // Poll runs every 30s while any run is 'running'
   const hasRunningRun = runsQuery.data?.runs.some(r => r.status === 'running') ?? false;
+  const refetchRuns = runsQuery.refetch;
   useEffect(() => {
     if (!hasRunningRun) return;
     const id = setInterval(() => {
-      void runsQuery.refetch();
+      void refetchRuns();
     }, 30_000);
     return () => clearInterval(id);
-  }, [hasRunningRun, runsQuery]);
+  }, [hasRunningRun, refetchRuns]);
 
   const startRunMutation = useMutation({
     mutationFn: startBenchmarkRun,
@@ -694,8 +687,7 @@ export function BenchmarksSection() {
     [queryClient]
   );
 
-  const anyRunning =
-    hasRunningRun || startRunMutation.isPending;
+  const anyRunning = hasRunningRun || startRunMutation.isPending;
 
   return (
     <div className="flex flex-col gap-4">

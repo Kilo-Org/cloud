@@ -26,13 +26,13 @@ import { KILO_AGENT_SESSION_LABEL, type DevContainerHandle } from './devcontaine
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import { shellQuote, validShellEnvEntries } from './utils.js';
 import {
-  parseWrapperSessionReadyErrorResponse,
   type WorkspaceFailureSubtype,
   type WrapperCommandRequest,
   type WrapperPromptRequest,
   type WrapperSessionReadyRequest,
   type WrapperSessionReadySuccessResponse,
 } from '../shared/wrapper-bootstrap.js';
+import { parseWrapperSessionReadyErrorResponse } from './wrapper-ready-error.js';
 
 // ---------------------------------------------------------------------------
 // Types

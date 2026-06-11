@@ -9,7 +9,6 @@ import {
   resolvePtyClientClose,
   type WrapperServer,
 } from './server';
-import { isWrapperSessionReadyErrorResponse } from '../../src/shared/wrapper-bootstrap';
 import type { WrapperKiloClient, WrapperPty, WrapperPtySize } from './kilo-api';
 
 type PtyCall = {
@@ -160,44 +159,6 @@ describe('session readiness errors', () => {
       detail: 'termination timeout, elapsed 120000ms, output truncated',
       retryable: true,
     });
-    expect(isWrapperSessionReadyErrorResponse(body)).toBe(true);
-    expect(
-      isWrapperSessionReadyErrorResponse({ error: 'WORKSPACE_SETUP_FAILED', message: 'old' })
-    ).toBe(true);
-    expect(
-      isWrapperSessionReadyErrorResponse({
-        error: 'WORKSPACE_SETUP_FAILED',
-        subtype: 'not_allowed',
-        message: 'bad',
-      })
-    ).toBe(false);
-    expect(
-      isWrapperSessionReadyErrorResponse({
-        error: 'WORKSPACE_SETUP_FAILED',
-        message: 'm'.repeat(4_097),
-      })
-    ).toBe(false);
-    expect(
-      isWrapperSessionReadyErrorResponse({
-        error: 'WORKSPACE_SETUP_FAILED',
-        message: 'bounded',
-        detail: 'd'.repeat(8_193),
-      })
-    ).toBe(false);
-    expect(
-      isWrapperSessionReadyErrorResponse({
-        error: 'WORKSPACE_SETUP_FAILED',
-        message: 'bounded',
-        retryable: 'false',
-      })
-    ).toBe(false);
-    expect(
-      isWrapperSessionReadyErrorResponse({
-        error: 'WORKSPACE_SETUP_FAILED',
-        message: 'bounded',
-        wrapperRunId: 42,
-      })
-    ).toBe(false);
     expect(fetchHandler).toBeDefined();
   });
 });

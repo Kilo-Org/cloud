@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { ClassifierApiKindSchema } from './routing-table';
+import { ClassifierApiKindSchema, RoutingTableSchema } from './routing-table';
 import { DifficultyTierSchema } from './tiers';
 
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
@@ -64,3 +64,9 @@ export const StartBenchmarkRunResponseSchema = z.object({
   runId: z.string(),
   enqueuedModels: z.number().int(),
 });
+
+export const BenchmarkRoutingTableResponseSchema = z.object({
+  table: RoutingTableSchema.nullable(),
+  publishedAt: z.string().nullable(),
+});
+export type BenchmarkRoutingTableResponse = z.infer<typeof BenchmarkRoutingTableResponseSchema>;

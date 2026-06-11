@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import type { ClassifierOutput } from './index';
 
 export const DifficultyTierSchema = z.enum(['low', 'medium', 'high']);
 export type DifficultyTier = z.infer<typeof DifficultyTierSchema>;
@@ -20,7 +19,16 @@ const RISK_POINTS = { low: 0, medium: 0, high: 1 } as const;
 // Reasoning complexity dominates (weight 2x) because it is the strongest
 // signal for whether a cheap model can complete the task; context size,
 // execution mode and blast radius nudge borderline cases up.
-export function deriveDifficultyTier(classification: ClassifierOutput): DifficultyTier {
+// Structural subset of ClassifierOutput: importing the full type from
+// ./index would create a module cycle (index re-exports this file).
+export type DifficultyTierSignal = {
+  reasoningComplexity: 'low' | 'medium' | 'high';
+  contextComplexity: 'small' | 'medium' | 'large';
+  executionMode: 'answer_only' | 'code_change' | 'command_execution' | 'multi_step_project';
+  riskLevel: 'low' | 'medium' | 'high';
+};
+
+export function deriveDifficultyTier(classification: DifficultyTierSignal): DifficultyTier {
   const score =
     REASONING_POINTS[classification.reasoningComplexity] +
     CONTEXT_POINTS[classification.contextComplexity] +

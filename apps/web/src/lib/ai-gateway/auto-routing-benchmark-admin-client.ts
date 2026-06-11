@@ -1,10 +1,16 @@
 import {
+  BenchmarkRoutingTableResponseSchema,
   BenchmarkConfigResponseSchema,
   BenchmarkRunsResponseSchema,
   StartBenchmarkRunResponseSchema,
   RoutingTableSchema,
   type BenchmarkConfig,
   type BenchmarkKind,
+} from '@kilocode/auto-routing-contracts';
+
+export {
+  BenchmarkRoutingTableResponseSchema,
+  type BenchmarkRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
 import { AUTO_ROUTING_BENCHMARK_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 import * as z from 'zod';
@@ -16,12 +22,6 @@ export type AutoRoutingAdminResult<T> = {
 
 type ErrorBody = { error: string };
 const ErrorBodySchema = z.object({ error: z.string() });
-
-export const BenchmarkRoutingTableResponseSchema = z.object({
-  table: RoutingTableSchema.nullable(),
-  publishedAt: z.string().nullable(),
-});
-export type BenchmarkRoutingTableResponse = z.infer<typeof BenchmarkRoutingTableResponseSchema>;
 
 type AutoRoutingBenchmarkAdminRequestInit = Omit<RequestInit, 'headers'> & {
   headers?: Record<string, string>;

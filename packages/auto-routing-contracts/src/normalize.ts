@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import type { JsonValue, NormalizedClassifierInput } from './index';
+import type { JsonValue, NormalizedClassifierInput } from './input';
 
 // Reduces a full gateway request body to the compact classifier input. Lives
 // in the shared contracts package so the Next.js gateway can normalize before

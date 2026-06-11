@@ -42,6 +42,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@${{ env.VERCEL_VERSION }}
+
+      - run: vercel env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
       - name: Check production DB startup path
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
 
@@ -70,6 +75,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@${{ env.VERCEL_VERSION }}
+
+      - run: vercel env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate

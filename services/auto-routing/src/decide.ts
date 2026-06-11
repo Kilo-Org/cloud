@@ -151,7 +151,7 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
               ...(fallback.topLevelKeys?.length
                 ? { classifierOutputTopLevelKeys: fallback.topLevelKeys }
                 : {}),
-              ...(meta ? { textHead: meta.textHead, textTail: meta.textTail } : {}),
+              ...(meta ? { textLength: meta.textLength } : {}),
             }
           : callDetails,
       };

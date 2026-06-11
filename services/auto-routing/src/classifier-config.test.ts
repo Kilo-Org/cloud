@@ -43,4 +43,19 @@ describe('classifier config', () => {
       })
     ).resolves.toBe(DEFAULT_CLASSIFIER_MODEL);
   });
+
+  it('fails closed to the default classifier model when the KV read rejects', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const kv = {
+      get: vi.fn(async () => {
+        throw new Error('KV unavailable');
+      }),
+    } as unknown as KVNamespace;
+
+    await expect(getClassifierModel({ AUTO_ROUTING_CONFIG: kv })).resolves.toBe(
+      DEFAULT_CLASSIFIER_MODEL
+    );
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });

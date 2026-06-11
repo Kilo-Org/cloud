@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { OpenRouter } from '@openrouter/sdk';
 import type { ChatResult } from '@openrouter/sdk/models';
 import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
-import { classifyWithOpenRouter } from './model-classifier';
+import { ClassifierRunError, classifyWithOpenRouter } from './model-classifier';
 import type { NormalizedClassifierInput } from './classifier-input';
 
 const normalizedInput = {
@@ -68,8 +68,7 @@ describe('OpenRouter classifier call', () => {
         finishReason: 'stop',
         completionTokens: 20,
         reasoningTokens: 0,
-        textHead: JSON.stringify(modelOutput).slice(0, 200),
-        textTail: JSON.stringify(modelOutput).slice(-100),
+        textLength: JSON.stringify(modelOutput).length,
       },
     });
     expect(send).toHaveBeenCalledWith({
@@ -163,6 +162,49 @@ describe('OpenRouter classifier call', () => {
         subtaskType: 'technical_planning',
         confidence: 0,
       },
+    });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves first-attempt cost and diagnostics when the retry throws', async () => {
+    const invalidResult: ChatResult = {
+      id: 'gen-test',
+      created: 1781010000,
+      model: DEFAULT_CLASSIFIER_MODEL,
+      object: 'chat.completion',
+      systemFingerprint: null,
+      choices: [
+        {
+          finishReason: 'stop',
+          index: 0,
+          message: { role: 'assistant', content: '{"taskType":"invalid"}' },
+        },
+      ],
+      usage: {
+        promptTokens: 100,
+        promptTokensDetails: { cachedTokens: 0 },
+        completionTokens: 20,
+        completionTokensDetails: { reasoningTokens: 0 },
+        totalTokens: 120,
+        cost: 0.00000123,
+      },
+    };
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce(invalidResult)
+      .mockRejectedValueOnce(new Error('upstream connection reset'));
+    const client = { chat: { send } } as unknown as OpenRouter;
+
+    const error = await classifyWithOpenRouter(client, normalizedInput, DEFAULT_CLASSIFIER_MODEL)
+      .then(() => null)
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ClassifierRunError);
+    expect(error).toMatchObject({
+      message: 'upstream connection reset',
+      cost: 0.00000123,
+      classifierModel: DEFAULT_CLASSIFIER_MODEL,
+      failureStage: 'invalid_schema',
     });
     expect(send).toHaveBeenCalledTimes(2);
   });

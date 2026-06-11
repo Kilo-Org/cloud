@@ -1,3 +1,4 @@
+import { formatError } from '@kilocode/worker-utils';
 import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
 import { ttlCached } from './ttl-cache';
 
@@ -42,12 +43,30 @@ export function clearClassifierConfigCache(): void {
   decisionLogSampleRateCache.clear();
 }
 
+// Config reads run before the guarded decision path. A transient KV failure
+// must not turn a best-effort background classification into an HTTP 500, so
+// reads fail closed to the documented default (logged for visibility). The
+// rejected load is not cached — ttlCached evicts it — so the next request
+// retries KV.
+function failClosed<T>(key: string, fallback: T): (error: unknown) => T {
+  return error => {
+    console.warn(
+      JSON.stringify({ event: 'auto_routing_config_read_failed', key, ...formatError(error) })
+    );
+    return fallback;
+  };
+}
+
 export function getClassifierModel(env: ClassifierConfigEnv): Promise<string> {
-  return classifierModelCache.get(env);
+  return classifierModelCache
+    .get(env)
+    .catch(failClosed(CLASSIFIER_MODEL_CONFIG_KEY, DEFAULT_CLASSIFIER_MODEL));
 }
 
 export function getDecisionLogSampleRate(env: ClassifierConfigEnv): Promise<number> {
-  return decisionLogSampleRateCache.get(env);
+  return decisionLogSampleRateCache
+    .get(env)
+    .catch(failClosed(DECISION_LOG_SAMPLE_RATE_CONFIG_KEY, DEFAULT_DECISION_LOG_SAMPLE_RATE));
 }
 
 export async function setClassifierModel(

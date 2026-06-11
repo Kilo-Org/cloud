@@ -25,16 +25,19 @@ export function deriveConversationKey(sessionId: string | null, hashes: ContentH
 export async function computeContentHashes(
   input: NormalizedClassifierInput
 ): Promise<ContentHashes> {
-  const base = [
+  // Canonical JSON encoding rather than a delimiter join: prompt fields can
+  // contain any character (including a delimiter), so joining on one would
+  // let distinct inputs collide onto the same hash.
+  const fields = [
     input.apiKind,
-    input.hasTools ? '1' : '0',
+    input.hasTools,
     input.systemPromptPrefix?.slice(0, 200) ?? '',
     input.userPromptPrefix?.slice(0, 800) ?? '',
     input.latestUserPromptPrefix?.slice(0, 800) ?? '',
-  ].join('|');
+  ];
   const [loose, exact] = await Promise.all([
-    sha256Hex16(base),
-    sha256Hex16(`${base}|${messageCountBucket(input.messageCount)}`),
+    sha256Hex16(JSON.stringify(fields)),
+    sha256Hex16(JSON.stringify([...fields, messageCountBucket(input.messageCount)])),
   ]);
   return { exact, loose };
 }

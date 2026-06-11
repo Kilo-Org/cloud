@@ -29,8 +29,10 @@ export type ClassifierModelCallMeta = {
   finishReason: string | null;
   completionTokens: number | null;
   reasoningTokens: number | null;
-  textHead: string | null;
-  textTail: string | null;
+  // Length only — the raw output is derived from untrusted, mirrored user
+  // prompts and must not reach persistent logs. Combined with finishReason
+  // and token counts this still distinguishes truncation from prompt echo.
+  textLength: number | null;
 };
 
 export type ClassifierRunFailureMetadata = {
@@ -98,7 +100,24 @@ export async function classifyWithOpenRouter(
     return firstAttempt;
   }
 
-  const retryAttempt = await runClassifierAttempt(client, input, classifierModel, options);
+  let retryAttempt: ClassifierRunResult;
+  try {
+    retryAttempt = await runClassifierAttempt(client, input, classifierModel, options);
+  } catch (error) {
+    // The retry threw (e.g. a transport error) after the first attempt had
+    // already billed and produced diagnostics. Surface those rather than
+    // letting the raw error escape and underreport spend.
+    throw new ClassifierRunError(
+      error instanceof Error ? error.message : 'classifier retry failed',
+      {
+        cost: firstAttempt.cost,
+        classifierModel,
+        failureStage: firstAttempt.fallback.failureStage ?? firstAttempt.fallback.reason,
+        schemaIssueSummary: firstAttempt.fallback.schemaIssueSummary,
+        topLevelKeys: firstAttempt.fallback.topLevelKeys,
+      }
+    );
+  }
   return {
     ...retryAttempt,
     cost: sumCosts(firstAttempt.cost, retryAttempt.cost),
@@ -169,8 +188,7 @@ function extractModelCallMeta(result: ChatResult, text: string | null): Classifi
     finishReason: result.choices[0]?.finishReason ?? null,
     completionTokens: result.usage?.completionTokens ?? null,
     reasoningTokens: result.usage?.completionTokensDetails?.reasoningTokens ?? null,
-    textHead: text?.slice(0, 200) ?? null,
-    textTail: text && text.length > 200 ? text.slice(-100) : null,
+    textLength: text?.length ?? null,
   };
 }
 

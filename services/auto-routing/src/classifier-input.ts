@@ -85,6 +85,7 @@ export function parseClassifierInput(payload: MirrorPayload): ClassifierInputPar
         requestedModel: parsed.data.model,
         systemPromptPrefix: firstPromptPrefix(parsed.data.messages, 'system'),
         userPromptPrefix: firstPromptPrefix(parsed.data.messages, 'user'),
+        latestUserPromptPrefix: latestPromptPrefix(parsed.data.messages, 'user'),
         messageCount: parsed.data.messages.length,
         hasTools: hasTools(parsed.data.tools),
         stream: parsed.data.stream === true,
@@ -110,6 +111,7 @@ export function parseClassifierInput(payload: MirrorPayload): ClassifierInputPar
         systemPromptPrefix:
           textPrefix(parsed.data.instructions) ?? firstPromptPrefix(inputMessages, 'system'),
         userPromptPrefix: firstPromptPrefix(inputMessages, 'user') ?? inputTextPrefix,
+        latestUserPromptPrefix: latestPromptPrefix(inputMessages, 'user'),
         messageCount: messageCount(parsed.data.input),
         hasTools: hasTools(parsed.data.tools),
         stream: parsed.data.stream === true,
@@ -131,6 +133,7 @@ export function parseClassifierInput(payload: MirrorPayload): ClassifierInputPar
       systemPromptPrefix:
         textPrefix(parsed.data.system) ?? firstPromptPrefix(parsed.data.messages, 'system'),
       userPromptPrefix: firstPromptPrefix(parsed.data.messages, 'user'),
+      latestUserPromptPrefix: latestPromptPrefix(parsed.data.messages, 'user'),
       messageCount: parsed.data.messages.length,
       hasTools: hasTools(parsed.data.tools),
       stream: parsed.data.stream === true,
@@ -168,6 +171,17 @@ function messageCount(input: unknown) {
 function firstPromptPrefix(messages: Message[], role: string) {
   const message = messages.find(item => item.role === role);
   return textPrefix(message?.content);
+}
+
+function latestPromptPrefix(messages: Message[], role: string) {
+  const first = messages.find(item => item.role === role);
+  const latest = messages.findLast(item => item.role === role);
+  if (!latest || latest === first) {
+    return null;
+  }
+
+  const latestPrefix = textPrefix(latest.content);
+  return latestPrefix && latestPrefix !== textPrefix(first?.content) ? latestPrefix : null;
 }
 
 function textPrefix(value: unknown): string | null {

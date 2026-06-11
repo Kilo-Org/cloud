@@ -38,6 +38,42 @@ describe('auto routing contracts', () => {
     ).toEqual({ cost: 0, decision: null, classifierResult: null });
 
     expect(
+      AutoRoutingDecisionResponseSchema.parse({
+        cost: 0,
+        decision: null,
+        classifierResult: {
+          classification: {
+            taskType: 'implementation',
+            subtaskType: 'feature_development',
+            contextComplexity: 'small',
+            reasoningComplexity: 'low',
+            riskLevel: 'low',
+            executionMode: 'code_change',
+            requiresTools: true,
+            confidence: 0.8,
+          },
+          normalized: {
+            apiKind: 'chat_completions',
+            requestedModel: 'anthropic/claude-sonnet-4',
+            systemPromptPrefix: 'You are Kilo Code.',
+            userPromptPrefix: 'Add parser tests.',
+            latestUserPromptPrefix: 'Focus on latency instead.',
+            messageCount: 4,
+            hasTools: true,
+            stream: true,
+            providerHints: { provider: null, providerOptions: null },
+          },
+        },
+      })
+    ).toMatchObject({
+      classifierResult: {
+        normalized: {
+          latestUserPromptPrefix: 'Focus on latency instead.',
+        },
+      },
+    });
+
+    expect(
       AutoRoutingClassifierModelResponseSchema.parse({
         model: 'google/gemini-2.5-flash-lite',
         defaultModel: 'google/gemini-2.5-flash-lite',

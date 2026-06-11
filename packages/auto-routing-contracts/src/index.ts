@@ -36,6 +36,7 @@ export const NormalizedClassifierInputSchema = z.object({
   requestedModel: z.string(),
   systemPromptPrefix: z.string().nullable(),
   userPromptPrefix: z.string().nullable(),
+  latestUserPromptPrefix: z.string().nullable().optional(),
   messageCount: z.number().int().nonnegative().nullable(),
   hasTools: z.boolean(),
   stream: z.boolean(),

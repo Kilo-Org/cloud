@@ -9,6 +9,18 @@ export type ClassifierMessage = {
   content: string;
 };
 
+const SYSTEM_PROMPT_PREFIX_MAX_LENGTH = 200;
+const LATEST_USER_PROMPT_PREFIX_MAX_LENGTH = 500;
+
+type ClassifierPromptSummary = {
+  apiKind: NormalizedClassifierInput['apiKind'];
+  systemPromptPrefix: string | null;
+  userPromptPrefix: string | null;
+  latestUserPromptPrefix: string | null;
+  messageCount: number | null;
+  hasTools: boolean;
+};
+
 const classifierAxisKeys = [
   'contextComplexity',
   'reasoningComplexity',
@@ -57,6 +69,20 @@ const compactTaxonomy = {
   axes: Object.fromEntries(classifierAxisKeys.map(axisKey => [axisKey, axisGuide(axisKey)])),
 };
 
+function buildClassifierPromptSummary(input: NormalizedClassifierInput): ClassifierPromptSummary {
+  return {
+    apiKind: input.apiKind,
+    systemPromptPrefix: input.systemPromptPrefix?.slice(0, SYSTEM_PROMPT_PREFIX_MAX_LENGTH) ?? null,
+    userPromptPrefix: input.userPromptPrefix,
+    latestUserPromptPrefix:
+      input.latestUserPromptPrefix && input.latestUserPromptPrefix !== input.userPromptPrefix
+        ? input.latestUserPromptPrefix.slice(0, LATEST_USER_PROMPT_PREFIX_MAX_LENGTH)
+        : null,
+    messageCount: input.messageCount,
+    hasTools: input.hasTools,
+  };
+}
+
 export function buildClassifierMessages(input: NormalizedClassifierInput): ClassifierMessage[] {
   return [
     {
@@ -73,7 +99,7 @@ export function buildClassifierMessages(input: NormalizedClassifierInput): Class
     },
     {
       role: 'user',
-      content: `Request summary:\n${JSON.stringify(input)}`,
+      content: `Request summary:\n${JSON.stringify(buildClassifierPromptSummary(input))}`,
     },
   ];
 }

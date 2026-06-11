@@ -442,7 +442,7 @@ export function ModelCombobox({
   );
 }
 
-function FreeModelDataIcon() {
+function FreeModelDataIcon({ compact = false }: { compact?: boolean }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -452,7 +452,7 @@ function FreeModelDataIcon() {
           role="img"
           tabIndex={0}
         >
-          <BookOpenCheck className="h-3.5 w-3.5" />
+          <BookOpenCheck className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
         </span>
       </TooltipTrigger>
       <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
@@ -473,7 +473,7 @@ function ModelMetadataBadges({ model }: { model: ModelOption }) {
           {FREE_MODEL_FREE_LABEL}
         </span>
       )}
-      {collectsData && <FreeModelDataIcon />}
+      {collectsData && <FreeModelDataIcon compact />}
     </span>
   );
 }

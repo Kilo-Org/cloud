@@ -39,6 +39,11 @@ export default {
   },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
     for (const message of batch.messages) {
+      // Deliberately no try/catch: a throw from processJob (transient token,
+      // D1 or container failures) must skip the ack so the queue retries the
+      // whole (run, model, chunk) unit, dead-lettering after max_retries.
+      // Case-level failures are recorded as failed rows inside processJob and
+      // do not throw. Swallowing the throw here would silently drop chunks.
       await processJob(env, message.body);
       message.ack();
     }

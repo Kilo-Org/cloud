@@ -83,7 +83,12 @@ function runCase({ model, prompt, kiloToken, timeoutMs }) {
         stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_CAP_BYTES);
       });
 
+      // 'error' and 'close' can both fire for the same child (Node emits
+      // 'close' after 'error' on spawn failure); only the first wins.
+      let finished = false;
       const finish = async exitCode => {
+        if (finished) return;
+        finished = true;
         clearTimeout(killTimer);
         await rm(dir, { recursive: true, force: true }).catch(() => {});
         const stdoutLines = stdout.split('\n').filter(line => line.length > 0);

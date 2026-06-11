@@ -71,7 +71,8 @@ const routingTableCache = ttlCached(ROUTING_TABLE_CACHE_TTL_MS, async (env: Rout
       return DEFAULT_ROUTING_TABLE;
     }
     return parsed.data;
-  } catch {
+  } catch (error) {
+    console.warn(JSON.stringify({ event: 'auto_routing_table_invalid', ...formatError(error) }));
     return DEFAULT_ROUTING_TABLE;
   }
 });

@@ -123,6 +123,9 @@ describe('auto routing worker', () => {
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
     writeDataPoint.mockReset();
     configGet.mockReset();
+    // Real KV returns null for missing keys; an undefined here would send the
+    // routing-table loader down the JSON.parse-throw path instead.
+    configGet.mockResolvedValue(null);
     configPut.mockReset();
     analyticsTokenGet.mockReset();
     analyticsTokenGet.mockResolvedValue('analytics-token');

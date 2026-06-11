@@ -47,7 +47,7 @@ const mockClassification = {
 
 const mockClassifierResult = {
   cost: 0.00000123,
-  classifierModel: 'google/gemma-4-31b-it',
+  classifierModel: 'google/gemini-2.5-flash-lite',
   classification: mockClassification,
 };
 
@@ -90,6 +90,9 @@ describe('auto routing worker', () => {
   });
 
   it('normalizes mirrored chat completion requests', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
     const response = await request('/decide', {
       method: 'POST',
       headers: {
@@ -160,9 +163,9 @@ describe('auto routing worker', () => {
       },
     });
     expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ['google/gemma-4-31b-it'],
+      indexes: ['google/gemini-2.5-flash-lite'],
       blobs: [
-        'google/gemma-4-31b-it',
+        'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
         'chat_completions',
         'classified',
@@ -177,6 +180,7 @@ describe('auto routing worker', () => {
       ],
       doubles: [expect.any(Number), 0.00000123, 0.82, 3, 1, expect.any(Number)],
     });
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 
   it('uses a zero cost when the classifier result has no usage cost', async () => {
@@ -369,12 +373,80 @@ describe('auto routing worker', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
+  it('logs classifier fallback results separately from classifier errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    classifyNormalizedInput.mockResolvedValueOnce({
+      ...mockClassifierResult,
+      classification: {
+        ...mockClassification,
+        confidence: 0,
+      },
+      fallback: {
+        reason: 'invalid_output',
+        failureStage: 'invalid_schema',
+        schemaIssueSummary: ['taskType:invalid_value'],
+        topLevelKeys: ['minecraft'],
+      },
+    });
+
+    const response = await request('/decide', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        path: '/chat/completions',
+        receivedAt: '2026-06-09T10:00:00.000Z',
+        sessionId: 'task-123',
+        headers: {},
+        body: JSON.stringify({
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content: 'Pick the best model.' }],
+        }),
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: 0.00000123,
+      classifierResult: {
+        classification: {
+          confidence: 0,
+        },
+      },
+    });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [logMessage] = warnSpy.mock.calls[0] ?? [];
+    expect(JSON.parse(String(logMessage))).toEqual({
+      event: 'auto_routing_classifier_fallback',
+      reason: 'invalid_output',
+      classifierModel: 'google/gemini-2.5-flash-lite',
+      requestedModel: 'anthropic/claude-sonnet-4',
+      apiKind: 'chat_completions',
+      sessionId: 'task-123',
+      classifierDurationMs: expect.any(Number),
+      classifierCostCredits: 0.00000123,
+      classifierFailureStage: 'invalid_schema',
+      classifierSchemaIssueSummary: ['taskType:invalid_value'],
+      classifierOutputTopLevelKeys: ['minecraft'],
+    });
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      indexes: ['google/gemini-2.5-flash-lite'],
+      blobs: expect.arrayContaining(['classified']),
+      doubles: expect.arrayContaining([0]),
+    });
+  });
+
   it('returns a null classifier result when the classifier request fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     classifyNormalizedInput.mockRejectedValueOnce(
       new ClassifierRunError('Classifier model returned invalid classification', {
         cost: 0.00000123,
-        classifierModel: 'google/gemma-4-31b-it',
+        classifierModel: 'google/gemini-2.5-flash-lite',
+        failureStage: 'invalid_schema',
+        schemaIssueSummary: ['taskType:invalid_value'],
+        topLevelKeys: ['confidence'],
       })
     );
 
@@ -408,22 +480,25 @@ describe('auto routing worker', () => {
     expect(JSON.parse(String(logMessage))).toEqual({
       event: 'auto_routing_classifier_error',
       reason: 'classifier_run_error',
-      classifierModel: 'google/gemma-4-31b-it',
+      classifierModel: 'google/gemini-2.5-flash-lite',
       requestedModel: 'anthropic/claude-sonnet-4',
       apiKind: 'chat_completions',
       sessionId: null,
       classifierDurationMs: expect.any(Number),
       classifierCostCredits: 0.00000123,
+      classifierFailureStage: 'invalid_schema',
+      classifierSchemaIssueSummary: ['taskType:invalid_value'],
+      classifierOutputTopLevelKeys: ['confidence'],
       error: 'Classifier model returned invalid classification',
       stack: expect.any(String),
     });
     expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ['google/gemma-4-31b-it'],
+      indexes: ['google/gemini-2.5-flash-lite'],
       blobs: [
-        'google/gemma-4-31b-it',
+        'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
         'chat_completions',
-        'classifier_error',
+        'classifier_error:invalid_schema',
         '',
         '',
         '',
@@ -509,7 +584,7 @@ describe('auto routing worker', () => {
   });
 
   it('returns the configured classifier model', async () => {
-    configGet.mockResolvedValueOnce('google/gemma-4-31b-it');
+    configGet.mockResolvedValueOnce('google/gemini-2.5-flash-lite');
 
     const response = await request('/admin/classifier-model', {
       headers: { authorization: 'Bearer classifier-token' },
@@ -517,8 +592,8 @@ describe('auto routing worker', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      model: 'google/gemma-4-31b-it',
-      defaultModel: 'google/gemma-4-31b-it',
+      model: 'google/gemini-2.5-flash-lite',
+      defaultModel: 'google/gemini-2.5-flash-lite',
     });
     expect(configGet).toHaveBeenCalledWith('classifier_model');
   });
@@ -530,15 +605,15 @@ describe('auto routing worker', () => {
         authorization: 'Bearer classifier-token',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ model: 'google/gemma-4-31b-it:free' }),
+      body: JSON.stringify({ model: 'google/gemini-2.5-flash-lite:free' }),
     });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      model: 'google/gemma-4-31b-it:free',
-      defaultModel: 'google/gemma-4-31b-it',
+      model: 'google/gemini-2.5-flash-lite:free',
+      defaultModel: 'google/gemini-2.5-flash-lite',
     });
-    expect(configPut).toHaveBeenCalledWith('classifier_model', 'google/gemma-4-31b-it:free');
+    expect(configPut).toHaveBeenCalledWith('classifier_model', 'google/gemini-2.5-flash-lite:free');
   });
 
   it('rejects blank classifier model updates', async () => {
@@ -587,7 +662,7 @@ describe('auto routing worker', () => {
           JSON.stringify({
             data: [
               { status: 'classified', requests: 8 },
-              { status: 'classifier_error', requests: 1 },
+              { status: 'classifier_error:invalid_schema', requests: 1 },
             ],
           }),
           { status: 200 }
@@ -604,7 +679,22 @@ describe('auto routing worker', () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            data: [{ classifier_model: 'google/gemma-4-31b-it', requests: 10 }],
+            data: [
+              {
+                task_type: 'implementation',
+                subtask_type: 'feature_development',
+                requests: 4,
+                avg_confidence: 0.88,
+              },
+            ],
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [{ classifier_model: 'google/gemini-2.5-flash-lite', requests: 10 }],
           }),
           { status: 200 }
         )
@@ -634,10 +724,18 @@ describe('auto routing worker', () => {
       },
       statusBreakdown: [
         { status: 'classified', requests: 8 },
-        { status: 'classifier_error', requests: 1 },
+        { status: 'classifier_error:invalid_schema', requests: 1 },
       ],
       taskTypeBreakdown: [{ taskType: 'implementation', requests: 5, avgConfidence: 0.9 }],
-      classifierModelBreakdown: [{ classifierModel: 'google/gemma-4-31b-it', requests: 10 }],
+      taskSubtypeBreakdown: [
+        {
+          taskType: 'implementation',
+          subtaskType: 'feature_development',
+          requests: 4,
+          avgConfidence: 0.88,
+        },
+      ],
+      classifierModelBreakdown: [{ classifierModel: 'google/gemini-2.5-flash-lite', requests: 10 }],
     });
     expect(analyticsTokenGet).toHaveBeenCalled();
     expect(mockedFetch).toHaveBeenCalledWith(
@@ -676,6 +774,7 @@ describe('auto routing worker', () => {
       },
       statusBreakdown: [],
       taskTypeBreakdown: [],
+      taskSubtypeBreakdown: [],
       classifierModelBreakdown: [],
     });
     expect(mockedFetch).not.toHaveBeenCalled();
@@ -707,6 +806,7 @@ describe('auto routing worker', () => {
           { status: 200 }
         )
       )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));

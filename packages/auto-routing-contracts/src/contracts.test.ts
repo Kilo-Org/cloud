@@ -39,13 +39,15 @@ describe('auto routing contracts', () => {
 
     expect(
       AutoRoutingClassifierModelResponseSchema.parse({
-        model: 'google/gemma-4-31b-it',
-        defaultModel: 'google/gemma-4-31b-it',
+        model: 'google/gemini-2.5-flash-lite',
+        defaultModel: 'google/gemini-2.5-flash-lite',
       })
-    ).toMatchObject({ model: 'google/gemma-4-31b-it' });
+    ).toMatchObject({ model: 'google/gemini-2.5-flash-lite' });
 
-    expect(UpdateClassifierModelRequestSchema.parse({ model: ' google/gemma-4-31b-it ' })).toEqual({
-      model: 'google/gemma-4-31b-it',
+    expect(
+      UpdateClassifierModelRequestSchema.parse({ model: ' google/gemini-2.5-flash-lite ' })
+    ).toEqual({
+      model: 'google/gemini-2.5-flash-lite',
     });
 
     expect(
@@ -68,6 +70,7 @@ describe('auto routing contracts', () => {
         },
         statusBreakdown: [],
         taskTypeBreakdown: [],
+        taskSubtypeBreakdown: [],
         classifierModelBreakdown: [],
       })
     ).toMatchObject({ period: '24h' });

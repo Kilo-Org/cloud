@@ -19,6 +19,7 @@ import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
+import { isOpenCodeGoAnthropicMessagesModel } from '@/lib/ai-gateway/providers/direct-byok/opencode-go';
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
@@ -136,6 +137,9 @@ export function getAiSdkProvider(
   if (seed_20_code_free_model.public_id === model) {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
+  }
+  if (isOpenCodeGoAnthropicMessagesModel(model)) {
+    return 'anthropic';
   }
   if (isClaudeModel(model)) {
     // on Vercel AI Gateway, this is necessary to support document attachments

@@ -132,7 +132,11 @@ import {
   type AgentRuntimeAcceptedDelivery,
   type AgentRuntimeOrchestrator,
 } from '../session/agent-runtime.js';
-import { createWrapperSupervisor, type WrapperSupervisor } from '../session/wrapper-supervisor.js';
+import {
+  createWrapperSupervisor,
+  type WrapperSupervisor,
+  type WrapperTerminalEvent,
+} from '../session/wrapper-supervisor.js';
 import { emitRunStateReport } from '../telemetry/queue-reports.js';
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import type {
@@ -2959,13 +2963,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     logger.withFields({ sessionId, executionId }).info('Execution complete - session is idle');
   }
 
-  async handleWrapperTerminalEvent(params: {
-    wrapperRunId: string;
-    status: 'completed' | 'failed' | 'interrupted';
-    error?: string;
-    gateResult?: 'pass' | 'fail';
-    messageIds?: string[];
-  }): Promise<void> {
+  async handleWrapperTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
     await this.resolveSessionId();
     await this.getWrapperSupervisor().onTerminalEvent(params);
   }

@@ -10,6 +10,7 @@ import type {
 } from '../notifications-binding.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import {
+  buildCloudMessageFailedPayload,
   createMessageSettlementOutbox,
   type MessageSettlementOutboxStorage,
 } from './message-settlement-outbox.js';
@@ -339,6 +340,108 @@ describe('MessageSettlementOutbox', () => {
     });
   });
 
+  it('omits raw terminal text from live events and reconnect callback repair', async () => {
+    const rawError = 'provider response Bearer secret-provider-token';
+    const rawReason = 'internal failure reason secret-reason';
+    const harness = createHarness();
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(firstMessageId, { url: 'https://example.com/safe-failure' }),
+      status: 'failed',
+      terminalAt: 10,
+      completionSource: 'wrapper_failure',
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      safeFailureMessage: 'Assistant request timed out',
+      error: rawError,
+      failureReason: rawReason,
+      terminalEffects: {
+        event: 'pending',
+        callback: { disposition: 'pending', allowWithoutObservedIdle: true },
+        push: { disposition: 'not-required' },
+      },
+    });
+
+    await harness.outbox.repairTerminalEffects();
+
+    const eventPayload = JSON.parse(harness.events[0].payload);
+    expect(eventPayload).toMatchObject({
+      reason: 'The message failed',
+      error: 'Assistant request timed out',
+      failure: {
+        code: 'assistant_error',
+        message: 'Assistant request timed out',
+      },
+    });
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      errorMessage: 'Assistant request timed out',
+      failure: {
+        code: 'assistant_error',
+        message: 'Assistant request timed out',
+      },
+    });
+    expect(JSON.stringify({ eventPayload, callback: harness.callbackJobs[0] })).not.toContain(
+      'secret-'
+    );
+  });
+
+  it('preserves allowlisted legacy reasons and replaces arbitrary reasons with status text', () => {
+    const state = {
+      ...acceptedMessageState(firstMessageId),
+      status: 'failed' as const,
+      failureReason: 'wrapper_protocol_error',
+      failureCode: 'wrapper_error_after_activity' as const,
+    };
+
+    expect(buildCloudMessageFailedPayload(state)).toMatchObject({
+      reason: 'wrapper_protocol_error',
+      error: 'Agent wrapper failed while processing the message',
+      failure: { code: 'wrapper_error_after_activity' },
+    });
+    expect(
+      buildCloudMessageFailedPayload({
+        ...state,
+        failureReason: 'private reason token=secret',
+      })
+    ).toMatchObject({
+      reason: 'The message failed',
+      error: 'Agent wrapper failed while processing the message',
+      failure: { code: 'wrapper_error_after_activity' },
+    });
+  });
+
+  it('uses only safe projected failure text in failed pushes', async () => {
+    const harness = createHarness({ metadata: pushMetadata });
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessageState(firstMessageId),
+      status: 'failed',
+      terminalAt: 10,
+      completionSource: 'wrapper_failure',
+      failureReason: 'assistant_error',
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      safeFailureMessage: 'Assistant request timed out',
+      error: 'provider response Bearer push-secret',
+      terminalEffects: {
+        event: 'accounted',
+        callback: { disposition: 'not-required' },
+        push: { disposition: 'pending' },
+      },
+    });
+
+    await harness.outbox.repairTerminalEffects();
+
+    expect(harness.pushJobs).toEqual([
+      {
+        userId: 'user_outbox',
+        cliSessionId: 'ses_outbox',
+        executionId: firstMessageId,
+        status: 'failed',
+        body: 'Failed: Assistant request timed out',
+      },
+    ]);
+    expect(JSON.stringify(harness.pushJobs)).not.toContain('push-secret');
+  });
+
   it('repairs a persisted terminal state after terminal event insertion fails once', async () => {
     const harness = createHarness({ failTerminalEventOnce: true });
     await putSessionMessageState(harness.storage, acceptedMessageState(firstMessageId));
@@ -489,9 +592,14 @@ describe('MessageSettlementOutbox', () => {
 
     await harness.outbox.terminalizeSessionMessageOnce(secondMessageId, {
       kind: 'failed',
-      reason: 'assistant_error',
-      error: 'provider failed',
+      reason: 'workspace setup failed internally',
+      error: 'raw clone output token=secret',
       completionSource: 'assistant_message_event',
+      failureStage: 'pre_dispatch',
+      failureCode: 'workspace_setup_failed',
+      failureSubtype: 'git_clone_timeout',
+      safeFailureMessage: 'Clone exceeded the safe deadline',
+      attempts: 2,
     });
 
     expect(harness.callbackJobs).toHaveLength(1);
@@ -501,8 +609,16 @@ describe('MessageSettlementOutbox', () => {
       messageId: secondMessageId,
       idempotencyKey: secondMessageId,
       status: 'failed',
-      errorMessage: 'provider failed',
+      errorMessage: 'Repository clone timed out: Clone exceeded the safe deadline',
+      failure: {
+        stage: 'pre_dispatch',
+        code: 'workspace_setup_failed',
+        subtype: 'git_clone_timeout',
+        attempts: 2,
+        message: 'Repository clone timed out: Clone exceeded the safe deadline',
+      },
     });
+    expect(JSON.stringify(harness.callbackJobs[0])).not.toContain('token=secret');
   });
 
   it('finalizes a terminal wrapper-run callback while the next run remains pending', async () => {

@@ -24,6 +24,7 @@ import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -51,6 +52,13 @@ export async function shouldRouteToVercel(
   if ((request.body.provider?.ignore?.length ?? 0) > 0) {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because provider.ignore is not supported`
+    );
+    return false;
+  }
+
+  if (isFableModel(requestedModel)) {
+    console.debug(
+      "[shouldRouteToVercel] not routing to Vercel because the Fable->Opus fallback doesn't seem to work"
     );
     return false;
   }

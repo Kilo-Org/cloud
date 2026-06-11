@@ -444,9 +444,14 @@ describe('new-path liveness without executionId', () => {
     expect(failedPayload).toMatchObject({
       messageId: 'msg_018f1e2d3c4bnewlivabcdefgh',
       status: 'failed',
-      error: 'Wrapper accepted the message but produced no output',
+      error: 'Agent wrapper produced no output',
       delivery: 'sent',
       accepted: true,
+      failure: {
+        stage: 'post_dispatch_no_activity',
+        code: 'wrapper_no_output',
+        message: 'Agent wrapper produced no output',
+      },
     });
 
     // Liveness deadlines must be cleared
@@ -521,9 +526,14 @@ describe('new-path liveness without executionId', () => {
     expect(failedPayload).toMatchObject({
       messageId: 'msg_018f1e2d3c4bnewpingabcdefg',
       status: 'failed',
-      error: 'Wrapper did not respond to liveness ping',
+      error: 'Agent wrapper stopped responding',
       delivery: 'sent',
       accepted: true,
+      failure: {
+        stage: 'post_dispatch_no_activity',
+        code: 'wrapper_ping_timeout',
+        message: 'Agent wrapper stopped responding',
+      },
     });
 
     expect(result.wrapperRuntimeState.pingDeadlineAt).toBeUndefined();

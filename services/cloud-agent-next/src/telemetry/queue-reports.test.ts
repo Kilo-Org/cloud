@@ -2,6 +2,23 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { emitRunStateReport } from './queue-reports.js';
 import type { SessionMessageState } from '../session/session-message-state.js';
+import type { WorkspaceFailureSubtype } from '../shared/wrapper-bootstrap.js';
+
+const WORKSPACE_FAILURE_DIAGNOSTICS = [
+  ['git_clone_timeout', 'Repository clone timed out'],
+  ['git_checkout_timeout', 'Repository checkout timed out'],
+  ['git_authentication_failed', 'Repository authentication failed'],
+  ['git_network_failed', 'Repository network request failed'],
+  ['git_pack_corrupt', 'Repository data is corrupt'],
+  ['git_checkout_conflict', 'Repository checkout conflict'],
+  ['git_branch_missing', 'Requested repository branch was not found'],
+  ['sandbox_storage_full', 'Workspace setup failed: sandbox storage full'],
+  ['kilo_import_timeout', 'Session import timed out'],
+  ['kilo_import_failed', 'Session import failed'],
+  ['setup_command_timeout', 'Setup command timed out'],
+  ['setup_command_failed', 'Setup command failed'],
+  ['workspace_setup_unknown', 'Workspace setup failed'],
+] satisfies ReadonlyArray<readonly [WorkspaceFailureSubtype, string]>;
 
 const state: SessionMessageState = {
   messageId: 'msg_018f1e2d3c4bReportMsgAbCdEF',
@@ -63,29 +80,78 @@ describe('Cloud Agent report emitter', () => {
     expect(JSON.stringify(reports)).not.toContain('model/test');
   });
 
-  it('emits a safe disk-full diagnostic for a workspace setup failure', async () => {
+  it.each(WORKSPACE_FAILURE_DIAGNOSTICS)(
+    'emits the allowlisted diagnostic for workspace subtype %s',
+    async (failureSubtype, expectedDiagnostic) => {
+      const reports: CloudAgentQueueReport[] = [];
+      await emitRunStateReport({
+        queue: { send: async report => void reports.push(report) },
+        cloudAgentSessionId: 'agent_report',
+        state: {
+          ...state,
+          acceptedAt: undefined,
+          dispatchAcceptanceKind: undefined,
+          agentActivityObservedAt: undefined,
+          wrapperRunId: undefined,
+          failureStage: 'pre_dispatch',
+          failureCode: 'workspace_setup_failed',
+          failureSubtype,
+          error: 'raw error with credential password=hunter2 and process output',
+          safeFailureMessage: 'bounded but secret-bearing token=super-secret',
+        },
+      });
+
+      expect(reports[0]?.run.diagnostic).toEqual({
+        errorMessageRedacted: expectedDiagnostic,
+        errorExpiresAt: new Date(5 + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+      expect(JSON.stringify(reports)).not.toContain('hunter2');
+      expect(JSON.stringify(reports)).not.toContain('super-secret');
+      expect(JSON.stringify(reports)).not.toContain('process output');
+    }
+  );
+
+  it.each([
+    ['absent', undefined],
+    ['unknown', 'future_workspace_subtype'],
+  ])('falls back for an %s workspace subtype', async (_name, failureSubtype) => {
     const reports: CloudAgentQueueReport[] = [];
     await emitRunStateReport({
       queue: { send: async report => void reports.push(report) },
       cloudAgentSessionId: 'agent_report',
       state: {
         ...state,
-        acceptedAt: undefined,
-        dispatchAcceptanceKind: undefined,
-        agentActivityObservedAt: undefined,
-        wrapperRunId: undefined,
         failureStage: 'pre_dispatch',
         failureCode: 'workspace_setup_failed',
-        error: 'Git clone failed: No space left on device while checking out secret-repository',
+        failureSubtype: failureSubtype as WorkspaceFailureSubtype | undefined,
+        error: 'credential=raw-secret',
+        safeFailureMessage: 'provider body with token=safe-message-secret',
       },
     });
 
-    expect(reports[0]?.run.diagnostic).toEqual({
-      errorMessageRedacted: 'Workspace setup failed: sandbox storage full',
-      errorExpiresAt: new Date(5 + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    expect(reports[0]?.run.diagnostic?.errorMessageRedacted).toBe('Workspace setup failed');
+    expect(JSON.stringify(reports)).not.toContain('raw-secret');
+    expect(JSON.stringify(reports)).not.toContain('safe-message-secret');
+  });
+
+  it('classifies storage-full from subtype independently of raw error text', async () => {
+    const reports: CloudAgentQueueReport[] = [];
+    await emitRunStateReport({
+      queue: { send: async report => void reports.push(report) },
+      cloudAgentSessionId: 'agent_report',
+      state: {
+        ...state,
+        failureStage: 'pre_dispatch',
+        failureCode: 'workspace_setup_failed',
+        failureSubtype: 'sandbox_storage_full',
+        error: 'unrelated secret-bearing failure text',
+      },
     });
-    expect(JSON.stringify(reports)).not.toContain('secret-repository');
-    expect(JSON.stringify(reports)).not.toContain('No space left on device');
+
+    expect(reports[0]?.run.diagnostic?.errorMessageRedacted).toBe(
+      'Workspace setup failed: sandbox storage full'
+    );
+    expect(JSON.stringify(reports)).not.toContain('unrelated secret-bearing failure text');
   });
 
   it('emits a safe insufficient-credit diagnostic for the wrapper terminal text', async () => {

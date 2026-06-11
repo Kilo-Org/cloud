@@ -97,6 +97,12 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { scheduleAutoRoutingMirror } from '@/lib/ai-gateway/auto-routing-mirror';
+import {
+  createStreamLifecycleTracker,
+  observeEventStream,
+  shouldObserveEventStream,
+  STREAM_ATTEMPT_HEADER,
+} from '@/lib/ai-gateway/o11y/stream-lifecycle.server';
 
 export const maxDuration = 800;
 
@@ -189,7 +195,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return malformedJsonResponse(e);
   }
 
-  delete requestBodyParsed.body.models; // OpenRouter specific field we do not support
   if (
     typeof requestBodyParsed.body.model !== 'string' ||
     requestBodyParsed.body.model.trim().length === 0
@@ -715,6 +720,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     authContext: Promise.resolve({ organizationId }),
   });
 
+  const observesProvider = effectiveProviderContext.provider.id === 'custom';
+  const attemptId = observesProvider ? crypto.randomUUID() : null;
   const response = await upstreamRequest({
     path,
     search: url.search,
@@ -762,7 +769,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
 
     // Return a service unavailable error instead of the 402
-    return temporarilyUnavailableResponse();
+    const errorResponse = temporarilyUnavailableResponse();
+    if (attemptId) errorResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
+    return errorResponse;
   }
 
   if (response.status >= 400) {
@@ -777,7 +786,29 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
   }
 
-  const clonedReponse = response.clone(); // reading from body is side-effectful
+  let clonedReponse = response.clone(); // reading from body is side-effectful
+  const observesStream = shouldObserveEventStream({
+    provider_id: effectiveProviderContext.provider.id,
+    status: response.status,
+    has_body: response.body !== null,
+    content_type: response.headers.get('content-type'),
+  });
+  const streamTracker =
+    observesStream && attemptId
+      ? createStreamLifecycleTracker({
+          attempt_id: attemptId,
+          provider_id: effectiveProviderContext.provider.id,
+          api_kind: requestBodyParsed.kind,
+        })
+      : null;
+  if (streamTracker && clonedReponse.body) {
+    const owner = clonedReponse;
+    const body = clonedReponse.body;
+    clonedReponse = new Response(
+      observeEventStream(body, outcome => streamTracker.observe('provider', outcome), owner),
+      owner
+    );
+  }
 
   if (!shouldBlockOnClassify) {
     classifyResult = await awaitClassifyAbuse(classifyPromise);
@@ -814,6 +845,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
+      if (attemptId) errorResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
       return errorResponse;
     }
   }
@@ -825,8 +857,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.kind
   );
   if (rewrittenResponse) {
+    // Rewritten streams are excluded because their final bytes cannot be compared to the source.
+    if (attemptId) rewrittenResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
     return rewrittenResponse;
   }
 
-  return wrapInSafeNextResponse(response);
+  const finalResponse = wrapInSafeNextResponse(response);
+  if (attemptId) finalResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
+  if (!streamTracker || !finalResponse.body) return finalResponse;
+
+  return new NextResponse(
+    observeEventStream(finalResponse.body, outcome => streamTracker.observe('final', outcome)),
+    finalResponse
+  );
 }

@@ -172,6 +172,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   }),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
+  modelsDevFetcher('opencode-go', 'opencode-go'),
   modelsDevFetcher('xiaomi-token-plan-ams', 'xiaomi-token-plan-ams'),
   modelsDevFetcher('xiaomi-token-plan-sgp', 'xiaomi-token-plan-sgp'),
 ];

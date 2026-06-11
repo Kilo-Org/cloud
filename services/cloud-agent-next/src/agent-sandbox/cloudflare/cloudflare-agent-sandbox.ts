@@ -43,6 +43,7 @@ import { ExecutionError } from '../../execution/errors.js';
 import {
   isSandboxFilesystemUnusableError,
   SandboxCapacityInspectionError,
+  WorkspaceCapacityAdmissionRejectedError,
 } from '../../workspace-errors.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -182,23 +183,47 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     const sandbox = await this.getSandbox({ sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS });
 
     if (this.requiresPreparedDevcontainerRuntime(request)) {
-      const preparedWorkspace = await withWorkspacePreparationTimeout(
-        this.sessionService.prepareWorkspace({
-          sandbox,
-          sandboxId,
-          orgId,
-          userId,
-          sessionId: sessionId as ServiceSessionId,
-          kilocodeModel: plan.agent.model,
-          env: this.env,
-          metadata: plan.workspace.metadata,
-          onProgress: request.onProgress,
-        }),
-        'devcontainer workspace preparation'
-      );
+      let preparedWorkspace;
+      try {
+        preparedWorkspace = await withWorkspacePreparationTimeout(
+          this.sessionService.prepareWorkspace({
+            sandbox,
+            sandboxId,
+            orgId,
+            userId,
+            sessionId: sessionId as ServiceSessionId,
+            kilocodeModel: plan.agent.model,
+            env: this.env,
+            metadata: plan.workspace.metadata,
+            onProgress: request.onProgress,
+          }),
+          'devcontainer workspace preparation'
+        );
+      } catch (error) {
+        if (error instanceof WorkspaceCapacityAdmissionRejectedError) throw error;
+        const storageFull =
+          error instanceof SandboxCapacityInspectionError ||
+          isSandboxFilesystemUnusableError(error);
+        throw ExecutionError.workspaceSetupFailed(
+          storageFull ? 'Sandbox storage is full' : 'Devcontainer workspace preparation failed',
+          error,
+          {
+            subtype: storageFull ? 'sandbox_storage_full' : 'workspace_setup_unknown',
+            safeFailureMessage: storageFull
+              ? 'Sandbox storage is full'
+              : 'Devcontainer workspace preparation failed',
+          }
+        );
+      }
       if (!preparedWorkspace.devcontainer || !preparedWorkspace.ready.devcontainer) {
         throw ExecutionError.workspaceSetupFailed(
-          'Devcontainer workspace preparation did not resolve runtime metadata'
+          'Devcontainer workspace preparation did not resolve runtime metadata',
+          undefined,
+          {
+            subtype: 'workspace_setup_unknown',
+            safeFailureMessage:
+              'Devcontainer workspace preparation did not resolve runtime metadata',
+          }
         );
       }
       let wrapper: Awaited<ReturnType<typeof WrapperClient.ensureWrapper>>;

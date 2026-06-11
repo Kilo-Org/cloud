@@ -183,6 +183,32 @@ describe('resolveSessionMessageResult', () => {
     });
   });
 
+  it('projects a safe generic message instead of raw non-workspace failure text', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      lifecycleState(messageA, {
+        status: 'failed',
+        terminalAt: 4,
+        failureStage: 'agent_activity',
+        failureCode: 'assistant_error',
+        error: 'provider body token=secret',
+        failureReason: 'private reason',
+      })
+    );
+
+    const resolved = await resolveSessionMessageResult(storage, messageA);
+
+    expect(resolved).toMatchObject({
+      type: 'found',
+      result: {
+        failure: { code: 'assistant_error', message: 'Assistant request failed' },
+      },
+    });
+    expect(JSON.stringify(resolved)).not.toContain('secret');
+    expect(JSON.stringify(resolved)).not.toContain('private reason');
+  });
+
   it('projects only safe structured terminal fields without assistant lookup for failures', async () => {
     const storage = createFakeStorage();
     await putSessionMessageState(
@@ -192,9 +218,11 @@ describe('resolveSessionMessageResult', () => {
         terminalAt: 4,
         completionSource: 'wrapper_failure',
         failureStage: 'agent_activity',
-        failureCode: 'assistant_error',
+        failureCode: 'workspace_setup_failed',
+        failureSubtype: 'git_clone_timeout',
+        safeFailureMessage: 'Clone exceeded the safe deadline',
         attempts: 2,
-        error: 'private raw error',
+        error: 'private raw error token=secret',
         failureReason: 'private reason',
         terminalEffects: {
           event: 'pending',
@@ -212,7 +240,13 @@ describe('resolveSessionMessageResult', () => {
         queuedAt: 1,
         terminalAt: 4,
         completionSource: 'wrapper_failure',
-        failure: { stage: 'agent_activity', code: 'assistant_error', attempts: 2 },
+        failure: {
+          stage: 'agent_activity',
+          code: 'workspace_setup_failed',
+          subtype: 'git_clone_timeout',
+          attempts: 2,
+          message: 'Repository clone timed out: Clone exceeded the safe deadline',
+        },
       },
     });
   });

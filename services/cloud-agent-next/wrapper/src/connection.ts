@@ -162,9 +162,14 @@ export type ConnectionConfig = {
   kiloClient: WrapperKiloClient;
 };
 
+export type AssistantTerminalError = {
+  error: string;
+  errorSource: 'assistant';
+};
+
 export type ConnectionCallbacks = {
-  /** Called when a terminal error is detected */
-  onTerminalError: (reason: string) => void;
+  /** Called when a terminal assistant request error is detected */
+  onTerminalError: (error: AssistantTerminalError) => void;
   /** Called when a command is received from DO */
   onCommand: (cmd: WrapperCommand) => void;
   /** Called when the connection unexpectedly closes */
@@ -737,7 +742,23 @@ export function createConnectionManager(
    * Check if an event represents a terminal error (payment/billing/quota/model resolution).
    */
   function isTerminalError(eventType: string, properties: Record<string, unknown>): boolean {
-    if (eventType === 'payment_required' || eventType === 'insufficient_funds') {
+    const eventSessionID =
+      typeof properties.sessionID === 'string' ? properties.sessionID : undefined;
+    if (eventSessionID && eventSessionID !== state.currentSession?.kiloSessionId) {
+      return false;
+    }
+    if (
+      eventType === 'session.error' &&
+      properties.sessionID !== state.currentSession?.kiloSessionId
+    ) {
+      return false;
+    }
+
+    if (
+      eventType === 'payment_required' ||
+      eventType === 'insufficient_funds' ||
+      eventType === 'usage_limit_exceeded'
+    ) {
       return true;
     }
     const error = properties.error;
@@ -749,7 +770,10 @@ export function createConnectionManager(
         normalizedError.includes('credit') ||
         normalizedError.includes('balance') ||
         normalizedError.includes('quota') ||
-        (eventType === 'session.error' && normalizedError.includes('model not found'))
+        (eventType === 'session.error' &&
+          (normalizedError.includes('usage_limit_exceeded') ||
+            normalizedError.includes('too many requests') ||
+            normalizedError.includes('model not found')))
       ) {
         return true;
       }
@@ -1001,7 +1025,10 @@ export function createConnectionManager(
 
           // Terminal error detection
           if (isTerminalError(eventType, properties)) {
-            callbacks.onTerminalError(getTerminalErrorText(eventType, properties));
+            callbacks.onTerminalError({
+              error: getTerminalErrorText(eventType, properties),
+              errorSource: 'assistant',
+            });
             return;
           }
 

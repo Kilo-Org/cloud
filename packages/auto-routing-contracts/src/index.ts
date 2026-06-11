@@ -163,6 +163,14 @@ export const AutoRoutingClassifierAnalyticsResponseSchema = z.object({
   taskTypeBreakdown: z.array(
     z.object({ taskType: z.string(), requests: z.number(), avgConfidence: z.number() })
   ),
+  taskSubtypeBreakdown: z.array(
+    z.object({
+      taskType: z.string(),
+      subtaskType: z.string(),
+      requests: z.number(),
+      avgConfidence: z.number(),
+    })
+  ),
   classifierModelBreakdown: z.array(
     z.object({ classifierModel: z.string(), requests: z.number() })
   ),

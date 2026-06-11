@@ -19,6 +19,7 @@
     "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
     "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",
+    "./cloud-agent-failure": "./src/cloud-agent-failure.ts",
     "./security-auto-analysis-policy": "./src/security-auto-analysis-policy.ts",
     "./security-remediation-policy": "./src/security-remediation-policy.ts",
     "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts"

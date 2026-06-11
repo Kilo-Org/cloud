@@ -13,8 +13,8 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const classifierModelResponse = {
-  model: 'google/gemma-4-31b-it',
-  defaultModel: 'google/gemma-4-31b-it',
+  model: 'google/gemini-2.5-flash-lite',
+  defaultModel: 'google/gemini-2.5-flash-lite',
 };
 
 const classifierAnalyticsResponse = {
@@ -36,6 +36,7 @@ const classifierAnalyticsResponse = {
   },
   statusBreakdown: [],
   taskTypeBreakdown: [],
+  taskSubtypeBreakdown: [],
   classifierModelBreakdown: [],
 };
 
@@ -74,7 +75,7 @@ describe('auto routing admin client', () => {
       json: () => Promise.resolve(classifierModelResponse),
     });
 
-    await updateAutoRoutingClassifierModel('google/gemma-4-31b-it');
+    await updateAutoRoutingClassifierModel('google/gemini-2.5-flash-lite');
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://auto-routing.example.com/admin/classifier-model',
@@ -84,7 +85,7 @@ describe('auto routing admin client', () => {
           authorization: 'Bearer test-internal-secret',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ model: 'google/gemma-4-31b-it' }),
+        body: JSON.stringify({ model: 'google/gemini-2.5-flash-lite' }),
       }
     );
   });

@@ -581,6 +581,8 @@ describe('message terminalization and stream events', () => {
         reason: 'missing_assistant_reply',
         error: 'No reply',
         completionSource: 'idle_reconciliation',
+        failureStage: 'agent_activity',
+        failureCode: 'missing_assistant_reply',
       });
 
       const db = drizzle(state.storage, { logger: false });
@@ -596,7 +598,12 @@ describe('message terminalization and stream events', () => {
     const payload = JSON.parse(result.failedEvents[0].payload);
     expect(payload.messageId).toBe(result.messageId);
     expect(payload.status).toBe('failed');
-    expect(payload.error).toBe('No reply');
+    expect(payload.error).toBe('No assistant reply was produced');
+    expect(payload.failure).toEqual({
+      stage: 'agent_activity',
+      code: 'missing_assistant_reply',
+      message: 'No assistant reply was produced',
+    });
     expect(payload.completionSource).toBe('idle_reconciliation');
   });
 
@@ -842,6 +849,8 @@ describe('message terminalization and stream events', () => {
         kind: 'interrupted',
         error: 'User interrupted',
         completionSource: 'interrupt',
+        failureStage: 'interruption',
+        failureCode: 'user_interrupt',
       });
 
       const db = drizzle(state.storage, { logger: false });
@@ -857,7 +866,12 @@ describe('message terminalization and stream events', () => {
     const payload = JSON.parse(result.failedEvents[0].payload);
     expect(payload.messageId).toBe(result.messageId);
     expect(payload.status).toBe('interrupted');
-    expect(payload.error).toBe('User interrupted');
+    expect(payload.error).toBe('The message was interrupted by the user');
+    expect(payload.failure).toEqual({
+      stage: 'interruption',
+      code: 'user_interrupt',
+      message: 'The message was interrupted by the user',
+    });
     expect(payload.completionSource).toBe('interrupt');
   });
 

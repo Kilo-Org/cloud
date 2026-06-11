@@ -113,12 +113,19 @@ describe('fitCallbackJobToQueueLimit', () => {
     expect(result.serializedByteLength).toBeLessThanOrEqual(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
   });
 
-  it('truncates oversized failure errors so the terminal callback is still delivered', () => {
+  it('truncates oversized failure errors while preserving structured failure fields', () => {
     const errorMessage = 'provider failure: '.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
     const job = callbackJob('');
     job.payload.status = 'failed';
     delete job.payload.lastAssistantMessageText;
     job.payload.errorMessage = errorMessage;
+    job.payload.failure = {
+      stage: 'pre_dispatch',
+      code: 'workspace_setup_failed',
+      subtype: 'git_clone_timeout',
+      attempts: 3,
+      message: 'Repository clone timed out',
+    };
 
     const result = fitCallbackJobToQueueLimit(job);
 
@@ -130,6 +137,7 @@ describe('fitCallbackJobToQueueLimit', () => {
       originalUtf8ByteLength: new TextEncoder().encode(errorMessage).byteLength,
       retainedUtf8ByteLength: new TextEncoder().encode(result.job.payload.errorMessage).byteLength,
     });
+    expect(result.job.payload.failure).toEqual(job.payload.failure);
     expect(actualSerializedCallbackJobByteLength(result.job)).toBe(result.serializedByteLength);
     expect(result.serializedByteLength).toBeLessThanOrEqual(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
   });

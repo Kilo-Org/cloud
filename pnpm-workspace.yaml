@@ -97,6 +97,7 @@ overrides:
   hono: 4.12.18
   '@hono/node-server': 1.19.14
   undici@^6: 6.24.1
+  shell-quote: '>=1.8.4'
   # 1.30.2+ regresses var() round-trip through JS visitors, breaking
   # react-native-css's metro transformer. Upstream issue:
   # https://github.com/parcel-bundler/lightningcss/issues/1081

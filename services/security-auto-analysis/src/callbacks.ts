@@ -1,6 +1,10 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { security_audit_log } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import {
+  CloudAgentCallbackFailureSchema,
+  type CloudAgentSafeFailure,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import {
   getActiveAnalysisAttemptToken,
@@ -20,12 +24,15 @@ import type {
   SecurityFindingSandboxAnalysis,
 } from './types.js';
 
+type CallbackFailure = CloudAgentSafeFailure;
+
 export const SecurityAnalysisCallbackPayloadSchema = z.object({
   sessionId: z.string().min(1),
   cloudAgentSessionId: z.string().min(1),
   executionId: z.string().min(1),
   status: z.enum(['completed', 'failed', 'interrupted']),
   errorMessage: z.string().optional(),
+  failure: CloudAgentCallbackFailureSchema,
   kiloSessionId: z.string().optional(),
   lastSeenBranch: z.string().optional(),
   lastAssistantMessageText: z.string().optional(),
@@ -80,21 +87,11 @@ export function classifyAnalysisCallback(
   return 'process';
 }
 
-export function mapAnalysisCallbackFailure(params: {
-  status: 'failed' | 'interrupted';
-  errorMessage?: string;
-}): { errorMessage: string; failureCode: AutoAnalysisFailureCode } {
-  if (params.status === 'interrupted') {
-    return {
-      errorMessage: `Analysis interrupted: ${params.errorMessage ?? 'unknown reason'}`,
-      failureCode: 'STATE_GUARD_REJECTED',
-    };
-  }
-
-  const errorMessage = params.errorMessage ?? 'Analysis failed';
-  const normalized = errorMessage.toLowerCase();
+function classifyAnalysisFailureText(message?: string): AutoAnalysisFailureCode | undefined {
+  const normalized = message?.toLowerCase();
+  if (!normalized) return undefined;
   if (normalized.includes('timeout') || normalized.includes('timed out')) {
-    return { errorMessage, failureCode: 'NETWORK_TIMEOUT' };
+    return 'NETWORK_TIMEOUT';
   }
   if (
     normalized.includes('502') ||
@@ -103,9 +100,42 @@ export function mapAnalysisCallbackFailure(params: {
     normalized.includes('upstream') ||
     normalized.includes('5xx')
   ) {
-    return { errorMessage, failureCode: 'UPSTREAM_5XX' };
+    return 'UPSTREAM_5XX';
   }
-  return { errorMessage, failureCode: 'START_CALL_AMBIGUOUS' };
+  return undefined;
+}
+
+function classifyStructuredAnalysisFailure(
+  failure?: CallbackFailure
+): AutoAnalysisFailureCode | undefined {
+  if (
+    failure?.code === 'wrapper_no_output' ||
+    failure?.code === 'wrapper_ping_timeout' ||
+    failure?.subtype?.endsWith('_timeout')
+  ) {
+    return 'NETWORK_TIMEOUT';
+  }
+  return classifyAnalysisFailureText(failure?.message);
+}
+
+export function mapAnalysisCallbackFailure(params: {
+  status: 'failed' | 'interrupted';
+  errorMessage?: string;
+  failure?: CallbackFailure;
+}): { errorMessage: string; failureCode: AutoAnalysisFailureCode } {
+  const errorMessage = params.failure?.message ?? params.errorMessage;
+  if (params.status === 'interrupted') {
+    return {
+      errorMessage: `Analysis interrupted: ${errorMessage ?? 'unknown reason'}`,
+      failureCode: 'STATE_GUARD_REJECTED',
+    };
+  }
+
+  const failureCode =
+    classifyStructuredAnalysisFailure(params.failure) ??
+    classifyAnalysisFailureText(params.errorMessage) ??
+    'START_CALL_AMBIGUOUS';
+  return { errorMessage: errorMessage ?? 'Analysis failed', failureCode };
 }
 
 type ExtractSandboxAnalysis = (params: {
@@ -337,6 +367,7 @@ export async function finalizeFailedAnalysisCallback(params: {
         ? mapAnalysisCallbackFailure({
             status: params.payload.status === 'interrupted' ? 'interrupted' : 'failed',
             errorMessage: params.payload.errorMessage,
+            failure: params.payload.failure,
           })
         : null;
     if (!attemptToken) return { status: disposition };
@@ -366,6 +397,7 @@ export async function finalizeFailedAnalysisCallback(params: {
   const failure = mapAnalysisCallbackFailure({
     status: params.payload.status === 'interrupted' ? 'interrupted' : 'failed',
     errorMessage: params.payload.errorMessage,
+    failure: params.payload.failure,
   });
   const lifecycleTransition = await transitionAnalysisCallbackLifecycle(params.db, {
     findingId: params.findingId,

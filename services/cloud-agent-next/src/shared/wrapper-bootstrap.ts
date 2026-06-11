@@ -1,3 +1,7 @@
+import type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
+
+export type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
+
 export type WrapperCommitCoAuthor = {
   name: string;
   email: string;
@@ -145,6 +149,9 @@ export type WrapperSessionReadySuccessResponse = {
   workspaceReady: WrapperWorkspaceReady;
 };
 
+export const WRAPPER_READY_ERROR_MESSAGE_MAX_LENGTH = 4_096;
+export const WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH = 8_192;
+
 export type WrapperSessionReadyErrorResponse = {
   status: 'error';
   error: {
@@ -153,7 +160,9 @@ export type WrapperSessionReadyErrorResponse = {
       | 'WRAPPER_FINALIZING'
       | 'WORKSPACE_SETUP_FAILED'
       | 'KILO_SERVER_FAILED';
+    subtype?: WorkspaceFailureSubtype;
     message: string;
+    detail?: string;
     retryable?: boolean;
     wrapperRunId?: string;
   };

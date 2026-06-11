@@ -17,7 +17,9 @@ export function buildRoutingTable(params: {
   summaries: BenchmarkModelSummary[];
 }): RoutingTable {
   const { runId, generatedAt, config, summaries } = params;
-  const apiKindsByModel = new Map(config.deciderModels.map(m => [m.id, m.supportedApiKinds] as const));
+  const apiKindsByModel = new Map(
+    config.deciderModels.map(m => [m.id, m.supportedApiKinds] as const)
+  );
 
   const tierCandidates = (t: DifficultyTier) =>
     rankCandidates(

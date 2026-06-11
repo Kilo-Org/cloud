@@ -43,10 +43,14 @@ export async function startRun(
 ): Promise<{ runId: string; enqueuedModels: number }> {
   // Stale-run sweeper: anything still 'running' after 6h is dead (queue
   // retries exhausted); fail it so the admin panel shows the truth.
-  await markStaleRunsFailed(env.BENCH_DB, new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString());
+  await markStaleRunsFailed(
+    env.BENCH_DB,
+    new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString()
+  );
 
   const config = await getBenchmarkConfig(env.BENCH_DB);
-  const models = kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id);
+  const models =
+    kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id);
   const runId = `${kind}-${new Date().toISOString().replace(/[:.]/g, '-')}`;
   await insertRun(env.BENCH_DB, {
     id: runId,
@@ -86,7 +90,9 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
       const startedAt = performance.now();
       try {
         const result = await classifyWithOpenRouter(client, benchCase.input, message.model);
-        const score = result.fallback ? 0 : gradeClassifierOutput(benchCase.expected, result.classification);
+        const score = result.fallback
+          ? 0
+          : gradeClassifierOutput(benchCase.expected, result.classification);
         await upsertCaseResult(env.BENCH_DB, {
           run_id: message.runId,
           model: message.model,
@@ -103,7 +109,10 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
           error: null,
         });
       } catch (error) {
-        await upsertCaseResult(env.BENCH_DB, failedRow(message, benchCase.id, null, startedAt, error));
+        await upsertCaseResult(
+          env.BENCH_DB,
+          failedRow(message, benchCase.id, null, startedAt, error)
+        );
       }
     });
   } else {
@@ -270,9 +279,7 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
       tier: tier as BenchmarkModelSummary['tier'],
       accuracy: Number((group.reduce((a, r) => a + r.score, 0) / group.length).toFixed(4)),
       avgCostUsd: costs.length
-        ? Number(
-            (costs.reduce((a, r) => a + (r.cost_usd ?? 0), 0) / costs.length).toFixed(8)
-          )
+        ? Number((costs.reduce((a, r) => a + (r.cost_usd ?? 0), 0) / costs.length).toFixed(8))
         : null,
       avgLatencyMs: Math.round(group.reduce((a, r) => a + r.latency_ms, 0) / group.length),
       p50LatencyMs: latencies[Math.floor(latencies.length / 2)] ?? null,

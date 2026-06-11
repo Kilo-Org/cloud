@@ -20,8 +20,22 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
 describe('summarize — classifier kind', () => {
   it('groups all classifier rows under * tier', () => {
     const rows: CaseResultRow[] = [
-      makeRow({ model: 'model/a', case_id: 'c1', tier: null, score: 1, latency_ms: 100, cost_usd: 0.001 }),
-      makeRow({ model: 'model/a', case_id: 'c2', tier: null, score: 0.5, latency_ms: 200, cost_usd: 0.002 }),
+      makeRow({
+        model: 'model/a',
+        case_id: 'c1',
+        tier: null,
+        score: 1,
+        latency_ms: 100,
+        cost_usd: 0.001,
+      }),
+      makeRow({
+        model: 'model/a',
+        case_id: 'c2',
+        tier: null,
+        score: 0.5,
+        latency_ms: 200,
+        cost_usd: 0.002,
+      }),
     ];
 
     const summaries = summarize(rows, 'classifier');

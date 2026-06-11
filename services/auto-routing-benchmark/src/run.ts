@@ -216,6 +216,25 @@ async function processDeciderJob(
   const kiloToken = await fetchBenchmarkUserToken(env, config.benchmarkUserId);
   const instanceName = `${message.runId}:${message.model}:${message.chunk ?? 0}`;
 
+  // The CLI performs a one-time sqlite migration on each fresh container
+  // instance; concurrent first runs against the migrating database end with
+  // empty event streams (exit 0, zero events). One sequential warmup run
+  // completes the migration before the concurrent case loop starts.
+  await runDeciderCaseViaCli(env, {
+    instanceName,
+    model: message.model,
+    benchCase: {
+      id: 'warmup',
+      tier: 'low',
+      taskType: 'implementation',
+      systemPrompt: 'You are a terse assistant.',
+      userPrompt: 'Reply with exactly: ok',
+      maxTokens: 512,
+      check: { kind: 'exact', value: 'ok' },
+    },
+    kiloToken,
+  }).catch(() => {});
+
   await runCasesWithConcurrency(cases, config.maxConcurrency, async benchCase => {
     const startedAt = performance.now();
     try {

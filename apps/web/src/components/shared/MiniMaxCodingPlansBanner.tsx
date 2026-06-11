@@ -28,10 +28,10 @@ export function MiniMaxCodingPlansBanner() {
         <Megaphone />
       </Banner.Icon>
       <Banner.Content>
-        <Banner.Title>MiniMax Coding Plans are now live in Kilo</Banner.Title>
+        <Banner.Title>New! Purchase MiniMax token plans with your Kilo Credits.</Banner.Title>
       </Banner.Content>
       <Banner.Action>
-        <Banner.Button href="https://app.kilo.ai/subscriptions?_gl=1*1dynlu_gcl_auMjAyNzk4MzIxOC4xNzc5MjczMTMx#coding-plans">
+        <Banner.Button href="https://app.kilo.ai/subscriptions#coding-plans">
           Learn more
         </Banner.Button>
       </Banner.Action>

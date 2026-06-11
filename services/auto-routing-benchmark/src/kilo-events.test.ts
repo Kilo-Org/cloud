@@ -58,6 +58,6 @@ describe('parseKiloRunEvents', () => {
       JSON.stringify({ type: 'tool', part: { name: 'read' } }),
       JSON.stringify({ type: 'start' }),
     ];
-    expect(parseKiloRunEvents(lines)).toEqual({ text: '', costUsd: null });
+    expect(parseKiloRunEvents(lines)).toMatchObject({ text: '', costUsd: null });
   });
 });

@@ -7,9 +7,17 @@ export type CliRunResult = {
   latencyMs: number;
   exitCode: number;
   stderrTail: string;
+  eventCount: number;
+  lastEventTypes: string[];
 };
 
 const DECIDER_CLI_TIMEOUT_MS = 180_000;
+
+// Appended to every decider prompt: the agent harness tends to wrap answers
+// in prose ("The output is: ..."), which strict mechanical checks reject.
+// One uniform instruction across all candidate models keeps grading fair.
+const FINAL_ANSWER_SUFFIX =
+  '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
 
 type ContainerRunResponse = {
   exitCode: number;
@@ -32,7 +40,7 @@ export async function runDeciderCaseViaCli(
 ): Promise<CliRunResult> {
   const { instanceName, model, benchCase, kiloToken } = params;
   const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(instanceName));
-  const prompt = `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}`;
+  const prompt = `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}${FINAL_ANSWER_SUFFIX}`;
 
   const startedAt = Date.now();
   const response = await stub.fetch(
@@ -49,7 +57,7 @@ export async function runDeciderCaseViaCli(
   }
 
   const body = (await response.json()) as ContainerRunResponse;
-  const { text, costUsd } = parseKiloRunEvents(body.stdoutLines ?? []);
+  const { text, costUsd, eventCount, lastEventTypes } = parseKiloRunEvents(body.stdoutLines ?? []);
 
   return {
     text,
@@ -57,5 +65,48 @@ export async function runDeciderCaseViaCli(
     latencyMs: body.durationMs ?? Date.now() - startedAt,
     exitCode: body.exitCode,
     stderrTail: body.stderrTail ?? '',
+    eventCount,
+    lastEventTypes,
+  };
+}
+
+// Ad-hoc CLI run for the /admin/debug-cli endpoint: returns raw (truncated)
+// stdout lines alongside the parsed result so empty-output cases in prod can
+// be diagnosed without redeploying.
+export async function debugRunCli(
+  env: Env,
+  params: { model: string; prompt: string; kiloToken: string }
+): Promise<{
+  exitCode: number;
+  durationMs: number;
+  stderrTail: string;
+  stdoutLines: string[];
+  parsed: ReturnType<typeof parseKiloRunEvents>;
+}> {
+  const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(`debug:${params.model}`));
+  const response = await stub.fetch(
+    new Request('http://container/run', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: params.model,
+        prompt: params.prompt,
+        kiloToken: params.kiloToken,
+        timeoutMs: DECIDER_CLI_TIMEOUT_MS,
+      }),
+    })
+  );
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => '')).slice(0, 500);
+    throw new Error(`container /run failed: HTTP ${response.status} ${detail}`);
+  }
+  const body = (await response.json()) as ContainerRunResponse;
+  const stdoutLines = (body.stdoutLines ?? []).slice(0, 80).map(l => l.slice(0, 600));
+  return {
+    exitCode: body.exitCode,
+    durationMs: body.durationMs,
+    stderrTail: body.stderrTail ?? '',
+    stdoutLines,
+    parsed: parseKiloRunEvents(body.stdoutLines ?? []),
   };
 }

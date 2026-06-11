@@ -7,6 +7,7 @@ import {
   listRunsHandler,
   startRunHandler,
   getRoutingTableHandler,
+  debugCliHandler,
 } from './admin';
 import type { HonoEnv } from './hono-env';
 import { processJob, startRun, type BenchmarkJobMessage } from './run';
@@ -23,6 +24,7 @@ app.put('/admin/config', putConfigHandler);
 app.get('/admin/runs', listRunsHandler);
 app.post('/admin/runs', startRunHandler);
 app.get('/admin/routing-table', getRoutingTableHandler);
+app.post('/admin/debug-cli', debugCliHandler);
 
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler());

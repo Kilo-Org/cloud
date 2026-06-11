@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import {
   BenchmarkConfigSchema,
   StartBenchmarkRunRequestSchema,
@@ -5,6 +6,8 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
 import { DEFAULT_BENCHMARK_CONFIG, getBenchmarkConfig, saveBenchmarkConfig } from './config';
+import { debugRunCli } from './cli-runner';
+import { fetchBenchmarkUserToken } from './run';
 import { getLatestRoutingTable, listRuns } from './db';
 import { startRun } from './run';
 import type { HonoEnv } from './hono-env';
@@ -53,4 +56,29 @@ export const getRoutingTableHandler: Handler<HonoEnv> = async c => {
     table: latest ? (JSON.parse(latest.table_json) as unknown) : null,
     publishedAt: latest?.published_at ?? null,
   });
+};
+
+const DebugCliRequestSchema = z.object({
+  model: z.string().trim().min(1),
+  prompt: z.string().min(1),
+});
+
+// Runs one ad-hoc prompt through the kilo CLI container and returns raw
+// (truncated) stdout lines plus the parsed result. Diagnostic-only.
+export const debugCliHandler: Handler<HonoEnv> = async c => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  const parsed = DebugCliRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'Invalid debug request' }, 400);
+  const config = await getBenchmarkConfig(c.env.BENCH_DB);
+  if (!config.benchmarkUserId) {
+    return c.json({ error: 'benchmarkUserId is not configured' }, 400);
+  }
+  const kiloToken = await fetchBenchmarkUserToken(c.env, config.benchmarkUserId);
+  const result = await debugRunCli(c.env, { ...parsed.data, kiloToken });
+  return c.json(result);
 };

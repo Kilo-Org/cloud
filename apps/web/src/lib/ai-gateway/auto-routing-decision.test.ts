@@ -69,9 +69,7 @@ describe('fetchEfficientAutoDecision', () => {
   });
 
   it('returns the decision on a 200 response with valid body', async () => {
-    mockedFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(validResponse), { status: 200 })
-    );
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
 
     const result = await fetchEfficientAutoDecision(makeParams(), options);
 
@@ -155,10 +153,9 @@ describe('fetchEfficientAutoDecision', () => {
 
   it('returns null (not the decision object) when the worker returns a null decision', async () => {
     mockedFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ cost: 0.001, decision: null, classifierResult: null }),
-        { status: 200 }
-      )
+      new Response(JSON.stringify({ cost: 0.001, decision: null, classifierResult: null }), {
+        status: 200,
+      })
     );
 
     const result = await fetchEfficientAutoDecision(makeParams(), options);

@@ -219,12 +219,30 @@ async function processDeciderJob(
   await runCasesWithConcurrency(cases, config.maxConcurrency, async benchCase => {
     const startedAt = performance.now();
     try {
-      const result = await runDeciderCaseViaCli(env, {
+      let result = await runDeciderCaseViaCli(env, {
         instanceName,
         model: message.model,
         benchCase,
         kiloToken,
       });
+      // The CLI occasionally ends a session with no assistant text at all
+      // (transient empty completion: a lone step_finish with cost 0). Mirror
+      // the production classifier's policy and retry once.
+      let retried = false;
+      if (result.exitCode === 0 && result.text.length === 0) {
+        retried = true;
+        const retry = await runDeciderCaseViaCli(env, {
+          instanceName,
+          model: message.model,
+          benchCase,
+          kiloToken,
+        });
+        retry.costUsd =
+          retry.costUsd === null && result.costUsd === null
+            ? null
+            : (retry.costUsd ?? 0) + (result.costUsd ?? 0);
+        result = retry;
+      }
       const succeeded =
         result.exitCode === 0 &&
         result.text.length > 0 &&
@@ -240,6 +258,9 @@ async function processDeciderJob(
         detail_json: JSON.stringify({
           exitCode: result.exitCode,
           outputPrefix: result.text.slice(0, 200),
+          eventCount: result.eventCount,
+          lastEventTypes: result.lastEventTypes,
+          retried,
         }),
         error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
       });
@@ -256,7 +277,7 @@ const TokenResponseSchema = z.object({ token: z.string().min(1), expiresAt: z.st
 
 // Calls apps/web's internal endpoint to mint a short-lived user API token for
 // the decider CLI. Never logs the token.
-async function fetchBenchmarkUserToken(env: Env, userId: string): Promise<string> {
+export async function fetchBenchmarkUserToken(env: Env, userId: string): Promise<string> {
   const secret = await env.INTERNAL_API_SECRET_PROD.get();
   const response = await fetch(
     `${env.KILO_WEB_API_BASE_URL}/api/internal/auto-routing-benchmark/token`,

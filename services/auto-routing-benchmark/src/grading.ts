@@ -89,8 +89,20 @@ function extractJson(text: string): unknown {
 
 export function runDeciderCheck(check: DeciderCheck, output: string): boolean {
   switch (check.kind) {
-    case 'exact':
-      return normalizeAnswer(output) === normalizeAnswer(check.value);
+    case 'exact': {
+      // Agent harnesses sometimes prepend prose despite instructions; accept
+      // the answer when the whole output OR its last non-empty line matches.
+      // Wrong answers fail either way.
+      const normalized = normalizeAnswer(output);
+      const expected = normalizeAnswer(check.value);
+      if (normalized === expected) return true;
+      const lastLine =
+        normalized
+          .split('\n')
+          .filter(l => l.trim().length > 0)
+          .at(-1) ?? '';
+      return lastLine.trim() === expected;
+    }
     case 'contains_all':
       return check.values.every(v => normalizeAnswer(output).includes(normalizeAnswer(v)));
     case 'regex':

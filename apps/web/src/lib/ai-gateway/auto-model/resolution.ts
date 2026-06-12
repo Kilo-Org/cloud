@@ -125,7 +125,17 @@ export async function resolveAutoModel(
   if (model === KILO_AUTO_EFFICIENT_MODEL.id) {
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision) {
-      return { kind: 'ok', resolved: { model: decision.model } };
+      // Apply the candidate's pinned reasoning effort so the model runs under
+      // the same conditions the benchmark measured it at.
+      return {
+        kind: 'ok',
+        resolved: {
+          model: decision.model,
+          ...(decision.reasoningEffort
+            ? { reasoning: { enabled: true, effort: decision.reasoningEffort } }
+            : {}),
+        },
+      };
     }
     // Static fallback when the worker is slow/unavailable: same shape as
     // balanced so an efficient request never degrades below balanced.

@@ -50,6 +50,40 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: { model: 'anthropic/claude-haiku-4' } });
   });
 
+  it('applies the decision reasoningEffort as a reasoning config', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({ ...sampleDecision, reasoningEffort: 'minimal' }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: 'anthropic/claude-haiku-4',
+        reasoning: { enabled: true, effort: 'minimal' },
+      },
+    });
+  });
+
+  it('omits reasoning when the decision reasoningEffort is null', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({ ...sampleDecision, reasoningEffort: null }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: { model: 'anthropic/claude-haiku-4' } });
+  });
+
   it('falls back to BALANCED_RESPONSES_FALLBACK_MODEL when no thunk is provided and apiKind=responses', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'responses' },

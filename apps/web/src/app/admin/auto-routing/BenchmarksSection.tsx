@@ -464,7 +464,7 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
   if (sortedSummaries.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={8} className="text-muted-foreground h-10 text-center text-xs">
+        <TableCell colSpan={6} className="text-muted-foreground h-10 text-center text-xs">
           No summaries
         </TableCell>
       </TableRow>
@@ -474,7 +474,7 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
   return (
     <>
       <TableRow className="bg-muted/30">
-        <TableCell colSpan={8} className="px-4 py-2">
+        <TableCell colSpan={6} className="px-4 py-2">
           <Table>
             <TableHeader>
               <TableRow>

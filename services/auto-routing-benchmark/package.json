@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
+    "predeploy": "wrangler d1 migrations apply auto-routing-benchmark --remote",
     "dev": "wrangler dev",
     "types": "wrangler types --include-runtime=false",
     "typecheck": "tsgo --noEmit",

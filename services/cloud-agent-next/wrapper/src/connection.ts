@@ -773,7 +773,7 @@ export function createConnectionManager(
     } else if (eventType !== 'usage_limit_exceeded') {
       const error = properties.error;
       if (error) {
-        const normalizedError = terminalErrorText.toLowerCase();
+        const normalizedError = JSON.stringify(error).toLowerCase();
         if (eventType === 'session.error' && isModelNotFoundMessage(terminalErrorText)) {
           code = 'model_missing';
         } else if (

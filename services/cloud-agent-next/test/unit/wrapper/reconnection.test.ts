@@ -1296,6 +1296,35 @@ describe('ingest WS reconnection', () => {
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
+  it('detects billing markers in full session error objects', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                name: 'PaymentRequiredError',
+                data: { message: 'Request failed' },
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'payment_required',
+      message: 'Request failed',
+      errorSource: 'assistant',
+    });
+  });
+
   it.each(['usage_limit_exceeded', 'Too Many Requests'])(
     'surfaces explicit assistant request failures as terminal errors: %s',
     async errorMessage => {

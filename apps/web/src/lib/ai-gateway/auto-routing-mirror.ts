@@ -5,8 +5,7 @@ import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.serve
 import { warnExceptInTest } from '@/lib/utils.server';
 
 // Shared base params for both the mirror (fire-and-forget) and the
-// efficient-decision (blocking) call sites. Keep in sync with
-// EfficientDecisionParams in auto-routing-decision.ts.
+// efficient-decision (blocking) call sites.
 export type DecideBaseParams = {
   apiKind: ClassifierApiKind;
   body: unknown;

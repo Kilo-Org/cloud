@@ -282,69 +282,67 @@ export const organizationModesRouter = createTRPCRouter({
         changes.push(`slug: "${existingMode.slug}" → "${updates.slug}"`);
       }
       if (updates.config) {
+        const auditConfig = normalizedConfig ?? updates.config;
         const configChanges: string[] = [];
 
         if (
-          'roleDefinition' in updates.config &&
-          updates.config.roleDefinition !== existingMode.config.roleDefinition
+          'roleDefinition' in auditConfig &&
+          auditConfig.roleDefinition !== existingMode.config.roleDefinition
         ) {
           const oldValue = existingMode.config.roleDefinition || '(empty)';
-          const newValue = updates.config.roleDefinition || '(empty)';
+          const newValue = auditConfig.roleDefinition || '(empty)';
           configChanges.push(
             `roleDefinition: "${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''}" → "${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}"`
           );
         }
-        if (
-          'whenToUse' in updates.config &&
-          updates.config.whenToUse !== existingMode.config.whenToUse
-        ) {
+        if ('whenToUse' in auditConfig && auditConfig.whenToUse !== existingMode.config.whenToUse) {
           const oldValue = existingMode.config.whenToUse || '(empty)';
-          const newValue = updates.config.whenToUse || '(empty)';
+          const newValue = auditConfig.whenToUse || '(empty)';
           configChanges.push(
             `whenToUse: "${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''}" → "${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}"`
           );
         }
         if (
-          'description' in updates.config &&
-          updates.config.description !== existingMode.config.description
+          'description' in auditConfig &&
+          auditConfig.description !== existingMode.config.description
         ) {
           const oldValue = existingMode.config.description || '(empty)';
-          const newValue = updates.config.description || '(empty)';
+          const newValue = auditConfig.description || '(empty)';
           configChanges.push(
             `description: "${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''}" → "${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}"`
           );
         }
         if (
-          'customInstructions' in updates.config &&
-          updates.config.customInstructions !== existingMode.config.customInstructions
+          'customInstructions' in auditConfig &&
+          auditConfig.customInstructions !== existingMode.config.customInstructions
         ) {
           const oldValue = existingMode.config.customInstructions || '(empty)';
-          const newValue = updates.config.customInstructions || '(empty)';
+          const newValue = auditConfig.customInstructions || '(empty)';
           configChanges.push(
             `customInstructions: "${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''}" → "${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}"`
           );
         }
         if (
-          'defaultModel' in updates.config &&
-          updates.config.defaultModel !== existingMode.config.defaultModel
+          'defaultModel' in auditConfig &&
+          auditConfig.defaultModel !== existingMode.config.defaultModel
         ) {
-          if (existingMode.config.defaultModel && updates.config.defaultModel) {
+          if (existingMode.config.defaultModel && auditConfig.defaultModel) {
             configChanges.push(
-              `defaultModel: "${existingMode.config.defaultModel}" → "${updates.config.defaultModel}"`
+              `defaultModel: "${existingMode.config.defaultModel}" → "${auditConfig.defaultModel}"`
             );
-          } else if (updates.config.defaultModel) {
-            configChanges.push(`defaultModel: set to "${updates.config.defaultModel}"`);
+          } else if (auditConfig.defaultModel) {
+            configChanges.push(`defaultModel: set to "${auditConfig.defaultModel}"`);
           } else if (existingMode.config.defaultModel) {
             configChanges.push(`defaultModel: cleared "${existingMode.config.defaultModel}"`);
           }
         }
         if (
-          updates.config.groups !== undefined &&
+          auditConfig.groups !== undefined &&
           existingMode.config.groups !== undefined &&
-          JSON.stringify(updates.config.groups) !== JSON.stringify(existingMode.config.groups)
+          JSON.stringify(auditConfig.groups) !== JSON.stringify(existingMode.config.groups)
         ) {
           const oldValue = JSON.stringify(existingMode.config.groups);
-          const newValue = JSON.stringify(updates.config.groups);
+          const newValue = JSON.stringify(auditConfig.groups);
           configChanges.push(
             `groups: ${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''} → ${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}`
           );

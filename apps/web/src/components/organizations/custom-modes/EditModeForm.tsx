@@ -25,6 +25,14 @@ function normalizeOptionalValue(value: string | undefined): string | undefined {
   return value || undefined;
 }
 
+function normalizeGroups(groups: unknown): string[] | undefined {
+  if (!Array.isArray(groups)) {
+    return undefined;
+  }
+
+  return groups.map(group => JSON.stringify(group)).sort();
+}
+
 function matchesBuiltInModeState(formData: ModeFormData, defaultModeSlug: string): boolean {
   const defaultMode = DEFAULT_MODES.find(mode => mode.slug === defaultModeSlug);
   if (!defaultMode) {
@@ -37,7 +45,8 @@ function matchesBuiltInModeState(formData: ModeFormData, defaultModeSlug: string
     formData.roleDefinition === defaultMode.config.roleDefinition &&
     normalizeOptionalValue(formData.description) === defaultMode.config.description &&
     normalizeOptionalValue(formData.whenToUse) === defaultMode.config.whenToUse &&
-    JSON.stringify(formData.groups) === JSON.stringify(defaultMode.config.groups) &&
+    JSON.stringify(normalizeGroups(formData.groups)) ===
+      JSON.stringify(normalizeGroups(defaultMode.config.groups)) &&
     normalizeOptionalValue(formData.customInstructions) === defaultMode.config.customInstructions
   );
 }

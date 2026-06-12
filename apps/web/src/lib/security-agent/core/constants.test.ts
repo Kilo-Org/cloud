@@ -27,6 +27,10 @@ describe('security agent config', () => {
     expect(parseSecurityAgentConfig({}).sla_enabled).toBe(true);
   });
 
+  it('defaults SLA notifications off for legacy config', () => {
+    expect(parseSecurityAgentConfig({}).sla_notifications_enabled).toBe(false);
+  });
+
   it('tolerates malformed notification fields during general config reads', () => {
     expect(() =>
       parseSecurityAgentConfig({

@@ -72,7 +72,7 @@ const DEFAULT_SLA_CONFIG: SlaConfig = {
 };
 
 const DEFAULT_NOTIFICATION_CONFIG = {
-  slaNotificationsEnabled: true,
+  slaNotificationsEnabled: false,
   slaNotificationMinSeverity: 'high',
   slaNotificationWarningDays: 3,
   newFindingNotificationsEnabled: false,

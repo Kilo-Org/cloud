@@ -816,7 +816,7 @@ export function SlaSection({
           <SwitchRow
             id="sla-notifications-enabled"
             label={slaLabel}
-            description="SLA notifications are enabled by default and send warning and breach emails."
+            description="Turn on warning and breach emails for findings that approach or pass SLA deadlines."
             checked={state.slaNotificationsEnabled}
             disabled={disabled}
             onCheckedChange={slaNotificationsEnabled =>

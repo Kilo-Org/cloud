@@ -461,7 +461,7 @@ The defaults MUST be:
 | New-finding Notifications enabled | `false` |
 | New-finding minimum severity | `high` |
 | SLA tracking enabled | `true` |
-| SLA notifications enabled | `true` |
+| SLA notifications enabled | `false` |
 | SLA minimum severity | `high` |
 | SLA warning lead time | `3` days |
 

@@ -15,7 +15,7 @@ export const SecurityNotificationWarningDaysSchema = z.number().int().min(1).max
 
 export const DEFAULT_SECURITY_NOTIFICATION_POLICY = {
   sla_enabled: true,
-  sla_notifications_enabled: true,
+  sla_notifications_enabled: false,
   sla_notification_min_severity: SecuritySeverity.HIGH,
   sla_notification_warning_days: 3,
   new_finding_notifications_enabled: false,
@@ -24,7 +24,7 @@ export const DEFAULT_SECURITY_NOTIFICATION_POLICY = {
 
 export const SecurityNotificationPolicySchema = z.object({
   sla_enabled: z.boolean().default(true),
-  sla_notifications_enabled: z.boolean().default(true),
+  sla_notifications_enabled: z.boolean().default(false),
   sla_notification_min_severity: SecurityNotificationSeveritySchema.default(SecuritySeverity.HIGH),
   sla_notification_warning_days: SecurityNotificationWarningDaysSchema.default(3),
   new_finding_notifications_enabled: z.boolean().default(false),

@@ -293,6 +293,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
     const dueAt = new Date(Date.now() - 60_000).toISOString();
     const { notification } = await insertPersonalNotification({
       kind: SecurityFindingNotificationKind.SlaWarning,
+      config: { new_finding_notifications_enabled: true, sla_notifications_enabled: true },
       finding: { sla_due_at: dueAt },
     });
 
@@ -310,6 +311,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
     const dueAt = new Date(Date.now() - 60_000).toISOString();
     const { notification } = await insertPersonalNotification({
       kind: SecurityFindingNotificationKind.SlaBreach,
+      config: { new_finding_notifications_enabled: true, sla_notifications_enabled: true },
       finding: { sla_due_at: dueAt },
     });
 

@@ -66,7 +66,7 @@ export function SecurityConfigPage() {
       configData?.analysisModelSlug ??
       configData?.modelSlug ??
       DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
-    slaNotificationsEnabled: configData?.slaNotificationsEnabled ?? true,
+    slaNotificationsEnabled: configData?.slaNotificationsEnabled ?? false,
     slaNotificationMinSeverity: configData?.slaNotificationMinSeverity ?? 'high',
     slaNotificationWarningDays: configData?.slaNotificationWarningDays ?? 3,
     newFindingNotificationsEnabled: configData?.newFindingNotificationsEnabled ?? false,

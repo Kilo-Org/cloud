@@ -14,6 +14,7 @@ describe('security notification policy', () => {
     expect(SecurityNotificationPolicySchema.parse({})).toEqual(
       DEFAULT_SECURITY_NOTIFICATION_POLICY
     );
+    expect(DEFAULT_SECURITY_NOTIFICATION_POLICY.sla_notifications_enabled).toBe(false);
   });
 
   it.each([

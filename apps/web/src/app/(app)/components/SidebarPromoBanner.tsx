@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 
 export default function SidebarPromoBanner() {
   return (
-    <div className="px-3 pb-3">
+    <div className="px-3 py-3">
       <div className="bg-card flex flex-col gap-2 rounded-xl border p-3">
         <div>
           <p className="text-sm font-semibold leading-tight">Up to 50% Free AI Credits</p>

@@ -50,8 +50,9 @@
     ],
   },
   "kv_namespaces": [
-    // Shared with the auto-routing worker: the decider benchmark publishes
-    // the routing table here and auto-routing reads it on /decide.
+    // Shared with the auto-routing worker, which uses it as a read-through
+    // cache over this worker's D1. On publish we only DELETE the cached keys
+    // (routing table + classifier winner) so the next read repopulates.
     { "binding": "AUTO_ROUTING_CONFIG", "id": "4316b8db31e347e19cfadad1b6386ad5" },
   ],
   "secrets_store_secrets": [

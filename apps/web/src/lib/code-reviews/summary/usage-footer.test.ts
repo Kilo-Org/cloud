@@ -2,6 +2,7 @@ import {
   appendReviewSummaryFooter,
   appendUsageFooter,
   buildReviewGuidanceFooter,
+  buildReviewSummaryFooter,
   buildUsageFooter,
   stripReviewSummaryFooter,
 } from './usage-footer';
@@ -54,6 +55,23 @@ describe('buildReviewGuidanceFooter', () => {
     expect(footer).toContain('&lt;tag&gt;&amp;');
     expect(footer).not.toContain('<tag>');
     expect(footer).toContain('`` feat/`tick`-&lt;tag&gt;&amp; ``');
+  });
+});
+
+describe('buildReviewSummaryFooter', () => {
+  it('returns the exact suffix appended to the summary body', () => {
+    const footerData = {
+      usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 5000, tokensOut: 1000 },
+      reviewGuidance: { used: true, ref: 'main', truncated: false },
+    };
+    const footer = buildReviewSummaryFooter(footerData);
+
+    expect(`body${footer}`).toBe(appendReviewSummaryFooter('body', footerData));
+    expect(footer).toMatch(/^\n\n---\n<!-- kilo-usage -->/);
+  });
+
+  it('returns an empty suffix when no footer metadata is available', () => {
+    expect(buildReviewSummaryFooter({})).toBe('');
   });
 });
 

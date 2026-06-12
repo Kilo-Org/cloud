@@ -13,6 +13,11 @@ type BuildPreviousReviewSummaryHistoryOptions = {
   maxCharacters?: number;
 };
 
+type AppendPreviousReviewSummaryHistoryOptions = {
+  maxBodyCharacters?: number;
+  reservedCharacters?: number;
+};
+
 type HistoryEntry = {
   heading: string;
   body: string;
@@ -31,14 +36,32 @@ export function getCurrentReviewSummaryForContext(body: string): string {
 export function appendPreviousReviewSummaryHistory(
   body: string,
   previousSummaryBody: string | null,
-  previousHeadSha: string | null
+  previousHeadSha: string | null,
+  options: AppendPreviousReviewSummaryHistoryOptions = {}
 ): string {
   if (!previousSummaryBody) {
     return body;
   }
 
   const currentSummary = stripReviewSummaryFooter(stripReviewSummaryHistory(body)).trimEnd();
-  const history = buildPreviousReviewSummaryHistory(previousSummaryBody, { previousHeadSha });
+  const separatorCharacters = currentSummary ? 2 : 0;
+  const availableHistoryCharacters =
+    options.maxBodyCharacters === undefined
+      ? DEFAULT_HISTORY_MAX_CHARACTERS
+      : Math.max(
+          0,
+          Math.min(
+            DEFAULT_HISTORY_MAX_CHARACTERS,
+            options.maxBodyCharacters -
+              currentSummary.length -
+              separatorCharacters -
+              (options.reservedCharacters ?? 0)
+          )
+        );
+  const history = buildPreviousReviewSummaryHistory(previousSummaryBody, {
+    previousHeadSha,
+    maxCharacters: availableHistoryCharacters,
+  });
 
   if (!history) {
     return currentSummary;
@@ -165,6 +188,10 @@ function renderHistoryBlock(
     }
     truncated = true;
     break;
+  }
+
+  if (renderedEntries.length === 0) {
+    return '';
   }
 
   return renderHistoryBlockParts(header, renderedEntries, footer, truncated);

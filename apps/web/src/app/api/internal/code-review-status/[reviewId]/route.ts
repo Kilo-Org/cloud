@@ -60,7 +60,10 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
-import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
+import {
+  appendReviewSummaryFooter,
+  buildReviewSummaryFooter,
+} from '@/lib/code-reviews/summary/usage-footer';
 import { APP_URL } from '@/lib/constants';
 import type {
   CloudAgentCodeReview,
@@ -395,6 +398,7 @@ async function resolveTerminalOwner(
   return undefined;
 }
 
+const GITHUB_COMMENT_MAX_CHARACTERS = 65_536;
 const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
 const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
 const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
@@ -1295,6 +1299,8 @@ export async function POST(
                     ? { model, tokensIn, tokensOut }
                     : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
+                const summaryFooter = { usage, reviewGuidance };
+                const reservedFooterCharacters = buildReviewSummaryFooter(summaryFooter).length;
 
                 const existing = await findKiloReviewComment(
                   integration.platform_installation_id,
@@ -1307,12 +1313,17 @@ export async function POST(
                   const bodyWithHistory = appendPreviousReviewSummaryHistory(
                     existing.body,
                     review.previous_summary_body,
-                    review.previous_summary_head_sha
+                    review.previous_summary_head_sha,
+                    {
+                      maxBodyCharacters: GITHUB_COMMENT_MAX_CHARACTERS,
+                      reservedCharacters: reservedFooterCharacters,
+                    }
                   );
-                  const updatedBody = appendReviewSummaryFooter(bodyWithHistory, {
-                    usage,
-                    reviewGuidance,
-                  });
+                  const bodyWithFooter = appendReviewSummaryFooter(bodyWithHistory, summaryFooter);
+                  const updatedBody =
+                    bodyWithFooter.length <= GITHUB_COMMENT_MAX_CHARACTERS
+                      ? bodyWithFooter
+                      : bodyWithHistory;
                   if (updatedBody !== existing.body) {
                     await updateKiloReviewComment(
                       integration.platform_installation_id,

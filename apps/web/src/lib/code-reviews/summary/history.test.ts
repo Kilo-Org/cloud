@@ -233,6 +233,33 @@ describe('appendPreviousReviewSummaryHistory', () => {
     expect(result).toContain('### Previous review (commit abcdef1)');
   });
 
+  it('reserves space for the current summary and backend footer', () => {
+    const maxBodyCharacters = 1_200;
+    const reservedCharacters = 180;
+
+    const result = appendPreviousReviewSummaryHistory(
+      cleanSummary,
+      `${summaryWithIssues}\n${'x'.repeat(3_000)}`,
+      'abcdef1234567890',
+      { maxBodyCharacters, reservedCharacters }
+    );
+
+    expect(result).toContain(REVIEW_SUMMARY_HISTORY_START);
+    expect(result.length + reservedCharacters).toBeLessThanOrEqual(maxBodyCharacters);
+  });
+
+  it('omits history when the complete body leaves no room for an entry', () => {
+    const result = appendPreviousReviewSummaryHistory(
+      cleanSummary,
+      summaryWithIssues,
+      'abcdef1234567890',
+      { maxBodyCharacters: cleanSummary.length + 100, reservedCharacters: 100 }
+    );
+
+    expect(result).toBe(cleanSummary);
+    expect(result).not.toContain(REVIEW_SUMMARY_HISTORY_START);
+  });
+
   it('leaves the current body unchanged when no previous summary was captured', () => {
     expect(appendPreviousReviewSummaryHistory(cleanSummary, null, null)).toBe(cleanSummary);
   });

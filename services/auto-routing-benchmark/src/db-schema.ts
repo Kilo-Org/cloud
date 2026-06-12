@@ -7,6 +7,7 @@ import type { BenchmarkKind, BenchmarkRunStatus } from '@kilocode/auto-routing-c
 export const benchmarkConfig = sqliteTable('benchmark_config', {
   id: integer('id').primaryKey(),
   min_accuracy: real('min_accuracy').notNull(),
+  switch_cost_factor: real('switch_cost_factor').notNull(),
   max_concurrency: integer('max_concurrency').notNull(),
   benchmark_user_id: text('benchmark_user_id'),
   updated_at: text('updated_at').notNull(),
@@ -34,6 +35,7 @@ export const benchmarkRuns = sqliteTable('benchmark_runs', {
   error: text('error'),
   // Config snapshot taken at startRun time so mid-run edits can't skew results.
   min_accuracy: real('min_accuracy').notNull(),
+  switch_cost_factor: real('switch_cost_factor').notNull(),
   max_concurrency: integer('max_concurrency').notNull(),
   benchmark_user_id: text('benchmark_user_id'),
 });
@@ -101,6 +103,7 @@ export const routingTables = sqliteTable('routing_tables', {
   published_at: text('published_at').notNull(),
   generated_at: text('generated_at').notNull(),
   min_accuracy: real('min_accuracy').notNull(),
+  switch_cost_factor: real('switch_cost_factor').notNull(),
   source: text('source').notNull(),
 });
 

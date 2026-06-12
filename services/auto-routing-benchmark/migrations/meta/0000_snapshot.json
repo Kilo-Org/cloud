@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "905b4a67-d32c-491d-9206-ede5de77d0b2",
+  "id": "fcf958da-88cb-4c79-af3d-4709268e140c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "benchmark_config": {
@@ -16,6 +16,13 @@
         },
         "min_accuracy": {
           "name": "min_accuracy",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "switch_cost_factor": {
+          "name": "switch_cost_factor",
           "type": "real",
           "primaryKey": false,
           "notNull": true,
@@ -103,6 +110,13 @@
         },
         "min_accuracy": {
           "name": "min_accuracy",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "switch_cost_factor": {
+          "name": "switch_cost_factor",
           "type": "real",
           "primaryKey": false,
           "notNull": true,
@@ -520,6 +534,13 @@
         },
         "min_accuracy": {
           "name": "min_accuracy",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "switch_cost_factor": {
+          "name": "switch_cost_factor",
           "type": "real",
           "primaryKey": false,
           "notNull": true,

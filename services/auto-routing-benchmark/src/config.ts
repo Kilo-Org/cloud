@@ -7,6 +7,7 @@ import { apiKindsToFlags, getConfigRows, replaceConfig, type ConfigDeciderModelR
 export function mapConfigRows(
   configRow: {
     min_accuracy: number;
+    switch_cost_factor: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
     updated_at: string;
@@ -32,6 +33,7 @@ export function mapConfigRows(
         r.reasoning_effort as BenchmarkConfig['deciderModels'][number]['reasoningEffort'],
     })),
     minAccuracy: configRow.min_accuracy,
+    switchCostFactor: configRow.switch_cost_factor,
     maxConcurrency: configRow.max_concurrency,
     benchmarkUserId: configRow.benchmark_user_id,
     updatedAt: configRow.updated_at,
@@ -62,6 +64,7 @@ export async function saveBenchmarkConfig(
     db,
     {
       min_accuracy: config.minAccuracy,
+      switch_cost_factor: config.switchCostFactor,
       max_concurrency: config.maxConcurrency,
       benchmark_user_id: config.benchmarkUserId,
       updated_at: updatedAt,

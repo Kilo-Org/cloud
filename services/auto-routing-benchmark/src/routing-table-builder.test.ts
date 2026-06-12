@@ -51,6 +51,7 @@ describe('buildRoutingTable', () => {
       runId: 'test-run-1',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       deciderModels: DECIDER_MODELS,
       summaries: ALL_TIERS_SUMMARIES,
     });
@@ -78,6 +79,7 @@ describe('buildRoutingTable', () => {
       runId: 'test-run-nocost',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       deciderModels: DECIDER_MODELS,
       summaries: ALL_TIERS_SUMMARIES.map(s =>
         s.model === 'model/cheap' && s.tier === 'low' ? { ...s, avgCostUsd: null } : s
@@ -94,6 +96,7 @@ describe('buildRoutingTable', () => {
       runId: 'test-run-2',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       deciderModels: DECIDER_MODELS,
       summaries: ALL_TIERS_SUMMARIES,
     });
@@ -121,6 +124,7 @@ describe('buildRoutingTable', () => {
       runId: 'test-run-3',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       deciderModels: DECIDER_MODELS,
       summaries,
     });
@@ -136,6 +140,7 @@ describe('buildRoutingTable', () => {
       runId: 'test-run-4',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       deciderModels: DECIDER_MODELS,
       summaries: ALL_TIERS_SUMMARIES,
     });
@@ -161,6 +166,7 @@ describe('buildRoutingTable', () => {
       runId: 'test-run-5',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       deciderModels: DECIDER_MODELS,
       summaries,
     });
@@ -185,6 +191,7 @@ describe('buildRoutingTable', () => {
         runId: 'test-run-6',
         generatedAt: '2026-01-01T00:00:00.000Z',
         minAccuracy: 0.7,
+        switchCostFactor: 3,
         deciderModels: DECIDER_MODELS,
         summaries,
       })
@@ -205,6 +212,7 @@ describe('buildRoutingTable', () => {
         runId: 'test-run-7',
         generatedAt: '2026-01-01T00:00:00.000Z',
         minAccuracy: 0.7,
+        switchCostFactor: 3,
         deciderModels: DECIDER_MODELS,
         summaries,
       })
@@ -224,6 +232,7 @@ describe('buildRoutingTable', () => {
       runId: 'test-run-8',
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       deciderModels: DECIDER_MODELS,
       summaries,
     });
@@ -237,6 +246,7 @@ describe('buildRoutingTable', () => {
       runId: 'decider-2026-01-01',
       generatedAt: '2026-01-01T12:00:00.000Z',
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       deciderModels: DECIDER_MODELS,
       summaries: ALL_TIERS_SUMMARIES,
     });
@@ -245,5 +255,6 @@ describe('buildRoutingTable', () => {
     expect(table.generatedAt).toBe('2026-01-01T12:00:00.000Z');
     expect(table.source).toBe('benchmark');
     expect(table.minAccuracy).toBe(0.7);
+    expect(table.switchCostFactor).toBe(3);
   });
 });

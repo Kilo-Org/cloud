@@ -450,6 +450,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         tier: 'low',
         source: 'benchmark',
         tableVersion: 'v1',
+        sticky: false,
       },
       costUsd: 0.002,
     });
@@ -479,6 +480,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         tier: 'low',
         source: 'benchmark' as const,
         tableVersion: 'v1',
+        sticky: false,
       },
       costUsd: 0,
     });
@@ -505,6 +507,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         tier: 'low',
         source: 'benchmark',
         tableVersion: 'v1',
+        sticky: false,
       },
       costUsd: 0.002,
     });

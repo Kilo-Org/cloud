@@ -115,6 +115,7 @@ export async function replaceConfig(
   db: D1Database,
   config: {
     min_accuracy: number;
+    switch_cost_factor: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
     updated_at: string;
@@ -157,6 +158,7 @@ export async function insertRun(
     kind: BenchmarkKind;
     startedAt: string;
     min_accuracy: number;
+    switch_cost_factor: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
   },
@@ -170,6 +172,7 @@ export async function insertRun(
     status: 'running',
     started_at: run.startedAt,
     min_accuracy: run.min_accuracy,
+    switch_cost_factor: run.switch_cost_factor,
     max_concurrency: run.max_concurrency,
     benchmark_user_id: run.benchmark_user_id,
   });
@@ -416,6 +419,7 @@ export function routingTableToRows(
     published_at: publishedAt,
     generated_at: table.generatedAt,
     min_accuracy: table.minAccuracy,
+    switch_cost_factor: table.switchCostFactor,
     source: table.source,
   };
 
@@ -463,6 +467,7 @@ export function rowsToRoutingTable(
     version: tableRow.run_id,
     generatedAt: tableRow.generated_at,
     minAccuracy: tableRow.min_accuracy,
+    switchCostFactor: tableRow.switch_cost_factor,
     source: tableRow.source as RoutingTable['source'],
     tiers: {
       low: tierMap.low ?? [],
@@ -491,6 +496,7 @@ export async function saveRoutingTable(
           published_at: tableRow.published_at,
           generated_at: tableRow.generated_at,
           min_accuracy: tableRow.min_accuracy,
+          switch_cost_factor: tableRow.switch_cost_factor,
           source: tableRow.source,
         },
       }),

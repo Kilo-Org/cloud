@@ -114,6 +114,7 @@ function configToFormState(config: BenchmarkConfig | null): {
   classifierModels: string;
   deciderModels: DeciderModelRow[];
   minAccuracy: number;
+  switchCostFactor: number;
   maxConcurrency: number;
   benchmarkUserId: string;
 } {
@@ -124,6 +125,7 @@ function configToFormState(config: BenchmarkConfig | null): {
       classifierModels: '',
       deciderModels: [],
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       maxConcurrency: 4,
       benchmarkUserId: '',
     };
@@ -135,6 +137,7 @@ function configToFormState(config: BenchmarkConfig | null): {
       reasoningEffort: m.reasoningEffort ?? null,
     })),
     minAccuracy: config.minAccuracy,
+    switchCostFactor: config.switchCostFactor,
     maxConcurrency: config.maxConcurrency,
     benchmarkUserId: config.benchmarkUserId ?? '',
   };
@@ -159,6 +162,7 @@ function formStateToConfig(
     classifierModels,
     deciderModels,
     minAccuracy: state.minAccuracy,
+    switchCostFactor: state.switchCostFactor,
     maxConcurrency: state.maxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
     updatedAt: base?.updatedAt ?? null,
@@ -333,6 +337,23 @@ function BenchmarkConfigEditor({
               value={form.minAccuracy}
               onChange={e =>
                 setForm(prev => ({ ...prev, minAccuracy: parseFloat(e.target.value) || 0 }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-switch-cost-factor" className="text-sm font-medium">
+              Switch cost factor (1–100)
+            </Label>
+            <Input
+              id="benchmark-switch-cost-factor"
+              type="number"
+              min={1}
+              max={100}
+              step={0.5}
+              value={form.switchCostFactor}
+              onChange={e =>
+                setForm(prev => ({ ...prev, switchCostFactor: parseFloat(e.target.value) || 1 }))
               }
               className="h-8 w-40 tabular-nums"
             />

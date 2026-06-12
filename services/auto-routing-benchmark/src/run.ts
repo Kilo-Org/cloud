@@ -136,6 +136,7 @@ export async function startRun(
       kind,
       startedAt: new Date().toISOString(),
       min_accuracy: config.minAccuracy,
+      switch_cost_factor: config.switchCostFactor,
       max_concurrency: config.maxConcurrency,
       benchmark_user_id: config.benchmarkUserId,
     },
@@ -161,6 +162,7 @@ export async function startRun(
     await finalizeRunIfComplete(env, runId, kind, {
       maxConcurrency: config.maxConcurrency,
       minAccuracy: config.minAccuracy,
+      switchCostFactor: config.switchCostFactor,
       benchmarkUserId: config.benchmarkUserId,
       models: runModelRows,
     });
@@ -255,6 +257,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
 type RunState = {
   maxConcurrency: number;
   minAccuracy: number;
+  switchCostFactor: number;
   benchmarkUserId: string | null;
   models: RunModelRow[];
 };
@@ -267,6 +270,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
   return {
     maxConcurrency: run.max_concurrency,
     minAccuracy: run.min_accuracy,
+    switchCostFactor: run.switch_cost_factor,
     benchmarkUserId: run.benchmark_user_id,
     models,
   };
@@ -489,6 +493,7 @@ async function finalizeRunIfComplete(
         runId,
         generatedAt,
         minAccuracy: state.minAccuracy,
+        switchCostFactor: state.switchCostFactor,
         deciderModels,
         summaries: allSummaries,
       });

@@ -18,6 +18,7 @@ const TEST_CONFIG: BenchmarkConfig = {
     },
   ],
   minAccuracy: 0.7,
+  switchCostFactor: 3,
   maxConcurrency: 4,
   benchmarkUserId: null,
   updatedAt: null,
@@ -29,6 +30,7 @@ const TEST_CONFIG_ROWS = {
   config: {
     id: 1 as const,
     min_accuracy: TEST_CONFIG.minAccuracy,
+    switch_cost_factor: TEST_CONFIG.switchCostFactor,
     max_concurrency: TEST_CONFIG.maxConcurrency,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
     updated_at: '2026-06-01T00:00:00.000Z',
@@ -184,6 +186,7 @@ describe('GET /admin/config', () => {
       config: {
         id: 1,
         min_accuracy: 0.9,
+        switch_cost_factor: 3,
         max_concurrency: 4,
         benchmark_user_id: null,
         updated_at: '2026-06-01T00:00:00.000Z',
@@ -314,6 +317,10 @@ describe('POST /admin/runs', () => {
     expect(body.runId).toMatch(/^classifier-/);
     expect(body.enqueuedModels).toBe(TEST_CONFIG.classifierModels.length);
     expect(insertRun).toHaveBeenCalledOnce();
+    // The run row snapshots the live config (mid-run edits must not skew results).
+    const [, runArg] = vi.mocked(insertRun).mock.calls[0];
+    expect(runArg.min_accuracy).toBe(TEST_CONFIG.minAccuracy);
+    expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
     expect(queueSendBatch).toHaveBeenCalledOnce();
   });
 });
@@ -341,6 +348,7 @@ describe('GET /admin/routing-table', () => {
       version: 'test-v1',
       generatedAt: '2026-06-01T10:00:00.000Z',
       minAccuracy: 0.7,
+      switchCostFactor: 3,
       source: 'benchmark',
       tiers: { low: [candidate], medium: [candidate], high: [candidate] },
     };

@@ -29,6 +29,7 @@ const configResponse = {
       },
     ],
     minAccuracy: 0.8,
+    switchCostFactor: 3,
     maxConcurrency: 4,
     benchmarkUserId: null,
     updatedAt: null,

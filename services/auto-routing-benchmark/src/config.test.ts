@@ -5,6 +5,7 @@ import type { ConfigDeciderModelRow } from './db';
 const configRow = {
   id: 1 as const,
   min_accuracy: 0.85,
+  switch_cost_factor: 3,
   max_concurrency: 8,
   benchmark_user_id: 'user-123',
   updated_at: '2026-06-01T00:00:00.000Z',
@@ -41,6 +42,7 @@ describe('mapConfigRows', () => {
 
     expect(result).not.toBeNull();
     expect(result?.minAccuracy).toBe(0.85);
+    expect(result?.switchCostFactor).toBe(3);
     expect(result?.maxConcurrency).toBe(8);
     expect(result?.benchmarkUserId).toBe('user-123');
     expect(result?.updatedAt).toBe('2026-06-01T00:00:00.000Z');

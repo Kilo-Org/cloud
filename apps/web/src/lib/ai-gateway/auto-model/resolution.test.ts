@@ -33,6 +33,7 @@ const sampleDecision: AutoRoutingDecision = {
   tier: 'low',
   source: 'benchmark',
   tableVersion: 'v1',
+  sticky: false,
 };
 
 describe('resolveAutoModel — kilo-auto/efficient branch', () => {

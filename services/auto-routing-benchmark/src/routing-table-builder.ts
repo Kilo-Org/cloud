@@ -12,16 +12,17 @@ import {
 // models with no cost signal at all (avgCostUsd null means every case failed
 // to report cost; ranking such a model as cheapest would hand it the tier).
 // Throws when any tier ends up empty so the caller keeps the previous
-// published table. deciderModels/minAccuracy come from the run's snapshot,
-// not live config.
+// published table. deciderModels/minAccuracy/switchCostFactor come from the
+// run's snapshot, not live config.
 export function buildRoutingTable(params: {
   runId: string;
   generatedAt: string;
   minAccuracy: number;
+  switchCostFactor: number;
   deciderModels: BenchmarkDeciderModel[];
   summaries: BenchmarkModelSummary[];
 }): RoutingTable {
-  const { runId, generatedAt, minAccuracy, deciderModels, summaries } = params;
+  const { runId, generatedAt, minAccuracy, switchCostFactor, deciderModels, summaries } = params;
   const modelConfigById = new Map(deciderModels.map(m => [m.id, m] as const));
 
   const tierCandidates = (t: DifficultyTier) =>
@@ -45,6 +46,7 @@ export function buildRoutingTable(params: {
     version: runId,
     generatedAt,
     minAccuracy,
+    switchCostFactor,
     source: 'benchmark',
     tiers: {
       low: tierCandidates('low'),

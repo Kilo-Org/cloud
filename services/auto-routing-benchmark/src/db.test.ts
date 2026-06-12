@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
 import {
   apiKindsToFlags,
@@ -157,6 +158,7 @@ describe('mapRunRow', () => {
       completed_at: '2026-06-10T04:25:00.000Z',
       error: null,
       min_accuracy: 0.7,
+      switch_cost_factor: 3,
       max_concurrency: 4,
       benchmark_user_id: null,
     };
@@ -192,6 +194,7 @@ describe('mapRunRow', () => {
       completed_at: null,
       error: null,
       min_accuracy: 0.7,
+      switch_cost_factor: 3,
       max_concurrency: 4,
       benchmark_user_id: null,
     };
@@ -218,6 +221,7 @@ const sampleTable: RoutingTable = {
   version: 'run-test-1',
   generatedAt: '2026-06-01T10:00:00.000Z',
   minAccuracy: 0.7,
+  switchCostFactor: 3,
   source: 'benchmark',
   tiers: {
     low: [candidate('model-a'), candidate('model-b')],
@@ -233,6 +237,7 @@ describe('routingTableToRows', () => {
     expect(tableRow.published_at).toBe('2026-06-01T11:00:00.000Z');
     expect(tableRow.generated_at).toBe('2026-06-01T10:00:00.000Z');
     expect(tableRow.min_accuracy).toBe(0.7);
+    expect(tableRow.switch_cost_factor).toBe(3);
     expect(tableRow.source).toBe('benchmark');
   });
 
@@ -260,6 +265,8 @@ describe('rowsToRoutingTable', () => {
     const { tableRow, candidateRows } = routingTableToRows(sampleTable, '2026-06-01T11:00:00.000Z');
     const reassembled = rowsToRoutingTable(tableRow, candidateRows);
     expect(reassembled).toEqual(sampleTable);
+    // The reassembled table must satisfy the contract schema (getLatestRoutingTable parses it).
+    expect(RoutingTableSchema.parse(reassembled)).toEqual(sampleTable);
   });
 
   it('preserves candidate order within each tier', () => {

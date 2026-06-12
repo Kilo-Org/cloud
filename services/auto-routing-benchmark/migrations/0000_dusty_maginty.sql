@@ -1,6 +1,7 @@
 CREATE TABLE `benchmark_config` (
 	`id` integer PRIMARY KEY NOT NULL,
 	`min_accuracy` real NOT NULL,
+	`switch_cost_factor` real NOT NULL,
 	`max_concurrency` integer NOT NULL,
 	`benchmark_user_id` text,
 	`updated_at` text NOT NULL,
@@ -15,6 +16,7 @@ CREATE TABLE `benchmark_runs` (
 	`completed_at` text,
 	`error` text,
 	`min_accuracy` real NOT NULL,
+	`switch_cost_factor` real NOT NULL,
 	`max_concurrency` integer NOT NULL,
 	`benchmark_user_id` text
 );
@@ -83,6 +85,7 @@ CREATE TABLE `routing_tables` (
 	`published_at` text NOT NULL,
 	`generated_at` text NOT NULL,
 	`min_accuracy` real NOT NULL,
+	`switch_cost_factor` real NOT NULL,
 	`source` text NOT NULL
 );
 --> statement-breakpoint

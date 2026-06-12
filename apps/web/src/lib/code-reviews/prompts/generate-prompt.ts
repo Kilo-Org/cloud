@@ -375,7 +375,7 @@ export async function generateReviewPrompt(
   // 13. Fix link (dynamic - only if reviewId provided)
   if (reviewId) {
     const baseUrl = process.env.NEXTAUTH_URL || 'https://kilo.ai';
-    const fixLink = `${baseUrl}/cloud-agent-fork/review/${reviewId}`;
+    const fixLink = `${baseUrl}/cloud/review/${reviewId}`;
     prompt += template.fixLinkTemplate.replace(/{FIX_LINK}/g, fixLink) + '\n\n';
   }
 

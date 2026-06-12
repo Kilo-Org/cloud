@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (error instanceof TRPCError) {
       if (error.code === 'UNAUTHORIZED') {
         const signInUrl = new URL('/users/sign_in', url.origin);
-        signInUrl.searchParams.set('callbackPath', `/cloud-agent-fork/review/${reviewId}`);
+        signInUrl.searchParams.set('callbackPath', `/cloud/review/${reviewId}`);
         return NextResponse.redirect(signInUrl);
       }
       if (error.code === 'NOT_FOUND') {

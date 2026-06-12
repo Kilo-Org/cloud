@@ -31,6 +31,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid start benchmark run request' }, { status: 400 });
   }
 
-  const result = await startBenchmarkRun(parsed.data.kind);
+  const result = await startBenchmarkRun(parsed.data.kind, parsed.data.force);
   return NextResponse.json(result.body, { status: result.status });
 }

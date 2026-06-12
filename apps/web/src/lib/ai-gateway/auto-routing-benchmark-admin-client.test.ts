@@ -25,6 +25,7 @@ const configResponse = {
           | 'responses'
           | 'messages'
         )[],
+        reasoningEffort: null,
       },
     ],
     minAccuracy: 0.8,
@@ -43,6 +44,7 @@ const configResponse = {
           | 'responses'
           | 'messages'
         )[],
+        reasoningEffort: null,
       },
     ],
     minAccuracy: 0.8,
@@ -158,16 +160,16 @@ describe('auto routing benchmark admin client', () => {
     });
   });
 
-  it('starts a benchmark run with the given kind', async () => {
+  it('starts a benchmark run with the given kind and force flag', async () => {
     mockFetch.mockResolvedValue({
       status: 200,
       ok: true,
-      json: () => Promise.resolve({ runId: 'run-2', enqueuedModels: 3 }),
+      json: () => Promise.resolve({ runId: 'run-2', enqueuedModels: 3, skippedModels: [] }),
     });
 
-    await expect(startBenchmarkRun('classifier')).resolves.toEqual({
+    await expect(startBenchmarkRun('classifier', false)).resolves.toEqual({
       status: 200,
-      body: { runId: 'run-2', enqueuedModels: 3 },
+      body: { runId: 'run-2', enqueuedModels: 3, skippedModels: [] },
     });
 
     expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
@@ -176,7 +178,27 @@ describe('auto routing benchmark admin client', () => {
         authorization: 'Bearer test-internal-secret',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ kind: 'classifier' }),
+      body: JSON.stringify({ kind: 'classifier', force: false }),
+    });
+  });
+
+  it('starts a benchmark run with force=true to re-run existing models', async () => {
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () =>
+        Promise.resolve({ runId: 'run-3', enqueuedModels: 3, skippedModels: ['model-a'] }),
+    });
+
+    await startBenchmarkRun('decider', true);
+
+    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer test-internal-secret',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ kind: 'decider', force: true }),
     });
   });
 

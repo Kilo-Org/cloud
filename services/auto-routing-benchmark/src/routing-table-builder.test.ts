@@ -5,9 +5,13 @@ import { buildRoutingTable } from './routing-table-builder';
 const BASE_CONFIG: BenchmarkConfig = {
   classifierModels: ['some/classifier'],
   deciderModels: [
-    { id: 'model/cheap', supportedApiKinds: ['chat_completions'] },
-    { id: 'model/expensive', supportedApiKinds: ['chat_completions', 'responses'] },
-    { id: 'model/mid', supportedApiKinds: ['chat_completions', 'messages'] },
+    { id: 'model/cheap', supportedApiKinds: ['chat_completions'], reasoningEffort: null },
+    {
+      id: 'model/expensive',
+      supportedApiKinds: ['chat_completions', 'responses'],
+      reasoningEffort: null,
+    },
+    { id: 'model/mid', supportedApiKinds: ['chat_completions', 'messages'], reasoningEffort: null },
   ],
   minAccuracy: 0.7,
   maxConcurrency: 4,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CaseResultRow } from './db';
-import { chunkArray, runCasesWithConcurrency, summarize } from './run';
+import { chunkArray, pickClassifierWinner, runCasesWithConcurrency, summarize } from './run';
 
 function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
   return {
@@ -229,5 +229,46 @@ describe('chunkArray', () => {
 
   it('returns no chunks for an empty array', () => {
     expect(chunkArray([], 10)).toEqual([]);
+  });
+});
+
+describe('pickClassifierWinner', () => {
+  const summary = (model: string, accuracy: number, avgCostUsd: number | null) => ({
+    model,
+    tier: '*' as const,
+    accuracy,
+    avgCostUsd,
+    avgLatencyMs: 100,
+    p50LatencyMs: 90,
+    cases: 36,
+    errors: 0,
+  });
+
+  it('picks the cheapest model meeting the threshold', () => {
+    const winner = pickClassifierWinner(
+      [summary('pricy', 0.95, 0.01), summary('cheap', 0.9, 0.001), summary('weak', 0.5, 0.0001)],
+      0.7
+    );
+    expect(winner?.model).toBe('cheap');
+  });
+
+  it('falls back to highest accuracy when nothing meets the threshold', () => {
+    const winner = pickClassifierWinner([summary('a', 0.5, 0.001), summary('b', 0.6, 0.01)], 0.9);
+    expect(winner?.model).toBe('b');
+  });
+
+  it('treats null cost as most expensive', () => {
+    const winner = pickClassifierWinner(
+      [summary('nocost', 0.95, null), summary('cheap', 0.9, 0.001)],
+      0.7
+    );
+    expect(winner?.model).toBe('cheap');
+  });
+
+  it('ignores decider-tier summaries and returns null when nothing is graded', () => {
+    expect(
+      pickClassifierWinner([{ ...summary('m', 1, 0.001), tier: 'low' as const }], 0.7)
+    ).toBeNull();
+    expect(pickClassifierWinner([], 0.7)).toBeNull();
   });
 });

@@ -29,10 +29,6 @@
     "bindings": [{ "name": "BENCH_RUNNER", "class_name": "BenchRunnerContainer" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BenchRunnerContainer"] }],
-  "triggers": {
-    // 04:10 UTC daily: classifier benchmark. 05:10 UTC Monday: decider benchmark.
-    "crons": ["10 4 * * *", "10 5 * * 1"],
-  },
   "d1_databases": [
     {
       "binding": "BENCH_DB",

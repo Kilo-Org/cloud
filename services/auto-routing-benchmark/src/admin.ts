@@ -48,7 +48,7 @@ export const startRunHandler: Handler<HonoEnv> = async c => {
   }
   const parsed = StartBenchmarkRunRequestSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'Invalid run request' }, 400);
-  return c.json(await startRun(c.env, parsed.data.kind));
+  return c.json(await startRun(c.env, parsed.data.kind, { force: parsed.data.force }));
 };
 
 export const getRoutingTableHandler: Handler<HonoEnv> = async c => {

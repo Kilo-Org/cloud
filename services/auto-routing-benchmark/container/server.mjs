@@ -40,7 +40,7 @@ function runCaseSerialized(params) {
   return next;
 }
 
-function runCase({ model, prompt, kiloToken, timeoutMs }) {
+function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
   return new Promise(resolve => {
     void (async () => {
       const dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
@@ -50,19 +50,19 @@ function runCase({ model, prompt, kiloToken, timeoutMs }) {
       let stdoutTruncated = false;
       let stderrTail = '';
 
-      const child = spawn(
-        'kilo',
-        ['run', '--format', 'json', '--auto', '-m', `kilo/${model}`, prompt],
-        {
-          cwd: dir,
-          env: {
-            ...process.env,
-            KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kiloToken } }),
-            NO_COLOR: '1',
-          },
-          stdio: ['ignore', 'pipe', 'pipe'],
-        }
-      );
+      const args = ['run', '--format', 'json', '--auto', '-m', `kilo/${model}`];
+      // Reasoning effort: forwarded as the CLI's provider-specific variant.
+      if (typeof variant === 'string' && variant.length > 0) args.push('--variant', variant);
+      args.push(prompt);
+      const child = spawn('kilo', args, {
+        cwd: dir,
+        env: {
+          ...process.env,
+          KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kiloToken } }),
+          NO_COLOR: '1',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
 
       const killTimer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -129,7 +129,7 @@ const server = createServer((req, res) => {
         return;
       }
 
-      const { model, prompt, kiloToken } = parsed ?? {};
+      const { model, prompt, kiloToken, variant } = parsed ?? {};
       const timeoutMs =
         typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
           ? parsed.timeoutMs
@@ -145,7 +145,11 @@ const server = createServer((req, res) => {
       }
 
       try {
-        const result = await runCaseSerialized({ model, prompt, kiloToken, timeoutMs });
+        if (variant !== undefined && variant !== null && typeof variant !== 'string') {
+          sendJson(res, 400, { error: 'variant must be a string when provided' });
+          return;
+        }
+        const result = await runCaseSerialized({ model, prompt, kiloToken, timeoutMs, variant });
         sendJson(res, 200, result);
       } catch (err) {
         sendJson(res, 500, { error: err instanceof Error ? err.message : 'run failed' });

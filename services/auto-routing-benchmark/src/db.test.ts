@@ -57,6 +57,7 @@ describe('mapRunRow', () => {
       started_at: '2026-06-10T04:10:00.000Z',
       completed_at: '2026-06-10T04:25:00.000Z',
       config_json: '{}',
+      runtime_json: null,
       error: null,
     };
     const summaries: BenchmarkModelSummary[] = [
@@ -90,6 +91,7 @@ describe('mapRunRow', () => {
       started_at: '2026-06-11T05:10:00.000Z',
       completed_at: null,
       config_json: '{}',
+      runtime_json: null,
       error: null,
     };
     const result = mapRunRow(runRow, []);
@@ -105,6 +107,7 @@ describe('mapRunRow', () => {
       started_at: '2026-06-01T04:10:00.000Z',
       completed_at: '2026-06-01T04:20:00.000Z',
       config_json: '{}',
+      runtime_json: null,
       error: null,
     };
     const runRow2 = {
@@ -114,6 +117,7 @@ describe('mapRunRow', () => {
       started_at: '2026-06-02T05:10:00.000Z',
       completed_at: null,
       config_json: '{}',
+      runtime_json: null,
       error: 'timed out',
     };
     const summariesForRun1: BenchmarkModelSummary[] = [

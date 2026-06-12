@@ -65,7 +65,7 @@ export function getAutoRoutingClassifierModel() {
   );
 }
 
-export function updateAutoRoutingClassifierModel(model: string) {
+export function updateAutoRoutingClassifierModel(model: string | null) {
   return fetchAutoRoutingAdmin(
     '/admin/classifier-model',
     {

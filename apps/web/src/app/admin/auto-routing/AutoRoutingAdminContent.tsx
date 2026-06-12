@@ -66,7 +66,7 @@ async function fetchClassifierModel() {
   );
 }
 
-async function saveClassifierModel(model: string) {
+async function saveClassifierModel(model: string | null) {
   const response = await fetch('/admin/api/auto-routing/classifier-model', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
@@ -398,10 +398,10 @@ export function AutoRoutingAdminContent() {
   });
 
   useEffect(() => {
-    if (classifierModelQuery.data?.model) {
-      setSelectedModel(classifierModelQuery.data.model);
+    if (classifierModelQuery.data) {
+      setSelectedModel(classifierModelQuery.data.override ?? classifierModelQuery.data.model);
     }
-  }, [classifierModelQuery.data?.model]);
+  }, [classifierModelQuery.data]);
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (
@@ -415,10 +415,14 @@ export function AutoRoutingAdminContent() {
 
   const saveMutation = useMutation({
     mutationFn: saveClassifierModel,
-    onSuccess: data => {
+    onSuccess: (data, model) => {
       queryClient.setQueryData(['auto-routing', 'classifier-model'], data);
-      setSelectedModel(data.model);
-      toast.success('Classifier model updated');
+      setSelectedModel(data.override ?? data.model);
+      if (model === null) {
+        toast.success('Override cleared — benchmark winner in effect');
+      } else {
+        toast.success('Classifier model override saved');
+      }
     },
     onError: error => {
       toast.error(error instanceof Error ? error.message : 'Failed to update classifier model');
@@ -433,10 +437,12 @@ export function AutoRoutingAdminContent() {
     classifierModelQuery.error instanceof Error ? classifierModelQuery.error.message : undefined;
   const openRouterModelsError =
     openRouterModelsQuery.error instanceof Error ? openRouterModelsQuery.error.message : undefined;
-  const currentModel = classifierModelQuery.data?.model ?? '';
-  const hasClassifierModelLoaded = classifierModelQuery.isSuccess && currentModel.length > 0;
+  const currentOverride = classifierModelQuery.data?.override ?? null;
+  const hasClassifierModelLoaded = classifierModelQuery.isSuccess;
   const hasModelChange =
-    hasClassifierModelLoaded && selectedModel.trim().length > 0 && selectedModel !== currentModel;
+    hasClassifierModelLoaded &&
+    selectedModel.trim().length > 0 &&
+    selectedModel !== (currentOverride ?? '');
   const summary = analyticsQuery.data?.summary;
   const totalRequests = summary?.totalRequests ?? 0;
   const { classifiedRate, cacheHitRate, fallbackRate } = summaryRates(summary);
@@ -473,32 +479,67 @@ export function AutoRoutingAdminContent() {
 
       <Card className="rounded-lg">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
-          <CardTitle className="text-base">Classifier Model</CardTitle>
+          <CardTitle className="text-base">Classifier model override</CardTitle>
           <MetricHelp
-            label="Classifier Model"
-            description="The OpenRouter model used by the auto-routing classifier. Saving changes updates KV config, so the classifier can change without a redeploy."
+            label="Classifier model override"
+            description="When unset, the latest classifier benchmark winner is used. Setting an override bypasses the benchmark winner. Saving updates KV config without a redeploy."
           />
         </CardHeader>
-        <CardContent className="grid gap-4 p-4 pt-0 lg:grid-cols-[1fr_auto] lg:items-end">
-          <ModelCombobox
-            label="Model"
-            models={modelOptions}
-            value={selectedModel}
-            onValueChange={setSelectedModel}
-            isLoading={openRouterModelsQuery.isLoading || classifierModelQuery.isLoading}
-            error={classifierModelError ?? openRouterModelsError}
-            placeholder={classifierModelQuery.data?.defaultModel ?? 'Select classifier model'}
-            className="w-full"
-          />
-          <Button
-            type="button"
-            onClick={() => saveMutation.mutate(selectedModel)}
-            disabled={!hasModelChange || saveMutation.isPending}
-            className="w-full lg:w-auto"
-          >
-            <Save className="size-4" />
-            Save model
-          </Button>
+        <CardContent className="flex flex-col gap-4 p-4 pt-0">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-muted-foreground">Effective model</dt>
+            <dd className="font-mono text-xs truncate">
+              {classifierModelQuery.data?.model ?? <Skeleton className="h-4 w-48" />}
+            </dd>
+            <dt className="text-muted-foreground">Override</dt>
+            <dd className="font-mono text-xs truncate">
+              {classifierModelQuery.isLoading ? (
+                <Skeleton className="h-4 w-48" />
+              ) : (
+                (classifierModelQuery.data?.override ?? 'none')
+              )}
+            </dd>
+            <dt className="text-muted-foreground">Benchmark winner</dt>
+            <dd className="font-mono text-xs truncate">
+              {classifierModelQuery.isLoading ? (
+                <Skeleton className="h-4 w-48" />
+              ) : (
+                (classifierModelQuery.data?.benchmarkWinner ?? 'not yet published')
+              )}
+            </dd>
+          </dl>
+          <div className="grid gap-4 lg:grid-cols-[1fr_auto_auto] lg:items-end">
+            <ModelCombobox
+              label="Set override"
+              models={modelOptions}
+              value={selectedModel}
+              onValueChange={setSelectedModel}
+              isLoading={openRouterModelsQuery.isLoading || classifierModelQuery.isLoading}
+              error={classifierModelError ?? openRouterModelsError}
+              placeholder={classifierModelQuery.data?.defaultModel ?? 'Select classifier model'}
+              className="w-full"
+            />
+            <Button
+              type="button"
+              onClick={() => saveMutation.mutate(selectedModel)}
+              disabled={!hasModelChange || saveMutation.isPending}
+              className="w-full lg:w-auto"
+            >
+              <Save className="size-4" />
+              Save override
+            </Button>
+            {currentOverride !== null ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => saveMutation.mutate(null)}
+                disabled={saveMutation.isPending}
+                className="w-full lg:w-auto text-destructive hover:text-destructive"
+              >
+                Clear override
+              </Button>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 

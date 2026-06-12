@@ -10,7 +10,7 @@ import {
   debugCliHandler,
 } from './admin';
 import type { HonoEnv } from './hono-env';
-import { processJob, startRun, type BenchmarkJobMessage } from './run';
+import { processJob, type BenchmarkJobMessage } from './run';
 
 // Re-exported so the Durable Object class binding (BENCH_RUNNER) can find it.
 export { BenchRunnerContainer } from './bench-runner-container';
@@ -29,14 +29,8 @@ app.post('/admin/debug-cli', debugCliHandler);
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler());
 
-const DECIDER_CRON = '10 5 * * 1';
-
 export default {
   fetch: app.fetch,
-  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    const kind = controller.cron === DECIDER_CRON ? 'decider' : 'classifier';
-    ctx.waitUntil(startRun(env, kind));
-  },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
     for (const message of batch.messages) {
       // Deliberately no try/catch: a throw from processJob (transient token,

@@ -7,6 +7,7 @@ import {
   type BenchmarkConfig,
   type BenchmarkRun,
   type BenchmarkModelSummary,
+  type ReasoningEffort,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +20,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -96,11 +104,17 @@ async function fetchBenchmarkRuns() {
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
 }
 
-async function startBenchmarkRun(kind: 'classifier' | 'decider') {
+async function startBenchmarkRun({
+  kind,
+  force,
+}: {
+  kind: 'classifier' | 'decider';
+  force: boolean;
+}) {
   const response = await fetch('/admin/api/auto-routing/benchmark-runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ kind }),
+    body: JSON.stringify({ kind, force }),
   });
   return parseAdminResponse(response, StartBenchmarkRunResponseSchema);
 }
@@ -122,6 +136,7 @@ type DeciderModelRow = {
   chat_completions: boolean;
   responses: boolean;
   messages: boolean;
+  reasoningEffort: ReasoningEffort | null;
 };
 
 function configToFormState(config: BenchmarkConfig): {
@@ -138,6 +153,7 @@ function configToFormState(config: BenchmarkConfig): {
       chat_completions: m.supportedApiKinds.includes('chat_completions'),
       responses: m.supportedApiKinds.includes('responses'),
       messages: m.supportedApiKinds.includes('messages'),
+      reasoningEffort: m.reasoningEffort ?? null,
     })),
     minAccuracy: config.minAccuracy,
     maxConcurrency: config.maxConcurrency,
@@ -163,6 +179,7 @@ function formStateToConfig(
       return {
         id: row.id.trim(),
         supportedApiKinds: kinds.length ? kinds : ['chat_completions' as const],
+        reasoningEffort: row.reasoningEffort ?? null,
       };
     });
   const benchmarkUserId = state.benchmarkUserId.trim();
@@ -221,7 +238,13 @@ function BenchmarkConfigEditor({
       ...prev,
       deciderModels: [
         ...prev.deciderModels,
-        { id: '', chat_completions: true, responses: false, messages: false },
+        {
+          id: '',
+          chat_completions: true,
+          responses: false,
+          messages: false,
+          reasoningEffort: null,
+        },
       ],
     }));
   }, []);
@@ -276,6 +299,7 @@ function BenchmarkConfigEditor({
                   <TableHead className="w-32 text-center">chat_completions</TableHead>
                   <TableHead className="w-24 text-center">responses</TableHead>
                   <TableHead className="w-24 text-center">messages</TableHead>
+                  <TableHead className="w-36">Reasoning effort</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -317,6 +341,30 @@ function BenchmarkConfigEditor({
                         }
                         aria-label={`Model ${index + 1} supports messages`}
                       />
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Select
+                        value={row.reasoningEffort ?? 'none'}
+                        onValueChange={value =>
+                          handleDeciderRowChange(index, {
+                            reasoningEffort: value === 'none' ? null : (value as ReasoningEffort),
+                          })
+                        }
+                      >
+                        <SelectTrigger
+                          className="h-8 text-xs"
+                          aria-label={`Model ${index + 1} reasoning effort`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="minimal">minimal</SelectItem>
+                          <SelectItem value="low">low</SelectItem>
+                          <SelectItem value="medium">medium</SelectItem>
+                          <SelectItem value="high">high</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell className="py-2">
                       <Button
@@ -661,6 +709,7 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
 
 export function BenchmarksSection() {
   const queryClient = useQueryClient();
+  const [forceRerun, setForceRerun] = useState(false);
 
   const configQuery = useQuery({
     queryKey: ['auto-routing', 'benchmark-config'],
@@ -690,10 +739,15 @@ export function BenchmarksSection() {
 
   const startRunMutation = useMutation({
     mutationFn: startBenchmarkRun,
-    onSuccess: (data, kind) => {
-      toast.success(
-        `${kind === 'classifier' ? 'Classifier' : 'Decider'} benchmark started — ${data.enqueuedModels} models enqueued`
-      );
+    onSuccess: (data, variables) => {
+      const kindLabel = variables.kind === 'classifier' ? 'Classifier' : 'Decider';
+      if (data.enqueuedModels === 0) {
+        toast.success(`All models already have results — republished from existing data`);
+      } else {
+        toast.success(
+          `${kindLabel} benchmark started — ${data.enqueuedModels} models enqueued, ${data.skippedModels.length} skipped`
+        );
+      }
       void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-runs'] });
     },
     onError: (error: unknown) => {
@@ -745,30 +799,46 @@ export function BenchmarksSection() {
         <CardHeader className="p-4 pb-2">
           <CardTitle className="text-base">Run Benchmark</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2 p-4 pt-0">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={anyRunning}
-            onClick={() => startRunMutation.mutate('classifier')}
-          >
-            <Play className="size-4" />
-            Run classifier benchmark
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={anyRunning}
-            onClick={() => startRunMutation.mutate('decider')}
-          >
-            <Play className="size-4" />
-            Run decider benchmark
-          </Button>
-          {hasRunningRun ? (
-            <p className="text-muted-foreground self-center text-xs">
-              A benchmark is running — refreshing every 30 s
-            </p>
-          ) : null}
+        <CardContent className="flex flex-col gap-3 p-4 pt-0">
+          <p className="text-muted-foreground text-xs">
+            Runs are triggered manually. Models with existing results are skipped unless "Re-run
+            models with existing results" is checked.
+          </p>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="force-rerun"
+              checked={forceRerun}
+              onCheckedChange={checked => setForceRerun(checked === true)}
+            />
+            <Label htmlFor="force-rerun" className="text-sm font-normal cursor-pointer">
+              Re-run models with existing results
+            </Label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={anyRunning}
+              onClick={() => startRunMutation.mutate({ kind: 'classifier', force: forceRerun })}
+            >
+              <Play className="size-4" />
+              Run classifier benchmark
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={anyRunning}
+              onClick={() => startRunMutation.mutate({ kind: 'decider', force: forceRerun })}
+            >
+              <Play className="size-4" />
+              Run decider benchmark
+            </Button>
+            {hasRunningRun ? (
+              <p className="text-muted-foreground self-center text-xs">
+                A benchmark is running — refreshing every 30 s
+              </p>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 

@@ -17,9 +17,7 @@ export function buildRoutingTable(params: {
   summaries: BenchmarkModelSummary[];
 }): RoutingTable {
   const { runId, generatedAt, config, summaries } = params;
-  const apiKindsByModel = new Map(
-    config.deciderModels.map(m => [m.id, m.supportedApiKinds] as const)
-  );
+  const modelConfigById = new Map(config.deciderModels.map(m => [m.id, m] as const));
 
   const tierCandidates = (t: DifficultyTier) =>
     rankCandidates(
@@ -30,7 +28,10 @@ export function buildRoutingTable(params: {
           accuracy: s.accuracy,
           avgCostUsd: s.avgCostUsd ?? 0,
           // Spread into a mutable array so tsgo is happy with the readonly type.
-          supportedApiKinds: [...(apiKindsByModel.get(s.model) ?? (['chat_completions'] as const))],
+          supportedApiKinds: [
+            ...(modelConfigById.get(s.model)?.supportedApiKinds ?? (['chat_completions'] as const)),
+          ],
+          reasoningEffort: modelConfigById.get(s.model)?.reasoningEffort ?? null,
         })),
       config.minAccuracy
     );

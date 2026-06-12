@@ -23,6 +23,10 @@ export type RunRow = {
   started_at: string;
   completed_at: string | null;
   config_json: string;
+  // Run-scoped execution state: which models were actually enqueued and the
+  // summaries carried forward for models skipped because they already had
+  // results. Null on rows created before the column existed.
+  runtime_json: string | null;
   error: string | null;
 };
 
@@ -65,14 +69,20 @@ export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): Benc
 
 export async function insertRun(
   db: D1Database,
-  run: { id: string; kind: BenchmarkKind; startedAt: string; configJson: string }
+  run: {
+    id: string;
+    kind: BenchmarkKind;
+    startedAt: string;
+    configJson: string;
+    runtimeJson: string;
+  }
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO benchmark_runs (id, kind, status, started_at, config_json)
-       VALUES (?1, ?2, 'running', ?3, ?4)`
+      `INSERT INTO benchmark_runs (id, kind, status, started_at, config_json, runtime_json)
+       VALUES (?1, ?2, 'running', ?3, ?4, ?5)`
     )
-    .bind(run.id, run.kind, run.startedAt, run.configJson)
+    .bind(run.id, run.kind, run.startedAt, run.configJson, run.runtimeJson)
     .run();
 }
 
@@ -258,4 +268,50 @@ export async function saveConfigRow(
     )
     .bind(configJson, updatedAt, updatedBy)
     .run();
+}
+
+type LatestSummaryRow = {
+  run_id: string;
+  started_at: string;
+  model: string;
+  tier: string;
+  accuracy: number;
+  avg_cost_usd: number | null;
+  avg_latency_ms: number;
+  p50_latency_ms: number | null;
+  cases: number;
+  errors: number;
+};
+
+// Latest summaries per model for a benchmark kind: for each model, all tiers
+// from the most recent COMPLETED run that included it (mixing tiers across
+// runs would pair incomparable numbers).
+export async function getLatestSummariesByModel(
+  db: D1Database,
+  kind: BenchmarkKind
+): Promise<Map<string, BenchmarkModelSummary[]>> {
+  const { results } = await db
+    .prepare(
+      `SELECT ms.run_id, r.started_at, ms.model, ms.tier, ms.accuracy, ms.avg_cost_usd,
+              ms.avg_latency_ms, ms.p50_latency_ms, ms.cases, ms.errors
+       FROM model_summaries ms
+       JOIN benchmark_runs r ON r.id = ms.run_id
+       WHERE r.kind = ?1 AND r.status = 'completed'
+       ORDER BY r.started_at DESC`
+    )
+    .bind(kind)
+    .all<LatestSummaryRow>();
+
+  const latestRunByModel = new Map<string, string>();
+  for (const row of results) {
+    if (!latestRunByModel.has(row.model)) latestRunByModel.set(row.model, row.run_id);
+  }
+  const byModel = new Map<string, BenchmarkModelSummary[]>();
+  for (const row of results) {
+    if (latestRunByModel.get(row.model) !== row.run_id) continue;
+    const list = byModel.get(row.model) ?? [];
+    list.push(mapSummaryRow(row));
+    byModel.set(row.model, list);
+  }
+  return byModel;
 }

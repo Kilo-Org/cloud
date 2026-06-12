@@ -1,10 +1,13 @@
 import { classifyWithOpenRouter } from '@kilocode/auto-routing-contracts/classifier';
 import {
   BenchmarkConfigSchema,
+  BenchmarkModelSummarySchema,
+  CLASSIFIER_WINNER_KV_KEY,
   ROUTING_TABLE_KV_KEY,
   type BenchmarkConfig,
   type BenchmarkKind,
   type BenchmarkModelSummary,
+  type ClassifierWinner,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import * as z from 'zod';
@@ -14,6 +17,7 @@ import { DECIDER_CASES } from './datasets/decider-cases';
 import {
   countCaseResults,
   getCaseResults,
+  getLatestSummariesByModel,
   getRun,
   insertRun,
   markRunCompleted,
@@ -61,10 +65,20 @@ export function chunkArray<T>(items: readonly T[], size: number): T[][] {
 
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 
+// Per-run execution state stored in benchmark_runs.runtime_json: which models
+// were actually enqueued, and the latest prior summaries carried forward for
+// models skipped because they already had results.
+const RunRuntimeSchema = z.object({
+  enqueuedModels: z.array(z.string()),
+  carriedSummaries: z.array(BenchmarkModelSummarySchema),
+});
+type RunRuntime = z.infer<typeof RunRuntimeSchema>;
+
 export async function startRun(
   env: Env,
-  kind: BenchmarkKind
-): Promise<{ runId: string; enqueuedModels: number }> {
+  kind: BenchmarkKind,
+  options: { force?: boolean } = {}
+): Promise<{ runId: string; enqueuedModels: number; skippedModels: string[] }> {
   // Stale-run sweeper: anything still 'running' after 6h is dead (queue
   // retries exhausted); fail it so the admin panel shows the truth.
   await markStaleRunsFailed(
@@ -76,35 +90,57 @@ export async function startRun(
   const models =
     kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id);
 
+  // Models with prior results are skipped (their latest summaries are carried
+  // into this run's aggregate) unless the admin forces a full re-run.
+  const priorSummaries = options.force
+    ? new Map<string, BenchmarkModelSummary[]>()
+    : await getLatestSummariesByModel(env.BENCH_DB, kind);
+  const enqueuedModels = models.filter(m => !priorSummaries.has(m));
+  const skippedModels = models.filter(m => priorSummaries.has(m));
+  const carriedSummaries = skippedModels.flatMap(m => priorSummaries.get(m) ?? []);
+
   // Decider runs execute through the kilo CLI under a real Kilo user's
   // identity/billing. Fail fast (before inserting the run) when that user
   // isn't configured so the admin POST surfaces the misconfiguration.
-  if (kind === 'decider' && !config.benchmarkUserId) {
+  if (kind === 'decider' && enqueuedModels.length > 0 && !config.benchmarkUserId) {
     throw new Error(
       'benchmark user not configured: set benchmarkUserId before running the decider benchmark'
     );
   }
 
   const runId = `${kind}-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+  const runtime: RunRuntime = { enqueuedModels, carriedSummaries };
   await insertRun(env.BENCH_DB, {
     id: runId,
     kind,
     startedAt: new Date().toISOString(),
     configJson: JSON.stringify(config),
+    runtimeJson: JSON.stringify(runtime),
   });
+
+  console.log(
+    JSON.stringify({ event: 'benchmark_run_started', runId, kind, enqueuedModels, skippedModels })
+  );
+
+  if (enqueuedModels.length === 0) {
+    // Everything already has results: complete immediately and republish the
+    // aggregate so config-only changes (model removed, threshold tweaked)
+    // take effect without re-running any model.
+    await finalizeRunIfComplete(env, runId, kind);
+    return { runId, enqueuedModels: 0, skippedModels };
+  }
 
   if (kind === 'classifier') {
     await env.BENCH_QUEUE.sendBatch(
-      models.map(model => ({ body: { runId, kind, model } satisfies BenchmarkJobMessage }))
+      enqueuedModels.map(model => ({ body: { runId, kind, model } satisfies BenchmarkJobMessage }))
     );
-    console.log(JSON.stringify({ event: 'benchmark_run_started', runId, kind, models }));
-    return { runId, enqueuedModels: models.length };
+    return { runId, enqueuedModels: enqueuedModels.length, skippedModels };
   }
 
   // Decider: one message per (model, chunk) so each queue invocation stays
-  // bounded. finalizeRunIfComplete still expects models × DECIDER_CASES rows.
+  // bounded. finalizeRunIfComplete expects enqueuedModels × DECIDER_CASES rows.
   const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
-  const messages = models.flatMap(model =>
+  const messages = enqueuedModels.flatMap(model =>
     chunks.map((chunkCases, chunk) => ({
       body: {
         runId,
@@ -116,10 +152,7 @@ export async function startRun(
     }))
   );
   await env.BENCH_QUEUE.sendBatch(messages);
-  console.log(
-    JSON.stringify({ event: 'benchmark_run_started', runId, kind, models, chunks: chunks.length })
-  );
-  return { runId, enqueuedModels: models.length };
+  return { runId, enqueuedModels: enqueuedModels.length, skippedModels };
 }
 
 export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
@@ -215,6 +248,8 @@ async function processDeciderJob(
   // queue retries the message. The token is never logged.
   const kiloToken = await fetchBenchmarkUserToken(env, config.benchmarkUserId);
   const instanceName = `${message.runId}:${message.model}:${message.chunk ?? 0}`;
+  const reasoningEffort =
+    config.deciderModels.find(m => m.id === message.model)?.reasoningEffort ?? null;
 
   // The CLI performs a one-time sqlite migration on each fresh container
   // instance; concurrent first runs against the migrating database end with
@@ -246,6 +281,7 @@ async function processDeciderJob(
         model: message.model,
         benchCase,
         kiloToken,
+        reasoningEffort,
       });
       // The CLI occasionally ends a session with no assistant text at all
       // (transient empty completion: a lone step_finish with cost 0). Mirror
@@ -258,6 +294,7 @@ async function processDeciderJob(
           model: message.model,
           benchCase,
           kiloToken,
+          reasoningEffort,
         });
         retry.costUsd =
           retry.costUsd === null && result.costUsd === null
@@ -343,11 +380,27 @@ function failedRow(
   };
 }
 
-async function getRunConfig(env: Env, runId: string): Promise<BenchmarkConfig> {
-  // Snapshot taken at startRun time so a mid-run admin edit can't skew it.
+async function getRunState(
+  env: Env,
+  runId: string
+): Promise<{ config: BenchmarkConfig; runtime: RunRuntime }> {
+  // Snapshots taken at startRun time so a mid-run admin edit can't skew them.
   const run = await getRun(env.BENCH_DB, runId);
   if (!run) throw new Error(`unknown run ${runId}`);
-  return BenchmarkConfigSchema.parse(JSON.parse(run.config_json));
+  const config = BenchmarkConfigSchema.parse(JSON.parse(run.config_json));
+  const runtime = run.runtime_json
+    ? RunRuntimeSchema.parse(JSON.parse(run.runtime_json))
+    : // Rows written before runtime_json existed ran every configured model.
+      {
+        enqueuedModels:
+          run.kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id),
+        carriedSummaries: [],
+      };
+  return { config, runtime };
+}
+
+async function getRunConfig(env: Env, runId: string): Promise<BenchmarkConfig> {
+  return (await getRunState(env, runId)).config;
 }
 
 export async function runCasesWithConcurrency<T>(
@@ -365,11 +418,9 @@ export async function runCasesWithConcurrency<T>(
 }
 
 async function finalizeRunIfComplete(env: Env, runId: string, kind: BenchmarkKind): Promise<void> {
-  const config = await getRunConfig(env, runId);
-  const models =
-    kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id);
+  const { config, runtime } = await getRunState(env, runId);
   const caseCount = kind === 'classifier' ? CLASSIFIER_CASES.length : DECIDER_CASES.length;
-  const expected = models.length * caseCount;
+  const expected = runtime.enqueuedModels.length * caseCount;
   const actual = await countCaseResults(env.BENCH_DB, runId);
 
   if (actual < expected) return;
@@ -379,9 +430,28 @@ async function finalizeRunIfComplete(env: Env, runId: string, kind: BenchmarkKin
   // is a batched delete+insert; markRunCompleted guards on status='running';
   // KV put is idempotent.
   const rows = await getCaseResults(env.BENCH_DB, runId);
-  const summaries = summarize(rows, kind);
+  // Fresh results plus the carried-forward summaries of skipped models.
+  const summaries = [...summarize(rows, kind), ...runtime.carriedSummaries];
   await replaceModelSummaries(env.BENCH_DB, runId, summaries);
   await markRunCompleted(env.BENCH_DB, runId);
+
+  if (kind === 'classifier') {
+    const winner = pickClassifierWinner(summaries, config.minAccuracy);
+    if (winner) {
+      const payload: ClassifierWinner = {
+        model: winner.model,
+        runId,
+        accuracy: winner.accuracy,
+        generatedAt: new Date().toISOString(),
+      };
+      await env.AUTO_ROUTING_CONFIG.put(CLASSIFIER_WINNER_KV_KEY, JSON.stringify(payload));
+      console.log(
+        JSON.stringify({ event: 'classifier_winner_published', runId, model: winner.model })
+      );
+    } else {
+      console.warn(JSON.stringify({ event: 'classifier_winner_skipped', runId }));
+    }
+  }
 
   if (kind === 'decider') {
     const generatedAt = new Date().toISOString();
@@ -412,6 +482,23 @@ async function finalizeRunIfComplete(env: Env, runId: string, kind: BenchmarkKin
       summaries,
     })
   );
+}
+
+// Same bang-for-buck rule as the routing table, applied to classifier
+// summaries (tier '*'): cheapest candidate meeting the accuracy threshold,
+// else the most accurate one. Null when there are no graded summaries.
+export function pickClassifierWinner(
+  summaries: BenchmarkModelSummary[],
+  minAccuracy: number
+): BenchmarkModelSummary | null {
+  const graded = summaries.filter(s => s.tier === '*' && s.cases > 0);
+  if (graded.length === 0) return null;
+  const cost = (s: BenchmarkModelSummary) => s.avgCostUsd ?? Number.POSITIVE_INFINITY;
+  const meeting = graded.filter(s => s.accuracy >= minAccuracy);
+  if (meeting.length > 0) {
+    return meeting.toSorted((a, b) => cost(a) - cost(b) || b.accuracy - a.accuracy)[0];
+  }
+  return graded.toSorted((a, b) => b.accuracy - a.accuracy || cost(a) - cost(b))[0];
 }
 
 export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): BenchmarkModelSummary[] {

@@ -36,9 +36,15 @@ type ContainerRunResponse = {
  */
 export async function runDeciderCaseViaCli(
   env: Env,
-  params: { instanceName: string; model: string; benchCase: DeciderCase; kiloToken: string }
+  params: {
+    instanceName: string;
+    model: string;
+    benchCase: DeciderCase;
+    kiloToken: string;
+    reasoningEffort?: string | null;
+  }
 ): Promise<CliRunResult> {
-  const { instanceName, model, benchCase, kiloToken } = params;
+  const { instanceName, model, benchCase, kiloToken, reasoningEffort } = params;
   const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(instanceName));
   const prompt = `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}${FINAL_ANSWER_SUFFIX}`;
 
@@ -47,7 +53,13 @@ export async function runDeciderCaseViaCli(
     new Request('http://container/run', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model, prompt, kiloToken, timeoutMs: DECIDER_CLI_TIMEOUT_MS }),
+      body: JSON.stringify({
+        model,
+        prompt,
+        kiloToken,
+        timeoutMs: DECIDER_CLI_TIMEOUT_MS,
+        variant: reasoningEffort ?? null,
+      }),
     })
   );
 

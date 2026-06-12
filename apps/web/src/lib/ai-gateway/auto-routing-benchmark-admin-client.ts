@@ -86,13 +86,13 @@ export function listBenchmarkRuns() {
   return fetchBenchmarkAdmin('/admin/runs', { method: 'GET' }, BenchmarkRunsResponseSchema);
 }
 
-export function startBenchmarkRun(kind: BenchmarkKind) {
+export function startBenchmarkRun(kind: BenchmarkKind, force: boolean) {
   return fetchBenchmarkAdmin(
     '/admin/runs',
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ kind }),
+      body: JSON.stringify({ kind, force }),
     },
     StartBenchmarkRunResponseSchema
   );

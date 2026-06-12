@@ -188,6 +188,28 @@ describe('buildPreviousReviewSummaryHistory', () => {
     expect(result).toContain('**Worst part**');
   });
 
+  it('counts only snapshots rendered within the character limit', () => {
+    const shortArchivedSummary = '<!-- kilo-review -->\n## Code Review Summary\n\nShort snapshot.';
+    const oneOldSnapshot = buildPreviousReviewSummaryHistory(shortArchivedSummary);
+    const twoSnapshotBody = [cleanSummary, oneOldSnapshot].join('\n\n');
+    const twoSnapshotHistory = buildPreviousReviewSummaryHistory(twoSnapshotBody);
+    const twoOldSnapshots = buildPreviousReviewSummaryHistory(
+      [shortArchivedSummary, buildPreviousReviewSummaryHistory(summaryWithIssues)].join('\n\n')
+    );
+    const threeSnapshotBody = [cleanSummary, twoOldSnapshots].join('\n\n');
+
+    const result = buildPreviousReviewSummaryHistory(threeSnapshotBody, {
+      previousHeadSha: 'abcdef1234567890',
+      maxCharacters: twoSnapshotHistory.length + 150,
+    });
+
+    expect(countOccurrences(result, REVIEW_SUMMARY_HISTORY_ENTRY)).toBe(2);
+    expect(result).toContain(
+      '<summary><b>Previous Review Summaries</b> (2 snapshots, latest commit abcdef1)</summary>'
+    );
+    expect(result).not.toContain('(3 snapshots');
+  });
+
   it('truncates long archived content while preserving the history wrapper', () => {
     const longSummary = [
       '<!-- kilo-review -->',

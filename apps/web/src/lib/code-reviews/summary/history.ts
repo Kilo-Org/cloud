@@ -154,15 +154,7 @@ function renderHistoryBlock(
   entries: HistoryEntry[],
   options: { previousHeadSha?: string | null; maxCharacters: number }
 ): string {
-  const summaryLine = formatHistorySummary(entries.length, options.previousHeadSha);
-  const header = [
-    REVIEW_SUMMARY_HISTORY_START,
-    '<details>',
-    `<summary>${summaryLine}</summary>`,
-    '',
-    '_Current summary above is authoritative. Previous snapshots are kept for context only._',
-    '',
-  ].join('\n');
+  const header = renderHistoryHeader(entries.length, options.previousHeadSha);
   const footer = `\n</details>\n${REVIEW_SUMMARY_HISTORY_END}`;
   const renderedEntries: string[] = [];
   let truncated = false;
@@ -194,7 +186,19 @@ function renderHistoryBlock(
     return '';
   }
 
-  return renderHistoryBlockParts(header, renderedEntries, footer, truncated);
+  const renderedHeader = renderHistoryHeader(renderedEntries.length, options.previousHeadSha);
+  return renderHistoryBlockParts(renderedHeader, renderedEntries, footer, truncated);
+}
+
+function renderHistoryHeader(entryCount: number, previousHeadSha?: string | null): string {
+  return [
+    REVIEW_SUMMARY_HISTORY_START,
+    '<details>',
+    `<summary>${formatHistorySummary(entryCount, previousHeadSha)}</summary>`,
+    '',
+    '_Current summary above is authoritative. Previous snapshots are kept for context only._',
+    '',
+  ].join('\n');
 }
 
 function renderHistoryBlockParts(

@@ -4,6 +4,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { KiloPassReferralPageContent } from './KiloPassReferralPageContent';
 import type { KiloPassReferralRewardSummary } from './KiloPassReferralPageContent';
+import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 
 const emptySummary: KiloPassReferralRewardSummary = {
   totals: {
@@ -34,13 +35,16 @@ describe('KiloPassReferralPageContent', () => {
 
     expect(html).toContain('Earn Kilo Pass referral bonuses');
     expect(html).toContain('50% monthly Kilo Pass bonus');
+    expect(html).toContain('href="/subscriptions#kilo-pass"');
     expect(html).toContain('No Kilo Pass referral rewards yet.');
+    expect(html).toContain('applies automatically');
     expect(html).toContain('aria-label="Kilo Pass referral sharing"');
     expect(html).toContain('data-testid="share-widget"');
     expect(html).not.toContain('Share your Kilo Pass referral link');
     expect(html).not.toContain('Use the Kilo Pass referral widget');
     expect(html).not.toContain('KiloClaw');
     expect(html).not.toContain('free month');
+    expect(html.toLowerCase()).not.toContain('claim');
   });
 
   it('renders loading and non-sensitive error states without color-only messaging', () => {
@@ -63,6 +67,74 @@ describe('KiloPassReferralPageContent', () => {
     expect(errorHtml).toContain('Try again in a minute.');
     expect(errorHtml).toContain('role="alert"');
     expect(errorHtml).not.toContain('stack');
+  });
+
+  it('renders contextual eligibility for active monthly, annual, paused, canceling, and unsubscribed states', () => {
+    const activeMonthlyHtml = renderToStaticMarkup(
+      React.createElement(KiloPassReferralPageContent, {
+        summary: emptySummary,
+        subscriptionContext: {
+          status: 'active',
+          cadence: KiloPassCadence.Monthly,
+          cancelAtPeriodEnd: false,
+        },
+      })
+    );
+    const annualHtml = renderToStaticMarkup(
+      React.createElement(KiloPassReferralPageContent, {
+        summary: emptySummary,
+        subscriptionContext: {
+          status: 'active',
+          cadence: KiloPassCadence.Yearly,
+          cancelAtPeriodEnd: false,
+        },
+      })
+    );
+    const pausedHtml = renderToStaticMarkup(
+      React.createElement(KiloPassReferralPageContent, {
+        summary: emptySummary,
+        subscriptionContext: {
+          status: 'paused',
+          cadence: KiloPassCadence.Monthly,
+          cancelAtPeriodEnd: false,
+        },
+      })
+    );
+    const cancelingHtml = renderToStaticMarkup(
+      React.createElement(KiloPassReferralPageContent, {
+        summary: emptySummary,
+        subscriptionContext: {
+          status: 'active',
+          cadence: KiloPassCadence.Monthly,
+          cancelAtPeriodEnd: true,
+        },
+      })
+    );
+    const unsubscribedHtml = renderToStaticMarkup(
+      React.createElement(KiloPassReferralPageContent, {
+        summary: emptySummary,
+        subscriptionContext: null,
+      })
+    );
+
+    expect(activeMonthlyHtml).toContain('Ready for future eligible monthly issuance');
+    expect(activeMonthlyHtml).toContain('oldest pending reward applies automatically');
+    expect(activeMonthlyHtml).not.toContain('Choose monthly Kilo Pass');
+
+    expect(annualHtml).toContain('Annual subscription cannot consume reward');
+    expect(annualHtml).toContain('Manage subscription');
+
+    expect(pausedHtml).toContain('Canceling or paused subscription needs future eligible issuance');
+    expect(pausedHtml).toContain('Manage subscription');
+
+    expect(cancelingHtml).toContain(
+      'Canceling or paused subscription needs future eligible issuance'
+    );
+    expect(cancelingHtml).toContain('Manage subscription');
+
+    expect(unsubscribedHtml).toContain('Pending until monthly subscription resumes or activates');
+    expect(unsubscribedHtml).toContain('Choose monthly Kilo Pass');
+    expect(unsubscribedHtml).toContain('Any Kilo user can share');
   });
 
   it('summarizes pending, applied, history, and cap-reached reward states', () => {
@@ -126,7 +198,9 @@ describe('KiloPassReferralPageContent', () => {
     expect(html).toContain('$9.50');
     expect(html).toContain('Cap reached');
     expect(html).toContain('5 of 5 referrer rewards');
-    expect(html).toContain('Waiting for a future eligible monthly issuance');
+    expect(html).toContain('eligible referees can still earn their reward');
+    expect(html).toContain('will not earn another referrer reward');
+    expect(html).toContain('Pending, applies automatically at future eligible monthly issuance');
     expect(html).toContain('Applied');
     expect(html).toContain('Needs review');
     expect(html).toContain('May 10, 2026');

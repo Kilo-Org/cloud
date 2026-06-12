@@ -34,11 +34,17 @@ async function getWidgetToken(product: ImpactAdvocateReferralProduct): Promise<W
   } | null;
 
   if (!response.ok || !payload?.token || !payload.widgetId) {
-    throw new Error(
-      payload?.error ??
-        (response.status === 503
+    const fallbackMessage =
+      product === 'kilo_pass' && response.status === 503
+        ? 'Kilo Pass referral sharing is unavailable right now. Rewards already earned stay pending and apply automatically when eligible.'
+        : response.status === 503
           ? 'Referral sharing is not configured in this environment.'
-          : 'Referral sharing is temporarily unavailable.')
+          : 'Referral sharing is temporarily unavailable.';
+
+    throw new Error(
+      product === 'kilo_pass' && response.status === 503
+        ? fallbackMessage
+        : (payload?.error ?? fallbackMessage)
     );
   }
 

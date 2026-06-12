@@ -2,7 +2,10 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from '@jest/globals';
 
-import { KiloPassReferralPageContent } from './KiloPassReferralPageContent';
+import {
+  getKiloPassReferralEligibilityPresentation,
+  KiloPassReferralPageContent,
+} from './KiloPassReferralPageContent';
 import type { KiloPassReferralRewardSummary } from './KiloPassReferralPageContent';
 import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 
@@ -140,6 +143,9 @@ describe('KiloPassReferralPageContent', () => {
       'Any Kilo user can refer! Redeem your reward with an active Kilo Pass.'
     );
     expect(unsubscribedHtml).toContain('More info: Kilo Pass referral reward mechanics');
+    expect(getKiloPassReferralEligibilityPresentation(null).details).toBe(
+      'Each reward applies automatically to your next eligible monthly credit bonus when you have an active monthly Kilo Pass.'
+    );
   });
 
   it('summarizes pending, applied, history, and cap-reached reward states', () => {

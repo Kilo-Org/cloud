@@ -56,7 +56,7 @@ function prioritizeMistralKeys(
   if (!MISTRAL_USER_BYOK_PROVIDER_IDS.every(providerId => providerIds.includes(providerId))) {
     return byok;
   }
-  const providerPriority = new Map(
+  const providerPriority = new Map<UserByokProviderId, number>(
     MISTRAL_USER_BYOK_PROVIDER_IDS.map((providerId, index) => [providerId, index])
   );
   return byok.toSorted(

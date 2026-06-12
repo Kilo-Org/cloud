@@ -9,12 +9,7 @@ jest.mock('@/lib/kiloclaw/setup-promo', () => ({
 }));
 
 import { resolveAutoModel } from './resolution';
-import {
-  BALANCED_RESPONSES_FALLBACK_MODEL,
-  BALANCED_MESSAGES_FALLBACK_MODEL,
-  BALANCED_QWEN_MODEL,
-  KILO_AUTO_EFFICIENT_MODEL,
-} from '@/lib/ai-gateway/auto-model';
+import { BALANCED_QWEN_MODEL, KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 
 const baseParams = {
@@ -85,24 +80,24 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: { model: 'anthropic/claude-haiku-4' } });
   });
 
-  it('falls back to BALANCED_RESPONSES_FALLBACK_MODEL when no thunk is provided and apiKind=responses', async () => {
+  it('falls back to BALANCED_QWEN_MODEL when no thunk is provided and apiKind=responses', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'responses' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_RESPONSES_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
   });
 
-  it('falls back to BALANCED_MESSAGES_FALLBACK_MODEL when no thunk is provided and apiKind=messages', async () => {
+  it('falls back to BALANCED_QWEN_MODEL when no thunk is provided and apiKind=messages', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'messages' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_MESSAGES_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
   });
 
   it('falls back to BALANCED_QWEN_MODEL when no thunk is provided and apiKind=chat_completions', async () => {

@@ -135,10 +135,8 @@ export async function resolveAutoModel(
         },
       };
     }
-    // Static fallback when the worker is slow/unavailable: same shape as
+    // Static fallback when the worker is slow/unavailable: same model as
     // balanced so an efficient request never degrades below balanced.
-    if (apiKind === 'responses') return { kind: 'ok', resolved: BALANCED_RESPONSES_FALLBACK_MODEL };
-    if (apiKind === 'messages') return { kind: 'ok', resolved: BALANCED_MESSAGES_FALLBACK_MODEL };
     return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
   }
   const mode = resolveMode(modeHeader, featureHeader);

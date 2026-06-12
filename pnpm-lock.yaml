@@ -2428,8 +2428,8 @@ importers:
         specifier: '>=0.25.0'
         version: 0.27.4
       openclaw:
-        specifier: 2026.6.5
-        version: 2026.6.5(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        specifier: 2026.6.6
+        version: 2026.6.6(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest:
         specifier: 'catalog:'
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -2452,8 +2452,8 @@ importers:
         specifier: '>=0.25.0'
         version: 0.27.4
       openclaw:
-        specifier: 2026.6.5
-        version: 2026.6.5(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        specifier: 2026.6.6
+        version: 2026.6.6(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest:
         specifier: 'catalog:'
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
@@ -13670,8 +13670,8 @@ packages:
       zod:
         optional: true
 
-  openclaw@2026.6.5:
-    resolution: {integrity: sha512-sRgF0TexfRcJX8Eg0lcL6Jj0YdZbSxUbbp8EbG+qo3v6TtVayE6tKPEs3oCKD7YfYe2C/8Qg26HUxTnycd44ZQ==}
+  openclaw@2026.6.6:
+    resolution: {integrity: sha512-oMYoQ8a7zummw1tD+AX98yYLzqoq0tQmYWHG65AA0ZivgzmOb2oD0cVdhcWP9IT3opkHdJ5vBdWywUe6xWQXtw==}
     engines: {node: '>=22.19.0'}
     hasBin: true
 
@@ -29946,7 +29946,7 @@ snapshots:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.4.3
 
-  openclaw@2026.6.5(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  openclaw@2026.6.6(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@agentclientprotocol/sdk': 0.22.1(zod@4.4.3)
       '@anthropic-ai/sdk': 0.100.1(zod@4.4.3)

@@ -104,6 +104,7 @@ type CloudAgentNextCallbackPayload = {
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
   terminalReason?: CodeReviewTerminalReason;
+  modelNotFoundRuntimeDiagnostics?: unknown;
   lastSeenBranch?: string;
   gateResult?: 'pass' | 'fail';
 };
@@ -114,6 +115,135 @@ type TerminalOwnerResolution = {
   owner: Owner;
   canDispatch: boolean;
 };
+
+type ModelNotFoundRuntimeDiagnostics = {
+  requestedModel: string;
+  availableModelCount: number;
+  availableModels: string[];
+  suggestedModels: string[];
+  suggestionSource: ModelNotFoundSuggestionSource;
+};
+
+type ModelNotFoundSuggestionSource = 'fuzzy' | 'first-five' | 'none';
+
+const MODEL_DIAGNOSTIC_MAX_MODEL_ID_LENGTH = 512;
+const MODEL_DIAGNOSTIC_MAX_SUGGESTIONS = 5;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidDiagnosticModelId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MODEL_DIAGNOSTIC_MAX_MODEL_ID_LENGTH
+  );
+}
+
+function hasUniqueEntries(values: string[]): boolean {
+  return new Set(values).size === values.length;
+}
+
+function isModelDiagnosticSuggestionSource(value: unknown): value is ModelNotFoundSuggestionSource {
+  return value === 'fuzzy' || value === 'first-five' || value === 'none';
+}
+
+function parseModelNotFoundRuntimeDiagnostics(
+  value: unknown
+): ModelNotFoundRuntimeDiagnostics | undefined {
+  if (!isRecord(value)) return undefined;
+  const requestedModel = value.requestedModel;
+  const availableModelCount = value.availableModelCount;
+  const availableModels = value.availableModels;
+  const suggestedModels = value.suggestedModels;
+  const suggestionSource = value.suggestionSource;
+
+  if (!isValidDiagnosticModelId(requestedModel)) return undefined;
+  if (
+    typeof availableModelCount !== 'number' ||
+    !Number.isInteger(availableModelCount) ||
+    availableModelCount < 0
+  ) {
+    return undefined;
+  }
+  if (!Array.isArray(availableModels) || !availableModels.every(isValidDiagnosticModelId)) {
+    return undefined;
+  }
+  if (availableModels.length !== availableModelCount || !hasUniqueEntries(availableModels)) {
+    return undefined;
+  }
+  if (
+    !Array.isArray(suggestedModels) ||
+    suggestedModels.length > MODEL_DIAGNOSTIC_MAX_SUGGESTIONS ||
+    !suggestedModels.every(isValidDiagnosticModelId) ||
+    !hasUniqueEntries(suggestedModels)
+  ) {
+    return undefined;
+  }
+  if (!isModelDiagnosticSuggestionSource(suggestionSource)) {
+    return undefined;
+  }
+  if (suggestionSource === 'none' && suggestedModels.length > 0) return undefined;
+  if (availableModelCount === 0 && (availableModels.length > 0 || suggestedModels.length > 0)) {
+    return undefined;
+  }
+
+  return {
+    requestedModel,
+    availableModelCount,
+    availableModels,
+    suggestedModels,
+    suggestionSource,
+  };
+}
+
+function getModelNotFoundRuntimeDiagnostics(
+  payload: StatusUpdatePayload,
+  terminalReason?: CodeReviewTerminalReason
+): ModelNotFoundRuntimeDiagnostics | undefined {
+  if (terminalReason !== 'model_not_found') return undefined;
+  if (!('modelNotFoundRuntimeDiagnostics' in payload)) return undefined;
+  return parseModelNotFoundRuntimeDiagnostics(payload.modelNotFoundRuntimeDiagnostics);
+}
+
+function getLoggableStatusErrorMessage(
+  errorMessage: string | undefined,
+  terminalReason: CodeReviewTerminalReason | undefined
+): string | undefined {
+  if (!errorMessage) return undefined;
+  if (terminalReason === 'model_not_found') return 'Model not found';
+  return errorMessage;
+}
+
+function captureRuntimeModelNotFoundDiagnostics(params: {
+  reviewId: string;
+  sessionId?: string;
+  diagnostics: ModelNotFoundRuntimeDiagnostics;
+}): void {
+  const { reviewId, sessionId, diagnostics } = params;
+  const tags = {
+    source: 'code-review-runtime-model-not-found',
+    review_id: reviewId,
+    cloud_agent_session_id: sessionId ?? '',
+  };
+  const extra = {
+    requestedModel: diagnostics.requestedModel,
+    availableModelCount: diagnostics.availableModelCount,
+    availableModels: diagnostics.availableModels,
+    suggestedModels: diagnostics.suggestedModels,
+    suggestionSource: diagnostics.suggestionSource,
+  };
+  captureMessage('Code review runtime model not found', {
+    level: 'warning',
+    tags,
+    extra,
+  });
+  logExceptInTest('[code-review-status] Code review runtime model not found', {
+    reviewId,
+    sessionId,
+    ...extra,
+  });
+}
 
 /**
  * Normalize a payload from either the orchestrator or cloud-agent-next callback
@@ -846,6 +976,7 @@ export async function POST(
       });
     }
 
+    const loggableErrorMessage = getLoggableStatusErrorMessage(errorMessage, terminalReason);
     logExceptInTest('[code-review-status] Received status update', {
       reviewId,
       attemptId,
@@ -853,7 +984,7 @@ export async function POST(
       cliSessionId,
       status,
       hasError: !!errorMessage,
-      ...(errorMessage ? { errorMessage } : {}),
+      ...(loggableErrorMessage ? { errorMessage: loggableErrorMessage } : {}),
     });
 
     // Get current review to check if update is needed
@@ -942,6 +1073,11 @@ export async function POST(
         message: 'Stale callback from superseded session',
       });
     }
+
+    const modelNotFoundRuntimeDiagnostics = getModelNotFoundRuntimeDiagnostics(
+      rawPayload,
+      terminalReason
+    );
 
     let terminalOwnerResolution: TerminalOwnerResolution | undefined;
     const getTerminalOwnerResolution = async () => {
@@ -1116,6 +1252,13 @@ export async function POST(
         return NextResponse.json({
           success: true,
           message: 'Review already in terminal state',
+        });
+      }
+      if (modelNotFoundRuntimeDiagnostics) {
+        captureRuntimeModelNotFoundDiagnostics({
+          reviewId,
+          sessionId,
+          diagnostics: modelNotFoundRuntimeDiagnostics,
         });
       }
     } else {

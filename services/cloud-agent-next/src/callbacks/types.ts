@@ -1,4 +1,5 @@
 import type { SafeFailureProjection } from '../session/safe-failure-projection.js';
+import type { ModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
 
 export type CallbackTarget = {
   url: string;
@@ -20,6 +21,7 @@ export type ExecutionCallbackPayload = {
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
   failure?: SafeFailureProjection;
+  modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
   /** Present when errorMessage was shortened to fit the callback queue. */
   errorMessageTruncation?: CallbackTextTruncation;
   lastSeenBranch?: string;

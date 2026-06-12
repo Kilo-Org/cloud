@@ -20,6 +20,7 @@ import {
 } from './session-message-state.js';
 import { projectSafeFailure, type SafeFailureProjection } from './safe-failure-projection.js';
 import type { AssistantMessagePart, LatestAssistantMessage } from './types.js';
+import { formatModelNotFoundDashboardError } from '../shared/runtime-model-diagnostics.js';
 
 const CURRENT_IDLE_BATCH_CALLBACK_KEY = 'idle_batch_callback_current';
 const IDLE_BATCH_CALLBACK_PREFIX = 'idle_batch_callback:';
@@ -441,14 +442,18 @@ export function createMessageSettlementOutbox(
         ? undefined
         : (failure?.message ??
           (status === 'failed' ? 'The message failed' : 'The message was interrupted'));
+    const modelNotFoundDashboardError = state.modelNotFoundRuntimeDiagnostics
+      ? formatModelNotFoundDashboardError(state.modelNotFoundRuntimeDiagnostics)
+      : undefined;
     const payload: CallbackJob['payload'] = {
       sessionId,
       cloudAgentSessionId: sessionId,
       executionId: state.messageId,
       messageId: state.messageId,
       status,
-      errorMessage: legacyErrorMessage,
+      errorMessage: modelNotFoundDashboardError ?? legacyErrorMessage,
       failure,
+      modelNotFoundRuntimeDiagnostics: state.modelNotFoundRuntimeDiagnostics,
       lastSeenBranch: metadata?.repository?.upstreamBranch,
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,

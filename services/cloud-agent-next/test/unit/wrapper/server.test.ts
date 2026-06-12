@@ -47,6 +47,9 @@ function createMockKiloClient(): WrapperKiloClient {
     getSessionStatuses: vi.fn().mockResolvedValue({}),
     getQuestions: vi.fn().mockResolvedValue([]),
     getPermissions: vi.fn().mockResolvedValue([]),
+    getNetworkWaits: vi.fn().mockResolvedValue([]),
+    resumeNetworkWait: vi.fn().mockResolvedValue(true),
+    listEffectiveModels: vi.fn().mockResolvedValue([]),
     subscribeEvents: vi.fn().mockResolvedValue({ stream: undefined }),
     serverUrl: 'http://127.0.0.1:0',
   };

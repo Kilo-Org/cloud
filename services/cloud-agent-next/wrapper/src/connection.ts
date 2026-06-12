@@ -14,6 +14,8 @@ import type { IngestEvent, WrapperCommand } from '../../src/shared/protocol.js';
 import { trimPayload } from '../../src/shared/trim-payload.js';
 import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
+import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-model-diagnostics.js';
+import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -165,6 +167,7 @@ export type ConnectionConfig = {
 export type AssistantTerminalError = {
   error: string;
   errorSource: 'assistant';
+  modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
 };
 
 export type ConnectionCallbacks = {
@@ -232,6 +235,7 @@ const RECONNECT_BASE_DELAY_MS = 1_000;
  *  a silently stuck HTTP stream. */
 const SUBSCRIBE_HANDSHAKE_TIMEOUT_MS = 5_000;
 const INGEST_INITIAL_CONNECT_TIMEOUT_MS = 10_000;
+const MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS = 1_000;
 
 function buildIngestWebSocketUrl(session: NonNullable<WrapperState['currentSession']>): string {
   const url = new URL(session.ingestUrl);
@@ -803,6 +807,82 @@ export function createConnectionManager(
     return `Insufficient credits: ${eventType}`;
   }
 
+  function isModelNotFoundMessage(message: string): boolean {
+    return /\bmodel\s+(?:was\s+)?not\s+found\b/i.test(message);
+  }
+
+  function shouldFetchModelNotFoundDiagnostics(
+    eventType: string,
+    properties: Record<string, unknown>,
+    terminalErrorText: string
+  ): boolean {
+    if (eventType !== 'session.error') return false;
+    if (!isCodeReviewJob(state)) return false;
+    if (properties.sessionID !== state.currentSession?.kiloSessionId) return false;
+    return isModelNotFoundMessage(terminalErrorText);
+  }
+
+  function logModelDiagnosticUnavailable(reason: string, requestedModel?: string): void {
+    logToFile(
+      JSON.stringify({
+        message: 'model_not_found_runtime_diagnostics_unavailable',
+        reason,
+        agentSessionId: state.currentSession?.agentSessionId,
+        kiloSessionId: state.currentSession?.kiloSessionId,
+        requestedModel,
+      })
+    );
+  }
+
+  async function listEffectiveModelsForDiagnostics(
+    requestedModel: string
+  ): Promise<string[] | undefined> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<undefined>(resolve => {
+      timeoutId = setTimeout(() => {
+        logModelDiagnosticUnavailable(
+          `timed out after ${MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS}ms`,
+          requestedModel
+        );
+        resolve(undefined);
+      }, MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS);
+    });
+
+    try {
+      return await Promise.race([config.kiloClient.listEffectiveModels('kilo'), timeout]);
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
+  }
+
+  async function maybeBuildModelNotFoundDiagnostics(
+    eventType: string,
+    properties: Record<string, unknown>,
+    terminalErrorText: string
+  ): Promise<ModelNotFoundRuntimeDiagnostics | undefined> {
+    if (!shouldFetchModelNotFoundDiagnostics(eventType, properties, terminalErrorText)) {
+      return undefined;
+    }
+
+    const requestedModel = state.batchFinalizationConfig?.model?.trim();
+    if (!requestedModel) {
+      logModelDiagnosticUnavailable('missing_requested_model');
+      return undefined;
+    }
+
+    try {
+      const availableModels = await listEffectiveModelsForDiagnostics(requestedModel);
+      if (!availableModels) return undefined;
+      return buildModelNotFoundRuntimeDiagnostics(requestedModel, availableModels);
+    } catch (error) {
+      logModelDiagnosticUnavailable(
+        error instanceof Error ? error.message : String(error),
+        requestedModel
+      );
+      return undefined;
+    }
+  }
+
   function maybeResumeNetworkWait(eventType: string, properties: Record<string, unknown>): void {
     if (eventType !== 'session.network.restored') return;
 
@@ -1025,9 +1105,16 @@ export function createConnectionManager(
 
           // Terminal error detection
           if (isTerminalError(eventType, properties)) {
+            const terminalErrorText = getTerminalErrorText(eventType, properties);
+            const modelNotFoundRuntimeDiagnostics = await maybeBuildModelNotFoundDiagnostics(
+              eventType,
+              properties,
+              terminalErrorText
+            );
             callbacks.onTerminalError({
-              error: getTerminalErrorText(eventType, properties),
+              error: terminalErrorText,
               errorSource: 'assistant',
+              ...(modelNotFoundRuntimeDiagnostics ? { modelNotFoundRuntimeDiagnostics } : {}),
             });
             return;
           }

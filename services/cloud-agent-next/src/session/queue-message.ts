@@ -35,37 +35,38 @@ function isRetryableCode(code: string): code is RetryableResultCode {
   return RETRYABLE_CODES.includes(code as RetryableResultCode);
 }
 
-type NonRetryableCode = Exclude<
-  Extract<SessionMessageAdmissionResult, { success: false }>['code'],
-  RetryableResultCode
->;
+type AdmissionFailureCode = Extract<SessionMessageAdmissionResult, { success: false }>['code'];
+type NonTransientExecutionCode = Exclude<AdmissionFailureCode, RetryableResultCode>;
 
 type TRPCCodeName = ConstructorParameters<typeof TRPCError>[0]['code'];
 
-const PERMANENT_CODE_TO_TRPC: Record<NonRetryableCode, TRPCCodeName> = {
+const ADMISSION_CODE_TO_TRPC: Record<NonTransientExecutionCode, TRPCCodeName> = {
   NOT_FOUND: 'NOT_FOUND',
   BAD_REQUEST: 'BAD_REQUEST',
   PENDING_QUEUE_FULL: 'TOO_MANY_REQUESTS',
   INTERNAL: 'INTERNAL_SERVER_ERROR',
 };
 
+function isAdmissionFailureRetryable(code: AdmissionFailureCode): boolean {
+  return isRetryableCode(code) || code === 'PENDING_QUEUE_FULL' || code === 'INTERNAL';
+}
+
 export function throwAdmissionError(
   result: Extract<SessionMessageAdmissionResult, { success: false }>
 ): never {
-  if (isRetryableCode(result.code)) {
-    throw new TRPCError({
-      code: 'SERVICE_UNAVAILABLE',
+  const explicitlyRetryable = isAdmissionFailureRetryable(result.code);
+  const code = isRetryableCode(result.code)
+    ? 'SERVICE_UNAVAILABLE'
+    : (ADMISSION_CODE_TO_TRPC[result.code] ?? 'INTERNAL_SERVER_ERROR');
+  throw new TRPCError({
+    code,
+    message: result.error,
+    cause: {
+      error: result.code,
       message: result.error,
-      cause: {
-        error: result.code,
-        message: result.error,
-        retryable: true,
-      },
-    });
-  }
-
-  const code = PERMANENT_CODE_TO_TRPC[result.code] ?? 'INTERNAL_SERVER_ERROR';
-  throw new TRPCError({ code, message: result.error });
+      retryable: explicitlyRetryable,
+    },
+  });
 }
 
 export type QueueMessageInput = {
@@ -170,7 +171,7 @@ export async function queueMessage(
         sessionId,
         userId: ctx.userId,
         resultCode: result.code,
-        retryable: isRetryableCode(result.code),
+        retryable: isAdmissionFailureRetryable(result.code),
       })
       .warn('Cloud-agent Durable Object rejected message admission request');
     throwAdmissionError(result);

@@ -55,11 +55,14 @@ export const subjects = {
   creditsTopUp: 'Your Kilo credit top-up',
   kiloClawSubscriptionStarted: 'Your KiloClaw subscription is active',
   kiloPassDuplicateCardCanceled: 'Kilo Pass: Subscription Cancelled',
+  securityFindingNew: 'Kilo Security Agent: New finding',
+  securityFindingSlaWarning: 'Kilo Security Agent: SLA warning',
+  securityFindingSlaBreach: 'Kilo Security Agent: SLA breached',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
 
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

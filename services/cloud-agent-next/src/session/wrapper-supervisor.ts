@@ -18,6 +18,7 @@ import {
   type SessionMessageState,
   type SessionMessageStorage,
 } from './session-message-state.js';
+import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
 import type { LatestAssistantMessage } from './types.js';
 import {
   MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE,
@@ -98,6 +99,7 @@ export type WrapperTerminalEvent = {
   errorSource?: 'assistant';
   modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
   interruptionSource?: 'container_shutdown';
+  failureCode?: WrapperTerminalFailureCode;
   gateResult?: 'pass' | 'fail';
   messageIds?: string[];
 };
@@ -1047,6 +1049,7 @@ export function createWrapperSupervisor(
       errorSource,
       modelNotFoundRuntimeDiagnostics,
       interruptionSource,
+      failureCode: terminalFailureCode,
       gateResult,
       messageIds,
     } = params;
@@ -1117,7 +1120,7 @@ export function createWrapperSupervisor(
               error: error ?? 'Assistant request failed',
               completionSource: 'wrapper_failure',
               failureStage: 'agent_activity',
-              failureCode: 'assistant_error',
+              failureCode: terminalFailureCode ?? 'assistant_error',
               safeFailureMessage: classifyAssistantFailureMessage(error),
               ...(persistedModelNotFoundDiagnostics
                 ? { modelNotFoundRuntimeDiagnostics: persistedModelNotFoundDiagnostics }
@@ -1133,9 +1136,9 @@ export function createWrapperSupervisor(
             error: error ?? 'Wrapper error',
             completionSource: 'wrapper_failure',
             failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-            failureCode: activityObserved
-              ? 'wrapper_error_after_activity'
-              : 'wrapper_error_before_activity',
+            failureCode:
+              terminalFailureCode ??
+              (activityObserved ? 'wrapper_error_after_activity' : 'wrapper_error_before_activity'),
           });
           continue;
         }

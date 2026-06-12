@@ -2,19 +2,22 @@
 
 ## Role of This Document
 
-This spec defines the business rules and outcome guarantees for Security Agent Auto Remediation. It is the source of truth for what users should be able to rely on when Security Agent creates or manages remediation work for security findings.
+This spec defines the business rules and outcome guarantees for Security Agent Auto Remediation and Security Agent Notifications. It is the source of truth for what users should be able to rely on when Security Agent creates or manages remediation work and sends New-finding, SLA Warning, or SLA Breach Notifications.
 
-This document deliberately does not specify database tables, queue design, worker names, router names, UI layout, or prompt implementation details. Those belong in plans and code.
+This document deliberately does not specify database tables, queue design, worker names, router names, UI layout, email markup, or prompt implementation details. Those belong in plans and code.
 
 ## Status
 
-Draft -- created 2026-06-09.
+Draft -- created 2026-06-09; notification rules added 2026-06-11.
 
 ## Scope
 
-This spec covers the Auto Remediation capability of Security Agent.
+This spec covers two Security Agent capabilities:
 
-It does not backfill the complete Security Agent product spec. Existing Security Agent behavior such as finding sync, Auto Analysis, Auto Dismiss, dashboard statistics, SLA calculation, and Dependabot writeback is included only where it affects Auto Remediation outcomes.
+- Auto Remediation;
+- New-finding, SLA Warning, and SLA Breach Notifications.
+
+It does not backfill the complete Security Agent product spec. Existing Security Agent behavior such as finding sync, Auto Analysis, Auto Dismiss, dashboard statistics, SLA calculation, and Dependabot writeback is included only where it affects Auto Remediation or notification outcomes.
 
 ## Conventions
 
@@ -32,8 +35,14 @@ BDD-style scenarios use "Given", "When", and "Then" to describe user-visible beh
 - **Automatic Remediation**: A Security Remediation started by Auto Remediation policy without a per-finding user click.
 - **Bulk Existing Remediation**: Automatic remediation of already-analyzed findings included because the user enabled the include-existing setting.
 - **Sandbox Analysis**: The completed codebase-level analysis that determines whether a finding is exploitable in the repository and whether opening a PR is the recommended action.
+- **Security Agent Notification**: A durable per-finding, per-recipient identity with one notification kind.
+- **New-finding Notification**: A Security Agent Notification admitted when an eligible finding is first inserted into Kilo.
+- **SLA Warning Notification**: A Security Agent Notification admitted when an eligible open finding enters its configured pre-deadline warning window.
+- **SLA Breach Notification**: A Security Agent Notification admitted when an eligible open finding reaches or passes its persisted SLA deadline.
+- **Notification Recipient**: The personal owner or a current organization owner authorized to receive a notification for a finding.
+- **Email Delivery**: An attempt to render and send one Security Agent Notification through the email provider.
 
-## Configuration
+## Auto Remediation configuration
 
 Auto Remediation MUST be off by default.
 
@@ -416,6 +425,204 @@ Given Auto Remediation starts a remediation after analysis
 When the remediation appears in history
 Then Security Agent SHOULD identify it as policy-driven automatic remediation.
 
+## Security Agent Notifications
+
+### Delivery and policy ownership
+
+Security Agent notifications MUST use email as the only delivery channel in v1. The system MUST NOT expose a channel selector until another complete delivery destination is supported.
+
+Notification evaluation and Email Delivery are asynchronous. V1 does not guarantee real-time email delivery. A delivery failure MUST NOT roll back or cause replay of a successful source synchronization.
+
+Notification policy MUST follow the existing Security Agent owner boundary:
+
+- a personal Security Agent policy belongs to its owning user;
+- an organization Security Agent policy belongs to the organization;
+- organization notification settings MUST use the same settings permissions as the rest of the organization Security Agent configuration.
+
+Personal notifications MUST be addressed only to the user who owns the finding. Organization notifications MUST be addressed to every current organization member with role `owner`. Members with role `member` or `billing_manager` MUST NOT receive organization Security Agent notifications solely because of those roles.
+
+Per-member organization overrides are outside v1.
+
+### Notification configuration
+
+Users MUST be able to configure:
+
+- whether New-finding Notifications are enabled;
+- the minimum severity for New-finding Notifications;
+- whether SLA tracking is enabled;
+- whether SLA warning and breach notifications are enabled;
+- the minimum severity for SLA notifications;
+- the warning lead time in whole days.
+
+The defaults MUST be:
+
+| Setting | Default |
+|---|---|
+| New-finding Notifications enabled | `false` |
+| New-finding minimum severity | `high` |
+| SLA tracking enabled | `true` |
+| SLA notifications enabled | `false` |
+| SLA minimum severity | `high` |
+| SLA warning lead time | `3` days |
+
+Warning lead time MUST be a whole number from 1 through 365 days.
+
+Notification severity settings MUST use `critical`, `high`, `medium`, and `low` as minimum thresholds:
+
+| Minimum | Eligible severities |
+|---|---|
+| `critical` | critical |
+| `high` | critical, high |
+| `medium` | critical, high, medium |
+| `low` | critical, high, medium, low |
+
+Unknown severity or malformed notification settings MUST NOT be interpreted as a less restrictive policy. Missing notification fields in a legacy configuration MUST use the defaults above. If a stored notification value is present but invalid, Security Agent MUST withhold notification work for that owner until valid settings are saved. This quarantine MUST NOT block finding sync or notification processing for other owners. It MUST NOT discard unsent notification history solely because the stored setting is malformed. If malformed policy is detected after notification work has started, Security Agent MUST retain that unsent event for later evaluation without cancelling it or counting a delivery failure.
+
+New-finding Notifications MUST be off by default. Enabling them affects only future inserted findings; enabling them later MUST NOT replay historical insertions.
+
+### New-finding eligibility
+
+A finding is eligible for a New-finding Notification only when all of these conditions are true:
+
+- the finding is first inserted into Kilo rather than updated;
+- its effective status is open;
+- Security Agent is enabled for its owner;
+- New-finding Notifications are enabled for its owner;
+- its severity meets the configured new-finding minimum;
+- it remains canonical after duplicate consolidation.
+
+An existing source alert discovered during an owner's first Security Agent sync counts as new because that sync first inserts it into Kilo.
+
+Security Agent MUST NOT create a New-finding Notification because an existing finding was unchanged, had its severity updated, was reopened, or later became eligible after a threshold was lowered. Fixed, ignored, and superseded findings MUST NOT produce New-finding Notifications.
+
+### Scenario: First import counts as new
+
+Given an open source alert has not previously been stored in Kilo for an owner
+And New-finding Notifications are enabled for that owner
+And its severity meets that owner's new-finding threshold
+When Security Agent first imports the alert
+Then Security Agent MUST treat it as an eligible new finding.
+
+### Scenario: Existing finding is not new again
+
+Given a finding was previously stored for an owner
+When a later sync updates it or reopens it
+Then Security Agent MUST NOT create another New-finding Notification for that finding and recipient.
+
+### SLA warning eligibility
+
+An open finding is eligible for an SLA Warning Notification only when all of these conditions are true:
+
+- Security Agent is enabled for its owner;
+- SLA tracking is enabled for its owner;
+- SLA notifications are enabled;
+- `sla_due_at` is present;
+- severity meets configured SLA minimum;
+- current time is at or after `sla_due_at` minus configured warning days;
+- current time is before `sla_due_at`.
+
+Notification policy MUST use persisted `sla_due_at`. It MUST NOT recalculate deadline from source timestamps during notification evaluation.
+
+### SLA breach eligibility
+
+An open finding is eligible for an SLA Breach Notification only when all of these conditions are true:
+
+- Security Agent is enabled for its owner;
+- SLA tracking is enabled for its owner;
+- SLA notifications are enabled;
+- `sla_due_at` is present;
+- severity meets configured SLA minimum;
+- current time is at or after `sla_due_at`.
+
+A finding is breached at exact deadline equality.
+
+### Scenario: Warning and breach boundaries
+
+Given an eligible open finding has a persisted SLA deadline
+When current time equals its warning boundary and remains before deadline
+Then Security Agent MUST consider warning eligible.
+
+Given current time equals or passes persisted SLA deadline
+Then Security Agent MUST consider breach eligible.
+And Security Agent MUST NOT create a stale warning if no warning was created before deadline.
+
+### Event independence and repetition
+
+Security Agent MUST admit at most one New-finding Notification, one SLA Warning Notification, and one SLA Breach Notification per finding and recipient.
+
+A warning MUST NOT suppress later breach. A New-finding Notification MUST NOT suppress a warning or breach. A newly inserted finding that is already in warning window or already breached MAY produce both its New-finding Notification and current eligible SLA event. A breached finding MUST NOT also receive stale warning.
+
+Repeated syncs and repeated scheduled evaluations MUST NOT intentionally create duplicate notification events. Reopening a finding or moving its SLA deadline MUST NOT reset sent notification history.
+
+Email delivery is at least once. A provider acceptance followed by failure to record success MAY result in a duplicate email. This limitation does not permit the system to intentionally create duplicate semantic events.
+
+### Scenario: Overlapping events
+
+Given an eligible finding is first inserted into Kilo
+And it is already past persisted SLA deadline
+When notification eligibility is evaluated
+Then Security Agent MAY send one New-finding Notification and one SLA Breach Notification.
+And Security Agent MUST NOT send an SLA Warning Notification for that evaluation.
+
+### Changes before delivery
+
+Security Agent MUST recheck current finding state, enabled settings, severity policy, SLA boundary, and recipient authorization before sending an email.
+
+Unsent notification work MUST be cancelled when it is no longer eligible, including when:
+
+- finding is fixed, ignored, superseded, or deleted;
+- Security Agent is disabled;
+- relevant severity threshold is raised above finding severity;
+- New-finding Notifications are disabled for new-finding work;
+- SLA tracking is disabled for warning or breach work;
+- SLA notifications are disabled for warning or breach work;
+- recipient no longer owns personal finding or is no longer an organization owner.
+
+A cancelled New-finding Notification MUST remain terminal. Lowering a threshold or re-enabling Security Agent later MUST NOT replay that historical insertion.
+
+An unsent cancelled SLA warning or breach MAY become pending again when current policy, finding state, and recipient authorization make same event eligible. This applies when SLA notifications are re-enabled, SLA threshold is lowered, or organization owner authorization is restored. Sent and permanently failed notifications MUST NOT reactivate.
+
+### Scenario: Policy changes before send
+
+Given an SLA notification is waiting to be sent
+When owner disables SLA notifications or raises threshold above finding severity
+Then Security Agent MUST cancel unsent notification.
+
+Given same warning or breach has not been sent
+When owner later restores policy while finding remains in corresponding SLA window
+Then Security Agent MAY reactivate same notification event.
+
+Given a New-finding Notification was cancelled
+When owner later lowers new-finding threshold, enables New-finding Notifications, or re-enables Security Agent
+Then Security Agent MUST NOT reactivate historical New-finding Notification.
+
+### Organization membership changes
+
+Organization recipients MUST be based on current owner membership.
+
+A person promoted to organization owner MUST NOT receive historical New-finding Notifications. They MAY receive current SLA warning or breach on next evaluation. A removed owner MUST NOT receive an unsent organization notification after removal.
+
+### Repository selection
+
+Removing a repository from Security Agent selection stops future syncs for that repository but does not, by itself, close persisted findings. Open persisted findings remain SLA-eligible until fixed, ignored, superseded, or deleted.
+
+### Notification content
+
+Notification emails SHOULD contain only information needed to act:
+
+- severity;
+- repository name;
+- finding title;
+- finding description;
+- CVE, GHSA, and CVSS metadata when available;
+- SLA deadline for warning and breach;
+- one primary link to owner-appropriate Security Agent findings list;
+- one link to manage relevant Security Agent notification settings.
+
+Repository, CVE, and GHSA metadata MAY link to the canonical public GitHub repository, CVE record, and GitHub Security Advisory pages when those identifiers validate. These links are supporting metadata, not app navigation CTAs.
+
+Notification email MUST NOT expose raw advisory payloads, internal credentials, or another owner's finding data.
+
 ## V1 Exclusions
 
 The following are intentionally outside the guaranteed v1 behavior:
@@ -426,4 +633,6 @@ The following are intentionally outside the guaranteed v1 behavior:
 - Combining multiple Security Findings into one planned remediation.
 - GitLab security finding remediation.
 - Settings-time or launch-time repository write-permission preflight by Security Agent.
-- Backfilling complete specifications for Security Agent features unrelated to Auto Remediation.
+- Notification channels other than email.
+- Per-member organization notification overrides.
+- Backfilling complete specifications for Security Agent features unrelated to Auto Remediation or Security Agent Notifications.

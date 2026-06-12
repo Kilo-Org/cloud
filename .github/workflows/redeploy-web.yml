@@ -10,9 +10,6 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
-env:
-  VERCEL_VERSION: '53.3.1'
-
 jobs:
   verify-main:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -26,54 +23,30 @@ jobs:
             exit 1
           fi
 
-  deploy-app:
+  stage-app:
     needs: verify-main
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 30
-    environment: production
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      vercel_project_id_var: VERCEL_PROJECT_ID_APP
+    secrets: inherit
 
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_APP }}
-
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
-
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - run: npx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-
-      - name: Deploy to Vercel
-        run: npx vercel@${{ env.VERCEL_VERSION }} deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-  deploy-global-app:
+  stage-global-app:
     needs: verify-main
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 30
-    environment: production
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
+    secrets: inherit
 
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_GLOBAL_APP }}
+  promote-app:
+    needs: stage-app
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
+    secrets: inherit
 
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
-
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - run: npx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-
-      - name: Deploy to Vercel
-        run: npx vercel@${{ env.VERCEL_VERSION }} deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+  promote-global-app:
+    needs: stage-global-app
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
+    secrets: inherit

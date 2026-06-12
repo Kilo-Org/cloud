@@ -1138,7 +1138,8 @@ describe('ingest WS reconnection', () => {
     expect(sessionErrors).toHaveLength(1);
     expect(listEffectiveModels).toHaveBeenCalledWith('kilo');
     expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-      error: 'Model not found: kilo/zzzzzzzz.',
+      code: 'model_missing',
+      message: 'Model not found: kilo/zzzzzzzz.',
       errorSource: 'assistant',
       modelNotFoundRuntimeDiagnostics: {
         requestedModel: 'kilo/zzzzzzzz',
@@ -1193,7 +1194,8 @@ describe('ingest WS reconnection', () => {
 
     expect(listEffectiveModels).toHaveBeenCalledWith('kilo');
     expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-      error: 'Model not found: kilo/retired-model.',
+      code: 'model_missing',
+      message: 'Model not found: kilo/retired-model.',
       errorSource: 'assistant',
     });
   });
@@ -1232,7 +1234,8 @@ describe('ingest WS reconnection', () => {
     await vi.advanceTimersByTimeAsync(1_000);
 
     expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-      error: 'Model not found: kilo/retired-model.',
+      code: 'model_missing',
+      message: 'Model not found: kilo/retired-model.',
       errorSource: 'assistant',
     });
   });
@@ -1260,7 +1263,8 @@ describe('ingest WS reconnection', () => {
 
     expect(listEffectiveModels).not.toHaveBeenCalled();
     expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-      error: 'Model not found: kilo/retired-model.',
+      code: 'model_missing',
+      message: 'Model not found: kilo/retired-model.',
       errorSource: 'assistant',
     });
   });
@@ -1317,7 +1321,7 @@ describe('ingest WS reconnection', () => {
       await vi.advanceTimersByTimeAsync(0);
 
       expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-        error: errorMessage,
+        message: errorMessage,
         errorSource: 'assistant',
       });
     }
@@ -1628,7 +1632,8 @@ describe('ingest WS reconnection', () => {
       expect(callbacks.onTerminalError).toHaveBeenCalledTimes(terminal ? 1 : 0);
       if (terminal) {
         expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-          error: 'Insufficient credits',
+          ...(eventType === 'usage_limit_exceeded' ? {} : { code: 'payment_required' }),
+          message: 'Insufficient credits',
           errorSource: 'assistant',
         });
       }

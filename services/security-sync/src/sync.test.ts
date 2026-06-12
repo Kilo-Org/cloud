@@ -62,6 +62,7 @@ function createFakeDb(options: FakeDbOptions = {}) {
       }),
     }),
     execute: async () => ({ rows: [] }),
+    transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback(db),
   };
 
   return { db, sets };

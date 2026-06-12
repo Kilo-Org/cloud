@@ -190,6 +190,7 @@ type SecurityFindingRowProps = {
   onCancelRemediation?: (attemptId: string, findingId?: string) => void;
   isStartingRemediation?: boolean;
   isCancellingRemediation?: boolean;
+  slaDisplay?: 'visible' | 'hidden';
 };
 
 function formatCompactDistance(date: Date) {
@@ -221,6 +222,7 @@ export function SecurityFindingRow({
   onCancelRemediation,
   isStartingRemediation,
   isCancellingRemediation,
+  slaDisplay = 'visible',
 }: SecurityFindingRowProps) {
   const severity: Severity = isSeverity(finding.severity) ? finding.severity : 'medium';
   const canStartAnalysis =
@@ -239,6 +241,7 @@ export function SecurityFindingRow({
     remediationStatus === 'pr_opened' && remediation?.prUrl ? remediation.prUrl : null;
   const isHighlighted =
     finding.status === 'open' &&
+    slaDisplay === 'visible' &&
     finding.sla_due_at !== null &&
     isPast(new Date(finding.sla_due_at));
 

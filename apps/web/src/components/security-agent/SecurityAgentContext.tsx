@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
-import type { SlaConfig } from './SecurityConfigForm';
+import type { SlaConfig } from './security-config-types';
 import {
   getSecurityAgentCommandFailureTitle,
   getSecurityAgentDismissalTerminalTitle,
@@ -43,6 +43,7 @@ type SecurityAgentContextValue = {
         slaHighDays: number;
         slaMediumDays: number;
         slaLowDays: number;
+        slaEnabled: boolean;
         repositorySelectionMode: 'all' | 'selected';
         selectedRepositoryIds: number[];
         modelSlug?: string;
@@ -59,6 +60,11 @@ type SecurityAgentContextValue = {
         autoRemediationIncludeExisting: boolean;
         autoRemediationEnabledAt: string | null;
         remediationModelSlug?: string;
+        slaNotificationsEnabled: boolean;
+        slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+        slaNotificationWarningDays: number;
+        newFindingNotificationsEnabled: boolean;
+        newFindingNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
       }
     | undefined;
   refetchConfig: () => Promise<unknown>;
@@ -77,6 +83,7 @@ type SecurityAgentContextValue = {
   ) => void;
   handleSaveConfig: (
     config: SlaConfig & {
+      slaEnabled: boolean;
       repositorySelectionMode: 'all' | 'selected';
       selectedRepositoryIds: number[];
       triageModelSlug: string;
@@ -92,7 +99,13 @@ type SecurityAgentContextValue = {
       autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
       autoRemediationIncludeExisting: boolean;
       remediationModelSlug: string;
-    }
+      slaNotificationsEnabled: boolean;
+      slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+      slaNotificationWarningDays: number;
+      newFindingNotificationsEnabled: boolean;
+      newFindingNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+    },
+    options?: { onSuccess?: () => void; onError?: () => void }
   ) => void;
   handleToggleEnabled: (
     enabled: boolean,
@@ -1130,6 +1143,7 @@ function useSecurityAgentProviderValue(
   const handleSaveConfig = useCallback(
     (
       config: SlaConfig & {
+        slaEnabled: boolean;
         repositorySelectionMode: 'all' | 'selected';
         selectedRepositoryIds: number[];
         triageModelSlug: string;
@@ -1145,7 +1159,13 @@ function useSecurityAgentProviderValue(
         autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoRemediationIncludeExisting: boolean;
         remediationModelSlug: string;
-      }
+        slaNotificationsEnabled: boolean;
+        slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+        slaNotificationWarningDays: number;
+        newFindingNotificationsEnabled: boolean;
+        newFindingNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+      },
+      options?: { onSuccess?: () => void; onError?: () => void }
     ) => {
       const modelConfigPayload = {
         triageModelSlug: config.triageModelSlug,
@@ -1155,44 +1175,62 @@ function useSecurityAgentProviderValue(
       };
 
       if (isOrg && organizationId) {
-        orgSaveConfigMutate({
-          organizationId,
-          slaCriticalDays: config.critical,
-          slaHighDays: config.high,
-          slaMediumDays: config.medium,
-          slaLowDays: config.low,
-          repositorySelectionMode: config.repositorySelectionMode,
-          selectedRepositoryIds: config.selectedRepositoryIds,
-          analysisMode: config.analysisMode,
-          autoDismissEnabled: config.autoDismissEnabled,
-          autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
-          autoAnalysisEnabled: config.autoAnalysisEnabled,
-          autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
-          autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
-          autoRemediationEnabled: config.autoRemediationEnabled,
-          autoRemediationMinSeverity: config.autoRemediationMinSeverity,
-          autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
-          ...modelConfigPayload,
-        });
+        orgSaveConfigMutate(
+          {
+            organizationId,
+            slaCriticalDays: config.critical,
+            slaHighDays: config.high,
+            slaMediumDays: config.medium,
+            slaLowDays: config.low,
+            slaEnabled: config.slaEnabled,
+            repositorySelectionMode: config.repositorySelectionMode,
+            selectedRepositoryIds: config.selectedRepositoryIds,
+            analysisMode: config.analysisMode,
+            autoDismissEnabled: config.autoDismissEnabled,
+            autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
+            autoAnalysisEnabled: config.autoAnalysisEnabled,
+            autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
+            autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
+            autoRemediationEnabled: config.autoRemediationEnabled,
+            autoRemediationMinSeverity: config.autoRemediationMinSeverity,
+            autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            slaNotificationsEnabled: config.slaNotificationsEnabled,
+            slaNotificationMinSeverity: config.slaNotificationMinSeverity,
+            slaNotificationWarningDays: config.slaNotificationWarningDays,
+            newFindingNotificationsEnabled: config.newFindingNotificationsEnabled,
+            newFindingNotificationMinSeverity: config.newFindingNotificationMinSeverity,
+            ...modelConfigPayload,
+          },
+          options
+        );
       } else {
-        personalSaveConfigMutate({
-          slaCriticalDays: config.critical,
-          slaHighDays: config.high,
-          slaMediumDays: config.medium,
-          slaLowDays: config.low,
-          repositorySelectionMode: config.repositorySelectionMode,
-          selectedRepositoryIds: config.selectedRepositoryIds,
-          analysisMode: config.analysisMode,
-          autoDismissEnabled: config.autoDismissEnabled,
-          autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
-          autoAnalysisEnabled: config.autoAnalysisEnabled,
-          autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
-          autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
-          autoRemediationEnabled: config.autoRemediationEnabled,
-          autoRemediationMinSeverity: config.autoRemediationMinSeverity,
-          autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
-          ...modelConfigPayload,
-        });
+        personalSaveConfigMutate(
+          {
+            slaCriticalDays: config.critical,
+            slaHighDays: config.high,
+            slaMediumDays: config.medium,
+            slaLowDays: config.low,
+            slaEnabled: config.slaEnabled,
+            repositorySelectionMode: config.repositorySelectionMode,
+            selectedRepositoryIds: config.selectedRepositoryIds,
+            analysisMode: config.analysisMode,
+            autoDismissEnabled: config.autoDismissEnabled,
+            autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
+            autoAnalysisEnabled: config.autoAnalysisEnabled,
+            autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
+            autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
+            autoRemediationEnabled: config.autoRemediationEnabled,
+            autoRemediationMinSeverity: config.autoRemediationMinSeverity,
+            autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            slaNotificationsEnabled: config.slaNotificationsEnabled,
+            slaNotificationMinSeverity: config.slaNotificationMinSeverity,
+            slaNotificationWarningDays: config.slaNotificationWarningDays,
+            newFindingNotificationsEnabled: config.newFindingNotificationsEnabled,
+            newFindingNotificationMinSeverity: config.newFindingNotificationMinSeverity,
+            ...modelConfigPayload,
+          },
+          options
+        );
       }
     },
     [isOrg, organizationId, orgSaveConfigMutate, personalSaveConfigMutate]
@@ -1324,6 +1362,7 @@ function useSecurityAgentProviderValue(
       configData: configData
         ? {
             ...configData,
+            slaEnabled: configData.slaEnabled ?? true,
             repositorySelectionMode: configData.repositorySelectionMode ?? 'selected',
             selectedRepositoryIds: configData.selectedRepositoryIds ?? [],
             triageModelSlug,

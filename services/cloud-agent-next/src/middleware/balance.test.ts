@@ -58,6 +58,40 @@ describe('balanceMiddleware', () => {
     );
   }
 
+  it('returns non-retryable clientError for insufficient credits', async () => {
+    vi.mocked(validateBalanceOnly).mockResolvedValue({
+      success: false,
+      status: 402,
+      message: 'Insufficient credits',
+    });
+
+    const response = await postTrpc('start', {});
+    const body: any = await response.json();
+
+    expect(body.error.data.clientError).toEqual({
+      code: 'PAYMENT_REQUIRED',
+      message: 'Insufficient credits',
+      retryable: false,
+    });
+  });
+
+  it('returns retryable clientError for balance infrastructure failures', async () => {
+    vi.mocked(validateBalanceOnly).mockResolvedValue({
+      success: false,
+      status: 500,
+      message: 'Failed to verify balance',
+    });
+
+    const response = await postTrpc('start', {});
+    const body: any = await response.json();
+
+    expect(body.error.data.clientError).toEqual({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to verify balance',
+      retryable: true,
+    });
+  });
+
   it('uses nested start organization context for balance validation', async () => {
     const orgId = '11111111-2222-3333-4444-555555555555';
 

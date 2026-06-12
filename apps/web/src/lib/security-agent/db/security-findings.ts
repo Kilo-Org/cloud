@@ -25,6 +25,18 @@ function toOwner(owner: SecurityReviewOwner): Owner {
   throw new Error('Invalid owner: must have either organizationId or userId');
 }
 
+function ownerFindingPredicate(owner: Owner): SQL {
+  return owner.type === 'org'
+    ? eq(security_findings.owned_by_organization_id, owner.id)
+    : eq(security_findings.owned_by_user_id, owner.id);
+}
+
+function ownerConflictTarget(owner: Owner): SQL {
+  return owner.type === 'org'
+    ? sql`(${sql.identifier(security_findings.owned_by_organization_id.name)}, ${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) WHERE ${sql.identifier(security_findings.owned_by_organization_id.name)} IS NOT NULL`
+    : sql`(${sql.identifier(security_findings.owned_by_user_id.name)}, ${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) WHERE ${sql.identifier(security_findings.owned_by_user_id.name)} IS NOT NULL`;
+}
+
 type CreateFindingParams = ParsedSecurityFinding & {
   owner: SecurityReviewOwner;
   platformIntegrationId?: string;
@@ -89,7 +101,7 @@ export type UpsertSecurityFindingResult = {
   findingCreatedAt: string;
 };
 
-/** Upsert using repo_full_name + source + source_id as the unique key. */
+/** Upsert using owner + repo_full_name + source + source_id as the unique key. */
 export async function upsertSecurityFinding(
   params: CreateFindingParams
 ): Promise<UpsertSecurityFindingResult> {
@@ -110,6 +122,7 @@ export async function upsertSecurityFinding(
         WHERE ${security_findings.repo_full_name} = ${params.repoFullName}
           AND ${security_findings.source} = ${params.source}
           AND ${security_findings.source_id} = ${params.source_id}
+          AND ${ownerFindingPredicate(owner)}
         FOR UPDATE
       ),
       upserted AS (
@@ -172,7 +185,7 @@ export async function upsertSecurityFinding(
           ${params.dependency_scope}
         FROM (SELECT 1) AS input
         LEFT JOIN existing_match ON true
-        ON CONFLICT (${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) DO UPDATE
+        ON CONFLICT ${ownerConflictTarget(owner)} DO UPDATE
         SET
           ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
           ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
@@ -246,6 +259,7 @@ export async function upsertSecurityFinding(
         WHERE ${security_findings.repo_full_name} = ${params.repoFullName}
           AND ${security_findings.source} = ${params.source}
           AND ${security_findings.source_id} = ${params.source_id}
+          AND ${ownerFindingPredicate(owner)}
         LIMIT 1
       `);
       finding = fallback.rows[0];
@@ -272,14 +286,23 @@ export async function upsertSecurityFinding(
  */
 export type SupersedeResult = { count: number; supersededFindingIds: string[] };
 
-export async function supersedeDuplicateFindings(repoFullName: string): Promise<SupersedeResult> {
+export async function supersedeDuplicateFindings(
+  repoFullName: string,
+  securityOwner: SecurityReviewOwner
+): Promise<SupersedeResult> {
   try {
+    const owner = toOwner(securityOwner);
+    const ownerPartitionColumn =
+      owner.type === 'org'
+        ? security_findings.owned_by_organization_id
+        : security_findings.owned_by_user_id;
     const { rows } = await db.execute<{ id: string }>(sql`
     WITH ranked AS (
       SELECT
         ${security_findings.id} AS id,
         ROW_NUMBER() OVER (
-          PARTITION BY ${security_findings.repo_full_name},
+          PARTITION BY ${ownerPartitionColumn},
+                       ${security_findings.repo_full_name},
                        ${security_findings.source},
                        ${security_findings.ghsa_id},
                        ${security_findings.package_name},
@@ -287,7 +310,8 @@ export async function supersedeDuplicateFindings(repoFullName: string): Promise<
           ORDER BY CASE WHEN ${security_findings.source_id} ~ '^[0-9]+$' THEN ${security_findings.source_id}::int ELSE 0 END DESC
         ) AS rn,
         FIRST_VALUE(${security_findings.id}) OVER (
-          PARTITION BY ${security_findings.repo_full_name},
+          PARTITION BY ${ownerPartitionColumn},
+                       ${security_findings.repo_full_name},
                        ${security_findings.source},
                        ${security_findings.ghsa_id},
                        ${security_findings.package_name},
@@ -296,6 +320,7 @@ export async function supersedeDuplicateFindings(repoFullName: string): Promise<
         ) AS canonical_id
       FROM ${security_findings}
       WHERE ${security_findings.repo_full_name} = ${repoFullName}
+        AND ${ownerFindingPredicate(owner)}
         AND ${security_findings.source} = 'dependabot'
         AND ${security_findings.ghsa_id} IS NOT NULL
         AND ${security_findings.status} = 'open'
@@ -320,7 +345,7 @@ export async function supersedeDuplicateFindings(repoFullName: string): Promise<
   } catch (error) {
     captureException(error, {
       tags: { operation: 'supersedeDuplicateFindings' },
-      extra: { repoFullName },
+      extra: { repoFullName, securityOwner },
     });
     throw error;
   }

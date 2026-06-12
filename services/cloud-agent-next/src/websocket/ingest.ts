@@ -24,7 +24,12 @@ import {
   handleCommandsAvailable,
   extractEntityId,
 } from '../session/ingest-handlers/index.js';
-import type { CompleteEventData, KilocodeEventData, CloudStatusData } from '../shared/protocol.js';
+import {
+  WrapperTerminalFailureCodes,
+  type CompleteEventData,
+  type KilocodeEventData,
+  type CloudStatusData,
+} from '../shared/protocol.js';
 import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
@@ -65,6 +70,7 @@ const errorEventSchema = z.object({
   message: z.string().optional(),
   errorSource: z.literal('assistant').optional(),
   modelNotFoundRuntimeDiagnostics: z.unknown().optional(),
+  failureCode: z.enum(WrapperTerminalFailureCodes).optional(),
 });
 
 const MODEL_NOT_FOUND_SAFE_ERROR_MESSAGE = 'Assistant request failed: model not found';
@@ -878,6 +884,7 @@ export function createIngestHandler(
               ...(parsedDiagnostics?.success
                 ? { modelNotFoundRuntimeDiagnostics: parsedDiagnostics.data }
                 : {}),
+              failureCode: errorData.failureCode,
             });
             logger
               .withFields({

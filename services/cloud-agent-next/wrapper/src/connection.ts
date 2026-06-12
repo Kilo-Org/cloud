@@ -10,7 +10,11 @@
  */
 
 import type { WrapperState } from './state.js';
-import type { IngestEvent, WrapperCommand } from '../../src/shared/protocol.js';
+import type {
+  IngestEvent,
+  WrapperCommand,
+  WrapperTerminalFailureCode,
+} from '../../src/shared/protocol.js';
 import { trimPayload } from '../../src/shared/trim-payload.js';
 import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
@@ -164,15 +168,16 @@ export type ConnectionConfig = {
   kiloClient: WrapperKiloClient;
 };
 
-export type AssistantTerminalError = {
-  error: string;
+export type WrapperTerminalFailure = {
+  code?: WrapperTerminalFailureCode;
+  message: string;
   errorSource: 'assistant';
   modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
 };
 
 export type ConnectionCallbacks = {
   /** Called when a terminal assistant request error is detected */
-  onTerminalError: (error: AssistantTerminalError) => void;
+  onTerminalError: (failure: WrapperTerminalFailure) => void;
   /** Called when a command is received from DO */
   onCommand: (cmd: WrapperCommand) => void;
   /** Called when the connection unexpectedly closes */
@@ -743,46 +748,62 @@ export function createConnectionManager(
   }
 
   /**
-   * Check if an event represents a terminal error (payment/billing/quota/model resolution).
+   * Classify terminal errors that require changed model or account state.
    */
-  function isTerminalError(eventType: string, properties: Record<string, unknown>): boolean {
+  function getTerminalFailure(
+    eventType: string,
+    properties: Record<string, unknown>
+  ): WrapperTerminalFailure | undefined {
     const eventSessionID =
       typeof properties.sessionID === 'string' ? properties.sessionID : undefined;
     if (eventSessionID && eventSessionID !== state.currentSession?.kiloSessionId) {
-      return false;
+      return undefined;
     }
     if (
       eventType === 'session.error' &&
       properties.sessionID !== state.currentSession?.kiloSessionId
     ) {
-      return false;
+      return undefined;
     }
 
-    if (
-      eventType === 'payment_required' ||
-      eventType === 'insufficient_funds' ||
-      eventType === 'usage_limit_exceeded'
-    ) {
-      return true;
-    }
-    const error = properties.error;
-    if (error) {
-      const errorStr = typeof error === 'string' ? error : JSON.stringify(error);
-      const normalizedError = errorStr.toLowerCase();
-      if (
-        normalizedError.includes('payment') ||
-        normalizedError.includes('credit') ||
-        normalizedError.includes('balance') ||
-        normalizedError.includes('quota') ||
-        (eventType === 'session.error' &&
-          (normalizedError.includes('usage_limit_exceeded') ||
-            normalizedError.includes('too many requests') ||
-            normalizedError.includes('model not found')))
-      ) {
-        return true;
+    const terminalErrorText = getTerminalErrorText(eventType, properties);
+    let code: WrapperTerminalFailureCode | undefined;
+    if (eventType === 'payment_required' || eventType === 'insufficient_funds') {
+      code = 'payment_required';
+    } else if (eventType !== 'usage_limit_exceeded') {
+      const error = properties.error;
+      if (error) {
+        const normalizedError = terminalErrorText.toLowerCase();
+        if (eventType === 'session.error' && isModelNotFoundMessage(terminalErrorText)) {
+          code = 'model_missing';
+        } else if (
+          normalizedError.includes('payment') ||
+          normalizedError.includes('credit') ||
+          normalizedError.includes('balance') ||
+          normalizedError.includes('quota')
+        ) {
+          code = 'payment_required';
+        }
       }
     }
-    return false;
+
+    const isExplicitAssistantFailure =
+      eventType === 'usage_limit_exceeded' ||
+      (eventType === 'session.error' &&
+        (() => {
+          const normalizedError = JSON.stringify(properties.error ?? '').toLowerCase();
+          return (
+            normalizedError.includes('usage_limit_exceeded') ||
+            normalizedError.includes('too many requests')
+          );
+        })());
+    if (!code && !isExplicitAssistantFailure) return undefined;
+
+    return {
+      ...(code ? { code } : {}),
+      message: terminalErrorText,
+      errorSource: 'assistant',
+    };
   }
 
   function getTerminalErrorText(eventType: string, properties: Record<string, unknown>): string {
@@ -1104,16 +1125,15 @@ export function createConnectionManager(
           }
 
           // Terminal error detection
-          if (isTerminalError(eventType, properties)) {
-            const terminalErrorText = getTerminalErrorText(eventType, properties);
+          const terminalFailure = getTerminalFailure(eventType, properties);
+          if (terminalFailure) {
             const modelNotFoundRuntimeDiagnostics = await maybeBuildModelNotFoundDiagnostics(
               eventType,
               properties,
-              terminalErrorText
+              terminalFailure.message
             );
             callbacks.onTerminalError({
-              error: terminalErrorText,
-              errorSource: 'assistant',
+              ...terminalFailure,
               ...(modelNotFoundRuntimeDiagnostics ? { modelNotFoundRuntimeDiagnostics } : {}),
             });
             return;

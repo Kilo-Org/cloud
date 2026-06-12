@@ -11,6 +11,7 @@ export type AnalysisMode = 'auto' | 'shallow' | 'deep';
 export type AutoDismissConfidenceThreshold = 'high' | 'medium' | 'low';
 export type AutoAnalysisMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 export type AutoRemediationMinSeverity = 'critical' | 'high' | 'medium' | 'all';
+export type NotificationMinSeverity = 'critical' | 'high' | 'medium' | 'low';
 export type RepositorySelectionMode = 'all' | 'selected';
 
 export type SecurityRepository = {
@@ -22,6 +23,7 @@ export type SecurityRepository = {
 
 export type SecurityConfigFormState = {
   slaConfig: SlaConfig;
+  slaEnabled: boolean;
   repositorySelectionMode: RepositorySelectionMode;
   selectedRepositoryIds: number[];
   triageModelSlug: string;
@@ -36,6 +38,11 @@ export type SecurityConfigFormState = {
   autoRemediationMinSeverity: AutoRemediationMinSeverity;
   autoRemediationIncludeExisting: boolean;
   remediationModelSlug: string;
+  slaNotificationsEnabled: boolean;
+  slaNotificationMinSeverity: NotificationMinSeverity;
+  slaNotificationWarningDays: number;
+  newFindingNotificationsEnabled: boolean;
+  newFindingNotificationMinSeverity: NotificationMinSeverity;
 };
 
 export type SecurityConfigSavePayload = SlaConfig &

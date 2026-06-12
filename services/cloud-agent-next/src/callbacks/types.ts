@@ -1,3 +1,5 @@
+import type { CloudAgentFailureStage } from '@kilocode/worker-utils/cloud-agent-failure';
+import type { ClientError } from '@kilocode/worker-utils/client-error';
 import type { SafeFailureProjection } from '../session/safe-failure-projection.js';
 import type { ModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
 
@@ -22,6 +24,8 @@ export type ExecutionCallbackPayload = {
   errorMessage?: string;
   failure?: SafeFailureProjection;
   modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
+  failureStage?: CloudAgentFailureStage;
+  clientError?: ClientError;
   /** Present when errorMessage was shortened to fit the callback queue. */
   errorMessageTruncation?: CallbackTextTruncation;
   lastSeenBranch?: string;

@@ -15,6 +15,7 @@ import { agent_configs } from '@kilocode/db/schema';
 import { eq, and, isNotNull, or } from 'drizzle-orm';
 import { syncOwner } from './sync';
 import { processSecurityFindingDismissal } from './dismiss';
+import { runSecurityNotificationSweep } from './notifications/sweep';
 
 const SecuritySyncOwnerSchema = z
   .object({
@@ -151,6 +152,13 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+function isStrictTrueRolloutFlag(value: string | undefined, name: string): boolean {
+  if (value === 'true') return true;
+  if (value === 'false' || value === undefined) return false;
+  console.warn('Malformed Security Sync rollout flag; treating as disabled', { name });
+  return false;
 }
 
 const QUEUE_SEND_BATCH_LIMIT = 100;
@@ -460,6 +468,10 @@ async function processSecuritySyncMessage(
     trigger: body.trigger,
     actor: body.actor,
     repoFullName: body.repoFullName,
+    notificationMaterializationEnabled: isStrictTrueRolloutFlag(
+      env.SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED,
+      'SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED'
+    ),
   });
 
   const terminal = syncCommandTerminalState(result);
@@ -580,7 +592,16 @@ export default {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   },
 
-  async scheduled(_controller: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
+  async scheduled(controller: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
+    if (controller.cron === '15 * * * *') {
+      await runSecurityNotificationSweep(env);
+      return;
+    }
+    if (controller.cron !== '0 */6 * * *') {
+      console.info('Ignoring unknown Security Sync cron expression', { cron: controller.cron });
+      return;
+    }
+
     const runId = crypto.randomUUID();
     let failed = false;
 

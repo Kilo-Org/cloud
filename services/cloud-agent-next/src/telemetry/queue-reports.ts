@@ -51,6 +51,15 @@ function timestamp(value: number): string {
   return new Date(value).toISOString();
 }
 
+function persistedFailureCode(state: SessionMessageState): SessionMessageState['failureCode'] {
+  if (state.failureCode !== 'model_missing' && state.failureCode !== 'payment_required') {
+    return state.failureCode;
+  }
+  if (state.failureStage === 'agent_activity') return 'assistant_error';
+  if (state.failureStage === 'post_dispatch_no_activity') return 'wrapper_error_before_activity';
+  return state.failureCode;
+}
+
 function isKnownInsufficientCreditFailure(state: SessionMessageState): boolean {
   if (
     state.failureCode !== 'assistant_error' &&
@@ -124,7 +133,8 @@ export async function emitRunStateReport(params: {
   const { state } = params;
   const observedDispatchAcceptedAt =
     state.dispatchAcceptanceKind === 'observed' ? state.acceptedAt : undefined;
-  const diagnostic = diagnosticForFailedRun(state);
+  const failureCode = persistedFailureCode(state);
+  const diagnostic = diagnosticForFailedRun({ ...state, failureCode });
   const report: CloudAgentRunStateReport = {
     version: 1,
     type: 'run.state',
@@ -143,7 +153,7 @@ export async function emitRunStateReport(params: {
         : { agentActivityObservedAt: timestamp(state.agentActivityObservedAt) }),
       ...(state.terminalAt === undefined ? {} : { terminalAt: timestamp(state.terminalAt) }),
       ...(state.failureStage === undefined ? {} : { failureStage: state.failureStage }),
-      ...(state.failureCode === undefined ? {} : { failureCode: state.failureCode }),
+      ...(failureCode === undefined ? {} : { failureCode }),
       ...(diagnostic === undefined ? {} : { diagnostic }),
     },
   };

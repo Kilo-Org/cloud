@@ -19,6 +19,7 @@ import {
   type TerminalizeParams,
 } from './session-message-state.js';
 import { projectSafeFailure, type SafeFailureProjection } from './safe-failure-projection.js';
+import { projectTerminalClientError } from './terminal-error-projector.js';
 import type { AssistantMessagePart, LatestAssistantMessage } from './types.js';
 import { formatModelNotFoundDashboardError } from '../shared/runtime-model-diagnostics.js';
 
@@ -453,7 +454,20 @@ export function createMessageSettlementOutbox(
       status,
       errorMessage: modelNotFoundDashboardError ?? legacyErrorMessage,
       failure,
-      modelNotFoundRuntimeDiagnostics: state.modelNotFoundRuntimeDiagnostics,
+      ...(state.modelNotFoundRuntimeDiagnostics
+        ? { modelNotFoundRuntimeDiagnostics: state.modelNotFoundRuntimeDiagnostics }
+        : {}),
+      ...(status === 'completed'
+        ? {}
+        : {
+            failureStage: state.failureStage,
+            clientError: projectTerminalClientError({
+              status,
+              failureStage: state.failureStage,
+              failureCode: state.failureCode,
+              error: failure?.message ?? legacyErrorMessage,
+            }),
+          }),
       lastSeenBranch: metadata?.repository?.upstreamBranch,
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,

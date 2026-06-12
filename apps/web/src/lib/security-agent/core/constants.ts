@@ -1,7 +1,9 @@
 import { SecurityAgentConfigSchema, type SecurityAgentConfig } from './types';
+import { DEFAULT_SECURITY_NOTIFICATION_POLICY } from '@kilocode/worker-utils/security-notification-policy';
 
 /** Order matters — first entry is the default. */
 export const SECURITY_AGENT_MODELS = [
+  { id: 'kilo-auto/balanced', name: 'Kilo Balanced', free: false },
   { id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6', free: false },
   { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5', free: false },
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', free: false },
@@ -34,6 +36,7 @@ export const DEFAULT_SECURITY_AGENT_CONFIG: SecurityAgentConfig = {
   auto_remediation_include_existing: false,
   auto_remediation_enabled_at: null,
   remediation_model_slug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
+  ...DEFAULT_SECURITY_NOTIFICATION_POLICY,
 };
 
 export const SECURITY_ANALYSIS_OWNER_CAP = 3;
@@ -56,4 +59,14 @@ export function parseSecurityAgentConfig(rawConfig: unknown): SecurityAgentConfi
       parsed.model_slug ??
       DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
   };
+}
+
+export function mergeSecurityAgentConfigPatch(
+  storedConfig: Partial<SecurityAgentConfig> | undefined,
+  patch: Partial<SecurityAgentConfig>
+): SecurityAgentConfig {
+  const definedPatch = Object.fromEntries(
+    Object.entries(patch).filter(([, value]) => value !== undefined)
+  ) as Partial<SecurityAgentConfig>;
+  return parseSecurityAgentConfig({ ...storedConfig, ...definedPatch });
 }

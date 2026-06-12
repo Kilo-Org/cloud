@@ -24,7 +24,7 @@ import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { withPreparationInfrastructureRecovery } from '../sandbox-recovery.js';
 import type { AgentSandbox, WrapperInstanceLease } from '../agent-sandbox/protocol.js';
 
-/** Maximum time allowed for wrapper readiness workspace preparation. */
+/** Maximum time allowed for complete wrapper readiness, including Kilo startup. */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 
 const CODE_REVIEW_DISABLED_TOOLS = {

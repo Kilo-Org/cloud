@@ -11,12 +11,17 @@ export type ExecResult = {
   stderrTruncated?: boolean;
 };
 
+export type ProcessOutputStream = 'stdout' | 'stderr';
+
 export type ProcessOptions = {
   cwd?: string;
   timeoutMs?: number;
+  inactivityTimeoutMs?: number;
+  hardTimeoutMs?: number;
   signal?: AbortSignal;
   terminationGraceMs?: number;
   maxOutputBytes?: number;
+  onOutput?: (stream: ProcessOutputStream, output: string) => void;
 };
 
 export type GitOptions = ProcessOptions;
@@ -32,11 +37,21 @@ const EXEC_TIMEOUT_EXIT_CODE = 124;
 const EXEC_TERMINATION_GRACE_MS = 2_000;
 const EXEC_TERMINATION_POLL_MS = 25;
 const EXEC_TIMEOUT_MESSAGE = 'exec timeout reached';
+const EXEC_INACTIVITY_TIMEOUT_MESSAGE = 'exec inactivity timeout reached';
+const EXEC_HARD_TIMEOUT_MESSAGE = 'exec hard timeout reached';
 const EXEC_ABORTED_MESSAGE = 'exec aborted';
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1_024;
 const TRUNCATION_MARKER = 'output truncated';
 
-export type TerminationReason = 'timeout' | 'abort';
+export type TerminationReason = 'timeout' | 'inactivity_timeout' | 'hard_timeout' | 'abort';
+
+export function isTimeoutTermination(result: ExecResult): boolean {
+  return (
+    result.terminationReason === 'timeout' ||
+    result.terminationReason === 'inactivity_timeout' ||
+    result.terminationReason === 'hard_timeout'
+  );
+}
 
 function utf8Tail(value: string, maxBytes: number): string {
   const bytes = Buffer.from(value);
@@ -74,6 +89,19 @@ export function createSafeProcessDiagnostic(result: ExecResult): string {
     .join(', ');
 }
 
+function terminationMessage(reason: TerminationReason): string {
+  switch (reason) {
+    case 'timeout':
+      return EXEC_TIMEOUT_MESSAGE;
+    case 'inactivity_timeout':
+      return EXEC_INACTIVITY_TIMEOUT_MESSAGE;
+    case 'hard_timeout':
+      return EXEC_HARD_TIMEOUT_MESSAGE;
+    case 'abort':
+      return EXEC_ABORTED_MESSAGE;
+  }
+}
+
 export function runProcess(
   command: string,
   args: string[],
@@ -103,6 +131,9 @@ export function runProcess(
     const maxOutputBytes = opts?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     let settled = false;
     let terminationReason: TerminationReason | null = null;
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+    let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
+    let hardTimeoutTimer: ReturnType<typeof setTimeout> | undefined;
     let terminationTimer: ReturnType<typeof setTimeout> | undefined;
     let terminationPollTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -111,7 +142,9 @@ export function runProcess(
     }
 
     const clearTimers = () => {
-      if (timer) clearTimeout(timer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      if (hardTimeoutTimer) clearTimeout(hardTimeoutTimer);
       if (terminationTimer) clearTimeout(terminationTimer);
       if (terminationPollTimer) clearTimeout(terminationPollTimer);
     };
@@ -134,7 +167,7 @@ export function runProcess(
       if (destroyOpenPipes) destroyPipes();
       const boundedStderr = appendBoundedTail(
         stderr,
-        `${stderr.endsWith('\n') || stderr.length === 0 ? '' : '\n'}${reason === 'timeout' ? EXEC_TIMEOUT_MESSAGE : EXEC_ABORTED_MESSAGE}`,
+        `${stderr.endsWith('\n') || stderr.length === 0 ? '' : '\n'}${terminationMessage(reason)}`,
         maxOutputBytes
       );
       resolve({
@@ -180,7 +213,7 @@ export function runProcess(
     const terminate = (reason: TerminationReason): void => {
       if (settled || terminationReason !== null) return;
       terminationReason = reason;
-      if (timer) clearTimeout(timer);
+      clearTimers();
       killProcess('SIGTERM');
       terminationTimer = setTimeout(() => {
         killProcess('SIGKILL');
@@ -188,21 +221,41 @@ export function runProcess(
       }, opts?.terminationGraceMs ?? EXEC_TERMINATION_GRACE_MS);
     };
 
-    const timer =
-      opts?.timeoutMs !== undefined
-        ? setTimeout(() => terminate('timeout'), opts.timeoutMs)
-        : undefined;
+    const resetInactivityTimer = (): void => {
+      if (opts?.inactivityTimeoutMs === undefined || terminationReason !== null) return;
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => terminate('inactivity_timeout'), opts.inactivityTimeoutMs);
+    };
 
-    proc.stdout.on('data', (chunk: Buffer) => {
-      const bounded = appendBoundedTail(stdout, chunk, maxOutputBytes);
-      stdout = bounded.value;
-      stdoutTruncated ||= bounded.truncated;
-    });
-    proc.stderr.on('data', (chunk: Buffer) => {
-      const bounded = appendBoundedTail(stderr, chunk, maxOutputBytes);
-      stderr = bounded.value;
-      stderrTruncated ||= bounded.truncated;
-    });
+    const captureOutput = (stream: ProcessOutputStream, output: Buffer): void => {
+      const text = output.toString();
+      if (stream === 'stdout') {
+        const bounded = appendBoundedTail(stdout, text, maxOutputBytes);
+        stdout = bounded.value;
+        stdoutTruncated ||= bounded.truncated;
+      } else {
+        const bounded = appendBoundedTail(stderr, text, maxOutputBytes);
+        stderr = bounded.value;
+        stderrTruncated ||= bounded.truncated;
+      }
+      resetInactivityTimer();
+      try {
+        opts?.onOutput?.(stream, text);
+      } catch {
+        // Progress reporting must not affect process execution.
+      }
+    };
+
+    if (opts?.timeoutMs !== undefined) {
+      timeoutTimer = setTimeout(() => terminate('timeout'), opts.timeoutMs);
+    }
+    resetInactivityTimer();
+    if (opts?.hardTimeoutMs !== undefined) {
+      hardTimeoutTimer = setTimeout(() => terminate('hard_timeout'), opts.hardTimeoutMs);
+    }
+
+    proc.stdout.on('data', (output: Buffer) => captureOutput('stdout', output));
+    proc.stderr.on('data', (output: Buffer) => captureOutput('stderr', output));
 
     if (opts?.signal) {
       if (opts.signal.aborted) {

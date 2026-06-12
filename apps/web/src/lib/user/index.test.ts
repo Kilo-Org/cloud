@@ -36,6 +36,7 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   security_findings,
+  security_finding_notifications,
   security_remediation_attempts,
   security_remediations,
   security_analysis_queue,
@@ -111,6 +112,7 @@ import {
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { randomUUID } from 'crypto';
 import {
@@ -123,6 +125,10 @@ import {
 } from '@/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
+import {
+  SecurityFindingNotificationKind,
+  SecurityFindingNotificationStatus,
+} from '@kilocode/db/schema-types';
 
 jest.mock('@/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
@@ -186,6 +192,7 @@ describe('User', () => {
     await db.delete(security_remediations);
     await db.delete(security_agent_commands);
     await db.delete(security_agent_repository_sync_state);
+    await db.delete(security_finding_notifications);
     await db.delete(security_findings);
     await db.delete(security_analysis_owner_state);
     await db.delete(organization_invitations);
@@ -455,6 +462,92 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('deletes personal Security Agent notifications through finding cleanup', async () => {
+      const user = await insertTestUser();
+      const [finding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_user_id: user.id,
+          repo_full_name: 'test-org/security-notification-personal',
+          source: 'dependabot',
+          source_id: '1',
+          severity: 'high',
+          package_name: 'lodash',
+          package_ecosystem: 'npm',
+          title: 'Prototype Pollution in lodash',
+        })
+        .returning();
+      const [notification] = await db
+        .insert(security_finding_notifications)
+        .values({
+          finding_id: finding.id,
+          recipient_user_id: user.id,
+          kind: SecurityFindingNotificationKind.NewFinding,
+          status: SecurityFindingNotificationStatus.Pending,
+        })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const notificationRows = await db
+        .select()
+        .from(security_finding_notifications)
+        .where(eq(security_finding_notifications.id, notification.id));
+      const findingRows = await db
+        .select()
+        .from(security_findings)
+        .where(eq(security_findings.id, finding.id));
+      expect(notificationRows).toHaveLength(0);
+      expect(findingRows).toHaveLength(0);
+    });
+
+    it('deletes org-owned Security Agent notifications addressed to the user', async () => {
+      const orgOwner = await insertTestUser({ id: 'org-notification-owner' });
+      const recipient = await insertTestUser({ id: 'org-notification-recipient' });
+      const organization = await createTestOrganization('Notification Cleanup Org', orgOwner.id, 0);
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: recipient.id,
+        role: 'owner',
+      });
+      const [finding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_organization_id: organization.id,
+          repo_full_name: 'test-org/security-notification-org',
+          source: 'dependabot',
+          source_id: '2',
+          severity: 'critical',
+          package_name: 'express',
+          package_ecosystem: 'npm',
+          title: 'Unauthenticated admin token exchange',
+        })
+        .returning();
+      const [notification] = await db
+        .insert(security_finding_notifications)
+        .values({
+          finding_id: finding.id,
+          recipient_user_id: recipient.id,
+          kind: SecurityFindingNotificationKind.SlaBreach,
+          status: SecurityFindingNotificationStatus.Pending,
+        })
+        .returning();
+
+      await softDeleteUser(recipient.id);
+
+      const notificationRows = await db
+        .select()
+        .from(security_finding_notifications)
+        .where(eq(security_finding_notifications.id, notification.id));
+      const findingRows = await db
+        .select()
+        .from(security_findings)
+        .where(eq(security_findings.id, finding.id));
+      expect(notificationRows).toHaveLength(0);
+      expect(findingRows).toHaveLength(1);
+      expect(findingRows[0]?.owned_by_organization_id).toBe(organization.id);
+    });
+
     it('deletes gateway provider grants and pending provider state', async () => {
       const user = await insertTestUser();
       const [config] = await db

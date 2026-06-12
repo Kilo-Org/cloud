@@ -28,6 +28,7 @@ type RepositoryHealthTableProps = {
   isLoading: boolean;
   basePath: string;
   extraParams?: string;
+  showSla?: boolean;
 };
 
 function countCell(count: number) {
@@ -48,6 +49,7 @@ export function RepositoryHealthTable({
   isLoading,
   basePath,
   extraParams = '',
+  showSla = true,
 }: RepositoryHealthTableProps) {
   return (
     <Card>
@@ -78,8 +80,8 @@ export function RepositoryHealthTable({
                     <TableHead className="text-center">High</TableHead>
                     <TableHead className="text-center">Medium</TableHead>
                     <TableHead className="text-center">Low</TableHead>
-                    <TableHead className="text-center">Overdue</TableHead>
-                    <TableHead className="text-right">SLA compliance</TableHead>
+                    {showSla && <TableHead className="text-center">Overdue</TableHead>}
+                    {showSla && <TableHead className="text-right">SLA compliance</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -97,17 +99,21 @@ export function RepositoryHealthTable({
                       <TableCell className="text-center">{countCell(repo.high)}</TableCell>
                       <TableCell className="text-center">{countCell(repo.medium)}</TableCell>
                       <TableCell className="text-center">{countCell(repo.low)}</TableCell>
-                      <TableCell className="text-center">{countCell(repo.overdue)}</TableCell>
-                      <TableCell className="text-right">
-                        <span
-                          className={cn(
-                            'font-mono font-medium tabular-nums',
-                            complianceColor(repo.slaCompliancePercent)
-                          )}
-                        >
-                          {repo.slaCompliancePercent}%
-                        </span>
-                      </TableCell>
+                      {showSla && (
+                        <TableCell className="text-center">{countCell(repo.overdue)}</TableCell>
+                      )}
+                      {showSla && (
+                        <TableCell className="text-right">
+                          <span
+                            className={cn(
+                              'font-mono font-medium tabular-nums',
+                              complianceColor(repo.slaCompliancePercent)
+                            )}
+                          >
+                            {repo.slaCompliancePercent}%
+                          </span>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

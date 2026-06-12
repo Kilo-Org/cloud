@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-production
@@ -164,11 +165,39 @@ jobs:
       - name: Promote Vercel deployment
         run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
+  resolve-worker-base:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      base_sha: ${{ steps.base.outputs.sha }}
+
+    steps:
+      - name: Resolve last successful production SHA
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow deploy-production.yml \
+            --branch main \
+            --status success \
+            --json headSha \
+            --limit 1 \
+            --jq '.[0].headSha')
+
+          if [ -z "$sha" ] || [ "$sha" = "null" ]; then
+            sha="${{ github.event.before }}"
+          fi
+
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
   deploy-workers:
     needs:
       [
         check-production-db-startup,
         run-migrations,
+        resolve-worker-base,
         stage-app,
         stage-global-app,
         promote-app,
@@ -179,6 +208,7 @@ jobs:
         !cancelled() &&
         needs.check-production-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
+        needs.resolve-worker-base.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
@@ -186,7 +216,7 @@ jobs:
       }}
     uses: ./.github/workflows/deploy-workers.yml
     with:
-      base_sha: ${{ github.event.before }}
+      base_sha: ${{ needs.resolve-worker-base.outputs.base_sha }}
     secrets: inherit
 
   deploy-kiloclaw:

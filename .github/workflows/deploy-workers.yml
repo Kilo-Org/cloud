@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-workers
+  cancel-in-progress: false
+
 jobs:
   deploy-manual:
     if: github.event_name == 'workflow_dispatch'

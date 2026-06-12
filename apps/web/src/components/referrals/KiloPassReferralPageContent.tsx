@@ -154,7 +154,7 @@ export function getKiloPassReferralEligibilityPresentation(
       title: 'Any Kilo user can refer! Redeem your reward with an active Kilo Pass.',
       description: null,
       details:
-        'When a brand-new Kilo user uses your referral and completes their first eligible paid personal monthly Kilo Pass purchase, you earn a pending reward. It applies automatically to your next eligible monthly base issuance while you have an active monthly Kilo Pass.',
+        'When a brand-new Kilo user uses your referral and completes their first eligible paid personal monthly Kilo Pass purchase, you earn a pending reward. It applies automatically to your next eligible monthly credit bonus when you have an active monthly Kilo Pass.',
       action: {
         href: '/subscriptions#kilo-pass',
         label: 'Choose monthly Kilo Pass',

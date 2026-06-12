@@ -710,7 +710,6 @@ describe('admin.modelExperiments — versions and api keys', () => {
     await expect(
       caller.admin.modelExperiments.swapVariantVersion({
         variantId: variantA.id,
-        // @ts-expect-error — exercising strict schema rejection
         upstream: { ...validUpstream, api_key: 'leaked' },
         apiKey: 'sk',
       })

@@ -9,6 +9,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { KiloPassActiveSubscriptionCard } from '@/components/profile/kilo-pass/KiloPassActiveSubscriptionCard';
 import { KiloPassLoadingCard } from '@/components/profile/kilo-pass/KiloPassLoadingCard';
 import { KiloPassSubscribeCard } from '@/components/profile/kilo-pass/KiloPassSubscribeCard';
+import { KiloPassReferralButton } from '@/components/referrals/KiloPassReferralButton';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { recommendKiloPassTierFromAverageMonthlyUsageUsd } from '@/lib/kilo-pass/recommend-tier';
 import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
@@ -79,6 +80,7 @@ export function ProfileKiloPassSection() {
         pending={pending}
         showFirstMonthPromo={showFirstMonthPromo}
         showSecondMonthPromo={showSecondMonthPromo}
+        headerAction={<KiloPassReferralButton className="w-full sm:w-auto" />}
         recommendedTier={recommendedTier}
         onSelectTier={tier => checkoutMutation.mutate({ tier, cadence })}
       />

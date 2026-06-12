@@ -78,92 +78,30 @@ jobs:
         run: NODE_ENV=production pnpm run drizzle migrate
 
   stage-app:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 30
-    environment: production
-
-    outputs:
-      deployment_url: ${{ steps.deploy.outputs.deployment_url }}
-
-    env:
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_APP }}
-
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - name: Stage Vercel deployment
-        id: deploy
-        run: |
-          deployment_output=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_TOKEN }})
-          deployment_url=$(printf '%s\n' "$deployment_output" | tail -n 1)
-          if [[ ! "$deployment_url" =~ ^https:// ]]; then
-            echo "Vercel deploy did not print a deployment URL" >&2
-            exit 1
-          fi
-          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      vercel_project_id_var: VERCEL_PROJECT_ID_APP
+    secrets: inherit
 
   stage-global-app:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 30
-    environment: production
-
-    outputs:
-      deployment_url: ${{ steps.deploy.outputs.deployment_url }}
-
-    env:
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_GLOBAL_APP }}
-
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - name: Stage Vercel deployment
-        id: deploy
-        run: |
-          deployment_output=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_TOKEN }})
-          deployment_url=$(printf '%s\n' "$deployment_output" | tail -n 1)
-          if [[ ! "$deployment_url" =~ ^https:// ]]; then
-            echo "Vercel deploy did not print a deployment URL" >&2
-            exit 1
-          fi
-          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
+    secrets: inherit
 
   promote-app:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
     needs: [stage-app, check-production-db-startup, run-migrations]
-    environment: production
-
-    steps:
-      - name: Install Vercel CLI
-        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - name: Promote Vercel deployment
-        run: vercel promote "${{ needs.stage-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
+    secrets: inherit
 
   promote-global-app:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
     needs: [stage-global-app, check-production-db-startup, run-migrations]
-    environment: production
-
-    steps:
-      - name: Install Vercel CLI
-        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - name: Promote Vercel deployment
-        run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
+    secrets: inherit
 
   resolve-worker-base:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

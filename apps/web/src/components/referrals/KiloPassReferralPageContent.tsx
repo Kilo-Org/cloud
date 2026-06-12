@@ -8,9 +8,16 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 
 const SHARE_WIDGET_ANCHOR_ID = 'kilo-pass-referral-share';
+
+export type KiloPassReferralSubscriptionContext = {
+  status: string;
+  cadence: KiloPassCadence;
+  cancelAtPeriodEnd: boolean;
+} | null;
 
 export type KiloPassReferralRewardStatus =
   | 'pending'
@@ -50,6 +57,8 @@ export type KiloPassReferralRewardSummary = {
 
 type KiloPassReferralPageContentProps = {
   summary: KiloPassReferralRewardSummary | null;
+  subscriptionContext?: KiloPassReferralSubscriptionContext;
+  isSubscriptionContextLoading?: boolean;
   isLoading?: boolean;
   errorMessage?: string | null;
   children?: ReactNode;
@@ -58,6 +67,16 @@ type KiloPassReferralPageContentProps = {
 type StatusPresentation = {
   label: string;
   className: string;
+};
+
+type EligibilityPresentation = {
+  title: string;
+  description: string | null;
+  details: string | null;
+  action: {
+    href: string;
+    label: string;
+  } | null;
 };
 
 const usdFormatter = new Intl.NumberFormat('en-US', {
@@ -98,7 +117,7 @@ function rewardStatusPresentation(status: KiloPassReferralRewardStatus): StatusP
     case 'earned':
     case 'pending':
       return {
-        label: 'Waiting for a future eligible monthly issuance',
+        label: 'Pending, applies automatically at future eligible monthly issuance',
         className: 'bg-yellow-500/20 text-yellow-400 ring-yellow-500/20',
       };
     case 'expired':
@@ -124,8 +143,78 @@ function rewardStatusPresentation(status: KiloPassReferralRewardStatus): StatusP
   }
 }
 
+function isTerminalKiloPassStatus(status: string): boolean {
+  return status === 'canceled' || status === 'incomplete_expired';
+}
+
+export function getKiloPassReferralEligibilityPresentation(
+  subscriptionContext: KiloPassReferralSubscriptionContext
+): EligibilityPresentation {
+  if (!subscriptionContext || isTerminalKiloPassStatus(subscriptionContext.status)) {
+    return {
+      title: 'Any Kilo user can refer! Redeem your reward with an active Kilo Pass.',
+      description: null,
+      details:
+        'Each reward applies automatically to your next eligible monthly credit bonus when you have an active monthly Kilo Pass.',
+      action: {
+        href: '/subscriptions#kilo-pass',
+        label: 'Choose monthly Kilo Pass',
+      },
+    };
+  }
+
+  if (subscriptionContext.cadence === KiloPassCadence.Yearly) {
+    return {
+      title: 'Annual subscription cannot consume reward',
+      description:
+        'You can keep sharing and earning. Pending rewards apply automatically only to a future eligible personal monthly Kilo Pass base issuance.',
+      details: null,
+      action: {
+        href: '/subscriptions/kilo-pass',
+        label: 'Manage subscription',
+      },
+    };
+  }
+
+  if (subscriptionContext.cancelAtPeriodEnd || subscriptionContext.status === 'paused') {
+    return {
+      title: 'Canceling or paused subscription needs future eligible issuance',
+      description:
+        'You can keep sharing. Earned rewards stay pending until your monthly Kilo Pass resumes or renews with an eligible base issuance, then the oldest pending reward applies automatically.',
+      details: null,
+      action: {
+        href: '/subscriptions/kilo-pass',
+        label: 'Manage subscription',
+      },
+    };
+  }
+
+  if (subscriptionContext.status !== 'active') {
+    return {
+      title: 'Pending until monthly subscription resumes or activates',
+      description:
+        'You can keep sharing. Earned rewards stay pending until an eligible personal monthly Kilo Pass base issuance is created, then the oldest pending reward applies automatically.',
+      details: null,
+      action: {
+        href: '/subscriptions/kilo-pass',
+        label: 'Manage subscription',
+      },
+    };
+  }
+
+  return {
+    title: 'Ready for future eligible monthly issuance',
+    description:
+      'You can share now. Earned rewards stay pending until the next eligible personal monthly Kilo Pass base issuance, then the oldest pending reward applies automatically.',
+    details: null,
+    action: null,
+  };
+}
+
 export function KiloPassReferralPageContent({
   summary,
+  subscriptionContext = null,
+  isSubscriptionContextLoading = false,
   isLoading = false,
   errorMessage,
   children,
@@ -141,12 +230,14 @@ export function KiloPassReferralPageContent({
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Earn Kilo Pass referral bonuses</h1>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Share Kilo Pass with someone else and when their first eligible monthly payment is
-              confirmed, you both earn a 50% monthly Kilo Pass bonus based on their tier.
+              Share Kilo Pass with someone else. When a brand-new Kilo user completes their first
+              eligible paid personal monthly Kilo Pass purchase, you both earn a 50% monthly Kilo
+              Pass bonus. Earned rewards stay pending and apply automatically to future eligible
+              monthly base issuances.
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/subscriptions/kilo-pass">Back to Kilo Pass</Link>
+            <Link href="/subscriptions#kilo-pass">Back to Kilo Pass</Link>
           </Button>
         </div>
       </div>
@@ -164,6 +255,11 @@ export function KiloPassReferralPageContent({
               </output>
             )}
           </section>
+
+          <KiloPassReferralEligibility
+            subscriptionContext={subscriptionContext}
+            isLoading={isSubscriptionContextLoading}
+          />
 
           {isLoading ? (
             <output className="block border-t border-border pt-6 text-sm text-muted-foreground">
@@ -185,6 +281,73 @@ export function KiloPassReferralPageContent({
   );
 }
 
+function KiloPassReferralEligibility({
+  subscriptionContext,
+  isLoading,
+}: {
+  subscriptionContext: KiloPassReferralSubscriptionContext;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <section
+        aria-labelledby="kilo-pass-referral-eligibility-heading"
+        className="rounded-lg border border-border bg-input/20 p-4"
+      >
+        <h2 id="kilo-pass-referral-eligibility-heading" className="text-sm font-semibold">
+          Checking Kilo Pass status
+        </h2>
+        <output className="mt-1.5 block text-sm text-muted-foreground">
+          Loading referral reward eligibility…
+        </output>
+      </section>
+    );
+  }
+
+  const presentation = getKiloPassReferralEligibilityPresentation(subscriptionContext);
+
+  return (
+    <section
+      aria-labelledby="kilo-pass-referral-eligibility-heading"
+      className="flex flex-col gap-3 rounded-lg border border-border bg-input/20 p-4 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="space-y-1.5">
+        <div className="flex max-w-3xl items-start gap-1.5">
+          <h2 id="kilo-pass-referral-eligibility-heading" className="min-w-0 text-sm font-semibold">
+            {presentation.title}
+          </h2>
+          {presentation.details ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="More info: Kilo Pass referral reward mechanics"
+                  className="mt-0.5 rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Info className="size-3.5" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80 text-left text-balance">
+                {presentation.details}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+        </div>
+        {presentation.description ? (
+          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+            {presentation.description}
+          </p>
+        ) : null}
+      </div>
+      {presentation.action ? (
+        <Button asChild variant="outline" className="shrink-0 sm:self-center">
+          <Link href={presentation.action.href}>{presentation.action.label}</Link>
+        </Button>
+      ) : null}
+    </section>
+  );
+}
+
 function KiloPassReferralSummary({ summary }: { summary: KiloPassReferralRewardSummary }) {
   return (
     <section
@@ -196,7 +359,7 @@ function KiloPassReferralSummary({ summary }: { summary: KiloPassReferralRewardS
           Reward summary
         </h2>
         <p className="text-sm text-muted-foreground">
-          Track pending referral bonuses and previous Kilo Pass referral reward history.
+          Track pending referral bonuses and applied Kilo Pass referral reward history.
         </p>
       </div>
 
@@ -206,7 +369,8 @@ function KiloPassReferralSummary({ summary }: { summary: KiloPassReferralRewardS
             <div className="font-medium text-yellow-400">Cap reached</div>
             <div className="text-muted-foreground">
               {summary.referrerCap.grantedRewards} of {summary.referrerCap.limit} referrer rewards
-              granted. Referee rewards do not count toward this cap.
+              granted. You can keep sharing; eligible referees can still earn their reward, but you
+              will not earn another referrer reward.
             </div>
           </div>
         </div>
@@ -217,7 +381,7 @@ function KiloPassReferralSummary({ summary }: { summary: KiloPassReferralRewardS
         <SummaryTile
           label="Pending rewards"
           value={String(summary.totals.pendingRewards)}
-          info="Pending rewards wait for a future eligible monthly Kilo Pass issuance."
+          info="Pending rewards apply automatically to future eligible monthly Kilo Pass base issuances."
           indicator={summary.totals.pendingRewards > 0 ? 'warning' : undefined}
         />
         <SummaryTile label="Applied rewards" value={String(summary.totals.appliedRewards)} />
@@ -248,7 +412,7 @@ function KiloPassReferralSummary({ summary }: { summary: KiloPassReferralRewardS
             >
               Share your referral link
             </a>{' '}
-            to earn a future monthly bonus.
+            to earn a future monthly bonus that stays pending until it applies automatically.
           </div>
         ) : (
           <div className="divide-y divide-border rounded-lg border border-border">
@@ -362,7 +526,9 @@ function RewardRow({ reward }: { reward: KiloPassReferralRewardSummary['rewards'
         ) : reward.status === 'review_required' ? (
           <div>Support review required before this reward changes.</div>
         ) : (
-          <div>Application details appear after the referral bonus is issued.</div>
+          <div>
+            Oldest pending reward applies automatically when an eligible issuance is created.
+          </div>
         )}
       </div>
     </div>

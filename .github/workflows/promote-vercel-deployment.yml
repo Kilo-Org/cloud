@@ -1,0 +1,28 @@
+name: Promote Vercel Deployment
+
+on:
+  workflow_call:
+    inputs:
+      deployment_url:
+        description: 'Vercel deployment URL to promote'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    environment: production
+
+    env:
+      VERCEL_VERSION: '53.3.1'
+
+    steps:
+      - name: Install Vercel CLI
+        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
+
+      - name: Promote Vercel deployment
+        run: vercel promote "${{ inputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}

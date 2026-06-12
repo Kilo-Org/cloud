@@ -16,12 +16,10 @@ import {
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
   BALANCED_QWEN_MODEL,
-  BALANCED_RESPONSES_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
-  BALANCED_MESSAGES_FALLBACK_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -126,17 +124,7 @@ export async function resolveAutoModel(
       }
     }
 
-    // Alibaba doesn't expose a messages endpoint
-    // and does not support prompt caching on the responses endpoint
-    // so we use a fallback in those cases.
-    // This should be rare, both CLI and KiloClaw default to chat completions.
-    if (apiKind === 'responses') {
-      return { kind: 'ok', resolved: BALANCED_RESPONSES_FALLBACK_MODEL };
-    } else if (apiKind === 'messages') {
-      return { kind: 'ok', resolved: BALANCED_MESSAGES_FALLBACK_MODEL };
-    } else {
-      return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
-    }
+    return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
   }
   return {
     kind: 'ok',

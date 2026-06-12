@@ -6,7 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "placement": { "mode": "smart" },
   "dev": {
-    "port": 8796
+    "port": 8811,
   },
   "observability": {
     "enabled": true,

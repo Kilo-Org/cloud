@@ -5,6 +5,8 @@ import {
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { ttlCached } from './ttl-cache';
+import { kvReadThrough } from './kv-read-through';
+import { fetchRoutingTableFromOrigin } from './benchmark-origin';
 
 // Safety net used until the first decider benchmark publishes a table (and
 // whenever the stored table is missing or unparseable). Mirrors the static
@@ -54,27 +56,39 @@ export const DEFAULT_ROUTING_TABLE: RoutingTable = {
 
 const ROUTING_TABLE_CACHE_TTL_MS = 60_000;
 
-type RoutingTableEnv = Pick<Env, 'AUTO_ROUTING_CONFIG'>;
+type RoutingTableEnv = Pick<
+  Env,
+  'AUTO_ROUTING_CONFIG' | 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'
+>;
 
 const routingTableCache = ttlCached(ROUTING_TABLE_CACHE_TTL_MS, async (env: RoutingTableEnv) => {
-  const raw = await env.AUTO_ROUTING_CONFIG.get(ROUTING_TABLE_KV_KEY);
-  if (raw === null) return DEFAULT_ROUTING_TABLE;
-  try {
-    const parsed = RoutingTableSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success) {
-      console.warn(
-        JSON.stringify({
-          event: 'auto_routing_table_invalid',
-          issues: parsed.error.issues.slice(0, 5).map(i => `${i.path.join('.')}: ${i.code}`),
-        })
-      );
-      return DEFAULT_ROUTING_TABLE;
-    }
-    return parsed.data;
-  } catch (error) {
-    console.warn(JSON.stringify({ event: 'auto_routing_table_invalid', ...formatError(error) }));
-    return DEFAULT_ROUTING_TABLE;
-  }
+  const table = await kvReadThrough({
+    kv: env.AUTO_ROUTING_CONFIG,
+    key: ROUTING_TABLE_KV_KEY,
+    ttlSeconds: 3600,
+    fetchOrigin: () => fetchRoutingTableFromOrigin(env),
+    parse: raw => {
+      try {
+        const parsed = RoutingTableSchema.safeParse(JSON.parse(raw));
+        if (!parsed.success) {
+          console.warn(
+            JSON.stringify({
+              event: 'auto_routing_table_invalid',
+              issues: parsed.error.issues.slice(0, 5).map(i => `${i.path.join('.')}: ${i.code}`),
+            })
+          );
+          return null;
+        }
+        return parsed.data;
+      } catch (error) {
+        console.warn(
+          JSON.stringify({ event: 'auto_routing_table_invalid', ...formatError(error) })
+        );
+        return null;
+      }
+    },
+  });
+  return table ?? DEFAULT_ROUTING_TABLE;
 });
 
 export function clearRoutingTableCache(): void {

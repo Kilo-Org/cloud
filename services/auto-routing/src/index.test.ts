@@ -20,6 +20,7 @@ const analyticsTokenGet = vi.fn();
 const cacheGetEntry = vi.fn();
 const cachePutEntry = vi.fn();
 const cacheIdFromName = vi.fn(() => 'cache-do-id');
+const benchmarkFetch = vi.fn();
 const originalFetch = globalThis.fetch;
 const mockedFetch = vi.fn<typeof globalThis.fetch>();
 
@@ -31,6 +32,9 @@ const env = {
     get: configGet,
     delete: configDelete,
     put: configPut,
+  },
+  BENCHMARK_SERVICE: {
+    fetch: benchmarkFetch,
   },
   AUTO_ROUTING_CLASSIFIER_METRICS_V2: {
     writeDataPoint,
@@ -131,6 +135,17 @@ describe('auto routing worker', () => {
     configDelete.mockReset();
     configDelete.mockResolvedValue(undefined);
     configPut.mockReset();
+    benchmarkFetch.mockReset();
+    benchmarkFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes('/admin/classifier-winner')) {
+        return { ok: true, status: 200, json: async () => ({ winner: null }) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ table: null, publishedAt: null }),
+      };
+    });
     analyticsTokenGet.mockReset();
     analyticsTokenGet.mockResolvedValue('analytics-token');
     cacheGetEntry.mockReset();

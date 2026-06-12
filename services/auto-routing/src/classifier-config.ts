@@ -1,7 +1,13 @@
 import { formatError } from '@kilocode/worker-utils';
-import { CLASSIFIER_WINNER_KV_KEY, ClassifierWinnerSchema } from '@kilocode/auto-routing-contracts';
+import {
+  CLASSIFIER_WINNER_KV_KEY,
+  ClassifierWinnerSchema,
+  type ClassifierWinner,
+} from '@kilocode/auto-routing-contracts';
 import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/classifier';
 import { ttlCached } from './ttl-cache';
+import { kvReadThrough } from './kv-read-through';
+import { fetchClassifierWinnerFromOrigin } from './benchmark-origin';
 
 export const CLASSIFIER_MODEL_CONFIG_KEY = 'classifier_model';
 export const DECISION_LOG_SAMPLE_RATE_CONFIG_KEY = 'decision_log_sample_rate';
@@ -17,7 +23,10 @@ const DEFAULT_DECISION_LOG_SAMPLE_RATE = 0.01;
 // read from every classification.
 const CONFIG_CACHE_TTL_MS = 60_000;
 
-type ClassifierConfigEnv = Pick<Env, 'AUTO_ROUTING_CONFIG'>;
+type ClassifierConfigEnv = Pick<
+  Env,
+  'AUTO_ROUTING_CONFIG' | 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'
+>;
 
 export type ClassifierModelInfo = {
   // Effective model used by /decide: override ?? benchmark winner ?? default.
@@ -26,23 +35,28 @@ export type ClassifierModelInfo = {
   benchmarkWinner: string | null;
 };
 
-function parseBenchmarkWinner(raw: string | null): string | null {
-  if (raw === null) return null;
+function parseClassifierWinner(raw: string): ClassifierWinner | null {
   try {
     const parsed = ClassifierWinnerSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data.model : null;
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
 }
 
 const classifierModelCache = ttlCached(CONFIG_CACHE_TTL_MS, async (env: ClassifierConfigEnv) => {
-  const [configuredModel, winnerRaw] = await Promise.all([
+  const [configuredModel, winner] = await Promise.all([
     env.AUTO_ROUTING_CONFIG.get(CLASSIFIER_MODEL_CONFIG_KEY),
-    env.AUTO_ROUTING_CONFIG.get(CLASSIFIER_WINNER_KV_KEY),
+    kvReadThrough<ClassifierWinner>({
+      kv: env.AUTO_ROUTING_CONFIG,
+      key: CLASSIFIER_WINNER_KV_KEY,
+      ttlSeconds: 3600,
+      fetchOrigin: () => fetchClassifierWinnerFromOrigin(env),
+      parse: parseClassifierWinner,
+    }),
   ]);
   const override = configuredModel?.trim() || null;
-  const benchmarkWinner = parseBenchmarkWinner(winnerRaw);
+  const benchmarkWinner = winner?.model ?? null;
   return {
     model: override ?? benchmarkWinner ?? DEFAULT_CLASSIFIER_MODEL,
     override,

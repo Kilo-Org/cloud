@@ -45,6 +45,8 @@
       "dataset": "auto_routing_classifier_metrics_v2",
     },
   ],
+  "services": [{ "binding": "BENCHMARK_SERVICE", "service": "auto-routing-benchmark" }],
+
   "kv_namespaces": [
     {
       "binding": "AUTO_ROUTING_CONFIG",

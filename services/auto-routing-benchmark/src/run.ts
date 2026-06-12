@@ -2,6 +2,7 @@ import { classifyWithOpenRouter } from '@kilocode/auto-routing-contracts/classif
 import {
   CLASSIFIER_WINNER_KV_KEY,
   ROUTING_TABLE_KV_KEY,
+  type BenchmarkDeciderModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
 } from '@kilocode/auto-routing-contracts';
@@ -13,6 +14,7 @@ import { DECIDER_CASES } from './datasets/decider-cases';
 import type { RunModelRow } from './db';
 import {
   apiKindsToFlags,
+  flagsToApiKinds,
   countCaseResults,
   getCaseResults,
   getLatestSummariesByModel,
@@ -151,8 +153,14 @@ export async function startRun(
   if (enqueuedModelIds.length === 0) {
     // Everything already has results: complete immediately and republish the
     // aggregate so config-only changes (model removed, threshold tweaked)
-    // take effect without re-running any model.
-    await finalizeRunIfComplete(env, runId, kind);
+    // take effect without re-running any model. The state mirrors the rows
+    // insertRun just wrote, so no re-read is needed.
+    await finalizeRunIfComplete(env, runId, kind, {
+      maxConcurrency: config.maxConcurrency,
+      minAccuracy: config.minAccuracy,
+      benchmarkUserId: config.benchmarkUserId,
+      models: runModelRows,
+    });
     return { runId, enqueuedModels: 0, skippedModels };
   }
 
@@ -238,7 +246,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
     await processDeciderJob(env, message, state);
   }
 
-  await finalizeRunIfComplete(env, message.runId, message.kind);
+  await finalizeRunIfComplete(env, message.runId, message.kind, state);
 }
 
 type RunState = {
@@ -424,8 +432,13 @@ export async function runCasesWithConcurrency<T>(
   await Promise.all(workers);
 }
 
-async function finalizeRunIfComplete(env: Env, runId: string, kind: BenchmarkKind): Promise<void> {
-  const state = await getRunState(env, runId);
+async function finalizeRunIfComplete(
+  env: Env,
+  runId: string,
+  kind: BenchmarkKind,
+  // Run snapshot already loaded by the caller (startRun / processJob).
+  state: RunState
+): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
   const caseCount = kind === 'classifier' ? CLASSIFIER_CASES.length : DECIDER_CASES.length;
   const expected = enqueuedModels.length * caseCount;
@@ -462,8 +475,20 @@ async function finalizeRunIfComplete(env: Env, runId: string, kind: BenchmarkKin
   if (kind === 'decider') {
     const generatedAt = new Date().toISOString();
     try {
-      const config = await getBenchmarkConfig(env.BENCH_DB);
-      const table = buildRoutingTable({ runId, generatedAt, config, summaries: allSummaries });
+      // Built from the run's own model snapshot, not live config, so a mid-run
+      // admin edit can't skew the published table.
+      const deciderModels: BenchmarkDeciderModel[] = state.models.map(m => ({
+        id: m.model,
+        supportedApiKinds: flagsToApiKinds(m),
+        reasoningEffort: m.reasoning_effort as BenchmarkDeciderModel['reasoningEffort'],
+      }));
+      const table = buildRoutingTable({
+        runId,
+        generatedAt,
+        minAccuracy: state.minAccuracy,
+        deciderModels,
+        summaries: allSummaries,
+      });
       await saveRoutingTable(env.BENCH_DB, table, generatedAt);
       // Clear KV so the auto-routing worker repopulates from D1 on next request.
       await env.AUTO_ROUTING_CONFIG.delete(ROUTING_TABLE_KV_KEY);

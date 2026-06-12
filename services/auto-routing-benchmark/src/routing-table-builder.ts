@@ -1,7 +1,7 @@
 import {
   rankCandidates,
   RoutingTableSchema,
-  type BenchmarkConfig,
+  type BenchmarkDeciderModel,
   type BenchmarkModelSummary,
   type DifficultyTier,
   type RoutingTable,
@@ -10,14 +10,16 @@ import {
 // Builds the routing table from per-(model, tier) decider summaries. Models
 // with zero graded cases in a tier are excluded from that tier. Throws when
 // any tier ends up empty so the caller keeps the previous published table.
+// deciderModels/minAccuracy come from the run's snapshot, not live config.
 export function buildRoutingTable(params: {
   runId: string;
   generatedAt: string;
-  config: BenchmarkConfig;
+  minAccuracy: number;
+  deciderModels: BenchmarkDeciderModel[];
   summaries: BenchmarkModelSummary[];
 }): RoutingTable {
-  const { runId, generatedAt, config, summaries } = params;
-  const modelConfigById = new Map(config.deciderModels.map(m => [m.id, m] as const));
+  const { runId, generatedAt, minAccuracy, deciderModels, summaries } = params;
+  const modelConfigById = new Map(deciderModels.map(m => [m.id, m] as const));
 
   const tierCandidates = (t: DifficultyTier) =>
     rankCandidates(
@@ -33,13 +35,13 @@ export function buildRoutingTable(params: {
           ],
           reasoningEffort: modelConfigById.get(s.model)?.reasoningEffort ?? null,
         })),
-      config.minAccuracy
+      minAccuracy
     );
 
   const table: RoutingTable = {
     version: runId,
     generatedAt,
-    minAccuracy: config.minAccuracy,
+    minAccuracy,
     source: 'benchmark',
     tiers: {
       low: tierCandidates('low'),

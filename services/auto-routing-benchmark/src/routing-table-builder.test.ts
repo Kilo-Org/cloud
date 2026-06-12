@@ -1,24 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import type { BenchmarkConfig, BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
+import type {
+  BenchmarkDeciderModel,
+  BenchmarkModelSummary,
+} from '@kilocode/auto-routing-contracts';
 import { buildRoutingTable } from './routing-table-builder';
 
-const BASE_CONFIG: BenchmarkConfig = {
-  classifierModels: ['some/classifier'],
-  deciderModels: [
-    { id: 'model/cheap', supportedApiKinds: ['chat_completions'], reasoningEffort: null },
-    {
-      id: 'model/expensive',
-      supportedApiKinds: ['chat_completions', 'responses'],
-      reasoningEffort: null,
-    },
-    { id: 'model/mid', supportedApiKinds: ['chat_completions', 'messages'], reasoningEffort: null },
-  ],
-  minAccuracy: 0.7,
-  maxConcurrency: 4,
-  benchmarkUserId: null,
-  updatedAt: null,
-  updatedBy: null,
-};
+const DECIDER_MODELS: BenchmarkDeciderModel[] = [
+  { id: 'model/cheap', supportedApiKinds: ['chat_completions'], reasoningEffort: null },
+  {
+    id: 'model/expensive',
+    supportedApiKinds: ['chat_completions', 'responses'],
+    reasoningEffort: null,
+  },
+  { id: 'model/mid', supportedApiKinds: ['chat_completions', 'messages'], reasoningEffort: null },
+];
 
 function summary(
   model: string,
@@ -55,7 +50,8 @@ describe('buildRoutingTable', () => {
     const table = buildRoutingTable({
       runId: 'test-run-1',
       generatedAt: '2026-01-01T00:00:00.000Z',
-      config: BASE_CONFIG,
+      minAccuracy: 0.7,
+      deciderModels: DECIDER_MODELS,
       summaries: ALL_TIERS_SUMMARIES,
     });
 
@@ -81,7 +77,8 @@ describe('buildRoutingTable', () => {
     const table = buildRoutingTable({
       runId: 'test-run-2',
       generatedAt: '2026-01-01T00:00:00.000Z',
-      config: BASE_CONFIG,
+      minAccuracy: 0.7,
+      deciderModels: DECIDER_MODELS,
       summaries: ALL_TIERS_SUMMARIES,
     });
 
@@ -107,7 +104,8 @@ describe('buildRoutingTable', () => {
     const table = buildRoutingTable({
       runId: 'test-run-3',
       generatedAt: '2026-01-01T00:00:00.000Z',
-      config: BASE_CONFIG,
+      minAccuracy: 0.7,
+      deciderModels: DECIDER_MODELS,
       summaries,
     });
 
@@ -117,11 +115,12 @@ describe('buildRoutingTable', () => {
     expect(highModels).toContain('model/mid');
   });
 
-  it('carries supportedApiKinds from config', () => {
+  it('carries supportedApiKinds from the run snapshot', () => {
     const table = buildRoutingTable({
       runId: 'test-run-4',
       generatedAt: '2026-01-01T00:00:00.000Z',
-      config: BASE_CONFIG,
+      minAccuracy: 0.7,
+      deciderModels: DECIDER_MODELS,
       summaries: ALL_TIERS_SUMMARIES,
     });
 
@@ -132,7 +131,7 @@ describe('buildRoutingTable', () => {
     expect(midInLow?.supportedApiKinds).toEqual(['chat_completions', 'messages']);
   });
 
-  it('defaults supportedApiKinds to chat_completions when model missing from config', () => {
+  it('defaults supportedApiKinds to chat_completions when model missing from the snapshot', () => {
     const summaries: BenchmarkModelSummary[] = [
       summary('model/unknown', 'low', 0.9),
       summary('model/cheap', 'low', 0.8),
@@ -142,13 +141,11 @@ describe('buildRoutingTable', () => {
       summary('model/unknown', 'high', 0.9),
     ];
 
-    // Add a model that isn't in deciderModels
-    const config = { ...BASE_CONFIG };
-
     const table = buildRoutingTable({
       runId: 'test-run-5',
       generatedAt: '2026-01-01T00:00:00.000Z',
-      config,
+      minAccuracy: 0.7,
+      deciderModels: DECIDER_MODELS,
       summaries,
     });
 
@@ -171,7 +168,8 @@ describe('buildRoutingTable', () => {
       buildRoutingTable({
         runId: 'test-run-6',
         generatedAt: '2026-01-01T00:00:00.000Z',
-        config: BASE_CONFIG,
+        minAccuracy: 0.7,
+        deciderModels: DECIDER_MODELS,
         summaries,
       })
     ).toThrow();
@@ -190,7 +188,8 @@ describe('buildRoutingTable', () => {
       buildRoutingTable({
         runId: 'test-run-7',
         generatedAt: '2026-01-01T00:00:00.000Z',
-        config: BASE_CONFIG,
+        minAccuracy: 0.7,
+        deciderModels: DECIDER_MODELS,
         summaries,
       })
     ).toThrow();
@@ -208,7 +207,8 @@ describe('buildRoutingTable', () => {
     const table = buildRoutingTable({
       runId: 'test-run-8',
       generatedAt: '2026-01-01T00:00:00.000Z',
-      config: BASE_CONFIG,
+      minAccuracy: 0.7,
+      deciderModels: DECIDER_MODELS,
       summaries,
     });
 
@@ -220,7 +220,8 @@ describe('buildRoutingTable', () => {
     const table = buildRoutingTable({
       runId: 'decider-2026-01-01',
       generatedAt: '2026-01-01T12:00:00.000Z',
-      config: BASE_CONFIG,
+      minAccuracy: 0.7,
+      deciderModels: DECIDER_MODELS,
       summaries: ALL_TIERS_SUMMARIES,
     });
 

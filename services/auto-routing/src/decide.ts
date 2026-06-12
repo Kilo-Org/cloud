@@ -332,7 +332,9 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       );
     }
     const decision = computeDecision(classifier.classification, routingTable, stickyModel);
-    if (decision) {
+    // Like the classification cache, sticky state only trusts real classifier
+    // output: a heuristic fallback must not re-anchor the session's model.
+    if (decision && !classifier.fallback) {
       c.executionCtx.waitUntil(putStickyDecision(c.env, ctx.conversationKey, decision.model));
     }
     recordDecision(

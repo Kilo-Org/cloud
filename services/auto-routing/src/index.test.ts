@@ -457,6 +457,9 @@ describe('auto routing worker', () => {
       ],
       doubles: [expect.any(Number), 0.00000123, 0, 0],
     });
+    // A heuristic fallback classification is served but must not re-anchor
+    // the session's sticky model (same rule as the classification cache).
+    expect(cachePutEntry).not.toHaveBeenCalledWith('sticky', expect.anything());
   });
 
   it('makes no decision when no routing table is published', async () => {

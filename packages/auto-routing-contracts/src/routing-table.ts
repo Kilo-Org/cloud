@@ -1,8 +1,6 @@
 import * as z from 'zod';
 import { ReasoningEffortSchema } from './tiers';
 
-export const ClassifierApiKindSchema = z.enum(['chat_completions', 'responses', 'messages']);
-
 export const RankedCandidateSchema = z.object({
   model: z.string().trim().min(1),
   // Benchmark accuracy in [0, 1] for this tier.

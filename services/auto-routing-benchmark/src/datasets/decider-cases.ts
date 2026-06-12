@@ -204,7 +204,9 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     check: { kind: 'json_equal', value: { line: 6, fix: 'if (a[mid] < t) lo = mid + 1;' } },
   },
   {
-    id: 'debug-fix-pagination-slice',
+    // 'pages' rather than 'pagination' so the id never collides with the
+    // classifier dataset's debug-fix-pagination-slice in shared telemetry.
+    id: 'debug-fix-pages-slice',
     tier: 'medium',
     taskType: 'debugging',
     subtaskType: 'bug_fixing',

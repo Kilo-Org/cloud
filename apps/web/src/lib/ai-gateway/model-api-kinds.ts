@@ -12,9 +12,7 @@ const GATEWAY_CHAT_API_KINDS: readonly GatewayChatApiKind[] = [
  * The gateway chat API kinds the model's serving provider can speak, derived
  * from the provider the gateway would route it to. Mirrors get-provider.ts's
  * static fallback resolution — a Kilo-exclusive model is served by its
- * declared gateway, everything else by OpenRouter. The dynamic paths (BYOK,
- * custom LLMs, experiments, Vercel re-routing) never apply to auto-routing
- * benchmark candidates, which is the only consumer.
+ * declared gateway, everything else by OpenRouter.
  */
 export function gatewayChatApisForModel(modelId: string): ReadonlyArray<GatewayChatApiKind> {
   const exclusive = findKiloExclusiveModel(modelId);

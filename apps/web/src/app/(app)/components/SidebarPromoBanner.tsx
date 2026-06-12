@@ -1,7 +1,10 @@
 import Link from 'next/link';
+import { usePostHog } from 'posthog-js/react';
 import { Button } from '@/components/ui/button';
 
 export default function SidebarPromoBanner() {
+  const posthog = usePostHog();
+
   return (
     <div className="px-3 py-3">
       <div className="bg-card flex flex-col gap-2 rounded-xl border p-3">
@@ -12,7 +15,9 @@ export default function SidebarPromoBanner() {
           </p>
         </div>
         <Button asChild size="sm" className="w-full">
-          <Link href="/subscriptions">Get Kilo Pass</Link>
+          <Link href="/subscriptions" onClick={() => posthog?.capture('kilo_pass_banner_clicked')}>
+            Get Kilo Pass
+          </Link>
         </Button>
       </div>
     </div>

@@ -33,7 +33,7 @@ export function managedChannels(agent: AgentSummary): string[] {
     .map(b => b.channel.toLowerCase());
 }
 
-type ChannelCatalogEntry = { id: string; label: string; configured: boolean };
+export type ChannelCatalogEntry = { id: string; label: string; configured: boolean };
 
 /**
  * Inline per-agent model picker for the agents list row. A compact combobox with

@@ -4,6 +4,7 @@ import { Bot, Check, Loader2, Pencil, Plus, Radio, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { type AgentUpdateInput } from '@/lib/kiloclaw/agent-schemas';
@@ -23,7 +24,12 @@ import { useClawModelOptions } from '../hooks/useClawModelOptions';
 import { AgentCreateDialog } from './AgentCreateDialog';
 import { AgentDefaultsDialog } from './AgentDefaultsDialog';
 import { AgentEditDialog } from './AgentEditDialog';
-import { AgentChannelsControl, AgentModelControl, ownModelFallbacks } from './AgentInlineControls';
+import {
+  AgentChannelsControl,
+  AgentModelControl,
+  ownModelFallbacks,
+  type ChannelCatalogEntry,
+} from './AgentInlineControls';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { DetailTile } from './DetailTile';
 import { addKilocodeModelPrefix } from './modelSupport';
@@ -83,86 +89,47 @@ function ReadonlyChannels({ agent }: { agent: AgentSummary }) {
 
 function AgentRow({
   agent,
-  agents,
-  etag,
   canUpdate,
   canDelete,
   canBindings,
+  modelOptions,
+  isLoadingModels,
+  modelError,
+  catalog,
+  isLoadingChannels,
+  channelOwner,
+  savingModel,
+  savingChannels,
   onEditAdvanced,
   onDelete,
+  onSetModel,
+  onSetChannels,
 }: {
   agent: AgentSummary;
-  // The full agent list, so the channels picker can disable channels another agent owns.
-  agents: AgentSummary[];
-  etag: string;
   canUpdate: boolean;
   canDelete: boolean;
   canBindings: boolean;
+  // Shared data + handlers are hoisted to AgentsSection so the list subscribes to
+  // the model/channel queries and mutations once, not once per row.
+  modelOptions: ModelOption[];
+  isLoadingModels: boolean;
+  modelError: string | undefined;
+  catalog: ChannelCatalogEntry[];
+  isLoadingChannels: boolean;
+  channelOwner: Map<string, string>;
+  savingModel: boolean;
+  savingChannels: boolean;
   onEditAdvanced: () => void;
   onDelete: () => void;
+  onSetModel: (value: string | null) => void;
+  onSetChannels: (channels: string[]) => void;
 }) {
-  // Per-row mutations so each row's saving state is independent.
-  const { updateAgent, updateBindings } = useClawAgentMutations();
-  const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
-  const { data: catalog, isLoading: isLoadingChannels } = useClawChannelCatalog();
-
   const settings = settingChips(agent.settings);
   // `main` is reserved and cannot be deleted (controller rejects it).
   const deletable = canDelete && agent.id !== 'main';
   // Channel edits target agents in agents.list; the implicit (unconfigured) main
   // is rejected with agent_not_found, so it stays read-only until configured.
   const canEditChannels = canBindings && agent.configured;
-
-  // channel id -> the OTHER agent that owns its default route (self excluded), so
-  // the picker can disable a channel already routed elsewhere.
-  const channelOwner = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const other of agents) {
-      if (other.id === agent.id) continue;
-      for (const channel of other.bindings) {
-        if (!channel.advanced && channel.accountId === null) {
-          map.set(channel.channel.toLowerCase(), other.name ?? other.id);
-        }
-      }
-    }
-    return map;
-  }, [agents, agent.id]);
-
-  const onSetModel = async (value: string | null) => {
-    const fallbacks = ownModelFallbacks(agent);
-    const patch: AgentUpdateInput =
-      value === null
-        ? { etag, set: {}, unset: ['model'] }
-        : {
-            etag,
-            set: {
-              model: {
-                primary: addKilocodeModelPrefix(value),
-                ...(fallbacks.length > 0 ? { fallbacks } : {}),
-              },
-            },
-            unset: [],
-          };
-    try {
-      await updateAgent.mutateAsync(agent.id, patch);
-      toast.success(`Updated model for ${agent.name ?? agent.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update model', {
-        duration: 10000,
-      });
-    }
-  };
-
-  const onSetChannels = async (channels: string[]) => {
-    try {
-      await updateBindings.mutateAsync(agent.id, { etag, channels });
-      toast.success(`Updated channels for ${agent.name ?? agent.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update channels', {
-        duration: 10000,
-      });
-    }
-  };
 
   return (
     <div className="px-4 py-3">
@@ -214,7 +181,7 @@ function AgentRow({
             models={modelOptions}
             isLoading={isLoadingModels}
             error={modelError}
-            saving={updateAgent.isPending}
+            saving={savingModel}
             onChange={onSetModel}
           />
         ) : (
@@ -229,10 +196,10 @@ function AgentRow({
         {canEditChannels ? (
           <AgentChannelsControl
             agent={agent}
-            catalog={catalog ?? []}
+            catalog={catalog}
             isLoading={isLoadingChannels}
             channelOwner={channelOwner}
-            saving={updateBindings.isPending}
+            saving={savingChannels}
             onChange={onSetChannels}
           />
         ) : (
@@ -310,7 +277,15 @@ export function AgentsSection({
   canEditDefaults: boolean;
 }) {
   const { data, isLoading, error } = useClawAgents(enabled);
-  const { deleteAgent, refetchAgents } = useClawAgentMutations();
+  const { deleteAgent, refetchAgents, updateAgent, updateBindings } = useClawAgentMutations();
+  // Shared across the whole list (subscribed once, not per row).
+  const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
+  const { data: catalog, isLoading: isLoadingChannels } = useClawChannelCatalog();
+
+  // Which agent's inline model / channels save is in flight, so only that row's
+  // control shows pending (the mutations themselves are shared).
+  const [savingModelFor, setSavingModelFor] = useState<string | null>(null);
+  const [savingChannelsFor, setSavingChannelsFor] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   // Freeze the agent AND the etag together when opening an editor, so a
@@ -358,6 +333,66 @@ export function AgentsSection({
   const configuredCount = agents.filter(a => a.configured).length;
   const routedChannels = new Set(agents.flatMap(a => a.bindings.map(b => b.channel))).size;
 
+  // channel id -> the agent that owns its default route, computed once for the
+  // whole list. A self-owned channel is already checked/selected in its own row,
+  // so the picker's "owned elsewhere" test (owner present AND not selected) only
+  // disables channels routed to a DIFFERENT agent.
+  const channelOwner = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of agents) {
+      for (const b of a.bindings) {
+        if (!b.advanced && b.accountId === null) {
+          map.set(b.channel.toLowerCase(), a.name ?? a.id);
+        }
+      }
+    }
+    return map;
+  }, [agents]);
+
+  const handleSetModel = async (agent: AgentSummary, value: string | null) => {
+    if (!data) return;
+    const fallbacks = ownModelFallbacks(agent);
+    const patch: AgentUpdateInput =
+      value === null
+        ? { etag: data.etag, set: {}, unset: ['model'] }
+        : {
+            etag: data.etag,
+            set: {
+              model: {
+                primary: addKilocodeModelPrefix(value),
+                ...(fallbacks.length > 0 ? { fallbacks } : {}),
+              },
+            },
+            unset: [],
+          };
+    setSavingModelFor(agent.id);
+    try {
+      await updateAgent.mutateAsync(agent.id, patch);
+      toast.success(`Updated model for ${agent.name ?? agent.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update model', {
+        duration: 10000,
+      });
+    } finally {
+      setSavingModelFor(null);
+    }
+  };
+
+  const handleSetChannels = async (agent: AgentSummary, channels: string[]) => {
+    if (!data) return;
+    setSavingChannelsFor(agent.id);
+    try {
+      await updateBindings.mutateAsync(agent.id, { etag: data.etag, channels });
+      toast.success(`Updated channels for ${agent.name ?? agent.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update channels', {
+        duration: 10000,
+      });
+    } finally {
+      setSavingChannelsFor(null);
+    }
+  };
+
   return (
     <div>
       {enabled && data && (
@@ -402,13 +437,21 @@ export function AgentsSection({
               <AgentRow
                 key={agent.id}
                 agent={agent}
-                agents={data.agents}
-                etag={data.etag}
                 canUpdate={canUpdate}
                 canDelete={canDelete}
                 canBindings={canBindings}
+                modelOptions={modelOptions}
+                isLoadingModels={isLoadingModels}
+                modelError={modelError}
+                catalog={catalog ?? []}
+                isLoadingChannels={isLoadingChannels}
+                channelOwner={channelOwner}
+                savingModel={savingModelFor === agent.id}
+                savingChannels={savingChannelsFor === agent.id}
                 onEditAdvanced={() => setEditTarget({ agent, etag: data.etag })}
                 onDelete={() => setDeleteTarget(agent)}
+                onSetModel={value => handleSetModel(agent, value)}
+                onSetChannels={channels => handleSetChannels(agent, channels)}
               />
             ))}
             <DefaultsRow

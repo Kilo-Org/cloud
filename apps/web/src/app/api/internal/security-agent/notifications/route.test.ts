@@ -210,16 +210,19 @@ describe('POST /api/internal/security-agent/notifications', () => {
         finding_details: expect.any(RawHtml),
         sla_deadline: '',
         action_url: 'https://app.example.test/security-agent/findings',
+        manage_notifications_url:
+          'https://app.example.test/security-agent/config?tab=notifications',
       },
     });
     const sentEmail = mockSendEmail.mock.calls[0]?.[0];
     const findingDetails = sentEmail?.templateVars.finding_details;
     expect(findingDetails).toBeInstanceOf(RawHtml);
     if (!(findingDetails instanceof RawHtml)) throw new Error('Expected finding details HTML');
-    expect(findingDetails.html).toContain('acme/api');
-    expect(findingDetails.html).toContain('CVE-2026-0001');
-    expect(findingDetails.html).toContain('GHSA-AAAA-BBBB-CCCC');
-    expect(findingDetails.html).not.toContain('<a href=');
+    expect(findingDetails.html).toContain('href="https://github.com/acme/api"');
+    expect(findingDetails.html).toContain('href="https://www.cve.org/CVERecord?id=CVE-2026-0001"');
+    expect(findingDetails.html).toContain(
+      'href="https://github.com/advisories/GHSA-AAAA-BBBB-CCCC"'
+    );
     expect(findingDetails.html).toContain('CVSS 7.5');
     expect(findingDetails.html).not.toContain('Lodash merge allows prototype pollution');
   });
@@ -280,6 +283,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
         templateName: 'securityFindingNew',
         templateVars: expect.objectContaining({
           action_url: `https://app.example.test/organizations/${organization.id}/security-agent/findings`,
+          manage_notifications_url: `https://app.example.test/organizations/${organization.id}/security-agent/config?tab=notifications`,
         }),
       })
     );
@@ -302,7 +306,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
-  it('sends SLA notification emails with the findings-list action URL', async () => {
+  it('sends SLA notification management links to the SLA tab', async () => {
     const dueAt = new Date(Date.now() - 60_000).toISOString();
     const { notification } = await insertPersonalNotification({
       kind: SecurityFindingNotificationKind.SlaBreach,
@@ -318,6 +322,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
         templateName: 'securityFindingSlaBreach',
         templateVars: expect.objectContaining({
           action_url: 'https://app.example.test/security-agent/findings',
+          manage_notifications_url: 'https://app.example.test/security-agent/config?tab=sla',
         }),
       })
     );

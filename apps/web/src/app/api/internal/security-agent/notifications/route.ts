@@ -74,6 +74,15 @@ function actionUrl(finding: {
   return securityAgentUrl(finding, 'findings');
 }
 
+function manageNotificationsUrl(finding: {
+  kind: 'new_finding' | 'sla_warning' | 'sla_breach';
+  ownedByOrganizationId: string | null;
+  ownedByUserId: string | null;
+}): string {
+  const tab = finding.kind === 'new_finding' ? 'notifications' : 'sla';
+  return securityAgentUrl(finding, `config?tab=${tab}`);
+}
+
 async function recipientStillAuthorized(row: {
   recipientUserId: string;
   ownedByOrganizationId: string | null;
@@ -262,6 +271,7 @@ export async function POST(req: NextRequest) {
       cvssScore: row.cvssScore,
       slaDeadline: formatDeadline(row.slaDueAt),
       actionUrl: actionUrl(row),
+      manageNotificationsUrl: manageNotificationsUrl(row),
     }),
   }).catch(() => null);
 

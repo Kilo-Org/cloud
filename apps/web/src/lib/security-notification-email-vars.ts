@@ -9,6 +9,7 @@ type SecurityFindingEmailVarsInput = {
   ghsaId: string | null;
   cvssScore: string | number | null;
   actionUrl: string;
+  manageNotificationsUrl: string;
   slaDeadline?: string;
 };
 
@@ -21,11 +22,35 @@ const severityStyles = {
   low: { color: '#166534', background: '#dcfce7', border: '#bbf7d0' },
 } as const;
 
+function githubRepositoryUrl(repositoryName: string): string {
+  return `https://github.com/${repositoryName
+    .split('/')
+    .filter(Boolean)
+    .map(segment => encodeURIComponent(segment))
+    .join('/')}`;
+}
+
+function cveUrl(cveId: string): string | null {
+  if (!/^CVE-\d{4}-\d{4,}$/i.test(cveId)) return null;
+  return `https://www.cve.org/CVERecord?id=${encodeURIComponent(cveId.toUpperCase())}`;
+}
+
+function ghsaUrl(ghsaId: string): string | null {
+  if (!/^GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}$/i.test(ghsaId)) return null;
+  return `https://github.com/advisories/${encodeURIComponent(ghsaId.toUpperCase())}`;
+}
+
 function formatCvssScore(score: string | number | null): string | null {
   if (score === null || score === '') return null;
   const parsed = Number(score);
   if (!Number.isFinite(parsed)) return null;
   return parsed.toFixed(1);
+}
+
+function metadataLink(label: string, href: string | null): string {
+  const safeLabel = escapeHtml(label);
+  if (!href) return safeLabel;
+  return `<a href="${escapeHtml(href)}" style="color: #1a1a1a; text-decoration: underline">${safeLabel}</a>`;
 }
 
 function metadataRow(label: string, value: string): string {
@@ -46,10 +71,11 @@ function severityPill(severity: string, cvssScore: string | null): string {
 }
 
 function buildFindingDetails(input: SecurityFindingEmailVarsInput): RawHtml {
-  const cve = input.cveId ? escapeHtml(input.cveId.toUpperCase()) : 'Not reported';
-  const ghsa = input.ghsaId ? escapeHtml(input.ghsaId.toUpperCase()) : 'Not reported';
+  const repositoryUrl = githubRepositoryUrl(input.repositoryName);
+  const cve = input.cveId ? metadataLink(input.cveId, cveUrl(input.cveId)) : 'Not reported';
+  const ghsa = input.ghsaId ? metadataLink(input.ghsaId, ghsaUrl(input.ghsaId)) : 'Not reported';
   const rows = [
-    metadataRow('Repository', escapeHtml(input.repositoryName)),
+    metadataRow('Repository', metadataLink(input.repositoryName, repositoryUrl)),
     metadataRow('Severity', severityPill(input.severity, formatCvssScore(input.cvssScore))),
     metadataRow('CVE', cve),
     metadataRow('GHSA', ghsa),
@@ -68,5 +94,6 @@ export function securityFindingTemplateVars(input: SecurityFindingEmailVarsInput
     finding_details: buildFindingDetails(input),
     sla_deadline: input.slaDeadline ?? '',
     action_url: input.actionUrl,
+    manage_notifications_url: input.manageNotificationsUrl,
   };
 }

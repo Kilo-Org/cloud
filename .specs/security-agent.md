@@ -613,8 +613,13 @@ Notification emails SHOULD contain only information needed to act:
 - severity;
 - repository name;
 - finding title;
+- finding description;
+- CVE, GHSA, and CVSS metadata when available;
 - SLA deadline for warning and breach;
-- one link to owner-appropriate Security Agent findings list.
+- one primary link to owner-appropriate Security Agent findings list;
+- one link to manage relevant Security Agent notification settings.
+
+Repository, CVE, and GHSA metadata MAY link to the canonical public GitHub repository, CVE record, and GitHub Security Advisory pages when those identifiers validate. These links are supporting metadata, not app navigation CTAs.
 
 Notification email MUST NOT expose raw advisory payloads, internal credentials, or another owner's finding data.
 

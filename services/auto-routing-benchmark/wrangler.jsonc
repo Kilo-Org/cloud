@@ -15,6 +15,10 @@
     // Base URL for reaching apps/web's /api/internal/* routes. Other workers
     // that call apps/web internal endpoints use app.kilo.ai.
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
+    // Gateway base URL injected into the benchmark container as the kilo
+    // CLI's KILO_API_URL. Local dev overrides both vars via .dev.vars (see
+    // .dev.vars.example) so the decider benchmark runs fully locally.
+    "KILO_CLI_API_URL": "https://api.kilo.ai",
   },
   "containers": [
     {

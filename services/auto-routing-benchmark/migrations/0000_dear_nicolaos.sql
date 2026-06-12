@@ -37,7 +37,6 @@ CREATE TABLE `case_results` (
 	PRIMARY KEY(`run_id`, `model`, `case_id`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_case_results_run` ON `case_results` (`run_id`);--> statement-breakpoint
 CREATE TABLE `config_classifier_models` (
 	`model` text PRIMARY KEY NOT NULL
 );

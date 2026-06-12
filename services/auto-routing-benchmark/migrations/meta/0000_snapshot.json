@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "77565fdd-e92c-4de7-a4ee-0f832a620652",
+  "id": "905b4a67-d32c-491d-9206-ede5de77d0b2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "benchmark_config": {
@@ -231,15 +231,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "idx_case_results_run": {
-          "name": "idx_case_results_run",
-          "columns": [
-            "run_id"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "case_results_run_id_model_case_id_pk": {

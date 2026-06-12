@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { BenchmarkKind, BenchmarkRunStatus } from '@kilocode/auto-routing-contracts';
 
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
@@ -91,10 +91,9 @@ export const caseResults = sqliteTable(
     event_count: integer('event_count'),
     last_event_types: text('last_event_types'),
   },
-  table => [
-    primaryKey({ columns: [table.run_id, table.model, table.case_id] }),
-    index('idx_case_results_run').on(table.run_id),
-  ]
+  // The composite PK's leftmost column already serves run_id-prefix lookups
+  // (count/fetch by run); no separate run_id index is needed.
+  table => [primaryKey({ columns: [table.run_id, table.model, table.case_id] })]
 );
 
 export const routingTables = sqliteTable('routing_tables', {

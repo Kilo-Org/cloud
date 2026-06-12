@@ -18,11 +18,11 @@ export const RankedCandidateSchema = z.object({
 export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
 
 export const RoutingTableSchema = z.object({
-  // Benchmark run id (or 'default' for the built-in table).
+  // Benchmark run id.
   version: z.string().min(1),
   generatedAt: z.string().min(1),
   minAccuracy: z.number().min(0).max(1),
-  source: z.enum(['benchmark', 'default']),
+  source: z.enum(['benchmark']),
   tiers: z.object({
     low: z.array(RankedCandidateSchema).min(1),
     medium: z.array(RankedCandidateSchema).min(1),

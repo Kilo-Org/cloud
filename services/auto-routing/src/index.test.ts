@@ -81,6 +81,45 @@ const normalizedInput = {
   },
 };
 
+const benchmarkRoutingTable = {
+  version: 'bench-run-1',
+  generatedAt: '2026-06-12T00:00:00.000Z',
+  minAccuracy: 0.7,
+  source: 'benchmark',
+  tiers: {
+    low: [
+      {
+        model: 'google/gemini-2.5-flash-lite',
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions'],
+        reasoningEffort: null,
+      },
+    ],
+    medium: [
+      {
+        model: 'google/gemini-2.5-flash',
+        accuracy: 0.85,
+        avgCostUsd: 0.002,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions'],
+        reasoningEffort: null,
+      },
+    ],
+    high: [
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        accuracy: 0.8,
+        avgCostUsd: 0.01,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions', 'messages', 'responses'],
+        reasoningEffort: null,
+      },
+    ],
+  },
+};
+
 function mirrorPayload(overrides: Record<string, unknown> = {}) {
   return {
     input: normalizedInput,
@@ -135,6 +174,7 @@ describe('auto routing worker', () => {
     configDelete.mockReset();
     configDelete.mockResolvedValue(undefined);
     configPut.mockReset();
+    configPut.mockResolvedValue(undefined);
     benchmarkFetch.mockReset();
     benchmarkFetch.mockImplementation(async (url: string) => {
       if (String(url).includes('/admin/classifier-winner')) {
@@ -143,7 +183,10 @@ describe('auto routing worker', () => {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ table: null, publishedAt: null }),
+        json: async () => ({
+          table: benchmarkRoutingTable,
+          publishedAt: benchmarkRoutingTable.generatedAt,
+        }),
       };
     });
     analyticsTokenGet.mockReset();
@@ -185,8 +228,8 @@ describe('auto routing worker', () => {
       decision: {
         model: expect.any(String),
         tier: expect.stringMatching(/^(low|medium|high)$/),
-        source: 'default',
-        tableVersion: 'default',
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
         reasoningEffort: null,
       },
       classifierResult: {
@@ -248,8 +291,8 @@ describe('auto routing worker', () => {
       decision: {
         model: expect.any(String),
         tier: expect.stringMatching(/^(low|medium|high)$/),
-        source: 'default',
-        tableVersion: 'default',
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
         reasoningEffort: null,
       },
       classifierResult: { classification: mockClassification },
@@ -361,6 +404,24 @@ describe('auto routing worker', () => {
         '1',
       ],
       doubles: [expect.any(Number), 0.00000123, 0, 0],
+    });
+  });
+
+  it('makes no decision when no routing table is published', async () => {
+    benchmarkFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes('/admin/classifier-winner')) {
+        return { ok: true, status: 200, json: async () => ({ winner: null }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ table: null, publishedAt: null }) };
+    });
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: 0.00000123,
+      decision: null,
+      classifierResult: { classification: mockClassification },
     });
   });
 

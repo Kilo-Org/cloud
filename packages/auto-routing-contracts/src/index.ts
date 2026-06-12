@@ -100,7 +100,7 @@ export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 export const AutoRoutingDecisionSchema = z.object({
   model: z.string(),
   tier: DifficultyTierSchema,
-  source: z.enum(['benchmark', 'default']),
+  source: z.enum(['benchmark']),
   tableVersion: z.string(),
   // Mirrors the effort the chosen model was benchmarked with, when set.
   reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -109,8 +109,9 @@ export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 
 export const AutoRoutingDecisionResponseSchema = z.object({
   cost: z.number(),
-  // Null when classification failed or no table candidate supports the
-  // request's API kind; the gateway then falls back to its static default.
+  // Null when classification failed, no routing table is published, or no
+  // table candidate supports the request's API kind; the gateway then falls
+  // back to its static balanced defaults.
   decision: AutoRoutingDecisionSchema.nullable(),
   classifierResult: z
     .object({

@@ -9,8 +9,9 @@ import {
 export function computeDecision(
   classification: ClassifierOutput,
   apiKind: NormalizedClassifierInput['apiKind'],
-  table: RoutingTable
+  table: RoutingTable | null
 ): AutoRoutingDecision | null {
+  if (!table) return null;
   const tier = deriveDifficultyTier(classification);
   const candidate = table.tiers[tier].find(c => c.supportedApiKinds.includes(apiKind));
   if (!candidate) return null;

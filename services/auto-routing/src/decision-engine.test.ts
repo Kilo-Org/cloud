@@ -79,4 +79,7 @@ describe('computeDecision', () => {
   it('returns null when no candidate supports the api kind', () => {
     expect(computeDecision(classification, 'responses', table)).toBeNull();
   });
+  it('returns null when there is no routing table', () => {
+    expect(computeDecision(classification, 'chat_completions', null)).toBeNull();
+  });
 });

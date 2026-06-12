@@ -122,10 +122,32 @@ describe('agent config mutation routes', () => {
       name: 'Research',
       workspace: '/root/.openclaw/workspace-research',
     });
+    // No --bind requested → no bindings, and we skip the extra `agents bindings`
+    // subprocess (a cold start on the create hot path).
+    expect(deps.listBindingSummaries).not.toHaveBeenCalled();
     expect(await response.json()).toMatchObject({
       ok: true,
       etag: 'etag-1',
-      // CLI-sourced bindings are attached so a create with --bind isn't reported empty.
+      agent: { id: 'research', bindings: [] },
+    });
+  });
+
+  it('reads and attaches CLI bindings when the create requests them (--bind)', async () => {
+    const deps = createDeps();
+    const response = await makeApp(deps).request('/_kilo/config/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Research',
+        workspace: '/root/.openclaw/workspace-research',
+        bindings: ['slack'],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    // --bind requested → re-read the CLI's view so they aren't reported empty.
+    expect(deps.listBindingSummaries).toHaveBeenCalledWith('research');
+    expect(await response.json()).toMatchObject({
       agent: { id: 'research', bindings: [{ channel: 'slack', accountId: null, advanced: false }] },
     });
   });

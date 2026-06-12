@@ -125,12 +125,20 @@ export function registerAgentConfigRoutes(app: Hono, deps: AgentRouteDeps = defa
       const result = await deps.serializeMutation(async () => {
         const created = await deps.createViaCli(parsed.data);
         const { snapshot, agent } = deps.readSummary(created.agentId);
-        // summarizeAgentConfig can't see bindings; attach the CLI's view so a
-        // create with `--bind` doesn't report an empty binding set.
-        const bindingsByAgent = await deps.listBindingSummaries(agent.id);
+        // summarizeAgentConfig can't see bindings, so a `--bind` create must read
+        // the CLI's view to report them. A create with no `--bind` has no
+        // bindings, so we skip that extra `openclaw agents bindings` subprocess —
+        // a cold start on the create hot path that can push the round-trip past
+        // the edge gateway timeout. Output is identical to reading (a no-bind
+        // agent's binding set is empty); the client refetches the list (the
+        // authoritative source) regardless.
+        const bindings =
+          (parsed.data.bindings?.length ?? 0) > 0
+            ? ((await deps.listBindingSummaries(agent.id)).get(agent.id) ?? [])
+            : [];
         return {
           etag: snapshot.etag,
-          agent: { ...agent, bindings: bindingsByAgent.get(agent.id) ?? [] },
+          agent: { ...agent, bindings },
           created,
         };
       });

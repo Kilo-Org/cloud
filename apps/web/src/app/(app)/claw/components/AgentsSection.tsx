@@ -1,11 +1,12 @@
 'use client';
 
-import { Loader2, Pencil, Plus, Radio, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Bot, Check, Loader2, Pencil, Plus, Radio, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { type AgentUpdateInput } from '@/lib/kiloclaw/agent-schemas';
 import type {
   AgentDefaultsSummary,
   AgentSettingsSummary,
@@ -16,11 +17,16 @@ import {
   reconcileAmbiguousMutation,
   useClawAgentMutations,
   useClawAgents,
+  useClawChannelCatalog,
 } from '../hooks/useClawHooks';
-import { AgentBindingsDialog } from './AgentBindingsDialog';
+import { useClawModelOptions } from '../hooks/useClawModelOptions';
 import { AgentCreateDialog } from './AgentCreateDialog';
+import { AgentDefaultsDialog } from './AgentDefaultsDialog';
 import { AgentEditDialog } from './AgentEditDialog';
+import { AgentChannelsControl, AgentModelControl, ownModelFallbacks } from './AgentInlineControls';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
+import { DetailTile } from './DetailTile';
+import { addKilocodeModelPrefix } from './modelSupport';
 
 // Compact, human-readable list of the per-agent behavioral settings that are
 // actually set (null = inherits the default, so we omit it).
@@ -53,29 +59,110 @@ function AgentModelLabel({ model }: { model: AgentSummary['model'] }) {
   );
 }
 
+// Read-only channel badges for an agent whose channels can't be edited here
+// (no bindings capability, or the implicit/unconfigured main).
+function ReadonlyChannels({ agent }: { agent: AgentSummary }) {
+  if (agent.bindings.length === 0) {
+    return <span className="text-muted-foreground text-xs">none</span>;
+  }
+  // accountId null vs '' are distinct routes and advanced bindings can repeat
+  // channel+account, so the array index is the stable key here.
+  return (
+    <>
+      {agent.bindings.map((binding, index) => (
+        <Badge key={index} variant="outline" className="px-1.5 py-0 text-[10px] leading-4">
+          {binding.channel}
+          {binding.accountId !== null &&
+            ` (${binding.accountId === '' ? 'blank account' : binding.accountId})`}
+          {binding.advanced ? ' · advanced' : ''}
+        </Badge>
+      ))}
+    </>
+  );
+}
+
 function AgentRow({
   agent,
+  agents,
+  etag,
   canUpdate,
   canDelete,
   canBindings,
-  onEdit,
+  onEditAdvanced,
   onDelete,
-  onEditChannels,
 }: {
   agent: AgentSummary;
+  // The full agent list, so the channels picker can disable channels another agent owns.
+  agents: AgentSummary[];
+  etag: string;
   canUpdate: boolean;
   canDelete: boolean;
   canBindings: boolean;
-  onEdit: () => void;
+  onEditAdvanced: () => void;
   onDelete: () => void;
-  onEditChannels: () => void;
 }) {
+  // Per-row mutations so each row's saving state is independent.
+  const { updateAgent, updateBindings } = useClawAgentMutations();
+  const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
+  const { data: catalog, isLoading: isLoadingChannels } = useClawChannelCatalog();
+
   const settings = settingChips(agent.settings);
   // `main` is reserved and cannot be deleted (controller rejects it).
   const deletable = canDelete && agent.id !== 'main';
-  // Binding edits target agents in agents.list; the implicit (unconfigured) main
-  // is rejected with agent_not_found, so don't offer the channels action for it.
-  const showChannels = canBindings && agent.configured;
+  // Channel edits target agents in agents.list; the implicit (unconfigured) main
+  // is rejected with agent_not_found, so it stays read-only until configured.
+  const canEditChannels = canBindings && agent.configured;
+
+  // channel id -> the OTHER agent that owns its default route (self excluded), so
+  // the picker can disable a channel already routed elsewhere.
+  const channelOwner = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const other of agents) {
+      if (other.id === agent.id) continue;
+      for (const channel of other.bindings) {
+        if (!channel.advanced && channel.accountId === null) {
+          map.set(channel.channel.toLowerCase(), other.name ?? other.id);
+        }
+      }
+    }
+    return map;
+  }, [agents, agent.id]);
+
+  const onSetModel = async (value: string | null) => {
+    const fallbacks = ownModelFallbacks(agent);
+    const patch: AgentUpdateInput =
+      value === null
+        ? { etag, set: {}, unset: ['model'] }
+        : {
+            etag,
+            set: {
+              model: {
+                primary: addKilocodeModelPrefix(value),
+                ...(fallbacks.length > 0 ? { fallbacks } : {}),
+              },
+            },
+            unset: [],
+          };
+    try {
+      await updateAgent.mutateAsync(agent.id, patch);
+      toast.success(`Updated model for ${agent.name ?? agent.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update model', {
+        duration: 10000,
+      });
+    }
+  };
+
+  const onSetChannels = async (channels: string[]) => {
+    try {
+      await updateBindings.mutateAsync(agent.id, { etag, channels });
+      toast.success(`Updated channels for ${agent.name ?? agent.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update channels', {
+        duration: 10000,
+      });
+    }
+  };
 
   return (
     <div className="px-4 py-3">
@@ -91,26 +178,15 @@ function AgentRow({
             </Badge>
           )}
         </div>
-        {(canUpdate || showChannels || deletable) && (
+        {(canUpdate || deletable) && (
           <div className="flex shrink-0 items-center gap-1">
-            {showChannels && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onEditChannels}
-                aria-label="Edit channels"
-              >
-                <Radio className="h-4 w-4" />
-              </Button>
-            )}
             {canUpdate && (
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={onEdit}
-                aria-label="Edit agent"
+                onClick={onEditAdvanced}
+                aria-label="Advanced settings"
               >
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -130,27 +206,39 @@ function AgentRow({
         )}
       </div>
 
-      <div className="text-muted-foreground mt-1 text-xs">
-        Model: <AgentModelLabel model={agent.model} />
+      <div className="mt-2 flex items-center gap-2">
+        <span className="text-muted-foreground w-16 shrink-0 text-xs">Model</span>
+        {canUpdate ? (
+          <AgentModelControl
+            agent={agent}
+            models={modelOptions}
+            isLoading={isLoadingModels}
+            error={modelError}
+            saving={updateAgent.isPending}
+            onChange={onSetModel}
+          />
+        ) : (
+          <span className="text-xs">
+            <AgentModelLabel model={agent.model} />
+          </span>
+        )}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <span className="text-muted-foreground text-xs">Channels:</span>
-        {agent.bindings.length === 0 ? (
-          <span className="text-muted-foreground text-xs">none</span>
+      <div className="mt-2 flex items-start gap-2">
+        <span className="text-muted-foreground mt-0.5 w-16 shrink-0 text-xs">Channels</span>
+        {canEditChannels ? (
+          <AgentChannelsControl
+            agent={agent}
+            catalog={catalog ?? []}
+            isLoading={isLoadingChannels}
+            channelOwner={channelOwner}
+            saving={updateBindings.isPending}
+            onChange={onSetChannels}
+          />
         ) : (
-          // accountId null vs '' are distinct routes and advanced bindings can
-          // repeat channel+account, so the array index is the stable key here.
-          agent.bindings.map((binding, index) => (
-            <Badge key={index} variant="outline" className="px-1.5 py-0 text-[10px] leading-4">
-              {binding.channel}
-              {/* accountId is verbatim; null = default-account route. An empty
-                  string is still an account-scoped route, so test against null. */}
-              {binding.accountId !== null &&
-                ` (${binding.accountId === '' ? 'blank account' : binding.accountId})`}
-              {binding.advanced ? ' · advanced' : ''}
-            </Badge>
-          ))
+          <div className="flex flex-wrap items-center gap-1.5">
+            <ReadonlyChannels agent={agent} />
+          </div>
         )}
       </div>
 
@@ -161,7 +249,15 @@ function AgentRow({
   );
 }
 
-function DefaultsRow({ defaults }: { defaults: AgentDefaultsSummary }) {
+function DefaultsRow({
+  defaults,
+  canEdit,
+  onEdit,
+}: {
+  defaults: AgentDefaultsSummary;
+  canEdit: boolean;
+  onEdit: () => void;
+}) {
   const settings = settingChips(defaults.settings);
   // Defaults can be fallback-only (primary null, fallbacks set) — don't show "none".
   const modelLabel = defaults.model
@@ -172,16 +268,29 @@ function DefaultsRow({ defaults }: { defaults: AgentDefaultsSummary }) {
     : 'none';
 
   return (
-    <div className="text-muted-foreground bg-muted/30 px-4 py-3 text-xs">
-      <span className="font-medium">Inherited defaults</span> · Model:{' '}
-      <span className="font-mono">{modelLabel}</span>
-      {settings.length > 0 && ` · ${settings.join(' · ')}`}
+    <div className="bg-muted/30 flex items-center justify-between gap-2 px-4 py-3">
+      <p className="text-muted-foreground text-xs">
+        <span className="font-medium">Inherited defaults</span> · Model:{' '}
+        <span className="font-mono">{modelLabel}</span>
+        {settings.length > 0 && ` · ${settings.join(' · ')}`}
+      </p>
+      {canEdit && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          onClick={onEdit}
+          aria-label="Edit inherited defaults"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 }
 
 /**
- * Agents view: lists the fleet running on the user's machine and the channels
+ * Agents view: lists the agents running on the user's machine and the channels
  * routed to each, with create / edit / delete. Gated by the controller's
  * `config.agents.read` capability and admin status at the call site.
  */
@@ -191,12 +300,14 @@ export function AgentsSection({
   canUpdate,
   canDelete,
   canBindings,
+  canEditDefaults,
 }: {
   enabled: boolean;
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
   canBindings: boolean;
+  canEditDefaults: boolean;
 }) {
   const { data, isLoading, error } = useClawAgents(enabled);
   const { deleteAgent, refetchAgents } = useClawAgentMutations();
@@ -206,11 +317,11 @@ export function AgentsSection({
   // background list refetch can't advance the etag under a stale form (which
   // would let a save bypass the optimistic-concurrency check).
   const [editTarget, setEditTarget] = useState<{ agent: AgentSummary; etag: string } | null>(null);
-  const [channelsTarget, setChannelsTarget] = useState<{
-    agent: AgentSummary;
-    etag: string;
-  } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AgentSummary | null>(null);
+  // Freeze the config-wide etag when opening the defaults editor (same reason as
+  // the per-agent editors: a background refetch must not advance it under a
+  // stale form and let a save bypass the concurrency check).
+  const [defaultsTarget, setDefaultsTarget] = useState<{ etag: string } | null>(null);
 
   const onConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -240,14 +351,32 @@ export function AgentsSection({
     }
   };
 
+  // Agent metrics, all derived from the loaded list (no extra fetch): how many
+  // agents, how many carry their own config (vs inheriting), and how many
+  // distinct channels are routed to a non-default agent.
+  const agents = data?.agents ?? [];
+  const configuredCount = agents.filter(a => a.configured).length;
+  const routedChannels = new Set(agents.flatMap(a => a.bindings.map(b => b.channel))).size;
+
   return (
     <div>
-      {enabled && data && canCreate && (
-        <div className="mb-3 flex justify-end">
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Create agent
-          </Button>
+      {enabled && data && (
+        <div className="mb-4 flex flex-col gap-3">
+          {/* Stat tiles — same DetailTile pattern as the Settings page so the
+              two KiloClaw surfaces read consistently. All from the loaded list. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <DetailTile label="Agents" value={String(agents.length)} icon={Bot} />
+            <DetailTile label="Configured" value={String(configuredCount)} icon={Check} />
+            <DetailTile label="Channels routed" value={String(routedChannels)} icon={Radio} />
+          </div>
+          {canCreate && (
+            <div className="flex justify-end">
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Create agent
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -273,15 +402,20 @@ export function AgentsSection({
               <AgentRow
                 key={agent.id}
                 agent={agent}
+                agents={data.agents}
+                etag={data.etag}
                 canUpdate={canUpdate}
                 canDelete={canDelete}
                 canBindings={canBindings}
-                onEdit={() => setEditTarget({ agent, etag: data.etag })}
+                onEditAdvanced={() => setEditTarget({ agent, etag: data.etag })}
                 onDelete={() => setDeleteTarget(agent)}
-                onEditChannels={() => setChannelsTarget({ agent, etag: data.etag })}
               />
             ))}
-            <DefaultsRow defaults={data.defaults} />
+            <DefaultsRow
+              defaults={data.defaults}
+              canEdit={canEditDefaults}
+              onEdit={() => setDefaultsTarget({ etag: data.etag })}
+            />
           </div>
         )}
       </div>
@@ -314,15 +448,14 @@ export function AgentsSection({
         />
       )}
 
-      {channelsTarget && data && (
-        <AgentBindingsDialog
+      {defaultsTarget && data && (
+        <AgentDefaultsDialog
           open
           onOpenChange={open => {
-            if (!open) setChannelsTarget(null);
+            if (!open) setDefaultsTarget(null);
           }}
-          agent={channelsTarget.agent}
-          etag={channelsTarget.etag}
-          agents={data.agents}
+          defaults={data.defaults}
+          etag={defaultsTarget.etag}
         />
       )}
 

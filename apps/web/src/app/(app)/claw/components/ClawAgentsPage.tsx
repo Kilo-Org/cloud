@@ -98,6 +98,7 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
         canUpdate={false}
         canDelete={false}
         canBindings={false}
+        canEditDefaults={false}
       />
     );
   } else if (versionQuery.isLoading) {
@@ -133,6 +134,7 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
         canUpdate={has('config.agents.update')}
         canDelete={has('config.agents.delete.cli')}
         canBindings={has('config.agents.bindings.update')}
+        canEditDefaults={has('config.agent-defaults.update')}
       />
     );
   }

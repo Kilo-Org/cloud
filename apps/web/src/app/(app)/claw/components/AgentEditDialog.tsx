@@ -4,9 +4,7 @@ import { useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { AnimatedDots } from './AnimatedDots';
-import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -31,8 +29,6 @@ import {
 } from '@/lib/kiloclaw/agent-schemas';
 import type { AgentSummary } from '@/lib/kiloclaw/types';
 import { useClawAgentMutations } from '../hooks/useClawHooks';
-import { useClawModelOptions } from '../hooks/useClawModelOptions';
-import { addKilocodeModelPrefix, stripKilocodeModelPrefix } from './modelSupport';
 
 const INHERIT = 'inherit';
 
@@ -48,16 +44,6 @@ function toOption<T extends string>(raw: string | null, options: readonly T[]): 
   return options.find(opt => opt === raw) ?? INHERIT;
 }
 
-// The agent's OWN model (not the inherited/effective one): primary + fallbacks.
-function ownModel(agent: AgentSummary): { primary: string; fallbacks: string[] } {
-  const raw = agent.rawModel;
-  if (typeof raw === 'string') return { primary: raw, fallbacks: [] };
-  if (raw && typeof raw === 'object') {
-    return { primary: raw.primary ?? '', fallbacks: raw.fallbacks ?? [] };
-  }
-  return { primary: '', fallbacks: [] };
-}
-
 function LabeledSelect<T extends string>({
   label,
   hint,
@@ -66,7 +52,7 @@ function LabeledSelect<T extends string>({
   onChange,
 }: {
   label: string;
-  hint?: string;
+  hint: string;
   value: T;
   options: readonly T[];
   onChange: (value: T) => void;
@@ -83,18 +69,16 @@ function LabeledSelect<T extends string>({
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={triggerId}>{label}</Label>
-      {hint && (
-        <p id={hintId} className="text-muted-foreground text-xs">
-          {hint}
-        </p>
-      )}
+      <p id={hintId} className="text-muted-foreground text-xs">
+        {hint}
+      </p>
       <Select
         value={value}
         onValueChange={v => {
           if (isValue(v)) onChange(v);
         }}
       >
-        <SelectTrigger id={triggerId} aria-describedby={hint ? hintId : undefined}>
+        <SelectTrigger id={triggerId} aria-describedby={hintId}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -110,12 +94,9 @@ function LabeledSelect<T extends string>({
   );
 }
 
-// Plain-language explanations of the OpenClaw per-agent knobs, shown as inline
-// helper text under each control. These map to config that isn't surfaced on the
-// main Settings page. Kept terse for inline use; "Inherit default = fleet-wide
-// setting" is already covered by the dialog description, so it isn't repeated.
+// Plain-language explanations of the OpenClaw per-agent behavior knobs. These map
+// to config that isn't surfaced on the main Settings page.
 const HINTS = {
-  model: 'The model this agent runs on. Uncheck to choose a specific model.',
   thinking:
     'Reasoning effort before replying — higher helps on hard tasks but is slower. adaptive varies per task; max is the most.',
   reasoning:
@@ -125,6 +106,11 @@ const HINTS = {
   fastMode: 'Optimizes for responsiveness. Separate knob from Thinking.',
 } as const;
 
+/**
+ * Advanced per-agent behavior overrides (thinking / reasoning / verbose / fast
+ * mode). Model and channels are edited inline on the agent row, so this dialog
+ * holds only the rarely-touched advanced knobs.
+ */
 export function AgentEditDialog({
   open,
   onOpenChange,
@@ -137,14 +123,7 @@ export function AgentEditDialog({
   etag: string;
 }) {
   const { updateAgent } = useClawAgentMutations();
-  const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
 
-  // Work in bare (un-prefixed) model-id space so the combobox value matches the
-  // catalog options; the kilocode/ prefix is re-added when writing.
-  const initial = useMemo(() => {
-    const own = ownModel(agent);
-    return { primary: stripKilocodeModelPrefix(own.primary), fallbacks: own.fallbacks };
-  }, [agent]);
   // Initial select values. toOption maps null OR an unknown (forward-compat)
   // value to INHERIT; we diff against THESE rather than the raw settings so an
   // unknown value left untouched is never mistaken for an explicit unset and
@@ -169,39 +148,17 @@ export function AgentEditDialog({
     [agent.settings]
   );
 
-  // An agent owns a model when rawModel is set — including a fallback-only model
-  // (no primary). The inherit toggle is the only way to clear such a model.
-  const hadOwnModel = agent.rawModel != null;
-  const [inheritModel, setInheritModel] = useState(!hadOwnModel);
-  const [primary, setPrimary] = useState(initial.primary);
   const [thinking, setThinking] = useState<ThinkingOpt>(initialSettings.thinking);
   const [verbose, setVerbose] = useState<VerboseOpt>(initialSettings.verbose);
   const [reasoning, setReasoning] = useState<ReasoningOpt>(initialSettings.reasoning);
   const [fastMode, setFastMode] = useState<FastModeOpt>(initialSettings.fastMode);
 
-  // Diff the form against the initial values into a controller patch.
+  // Diff the form against the initial values into a controller patch. Only emit a
+  // change when it differs from its initial select value, so an untouched (incl.
+  // unknown forward-compat) value never produces a spurious unset.
   const patch = useMemo(() => {
     const set: AgentUpdateInput['set'] = {};
     const unset: AgentUpdateInput['unset'] = [];
-
-    if (inheritModel) {
-      // Clear the agent's own model (primary-only OR fallback-only) so it falls
-      // back to the fleet default.
-      if (hadOwnModel) unset.push('model');
-    } else {
-      const newPrimary = primary.trim();
-      const fallbacks = initial.fallbacks; // preserved; not edited here
-      const changed = !hadOwnModel || newPrimary !== initial.primary;
-      if (changed && (newPrimary !== '' || fallbacks.length > 0)) {
-        set.model = {
-          ...(newPrimary !== '' ? { primary: addKilocodeModelPrefix(newPrimary) } : {}),
-          ...(fallbacks.length > 0 ? { fallbacks } : {}),
-        };
-      }
-    }
-
-    // Only emit a setting change when it differs from its initial select value,
-    // so an untouched (incl. unknown) value never produces a spurious unset.
     if (thinking !== initialSettings.thinking) {
       if (thinking === INHERIT) unset.push('thinkingDefault');
       else set.thinkingDefault = thinking;
@@ -218,24 +175,11 @@ export function AgentEditDialog({
       if (fastMode === INHERIT) unset.push('fastModeDefault');
       else set.fastModeDefault = fastMode === 'on';
     }
-
     return { set, unset };
-  }, [
-    inheritModel,
-    hadOwnModel,
-    primary,
-    thinking,
-    verbose,
-    reasoning,
-    fastMode,
-    initial,
-    initialSettings,
-  ]);
+  }, [thinking, verbose, reasoning, fastMode, initialSettings]);
 
-  // Not inheriting but no primary and no fallbacks = no model to write.
-  const modelInvalid = !inheritModel && primary.trim() === '' && initial.fallbacks.length === 0;
   const hasChanges = Object.keys(patch.set).length > 0 || patch.unset.length > 0;
-  const canSubmit = hasChanges && !modelInvalid && !updateAgent.isPending;
+  const canSubmit = hasChanges && !updateAgent.isPending;
 
   const onSubmit = async () => {
     if (!canSubmit) return;
@@ -254,57 +198,14 @@ export function AgentEditDialog({
     <Dialog open={open} onOpenChange={updateAgent.isPending ? undefined : onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit {agent.name ?? agent.id}</DialogTitle>
+          <DialogTitle>Advanced settings · {agent.name ?? agent.id}</DialogTitle>
           <DialogDescription>
-            Model and behavior for this agent. Leave a field on “Inherit default” to use the
-            fleet-wide setting.
+            Behavior overrides for this agent. Leave a field on “Inherit default” to use the
+            inherited default. Model and channels are edited on the agent’s row.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label>Model</Label>
-            <p className="text-muted-foreground text-xs">{HINTS.model}</p>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="agent-edit-inherit-model"
-                checked={inheritModel}
-                onCheckedChange={checked => setInheritModel(checked === true)}
-              />
-              <Label
-                htmlFor="agent-edit-inherit-model"
-                className="text-muted-foreground font-normal"
-              >
-                Use the default model
-              </Label>
-            </div>
-            {!inheritModel && (
-              <>
-                <ModelCombobox
-                  label=""
-                  models={modelOptions}
-                  value={primary}
-                  onValueChange={setPrimary}
-                  isLoading={isLoadingModels}
-                  error={modelError}
-                  placeholder="Select a model"
-                  modal
-                  className="w-full"
-                />
-                {initial.fallbacks.length > 0 && (
-                  <p className="text-muted-foreground text-xs">
-                    Fallbacks preserved: {initial.fallbacks.join(', ')}
-                  </p>
-                )}
-                {modelInvalid && (
-                  <p className="text-destructive text-xs">
-                    Enter a model id, or use the default model.
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-
           <LabeledSelect
             label="Thinking"
             hint={HINTS.thinking}

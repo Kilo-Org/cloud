@@ -17,6 +17,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import type {
   AgentBindingsInput,
   AgentCreateInput,
+  AgentDefaultsUpdateInput,
   AgentUpdateInput,
 } from '@/lib/kiloclaw/agent-schemas';
 import type { AgentConfigListResponse } from '@/lib/kiloclaw/types';
@@ -101,7 +102,7 @@ export function useClawControllerVersion(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
-// Agents (read-only fleet)
+// Agents (read-only list)
 
 export function useClawAgents(enabled = true) {
   const trpc = useTRPC();
@@ -214,6 +215,12 @@ export function useClawAgentMutations() {
   const orgBindings = useMutation(
     trpc.organizations.kiloclaw.updateAgentBindings.mutationOptions(settledOpts)
   );
+  const personalDefaults = useMutation(
+    trpc.kiloclaw.updateAgentDefaults.mutationOptions(settledOpts)
+  );
+  const orgDefaults = useMutation(
+    trpc.organizations.kiloclaw.updateAgentDefaults.mutationOptions(settledOpts)
+  );
 
   return {
     refetchAgents,
@@ -244,6 +251,13 @@ export function useClawAgentMutations() {
           ? orgBindings.mutateAsync({ organizationId, agentId, bindings })
           : personalBindings.mutateAsync({ agentId, bindings }),
       isPending: organizationId ? orgBindings.isPending : personalBindings.isPending,
+    },
+    updateDefaults: {
+      mutateAsync: (patch: AgentDefaultsUpdateInput) =>
+        organizationId
+          ? orgDefaults.mutateAsync({ organizationId, patch })
+          : personalDefaults.mutateAsync(patch),
+      isPending: organizationId ? orgDefaults.isPending : personalDefaults.isPending,
     },
   };
 }

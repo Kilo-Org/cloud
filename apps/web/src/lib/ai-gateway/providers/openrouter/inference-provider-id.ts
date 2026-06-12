@@ -122,6 +122,11 @@ export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.
 
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
+export const MISTRAL_USER_BYOK_PROVIDER_IDS = [
+  VercelUserByokInferenceProviderIdSchema.enum.mistral,
+  DirectUserByokInferenceProviderIdSchema.enum.codestral,
+] satisfies UserByokProviderId[];
+
 export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',

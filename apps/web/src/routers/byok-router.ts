@@ -38,7 +38,6 @@ import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/pr
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
@@ -108,13 +107,10 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 
   const result: Record<string, string[]> = {};
 
-  result['codestral'] = ['Codestral (mistralai/codestral-2508)'];
-
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
     if (isKiloExclusiveModel(openRouterModel.id)) continue;
     const vercelModel = vercelModelMetadata[mapModelIdToVercel(openRouterModel.id, false)];
     if (!vercelModel) continue;
-    if (isCodestralModel(vercelModel.id)) continue;
     if (vercelModel.type !== 'language') continue;
     for (const endpoint of vercelModel.endpoints) {
       const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(
@@ -133,6 +129,13 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
       result[provider.id].push(model.name + ' (' + formatDirectByokModelId(provider, model) + ')');
     }
   }
+
+  const mistralProviderId = VercelUserByokInferenceProviderIdSchema.enum.mistral;
+  const mistralModels = result[mistralProviderId] ?? [];
+  const legacyCodestralModel = `Codestral (mistralai/${CODESTRAL_TEST_MODEL})`;
+  if (!mistralModels.includes(legacyCodestralModel)) mistralModels.push(legacyCodestralModel);
+  result[mistralProviderId] = mistralModels;
+  result.codestral = [...mistralModels];
 
   for (const models of Object.values(result)) {
     models.sort();

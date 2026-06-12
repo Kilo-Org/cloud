@@ -25,6 +25,10 @@ import { readDb } from '@/lib/drizzle';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
+import {
+  MISTRAL_USER_BYOK_PROVIDER_IDS,
+  type UserByokProviderId,
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // Mistral exposes FIM on two separate, key-incompatible endpoints:
 //   - https://api.mistral.ai          (La Plateforme, paid tier keys)
@@ -153,11 +157,12 @@ export async function POST(request: NextRequest) {
   // Extract properties for usage context
   const promptInfo = extractFimPromptInfo(requestBody);
 
-  const byokProviderKey = fimProvider === 'mistral' ? 'codestral' : 'inception';
+  const byokProviderKeys: UserByokProviderId[] =
+    fimProvider === 'mistral' ? [...MISTRAL_USER_BYOK_PROVIDER_IDS] : ['inception'];
 
   const userByok = organizationId
-    ? await getBYOKforOrganization(readDb, organizationId, [byokProviderKey])
-    : await getBYOKforUser(readDb, user.id, [byokProviderKey]);
+    ? await getBYOKforOrganization(readDb, organizationId, byokProviderKeys)
+    : await getBYOKforUser(readDb, user.id, byokProviderKeys);
 
   const usageContext: MicrodollarUsageContext = {
     api_kind: 'fim_completions',

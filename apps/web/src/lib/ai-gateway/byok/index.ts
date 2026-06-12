@@ -5,18 +5,19 @@ import type { EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import {
+  MISTRAL_USER_BYOK_PROVIDER_IDS,
   UserByokProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
   type UserByokProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
+import { isMistralModel } from '@/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import { getVercelModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
-  if (isCodestralModel(modelId)) {
-    return ['codestral'];
+  if (isMistralModel(modelId)) {
+    return [...MISTRAL_USER_BYOK_PROVIDER_IDS];
   }
   const vercelModelMetadata = await getVercelModelsMetadata();
   if (Object.keys(vercelModelMetadata).length === 0) {
@@ -48,6 +49,23 @@ export function decryptByokRow({
   };
 }
 
+function prioritizeMistralKeys(
+  byok: BYOKResult[],
+  providerIds: UserByokProviderId[]
+): BYOKResult[] {
+  if (!MISTRAL_USER_BYOK_PROVIDER_IDS.every(providerId => providerIds.includes(providerId))) {
+    return byok;
+  }
+  const providerPriority = new Map(
+    MISTRAL_USER_BYOK_PROVIDER_IDS.map((providerId, index) => [providerId, index])
+  );
+  return byok.toSorted(
+    (left, right) =>
+      (providerPriority.get(left.providerId) ?? Number.MAX_SAFE_INTEGER) -
+      (providerPriority.get(right.providerId) ?? Number.MAX_SAFE_INTEGER)
+  );
+}
+
 export async function getBYOKforUser(
   fromDb: typeof db,
   userId: string,
@@ -71,7 +89,12 @@ export async function getBYOKforUser(
     )
     .orderBy(byok_api_keys.created_at);
 
-  return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
+  return rows.length === 0
+    ? null
+    : prioritizeMistralKeys(
+        rows.map(row => decryptByokRow(row)),
+        providerIds
+      );
 }
 
 export async function getBYOKforOrganization(
@@ -97,5 +120,10 @@ export async function getBYOKforOrganization(
     )
     .orderBy(byok_api_keys.created_at);
 
-  return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
+  return rows.length === 0
+    ? null
+    : prioritizeMistralKeys(
+        rows.map(row => decryptByokRow(row)),
+        providerIds
+      );
 }

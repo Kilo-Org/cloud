@@ -428,7 +428,7 @@ export function routingTableToRows(
         rank,
         model: c.model,
         accuracy: c.accuracy,
-        avg_cost_usd: c.avgCostUsd ?? null,
+        avg_cost_usd: c.avgCostUsd,
         meets_threshold: c.meetsThreshold,
         reasoning_effort: c.reasoningEffort ?? null,
         ...apiKindsToFlags(c.supportedApiKinds),
@@ -453,10 +453,7 @@ export function rowsToRoutingTable(
     tierMap[row.tier].push({
       model: row.model,
       accuracy: row.accuracy,
-      // Pass through the stored value; a NULL here means corrupted data.
-      // getLatestRoutingTable runs RoutingTableSchema.safeParse which will
-      // reject the table rather than serving a null cost as 0 (cheapest).
-      avgCostUsd: row.avg_cost_usd as number,
+      avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
       supportedApiKinds: flagsToApiKinds(row),
       reasoningEffort: row.reasoning_effort as RankedCandidate['reasoningEffort'],

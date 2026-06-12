@@ -70,7 +70,7 @@ CREATE TABLE `routing_table_candidates` (
 	`rank` integer NOT NULL,
 	`model` text NOT NULL,
 	`accuracy` real NOT NULL,
-	`avg_cost_usd` real,
+	`avg_cost_usd` real NOT NULL,
 	`meets_threshold` integer NOT NULL,
 	`reasoning_effort` text,
 	`supports_chat_completions` integer NOT NULL,

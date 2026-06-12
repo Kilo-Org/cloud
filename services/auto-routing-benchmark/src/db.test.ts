@@ -270,34 +270,4 @@ describe('rowsToRoutingTable', () => {
     expect(reassembled.tiers.low[0].model).toBe('model-a');
     expect(reassembled.tiers.low[1].model).toBe('model-b');
   });
-
-  it('preserves null avgCostUsd through routingTableToRows → rowsToRoutingTable', () => {
-    const nullCostCandidate: RankedCandidate = {
-      model: 'model-nullcost',
-      accuracy: 0.88,
-      avgCostUsd: null as unknown as number,
-      meetsThreshold: true,
-      supportedApiKinds: ['responses'],
-      reasoningEffort: null,
-    };
-    const tableWithNullCost: RoutingTable = {
-      version: 'run-null-cost',
-      generatedAt: '2026-06-01T10:00:00.000Z',
-      minAccuracy: 0.7,
-      source: 'benchmark',
-      tiers: {
-        low: [nullCostCandidate],
-        medium: [candidate('model-c')],
-        high: [candidate('model-a')],
-      },
-    };
-    const { tableRow, candidateRows } = routingTableToRows(
-      tableWithNullCost,
-      '2026-06-01T11:00:00.000Z'
-    );
-    const lowRow = candidateRows.find(r => r.tier === 'low');
-    expect(lowRow?.avg_cost_usd).toBeNull();
-    const reassembled = rowsToRoutingTable(tableRow, candidateRows);
-    expect(reassembled.tiers.low[0].avgCostUsd).toBeNull();
-  });
 });

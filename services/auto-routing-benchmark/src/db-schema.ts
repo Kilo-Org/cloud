@@ -113,7 +113,9 @@ export const routingTableCandidates = sqliteTable(
     rank: integer('rank').notNull(),
     model: text('model').notNull(),
     accuracy: real('accuracy').notNull(),
-    avg_cost_usd: real('avg_cost_usd'),
+    // Non-null unlike model_summaries: RankedCandidate.avgCostUsd is a plain
+    // nonnegative number (buildRoutingTable maps unknown costs to 0).
+    avg_cost_usd: real('avg_cost_usd').notNull(),
     meets_threshold: integer('meets_threshold', { mode: 'boolean' }).notNull(),
     reasoning_effort: text('reasoning_effort'),
     supports_chat_completions: integer('supports_chat_completions', { mode: 'boolean' }).notNull(),

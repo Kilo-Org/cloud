@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d78fc8c4-926b-42c0-b876-6877d22e28fe",
+  "id": "77565fdd-e92c-4de7-a4ee-0f832a620652",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "benchmark_config": {
@@ -448,7 +448,7 @@
           "name": "avg_cost_usd",
           "type": "real",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "meets_threshold": {

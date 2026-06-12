@@ -1005,8 +1005,8 @@ function SwapVersionDialog({
               />
             </div>
             <p className="text-muted-foreground mt-1 text-xs">
-              Validated against <code>ExperimentUpstreamSchema</code> (strict). Do not put the api
-              key in this blob — use the field below.
+              Validated against <code>CustomLlmApiConfigSchema</code> (strict). Do not put the api
+              key in this blob; use the field below.
             </p>
           </div>
 

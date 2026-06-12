@@ -7810,10 +7810,11 @@ export type ModelExperimentVariant = typeof model_experiment_variant.$inferSelec
 export type NewModelExperimentVariant = typeof model_experiment_variant.$inferInsert;
 
 // Immutable per-variant version. New RC = new row. Never UPDATEd.
-// `upstream` is validated by ExperimentUpstreamSchema in app code. The
-// api key is stored separately in `encrypted_api_key` (same shape as
-// `byok_api_keys.encrypted_api_key`) so the JSONB blob never holds the
-// secret and reporting/admin views can simply omit the column.
+// `upstream` is typed as CustomLlmApiConfig and validated with
+// CustomLlmApiConfigSchema at application boundaries. The api key is stored
+// separately in `encrypted_api_key` (same shape as
+// `byok_api_keys.encrypted_api_key`) so the JSONB blob never holds the secret
+// and reporting/admin views can simply omit the column.
 export const model_experiment_variant_version = pgTable(
   'model_experiment_variant_version',
   {

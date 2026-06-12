@@ -43,11 +43,21 @@ import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
+
+const SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS = 5 * 60_000;
 
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  const trpc = useTRPC();
   const { data: user, isLoading } = useUser();
   const kiloClawNavStateQuery = useKiloClawNavState();
   const pathname = usePathname();
+  const { data: sidebarPromoEligibility } = useQuery(
+    trpc.kiloPass.getSidebarPromoEligibility.queryOptions(undefined, {
+      staleTime: SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS,
+    })
+  );
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -373,7 +383,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
         )}
       </SidebarContent>
 
-      <SidebarPromoBanner />
+      {sidebarPromoEligibility?.showPromoBanner && <SidebarPromoBanner />}
       <SidebarUserFooter user={user} isLoading={isLoading} />
     </Sidebar>
   );

@@ -52,6 +52,17 @@ const classifierModelCache = ttlCached(CONFIG_CACHE_TTL_MS, async (env: Classifi
       ttlSeconds: 3600,
       fetchOrigin: () => fetchClassifierWinnerFromOrigin(env),
       parse: parseClassifierWinner,
+    }).catch((error: unknown) => {
+      // A benchmark-origin failure must not reject the whole load: that would
+      // discard a healthy admin override and fail closed to the default.
+      console.warn(
+        JSON.stringify({
+          event: 'auto_routing_config_read_failed',
+          key: CLASSIFIER_WINNER_KV_KEY,
+          ...formatError(error),
+        })
+      );
+      return null;
     }),
   ]);
   const override = configuredModel?.trim() || null;

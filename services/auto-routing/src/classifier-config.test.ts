@@ -158,6 +158,17 @@ describe('classifier config', () => {
     warn.mockRestore();
   });
 
+  it('keeps a healthy admin override when the winner origin fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { env } = makeEnv({ overrideModel: 'override/model', originThrow: true });
+    expect(await getClassifierModelInfo(env)).toEqual({
+      model: 'override/model',
+      override: 'override/model',
+      benchmarkWinner: null,
+    });
+    warn.mockRestore();
+  });
+
   it('override takes precedence over benchmark winner from origin', async () => {
     const { env } = makeEnv({
       overrideModel: 'openai/gpt-4o',

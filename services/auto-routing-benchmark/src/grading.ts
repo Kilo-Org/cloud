@@ -1,21 +1,26 @@
 import type { ClassifierOutput } from '@kilocode/auto-routing-contracts';
 
-// Golden labels grade the axes the decision engine actually consumes.
-// subtaskType is intentionally ungraded (high label ambiguity, unused by
-// deriveDifficultyTier); riskLevel likewise; requiresTools gets a small weight.
+// Golden labels grade every classifier field except confidence. subtaskType
+// is worth less than taskType: a wrong subtype under the right type is a near
+// miss. riskLevel gets a small weight matching its small influence on tier
+// derivation.
 export type ClassifierExpectation = {
   taskType: ClassifierOutput['taskType'];
+  subtaskType: ClassifierOutput['subtaskType'];
   contextComplexity: ClassifierOutput['contextComplexity'];
   reasoningComplexity: ClassifierOutput['reasoningComplexity'];
+  riskLevel: ClassifierOutput['riskLevel'];
   executionMode: ClassifierOutput['executionMode'];
   requiresTools: boolean;
 };
 
 export const CLASSIFIER_FIELD_WEIGHTS: Record<keyof ClassifierExpectation, number> = {
-  taskType: 0.3,
-  reasoningComplexity: 0.25,
+  taskType: 0.25,
+  subtaskType: 0.1,
+  reasoningComplexity: 0.2,
   contextComplexity: 0.15,
-  executionMode: 0.2,
+  executionMode: 0.15,
+  riskLevel: 0.05,
   requiresTools: 0.1,
 };
 

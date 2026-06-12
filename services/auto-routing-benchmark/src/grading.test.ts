@@ -10,8 +10,10 @@ import {
 
 const expected: ClassifierExpectation = {
   taskType: 'implementation',
+  subtaskType: 'code_generation',
   contextComplexity: 'small',
   reasoningComplexity: 'low',
+  riskLevel: 'low',
   executionMode: 'answer_only',
   requiresTools: false,
 };
@@ -35,21 +37,21 @@ describe('gradeClassifierOutput', () => {
     expect(gradeClassifierOutput(expected, actualFrom({}))).toBe(1);
   });
 
-  it('scores a taskType mismatch alone as 0.7', () => {
-    expect(gradeClassifierOutput(expected, actualFrom({ taskType: 'debugging' }))).toBe(0.7);
+  it('scores a taskType mismatch alone as 0.75', () => {
+    expect(gradeClassifierOutput(expected, actualFrom({ taskType: 'debugging' }))).toBe(0.75);
   });
 
   it('scores a requiresTools mismatch alone as 0.9', () => {
     expect(gradeClassifierOutput(expected, actualFrom({ requiresTools: true }))).toBe(0.9);
   });
 
-  it('ignores ungraded fields like subtaskType and riskLevel', () => {
+  it('scores a combined subtaskType and riskLevel mismatch as 0.85', () => {
     expect(
       gradeClassifierOutput(
         expected,
         actualFrom({ subtaskType: 'feature_development', riskLevel: 'high' })
       )
-    ).toBe(1);
+    ).toBe(0.85);
   });
 });
 

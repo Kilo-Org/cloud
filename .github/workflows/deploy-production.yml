@@ -90,30 +90,18 @@ jobs:
     secrets: inherit
 
   promote-app:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
     needs: [stage-app, check-production-db-startup, run-migrations]
-    environment: production
-
-    steps:
-      - name: Install Vercel CLI
-        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - name: Promote Vercel deployment
-        run: vercel promote "${{ needs.stage-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
+    secrets: inherit
 
   promote-global-app:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
     needs: [stage-global-app, check-production-db-startup, run-migrations]
-    environment: production
-
-    steps:
-      - name: Install Vercel CLI
-        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
-
-      - name: Promote Vercel deployment
-        run: vercel promote "${{ needs.stage-global-app.outputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
+    secrets: inherit
 
   resolve-worker-base:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

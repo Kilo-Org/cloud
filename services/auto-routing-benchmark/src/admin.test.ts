@@ -1,44 +1,43 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_BENCHMARK_CONFIG } from './config';
 import { app } from './index';
+import type * as DbModule from './db';
 
 // ---------------------------------------------------------------------------
-// Env / binding stubs
+// Stubs: the db module is mocked at its function boundary (drizzle generates
+// the SQL, so statement-level stubbing would couple tests to its internals).
 // ---------------------------------------------------------------------------
+
+vi.mock('./db', async importOriginal => {
+  const actual = await importOriginal<typeof DbModule>();
+  return {
+    ...actual,
+    getConfigRow: vi.fn(),
+    saveConfigRow: vi.fn(),
+    listRuns: vi.fn(),
+    getLatestRoutingTable: vi.fn(),
+    getLatestSummariesByModel: vi.fn(),
+    insertRun: vi.fn(),
+    markStaleRunsFailed: vi.fn(),
+  };
+});
+
+import {
+  getConfigRow,
+  getLatestRoutingTable,
+  getLatestSummariesByModel,
+  insertRun,
+  listRuns,
+  markStaleRunsFailed,
+  saveConfigRow,
+} from './db';
 
 const tokenGet = vi.fn<() => Promise<string>>();
-const dbFirst = vi.fn();
-const dbAll = vi.fn();
-const dbRun = vi.fn();
-const dbBind = vi.fn();
-const dbPrepare = vi.fn();
 const queueSendBatch = vi.fn();
-
-// Minimal chainable D1 stub.
-// prepare() → { bind() → { first(), all(), run() } }
-function makeD1Stub() {
-  const stmt = {
-    bind: (..._args: unknown[]) => {
-      dbBind(..._args);
-      return stmt;
-    },
-    first: dbFirst,
-    all: dbAll,
-    run: dbRun,
-  };
-  dbPrepare.mockReturnValue(stmt);
-  return {
-    prepare: (sql: string) => {
-      dbPrepare(sql);
-      return stmt;
-    },
-    batch: vi.fn().mockResolvedValue([]),
-  } as unknown as D1Database;
-}
 
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
-  BENCH_DB: null as unknown as D1Database,
+  BENCH_DB: {} as D1Database,
   BENCH_QUEUE: { sendBatch: queueSendBatch },
   AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn() },
 } as unknown as Env;
@@ -81,14 +80,16 @@ function authedPut(path: string, body: unknown, extraHeaders: Record<string, str
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
+  vi.clearAllMocks();
   tokenGet.mockResolvedValue('bench-token');
-  dbFirst.mockResolvedValue(null);
-  dbAll.mockResolvedValue({ results: [] });
-  dbRun.mockResolvedValue({ meta: { changes: 0 } });
+  vi.mocked(getConfigRow).mockResolvedValue(null);
+  vi.mocked(saveConfigRow).mockResolvedValue(undefined);
+  vi.mocked(listRuns).mockResolvedValue([]);
+  vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
+  vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
+  vi.mocked(insertRun).mockResolvedValue(undefined);
+  vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
   queueSendBatch.mockResolvedValue(undefined);
-
-  // Rebuild the D1 stub each test so prepare/bind point to fresh mocks.
-  (env as unknown as Record<string, unknown>).BENCH_DB = makeD1Stub();
 });
 
 // ---------------------------------------------------------------------------
@@ -116,7 +117,7 @@ describe('auth middleware', () => {
 
 describe('GET /admin/config', () => {
   it('returns defaults when the DB row is absent', async () => {
-    // dbFirst already returns null by default
+    // getConfigRow already returns null by default
     const res = await authedGet('/admin/config');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -132,7 +133,11 @@ describe('GET /admin/config', () => {
       updatedAt: '2026-06-01T00:00:00.000Z',
       updatedBy: 'admin@example.com',
     };
-    dbFirst.mockResolvedValueOnce({ config_json: JSON.stringify(storedConfig) });
+    vi.mocked(getConfigRow).mockResolvedValueOnce({
+      config_json: JSON.stringify(storedConfig),
+      updated_at: '2026-06-01T00:00:00.000Z',
+      updated_by: 'admin@example.com',
+    });
 
     const res = await authedGet('/admin/config');
     expect(res.status).toBe(200);
@@ -168,7 +173,7 @@ describe('PUT /admin/config', () => {
       success: false,
       error: 'Invalid benchmark config',
     });
-    expect(dbRun).not.toHaveBeenCalled();
+    expect(saveConfigRow).not.toHaveBeenCalled();
   });
 
   it('persists a valid config and returns it with defaults', async () => {
@@ -194,18 +199,12 @@ describe('PUT /admin/config', () => {
     expect(typeof body.config.updatedAt).toBe('string');
     expect(body.defaults).toEqual(DEFAULT_BENCHMARK_CONFIG);
 
-    // The INSERT was actually executed (dbRun was called on the saveConfigRow stmt).
-    expect(dbRun).toHaveBeenCalled();
-    // The SQL should be an INSERT OR REPLACE into benchmark_config.
-    const insertCall = dbPrepare.mock.calls.find(
-      (args: unknown[]) =>
-        typeof args[0] === 'string' && (args[0] as string).includes('benchmark_config')
-    );
-    expect(insertCall).toBeDefined();
-    // The updatedBy value was forwarded via bind.
-    const bindCalls: unknown[][] = dbBind.mock.calls;
-    const foundUpdatedBy = bindCalls.some(args => args.includes('igor@kilocode.ai'));
-    expect(foundUpdatedBy).toBe(true);
+    // The row was persisted with the stamped config and updatedBy.
+    expect(saveConfigRow).toHaveBeenCalledOnce();
+    const [, configJson, updatedAt, updatedBy] = vi.mocked(saveConfigRow).mock.calls[0];
+    expect(JSON.parse(configJson).minAccuracy).toBe(0.85);
+    expect(typeof updatedAt).toBe('string');
+    expect(updatedBy).toBe('igor@kilocode.ai');
   });
 });
 
@@ -215,7 +214,7 @@ describe('PUT /admin/config', () => {
 
 describe('GET /admin/runs', () => {
   it('returns an empty runs array when the table is empty', async () => {
-    // dbAll returns { results: [] } by default
+    // listRuns returns [] by default
     const res = await authedGet('/admin/runs');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ runs: [] });
@@ -252,13 +251,13 @@ describe('POST /admin/runs', () => {
   });
 
   it('starts a classifier run and returns runId + enqueuedModels', async () => {
-    // markStaleRunsFailed → run (UPDATE), getBenchmarkConfig → first (null → defaults),
-    // insertRun → run, then sendBatch.
+    // No prior summaries → every configured model is enqueued.
     const res = await authedPost('/admin/runs', { kind: 'classifier' });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { runId: string; enqueuedModels: number };
     expect(body.runId).toMatch(/^classifier-/);
     expect(body.enqueuedModels).toBe(DEFAULT_BENCHMARK_CONFIG.classifierModels.length);
+    expect(insertRun).toHaveBeenCalledOnce();
     expect(queueSendBatch).toHaveBeenCalledOnce();
   });
 });
@@ -269,7 +268,7 @@ describe('POST /admin/runs', () => {
 
 describe('GET /admin/routing-table', () => {
   it('returns {table: null, publishedAt: null} when no rows exist', async () => {
-    // dbFirst already returns null by default
+    // getLatestRoutingTable already returns null by default
     const res = await authedGet('/admin/routing-table');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ table: null, publishedAt: null });
@@ -290,7 +289,7 @@ describe('GET /admin/routing-table', () => {
       source: 'benchmark',
       tiers: { low: [candidate], medium: [candidate], high: [candidate] },
     };
-    dbFirst.mockResolvedValueOnce({
+    vi.mocked(getLatestRoutingTable).mockResolvedValueOnce({
       run_id: 'run-123',
       published_at: '2026-06-01T10:00:00.000Z',
       table_json: JSON.stringify(tableData),

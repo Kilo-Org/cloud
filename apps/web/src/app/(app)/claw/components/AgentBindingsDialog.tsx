@@ -128,6 +128,14 @@ export function AgentBindingsDialog({
               those are left untouched.
             </p>
           )}
+          {/* Routing is cached per conversation, so a change only re-routes new
+              conversations until the machine restarts. Surfaced so users don't
+              think a saved binding "didn't work" when an open chat keeps replying
+              from the old agent. */}
+          <p className="text-muted-foreground mt-1 text-xs">
+            New routes apply to new conversations right away. A conversation that's already in
+            progress keeps replying from its current agent until the machine restarts.
+          </p>
         </div>
 
         <DialogFooter>

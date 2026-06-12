@@ -70,7 +70,7 @@ const VERCEL_BYOK_PROVIDER_NAMES = {
   fireworks: 'Fireworks',
   google: 'Google AI Studio',
   minimax: 'MiniMax',
-  mistral: 'Mistral AI (other models)',
+  mistral: 'Mistral AI',
   moonshotai: 'Moonshot AI',
   novita: 'Novita',
   perplexity: 'Perplexity',
@@ -81,7 +81,7 @@ const VERCEL_BYOK_PROVIDER_NAMES = {
 
 const VERCEL_BYOK_PROVIDERS = [
   ...Object.entries(VERCEL_BYOK_PROVIDER_NAMES).map(([id, name]) => ({ id, name })),
-  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
+  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Legacy Codestral-only key' },
 ];
 
 const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(([id, name]) => ({

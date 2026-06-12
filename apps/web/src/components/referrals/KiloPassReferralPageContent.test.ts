@@ -72,6 +72,22 @@ describe('KiloPassReferralPageContent', () => {
     expect(errorHtml).not.toContain('stack');
   });
 
+  it('does not render unsubscribed eligibility while subscription state is loading', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(KiloPassReferralPageContent, {
+        summary: emptySummary,
+        isSubscriptionContextLoading: true,
+      })
+    );
+
+    expect(html).toContain('Checking Kilo Pass status');
+    expect(html).toContain('Loading referral reward eligibility…');
+    expect(html).not.toContain(
+      'Any Kilo user can refer! Redeem your reward with an active Kilo Pass.'
+    );
+    expect(html).not.toContain('Choose monthly Kilo Pass');
+  });
+
   it('renders contextual eligibility for active monthly, annual, paused, canceling, and unsubscribed states', () => {
     const activeMonthlyHtml = renderToStaticMarkup(
       React.createElement(KiloPassReferralPageContent, {

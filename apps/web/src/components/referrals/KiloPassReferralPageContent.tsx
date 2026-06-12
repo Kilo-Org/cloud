@@ -58,6 +58,7 @@ export type KiloPassReferralRewardSummary = {
 type KiloPassReferralPageContentProps = {
   summary: KiloPassReferralRewardSummary | null;
   subscriptionContext?: KiloPassReferralSubscriptionContext;
+  isSubscriptionContextLoading?: boolean;
   isLoading?: boolean;
   errorMessage?: string | null;
   children?: ReactNode;
@@ -213,6 +214,7 @@ export function getKiloPassReferralEligibilityPresentation(
 export function KiloPassReferralPageContent({
   summary,
   subscriptionContext = null,
+  isSubscriptionContextLoading = false,
   isLoading = false,
   errorMessage,
   children,
@@ -254,7 +256,10 @@ export function KiloPassReferralPageContent({
             )}
           </section>
 
-          <KiloPassReferralEligibility subscriptionContext={subscriptionContext} />
+          <KiloPassReferralEligibility
+            subscriptionContext={subscriptionContext}
+            isLoading={isSubscriptionContextLoading}
+          />
 
           {isLoading ? (
             <output className="block border-t border-border pt-6 text-sm text-muted-foreground">
@@ -278,9 +283,27 @@ export function KiloPassReferralPageContent({
 
 function KiloPassReferralEligibility({
   subscriptionContext,
+  isLoading,
 }: {
   subscriptionContext: KiloPassReferralSubscriptionContext;
+  isLoading: boolean;
 }) {
+  if (isLoading) {
+    return (
+      <section
+        aria-labelledby="kilo-pass-referral-eligibility-heading"
+        className="rounded-lg border border-border bg-input/20 p-4"
+      >
+        <h2 id="kilo-pass-referral-eligibility-heading" className="text-sm font-semibold">
+          Checking Kilo Pass status
+        </h2>
+        <output className="mt-1.5 block text-sm text-muted-foreground">
+          Loading referral reward eligibility…
+        </output>
+      </section>
+    );
+  }
+
   const presentation = getKiloPassReferralEligibilityPresentation(subscriptionContext);
 
   return (

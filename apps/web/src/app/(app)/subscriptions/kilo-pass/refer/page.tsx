@@ -10,7 +10,7 @@ export default function KiloPassReferralPage() {
   const trpc = useTRPC();
   const rewardSummary = useQuery(trpc.kiloPass.getReferralRewardSummary.queryOptions());
   const state = useQuery(trpc.kiloPass.getState.queryOptions());
-  const subscription = state.data?.subscription ?? null;
+  const subscription = state.isPending ? undefined : (state.data?.subscription ?? null);
 
   return (
     <KiloPassReferralPageContent
@@ -22,8 +22,9 @@ export default function KiloPassReferralPage() {
               cadence: subscription.cadence,
               cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
             }
-          : null
+          : subscription
       }
+      isSubscriptionContextLoading={state.isPending}
       isLoading={rewardSummary.isLoading}
       errorMessage={
         rewardSummary.isError ? 'Rewards are temporarily unavailable. Try again in a minute.' : null

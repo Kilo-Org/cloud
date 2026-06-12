@@ -44,9 +44,7 @@ function rewriteOneOfAsAnyOf(schema: unknown): void {
  * chat completions request — both tool function `parameters` and the
  * `response_format.json_schema.schema`.
  */
-export function rewriteChatCompletionsOneOfAsAnyOf(
-  request: OpenRouterChatCompletionRequest
-): void {
+export function rewriteChatCompletionsOneOfAsAnyOf(request: OpenRouterChatCompletionRequest): void {
   if (Array.isArray(request.tools)) {
     for (const tool of request.tools) {
       if (!isRecord(tool) || tool.type !== 'function' || !isRecord(tool.function)) continue;

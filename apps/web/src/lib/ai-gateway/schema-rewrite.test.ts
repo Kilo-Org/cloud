@@ -31,8 +31,7 @@ describe('rewriteChatCompletionsOneOfAsAnyOf', () => {
 
     rewriteChatCompletionsOneOfAsAnyOf(request);
 
-    const parameters = request.tools![0].function
-      .parameters as Record<string, unknown>;
+    const parameters = request.tools![0].function.parameters as Record<string, unknown>;
     expect(parameters).not.toHaveProperty('oneOf');
     expect(parameters).toHaveProperty('anyOf');
     expect(parameters.anyOf).toEqual([{ type: 'string' }, { type: 'number' }]);
@@ -54,9 +53,11 @@ describe('rewriteChatCompletionsOneOfAsAnyOf', () => {
 
     rewriteChatCompletionsOneOfAsAnyOf(request);
 
-    const schema = (request.response_format as Record<string, unknown> & {
-      json_schema: { schema: Record<string, unknown> };
-    }).json_schema.schema;
+    const schema = (
+      request.response_format as Record<string, unknown> & {
+        json_schema: { schema: Record<string, unknown> };
+      }
+    ).json_schema.schema;
     expect(schema).not.toHaveProperty('oneOf');
     expect(schema.anyOf).toEqual([{ type: 'string' }]);
   });
@@ -84,15 +85,11 @@ describe('rewriteChatCompletionsOneOfAsAnyOf', () => {
 
     rewriteChatCompletionsOneOfAsAnyOf(request);
 
-    const parameters = request.tools![0].function
-      .parameters as Record<string, unknown>;
+    const parameters = request.tools![0].function.parameters as Record<string, unknown>;
     expect(parameters).not.toHaveProperty('oneOf');
     expect(parameters.anyOf).toEqual([{ type: 'object' }]);
     expect(parameters.properties.filter).not.toHaveProperty('oneOf');
-    expect(parameters.properties.filter.anyOf).toEqual([
-      { type: 'string' },
-      { type: 'number' },
-    ]);
+    expect(parameters.properties.filter.anyOf).toEqual([{ type: 'string' }, { type: 'number' }]);
   });
 
   it('leaves schemas without oneOf untouched', () => {
@@ -113,8 +110,7 @@ describe('rewriteChatCompletionsOneOfAsAnyOf', () => {
 
     rewriteChatCompletionsOneOfAsAnyOf(request);
 
-    const parameters = request.tools![0].function
-      .parameters as Record<string, unknown>;
+    const parameters = request.tools![0].function.parameters as Record<string, unknown>;
     expect(parameters).not.toHaveProperty('anyOf');
     expect(parameters).not.toHaveProperty('oneOf');
   });
@@ -138,8 +134,7 @@ describe('rewriteChatCompletionsOneOfAsAnyOf', () => {
 
     rewriteChatCompletionsOneOfAsAnyOf(request);
 
-    const parameters = request.tools![0].function
-      .parameters as Record<string, unknown>;
+    const parameters = request.tools![0].function.parameters as Record<string, unknown>;
     expect(parameters.type).toBe('object');
     expect(parameters.required).toEqual(['mode']);
     expect(parameters.anyOf).toEqual([{ type: 'string' }]);
@@ -164,8 +159,7 @@ describe('rewriteChatCompletionsOneOfAsAnyOf', () => {
 
     rewriteChatCompletionsOneOfAsAnyOf(request);
 
-    const parameters = request.tools![0].function
-      .parameters as Record<string, unknown>;
+    const parameters = request.tools![0].function.parameters as Record<string, unknown>;
     expect(parameters).not.toHaveProperty('oneOf');
     expect(parameters.anyOf).toEqual([{ type: 'boolean' }, { type: 'string' }]);
   });

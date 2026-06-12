@@ -51,7 +51,9 @@ describe('kvReadThrough', () => {
 
     expect(result).toEqual(origin);
     expect(fetchOrigin).toHaveBeenCalledOnce();
-    expect(put).toHaveBeenCalledWith('corrupt-key', JSON.stringify(origin), { expirationTtl: 3600 });
+    expect(put).toHaveBeenCalledWith('corrupt-key', JSON.stringify(origin), {
+      expirationTtl: 3600,
+    });
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
@@ -71,7 +73,9 @@ describe('kvReadThrough', () => {
 
     expect(result).toEqual(origin);
     expect(fetchOrigin).toHaveBeenCalledOnce();
-    expect(put).toHaveBeenCalledWith('missing-key', JSON.stringify(origin), { expirationTtl: 3600 });
+    expect(put).toHaveBeenCalledWith('missing-key', JSON.stringify(origin), {
+      expirationTtl: 3600,
+    });
   });
 
   it('returns null and does NOT write to KV when origin returns null', async () => {

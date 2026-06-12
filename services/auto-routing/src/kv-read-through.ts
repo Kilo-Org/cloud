@@ -18,9 +18,7 @@ export async function kvReadThrough<T>(options: {
     if (parsed !== null) {
       return parsed;
     }
-    console.warn(
-      JSON.stringify({ event: 'kv_read_through_corrupt', key })
-    );
+    console.warn(JSON.stringify({ event: 'kv_read_through_corrupt', key }));
   }
 
   // Miss (or corrupt value treated as miss): fetch from origin.
@@ -29,7 +27,15 @@ export async function kvReadThrough<T>(options: {
     return null;
   }
 
-  // Fire-and-forget the KV put; failures here should not block the response.
-  void kv.put(key, serialize(value), { expirationTtl: ttlSeconds });
+  // Awaited: an unawaited promise without waitUntil may be cancelled when the
+  // request ends, silently dropping the cache write. A put failure must not
+  // discard the value we already fetched, so it only warns.
+  await kv
+    .put(key, serialize(value), { expirationTtl: ttlSeconds })
+    .catch((error: unknown) =>
+      console.warn(
+        JSON.stringify({ event: 'kv_read_through_put_failed', key, error: String(error) })
+      )
+    );
   return value;
 }

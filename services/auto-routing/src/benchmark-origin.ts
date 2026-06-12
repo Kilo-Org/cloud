@@ -9,19 +9,17 @@ type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'>;
 
 async function fetchBenchmark(env: BenchmarkEnv, path: string): Promise<unknown> {
   const secret = await env.INTERNAL_API_SECRET_PROD.get();
-  const res = await env.BENCHMARK_SERVICE.fetch(
-    `https://auto-routing-benchmark${path}`,
-    { headers: { authorization: `Bearer ${secret}` } }
-  );
+  const res = await env.BENCHMARK_SERVICE.fetch(`https://auto-routing-benchmark${path}`, {
+    headers: { authorization: `Bearer ${secret}` },
+  });
   if (!res.ok) {
-    throw new Error(`benchmark origin ${path} responded ${res.status}`);
+    const detail = (await res.text().catch(() => '')).slice(0, 200);
+    throw new Error(`benchmark origin ${path} responded ${res.status} ${detail}`);
   }
   return res.json();
 }
 
-export async function fetchRoutingTableFromOrigin(
-  env: BenchmarkEnv
-): Promise<RoutingTable | null> {
+export async function fetchRoutingTableFromOrigin(env: BenchmarkEnv): Promise<RoutingTable | null> {
   const body = await fetchBenchmark(env, '/admin/routing-table');
   const parsed = BenchmarkRoutingTableResponseSchema.safeParse(body);
   if (!parsed.success) {

@@ -2,6 +2,7 @@ import type {
   BenchmarkKind,
   BenchmarkModelSummary,
   BenchmarkRun,
+  ClassifierApiKind,
   ClassifierWinner,
   RankedCandidate,
   RoutingTable,
@@ -28,15 +29,14 @@ export type RunRow = typeof benchmarkRuns.$inferSelect;
 export type RunModelRow = typeof runModels.$inferSelect;
 export type ConfigDeciderModelRow = typeof configDeciderModels.$inferSelect;
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
-type ApiKind = 'chat_completions' | 'messages' | 'responses';
 
 // ---------------------------------------------------------------------------
 // ApiKind flag helpers
 // ---------------------------------------------------------------------------
 
-const ALL_API_KINDS: ApiKind[] = ['chat_completions', 'messages', 'responses'];
+const ALL_API_KINDS: ClassifierApiKind[] = ['chat_completions', 'messages', 'responses'];
 
-export function apiKindsToFlags(kinds: ApiKind[]): {
+export function apiKindsToFlags(kinds: ClassifierApiKind[]): {
   supports_chat_completions: boolean;
   supports_messages: boolean;
   supports_responses: boolean;
@@ -52,7 +52,7 @@ export function flagsToApiKinds(flags: {
   supports_chat_completions: boolean;
   supports_messages: boolean;
   supports_responses: boolean;
-}): ApiKind[] {
+}): ClassifierApiKind[] {
   return ALL_API_KINDS.filter(k => {
     if (k === 'chat_completions') return flags.supports_chat_completions;
     if (k === 'messages') return flags.supports_messages;

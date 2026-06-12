@@ -1,28 +1,15 @@
 import {
   AutoRoutingDecisionResponseSchema,
-  normalizeClassifierInput,
   type AutoRoutingDecision,
-  type ClassifierApiKind,
-  type MirrorPayload,
 } from '@kilocode/auto-routing-contracts';
 import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { warnExceptInTest } from '@/lib/utils.server';
+import { buildDecidePayload, type DecideBaseParams } from './auto-routing-mirror';
 
 export const EFFICIENT_DECISION_TIMEOUT_MS = 2_000;
 
-export type EfficientDecisionParams = {
-  apiKind: ClassifierApiKind;
-  body: unknown;
-  requestedModel: string;
-  providerHints: MirrorPayload['input']['providerHints'];
-  bodyBytes: number;
-  userId: string;
-  sessionId: string | null;
-  machineId: string | null;
-  clientRequestId: string | null;
-  mode: string | null;
-  userAgent: string | null;
-};
+// EfficientDecisionParams is an alias for the shared base params type.
+export type EfficientDecisionParams = DecideBaseParams;
 
 type FetchEfficientDecisionOptions = {
   workerUrl?: string;
@@ -43,22 +30,8 @@ export async function fetchEfficientAutoDecision(
   const onError = options.onError ?? warnExceptInTest;
   if (!workerUrl || !authToken) return null;
 
-  const normalizedInput = normalizeClassifierInput(params.apiKind, params.body, {
-    requestedModel: params.requestedModel,
-    providerHints: params.providerHints,
-  });
-  if (!normalizedInput) return null;
-
-  const payload: MirrorPayload = {
-    input: normalizedInput,
-    userId: params.userId,
-    sessionId: params.sessionId,
-    machineId: params.machineId,
-    clientRequestId: params.clientRequestId,
-    mode: params.mode,
-    userAgent: params.userAgent,
-    bodyBytes: params.bodyBytes,
-  };
+  const payload = buildDecidePayload(params);
+  if (!payload) return null;
 
   try {
     const response = await fetch(`${workerUrl}/decide`, {

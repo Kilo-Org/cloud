@@ -5,9 +5,6 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { AUTO_ROUTING_WORKER_URL } from '@/lib/config.server';
 import { createWorkerAdminFetch } from './worker-admin-fetch';
-import type { WorkerAdminResult } from './worker-admin-fetch';
-
-export type AutoRoutingAdminResult<T> = WorkerAdminResult<T>;
 
 const fetchAutoRoutingAdmin = createWorkerAdminFetch({
   workerUrl: AUTO_ROUTING_WORKER_URL,

@@ -1,12 +1,12 @@
 import * as z from 'zod';
 import { ClassifierApiKindSchema, RoutingTableSchema } from './routing-table';
-import { DifficultyTierSchema } from './tiers';
+import { DifficultyTierSchema, ReasoningEffortSchema } from './tiers';
+
+export { ReasoningEffortSchema } from './tiers';
+export type { ReasoningEffort } from './tiers';
 
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
 export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
-
-export const ReasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high']);
-export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 
 export const BenchmarkDeciderModelSchema = z.object({
   id: z.string().trim().min(1),
@@ -36,6 +36,7 @@ export const BenchmarkConfigSchema = z.object({
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 
 export const BenchmarkRunStatusSchema = z.enum(['running', 'completed', 'failed']);
+export type BenchmarkRunStatus = z.infer<typeof BenchmarkRunStatusSchema>;
 
 export const BenchmarkModelSummarySchema = z.object({
   model: z.string(),

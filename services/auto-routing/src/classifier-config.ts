@@ -1,11 +1,10 @@
-import { formatError } from '@kilocode/worker-utils';
+import { formatError, ttlCached } from '@kilocode/worker-utils';
 import {
   CLASSIFIER_WINNER_KV_KEY,
   ClassifierWinnerSchema,
   type ClassifierWinner,
 } from '@kilocode/auto-routing-contracts';
 import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/classifier';
-import { ttlCached } from './ttl-cache';
 import { kvReadThrough } from './kv-read-through';
 import { fetchClassifierWinnerFromOrigin } from './benchmark-origin';
 

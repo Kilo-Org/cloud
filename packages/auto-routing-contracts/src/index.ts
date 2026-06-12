@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
-import { DifficultyTierSchema } from './tiers';
+import { DifficultyTierSchema, ReasoningEffortSchema } from './tiers';
 
 export {
   NormalizedClassifierInputSchema,
@@ -103,7 +103,7 @@ export const AutoRoutingDecisionSchema = z.object({
   source: z.enum(['benchmark', 'default']),
   tableVersion: z.string(),
   // Mirrors the effort the chosen model was benchmarked with, when set.
-  reasoningEffort: z.enum(['minimal', 'low', 'medium', 'high']).nullable().optional(),
+  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
 });
 export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 

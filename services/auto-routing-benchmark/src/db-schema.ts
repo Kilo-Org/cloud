@@ -1,5 +1,5 @@
 import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { BenchmarkKind } from '@kilocode/auto-routing-contracts';
+import type { BenchmarkKind, BenchmarkRunStatus } from '@kilocode/auto-routing-contracts';
 
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
 // via wrangler d1 migrations apply.
@@ -28,7 +28,7 @@ export const configDeciderModels = sqliteTable('config_decider_models', {
 export const benchmarkRuns = sqliteTable('benchmark_runs', {
   id: text('id').primaryKey(),
   kind: text('kind').$type<BenchmarkKind>().notNull(),
-  status: text('status').$type<'running' | 'completed' | 'failed'>().notNull(),
+  status: text('status').$type<BenchmarkRunStatus>().notNull(),
   started_at: text('started_at').notNull(),
   completed_at: text('completed_at'),
   error: text('error'),

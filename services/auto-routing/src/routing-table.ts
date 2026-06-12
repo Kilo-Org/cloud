@@ -1,10 +1,9 @@
-import { formatError } from '@kilocode/worker-utils';
+import { formatError, ttlCached } from '@kilocode/worker-utils';
 import {
   ROUTING_TABLE_KV_KEY,
   RoutingTableSchema,
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
-import { ttlCached } from './ttl-cache';
 import { kvReadThrough } from './kv-read-through';
 import { fetchRoutingTableFromOrigin } from './benchmark-origin';
 

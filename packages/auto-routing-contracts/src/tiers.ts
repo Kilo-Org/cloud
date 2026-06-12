@@ -1,6 +1,9 @@
 import * as z from 'zod';
 
 export const DifficultyTierSchema = z.enum(['low', 'medium', 'high']);
+
+export const ReasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high']);
+export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 export type DifficultyTier = z.infer<typeof DifficultyTierSchema>;
 
 export const DIFFICULTY_TIERS: readonly DifficultyTier[] = ['low', 'medium', 'high'];

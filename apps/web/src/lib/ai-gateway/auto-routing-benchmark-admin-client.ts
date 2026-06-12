@@ -6,16 +6,8 @@ import {
   type BenchmarkConfig,
   type BenchmarkKind,
 } from '@kilocode/auto-routing-contracts';
-
-export {
-  BenchmarkRoutingTableResponseSchema,
-  type BenchmarkRoutingTableResponse,
-} from '@kilocode/auto-routing-contracts';
 import { AUTO_ROUTING_BENCHMARK_WORKER_URL } from '@/lib/config.server';
 import { createWorkerAdminFetch } from './worker-admin-fetch';
-import type { WorkerAdminResult } from './worker-admin-fetch';
-
-export type AutoRoutingAdminResult<T> = WorkerAdminResult<T>;
 
 const fetchBenchmarkAdmin = createWorkerAdminFetch({
   workerUrl: AUTO_ROUTING_BENCHMARK_WORKER_URL,

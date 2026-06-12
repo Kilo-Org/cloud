@@ -1,5 +1,5 @@
 import { OpenRouter } from '@openrouter/sdk';
-import { ttlCached } from './ttl-cache';
+import { ttlCached } from '@kilocode/worker-utils';
 
 type OpenRouterEnv = Pick<Env, 'OPENROUTER_API_KEY'>;
 

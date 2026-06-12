@@ -6,9 +6,11 @@ import {
   BenchmarkRunsResponseSchema,
   StartBenchmarkRunResponseSchema,
   type BenchmarkConfig,
+  type BenchmarkKind,
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
   type BenchmarkModelSummary,
+  type ClassifierApiKind,
   type ReasoningEffort,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -80,13 +82,7 @@ async function fetchBenchmarkRuns() {
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
 }
 
-async function startBenchmarkRun({
-  kind,
-  force,
-}: {
-  kind: 'classifier' | 'decider';
-  force: boolean;
-}) {
+async function startBenchmarkRun({ kind, force }: { kind: BenchmarkKind; force: boolean }) {
   const response = await fetch('/admin/api/auto-routing/benchmark-runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -148,7 +144,7 @@ function formStateToConfig(
   const deciderModels = state.deciderModels
     .filter(row => row.id.trim().length > 0)
     .map(row => {
-      const kinds: Array<'chat_completions' | 'responses' | 'messages'> = [];
+      const kinds: ClassifierApiKind[] = [];
       if (row.chat_completions) kinds.push('chat_completions');
       if (row.responses) kinds.push('responses');
       if (row.messages) kinds.push('messages');

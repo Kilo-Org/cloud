@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { ReasoningEffortSchema } from './tiers';
 
 export const ClassifierApiKindSchema = z.enum(['chat_completions', 'responses', 'messages']);
 
@@ -12,7 +13,7 @@ export const RankedCandidateSchema = z.object({
   supportedApiKinds: z.array(ClassifierApiKindSchema).min(1),
   // Reasoning effort the model was benchmarked with; serving mirrors it.
   // Optional so tables published before this field existed stay valid.
-  reasoningEffort: z.enum(['minimal', 'low', 'medium', 'high']).nullable().optional(),
+  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
 });
 export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
 

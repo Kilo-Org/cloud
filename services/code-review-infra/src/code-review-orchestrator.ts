@@ -103,6 +103,16 @@ const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
 const REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE =
   'the requested model is not allowed for your team';
 
+function isSelectedModelActionRequiredMessage(message: string): boolean {
+  return (
+    message.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
+    message.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE) ||
+    message.includes('no allowed providers are specified.') ||
+    message.includes('no allowed providers are available for the selected model.') ||
+    message.includes('no endpoints found matching your data policy')
+  );
+}
+
 function findRiskyPattern(command: string): string | null {
   const normalized = command.toLowerCase();
   const match = RISKY_COMMAND_PATTERNS.find(pattern => normalized.includes(pattern));
@@ -142,12 +152,15 @@ type CloudAgentNextFreshRetryFailureCategory =
   | 'not_cloud_agent_next_error'
   | 'non_5xx'
   | 'cancelled'
+  | 'deterministic_action_required_failure'
+  | 'deterministic_non_retryable_failure'
   | 'sandbox_api_or_storage_failure'
+  | 'wrapper_version_mismatch'
   | 'wrapper_wait_for_port_timeout'
   | 'wrapper_kilo_server_start_timeout'
   | 'configured_session_lookup_failure'
   | 'repo_clone_or_checkout_failure'
-  | 'other_5xx';
+  | 'unclassified_5xx';
 
 type CloudAgentNextFreshRetryClassification = {
   retryable: boolean;
@@ -169,11 +182,47 @@ function cloudAgentNextFreshRetryClassification(
     failureCategory,
     retryClassificationReason,
     retryableWrapperReadinessFailure:
+      failureCategory === 'wrapper_version_mismatch' ||
       failureCategory === 'wrapper_wait_for_port_timeout' ||
       failureCategory === 'wrapper_kilo_server_start_timeout',
     cloudAgentNextProcedure: error?.procedure,
     cloudAgentNextStatus: error?.status,
   };
+}
+
+const RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE = 'Wrapper version mismatch'.toLowerCase();
+
+function isWorkspaceAdmissionCapacityFailure(body: string): boolean {
+  return (
+    /workspace admission rejected: \d+ mb available below \d+ mb threshold after cleanup/i.test(
+      body
+    ) || body.includes('workspace admission rejected because disk capacity could not be measured')
+  );
+}
+
+function hasKnownRetryableFreshSessionFailure(body: string): boolean {
+  return (
+    body.includes('failed to create workspace directory') ||
+    body.includes('failed to prepare session home') ||
+    body.includes(
+      'disk capacity inspection cannot run because the sandbox filesystem is unusable'
+    ) ||
+    body.includes(
+      'workspace admission probe cannot run because the sandbox filesystem is unusable'
+    ) ||
+    /\benospc\b/.test(body) ||
+    body.includes('no space left on device') ||
+    body.includes('wrapper cleanup is required before delivery can launch') ||
+    body.includes("enoent: no such file or directory, posix_spawn 'git'") ||
+    (body.includes('failed to checkout pull ref') &&
+      body.includes(
+        'your local changes to the following files would be overwritten by checkout'
+      )) ||
+    body.includes('session snapshot restore failed') ||
+    body.includes(
+      'internal error while starting up durable object storage caused object to be reset'
+    )
+  );
 }
 
 function classifyCloudAgentNextFreshSessionRetry(
@@ -183,7 +232,29 @@ function classifyCloudAgentNextFreshSessionRetry(
     return cloudAgentNextFreshRetryClassification(error, false, 'billing', 'billing_protected');
   }
 
-  if (!(error instanceof CloudAgentNextError)) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const normalizedErrorMessage = errorMessage.toLowerCase();
+  const cloudAgentNextError = error instanceof CloudAgentNextError ? error : undefined;
+
+  if (/\b(cancelled|canceled)\b/i.test(errorMessage)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      false,
+      'cancelled',
+      'cancelled_protected'
+    );
+  }
+
+  if (isSelectedModelActionRequiredMessage(normalizedErrorMessage)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      false,
+      'deterministic_action_required_failure',
+      'deterministic_action_required_failure_not_retryable'
+    );
+  }
+
+  if (!cloudAgentNextError) {
     return cloudAgentNextFreshRetryClassification(
       undefined,
       false,
@@ -192,45 +263,87 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
-  if (error.status < 500 || error.status >= 600) {
-    return cloudAgentNextFreshRetryClassification(error, false, 'non_5xx', 'non_5xx');
+  if (cloudAgentNextError.status < 500 || cloudAgentNextError.status >= 600) {
+    return cloudAgentNextFreshRetryClassification(cloudAgentNextError, false, 'non_5xx', 'non_5xx');
   }
 
-  if (/\b(cancelled|canceled)\b/i.test(error.body)) {
-    return cloudAgentNextFreshRetryClassification(error, false, 'cancelled', 'cancelled_protected');
+  const body = cloudAgentNextError.body.toLowerCase();
+  if (isWorkspaceAdmissionCapacityFailure(body)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'sandbox_api_or_storage_failure',
+      'workspace_admission_capacity_retryable'
+    );
   }
 
-  const body = error.body.toLowerCase();
   if (
     body.includes('configured session') &&
     body.includes('not found: session get returned no data')
   ) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       false,
       'configured_session_lookup_failure',
       'configured_session_lookup_not_retryable'
     );
   }
 
+  if (body.includes('git clone timed out')) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'repo_clone_or_checkout_failure',
+      'git_clone_timeout_retryable'
+    );
+  }
+
   if (
-    body.includes('git clone timed out') ||
-    body.includes('failed to checkout pull ref') ||
     body.includes('git-lfs filter-process') ||
     body.includes('object does not exist on the server')
   ) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       false,
       'repo_clone_or_checkout_failure',
       'repo_clone_or_checkout_not_retryable'
     );
   }
 
-  const parsedBody = parseJsonBody(error.body);
+  if (
+    body.includes('internal error in durable object storage') ||
+    body.includes('durable object storage operation exceeded timeout')
+  ) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'sandbox_api_or_storage_failure',
+      'durable_object_storage_failure_retryable'
+    );
+  }
+
+  if (body.includes(RETRYABLE_WRAPPER_VERSION_MISMATCH_PHRASE)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'wrapper_version_mismatch',
+      'wrapper_version_mismatch'
+    );
+  }
+
+  if (hasKnownRetryableFreshSessionFailure(body)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'sandbox_api_or_storage_failure',
+      'known_retryable_5xx_body_signal'
+    );
+  }
+
+  const parsedBody = parseJsonBody(cloudAgentNextError.body);
   if (hasRetryableSandboxMarker(parsedBody)) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       true,
       'sandbox_api_or_storage_failure',
       'sandbox_retryable_marker'
@@ -239,7 +352,7 @@ function classifyCloudAgentNextFreshSessionRetry(
 
   if (body.includes('failed to start kilo server: timeout waiting for server to start')) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       true,
       'wrapper_kilo_server_start_timeout',
       'wrapper_kilo_server_start_timeout'
@@ -251,7 +364,7 @@ function classifyCloudAgentNextFreshSessionRetry(
     body.includes('waitforport timed out')
   ) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       true,
       'wrapper_wait_for_port_timeout',
       'wrapper_wait_for_port_timeout'
@@ -266,33 +379,26 @@ function classifyCloudAgentNextFreshSessionRetry(
   const hasInternalServerSignal =
     body.includes('internal server error') ||
     body.includes('internal_server_error') ||
-    /http\s+error!\s+status:\s*500\b/i.test(error.body) ||
-    /\bstatus:\s*500\b/i.test(error.body) ||
-    /\bhttp\s*500\b/i.test(error.body) ||
-    /\b500\b/.test(error.body);
+    /http\s+error!\s+status:\s*500\b/i.test(cloudAgentNextError.body) ||
+    /\bstatus:\s*500\b/i.test(cloudAgentNextError.body) ||
+    /\bhttp\s*500\b/i.test(cloudAgentNextError.body) ||
+    /\b500\b/.test(cloudAgentNextError.body);
 
   if (hasSandboxSignal && hasInternalServerSignal) {
     return cloudAgentNextFreshRetryClassification(
-      error,
+      cloudAgentNextError,
       true,
       'sandbox_api_or_storage_failure',
       'sandbox_5xx_body_signal'
     );
   }
 
-  if (
-    body.includes('internal error in durable object storage') ||
-    body.includes('durable object storage operation exceeded timeout')
-  ) {
-    return cloudAgentNextFreshRetryClassification(
-      error,
-      false,
-      'sandbox_api_or_storage_failure',
-      'storage_failure_not_retryable_by_code_review_classifier'
-    );
-  }
-
-  return cloudAgentNextFreshRetryClassification(error, false, 'other_5xx', 'unclassified_5xx');
+  return cloudAgentNextFreshRetryClassification(
+    cloudAgentNextError,
+    false,
+    'unclassified_5xx',
+    'unclassified_5xx'
+  );
 }
 
 /**
@@ -314,6 +420,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   /** Fallback alarm for queued reviews accepted by the Worker but not run via waitUntil. */
   private static readonly RUN_REVIEW_FALLBACK_DELAY_MS = 30_000;
+
+  /** Jitter range before automatic infra retries start a fresh cloud-agent-next session. */
+  private static readonly AUTO_RETRY_MIN_DELAY_MS = 2 * 60_000;
+  private static readonly AUTO_RETRY_MAX_DELAY_MS = 5 * 60_000;
 
   /** Batch size for event persistence (save every N events to reduce CPU usage) */
   private static readonly EVENT_BATCH_SIZE = 10;
@@ -337,6 +447,16 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   private getCloudAgentNextClient(): CloudAgentNextFetchClient {
     this.cloudAgentNextClient ??= createCloudAgentNextFetchClient(this.env.CLOUD_AGENT_NEXT_URL);
     return this.cloudAgentNextClient;
+  }
+
+  private static getAutoRetryDelayMs(): number {
+    const delayRangeMs =
+      CodeReviewOrchestrator.AUTO_RETRY_MAX_DELAY_MS -
+      CodeReviewOrchestrator.AUTO_RETRY_MIN_DELAY_MS;
+    return (
+      CodeReviewOrchestrator.AUTO_RETRY_MIN_DELAY_MS +
+      Math.floor(Math.random() * (delayRangeMs + 1))
+    );
   }
 
   private logCloudAgentNextFreshSessionRetrySkipped(
@@ -408,10 +528,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     this.state.sandboxId = undefined;
     this.state.status = 'queued';
     this.state.updatedAt = new Date().toISOString();
+    const retryDelayMs = CodeReviewOrchestrator.getAutoRetryDelayMs();
     await this.saveState();
+    await this.ctx.storage.setAlarm(Date.now() + retryDelayMs);
 
     console.warn(
-      '[CodeReviewOrchestrator] Retrying with a fresh session after retryable cloud-agent-next failure',
+      '[CodeReviewOrchestrator] Scheduled fresh-session retry after retryable cloud-agent-next failure',
       {
         reviewId: this.state.reviewId,
         source,
@@ -421,13 +543,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         previousCliSessionId,
         previousSandboxId,
         sandboxRetryAttempted: true,
-        retryOutcome: 'attempted',
+        retryOutcome: 'scheduled',
+        retryDelayMs,
         ...classification,
       }
-    );
-
-    await this.runFreshCloudAgentNextFallback(
-      previousCloudAgentSessionId ?? previousSessionId ?? 'unknown'
     );
 
     return true;
@@ -475,7 +594,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         });
         await this.ctx.storage.deleteAll();
       } else if (this.state.status === 'queued') {
-        console.log('[CodeReviewOrchestrator] Fallback alarm starting queued review', {
+        console.log('[CodeReviewOrchestrator] Queued review alarm starting review', {
           reviewId: this.state.reviewId,
         });
         await this.runReview();
@@ -737,10 +856,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     const message = error.message.toLowerCase();
 
-    if (
-      message.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
-      message.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE)
-    ) {
+    if (isSelectedModelActionRequiredMessage(message)) {
       return 'selected_model_unavailable';
     }
 
@@ -834,6 +950,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     skipBalanceCheck?: boolean;
     agentVersion?: string;
     previousCloudAgentSessionId?: string;
+    repositorySize?: string | null;
+    runReviewDelayMs?: number;
   }): Promise<{ status: CodeReviewStatus }> {
     if (!this.state) {
       await this.loadState();
@@ -859,11 +977,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: params.skipBalanceCheck,
       agentVersion: params.agentVersion,
       previousCloudAgentSessionId: params.previousCloudAgentSessionId,
+      repositorySize: params.repositorySize,
     };
     await this.saveState();
-    await this.ctx.storage.setAlarm(
-      Date.now() + CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS
-    );
+    const runReviewDelayMs =
+      params.runReviewDelayMs ?? CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS;
+    await this.ctx.storage.setAlarm(Date.now() + runReviewDelayMs);
 
     console.log('[CodeReviewOrchestrator] Review created and queued', {
       reviewId: params.reviewId,
@@ -873,7 +992,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     console.log('[CodeReviewOrchestrator] Scheduled queued review fallback alarm', {
       reviewId: params.reviewId,
-      fallbackInMs: CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS,
+      fallbackInMs: runReviewDelayMs,
     });
 
     return { status: this.state.status };
@@ -954,6 +1073,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     this.state.sandboxRetryAttempted = true;
     await this.saveState();
+    const retryDelayMs = CodeReviewOrchestrator.getAutoRetryDelayMs();
 
     const retryId = this.env.CODE_REVIEW_ORCHESTRATOR.idFromName(
       doNameForAttempt(this.state.reviewId, params.retryAttemptId)
@@ -968,6 +1088,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: this.state.skipBalanceCheck,
       agentVersion: this.state.agentVersion,
       previousCloudAgentSessionId: undefined,
+      repositorySize: this.state.repositorySize,
+      runReviewDelayMs: retryDelayMs,
     });
 
     console.warn(
@@ -978,6 +1100,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         retryAttemptId: params.retryAttemptId,
         reason: params.reason,
         status: started.status,
+        retryDelayMs,
       }
     );
 
@@ -1078,7 +1201,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   /**
    * RPC method: Run the review.
-   * Called via HTTP context (not alarm) to avoid 15-minute wall time limit.
+   * Called via HTTP context or alarm to start queued work.
    */
   async runReview(): Promise<void> {
     await this.loadState();
@@ -1170,10 +1293,15 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         prepareInput
       );
 
+      const repositorySize = this.state.repositorySize ?? null;
+
       console.log('[CodeReviewOrchestrator] Session prepared', {
         reviewId: this.state.reviewId,
+        attemptId: this.state.attemptId,
         cloudAgentSessionId,
         kiloSessionId,
+        repositorySize,
+        repositorySizeKnown: repositorySize !== null,
       });
 
       // Store session IDs immediately (no stream parsing needed)

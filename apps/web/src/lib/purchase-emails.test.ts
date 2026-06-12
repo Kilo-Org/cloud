@@ -134,6 +134,23 @@ describe('subjects map', () => {
   });
 });
 
+describe('kiloPassDuplicateCardCanceled template', () => {
+  test('explains payment-method limits without disclosing enforcement details', () => {
+    const html = renderTemplate('kiloPassDuplicateCardCanceled', {
+      support_url: 'https://kilo.ai/support',
+      year: '2026',
+    });
+
+    expect(html).toContain('payment method used');
+    expect(html).toContain('limits across Kilo Pass accounts');
+    expect(html).toMatch(/will be\s+refunded/);
+    expect(html).toMatch(/shared\s+payment method for legitimate reasons/);
+    expect(html).toContain('https://kilo.ai/support');
+    expect(html).not.toContain('active Kilo Pass subscription');
+    expect(html).not.toContain('24-hour');
+  });
+});
+
 describe('codeReviewDisabled template', () => {
   test('renders reason and recovery link', () => {
     const html = renderTemplate('codeReviewDisabled', {

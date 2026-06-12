@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import type { TriageOrchestrator } from './triage-orchestrator';
 import type { Owner, MCPServerConfig } from '@kilocode/worker-utils';
+import { CloudAgentCallbackFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 
 export type { Owner, MCPServerConfig };
 
@@ -149,6 +150,7 @@ export const classificationCallbackPayloadSchema = z.object({
   cloudAgentSessionId: z.string(),
   status: z.enum(['completed', 'failed', 'interrupted']),
   errorMessage: z.string().optional(),
+  failure: CloudAgentCallbackFailureSchema,
   lastAssistantMessageText: z.string().optional(),
 });
 

@@ -13,7 +13,9 @@ import {
   type SessionMetadata,
 } from './session-metadata.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
+import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
+import { projectTerminalClientError } from '../session/terminal-error-projector.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { logger } from '../logger.js';
 import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
@@ -58,7 +60,12 @@ import {
 } from '../websocket/ingest.js';
 import type { StoredEvent } from '../websocket/types.js';
 import type { WrapperCommand, CloudStatusData } from '../shared/protocol.js';
+import {
+  isPublicCloudAgentExtensionSourceType,
+  projectPublicCloudAgentExtensionEvent,
+} from '../kilo-facade/cloud-agent-extension-events.js';
 import { commandsOrDefault, type SlashCommandInfo } from '../shared/slash-commands.js';
+import { withDORetry } from '../utils/do-retry.js';
 import type {
   AcceptedExecutionTurn,
   AgentSelection,
@@ -93,8 +100,16 @@ import {
   clearWrapperRuntimeIdentity,
   getWrapperLease,
   getWrapperRuntimeState,
+  isWrapperDeliveryHeld,
+  isWrapperRunFinalizing,
+  nextWrapperCleanupDeadline,
   nextWrapperLeaseDeadline,
 } from '../session/wrapper-runtime-state.js';
+import {
+  kiloGlobalFeedValidationSchema,
+  validateKiloGlobalFeedProducerIdentity,
+  type KiloGlobalFeedValidationResult,
+} from '../session/wrapper-global-feed-validation.js';
 import {
   getSessionMessageState,
   listNonTerminalAcceptedMessages,
@@ -118,7 +133,11 @@ import {
   type AgentRuntimeAcceptedDelivery,
   type AgentRuntimeOrchestrator,
 } from '../session/agent-runtime.js';
-import { createWrapperSupervisor, type WrapperSupervisor } from '../session/wrapper-supervisor.js';
+import {
+  createWrapperSupervisor,
+  type WrapperSupervisor,
+  type WrapperTerminalEvent,
+} from '../session/wrapper-supervisor.js';
 import { emitRunStateReport } from '../telemetry/queue-reports.js';
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import type {
@@ -280,6 +299,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private messageSettlementOutbox?: MessageSettlementOutbox;
   private sessionMessageQueue?: SessionMessageQueue;
   private wrapperSupervisor?: WrapperSupervisor;
+  private publicExtensionPublicationTail: Promise<void> = Promise.resolve();
   private isTerminalStatus(
     status: ExecutionStatus
   ): status is 'completed' | 'failed' | 'interrupted' {
@@ -326,6 +346,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       executionId: execution.executionId,
       status,
       errorMessage: error,
+      ...(status === 'completed'
+        ? {}
+        : { clientError: projectTerminalClientError({ status, error }) }),
       lastSeenBranch: metadata.repository?.upstreamBranch,
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
@@ -341,9 +364,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       target: callbackTarget,
       payload,
     };
+    const fittedCallbackJob = fitCallbackJobToQueueLimit(callbackJob);
+    if (fittedCallbackJob.status === 'too-large') {
+      logger
+        .withFields({
+          sessionId,
+          messageId,
+          serializedByteLength: fittedCallbackJob.serializedByteLength,
+          maximumByteLength: fittedCallbackJob.maximumByteLength,
+        })
+        .error('Skipped legacy callback job that cannot fit queue size limit');
+      return;
+    }
 
     try {
-      await callbackQueue.send(callbackJob);
+      await callbackQueue.send(fittedCallbackJob.job);
       logger
         .withFields({
           sessionId,
@@ -360,6 +395,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           error: err instanceof Error ? err.message : String(err),
         })
         .error('Failed to enqueue callback job');
+      throw err;
     }
   }
 
@@ -481,10 +517,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             ...event,
           });
         },
-        hasObservedWrapperIdle: async () => {
-          const state = await getWrapperRuntimeState(this.ctx.storage);
-          return state.lastWrapperIdleAt !== undefined;
-        },
+        hasObservedWrapperIdle: async () => false,
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         getSessionIdForLogs: () => this.sessionId,
       });
@@ -536,6 +569,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         hasActiveIngestConnection: async params =>
           (await this.getIngestHandler()).hasActiveConnection(params),
         clearInterruptRequest: () => this.executionQueries.clearInterrupt(),
+        ensureAcceptedMessageBeforeTerminal: (messageId, wrapperRunId) =>
+          this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId),
         stopWrappers: async request => {
           if (this.physicalWrapperStopper) return this.physicalWrapperStopper(request);
           if (this.orchestrator || (!this.env.Sandbox && !this.env.SandboxSmall)) {
@@ -586,7 +621,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         requireSessionId: () => this.requireSessionId(),
         validateModeAgainstRuntimeAgents,
         getDeliveryContext: () => this.getPendingMessageDeliveryContext(),
+        getDeliveryBlock: async () => {
+          const retryAt = nextWrapperCleanupDeadline(await getWrapperLease(this.ctx.storage));
+          return retryAt === undefined ? null : { retryAt };
+        },
         deliver: plan => this.executeDirectly(plan),
+        isDeliveryHeld: async () =>
+          isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage)),
         ensureQueuedMessageEvent: event => {
           this.ensureQueuedMessageEvent({
             executionId: '' as EventSourceId,
@@ -810,6 +851,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * @param event - The stored event to broadcast
    */
   broadcastEvent(event: StoredEvent): void {
+    this.publishPublicCloudAgentExtensionEvent(event);
     if (this.streamHandler) {
       this.streamHandler.broadcastEvent(event);
       return;
@@ -826,6 +868,39 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           })
           .warn('Failed to broadcast event - stream handler unavailable');
       });
+  }
+
+  private publishPublicCloudAgentExtensionEvent(event: StoredEvent): void {
+    if (!isPublicCloudAgentExtensionSourceType(event.stream_event_type)) return;
+    const publication = this.publicExtensionPublicationTail
+      .catch(() => undefined)
+      .then(async () => {
+        const metadata = await this.getMetadata();
+        const kiloSessionId = metadata?.auth.kiloSessionId;
+        if (!metadata || !kiloSessionId) return;
+        const projected = projectPublicCloudAgentExtensionEvent(event, kiloSessionId);
+        if (!projected) return;
+        const facadeId = this.env.USER_KILO_FACADE.idFromName(metadata.identity.userId);
+        await withDORetry(
+          () => this.env.USER_KILO_FACADE.get(facadeId),
+          facade =>
+            facade.publishCloudAgentExtensionEvent({
+              kiloUserId: metadata.identity.userId,
+              cloudAgentSessionId: metadata.identity.sessionId,
+              kiloSessionId,
+              organizationId: metadata.identity.orgId,
+              event: projected,
+            }),
+          'publishCloudAgentExtensionEvent'
+        );
+      })
+      .catch(error => {
+        logger
+          .withFields({ error: error instanceof Error ? error.message : String(error) })
+          .warn('Failed to publish public Cloud Agent extension event');
+      });
+    this.publicExtensionPublicationTail = publication;
+    this.ctx.waitUntil(publication);
   }
 
   private insertAndBroadcastEvent(params: {
@@ -974,6 +1049,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async getMetadata(): Promise<SessionMetadata | null> {
     const metadata = await this.ctx.storage.get('metadata');
     return metadata ? parseSessionMetadata(metadata) : null;
+  }
+
+  async validateKiloGlobalFeedProducer(params: {
+    kiloSessionId: string;
+    wrapperRunId: string;
+    wrapperGeneration: number;
+    wrapperConnectionId: string;
+  }): Promise<KiloGlobalFeedValidationResult> {
+    const parsed = kiloGlobalFeedValidationSchema.safeParse(params);
+    if (!parsed.success) {
+      return { success: false, status: 400, message: 'Invalid global feed producer identity' };
+    }
+
+    const metadata = await this.getMetadata();
+    const runtimeState = await getWrapperRuntimeState(this.ctx.storage);
+    return validateKiloGlobalFeedProducerIdentity({
+      metadata,
+      runtimeState,
+      producer: parsed.data,
+    });
   }
 
   async getLatestAssistantMessage(): Promise<LatestAssistantMessage | null> {
@@ -1839,10 +1934,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    */
   async alarm(): Promise<void> {
     const now = Date.now();
+    await this.scheduleAlarmAtOrBefore(now + PENDING_FLUSH_DEBOUNCE_MS);
     const alarmAtStart = await this.ctx.storage.getAlarm();
 
     let pendingFlushRetryAt: number | undefined;
     let remainingPendingCount: number | undefined;
+    let terminalEffectRepairRetryAt: number | undefined;
     let alarmWorkFailed = false;
 
     try {
@@ -1877,6 +1974,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       try {
         await this.getMessageSettlementOutbox().repairTerminalEffects();
       } catch (error) {
+        terminalEffectRepairRetryAt = Date.now() + PENDING_FLUSH_DEBOUNCE_MS;
         logger
           .withFields({
             sessionId: this.sessionId,
@@ -1921,6 +2019,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       if (alarmWorkFailed) {
         deadlines.push(currentTime + PENDING_FLUSH_DEBOUNCE_MS);
       }
+      if (terminalEffectRepairRetryAt !== undefined) {
+        deadlines.push(terminalEffectRepairRetryAt);
+      }
       if (pendingFlushRetryAt !== undefined) {
         deadlines.push(pendingFlushRetryAt);
       }
@@ -1942,9 +2043,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         nextAlarmAt = existingAlarm;
       }
 
+      const pendingDeliveryHeld = isWrapperDeliveryHeld(
+        await getWrapperRuntimeState(this.ctx.storage),
+        await getWrapperLease(this.ctx.storage)
+      );
       if (
         pendingFlushRetryAt === undefined &&
         pendingCount > 0 &&
+        !pendingDeliveryHeld &&
         currentTime + PENDING_FLUSH_DEBOUNCE_MS < nextAlarmAt
       ) {
         nextAlarmAt = currentTime + PENDING_FLUSH_DEBOUNCE_MS;
@@ -1954,7 +2060,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       // reaper retries soon rather than sleeping for an hour.
       nextAlarmAt = Date.now() + REAPER_INTERVAL_MS_DEFAULT;
     }
-    await this.ctx.storage.setAlarm(nextAlarmAt);
+    try {
+      await this.ctx.storage.setAlarm(nextAlarmAt);
+    } catch (error) {
+      logger
+        .withFields({
+          doId: this.ctx.id.toString(),
+          sessionId: this.sessionId,
+          nextAlarmAt,
+          alarmWorkFailed,
+          remainingPendingCount,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('Failed to schedule next alarm reaper run');
+      throw error;
+    }
   }
 
   /**
@@ -1962,10 +2082,15 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Called during initialization and when session is first created.
    */
   private async ensureAlarmScheduled(): Promise<void> {
+    if (await this.getSessionMessageQueue().requestPendingDrainIfNeeded()) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .info('Rearmed pending session message drain during initialization');
+      return;
+    }
     const alarm = await this.ctx.storage.getAlarm();
     if (alarm === null) {
       await this.ctx.storage.setAlarm(Date.now() + this.getReaperIntervalMs());
-      return;
     }
   }
 
@@ -2842,12 +2967,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     logger.withFields({ sessionId, executionId }).info('Execution complete - session is idle');
   }
 
-  async handleWrapperTerminalEvent(params: {
-    wrapperRunId: string;
-    status: 'completed' | 'failed' | 'interrupted';
-    error?: string;
-    gateResult?: 'pass' | 'fail';
-  }): Promise<void> {
+  async handleWrapperTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
     await this.resolveSessionId();
     await this.getWrapperSupervisor().onTerminalEvent(params);
   }

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { SubscriptionStatusBadge } from '@/components/subscriptions/SubscriptionStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { useTRPC } from '@/lib/trpc/utils';
 import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
+
+import { KiloPassReferralButton } from '@/components/referrals/KiloPassReferralButton';
 
 import { KiloPassSubscriptionSettingsModal } from './KiloPassSubscriptionSettingsModal';
 import type { KiloPassSubscription } from './kiloPassSubscription';
@@ -140,15 +142,18 @@ function HeaderRow() {
           <Coins className="h-5 w-5 text-amber-300" />
         </span>
         <span className="leading-none">
-          <span className="block text-base">Kilo Pass</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="block text-base">Kilo Pass</span>
+            <SubscriptionStatusBadge status={view.status.kind} />
+          </span>
           <span className="text-muted-foreground block text-sm font-normal">
             {view.header.tierLabel} • {view.header.cadenceLabel}
           </span>
         </span>
       </CardTitle>
 
-      <div className="flex items-center gap-2">
-        <Badge variant={view.status.badgeVariant}>{view.status.label}</Badge>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <KiloPassReferralButton />
         {providerManagement.externalManagementAction ? (
           <Button asChild variant="outline" size="icon" className="h-9 w-9">
             <a

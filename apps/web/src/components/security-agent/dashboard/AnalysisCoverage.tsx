@@ -43,25 +43,25 @@ function buildOutcomeItems(analysis: AnalysisData): OutcomeItem[] {
       dotClass: 'bg-red-400',
     },
     {
-      label: 'Not Exploitable',
+      label: 'Not exploitable',
       count: analysis.notExploitable,
       filter: 'not_exploitable',
       dotClass: 'bg-green-400',
     },
     {
-      label: 'Triage Complete',
+      label: 'Triage complete',
       count: analysis.triageComplete,
       filter: 'triage_complete',
       dotClass: 'bg-blue-400',
     },
     {
-      label: 'Safe to Dismiss',
+      label: 'Safe to dismiss',
       count: analysis.safeToDismiss,
       filter: 'safe_to_dismiss',
-      dotClass: 'bg-gray-400',
+      dotClass: 'bg-zinc-400',
     },
     {
-      label: 'Needs Review',
+      label: 'Needs review',
       count: analysis.needsReview,
       filter: 'needs_review',
       dotClass: 'bg-orange-400',
@@ -74,10 +74,10 @@ function buildOutcomeItems(analysis: AnalysisData): OutcomeItem[] {
       animate: true,
     },
     {
-      label: 'Not Analyzed',
+      label: 'Not analyzed',
       count: analysis.notAnalyzed,
       filter: 'not_analyzed',
-      dotClass: 'bg-gray-500',
+      dotClass: 'bg-zinc-500',
     },
     { label: 'Failed', count: analysis.failed, filter: 'failed', dotClass: 'bg-red-500' },
   ];
@@ -95,9 +95,9 @@ export function AnalysisCoverage({
   const outcomeItems = buildOutcomeItems(analysis);
 
   return (
-    <Card className="border border-gray-800 bg-gray-900/50">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Analysis Coverage</CardTitle>
+        <CardTitle className="text-sm font-medium">Analysis coverage</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -115,16 +115,18 @@ export function AnalysisCoverage({
           <div className="space-y-4">
             <div className="space-y-2">
               <div className="flex items-baseline justify-between">
-                <span className="text-sm text-white">
-                  <span className="font-semibold">{analysis.analyzed}</span>
+                <span className="text-foreground text-sm">
+                  <span className="font-mono font-semibold tabular-nums">{analysis.analyzed}</span>
                   <span className="text-muted-foreground">
                     {' '}
                     of {analysis.total} findings analyzed
                   </span>
                 </span>
-                <span className="text-muted-foreground text-xs">{progressPct}%</span>
+                <span className="text-muted-foreground font-mono text-xs tabular-nums">
+                  {progressPct}%
+                </span>
               </div>
-              <Progress value={progressPct} />
+              <Progress value={progressPct} className="bg-muted" indicatorClassName="bg-chart-2" />
             </div>
 
             {outcomeItems.length > 0 ? (
@@ -133,24 +135,28 @@ export function AnalysisCoverage({
                   <Link
                     key={item.filter}
                     href={`${basePath}/findings?outcomeFilter=${item.filter}${extraParams}`}
-                    className="flex items-center justify-between rounded px-2 py-1 text-sm transition-colors hover:bg-gray-800/50"
+                    className="hover:bg-muted focus-visible:ring-ring flex items-center justify-between rounded-md px-2 py-1 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
                   >
                     <span className="flex items-center gap-2">
                       <span
                         className={cn(
                           'h-2 w-2 rounded-full',
                           item.dotClass,
-                          item.animate && 'animate-pulse'
+                          item.animate && 'animate-pulse motion-reduce:animate-none'
                         )}
                       />
-                      <span className="text-gray-300">{item.label}</span>
+                      <span className="text-foreground">{item.label}</span>
                     </span>
-                    <span className="text-muted-foreground font-medium">{item.count}</span>
+                    <span className="text-muted-foreground font-mono font-medium tabular-nums">
+                      {item.count}
+                    </span>
                   </Link>
                 ))}
               </div>
             ) : (
-              <span className="text-muted-foreground text-sm">No analysis data</span>
+              <span className="text-muted-foreground text-sm">
+                No findings analyzed yet. Open a finding to start triage.
+              </span>
             )}
           </div>
         )}

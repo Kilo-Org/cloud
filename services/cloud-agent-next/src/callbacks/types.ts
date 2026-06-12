@@ -1,6 +1,15 @@
+import type { CloudAgentFailureStage } from '@kilocode/worker-utils/cloud-agent-failure';
+import type { ClientError } from '@kilocode/worker-utils/client-error';
+import type { SafeFailureProjection } from '../session/safe-failure-projection.js';
+
 export type CallbackTarget = {
   url: string;
   headers?: Record<string, string>;
+};
+
+export type CallbackTextTruncation = {
+  originalUtf8ByteLength: number;
+  retainedUtf8ByteLength: number;
 };
 
 export type ExecutionCallbackPayload = {
@@ -12,6 +21,11 @@ export type ExecutionCallbackPayload = {
   messageId?: string;
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
+  failure?: SafeFailureProjection;
+  failureStage?: CloudAgentFailureStage;
+  clientError?: ClientError;
+  /** Present when errorMessage was shortened to fit the callback queue. */
+  errorMessageTruncation?: CallbackTextTruncation;
   lastSeenBranch?: string;
   kiloSessionId?: string;
   /** Gate result reported by the agent when gate_threshold is active */
@@ -21,6 +35,8 @@ export type ExecutionCallbackPayload = {
    * Undefined when no assistant message has been recorded yet.
    */
   lastAssistantMessageText?: string;
+  /** Present when lastAssistantMessageText was omitted to fit the callback queue. */
+  lastAssistantMessageTextTruncation?: CallbackTextTruncation;
   /**
    * Deterministic idempotency key based on messageId.
    * Receivers can use this to safely deduplicate retried callbacks after a

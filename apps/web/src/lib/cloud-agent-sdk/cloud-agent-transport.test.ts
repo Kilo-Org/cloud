@@ -259,7 +259,7 @@ describe('CloudAgentTransport unexpected disconnect', () => {
 
     const stoppedEvents = serviceEvents.filter(e => e.type === 'stopped');
     expect(stoppedEvents).toHaveLength(1);
-    expect(stoppedEvents[0]).toEqual({ type: 'stopped', reason: 'disconnected' });
+    expect(stoppedEvents[0]).toEqual({ type: 'stopped', reason: 'transport-disconnected' });
 
     transport.destroy();
   });

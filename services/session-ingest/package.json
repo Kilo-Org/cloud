@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@streamparser/json": "0.0.22",
     "drizzle-orm": "catalog:",

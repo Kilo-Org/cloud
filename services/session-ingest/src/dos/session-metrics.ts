@@ -147,6 +147,10 @@ function freshAccumulator(): Accumulator {
   };
 }
 
+function nonNegative(value: number): number {
+  return Math.max(0, value);
+}
+
 function processKiloMeta(acc: Accumulator, raw: unknown) {
   const parsed = KiloMetaSchema.safeParse(raw);
   if (!parsed.success) return;
@@ -303,8 +307,14 @@ export function computeSessionMetrics(
     totalErrors: acc.totalErrors,
     errorsByType: acc.errorsByType,
     stuckToolCallCount,
-    totalTokens: acc.totalTokens,
-    totalCost: acc.totalCost,
+    totalTokens: {
+      input: nonNegative(acc.totalTokens.input),
+      output: nonNegative(acc.totalTokens.output),
+      reasoning: nonNegative(acc.totalTokens.reasoning),
+      cacheRead: nonNegative(acc.totalTokens.cacheRead),
+      cacheWrite: nonNegative(acc.totalTokens.cacheWrite),
+    },
+    totalCost: nonNegative(acc.totalCost),
     compactionCount: acc.compactionCount,
     autoCompactionCount: acc.autoCompactionCount,
     terminationReason: closeReason,

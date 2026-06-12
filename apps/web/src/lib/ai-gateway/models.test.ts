@@ -12,12 +12,6 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
-import {
-  isAlibabaDirectModel,
-  qwen36_plus_model,
-  qwen37_max_model,
-  qwen37_plus_model,
-} from './providers/qwen';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -67,6 +61,11 @@ describe('isFreeModel', () => {
       }
     });
 
+    test('does not register discounted OpenRouter Qwen models as Kilo exclusive', () => {
+      expect(findKiloExclusiveModel('qwen/qwen3.7-max')).toBeNull();
+      expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
+    });
+
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
       expect(getInferenceProvider(claude_opus_4_7_stealth_model)).toBe('stealth');
       expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
@@ -74,22 +73,6 @@ describe('isFreeModel', () => {
       expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
       expect(getInferenceProvider(claude_opus_4_6_stealth_model)).toBe('stealth');
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
-    });
-
-    test('routes Qwen3.7 Max directly through Alibaba', () => {
-      expect(findKiloExclusiveModel(qwen37_max_model.public_id)).toBe(qwen37_max_model);
-      expect(isAlibabaDirectModel(qwen37_max_model.public_id)).toBe(true);
-      expect(qwen37_max_model.gateway).toBe('alibaba');
-      expect(qwen37_max_model.internal_id).toBe('qwen3.7-max');
-      expect(getInferenceProvider(qwen37_max_model)).toBe('alibaba');
-    });
-
-    test('routes Qwen3.7 Plus directly through Alibaba', () => {
-      expect(findKiloExclusiveModel(qwen37_plus_model.public_id)).toBe(qwen37_plus_model);
-      expect(isAlibabaDirectModel(qwen37_plus_model.public_id)).toBe(true);
-      expect(qwen37_plus_model.gateway).toBe('alibaba');
-      expect(qwen37_plus_model.internal_id).toBe('qwen3.7-plus');
-      expect(getInferenceProvider(qwen37_plus_model)).toBe('alibaba');
     });
 
     test('requires data collection for paid training-enabled offerings', () => {
@@ -102,16 +85,19 @@ describe('isFreeModel', () => {
       expect(
         isKiloExclusiveModelRequiringDataCollection(claude_opus_4_6_stealth_model.public_id)
       ).toBe(true);
-      expect(isKiloExclusiveModelRequiringDataCollection(qwen36_plus_model.public_id)).toBe(false);
     });
 
-    test('all Kilo exclusive models should have either no pricing or valid pricing', () => {
-      // Verify that all kilo exclusive models have valid pricing structure
+    test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
       for (const model of kiloExclusiveModels) {
         if (model.pricing) {
-          expect(typeof model.pricing.prompt_per_million).toBe('number');
-          expect(typeof model.pricing.completion_per_million).toBe('number');
-          expect(typeof model.pricing.calculate_mUsd).toBe('function');
+          expect(model.pricing[0].start_context_length).toBe(0);
+          let previousStartContextLength = -1;
+          for (const tier of model.pricing) {
+            expect(typeof tier.pricing.prompt_per_million).toBe('number');
+            expect(typeof tier.pricing.completion_per_million).toBe('number');
+            expect(tier.start_context_length).toBeGreaterThan(previousStartContextLength);
+            previousStartContextLength = tier.start_context_length;
+          }
         }
       }
     });

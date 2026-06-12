@@ -20,6 +20,8 @@ import {
   createPromptHandler,
   createCommandHandler,
   createSessionReadyHandler,
+  createKiloProxyHandler,
+  isKiloProxyPath,
   bindSessionContext,
   type ServerConfig,
   type SessionBinding,
@@ -58,10 +60,11 @@ function createMockDeps(state: WrapperState) {
     closeConnection: vi.fn().mockResolvedValue(undefined),
     setAborted: vi.fn(),
     resetLifecycle: vi.fn(),
-    onMessageComplete: vi.fn(),
+    onDeliveryAcknowledged: vi.fn(),
     readySession: vi.fn(),
     materializePromptAttachments: vi.fn(async prompt => prompt),
     configureCommitCoAuthor: vi.fn().mockResolvedValue(undefined),
+    onSessionBound: vi.fn(),
   };
 }
 
@@ -98,6 +101,112 @@ afterEach(async () => {
   await Promise.all(
     createdRepos.splice(0).map(repoPath => rm(repoPath, { recursive: true, force: true }))
   );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+// ---------------------------------------------------------------------------
+// Kilo Proxy Handler
+// ---------------------------------------------------------------------------
+
+describe('createKiloProxyHandler', () => {
+  it('matches only the wrapper kilo proxy path family', () => {
+    expect(isKiloProxyPath('/kilo-proxy')).toBe(true);
+    expect(isKiloProxyPath('/kilo-proxy/session/ses_123/message')).toBe(true);
+    expect(isKiloProxyPath('/health')).toBe(false);
+    expect(isKiloProxyPath('/job/status')).toBe(false);
+  });
+
+  it('forwards path and query to the private Kilo server', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const fetchMock = vi.fn(async () => new Response('proxied'));
+    vi.stubGlobal('fetch', fetchMock);
+    const handler = createKiloProxyHandler(deps);
+
+    await handler(
+      new Request('http://wrapper/kilo-proxy/session/ses_123/message?cursor=abc', {
+        method: 'GET',
+      })
+    );
+
+    const upstreamRequest = fetchMock.mock.calls[0][0] as Request;
+    const upstreamUrl = new URL(upstreamRequest.url);
+    expect(upstreamUrl.origin).toBe('http://127.0.0.1:0');
+    expect(upstreamUrl.pathname).toBe('/session/ses_123/message');
+    expect(upstreamUrl.search).toBe('?cursor=abc');
+  });
+
+  it('preserves mutating methods, JSON bodies, and safe request headers', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const fetchMock = vi.fn(async () => new Response('proxied'));
+    vi.stubGlobal('fetch', fetchMock);
+    const handler = createKiloProxyHandler(deps);
+
+    await handler(
+      new Request('http://wrapper/kilo-proxy/session/ses_123', {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer should-not-forward',
+          Cookie: 'session=secret',
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ title: 'Updated' }),
+      })
+    );
+
+    const upstreamRequest = fetchMock.mock.calls[0][0] as Request;
+    expect(upstreamRequest.method).toBe('PATCH');
+    expect(upstreamRequest.headers.get('authorization')).toBeNull();
+    expect(upstreamRequest.headers.get('cookie')).toBeNull();
+    expect(upstreamRequest.headers.get('content-type')).toBe('application/json');
+    expect(upstreamRequest.headers.get('accept')).toBe('application/json');
+    await expect(upstreamRequest.text()).resolves.toBe('{"title":"Updated"}');
+  });
+
+  it('passes upstream status, headers, and body through without JSON parsing', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('plain upstream error', {
+            status: 500,
+            headers: { 'X-Kilo-Upstream': 'yes' },
+          })
+      )
+    );
+    const handler = createKiloProxyHandler(deps);
+
+    const response = await handler(new Request('http://wrapper/kilo-proxy/session/ses_123'));
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get('x-kilo-upstream')).toBe('yes');
+    await expect(response.text()).resolves.toBe('plain upstream error');
+  });
+
+  it('returns 503 when the private Kilo runtime is unavailable', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    Object.defineProperty(deps.kiloClient, 'serverUrl', {
+      get() {
+        throw new Error('Kilo server has not been bootstrapped');
+      },
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const handler = createKiloProxyHandler(deps);
+
+    const response = await handler(new Request('http://wrapper/kilo-proxy/session/ses_123'));
+
+    expect(response.status).toBe(503);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -369,6 +478,7 @@ describe('bindSessionContext', () => {
     expect(session!.wrapperRunId).toBe(completeBinding.wrapperRunId);
     expect(session!.wrapperGeneration).toBe(completeBinding.wrapperGeneration);
     expect(session!.wrapperConnectionId).toBe(completeBinding.wrapperConnectionId);
+    expect(deps.onSessionBound).toHaveBeenCalledOnce();
   });
 
   it('does not mutate state when validation fails', async () => {
@@ -378,6 +488,29 @@ describe('bindSessionContext', () => {
     await bindSessionContext(bindingWithoutRunId as SessionBinding, defaultServerConfig, deps);
 
     expect(state.hasSession).toBe(false);
+    expect(deps.onSessionBound).not.toHaveBeenCalled();
+  });
+
+  it('notifies only when an existing binding changes', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    await bindSessionContext(completeBinding, defaultServerConfig, deps);
+    deps.onSessionBound.mockClear();
+
+    await bindSessionContext(completeBinding, defaultServerConfig, deps);
+    expect(deps.onSessionBound).not.toHaveBeenCalled();
+
+    await bindSessionContext(
+      {
+        ...completeBinding,
+        wrapperGeneration: completeBinding.wrapperGeneration + 1,
+        wrapperConnectionId: 'conn_789',
+      },
+      defaultServerConfig,
+      deps
+    );
+
+    expect(deps.onSessionBound).toHaveBeenCalledOnce();
   });
 });
 
@@ -422,6 +555,48 @@ describe('createPromptHandler', () => {
     expect(state.hasSession).toBe(true);
     expect(deps.openConnection).toHaveBeenCalled();
   });
+
+  it('waits silently for slow snapshot initialization in Cloud Agent web prompts', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const handler = createPromptHandler(
+      { ...defaultServerConfig, platform: 'cloud-agent-web' },
+      deps
+    );
+
+    const response = await handler(
+      jsonRequest({
+        message: { id: 'msg_web_snapshot', prompt: 'Hello' },
+        session: completeBinding,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(deps.kiloClient.sendPromptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ snapshotInitialization: 'wait' })
+    );
+  });
+
+  it.each([undefined, 'slack', 'code-review', 'app-builder'])(
+    'does not wait for snapshot initialization in %s-origin prompts',
+    async platform => {
+      const state = new WrapperState();
+      const deps = createMockDeps(state);
+      const handler = createPromptHandler({ ...defaultServerConfig, platform }, deps);
+
+      const response = await handler(
+        jsonRequest({
+          message: { id: 'msg_non_web_snapshot', prompt: 'Hello' },
+          session: completeBinding,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(deps.kiloClient.sendPromptAsync).toHaveBeenCalledWith(
+        expect.not.objectContaining({ snapshotInitialization: expect.anything() })
+      );
+    }
+  );
 
   it('materializes a PDF before opening ingest and sends its local file part to Kilo', async () => {
     const state = new WrapperState();
@@ -800,6 +975,50 @@ describe('createPromptHandler', () => {
 // ---------------------------------------------------------------------------
 
 describe('createCommandHandler', () => {
+  it('waits silently for slow snapshot initialization in Cloud Agent web commands', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    const handler = createCommandHandler(
+      { ...defaultServerConfig, platform: 'cloud-agent-web' },
+      deps
+    );
+
+    const response = await handler(
+      jsonRequest({ command: 'review', messageId: 'msg_web_command', session: completeBinding })
+    );
+
+    expect(response.status).toBe(200);
+    expect(deps.kiloClient.sendCommand).toHaveBeenCalledWith({
+      sessionId: 'kilo_sess_1',
+      command: 'review',
+      args: undefined,
+      messageId: 'msg_web_command',
+      snapshotInitialization: 'wait',
+    });
+  });
+
+  it.each([undefined, 'slack', 'code-review', 'app-builder'])(
+    'does not wait for snapshot initialization in %s-origin commands',
+    async platform => {
+      const state = new WrapperState();
+      const deps = createMockDeps(state);
+      const handler = createCommandHandler({ ...defaultServerConfig, platform }, deps);
+
+      const response = await handler(
+        jsonRequest({
+          command: 'review',
+          messageId: 'msg_non_web_command',
+          session: completeBinding,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(deps.kiloClient.sendCommand).toHaveBeenCalledWith(
+        expect.not.objectContaining({ snapshotInitialization: expect.anything() })
+      );
+    }
+  );
+
   it('routes compact through session summarize with the selected model', async () => {
     const state = new WrapperState();
     const sendToIngest = vi.fn();
@@ -835,7 +1054,7 @@ describe('createCommandHandler', () => {
       },
       timestamp: expect.any(String),
     });
-    expect(deps.onMessageComplete).toHaveBeenCalledWith('msg_compact');
+    expect(deps.onDeliveryAcknowledged).toHaveBeenCalledWith('sync-command');
     expect(state.getMessageConfig('msg_compact')).toEqual({
       autoCommit: false,
       condenseOnComplete: false,
@@ -891,7 +1110,7 @@ describe('createCommandHandler', () => {
       message: 'Failed to send command: summarize failed',
     });
     expect(sendToIngest).not.toHaveBeenCalled();
-    expect(deps.onMessageComplete).not.toHaveBeenCalled();
+    expect(deps.onDeliveryAcknowledged).toHaveBeenCalledWith('failed');
     expect(state.getMessageConfig('msg_compact')).toBeNull();
   });
 });
@@ -940,6 +1159,45 @@ describe('createSessionReadyHandler', () => {
       kiloSessionId: 'kilo_sess_1',
     });
     expect(deps.readySession).toHaveBeenCalledOnce();
+  });
+
+  it('preserves finalizing retry metadata from readiness', async () => {
+    const state = new WrapperState();
+    const deps = createMockDeps(state);
+    deps.readySession.mockResolvedValue({
+      status: 'error',
+      error: {
+        code: 'WRAPPER_FINALIZING',
+        message: 'Wrapper batch is finalizing',
+        retryable: true,
+        wrapperRunId: 'run_finalizing',
+      },
+    });
+    const handler = createSessionReadyHandler(deps);
+
+    const response = await handler(
+      jsonRequest({
+        agentSessionId: 'agent_test',
+        userId: 'user_test',
+        sandboxId: 'usr-test',
+        kiloSessionId: 'kilo_sess_1',
+        workspace: {
+          workspacePath: '/workspace',
+          sessionHome: '/home/agent_test',
+          branchName: 'main',
+        },
+        materialized: { env: { KILOCODE_TOKEN: 'kilo-token' } },
+        session: completeBinding,
+      })
+    );
+
+    expect(response.status).toBe(503);
+    await expect(readJson(response)).resolves.toEqual({
+      error: 'WRAPPER_FINALIZING',
+      message: 'Wrapper batch is finalizing',
+      retryable: true,
+      wrapperRunId: 'run_finalizing',
+    });
   });
 
   it('maps typed bootstrap errors to JSON error responses', async () => {

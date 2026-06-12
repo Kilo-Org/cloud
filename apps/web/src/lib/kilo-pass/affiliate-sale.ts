@@ -54,7 +54,7 @@ const KILO_PASS_AFFILIATE_SALE_REPORTING = {
   Record<KiloPassCadence, { itemCategory: string; itemName: string }>
 >;
 
-function getKiloPassAffiliateSaleReportingFields(context: KiloPassAffiliateSaleContext) {
+export function getKiloPassAffiliateSaleReportingFields(context: KiloPassAffiliateSaleContext) {
   const reportingFields = KILO_PASS_AFFILIATE_SALE_REPORTING[context.tier][context.cadence];
   return context.itemSku ? { ...reportingFields, itemSku: context.itemSku } : reportingFields;
 }

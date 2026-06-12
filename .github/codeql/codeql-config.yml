@@ -1,0 +1,11 @@
+name: High-and-critical CodeQL config
+
+query-filters:
+  - include:
+      kind:
+        - problem
+        - path-problem
+        - alert
+        - path-alert
+      tags contain: security
+      security-severity: /^(7(\.[0-9])?|8(\.[0-9])?|9(\.[0-9])?|10(\.0)?)$/

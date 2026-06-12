@@ -26,8 +26,7 @@ export async function getAvailableModelsForOrganization(
   }
 
   const responseData = await getEnhancedOpenRouterModels();
-  const experimentModels = await listAvailableExperimentModels();
-  const restrictionCandidates = responseData.data.concat(experimentModels);
+  const restrictionCandidates = [...responseData.data];
 
   let filteredModels = restrictionCandidates;
   if (hasActiveModelRestrictions(restrictions)) {
@@ -39,6 +38,10 @@ export async function getAvailableModelsForOrganization(
       }
     }
     filteredModels = models;
+  }
+
+  if (organization.plan !== 'enterprise' && organization.settings.data_collection !== 'deny') {
+    filteredModels.push(...(await listAvailableExperimentModels()));
   }
 
   filteredModels.push(...(await getDirectByokModelsForOrganization(organizationId)));

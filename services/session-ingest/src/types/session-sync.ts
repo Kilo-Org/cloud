@@ -2,6 +2,13 @@ import { z } from 'zod';
 
 // Session ingest payload.
 // Intentionally minimal validation: enforce only identity fields needed for compaction.
+const storageKeySegmentSchema = z
+  .string()
+  .min(1)
+  .refine(segment => !segment.includes('/') && !segment.includes('\u0000'), {
+    message: 'storage key segments must not contain / or U+0000',
+  });
+
 export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('kilo_meta'),
@@ -19,14 +26,14 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('message'),
     data: z.looseObject({
-      id: z.string().min(1),
+      id: storageKeySegmentSchema,
     }),
   }),
   z.object({
     type: z.literal('part'),
     data: z.looseObject({
-      id: z.string().min(1),
-      messageID: z.string().min(1),
+      id: storageKeySegmentSchema,
+      messageID: storageKeySegmentSchema,
     }),
   }),
   z.object({

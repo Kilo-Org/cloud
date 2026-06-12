@@ -27,7 +27,6 @@ import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { botPlatforms } from '@/lib/bot/platforms';
 import { APP_URL } from '@/lib/constants';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
@@ -72,10 +71,6 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
 
   if (!integration) {
     return htmlPage('Link Failed', 'No matching GitHub integration was found.', 404);
-  }
-
-  if (!botPlatforms.require(PLATFORM.GITHUB).isEnabledForBot(integration)) {
-    return htmlPage('Link Unavailable', 'GitHub linking is not enabled for this integration.', 404);
   }
 
   if (integration.owned_by_organization_id) {

@@ -68,11 +68,13 @@ import {
   buildCommandGuardBashPermissions,
   fetchSessionMetadata,
   getCommandGuardPolicy,
+  writeGlobalRules,
 } from './session-service.js';
 import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 import type { ExecutionSession, SandboxInstance, SessionId } from './types.js';
 import type { FencedWrapperDispatchRequest } from './execution/types.js';
+import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
 import {
   SandboxCapacityInspectionError,
   WorkspaceCapacityAdmissionRejectedError,
@@ -94,6 +96,13 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab *']).toBeUndefined();
     expect(bashPermissions['gh']).toBeUndefined();
     expect(bashPermissions['gh *']).toBeUndefined();
+    expect(bashPermissions['gh api']).toBeUndefined();
+    expect(bashPermissions['gh api *']).toBeUndefined();
+
+    for (const textInspectionCommand of ['awk', 'rg']) {
+      expect(bashPermissions[textInspectionCommand]).toBe('allow');
+      expect(bashPermissions[`${textInspectionCommand} *`]).toBe('allow');
+    }
 
     expect(bashPermissions['glab mr diff']).toBe('allow');
     expect(bashPermissions['glab mr diff *']).toBe('allow');
@@ -102,9 +111,34 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab api --method POST *merge_requests/*/discussions*']).toBe('allow');
 
     expect(bashPermissions['gh pr diff']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/reviews']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/reviews *']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/comments']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/pulls/*/comments *']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/*/comments']).toBe('allow');
+    expect(bashPermissions['gh api repos/*/issues/*/comments *']).toBe('allow');
     expect(bashPermissions['gh api repos/*/issues/*/comments --input*']).toBe('allow');
     expect(bashPermissions['gh api repos/*/issues/comments/* -X PATCH*']).toBe('allow');
     expect(bashPermissions['gh api repos/*/pulls/*/reviews --input*']).toBe('allow');
+
+    for (const readOnlyGhApiCommand of [
+      'gh api repos/*/pulls/*/reviews',
+      'gh api repos/*/pulls/*/comments',
+      'gh api repos/*/issues/*/comments',
+    ]) {
+      for (const mutationFlag of ['--method*', '-X*', '-f*', '-F*', '--field*', '--raw-field*']) {
+        const deniedCommand = `${readOnlyGhApiCommand} ${mutationFlag}`;
+        expect(bashPermissions[deniedCommand]).toBe('deny');
+        expect(bashPermissions[`${deniedCommand} *`]).toBe('deny');
+      }
+    }
+    expect(bashPermissions['gh api repos/*/pulls/*/comments --input*']).toBe('deny');
+    expect(bashPermissions['gh api repos/*/pulls/*/comments --input* *']).toBe('deny');
+
+    for (const riskyAwkCommand of ['awk * -i*', 'awk * --in-place*', 'awk *system(*']) {
+      expect(bashPermissions[riskyAwkCommand]).toBe('deny');
+      expect(bashPermissions[`${riskyAwkCommand} *`]).toBe('deny');
+    }
 
     expect(bashPermissions['git']).toBe('allow');
     expect(bashPermissions['git *']).toBe('allow');
@@ -246,6 +280,20 @@ function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
+
+describe('writeGlobalRules', () => {
+  it('writes the shared Cloud Agent rules for the session', async () => {
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(createSession(), false, writeFile);
+
+    await writeGlobalRules(sandbox, '/home/agent_test', 'agent_test');
+
+    expect(writeFile).toHaveBeenCalledWith(
+      '/home/agent_test/.kilocode/rules/cloud-agent.md',
+      buildCloudAgentRules('agent_test')
+    );
+  });
+});
 
 describe('SessionService.prepareWorkspace', () => {
   beforeEach(() => {
@@ -1061,10 +1109,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.ready.devcontainer).toBeUndefined();
   });
 
-  it('materializes workspace setup and prompt delivery into separate wrapper requests', async () => {
+  it('materializes workspace setup and prompt delivery without using provider token overrides for ingest auth', async () => {
     const service = new SessionService();
     const env = createEnv();
     env.WORKER_URL = 'https://cloud-agent.example.com';
+    env.KILOCODE_TOKEN_OVERRIDE = 'provider-override-token';
     const metadata = createMetadata({
       setupCommands: ['pnpm install'],
       envVars: { PUBLIC_VALUE: 'visible' },
@@ -1144,7 +1193,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest).not.toHaveProperty('workspace');
     expect(result.promptRequest).not.toHaveProperty('materialized');
     expect(result.readyRequest.materialized.env.PUBLIC_VALUE).toBe('visible');
-    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('provider-override-token');
+    expect(JSON.parse(result.readyRequest.materialized.env.KILO_AUTH_CONTENT)).toEqual({
+      kilo: { type: 'api', key: 'kilo-token' },
+    });
     expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
@@ -1190,6 +1242,23 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(config).not.toMatchObject({
       permission: { external_directory: { '/tmp/attachments/**': 'allow' } },
     });
+  });
+
+  it.each([
+    ['cloud-agent-web', true],
+    [undefined, false],
+    ['app-builder', false],
+    ['code-review', false],
+    ['slack', false],
+  ])('sets Kilo snapshots for %s-origin sessions to %s', async (createdOnPlatform, snapshot) => {
+    const result = await buildPromptWrapperRequests(createMetadata({ createdOnPlatform }));
+    const kiloConfig = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      snapshot?: boolean;
+    };
+    const opencodeConfig = JSON.parse(result.readyRequest.materialized.env.OPENCODE_CONFIG_CONTENT);
+
+    expect(kiloConfig.snapshot).toBe(snapshot);
+    expect(opencodeConfig).toEqual(kiloConfig);
   });
 
   it('passes canonical document attachments through signed wrapper prompt construction', async () => {

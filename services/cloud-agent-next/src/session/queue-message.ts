@@ -20,6 +20,7 @@ import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { QueueAckResponse } from '../router/schemas.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { logger } from '../logger.js';
+import { preflightExistingPromptModel } from './model-preflight.js';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
@@ -27,43 +28,45 @@ const RETRYABLE_CODES: readonly RetryableResultCode[] = [
   'WORKSPACE_SETUP_FAILED',
   'KILO_SERVER_FAILED',
   'WRAPPER_START_FAILED',
+  'WRAPPER_FINALIZING',
 ] as const;
 
 function isRetryableCode(code: string): code is RetryableResultCode {
   return RETRYABLE_CODES.includes(code as RetryableResultCode);
 }
 
-type NonRetryableCode = Exclude<
-  Extract<SessionMessageAdmissionResult, { success: false }>['code'],
-  RetryableResultCode
->;
+type AdmissionFailureCode = Extract<SessionMessageAdmissionResult, { success: false }>['code'];
+type NonTransientExecutionCode = Exclude<AdmissionFailureCode, RetryableResultCode>;
 
 type TRPCCodeName = ConstructorParameters<typeof TRPCError>[0]['code'];
 
-const PERMANENT_CODE_TO_TRPC: Record<NonRetryableCode, TRPCCodeName> = {
+const ADMISSION_CODE_TO_TRPC: Record<NonTransientExecutionCode, TRPCCodeName> = {
   NOT_FOUND: 'NOT_FOUND',
   BAD_REQUEST: 'BAD_REQUEST',
   PENDING_QUEUE_FULL: 'TOO_MANY_REQUESTS',
   INTERNAL: 'INTERNAL_SERVER_ERROR',
 };
 
+function isAdmissionFailureRetryable(code: AdmissionFailureCode): boolean {
+  return isRetryableCode(code) || code === 'PENDING_QUEUE_FULL' || code === 'INTERNAL';
+}
+
 export function throwAdmissionError(
   result: Extract<SessionMessageAdmissionResult, { success: false }>
 ): never {
-  if (isRetryableCode(result.code)) {
-    throw new TRPCError({
-      code: 'SERVICE_UNAVAILABLE',
+  const explicitlyRetryable = isAdmissionFailureRetryable(result.code);
+  const code = isRetryableCode(result.code)
+    ? 'SERVICE_UNAVAILABLE'
+    : (ADMISSION_CODE_TO_TRPC[result.code] ?? 'INTERNAL_SERVER_ERROR');
+  throw new TRPCError({
+    code,
+    message: result.error,
+    cause: {
+      error: result.code,
       message: result.error,
-      cause: {
-        error: result.code,
-        message: result.error,
-        retryable: true,
-      },
-    });
-  }
-
-  const code = PERMANENT_CODE_TO_TRPC[result.code] ?? 'INTERNAL_SERVER_ERROR';
-  throw new TRPCError({ code, message: result.error });
+      retryable: explicitlyRetryable,
+    },
+  });
 }
 
 export type QueueMessageInput = {
@@ -95,23 +98,44 @@ export function projectAdmissionToPublicAck(
   };
 }
 
-export async function replayMessageIfAlreadyAdmitted(
-  input: QueueMessageInput,
-  ctx: QueueMessageContext
-): Promise<QueueAckResponse | undefined> {
+async function hasMessageAdmission(input: QueueMessageInput, ctx: QueueMessageContext) {
   const messageId = input.turn.id;
-  if (messageId === undefined || messageId === null) return undefined;
+  if (messageId === undefined || messageId === null) return false;
 
   const sessionId = input.cloudAgentSessionId as SessionId;
   const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${sessionId}`);
-  const alreadyAdmitted = await withDORetry<DurableObjectStub<CloudAgentSession>, boolean>(
+  return withDORetry<DurableObjectStub<CloudAgentSession>, boolean>(
     () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
     stub => stub.hasMessageAdmission(messageId),
     'hasMessageAdmission'
   );
-  if (!alreadyAdmitted) return undefined;
+}
 
-  return queueMessage(input, ctx);
+export async function preflightAndAdmitPromptMessage<T>(
+  input: QueueMessageInput,
+  ctx: QueueMessageContext,
+  procedure: string,
+  admit: (input: QueueMessageInput, ctx: QueueMessageContext) => Promise<T>
+): Promise<T> {
+  if (await hasMessageAdmission(input, ctx)) return admit(input, ctx);
+
+  await preflightExistingPromptModel({
+    env: ctx.env,
+    userId: ctx.userId,
+    cloudAgentSessionId: input.cloudAgentSessionId,
+    requestedModel: input.agent?.model,
+    procedure,
+  });
+
+  return admit(input, ctx);
+}
+
+export function preflightAndQueuePromptMessage(
+  input: QueueMessageInput,
+  ctx: QueueMessageContext,
+  procedure: string
+): Promise<QueueAckResponse> {
+  return preflightAndAdmitPromptMessage(input, ctx, procedure, queueMessage);
 }
 
 export async function queueMessage(
@@ -147,7 +171,7 @@ export async function queueMessage(
         sessionId,
         userId: ctx.userId,
         resultCode: result.code,
-        retryable: isRetryableCode(result.code),
+        retryable: isAdmissionFailureRetryable(result.code),
       })
       .warn('Cloud-agent Durable Object rejected message admission request');
     throwAdmissionError(result);

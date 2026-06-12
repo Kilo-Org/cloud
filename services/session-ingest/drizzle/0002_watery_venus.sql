@@ -1,0 +1,1 @@
+CREATE INDEX `ingest_items_ingested_at_id_idx` ON `ingest_items` (`ingested_at`,`id`);

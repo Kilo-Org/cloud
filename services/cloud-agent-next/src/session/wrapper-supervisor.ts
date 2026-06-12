@@ -9,29 +9,34 @@ import type {
 import type { AgentRuntime } from './agent-runtime.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS, WRAPPER_PING_INTERVAL_MS } from './agent-runtime.js';
 import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
+import { classifyAssistantFailureMessage } from './safe-failure-projection.js';
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
 import type { SessionMessageQueue } from './session-message-queue.js';
 import {
+  listMessagesForWrapperRun,
   listNonTerminalAcceptedMessages,
+  type SessionMessageState,
   type SessionMessageStorage,
 } from './session-message-state.js';
+import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
 import type { LatestAssistantMessage } from './types.js';
 import {
   clearCurrentWrapperRuntimeFailureState,
   clearCurrentWrapperRuntimeLivenessState,
-  clearWrapperIdleState,
   clearWrapperRuntimeIdentity,
   getWrapperLease,
   getWrapperRuntimeState,
   hasCompleteWrapperIdentity,
+  hasCompleteWrapperRunMessageIndex,
   IDLE_KEEP_WARM_MS,
-  IDLE_RECONCILIATION_GRACE_MS,
   isCurrentWrapperConnection,
+  isWrapperDeliveryHeld,
+  isWrapperRunFinalizing,
+  markWrapperFinalizing,
   markWrapperPingSent,
   nextWrapperLeaseDeadline,
   putWrapperLease,
   recordMeaningfulWrapperOutput,
-  recordRootSessionIdle,
   recordWrapperPong,
   reduceWrapperLease,
   type WrapperConnectionFence,
@@ -84,7 +89,15 @@ export type WrapperTerminalEvent = {
   wrapperRunId: string;
   status: 'completed' | 'failed' | 'interrupted';
   error?: string;
+  errorSource?: 'assistant';
+  interruptionSource?: 'container_shutdown';
+  failureCode?: WrapperTerminalFailureCode;
   gateResult?: 'pass' | 'fail';
+  messageIds?: string[];
+};
+
+type SealedBatchSettlementResult = {
+  failedTerminalObserved: boolean;
 };
 
 export type WrapperSupervisorStorage = DurableObjectStorage &
@@ -101,11 +114,7 @@ export type WrapperSupervisor = {
     wrapperConnectionId: string,
     now: number
   ): Promise<void>;
-  observeRootIdle(
-    wrapperGeneration: number,
-    wrapperConnectionId: string,
-    now: number
-  ): Promise<void>;
+  observeFinalizing(wrapperRunId: string): Promise<void>;
   onDisconnected(input: WrapperDisconnectedInput): Promise<void>;
   onTerminalEvent(params: WrapperTerminalEvent): Promise<void>;
   requestPhysicalWrapperStop(reason: WrapperStopReason, target?: WrapperStopTarget): Promise<void>;
@@ -125,6 +134,7 @@ export type WrapperSupervisorDependencies = {
     | 'releaseWrapperTerminalWaitForIdleBatchForWrapperRun'
     | 'isWaitingForWrapperTerminalGateResult'
     | 'finalizeIdleBatchCallbackIfReady'
+    | 'finalizeTerminalWrapperRunCallbackIfReady'
   >;
   sessionMessageQueue: Pick<SessionMessageQueue, 'requestPendingDrainIfNeeded'>;
   getMetadata: () => Promise<SessionMetadata | null>;
@@ -140,6 +150,7 @@ export type WrapperSupervisorDependencies = {
     wrapperConnectionId: string;
   }) => Promise<boolean>;
   clearInterruptRequest: () => Promise<void>;
+  ensureAcceptedMessageBeforeTerminal: (messageId: string, wrapperRunId: string) => Promise<void>;
   stopWrappers?: (request: {
     target: WrapperStopTarget;
     attemptId: string;
@@ -195,6 +206,18 @@ function getAssistantErrorMessage(error: unknown): string | undefined {
   return 'Assistant message failed';
 }
 
+function getWrapperInterruptionFailureCode(
+  interruptionSource: WrapperTerminalEvent['interruptionSource'],
+  error: string | undefined
+): 'container_shutdown' | 'system_interrupt' {
+  if (interruptionSource === 'container_shutdown') return 'container_shutdown';
+
+  // Preserve classification for wrappers already running during deployment.
+  return error === 'Container shutdown: SIGTERM' || error === 'Container shutdown: SIGINT'
+    ? 'container_shutdown'
+    : 'system_interrupt';
+}
+
 export function createWrapperSupervisor(
   dependencies: WrapperSupervisorDependencies
 ): WrapperSupervisor {
@@ -208,6 +231,7 @@ export function createWrapperSupervisor(
     observeCorrelatedAgentActivity,
     hasActiveIngestConnection,
     clearInterruptRequest,
+    ensureAcceptedMessageBeforeTerminal,
     stopWrappers,
     requestAlarmAtOrBefore,
     getSessionIdForLogs,
@@ -256,9 +280,7 @@ export function createWrapperSupervisor(
       );
     if (!released) return;
 
-    await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
-      allowWithoutObservedIdle: true,
-    });
+    await messageSettlementOutbox.finalizeTerminalWrapperRunCallbackIfReady(wrapperRunId);
   }
 
   async function checkReconnect(input: WrapperReconnectInput): Promise<WrapperReconnectDecision> {
@@ -344,19 +366,8 @@ export function createWrapperSupervisor(
     await requestAlarmAtOrBefore?.(now + IDLE_KEEP_WARM_MS);
   }
 
-  async function observeRootIdle(
-    wrapperGeneration: number,
-    wrapperConnectionId: string,
-    now: number
-  ): Promise<void> {
-    await recordRootSessionIdle(
-      storage,
-      wrapperGeneration,
-      wrapperConnectionId,
-      now,
-      now + IDLE_RECONCILIATION_GRACE_MS
-    );
-    await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady();
+  async function observeFinalizing(wrapperRunId: string): Promise<void> {
+    await markWrapperFinalizing(storage, wrapperRunId);
   }
 
   async function startDisconnectGrace(input: WrapperDisconnectedInput): Promise<void> {
@@ -401,7 +412,13 @@ export function createWrapperSupervisor(
     );
     const isWaitingForWrapperTerminalGateResult =
       await messageSettlementOutbox.isWaitingForWrapperTerminalGateResult();
-    if (acceptedMessages.length === 0 && !isWaitingForWrapperTerminalGateResult) return;
+    if (
+      acceptedMessages.length === 0 &&
+      !isWaitingForWrapperTerminalGateResult &&
+      !isWrapperRunFinalizing(state)
+    ) {
+      return;
+    }
 
     await startDisconnectGrace(input);
   }
@@ -458,9 +475,13 @@ export function createWrapperSupervisor(
       });
     }
     await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
-    await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
-      allowWithoutObservedIdle: true,
-    });
+    if (isWrapperRunFinalizing(state) && state.wrapperRunId) {
+      await messageSettlementOutbox.finalizeTerminalWrapperRunCallbackIfReady(state.wrapperRunId);
+    } else {
+      await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
+        allowWithoutObservedIdle: true,
+      });
+    }
 
     if (state.wrapperConnectionId) {
       await clearCurrentWrapperRuntimeFailureState(
@@ -507,7 +528,7 @@ export function createWrapperSupervisor(
     }
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
-    if (acceptedMessages.length === 0) {
+    if (acceptedMessages.length === 0 && !isWrapperRunFinalizing(state)) {
       logger
         .withFields({ wrapperRunId })
         .info('No accepted messages during grace period - skipping failure');
@@ -518,7 +539,7 @@ export function createWrapperSupervisor(
 
     logger
       .withFields({ wrapperRunId, messageCount: acceptedMessages.length })
-      .warn('Grace period expired - failing accepted messages');
+      .warn('Grace period expired - failing supervised wrapper work');
     await requestPhysicalWrapperStop('unhealthy-wrapper');
     await storage.delete(DISCONNECT_GRACE_KEY);
     for (const message of acceptedMessages) {
@@ -540,10 +561,11 @@ export function createWrapperSupervisor(
       },
       { incrementGeneration: true }
     );
-    await releaseWrapperTerminalWaitForIdleBatch();
+    await releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId);
   }
 
   async function hasActiveWrapperWork(state: WrapperRuntimeState): Promise<boolean> {
+    if (isWrapperRunFinalizing(state)) return true;
     return (await listNonTerminalAcceptedMessages(storage, state.wrapperRunId)).length > 0;
   }
 
@@ -645,137 +667,144 @@ export function createWrapperSupervisor(
     return false;
   }
 
-  async function checkIdleReconciliation(now: number): Promise<void> {
-    const metadata = await getMetadata();
-    if (!metadata) return;
+  function isPromptMessage(message: SessionMessageState): boolean {
+    const turn = message.admissionSnapshot?.turn ?? message.legacyAdmissionConstraints?.turn;
+    return turn?.type !== 'command';
+  }
 
-    const state = await getWrapperRuntimeState(storage);
-    if (!state.wrapperRunId) return;
-
-    const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
-    if (acceptedMessages.length === 0) {
-      if (
-        state.wrapperConnectionId &&
-        (state.lastWrapperIdleAt !== undefined || state.idleReconcileAfter !== undefined)
-      ) {
-        await clearWrapperIdleState(storage, state.wrapperGeneration, state.wrapperConnectionId);
-      }
-      return;
-    }
-
-    if (state.idleReconcileAfter !== undefined) {
-      if (now < state.idleReconcileAfter) return;
-    } else {
-      const hasRecentOutput =
-        state.lastWrapperMessageAt !== undefined &&
-        now - state.lastWrapperMessageAt < WRAPPER_NO_OUTPUT_TIMEOUT_MS;
-      if (hasRecentOutput) return;
-    }
-
-    logger
-      .withFields({
-        sessionId: metadata.identity.sessionId,
-        wrapperRunId: state.wrapperRunId,
-        acceptedMessageCount: acceptedMessages.length,
-        hasKiloSessionId: metadata.auth.kiloSessionId !== undefined,
-      })
-      .info('Idle reconciliation processing accepted messages');
-
-    let failedTerminalObserved = !metadata.auth.kiloSessionId;
-    if (!failedTerminalObserved && metadata.auth.kiloSessionId) {
-      failedTerminalObserved = acceptedMessages.some(message => {
-        const assistantMessage = getAssistantMessageForUserMessage(
-          metadata.identity.sessionId,
-          metadata.auth.kiloSessionId ?? '',
-          message.messageId
-        );
-        return (
-          !assistantMessage || getAssistantErrorMessage(assistantMessage.info.error) !== undefined
-        );
+  async function failAcceptedMessagesForProtocolError(
+    acceptedMessages: SessionMessageState[],
+    error: string
+  ): Promise<void> {
+    for (const message of acceptedMessages) {
+      await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
+        kind: 'failed',
+        reason: 'wrapper_protocol_error',
+        error,
+        completionSource: 'wrapper_failure',
+        failureStage: 'agent_activity',
+        failureCode: 'wrapper_error_after_activity',
       });
     }
-    if (failedTerminalObserved) {
-      await requestPhysicalWrapperStop('terminal-failed');
+  }
+
+  async function settleSealedBatch(
+    wrapperRunId: string,
+    messageIds: string[],
+    dispatchingMessageId?: string,
+    membershipProtocolError?: string
+  ): Promise<SealedBatchSettlementResult | null> {
+    const sealedMessageIds = [...new Set(messageIds)];
+    const repairMessageIds = [
+      ...new Set([...sealedMessageIds, ...(dispatchingMessageId ? [dispatchingMessageId] : [])]),
+    ];
+    for (const messageId of repairMessageIds) {
+      await ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId);
     }
 
-    for (const message of acceptedMessages) {
-      if (!metadata.auth.kiloSessionId) {
-        failedTerminalObserved = true;
-        await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
-          kind: 'failed',
-          reason: 'missing_assistant_reply',
-          error: 'No assistant reply found after idle timeout',
-          completionSource: 'idle_reconciliation',
-          failureStage: 'post_dispatch_no_activity',
-          failureCode: 'missing_assistant_reply',
-        });
-        continue;
-      }
+    const wrapperRunMessages = await listMessagesForWrapperRun(storage, wrapperRunId);
+    const wrapperRunMessagesById = new Map(
+      wrapperRunMessages.map(message => [message.messageId, message])
+    );
+    const acceptedMessages = wrapperRunMessages.filter(message => message.status === 'accepted');
+    const earlyProtocolError =
+      membershipProtocolError ??
+      (sealedMessageIds.length !== messageIds.length
+        ? 'Wrapper complete contained duplicate sealed batch membership'
+        : undefined);
+    if (earlyProtocolError) {
+      await requestPhysicalWrapperStop('terminal-failed');
+      await failAcceptedMessagesForProtocolError(acceptedMessages, earlyProtocolError);
+      return { failedTerminalObserved: true };
+    }
 
-      const assistantMessage = getAssistantMessageForUserMessage(
-        metadata.identity.sessionId,
-        metadata.auth.kiloSessionId,
-        message.messageId
+    const invalidMessageIds: string[] = [];
+    for (const messageId of sealedMessageIds) {
+      const state = wrapperRunMessagesById.get(messageId);
+      if (!state || state.status === 'queued') invalidMessageIds.push(messageId);
+    }
+    const sealedSet = new Set(sealedMessageIds);
+    const omittedMessages = wrapperRunMessages.filter(message => !sealedSet.has(message.messageId));
+    const protocolFailure = invalidMessageIds.length > 0 || omittedMessages.length > 0;
+
+    if (protocolFailure) {
+      await requestPhysicalWrapperStop('terminal-failed');
+      await failAcceptedMessagesForProtocolError(
+        acceptedMessages,
+        'Wrapper complete contained invalid sealed batch membership'
       );
-      if (!assistantMessage) {
-        failedTerminalObserved = true;
-        await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
-          kind: 'failed',
-          reason: 'missing_assistant_reply',
-          error: 'No assistant reply found after idle timeout',
-          completionSource: 'idle_reconciliation',
-          failureStage: 'post_dispatch_no_activity',
-          failureCode: 'missing_assistant_reply',
-        });
-        continue;
-      }
+      logger
+        .withFields({
+          wrapperRunId,
+          invalidMessageIds,
+          omittedMessageIds: omittedMessages.map(message => message.messageId),
+        })
+        .warn('Wrapper complete contained invalid sealed batch membership');
+      return { failedTerminalObserved: true };
+    }
 
-      await observeCorrelatedAgentActivity?.(message.messageId);
-      const assistantError = getAssistantErrorMessage(assistantMessage.info.error);
+    const metadata = await getMetadata();
+    if (!metadata) return null;
+    const kiloSessionId = metadata.auth.kiloSessionId;
+    let failedTerminalObserved = wrapperRunMessages.some(
+      message =>
+        sealedSet.has(message.messageId) &&
+        (message.status === 'failed' || message.status === 'interrupted')
+    );
+
+    for (const messageId of sealedMessageIds) {
+      const message = wrapperRunMessagesById.get(messageId);
+      if (!message || message.status !== 'accepted') continue;
+      const assistantMessage = kiloSessionId
+        ? getAssistantMessageForUserMessage(metadata.identity.sessionId, kiloSessionId, messageId)
+        : null;
+      const assistantError = getAssistantErrorMessage(assistantMessage?.info.error);
       if (assistantError !== undefined) {
         failedTerminalObserved = true;
-        await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
+        await observeCorrelatedAgentActivity?.(messageId);
+        await messageSettlementOutbox.terminalizeSessionMessageOnce(messageId, {
           kind: 'failed',
           reason: 'assistant_error',
           error: assistantError,
           completionSource: 'idle_reconciliation',
           failureStage: 'agent_activity',
           failureCode: 'assistant_error',
+          safeFailureMessage: classifyAssistantFailureMessage(assistantError),
         });
-        continue;
+      } else if (assistantMessage) {
+        await observeCorrelatedAgentActivity?.(messageId);
+        await messageSettlementOutbox.terminalizeSessionMessageOnce(messageId, {
+          kind: 'completed',
+          assistantMessageId: assistantMessage.info.id,
+          completionSource: 'idle_reconciliation',
+        });
+      } else if (!isPromptMessage(message)) {
+        await messageSettlementOutbox.terminalizeSessionMessageOnce(messageId, {
+          kind: 'completed',
+          completionSource: 'idle_reconciliation',
+        });
+      } else {
+        failedTerminalObserved = true;
+        await messageSettlementOutbox.terminalizeSessionMessageOnce(messageId, {
+          kind: 'failed',
+          reason: 'missing_assistant_reply',
+          error: 'No assistant reply found during wrapper completion',
+          completionSource: 'idle_reconciliation',
+          failureStage: 'post_dispatch_no_activity',
+          failureCode: 'missing_assistant_reply',
+        });
       }
-
-      await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
-        kind: 'completed',
-        assistantMessageId: assistantMessage.info.id,
-        completionSource: 'idle_reconciliation',
-      });
     }
 
-    if (failedTerminalObserved) {
-      if (state.wrapperConnectionId) {
-        await clearWrapperRuntimeIdentity(storage, {
-          wrapperGeneration: state.wrapperGeneration,
-          wrapperConnectionId: state.wrapperConnectionId,
-        });
-      }
-    } else {
-      await retainPhysicalWrapperWarm(now);
-    }
-    await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady();
-    logger
-      .withFields({
-        sessionId: metadata.identity.sessionId,
-        wrapperRunId: state.wrapperRunId,
-        acceptedMessageCount: acceptedMessages.length,
-      })
-      .info('Idle reconciliation pass completed');
+    if (failedTerminalObserved) await requestPhysicalWrapperStop('terminal-failed');
+    return { failedTerminalObserved };
   }
 
   async function checkKeepWarmCleanup(now: number): Promise<void> {
     const lease = await getWrapperLease(storage);
     if (lease.state === 'owns_wrapper' && lease.startupDeadlineAt !== undefined) return;
     const wrapperState = await getWrapperRuntimeState(storage);
+    if (isWrapperRunFinalizing(wrapperState)) return;
     const keepWarmUntil =
       lease.state === 'owns_wrapper' ? lease.keepWarmUntil : wrapperState.wrapperIdleDeadlineAt;
     if (keepWarmUntil === undefined || keepWarmUntil > now) return;
@@ -785,16 +814,7 @@ export function createWrapperSupervisor(
       storage,
       wrapperState.wrapperRunId
     );
-    if (pendingCount > 0 || acceptedMessages.length > 0) {
-      if (wrapperState.wrapperConnectionId) {
-        await clearWrapperIdleState(
-          storage,
-          wrapperState.wrapperGeneration,
-          wrapperState.wrapperConnectionId
-        );
-      }
-      return;
-    }
+    if (pendingCount > 0 || acceptedMessages.length > 0) return;
 
     logger
       .withFields({
@@ -885,10 +905,11 @@ export function createWrapperSupervisor(
 
     const latest = await getWrapperLease(storage);
     if (result.status === 'absent') {
-      await putWrapperLease(
-        storage,
-        reduceWrapperLease(latest, { type: 'stop_absent', attemptId })
-      );
+      const cleaned = reduceWrapperLease(latest, { type: 'stop_absent', attemptId });
+      await putWrapperLease(storage, cleaned);
+      if (!isWrapperDeliveryHeld(await getWrapperRuntimeState(storage), cleaned)) {
+        await sessionMessageQueue.requestPendingDrainIfNeeded();
+      }
       return;
     }
     const error =
@@ -900,14 +921,23 @@ export function createWrapperSupervisor(
       reduceWrapperLease(latest, {
         type: 'stop_not_confirmed',
         attemptId,
-        retryAt: stopRetryAt(now, stopping.attempts),
+        retryAt: stopRetryAt(Date.now(), stopping.attempts),
         error,
       })
     );
   }
 
   async function onTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
-    const { wrapperRunId, status, error, gateResult } = params;
+    const {
+      wrapperRunId,
+      status,
+      error,
+      errorSource,
+      interruptionSource,
+      failureCode: terminalFailureCode,
+      gateResult,
+      messageIds,
+    } = params;
     const sessionId = getSessionIdForLogs();
     const state = await getWrapperRuntimeState(storage);
     if (
@@ -927,8 +957,10 @@ export function createWrapperSupervisor(
         sessionId,
         wrapperRunId,
         status,
-        error,
+        errorSource,
+        interruptionSource,
         gateResult,
+        messageCount: messageIds?.length,
       })
       .info('Wrapper terminal event received by supervisor');
 
@@ -936,9 +968,25 @@ export function createWrapperSupervisor(
       await requestPhysicalWrapperStop(
         status === 'failed' ? 'terminal-failed' : 'terminal-interrupted'
       );
+      if (state.dispatchingMessageId) {
+        await ensureAcceptedMessageBeforeTerminal(state.dispatchingMessageId, wrapperRunId);
+      }
       const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
       for (const message of acceptedMessages) {
         if (status === 'failed') {
+          if (errorSource === 'assistant') {
+            await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
+              kind: 'failed',
+              reason: 'assistant_error',
+              error: error ?? 'Assistant request failed',
+              completionSource: 'wrapper_failure',
+              failureStage: 'agent_activity',
+              failureCode: terminalFailureCode ?? 'assistant_error',
+              safeFailureMessage: classifyAssistantFailureMessage(error),
+            });
+            continue;
+          }
+
           const activityObserved = message.agentActivityObservedAt !== undefined;
           await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
             kind: 'failed',
@@ -946,9 +994,9 @@ export function createWrapperSupervisor(
             error: error ?? 'Wrapper error',
             completionSource: 'wrapper_failure',
             failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-            failureCode: activityObserved
-              ? 'wrapper_error_after_activity'
-              : 'wrapper_error_before_activity',
+            failureCode:
+              terminalFailureCode ??
+              (activityObserved ? 'wrapper_error_after_activity' : 'wrapper_error_before_activity'),
           });
           continue;
         }
@@ -958,17 +1006,54 @@ export function createWrapperSupervisor(
           error: error ?? 'Wrapper interrupted',
           completionSource: 'interrupt',
           failureStage: 'interruption',
-          failureCode: 'system_interrupt',
+          failureCode: getWrapperInterruptionFailureCode(interruptionSource, error),
         });
       }
     }
 
     if (status === 'completed') {
-      const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
-      if (acceptedMessages.length === 0) {
+      const currentRunRequiresMembership = hasCompleteWrapperRunMessageIndex(state, wrapperRunId);
+      const missingRequiredMembership = messageIds === undefined && currentRunRequiresMembership;
+      const sealedMessageIds =
+        messageIds ??
+        (missingRequiredMembership
+          ? []
+          : [
+              ...new Set([
+                ...(await listMessagesForWrapperRun(storage, wrapperRunId)).map(
+                  message => message.messageId
+                ),
+                ...(state.dispatchingMessageId ? [state.dispatchingMessageId] : []),
+              ]),
+            ]);
+      const settlement = await settleSealedBatch(
+        wrapperRunId,
+        sealedMessageIds,
+        state.dispatchingMessageId,
+        missingRequiredMembership
+          ? 'Current wrapper complete omitted sealed batch membership'
+          : undefined
+      );
+      if (!settlement) {
+        await requestPhysicalWrapperStop('terminal-failed');
+        const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
+        await failAcceptedMessagesForProtocolError(
+          acceptedMessages,
+          'Wrapper complete omitted sealed batch membership'
+        );
+        await clearWrapperRuntimeIdentity(storage, {
+          wrapperGeneration: state.wrapperGeneration,
+          wrapperConnectionId: state.wrapperConnectionId,
+        });
+      } else if (settlement.failedTerminalObserved) {
+        await clearWrapperRuntimeIdentity(storage, {
+          wrapperGeneration: state.wrapperGeneration,
+          wrapperConnectionId: state.wrapperConnectionId,
+        });
+      } else {
         await retainPhysicalWrapperWarm(Date.now());
-        await clearInterruptRequest();
       }
+      await clearInterruptRequest();
     } else {
       await clearWrapperRuntimeIdentity(storage, {
         wrapperGeneration: state.wrapperGeneration,
@@ -979,17 +1064,18 @@ export function createWrapperSupervisor(
 
     await clearDisconnectGrace();
     await messageSettlementOutbox.observeWrapperTerminalForIdleBatch(gateResult);
-    await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
-      allowWithoutObservedIdle: true,
-    });
-    await sessionMessageQueue.requestPendingDrainIfNeeded();
+    await messageSettlementOutbox.finalizeTerminalWrapperRunCallbackIfReady(wrapperRunId);
+    if (
+      !isWrapperDeliveryHeld(await getWrapperRuntimeState(storage), await getWrapperLease(storage))
+    ) {
+      await sessionMessageQueue.requestPendingDrainIfNeeded();
+    }
   }
 
   async function runMaintenance(now: number): Promise<void> {
     await reconcilePhysicalCleanup(now);
     await checkDisconnectGrace(now);
     await checkWrapperLiveness(now);
-    await checkIdleReconciliation(now);
     await checkKeepWarmCleanup(now);
   }
 
@@ -1010,9 +1096,6 @@ export function createWrapperSupervisor(
     }
 
     const wrapperState = await getWrapperRuntimeState(storage);
-    if (wrapperState.idleReconcileAfter !== undefined) {
-      deadlines.push(wrapperState.idleReconcileAfter);
-    }
     if (wrapperState.wrapperIdleDeadlineAt !== undefined) {
       deadlines.push(wrapperState.wrapperIdleDeadlineAt);
     }
@@ -1026,7 +1109,7 @@ export function createWrapperSupervisor(
     isCurrentConnection,
     observePong,
     observeMeaningfulOutput,
-    observeRootIdle,
+    observeFinalizing,
     onDisconnected,
     onTerminalEvent,
     requestPhysicalWrapperStop,

@@ -9,14 +9,22 @@
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./hostname-label": "./src/hostname-label.ts",
+    "./deployment-slug": "./src/deployment-slug.ts",
     "./redact-headers": "./src/redact-headers.ts",
     "./normalize-git-url": "./src/normalize-git-url.ts",
     "./kiloclaw-billing-observability": "./src/kiloclaw-billing-observability.ts",
     "./kilo-pass-bonus-projection": "./src/kilo-pass-bonus-projection.ts",
     "./git-url": "./src/git-url.ts",
     "./callback-token": "./src/callback-token.ts",
+    "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
-    "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts"
+    "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",
+    "./cloud-agent-failure": "./src/cloud-agent-failure.ts",
+    "./security-auto-analysis-policy": "./src/security-auto-analysis-policy.ts",
+    "./security-remediation-policy": "./src/security-remediation-policy.ts",
+    "./security-notification-policy": "./src/security-notification-policy.ts",
+    "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts",
+    "./client-error": "./src/client-error.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -26,6 +34,7 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/encryption": "workspace:*",
     "aws4fetch": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

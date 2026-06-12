@@ -141,6 +141,16 @@ export default function OrganizationAppSidebar({
       icon: MessageSquare,
       url: `/organizations/${organizationId}/claw/chat`,
     },
+    // Agent management is admin-only for now.
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'Agents',
+            icon: Bot,
+            url: `/organizations/${organizationId}/claw/agents`,
+          },
+        ]
+      : []),
     {
       title: 'Settings',
       icon: Settings,
@@ -229,6 +239,15 @@ export default function OrganizationAppSidebar({
             title: 'Managed Indexing',
             icon: Database,
             url: `/organizations/${organizationId}/code-indexing`,
+          },
+        ]
+      : []),
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'MCP Gateway',
+            icon: Cable,
+            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
           },
         ]
       : []),

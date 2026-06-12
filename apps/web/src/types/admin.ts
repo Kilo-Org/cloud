@@ -101,7 +101,15 @@ export type SortableField = (typeof sortableFields)[number];
 
 export const ascendingFirstFields: SortableField[] = ['google_user_email'];
 
-export type OrganizationSortableField = 'name' | 'microdollars_used' | 'balance' | 'member_count';
+export type OrganizationSortableField =
+  | 'name'
+  | 'microdollars_used'
+  | 'balance'
+  | 'member_count'
+  | 'plan'
+  | 'kilo_pass_tier'
+  | 'latest_stripe_status'
+  | 'subscription_amount_usd';
 
 export type CreditCategorySortableField =
   | 'credit_category'

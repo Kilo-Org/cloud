@@ -56,10 +56,7 @@ const DEFAULT_MATRIX: Case[] = [
   { lifecycle: 'unknown-model', conversation: '_' },
   { lifecycle: 'waiters-clean', conversation: '_' },
 
-  // Callback delivery via the outbound HTTP fetch from workerd.
-  { lifecycle: 'callback-completion', conversation: 'echo:done' },
-  { lifecycle: 'callback-batch-followup', conversation: '_' },
-  { lifecycle: 'callback-interrupt', conversation: '_' },
+  // Callback scenarios remain manual because callbackTarget uses the internal legacy API.
 
   // Legacy-API sanity: one cold boot plus the same reused hot turn sequence.
   { lifecycle: 'cold-hot', conversation: 'echo:legacy', api: 'legacy' },

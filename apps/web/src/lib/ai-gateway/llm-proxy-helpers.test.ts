@@ -28,6 +28,7 @@ import {
   countAndStoreEditUsage,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
+  extractHeaderAndLimitLength,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
   parseEditUsageFromResponse,
@@ -699,11 +700,36 @@ describe('makeErrorReadable', () => {
   it('returns undefined for non-error responses', async () => {
     const response = new Response('{}', { status: 200 });
     const result = await makeErrorReadable({
+      providerId: 'openrouter',
       requestedModel: 'anything',
       request: { kind: 'chat_completions', body: { model: 'test', messages: [] } },
       response,
       isUserByok: false,
     });
     expect(result).toBeUndefined();
+  });
+});
+
+describe('extractHeaderAndLimitLength', () => {
+  // The auto-routing mirror contract relies on this helper never returning
+  // an empty or whitespace-only string: MirrorPayloadSchema rejects the
+  // whole payload on `.min(1)` identity fields, so '' must coerce to null.
+  it('returns null for missing, empty, and whitespace-only headers', () => {
+    const request = new Request('http://localhost', {
+      headers: { 'x-empty': '', 'x-blank': '   ', 'x-padded': '  value  ' },
+    }) as unknown as Parameters<typeof extractHeaderAndLimitLength>[0];
+
+    expect(extractHeaderAndLimitLength(request, 'x-missing')).toBeNull();
+    expect(extractHeaderAndLimitLength(request, 'x-empty')).toBeNull();
+    expect(extractHeaderAndLimitLength(request, 'x-blank')).toBeNull();
+    expect(extractHeaderAndLimitLength(request, 'x-padded')).toBe('value');
+  });
+
+  it('caps header values at 500 characters before trimming', () => {
+    const request = new Request('http://localhost', {
+      headers: { 'x-long': 'a'.repeat(600) },
+    }) as unknown as Parameters<typeof extractHeaderAndLimitLength>[0];
+
+    expect(extractHeaderAndLimitLength(request, 'x-long')).toBe('a'.repeat(500));
   });
 });

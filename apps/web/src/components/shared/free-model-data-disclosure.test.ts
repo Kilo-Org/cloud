@@ -4,6 +4,7 @@ import {
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataTooltip,
   isFreeModelOption,
+  mayTrainOnYourPrompts,
 } from './free-model-data-disclosure';
 
 describe('free model data disclosure', () => {
@@ -18,6 +19,24 @@ describe('free model data disclosure', () => {
     expect(isFreeModelOption({ id: 'openrouter/free' })).toBe(false);
     expect(isFreeModelOption({ id: 'openrouter/model-alpha' })).toBe(false);
     expect(isFreeModelOption({ id: 'anthropic/claude' })).toBe(false);
+  });
+
+  it('detects training eligibility independently of freeness', () => {
+    expect(
+      mayTrainOnYourPrompts({
+        id: 'paid-training-model',
+        isFree: false,
+        mayTrainOnYourPrompts: true,
+      })
+    ).toBe(true);
+    expect(
+      mayTrainOnYourPrompts({
+        id: 'free-private-model',
+        isFree: true,
+        mayTrainOnYourPrompts: false,
+      })
+    ).toBe(false);
+    expect(mayTrainOnYourPrompts({ id: 'free-model', isFree: true })).toBe(false);
   });
 
   it('uses the short disclosure text as tooltip content', () => {

@@ -120,9 +120,9 @@ function buildBrowseSql(filter: BrowseFilter | undefined): string {
   if (filter?.claimedBy) conditions.push(`claimed_by = '${escapeSqlString(filter.claimedBy)}'`);
   if (filter?.since) conditions.push(`updated_at >= '${escapeSqlString(filter.since)}'`);
   if (filter?.search) {
-    const s = escapeSqlString(filter.search).replace(/%/g, '\\%').replace(/_/g, '\\_');
+    const s = escapeSqlString(filter.search);
     conditions.push(
-      `(title LIKE '%${s}%' OR COALESCE(description,'') LIKE '%${s}%' OR COALESCE(tags,'') LIKE '%${s}%')`
+      `(INSTR(title, '${s}') > 0 OR INSTR(COALESCE(description,''), '${s}') > 0 OR INSTR(COALESCE(tags,''), '${s}') > 0)`
     );
   }
 

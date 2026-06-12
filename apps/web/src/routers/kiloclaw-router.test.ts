@@ -45,6 +45,7 @@ type KiloClawClientMock = {
   __getStatusMock: AnyMock;
   __getLatestVersionMock: AnyMock;
   __getLatestVersionForInstanceMock: AnyMock;
+  __getFileTreeMock: AnyMock;
   __destroyMock: AnyMock;
   __startMock: AnyMock;
 };
@@ -113,6 +114,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const getStatusMock = jest.fn();
   const getLatestVersionMock = jest.fn();
   const getLatestVersionForInstanceMock = jest.fn();
+  const getFileTreeMock = jest.fn();
   const destroyMock = jest.fn();
   const startMock = jest.fn();
   return {
@@ -120,6 +122,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       getStatus: getStatusMock,
       getLatestVersion: getLatestVersionMock,
       getLatestVersionForInstance: getLatestVersionForInstanceMock,
+      getFileTree: getFileTreeMock,
       start: startMock,
       destroy: destroyMock,
     })),
@@ -135,6 +138,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
     __getStatusMock: getStatusMock,
     __getLatestVersionMock: getLatestVersionMock,
     __getLatestVersionForInstanceMock: getLatestVersionForInstanceMock,
+    __getFileTreeMock: getFileTreeMock,
     __destroyMock: destroyMock,
     __startMock: startMock,
   };
@@ -151,6 +155,7 @@ jest.mock('@/lib/kiloclaw/install-dispatch', () => {
 let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
   getStatus: () => Promise<unknown>;
   latestVersion: (input?: { currentImageTag?: string }) => Promise<unknown>;
+  fileTree: (input?: { path?: string }) => Promise<unknown>;
   getNavState: () => Promise<{ hasActiveInstance: boolean }>;
   validateWeatherLocation: (input: { location: string }) => Promise<{
     location: string;
@@ -239,6 +244,16 @@ beforeAll(async () => {
   const mod = await import('@/routers/kiloclaw-router');
   createCaller = createCallerFactory(mod.kiloclawRouter);
 });
+
+async function createActivePersonalInstance(userId: string): Promise<string> {
+  const instanceId = crypto.randomUUID();
+  await db.insert(kiloclaw_instances).values({
+    id: instanceId,
+    user_id: userId,
+    sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+  });
+  return instanceId;
+}
 
 function wttrFormat3Response(text: string, status = 200): Response {
   return new Response(text, { status, headers: { 'Content-Type': 'text/plain' } });
@@ -564,6 +579,36 @@ describe('kiloclawRouter latestVersion', () => {
     expect(result).toEqual({ imageTag: 'anonymous-tag' });
     expect(kiloclawClientMock.__getLatestVersionMock).toHaveBeenCalledWith();
     expect(kiloclawClientMock.__getLatestVersionForInstanceMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('kiloclawRouter fileTree', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.__getFileTreeMock.mockReset();
+  });
+
+  it('forwards path-scoped tree requests to the active instance', async () => {
+    kiloclawClientMock.__getFileTreeMock.mockResolvedValue({ tree: [] });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-file-tree-${crypto.randomUUID()}@example.com`,
+    });
+    const instanceId = await createActivePersonalInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'trialing',
+      trial_ends_at: '2026-07-01T00:00:00.000Z',
+    });
+
+    const caller = createCaller({ user });
+    await caller.fileTree({ path: 'workspace/nested' });
+
+    expect(kiloclawClientMock.__getFileTreeMock).toHaveBeenCalledWith(user.id, {
+      instanceId,
+      path: 'workspace/nested',
+    });
   });
 });
 

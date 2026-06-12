@@ -23,6 +23,7 @@ describe('getControllerEndpointCapabilities', () => {
         'config.agents.create.basic.cli',
         'config.agents.update',
         'config.agents.delete.cli',
+        'config.agents.bindings.update',
         'config.agent-defaults.update',
       ])
     );
@@ -30,6 +31,10 @@ describe('getControllerEndpointCapabilities', () => {
 
   it('advertises validation-aware OpenClaw file writes', () => {
     expect(getControllerEndpointCapabilities()).toContain('files.write-openclaw-config');
+  });
+
+  it('advertises path-scoped file tree listing', () => {
+    expect(getControllerEndpointCapabilities()).toContain('files.tree.path');
   });
 
   it('includes conditional Kilo Chat capabilities only when requested', () => {

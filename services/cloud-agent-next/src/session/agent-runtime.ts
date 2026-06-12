@@ -1,3 +1,4 @@
+import { ExecutionError } from '../execution/errors.js';
 import { ExecutionOrchestrator } from '../execution/orchestrator.js';
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import type {
@@ -13,23 +14,32 @@ import type {
   WorkspaceReady,
 } from '../execution/types.js';
 import { logger } from '../logger.js';
+import { WrapperFinalizingError } from '../kilo/wrapper-client.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { WrapperCommand } from '../shared/protocol.js';
 import type { Env as WorkerEnv } from '../types.js';
+import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
 import {
   allocateWrapperRuntimeState,
   clearAllocatedWrapperRuntimeState,
+  clearWrapperDispatchingMessage,
   clearWrapperRuntimeIdentity,
   getWrapperLease,
   getWrapperRuntimeState,
+  isWrapperRunFinalizing,
+  markWrapperFinalizing,
+  nextWrapperCleanupDeadline,
   putWrapperLease,
   READY_ONLY_IDLE_MS,
   recordWrapperAcceptedMessage,
+  recordWrapperDispatchingMessage,
   recordWrapperReadyLease,
   reduceWrapperLease,
+  type WrapperLease,
 } from './wrapper-runtime-state.js';
 
-export const WRAPPER_NO_OUTPUT_TIMEOUT_MS = 5 * 60 * 1000;
+// Allow the five-minute provider timeout to finish event delivery and stable-idle handling before our watchdog fires.
+export const WRAPPER_NO_OUTPUT_TIMEOUT_MS = 330_000;
 export const WRAPPER_PING_INTERVAL_MS = 60_000;
 export const WRAPPER_STARTUP_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -78,6 +88,28 @@ export type AgentRuntimeDependencies = {
   discoverSessionWrappers?: (metadata: SessionMetadata) => Promise<WrapperObservation>;
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
 };
+
+function cleanupBlockedError(lease: WrapperLease): WrapperCleanupBlockedError {
+  const retryAt = nextWrapperCleanupDeadline(lease);
+  if (retryAt === undefined) {
+    throw new Error('Wrapper cleanup state is missing its retry deadline');
+  }
+  return new WrapperCleanupBlockedError(retryAt);
+}
+
+function hasSamePhysicalAuthorization(expected: WrapperLease, latest: WrapperLease): boolean {
+  if (expected.state === 'none') {
+    return (
+      latest.state === 'none' && latest.nextInstanceGeneration === expected.nextInstanceGeneration
+    );
+  }
+  if (expected.state !== 'owns_wrapper' || latest.state !== 'owns_wrapper') return false;
+  return (
+    latest.nextInstanceGeneration === expected.nextInstanceGeneration &&
+    latest.instance.instanceId === expected.instance.instanceId &&
+    latest.instance.instanceGeneration === expected.instance.instanceGeneration
+  );
+}
 
 function buildRuntimeAcceptanceResult(
   messageId: string,
@@ -130,7 +162,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
   }> {
     const current = await getWrapperLease(storage);
     if (current.state === 'stop_needed' || current.state === 'stopping') {
-      throw new Error('Wrapper cleanup is required before delivery can launch');
+      throw cleanupBlockedError(current);
     }
 
     const observeWrappers = () =>
@@ -140,6 +172,9 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     let allocatable = current;
     if (current.state === 'owns_wrapper') {
       const observation = await observeWrappers();
+      if (!hasSamePhysicalAuthorization(current, await getWrapperLease(storage))) {
+        return authorizePhysicalWrapper(plan);
+      }
       const matchingObserved =
         observation.status === 'present' &&
         observation.observed.length === 1 &&
@@ -178,37 +213,53 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         const reason =
           observation.status === 'inspection-failed' ? 'observation-failed' : 'unexpected-wrapper';
         const now = Date.now();
-        await putWrapperLease(
-          storage,
-          reduceWrapperLease(current, {
-            type: 'request_stop',
-            target: { kind: 'session' },
-            reason,
-            now,
-          })
-        );
+        const cleanupLease = reduceWrapperLease(current, {
+          type: 'request_stop',
+          target: { kind: 'session' },
+          reason,
+          now,
+        });
+        await putWrapperLease(storage, cleanupLease);
         await dependencies.requestAlarmAtOrBefore?.(now);
-        throw new Error('Wrapper cleanup is required before delivery can launch');
+        if (observation.status === 'inspection-failed') {
+          throw ExecutionError.sandboxConnectFailed(
+            'Sandbox connection failed during wrapper discovery'
+          );
+        }
+        throw cleanupBlockedError(cleanupLease);
       }
     }
 
     const observation =
       allocatable === current ? await observeWrappers() : { status: 'absent' as const };
+    if (
+      allocatable === current &&
+      !hasSamePhysicalAuthorization(current, await getWrapperLease(storage))
+    ) {
+      return authorizePhysicalWrapper(plan);
+    }
     if (observation.status !== 'absent') {
       const reason =
         observation.status === 'inspection-failed' ? 'observation-failed' : 'unexpected-wrapper';
       const now = Date.now();
-      await putWrapperLease(
-        storage,
-        reduceWrapperLease(allocatable, {
-          type: 'request_stop',
-          target: { kind: 'session' },
-          reason,
-          now,
-        })
-      );
+      const cleanupLease = reduceWrapperLease(allocatable, {
+        type: 'request_stop',
+        target: { kind: 'session' },
+        reason,
+        now,
+      });
+      await putWrapperLease(storage, cleanupLease);
       await dependencies.requestAlarmAtOrBefore?.(now);
-      throw new Error('Wrapper cleanup is required before delivery can launch');
+      if (observation.status === 'inspection-failed') {
+        throw ExecutionError.sandboxConnectFailed(
+          'Sandbox connection failed during wrapper discovery'
+        );
+      }
+      throw cleanupBlockedError(cleanupLease);
+    }
+
+    if (!hasSamePhysicalAuthorization(allocatable, await getWrapperLease(storage))) {
+      return authorizePhysicalWrapper(plan);
     }
 
     const leasedInstance = {
@@ -234,6 +285,14 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
   ): Promise<MessageDeliveryResult> {
     const { sessionId } = plan.scope;
     const { turn, agent } = plan;
+    const currentRuntimeState = await getWrapperRuntimeState(storage);
+    if (isWrapperRunFinalizing(currentRuntimeState)) {
+      return {
+        success: false,
+        code: 'WRAPPER_FINALIZING',
+        error: 'Wrapper batch is finalizing',
+      };
+    }
     const { leasedInstance, allocatedPhysicalInstance, requiresFreshRunFence } =
       await authorizePhysicalWrapper(plan);
     const previousRuntimeState = await getWrapperRuntimeState(storage);
@@ -302,6 +361,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
             })
             .info('AgentRuntime wrapper workspace reported ready');
           await hooks.onWorkspaceReady?.(ready);
+          await recordWrapperDispatchingMessage(storage, wrapperRuntimeState, turn.messageId);
         },
       });
 
@@ -316,6 +376,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         acceptedAt,
         wrapperRunId: wrapperRuntimeState.wrapperRunId,
       });
+      await clearWrapperDispatchingMessage(storage, wrapperRuntimeState, turn.messageId);
       try {
         const acceptedLease = await getWrapperLease(storage);
         await putWrapperLease(
@@ -347,6 +408,20 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         .info('AgentRuntime wrapper accepted pending session message');
       return buildRuntimeAcceptanceResult(turn.messageId, wrapperRuntimeState.wrapperRunId);
     } catch (error) {
+      await clearWrapperDispatchingMessage(storage, wrapperRuntimeState, turn.messageId);
+      if (error instanceof WrapperFinalizingError) {
+        if (
+          error.wrapperRunId === undefined ||
+          error.wrapperRunId === wrapperRuntimeState.wrapperRunId
+        ) {
+          await markWrapperFinalizing(storage, wrapperRuntimeState.wrapperRunId);
+        }
+        return {
+          success: false,
+          code: 'WRAPPER_FINALIZING',
+          error: error.message,
+        };
+      }
       logger
         .withFields({
           sessionId,

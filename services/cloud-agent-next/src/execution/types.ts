@@ -225,7 +225,8 @@ export type RetryableResultCode =
   | 'SANDBOX_CONNECT_FAILED'
   | 'WORKSPACE_SETUP_FAILED'
   | 'KILO_SERVER_FAILED'
-  | 'WRAPPER_START_FAILED';
+  | 'WRAPPER_START_FAILED'
+  | 'WRAPPER_FINALIZING';
 
 export type AdmissionFailure = {
   success: false;

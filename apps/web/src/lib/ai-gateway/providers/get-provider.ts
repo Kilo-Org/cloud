@@ -16,10 +16,7 @@ import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { CustomLlmDefinitionSchema } from '@kilocode/db';
-import {
-  buildDirectProvider,
-  inferSupportedChatApis,
-} from '@/lib/ai-gateway/experiments/build-direct-provider';
+import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import {
   pickModelExperimentVariant,
@@ -81,7 +78,7 @@ async function checkDirectBYOK(
       id: 'direct-byok',
       apiUrl: directByok.base_url,
       apiKey: userByok[0].decryptedAPIKey,
-      supportedChatApis: inferSupportedChatApis(directByok.ai_sdk_provider),
+      supportedChatApis: directByok.supported_chat_apis,
       transformRequest(context) {
         context.request.body.model = directByokModel.id;
         directByok.transformRequest(context);
@@ -110,20 +107,17 @@ async function checkCustomLlm(
   }
   return {
     kind: 'provider',
-    provider: buildDirectProvider('custom', {
-      internal_id: customLlm.internal_id,
-      base_url: customLlm.base_url,
-      api_key: customLlm.api_key,
-      opencode_settings: customLlm.opencode_settings
-        ? { ai_sdk_provider: customLlm.opencode_settings.ai_sdk_provider }
-        : undefined,
-      extra_body: customLlm.extra_body,
-      extra_headers: customLlm.extra_headers,
-      remove_from_body: customLlm.remove_from_body,
-      add_cache_breakpoints: customLlm.add_cache_breakpoints,
-      remove_cache_breakpoints: customLlm.remove_cache_breakpoints,
-      inject_reasoning_into_content: customLlm.inject_reasoning_into_content,
-    }),
+    provider: buildDirectProvider(
+      'custom',
+      [
+        customLlm.opencode_settings?.ai_sdk_provider === 'anthropic'
+          ? 'messages'
+          : customLlm.opencode_settings?.ai_sdk_provider === 'openai'
+            ? 'responses'
+            : 'chat_completions',
+      ],
+      customLlm
+    ),
     userByok: null,
     bypassAccessCheck: true,
   };
@@ -210,7 +204,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     if (selection?.status === 'active') {
       return {
         kind: 'provider',
-        provider: buildDirectProvider('experiment', selection.upstream),
+        provider: buildDirectProvider('experiment', ['chat_completions'], selection.upstream),
         userByok: null,
         bypassAccessCheck: false,
         experiment: {

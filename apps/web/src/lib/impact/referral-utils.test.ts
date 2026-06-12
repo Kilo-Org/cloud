@@ -49,6 +49,8 @@ describe('impact referral utils', () => {
     );
 
     expect(touch).toEqual({
+      product: 'kiloclaw',
+      programKey: 'kiloclaw',
       opaqueTrackingValue: 'sq-cookie',
       trackingValueLength: 9,
       isTrackingValueAccepted: true,
@@ -67,6 +69,16 @@ describe('impact referral utils', () => {
     });
   });
 
+  it('marks Kilo Pass callback paths as Kilo Pass referral touches', () => {
+    const touch = parseImpactReferralTouchFromUrl(
+      'https://kilo.ai/users/after-sign-in?callbackPath=%2Fsubscriptions%2Fkilo-pass&_saasquatch=pass-cookie'
+    );
+
+    expect(touch?.product).toBe('kilo_pass');
+    expect(touch?.programKey).toBe('kilo_pass');
+    expect(touch?.opaqueTrackingValue).toBe('pass-cookie');
+  });
+
   it('keeps referral metadata for diagnostics when _saasquatch is missing', () => {
     const touch = parseImpactReferralTouchFromUrl(
       'https://kilo.ai/get-started?rsCode=abc&rsShareMedium=email'
@@ -78,11 +90,43 @@ describe('impact referral utils', () => {
     expect(touch?.rsCode).toBe('abc');
   });
 
+  it('ignores over-limit referral values for attribution and metadata', () => {
+    const tooLongValue = 'x'.repeat(IMPACT_OPAQUE_TRACKING_VALUE_MAX_LENGTH + 1);
+    const touch = parseImpactReferralTouchFromUrl(
+      `https://kilo.ai/get-started?_saasquatch=${tooLongValue}&rsCode=${tooLongValue}&rsShareMedium=email`
+    );
+
+    expect(touch?.opaqueTrackingValue).toBeNull();
+    expect(touch?.trackingValueLength).toBe(tooLongValue.length);
+    expect(touch?.isTrackingValueAccepted).toBe(false);
+    expect(touch?.rsCode).toBeNull();
+    expect(touch?.rsShareMedium).toBe('email');
+  });
+
   it('parses affiliate touches from im_ref and override cookies', () => {
     const fromQuery = parseImpactAffiliateTouchFromUrl('https://kilo.ai/?im_ref=impact-click');
     expect(fromQuery?.trackingId).toBe('impact-click');
+    expect(fromQuery?.product).toBe('kiloclaw');
 
     const fromCookie = parseImpactAffiliateTouchFromUrl('https://kilo.ai/', 'impact-cookie-click');
     expect(fromCookie?.trackingId).toBe('impact-cookie-click');
+  });
+
+  it('marks Kilo Pass callback paths as Kilo Pass affiliate touches', () => {
+    const touch = parseImpactAffiliateTouchFromUrl(
+      'https://kilo.ai/users/after-sign-in?callbackPath=%2Fsubscriptions%2Fkilo-pass&im_ref=impact-click'
+    );
+
+    expect(touch?.product).toBe('kilo_pass');
+    expect(touch?.trackingId).toBe('impact-click');
+  });
+
+  it('ignores over-limit affiliate values for attribution', () => {
+    const tooLongValue = 'x'.repeat(IMPACT_OPAQUE_TRACKING_VALUE_MAX_LENGTH + 1);
+    const touch = parseImpactAffiliateTouchFromUrl(`https://kilo.ai/?im_ref=${tooLongValue}`);
+
+    expect(touch?.trackingId).toBeNull();
+    expect(touch?.trackingValueLength).toBe(tooLongValue.length);
+    expect(touch?.isTrackingValueAccepted).toBe(false);
   });
 });

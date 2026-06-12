@@ -26,6 +26,7 @@ import {
   getInboundEmailAddressForInstance,
 } from '@/lib/kiloclaw/inbound-email-alias';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import {
@@ -929,6 +930,51 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return client.getRegistryEntries(input.userId, input.orgId ?? undefined);
     }),
 
+  // Admin break-glass: release a STUCK provision reservation (status
+  // in_progress / failed_requires_reconciliation) so the user can provision
+  // again. This is an operator action — the admin asserts (via the UI confirm
+  // dialog) that they have verified the attempt is dead and any provider
+  // resources are cleaned up. The worker mutates only the registry bookkeeping
+  // row (no provider/Postgres changes) and refuses reservations backing an
+  // active instance or in a non-releasable state.
+  releaseReservation: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid(),
+        orgId: z.string().uuid().optional(),
+        // Caller (the break-glass confirmation dialog) must supply this; enforced
+        // at the API boundary, not auto-inserted by the client.
+        acknowledgeCleanupVerified: z.literal(true),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.releaseProvisionReservation(
+        input.userId,
+        input.instanceId,
+        input.orgId,
+        input.acknowledgeCleanupVerified
+      );
+      await createKiloClawAdminAuditLog({
+        action: 'kiloclaw.provision_reservation.release',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        target_user_id: input.userId,
+        message:
+          `Break-glass released stuck provision reservation ${input.instanceId} ` +
+          `(was ${result.previousStatus}); operator asserted provider cleanup verified`,
+        metadata: {
+          instanceId: input.instanceId,
+          orgId: input.orgId ?? null,
+          previousStatus: result.previousStatus,
+          acknowledgeCleanupVerified: true,
+        },
+      });
+      return result;
+    }),
+
   list: adminProcedure.input(ListInstancesSchema).query(async ({ input }) => {
     const { offset, limit, sortBy, sortOrder, search, status, imageTag, hasSizeOverride } = input;
     const searchTerm = search?.trim() || '';
@@ -1594,12 +1640,21 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   }),
 
   fileTree: adminProcedure
-    .input(z.object({ userId: z.string().min(1), instanceId: z.string().uuid().optional() }))
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        path: kiloclawFilePathSchema.optional(),
+      })
+    )
     .query(async ({ input }) => {
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
         const client = new KiloClawInternalClient();
-        const result = await client.getFileTree(input.userId, workerInstanceId(instance));
+        const result = await client.getFileTree(input.userId, {
+          instanceId: workerInstanceId(instance),
+          path: input.path,
+        });
         return result.tree;
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to fetch file tree');
@@ -1611,7 +1666,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
       })
     )
     .query(async ({ input }) => {
@@ -1629,7 +1684,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
         content: z.string(),
         etag: z.string().optional(),
         openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
@@ -3867,6 +3922,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       latest_sandbox_destroyed_at: string | null;
       user_email: string | null;
       subscription_status: string | null;
+      subscription_ended_at: string | null;
     };
 
     // 1. The latest destroyed row per (user, sandbox) inside the requested
@@ -3908,7 +3964,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         to_char(ranked.destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as destroyed_at,
         to_char(ranked.latest_sandbox_destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as latest_sandbox_destroyed_at,
         ranked.user_email,
-        ranked.subscription_status
+        ranked.subscription_status,
+        to_char(ranked.subscription_ended_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as subscription_ended_at
       from (
         select distinct on (i.user_id, i.sandbox_id)
           i.id,
@@ -3924,7 +3981,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               and latest.destroyed_at is not null
           ) as latest_sandbox_destroyed_at,
           u.google_user_email as user_email,
-          s.status as subscription_status
+          s.status as subscription_status,
+          -- Billing/trial period boundary for the subscription tied to this
+          -- destroyed instance — shown in the admin volume table as a proxy for
+          -- when the user's access ended (there is no canonical canceled_at
+          -- column). Prefer the paid period end, fall back to the trial end so
+          -- never-converted trials aren't blank. This is NOT an authoritative
+          -- end event: transfers and immediate cancellations can leave a
+          -- boundary that differs from the lineage's true end, so the UI labels
+          -- this column "Period End" rather than "Ended".
+          coalesce(s.current_period_end, s.trial_ends_at) as subscription_ended_at
         from kiloclaw_instances i
         left join kilocode_users u on i.user_id = u.id
         left join kiloclaw_subscriptions s on i.id = s.instance_id
@@ -3959,6 +4025,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       organization_id: string | null;
       destroyed_at: string;
       subscription_status: string | null;
+      subscription_ended_at: string | null;
       fly_app: string;
       volume_id: string;
       volume_name: string;
@@ -4099,6 +4166,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             organization_id: instance.organization_id,
             destroyed_at: destroyedAt,
             subscription_status: instance.subscription_status,
+            subscription_ended_at: instance.subscription_ended_at,
             fly_app: scan.flyApp,
             volume_id: v.id,
             volume_name: v.name,

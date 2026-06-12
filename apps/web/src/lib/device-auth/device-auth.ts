@@ -3,7 +3,7 @@ import { db } from '@/lib/drizzle';
 import { device_auth_requests, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, lt, sql } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
-import { randomBytes } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
@@ -15,11 +15,9 @@ const MAX_PENDING_REQUESTS_PER_IP = 5;
  */
 export function generateDeviceCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const buf = randomBytes(CODE_LENGTH);
   let code = '';
-  for (let i = 0; i < buf.length; i++) {
-    const index = buf[i] % chars.length;
-    code += chars[index];
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    code += chars.charAt(randomInt(chars.length));
   }
   // Format as XXXX-XXXX (8 characters total)
   return `${code.slice(0, 4)}-${code.slice(4)}`;

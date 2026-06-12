@@ -154,7 +154,7 @@ describe('file routes', () => {
   });
 
   describe('GET /_kilo/files/tree', () => {
-    it('returns recursive directory listing including credentials', async () => {
+    it('returns a shallow root directory listing including credentials', async () => {
       vi.mocked(fs.readdirSync).mockImplementation((dir: any) => {
         if (dir === ROOT) {
           return [
@@ -179,16 +179,68 @@ describe('file routes', () => {
       expect(res.status).toBe(200);
 
       const body = (await res.json()) as any;
-      const names = body.tree.flatMap(function flatNames(n: any): string[] {
-        return [n.name, ...(n.children ? n.children.flatMap(flatNames) : [])];
-      });
+      const names = body.tree.map((node: any) => node.name);
       expect(names).toContain('openclaw.json');
       expect(names).toContain('SOUL.md.bak.2026-03-01');
       expect(names).toContain('debug.log');
-      expect(names).toContain('SOUL.md');
       expect(names).toContain('credentials');
-      expect(names).toContain('token.txt');
+      expect(names).not.toContain('SOUL.md');
+      expect(names).not.toContain('token.txt');
       expect(names).not.toContain('.openclaw.kiloclaw-validation-candidate.json');
+      expect(vi.mocked(fs.readdirSync)).not.toHaveBeenCalledWith(`${ROOT}/workspace`, {
+        withFileTypes: true,
+      });
+    });
+
+    it('returns a shallow listing for a requested directory path', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isDirectory: () => true,
+      } as any);
+      vi.mocked(fs.readdirSync).mockImplementation((dir: any) => {
+        if (dir === `${ROOT}/workspace`) {
+          return [mockDirent('SOUL.md', false), mockDirent('nested', true)] as any;
+        }
+        if (dir === `${ROOT}/workspace/nested`) {
+          return [mockDirent('ignored.md', false)] as any;
+        }
+        return [];
+      });
+
+      const res = await app.request('/_kilo/files/tree?path=workspace', { headers: authHeaders() });
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as any;
+      expect(body.tree).toEqual([
+        { name: 'SOUL.md', path: 'workspace/SOUL.md', type: 'file' },
+        { name: 'nested', path: 'workspace/nested', type: 'directory' },
+      ]);
+      expect(vi.mocked(fs.readdirSync)).not.toHaveBeenCalledWith(`${ROOT}/workspace/nested`, {
+        withFileTypes: true,
+      });
+    });
+
+    it('rejects a requested file path', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isDirectory: () => false,
+      } as any);
+
+      const res = await app.request('/_kilo/files/tree?path=openclaw.json', {
+        headers: authHeaders(),
+      });
+
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toMatchObject({ error: 'Not a directory' });
+    });
+
+    it('rejects requested directory paths that escape root', async () => {
+      const res = await app.request('/_kilo/files/tree?path=../secret', { headers: authHeaders() });
+
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toMatchObject({ error: 'Path escapes root directory' });
     });
 
     it('skips symlinks', async () => {

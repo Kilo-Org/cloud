@@ -23,6 +23,7 @@ import { UpstreamApiError } from '@/lib/trpc/init';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
+const mockGetFileTree: jest.Mock<any, any> = jest.fn();
 const mockDestroyFlyMachine: jest.Mock<any, any> = jest.fn();
 const mockDestroyOrphanVolume: jest.Mock<any, any> = jest.fn();
 const mockScanOrphanVolumes: jest.Mock<any, any> = jest.fn();
@@ -44,6 +45,7 @@ function mockKiloClawInternalClient() {
   const { KiloClawInternalClient } = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-client');
   KiloClawInternalClient.mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
+    getFileTree: mockGetFileTree,
     destroyFlyMachine: mockDestroyFlyMachine,
     destroyOrphanVolume: mockDestroyOrphanVolume,
     scanOrphanVolumes: mockScanOrphanVolumes,
@@ -58,6 +60,7 @@ function mockKiloClawInternalClient() {
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
+    getFileTree: mockGetFileTree,
     destroyFlyMachine: mockDestroyFlyMachine,
     destroyOrphanVolume: mockDestroyOrphanVolume,
     scanOrphanVolumes: mockScanOrphanVolumes,
@@ -161,6 +164,7 @@ beforeEach(async () => {
 
   cliRunId = run.id;
   mockGetDebugStatus.mockReset();
+  mockGetFileTree.mockReset();
   mockDestroyFlyMachine.mockReset();
   mockDestroyOrphanVolume.mockReset();
   mockScanOrphanVolumes.mockReset();
@@ -327,6 +331,30 @@ describe('admin.kiloclawInstances.list and stats', () => {
     expect(stats.overview.inactiveTrialStoppedInstances).toBe(
       baselineStats.overview.inactiveTrialStoppedInstances + 1
     );
+  });
+});
+
+describe('admin.kiloclawInstances.fileTree', () => {
+  it('forwards path-scoped tree requests to the resolved instance', async () => {
+    mockGetFileTree.mockResolvedValue({ tree: [] });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: regularUser.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.kiloclawInstances.fileTree({
+      userId: regularUser.id,
+      instanceId,
+      path: 'workspace/nested',
+    });
+
+    expect(mockGetFileTree).toHaveBeenCalledWith(regularUser.id, {
+      instanceId,
+      path: 'workspace/nested',
+    });
   });
 });
 
@@ -2907,6 +2935,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
       instance_id: instance.id,
       plan: 'trial',
       status: 'canceled',
+      current_period_end: '2026-03-15T12:00:00.000Z',
     });
 
     mockScanOrphanVolumes.mockResolvedValue({
@@ -2947,7 +2976,70 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
       instance_id: instance.id,
       volume_id: 'vol_findorphans00000',
       subscription_status: 'canceled',
+      // current_period_end is surfaced as the "subscription ended" timestamp,
+      // formatted as strict ISO 8601 by the scan query's to_char.
+      subscription_ended_at: '2026-03-15T12:00:00.000Z',
       classification: 'safe_destroy',
+    });
+  });
+
+  it('falls back to trial_ends_at for subscription_ended_at when there is no paid period', async () => {
+    // A never-converted trial has no current_period_end; the scan query
+    // coalesces to trial_ends_at so the volume table still reports an end date
+    // instead of a blank cell that reads as "no subscription".
+    const destroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: destroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'canceled',
+      trial_ends_at: '2026-02-01T08:00:00.000Z',
+    });
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-trialend',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_trialend',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [
+        {
+          id: 'vol_trialend00000000',
+          name: 'kiloclaw_trialend',
+          state: 'created',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: '2026-04-01T00:00:00.000Z',
+          nameMatchesInstance: true,
+          trackedByLiveDo: false,
+        },
+      ],
+    });
+
+    const destroyedMs = Date.parse(destroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
+      destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.volumes).toHaveLength(1);
+    expect(result.volumes[0]).toMatchObject({
+      volume_id: 'vol_trialend00000000',
+      subscription_ended_at: '2026-02-01T08:00:00.000Z',
     });
   });
 

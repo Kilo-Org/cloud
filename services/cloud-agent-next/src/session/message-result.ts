@@ -6,11 +6,11 @@ import {
 import {
   lookupSessionMessageState,
   type SessionMessageCompletionSource,
-  type SessionMessageFailureCode,
-  type SessionMessageFailureStage,
   type SessionMessageState,
   type SessionMessageStorage,
 } from './session-message-state.js';
+import { projectSafeFailure, type SafeFailureProjection } from './safe-failure-projection.js';
+import { isTerminalFailureRetryable } from './terminal-error-projector.js';
 
 export type SafeMessageResult = {
   messageId: string;
@@ -20,11 +20,7 @@ export type SafeMessageResult = {
   acceptedAt?: number;
   terminalAt?: number;
   completionSource?: SessionMessageCompletionSource;
-  failure?: {
-    stage?: SessionMessageFailureStage;
-    code?: SessionMessageFailureCode;
-    attempts?: number;
-  };
+  failure?: SafeFailureProjection & { retryable: boolean };
   gateResult?: 'pass' | 'fail';
 };
 
@@ -51,17 +47,13 @@ type ResolvedSessionMessageResult =
 type MessageResultStorage = SessionMessageStorage & SessionQueueStorage;
 
 function projectFailure(state: SessionMessageState): SafeMessageResult['failure'] {
-  if (
-    state.failureStage === undefined &&
-    state.failureCode === undefined &&
-    state.attempts === undefined
-  ) {
-    return undefined;
-  }
+  if (state.status !== 'failed' && state.status !== 'interrupted') return undefined;
   return {
-    stage: state.failureStage,
-    code: state.failureCode,
-    attempts: state.attempts,
+    ...projectSafeFailure(state),
+    retryable: isTerminalFailureRetryable({
+      failureStage: state.failureStage,
+      failureCode: state.failureCode,
+    }),
   };
 }
 

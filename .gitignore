@@ -112,6 +112,13 @@ supabase/.temp
 # beads task workspace (per-agent local state)
 .beads/
 
+# generated SBOMs (produced in CI / locally, never committed)
+*sbom*.json
+*sbom*.json.gz
+*.cyclonedx.json
+*.cyclonedx.json.gz
+*.spdx.json
+
 # misc
 TMP_CI_commit_msg.txt
 *.csv
@@ -122,8 +129,7 @@ run-milvus-test.sh
 .tests/
 
 # Ignore stray .env-prefixed files but preserve committed example/test/envrc files.
-.env
-.env.*
+.env*
 !.env.example
 !.env.*.example
 !.env.test

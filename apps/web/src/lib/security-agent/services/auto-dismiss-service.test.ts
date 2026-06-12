@@ -175,8 +175,30 @@ describe('writebackDependabotDismissal', () => {
     expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
+  it('skips partially numeric Dependabot alert IDs', async () => {
+    mockGetSecurityFindingById.mockResolvedValue(makeFinding({ source_id: '42junk' }));
+    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+    mockDismissDependabotAlert.mockResolvedValue(undefined);
+
+    await writebackDependabotDismissal('finding-1', userOwner, 'reason');
+
+    expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
+  });
+
   it('skips when repo_full_name is invalid', async () => {
     mockGetSecurityFindingById.mockResolvedValue(makeFinding({ repo_full_name: 'no-slash' }));
+
+    await writebackDependabotDismissal('finding-1', userOwner, 'reason');
+
+    expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
+  });
+
+  it('skips repo_full_name values with extra path segments', async () => {
+    mockGetSecurityFindingById.mockResolvedValue(
+      makeFinding({ repo_full_name: 'acme/repo/extra' })
+    );
+    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+    mockDismissDependabotAlert.mockResolvedValue(undefined);
 
     await writebackDependabotDismissal('finding-1', userOwner, 'reason');
 

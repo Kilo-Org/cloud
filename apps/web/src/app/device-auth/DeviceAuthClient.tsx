@@ -8,9 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CheckCircle2, XCircle, Loader2, Shield, LogOut } from 'lucide-react';
+import {
+  closeDeviceAuthWindowIfAppMode,
+  getDeviceAuthOutcomeHeaderClassName,
+  getDeviceAuthShellClassName,
+  getDeviceAuthSignInUrl,
+} from './device-auth-url';
 
 type DeviceAuthClientProps = {
   code: string;
+  isAppMode: boolean;
   user: {
     name: string;
     email: string;
@@ -38,17 +45,14 @@ function getUserInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function getDeviceAuthSignInUrl(code: string): string {
-  const callbackPath = `/device-auth?${new URLSearchParams({ code }).toString()}`;
-  return `/users/sign_in?${new URLSearchParams({ callbackPath }).toString()}`;
-}
-
-export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
+export function DeviceAuthClient({ code, isAppMode, user }: DeviceAuthClientProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'denied' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const displayName = user.name.trim() || user.email;
+  const shellClassName = getDeviceAuthShellClassName(isAppMode);
+  const outcomeHeaderClassName = getDeviceAuthOutcomeHeaderClassName();
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -56,12 +60,12 @@ export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
     try {
       await fetch('/api/auth/revoke-web-session', { method: 'POST' });
     } finally {
-      await signOut({ callbackUrl: getDeviceAuthSignInUrl(code) });
+      await signOut({ callbackUrl: getDeviceAuthSignInUrl(code, { app: isAppMode }) });
     }
   };
 
   const redirectToSignIn = () => {
-    window.location.assign(getDeviceAuthSignInUrl(code));
+    window.location.assign(getDeviceAuthSignInUrl(code, { app: isAppMode }));
   };
 
   const handleAuthorize = async (approved: boolean) => {
@@ -103,16 +107,18 @@ export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
         return;
       }
       setStatus('denied');
+      closeDeviceAuthWindowIfAppMode(isAppMode);
       return;
     }
     setStatus('success');
+    closeDeviceAuthWindowIfAppMode(isAppMode);
   };
 
   if (status === 'success') {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center p-4">
+      <div className={shellClassName}>
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
+          <CardHeader className={outcomeHeaderClassName}>
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
               <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
             </div>
@@ -126,9 +132,9 @@ export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
 
   if (status === 'denied') {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center p-4">
+      <div className={shellClassName}>
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
+          <CardHeader className={outcomeHeaderClassName}>
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
               <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
             </div>
@@ -142,9 +148,9 @@ export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
 
   if (status === 'error' && errorMessage) {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center p-4">
+      <div className={shellClassName}>
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
+          <CardHeader className={outcomeHeaderClassName}>
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
               <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
             </div>
@@ -157,7 +163,7 @@ export function DeviceAuthClient({ code, user }: DeviceAuthClientProps) {
   }
 
   return (
-    <div className="bg-background flex min-h-screen items-center justify-center p-4">
+    <div className={shellClassName}>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="bg-primary/10 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">

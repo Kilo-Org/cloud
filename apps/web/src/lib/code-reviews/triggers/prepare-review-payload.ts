@@ -18,6 +18,7 @@ import {
   fetchPRInlineComments,
   getPRHeadCommit,
   fetchGitHubRootTextFileAtRef,
+  fetchGitHubRepositorySize,
 } from '@/lib/integrations/platforms/github/adapter';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
@@ -27,6 +28,7 @@ import {
   getMRDiffRefs,
   GitLabProjectAccessTokenPermissionError,
   fetchGitLabRootTextFileAtRef,
+  fetchGitLabRepositorySize,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   getOrCreateProjectAccessToken,
@@ -101,6 +103,8 @@ export type CodeReviewPayload = {
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
+  /** Provider-reported repository storage size, formatted for log correlation. */
+  repositorySize?: string | null;
 };
 
 /**
@@ -158,6 +162,7 @@ export async function prepareReviewPayload(
     let existingReviewState: ExistingReviewState | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
     let repositoryReviewInstructionsLookup = unusedRepositoryReviewInstructionsLookup();
+    let repositorySize: string | null = null;
 
     if (review.platform_integration_id) {
       const integration = await getIntegrationById(review.platform_integration_id);
@@ -174,6 +179,26 @@ export async function prepareReviewPayload(
         const installationToken = tokenData.token;
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
+
+        try {
+          repositorySize = await fetchGitHubRepositorySize({
+            token: installationToken,
+            owner: repoOwner,
+            repo: repoName,
+          });
+          logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
+            platform,
+            repoFullName: review.repo_full_name,
+            repositorySize,
+            repositorySizeKnown: repositorySize !== null,
+          });
+        } catch (error) {
+          warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
+            platform,
+            repoFullName: review.repo_full_name,
+            error: getReviewInstructionsFetchErrorMetadata(error),
+          });
+        }
 
         const repositoryReviewInstructionsPromise =
           shouldUseReviewMd && repoOwner && repoName
@@ -288,6 +313,26 @@ export async function prepareReviewPayload(
           );
         }
         const projectAccessToken = gitlabToken;
+
+        try {
+          repositorySize = await fetchGitLabRepositorySize(
+            projectAccessToken,
+            review.repo_full_name,
+            instanceUrl
+          );
+          logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
+            platform,
+            repoFullName: review.repo_full_name,
+            repositorySize,
+            repositorySizeKnown: repositorySize !== null,
+          });
+        } catch (error) {
+          warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
+            platform,
+            repoFullName: review.repo_full_name,
+            error: getReviewInstructionsFetchErrorMetadata(error),
+          });
+        }
 
         const repositoryReviewInstructionsPromise = shouldUseReviewMd
           ? fetchRepositoryReviewInstructions({
@@ -523,12 +568,14 @@ export async function prepareReviewPayload(
       sessionInput,
       owner,
       previousCloudAgentSessionId,
+      repositorySize,
     };
 
     logExceptInTest('[prepareReviewPayload] Prepared payload', {
       reviewId,
       platform,
       owner,
+      repositorySize,
       sessionInput: {
         ...sessionInput,
         githubToken: sessionInput.githubToken ? '***' : undefined, // Redact token

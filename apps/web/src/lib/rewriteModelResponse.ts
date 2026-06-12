@@ -1,4 +1,4 @@
-import { isKiloExclusiveFreeModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveFreeModel, shouldRedactModelNameInResponse } from '@/lib/ai-gateway/models';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
@@ -350,12 +350,13 @@ export async function rewriteFreeModelResponse(
 ): Promise<NextResponse | null> {
   const isFreeModelRequiringCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
-  const isStealthModelRequiringNameRemoval = providerId !== 'martian' && isKiloStealthModel(model);
 
-  if (!isFreeModelRequiringCostRemoval && !isStealthModelRequiringNameRemoval) {
+  if (!isFreeModelRequiringCostRemoval && !shouldRedactModelNameInResponse(providerId, model)) {
+    console.debug('[rewriteFreeModelResponse] skipping rewrite for %s', model);
     return null;
   }
 
+  console.debug('[rewriteFreeModelResponse] rewriting response for %s', model);
   if (kind === 'chat_completions') {
     return rewriteFreeModelResponse_ChatCompletions(response, model);
   }
@@ -366,5 +367,6 @@ export async function rewriteFreeModelResponse(
     return rewriteFreeModelResponse_Messages(response, model);
   }
 
+  console.error('[rewriteFreeModelResponse] implementation error: unrecognized API kind %s', kind);
   return null;
 }

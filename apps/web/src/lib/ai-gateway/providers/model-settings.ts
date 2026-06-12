@@ -1,8 +1,12 @@
-import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  isClaudeModel,
+  isFableModel,
+  isOpusModel,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { isAlibabaDirectModel, qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
+import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrokModel, isGrokToggleableReasoningModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
@@ -13,10 +17,13 @@ import type {
 } from '@kilocode/db/schema-types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
+import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
+import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
+import { isOpenCodeGoAnthropicMessagesModel } from '@/lib/ai-gateway/providers/direct-byok/opencode-go';
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
-  thinking: { reasoning: { enabled: true, effort: 'medium' } },
+  thinking: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
 export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
@@ -33,6 +40,12 @@ export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
 export const REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH = {
   none: { reasoning: { enabled: false, effort: 'none' } },
   ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+} as const;
+
+export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
+  none: { reasoning: { enabled: false, effort: 'none' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
 } as const;
 
 const REASONING_VARIANTS_CLAUDE_BASE = {
@@ -64,7 +77,7 @@ export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  if (isOpusModel(model) && (model.includes('4.7') || model.includes('4.8'))) {
+  if (isOpusModel(model) || isFableModel(model)) {
     return REASONING_VARIANTS_OPUS;
   }
   if (isClaudeModel(model)) {
@@ -84,13 +97,17 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
+  if (model.includes('mistral-medium-3-5')) {
+    return REASONING_VARIANTS_BINARY;
+  }
   if (
+    isMinimaxModel(model) ||
     isKimiModel(model) ||
     isGlmModel(model) ||
     isGrokToggleableReasoningModel(model) ||
-    isAlibabaDirectModel(model) ||
-    model === qwen36_plus_stealth_model.public_id ||
-    isGemmaModel(model)
+    isQwenModel(model) ||
+    isGemmaModel(model) ||
+    model.includes('mimo')
   ) {
     return REASONING_VARIANTS_BINARY;
   }
@@ -103,21 +120,21 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (isStepModel(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
   }
+  if (isDeepseekModel(model)) {
+    return REASONING_VARIANTS_NONE_HIGH_XHIGH;
+  }
   return undefined;
 }
 
-function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
-  if (isAlibabaDirectModel(model)) {
-    // with 'openai' (Responses) prompt caching doesn't work
-    // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
-    return 'alibaba';
-  }
-  if (qwen36_plus_stealth_model.public_id === model) {
-    return 'openrouter';
-  }
+export function getAiSdkProvider(
+  model: string
+): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
   if (seed_20_code_free_model.public_id === model) {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
+  }
+  if (isOpenCodeGoAnthropicMessagesModel(model)) {
+    return 'anthropic';
   }
   if (isClaudeModel(model)) {
     // on Vercel AI Gateway, this is necessary to support document attachments

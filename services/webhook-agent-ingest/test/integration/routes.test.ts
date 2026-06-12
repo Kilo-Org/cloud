@@ -248,4 +248,26 @@ describe('Hono Routes', () => {
       expect(body.data.message).toBe('Webhook captured successfully');
     });
   });
+
+  describe('Completion callback auth boundary', () => {
+    it('routes /api/callbacks past the internal-key middleware to the callback handler', async () => {
+      // Regression for the webhook-stuck-`inprogress` bug: completion callbacks
+      // authenticate with X-Callback-Token, not the internal API key. Because
+      // `/api/callbacks` is mounted under `/api`, the internal-key middleware
+      // previously 401'd them before the handler ran. With no internal key and
+      // no webhook identity headers, the request must now reach the handler,
+      // whose own 400 (missing webhook headers) proves it was not blocked by the
+      // internal-key middleware.
+      const response = await SELF.fetch('http://localhost/api/callbacks/execution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error).toBe('Missing webhook identification headers');
+    });
+  });
 });

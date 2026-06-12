@@ -6,6 +6,7 @@ import type {
 } from '../agent-sandbox/protocol.js';
 
 const WRAPPER_RUNTIME_STATE_KEY = 'wrapper_runtime_state';
+const WRAPPER_RUN_MESSAGE_INDEX_VERSION = 1;
 const WRAPPER_LEASE_KEY = 'wrapper_lease';
 
 const wrapperInstanceLeaseSchema = z.object({
@@ -183,14 +184,19 @@ export function reduceWrapperLease(state: WrapperLease, event: WrapperLeaseEvent
   }
 }
 
-export function nextWrapperLeaseDeadline(lease: WrapperLease): number | undefined {
+export function nextWrapperCleanupDeadline(lease: WrapperLease): number | undefined {
   if (lease.state === 'stop_needed') return lease.nextAttemptAt;
   if (lease.state === 'stopping') return lease.attemptDeadlineAt;
+  return undefined;
+}
+
+export function nextWrapperLeaseDeadline(lease: WrapperLease): number | undefined {
+  const cleanupDeadline = nextWrapperCleanupDeadline(lease);
+  if (cleanupDeadline !== undefined) return cleanupDeadline;
   if (lease.state !== 'owns_wrapper') return undefined;
   return lease.startupDeadlineAt ?? lease.keepWarmUntil;
 }
 
-export const IDLE_RECONCILIATION_GRACE_MS = 15_000;
 export const IDLE_KEEP_WARM_MS = 5 * 60 * 1000;
 export const READY_ONLY_IDLE_MS = 60_000;
 
@@ -198,11 +204,12 @@ const wrapperRuntimeStateSchema = z.object({
   wrapperGeneration: z.number().int().nonnegative(),
   wrapperConnectionId: z.string().optional(),
   wrapperRunId: z.string().optional(),
+  messageIndexVersion: z.number().int().nonnegative().optional(),
+  dispatchingMessageId: z.string().optional(),
   lastWrapperConnectedAt: z.number().int().nonnegative().optional(),
   lastWrapperMessageAt: z.number().int().nonnegative().optional(),
   lastWrapperPongAt: z.number().int().nonnegative().optional(),
-  lastWrapperIdleAt: z.number().int().nonnegative().optional(),
-  idleReconcileAfter: z.number().int().nonnegative().optional(),
+  finalizingWrapperRunId: z.string().optional(),
   wrapperIdleDeadlineAt: z.number().int().nonnegative().optional(),
   pingDeadlineAt: z.number().int().nonnegative().optional(),
   nextPingAt: z.number().int().nonnegative().optional(),
@@ -222,6 +229,16 @@ export function isActiveWrapperRuntimeState(
   return Boolean(state.wrapperConnectionId && state.wrapperRunId);
 }
 
+export function hasCompleteWrapperRunMessageIndex(
+  state: WrapperRuntimeState,
+  wrapperRunId: string
+): boolean {
+  return (
+    state.wrapperRunId === wrapperRunId &&
+    state.messageIndexVersion === WRAPPER_RUN_MESSAGE_INDEX_VERSION
+  );
+}
+
 export function hasCompleteWrapperIdentity(state: WrapperRuntimeState): boolean {
   const hasIdentityField = Boolean(state.wrapperConnectionId || state.wrapperRunId);
   return !hasIdentityField || Boolean(state.wrapperConnectionId && state.wrapperRunId);
@@ -231,8 +248,12 @@ export const emptyWrapperRuntimeState = (): WrapperRuntimeState => ({
   wrapperGeneration: 0,
 });
 
+type WrapperRuntimeStateReader = {
+  get<T = unknown>(key: string): Promise<T | undefined>;
+};
+
 export async function getWrapperRuntimeState(
-  storage: DurableObjectStorage
+  storage: WrapperRuntimeStateReader
 ): Promise<WrapperRuntimeState> {
   const stored = await storage.get(WRAPPER_RUNTIME_STATE_KEY);
   const parsed = wrapperRuntimeStateSchema.safeParse(stored);
@@ -271,6 +292,7 @@ export async function allocateWrapperRuntimeState(
     wrapperGeneration: current.wrapperGeneration + 1,
     wrapperConnectionId: crypto.randomUUID(),
     wrapperRunId: `wr_${crypto.randomUUID().replace(/-/g, '')}`,
+    messageIndexVersion: WRAPPER_RUN_MESSAGE_INDEX_VERSION,
     lastWrapperConnectedAt: now,
   } satisfies ActiveWrapperRuntimeState;
   await storage.put(WRAPPER_RUNTIME_STATE_KEY, next);
@@ -365,6 +387,37 @@ async function updateIfCurrent(
   return next;
 }
 
+export async function recordWrapperDispatchingMessage(
+  storage: DurableObjectStorage,
+  allocated: ActiveWrapperRuntimeState,
+  messageId: string
+): Promise<void> {
+  await updateIfCurrent(
+    storage,
+    allocated.wrapperGeneration,
+    allocated.wrapperConnectionId,
+    current => ({ ...current, dispatchingMessageId: messageId })
+  );
+}
+
+export async function clearWrapperDispatchingMessage(
+  storage: DurableObjectStorage,
+  allocated: ActiveWrapperRuntimeState,
+  messageId: string
+): Promise<void> {
+  await updateIfCurrent(
+    storage,
+    allocated.wrapperGeneration,
+    allocated.wrapperConnectionId,
+    current => {
+      if (current.dispatchingMessageId !== messageId) return current;
+      const next = { ...current };
+      delete next.dispatchingMessageId;
+      return next;
+    }
+  );
+}
+
 export async function recordWrapperAcceptedMessage(
   storage: DurableObjectStorage,
   allocated: ActiveWrapperRuntimeState,
@@ -382,8 +435,6 @@ export async function recordWrapperAcceptedMessage(
       noOutputDeadlineAt,
       nextPingAt:
         current.pingDeadlineAt === undefined ? (current.nextPingAt ?? nextPingAt) : undefined,
-      lastWrapperIdleAt: undefined,
-      idleReconcileAfter: undefined,
       wrapperIdleDeadlineAt: undefined,
     })
   );
@@ -423,35 +474,30 @@ export async function recordWrapperPong(
   }));
 }
 
-/**
- * Record that the wrapper received a root session.idle event.
- * Stores the idle timestamp, the reconciliation deadline, and the
- * keep-warm cleanup deadline.
- */
-export async function recordRootSessionIdle(
+export async function markWrapperFinalizing(
   storage: DurableObjectStorage,
-  wrapperGeneration: number,
-  wrapperConnectionId: string,
-  now = Date.now(),
-  idleReconcileAfter = now + IDLE_RECONCILIATION_GRACE_MS,
-  wrapperIdleDeadlineAt = now + IDLE_KEEP_WARM_MS
+  wrapperRunId: string
 ): Promise<WrapperRuntimeState | null> {
-  return updateIfCurrent(storage, wrapperGeneration, wrapperConnectionId, current => ({
-    ...current,
-    lastWrapperIdleAt: now,
-    idleReconcileAfter,
-    wrapperIdleDeadlineAt,
-  }));
+  const current = await getWrapperRuntimeState(storage);
+  if (current.wrapperRunId !== wrapperRunId) return null;
+  if (current.finalizingWrapperRunId === wrapperRunId) return current;
+
+  const next = { ...current, finalizingWrapperRunId: wrapperRunId } satisfies WrapperRuntimeState;
+  await storage.put(WRAPPER_RUNTIME_STATE_KEY, next);
+  return next;
 }
 
-/**
- * Record a meaningful output event from the wrapper.
- *
- * Refreshes `noOutputDeadlineAt` so mid-execution stalls are caught: without
- * this, the deadline would be cleared forever after the first event, and a
- * wrapper whose kilo-server SSE subscription silently stalls would remain
- * live without failing its accepted messages.
- */
+export function isWrapperRunFinalizing(state: WrapperRuntimeState): boolean {
+  return Boolean(state.wrapperRunId && state.finalizingWrapperRunId === state.wrapperRunId);
+}
+
+export function isWrapperDeliveryHeld(state: WrapperRuntimeState, lease: WrapperLease): boolean {
+  return (
+    isWrapperRunFinalizing(state) || lease.state === 'stop_needed' || lease.state === 'stopping'
+  );
+}
+
+/** Record meaningful output while accepted work remains supervised. */
 export async function recordMeaningfulWrapperOutput(
   storage: DurableObjectStorage,
   wrapperGeneration: number,
@@ -465,9 +511,6 @@ export async function recordMeaningfulWrapperOutput(
     lastWrapperMessageAt: now,
     noOutputDeadlineAt,
     nextPingAt: current.pingDeadlineAt === undefined ? nextPingAt : undefined,
-    lastWrapperIdleAt: undefined,
-    idleReconcileAfter: undefined,
-    wrapperIdleDeadlineAt: undefined,
   }));
 }
 
@@ -493,25 +536,13 @@ export async function clearCurrentWrapperRuntimeLivenessState(
     wrapperGeneration: current.wrapperGeneration,
     wrapperConnectionId: current.wrapperConnectionId,
     wrapperRunId: current.wrapperRunId,
+    messageIndexVersion: current.messageIndexVersion,
+    dispatchingMessageId: current.dispatchingMessageId,
     lastWrapperConnectedAt: current.lastWrapperConnectedAt,
     lastWrapperMessageAt: current.lastWrapperMessageAt,
     lastWrapperPongAt: current.lastWrapperPongAt,
-    lastWrapperIdleAt: current.lastWrapperIdleAt,
-    idleReconcileAfter: current.idleReconcileAfter,
+    finalizingWrapperRunId: current.finalizingWrapperRunId,
     wrapperIdleDeadlineAt: current.wrapperIdleDeadlineAt,
-  }));
-}
-
-export async function clearWrapperIdleState(
-  storage: DurableObjectStorage,
-  wrapperGeneration: number,
-  wrapperConnectionId: string
-): Promise<WrapperRuntimeState | null> {
-  return updateIfCurrent(storage, wrapperGeneration, wrapperConnectionId, current => ({
-    ...current,
-    lastWrapperIdleAt: undefined,
-    idleReconcileAfter: undefined,
-    wrapperIdleDeadlineAt: undefined,
   }));
 }
 

@@ -6,5 +6,6 @@ export const githubAdapter = createGitHubAdapter({
   appId: githubAppCredentials.appId,
   privateKey: githubAppCredentials.privateKey,
   webhookSecret: githubAppCredentials.webhookSecret,
+  botUserId: process.env.NODE_ENV === 'development' ? 242397087 : 240665456,
   userName: process.env.NODE_ENV === 'development' ? 'kilocode-dev' : 'kilocode-bot',
 });

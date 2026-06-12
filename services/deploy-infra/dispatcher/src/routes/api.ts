@@ -102,42 +102,121 @@ api.get('/password/:worker', validateWorkerParam, async c => {
 // Maps public slugs to internal worker names for custom subdomain support
 // ============================================================================
 
-/**
- * Set a slug mapping.
- * Maps a public slug to an internal worker name (bidirectional).
- * Cleans up any previous slug mapping for this worker.
- */
-api.put('/slug-mapping/:worker', validateWorkerParam, validateSetSlugMappingBody, async c => {
-  const { worker } = c.req.valid('param');
-  const { slug } = c.req.valid('json');
+function slugKey(slug: string): string {
+  return `slug2worker:${slug}`;
+}
 
-  // Remove the old forward mapping if the worker was previously mapped to a different slug
-  const oldSlug = await c.env.DEPLOY_KV.get(`worker2slug:${worker}`);
-  if (oldSlug && oldSlug !== slug) {
-    await c.env.DEPLOY_KV.delete(`slug2worker:${oldSlug}`);
+function workerKey(worker: string): string {
+  return `worker2slug:${worker}`;
+}
+
+async function bestEffort(compensate: () => Promise<void>): Promise<void> {
+  try {
+    await compensate();
+  } catch {
+    return;
   }
-
-  await c.env.DEPLOY_KV.put(`slug2worker:${slug}`, worker);
-  await c.env.DEPLOY_KV.put(`worker2slug:${worker}`, slug);
-
-  return c.json({ success: true });
-});
+}
 
 /**
- * Delete a slug mapping.
- * Looks up the slug via the reverse mapping and removes both directions.
+ * Set a slug mapping unless the public slug already belongs to another worker.
  */
-api.delete('/slug-mapping/:worker', validateWorkerParam, async c => {
-  const { worker } = c.req.valid('param');
+function registerSlugMappingRoutes(path: string): void {
+  api.put(path, validateWorkerParam, validateSetSlugMappingBody, async c => {
+    const { worker } = c.req.valid('param');
+    const { slug } = c.req.valid('json');
+    const forwardKey = slugKey(slug);
+    const existingWorker = await c.env.DEPLOY_KV.get(forwardKey);
 
-  const slug = await c.env.DEPLOY_KV.get(`worker2slug:${worker}`);
-  if (slug) {
-    await c.env.DEPLOY_KV.delete(`slug2worker:${slug}`);
-  }
-  await c.env.DEPLOY_KV.delete(`worker2slug:${worker}`);
+    if (existingWorker !== null && existingWorker !== worker) {
+      return c.json({ error: 'This subdomain is already taken' }, 409);
+    }
 
-  return c.json({ success: true });
-});
+    const reverseKey = workerKey(worker);
+    const previousSlug = await c.env.DEPLOY_KV.get(reverseKey);
+
+    if (previousSlug === null) {
+      try {
+        await c.env.DEPLOY_KV.put(reverseKey, slug);
+        await c.env.DEPLOY_KV.put(forwardKey, worker);
+      } catch (mutationError) {
+        await bestEffort(async () => {
+          if (existingWorker === null && (await c.env.DEPLOY_KV.get(forwardKey)) === worker) {
+            await c.env.DEPLOY_KV.delete(forwardKey);
+          }
+        });
+        throw mutationError;
+      }
+
+      return c.json({ success: true });
+    }
+
+    const previousForwardKey = slugKey(previousSlug);
+    let shouldRestorePreviousForward = false;
+
+    try {
+      await c.env.DEPLOY_KV.put(forwardKey, worker);
+
+      if (previousSlug !== slug && (await c.env.DEPLOY_KV.get(previousForwardKey)) === worker) {
+        shouldRestorePreviousForward = true;
+        await c.env.DEPLOY_KV.delete(previousForwardKey);
+      }
+
+      await c.env.DEPLOY_KV.put(reverseKey, slug);
+    } catch (mutationError) {
+      await bestEffort(async () => {
+        if (
+          existingWorker === null &&
+          previousSlug !== slug &&
+          (await c.env.DEPLOY_KV.get(forwardKey)) === worker
+        ) {
+          await c.env.DEPLOY_KV.delete(forwardKey);
+        }
+      });
+
+      if (shouldRestorePreviousForward) {
+        await bestEffort(async () => {
+          if ((await c.env.DEPLOY_KV.get(previousForwardKey)) === null) {
+            await c.env.DEPLOY_KV.put(previousForwardKey, worker);
+          }
+        });
+      }
+
+      await bestEffort(async () => {
+        if ((await c.env.DEPLOY_KV.get(reverseKey)) === slug) {
+          await c.env.DEPLOY_KV.put(reverseKey, previousSlug);
+        }
+      });
+
+      throw mutationError;
+    }
+
+    return c.json({ success: true });
+  });
+
+  api.delete(path, validateWorkerParam, async c => {
+    const { worker } = c.req.valid('param');
+    const reverseKey = workerKey(worker);
+    const slug = await c.env.DEPLOY_KV.get(reverseKey);
+
+    if (slug !== null) {
+      const forwardKey = slugKey(slug);
+      if ((await c.env.DEPLOY_KV.get(forwardKey)) === worker) {
+        await c.env.DEPLOY_KV.delete(forwardKey);
+      }
+      if ((await c.env.DEPLOY_KV.get(reverseKey)) === slug) {
+        await c.env.DEPLOY_KV.delete(reverseKey);
+      }
+    } else {
+      await c.env.DEPLOY_KV.delete(reverseKey);
+    }
+
+    return c.json({ success: true });
+  });
+}
+
+registerSlugMappingRoutes('/slug-mapping/:worker');
+registerSlugMappingRoutes('/quick-deploy-slug-mapping/:worker');
 
 // ============================================================================
 // Banner Routes

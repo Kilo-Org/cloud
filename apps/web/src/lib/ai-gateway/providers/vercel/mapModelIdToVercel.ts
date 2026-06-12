@@ -1,5 +1,6 @@
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import {
+  CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
@@ -16,6 +17,7 @@ import {
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
+  '~anthropic/claude-fable-latest': CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
   '~anthropic/claude-opus-latest': CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
   '~anthropic/claude-sonnet-latest': CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
   '~anthropic/claude-haiku-latest': CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,

@@ -80,6 +80,15 @@ import {
   parseMachineSizeFromFlyGuest,
 } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
+import type {
+  AgentConfigListResponse,
+  AgentReadResponse,
+  AgentMutationResponse,
+  AgentDefaultsMutationResponse,
+  AgentCreateResponse,
+  AgentDeleteResponse,
+  AgentConfigErrorEnvelope,
+} from '../gateway-controller-types';
 
 // Domain modules
 import type { InstanceMutableState, InstanceStatus, DestroyResult } from './types';
@@ -208,6 +217,30 @@ type PendingRegistryCleanup = {
 const PENDING_REGISTRY_CLEANUP_KEY = 'pendingRegistryCleanup';
 const SKIP_PROVISION_RESERVATION_RELEASE_KEY = 'skipProvisionReservationRelease';
 const REGISTRY_CLEANUP_RETRY_MS = 60_000;
+
+const JSON_LOG_STRING_ESCAPES: Record<string, string> = {
+  '\b': '\\b',
+  '\f': '\\f',
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+  '"': '\\"',
+  '\\': '\\\\',
+};
+
+function formatJsonLogString(value: string): string {
+  let result = '"';
+  for (const char of value) {
+    const escaped = JSON_LOG_STRING_ESCAPES[char];
+    if (escaped) {
+      result += escaped;
+      continue;
+    }
+    const code = char.charCodeAt(0);
+    result += code < 0x20 ? `\\u${code.toString(16).padStart(4, '0')}` : char;
+  }
+  return `${result}"`;
+}
 
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
@@ -3478,7 +3511,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           previousOverride ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB` : 'none'
         } ` +
         `new=${input.size.cpus}/${input.size.memory_mb}MB cpu_kind=${input.size.cpu_kind ?? 'shared'} ` +
-        `reason="${input.reason.replace(/"/g, '\\"')}"`
+        `reason=${formatJsonLogString(input.reason)}`
     );
 
     return { previousOverride, newOverride: input.size };
@@ -3518,7 +3551,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
       console.log(
         `[admin-size-override] clear (no-op) userId=${this.s.userId} actor=${input.actorEmail} ` +
-          `reason="${input.reason.replace(/"/g, '\\"')}"`
+          `reason=${JSON.stringify(input.reason)}`
       );
       return { previousOverride: null };
     }
@@ -3549,10 +3582,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const previousLabel = previousOverride
       ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB`
       : 'metadata-only (skewed state)';
-    console.log(
-      `[admin-size-override] clear userId=${this.s.userId} actor=${input.actorEmail} ` +
-        `previous=${previousLabel} reason="${input.reason.replace(/"/g, '\\"')}"`
-    );
+    console.log('[admin-size-override] clear', {
+      userId: this.s.userId,
+      actor: input.actorEmail,
+      previous: previousLabel,
+      reason: input.reason,
+    });
 
     return { previousOverride };
   }
@@ -3870,9 +3905,91 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.replaceConfigOnMachine(this.s, this.env, config, etag);
   }
 
-  async getFileTree() {
+  /**
+   * List the agent fleet (+ inherited defaults). Fails closed with a typed
+   * `capability_unavailable` error when the controller lacks `config.agents.read`.
+   */
+  async listAgents(): Promise<AgentConfigListResponse | AgentConfigErrorEnvelope> {
     await this.loadState();
-    return gateway.getFileTree(this.s, this.env);
+    return gateway.listAgents(this.s, this.env);
+  }
+
+  /**
+   * Read one agent's normalized config. Returns an error envelope for an unknown
+   * id (`agent_not_found`) or a missing capability (`capability_unavailable`) —
+   * typed errors are returned, not thrown, so they survive the DO RPC boundary.
+   */
+  async getAgent(agentId: string): Promise<AgentReadResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.getAgent(this.s, this.env, agentId);
+  }
+
+  /**
+   * Edit one agent's model & behavioral settings ({ etag?, set, unset }).
+   * Throws typed errors for stale etag (`config_etag_conflict`), unknown agent
+   * (`agent_not_found`), or missing capability (`capability_unavailable`).
+   */
+  async updateAgent(
+    agentId: string,
+    patch: Record<string, unknown>
+  ): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.updateAgent(this.s, this.env, agentId, patch);
+  }
+
+  /**
+   * Edit the fleet-wide inherited agent defaults ({ etag?, set, unset }).
+   * Returns an error envelope for stale etag (`config_etag_conflict`) or missing
+   * capability (`capability_unavailable`).
+   */
+  async updateAgentDefaults(
+    patch: Record<string, unknown>
+  ): Promise<AgentDefaultsMutationResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.updateAgentDefaults(this.s, this.env, patch);
+  }
+
+  /**
+   * Create an agent (config + workspace + session dirs) via the OpenClaw CLI.
+   * Returns an error envelope for typed failures: `agent_exists`,
+   * `reserved_agent_id`, `openclaw_cli_failed`, `openclaw_cli_timeout`,
+   * `capability_unavailable`.
+   */
+  async createAgent(
+    body: Record<string, unknown>
+  ): Promise<AgentCreateResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.createAgent(this.s, this.env, body);
+  }
+
+  /**
+   * Delete an agent + clean up its references via the OpenClaw CLI. On-disk files
+   * are not confirmed removed (`filesystemDisposition: 'unverified'`). Rejects
+   * `main` (`reserved_agent_id`). Returns an error envelope for
+   * `openclaw_cli_failed`/`_timeout` or `capability_unavailable`.
+   */
+  async deleteAgent(agentId: string): Promise<AgentDeleteResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.deleteAgent(this.s, this.env, agentId);
+  }
+
+  /**
+   * Declaratively set an agent's channel-level routes ({ etag?, channels[] }).
+   * Returns an error envelope for stale etag (`config_etag_conflict`), unknown
+   * agent (`agent_not_found`), channel conflict (`agent_binding_conflict`), or
+   * missing capability (`capability_unavailable`).
+   */
+  async updateAgentBindings(
+    agentId: string,
+    body: Record<string, unknown>
+  ): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.updateAgentBindings(this.s, this.env, agentId, body);
+  }
+
+  async getFileTree(filePath?: string) {
+    await this.loadState();
+    return gateway.getFileTree(this.s, this.env, filePath);
   }
 
   async readFile(filePath: string) {

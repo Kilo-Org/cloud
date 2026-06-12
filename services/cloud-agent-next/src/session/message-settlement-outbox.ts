@@ -1,3 +1,4 @@
+import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob } from '../callbacks/types.js';
 import { logger } from '../logger.js';
 import type {
@@ -17,12 +18,25 @@ import {
   type SessionMessageStorage,
   type TerminalizeParams,
 } from './session-message-state.js';
+import { projectSafeFailure, type SafeFailureProjection } from './safe-failure-projection.js';
+import { projectTerminalClientError } from './terminal-error-projector.js';
 import type { AssistantMessagePart, LatestAssistantMessage } from './types.js';
 
 const CURRENT_IDLE_BATCH_CALLBACK_KEY = 'idle_batch_callback_current';
 const IDLE_BATCH_CALLBACK_PREFIX = 'idle_batch_callback:';
 const CALLBACK_ENQUEUE_RETRY_DELAY_MS = 30_000;
 const PUSH_DISPATCH_RETRY_DELAY_MS = 30_000;
+const LEGACY_FAILURE_REASONS = new Set([
+  'exhausted',
+  'wrapper_failure',
+  'wrapper_disconnected',
+  'wrapper_protocol_error',
+  'assistant_error',
+  'missing_assistant_reply',
+  'startup-failed',
+  'wrapper_error',
+  'interrupted',
+]);
 
 type IdleBatchCallbackState = {
   batchId: string;
@@ -46,6 +60,45 @@ type PersistedMessageEvent = {
   timestamp: number;
   entityId: string;
 };
+
+export type CloudMessageFailedPayload = {
+  messageId: string;
+  status: 'failed' | 'interrupted';
+  delivery: 'sent' | 'queued';
+  accepted: boolean;
+  completionSource?: string;
+  reason?: string;
+  attempts?: number;
+  error?: string;
+  failure?: SafeFailureProjection;
+};
+
+export function buildCloudMessageFailedPayload(
+  state: SessionMessageState
+): CloudMessageFailedPayload {
+  const wasAccepted = state.status === 'accepted' || state.acceptedAt !== undefined;
+  if (state.status !== 'failed' && state.status !== 'interrupted') {
+    throw new Error(`Cannot build failure payload for ${state.status} message`);
+  }
+  const failure = projectSafeFailure(state);
+  const fallbackMessage =
+    state.status === 'failed' ? 'The message failed' : 'The message was interrupted';
+  const reason =
+    state.failureReason && LEGACY_FAILURE_REASONS.has(state.failureReason)
+      ? state.failureReason
+      : fallbackMessage;
+  return {
+    messageId: state.messageId,
+    status: state.status,
+    delivery: wasAccepted ? 'sent' : 'queued',
+    accepted: wasAccepted,
+    completionSource: state.completionSource,
+    reason,
+    attempts: state.attempts,
+    error: failure?.message ?? fallbackMessage,
+    failure,
+  };
+}
 
 export type MessageSettlementOutboxStorage = SessionQueueStorage & SessionMessageStorage;
 
@@ -77,6 +130,7 @@ export type MessageSettlementOutbox = {
   releaseWrapperTerminalWaitForIdleBatchForWrapperRun(wrapperRunId: string): Promise<boolean>;
   isWaitingForWrapperTerminalGateResult(): Promise<boolean>;
   finalizeIdleBatchCallbackIfReady(options?: FinalizeIdleBatchCallbackOptions): Promise<void>;
+  finalizeTerminalWrapperRunCallbackIfReady(wrapperRunId: string): Promise<void>;
   repairTerminalEffects(): Promise<boolean>;
   retryPendingCallbacks(now: number): Promise<void>;
   nextCallbackDeadline(): Promise<number | undefined>;
@@ -239,6 +293,7 @@ export function createMessageSettlementOutbox(
       if (
         representative?.callbackRequired &&
         !representative.callbackEnqueuedAt &&
+        !representative.callbackAbandonedAt &&
         representative.gateResult === undefined
       ) {
         const updated = { ...representative, gateResult };
@@ -317,28 +372,9 @@ export function createMessageSettlementOutbox(
     });
   }
 
-  async function emitSessionMessageFailed(
-    state: SessionMessageState,
-    extra?: { error?: string }
-  ): Promise<void> {
+  async function emitSessionMessageFailed(state: SessionMessageState): Promise<void> {
     const sessionId = await requireSessionId();
-    const wasAccepted = state.status === 'accepted' || state.acceptedAt !== undefined;
-    const payload: Record<string, unknown> = {
-      messageId: state.messageId,
-      status: state.status,
-      delivery: wasAccepted ? 'sent' : 'queued',
-      accepted: wasAccepted,
-      completionSource: state.completionSource,
-      reason: state.failureReason,
-    };
-    if (state.attempts !== undefined) {
-      payload.attempts = state.attempts;
-    }
-    if (extra?.error !== undefined) {
-      payload.error = extra.error;
-    } else if (state.error) {
-      payload.error = state.error;
-    }
+    const payload = buildCloudMessageFailedPayload(state);
     ensureTerminalMessageEvent({
       entityId: `terminal-message/${state.messageId}`,
       sessionId,
@@ -400,13 +436,31 @@ export function createMessageSettlementOutbox(
       }
     }
 
+    const failure = projectSafeFailure(state);
+    const legacyErrorMessage =
+      status === 'completed'
+        ? undefined
+        : (failure?.message ??
+          (status === 'failed' ? 'The message failed' : 'The message was interrupted'));
     const payload: CallbackJob['payload'] = {
       sessionId,
       cloudAgentSessionId: sessionId,
       executionId: state.messageId,
       messageId: state.messageId,
       status,
-      errorMessage: state.error,
+      errorMessage: legacyErrorMessage,
+      failure,
+      ...(status === 'completed'
+        ? {}
+        : {
+            failureStage: state.failureStage,
+            clientError: projectTerminalClientError({
+              status,
+              failureStage: state.failureStage,
+              failureCode: state.failureCode,
+              error: failure?.message ?? legacyErrorMessage,
+            }),
+          }),
       lastSeenBranch: metadata?.repository?.upstreamBranch,
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,
@@ -419,8 +473,30 @@ export function createMessageSettlementOutbox(
       payload,
     };
 
+    const fittedCallbackJob = fitCallbackJobToQueueLimit(callbackJob);
+    if (fittedCallbackJob.status === 'too-large') {
+      const error = `Callback job is ${fittedCallbackJob.serializedByteLength} bytes after minimizing callback text; maximum is ${fittedCallbackJob.maximumByteLength} bytes`;
+      const abandonedAt = Date.now();
+      state.callbackAbandonedAt = abandonedAt;
+      // Rolled-back workers only recognize callbackEnqueuedAt as a terminal callback marker.
+      state.callbackEnqueuedAt = abandonedAt;
+      state.callbackLastError = error;
+      state.callbackAttempts = (state.callbackAttempts ?? 0) + 1;
+      delete state.callbackRetryAt;
+      await putSessionMessageState(storage, state);
+      logger
+        .withFields({
+          sessionId,
+          messageId: state.messageId,
+          serializedByteLength: fittedCallbackJob.serializedByteLength,
+          maximumByteLength: fittedCallbackJob.maximumByteLength,
+        })
+        .error('Abandoned callback job that cannot fit queue size limit');
+      return;
+    }
+
     try {
-      await callbackQueue.send(callbackJob);
+      await callbackQueue.send(fittedCallbackJob.job);
       state.callbackEnqueuedAt = Date.now();
       await putSessionMessageState(storage, state);
       logger
@@ -485,12 +561,17 @@ export function createMessageSettlementOutbox(
     }
 
     try {
+      const failureMessage =
+        state.status === 'completed'
+          ? undefined
+          : (projectSafeFailure(state)?.message ??
+            (state.status === 'failed' ? 'The message failed' : 'The message was interrupted'));
       const result = await sendPushNotification({
         userId: metadata.identity.userId,
         cliSessionId,
         executionId: state.messageId,
         status: state.status,
-        body: buildCloudAgentPushBody(state.status, lastAssistantMessageText, state.error),
+        body: buildCloudAgentPushBody(state.status, lastAssistantMessageText, failureMessage),
       });
       if (result.dispatched) {
         return 'accounted';
@@ -547,6 +628,39 @@ export function createMessageSettlementOutbox(
     return gateThreshold !== undefined && gateThreshold !== 'off';
   }
 
+  async function finalizeIdleBatchCallbackState(
+    batch: IdleBatchCallbackState,
+    allowWithoutObservedIdle: boolean
+  ): Promise<void> {
+    const now = Date.now();
+    const finalized: IdleBatchCallbackState = {
+      ...batch,
+      finalizedAt: now,
+      updatedAt: now,
+    };
+    await storage.put(idleBatchCallbackKey(finalized.batchId), finalized);
+    await storage.delete(CURRENT_IDLE_BATCH_CALLBACK_KEY);
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        batchId: finalized.batchId,
+        representativeMessageId: finalized.representativeMessageId,
+        allowWithoutObservedIdle,
+      })
+      .info('Finalized idle-batch callback state');
+
+    if (!finalized.representativeMessageId) return;
+    const representative = await getSessionMessageState(storage, finalized.representativeMessageId);
+    if (
+      !representative?.callbackRequired ||
+      representative.callbackEnqueuedAt ||
+      representative.callbackAbandonedAt
+    ) {
+      return;
+    }
+    await enqueueMessageCallbackNotification(representative);
+  }
+
   async function finalizeIdleBatchCallbackIfReady(
     options?: FinalizeIdleBatchCallbackOptions
   ): Promise<void> {
@@ -559,7 +673,8 @@ export function createMessageSettlementOutbox(
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage);
     if (acceptedMessages.length > 0) return;
 
-    if (!options?.allowWithoutObservedIdle && !(await hasObservedWrapperIdle())) {
+    const allowWithoutObservedIdle = options?.allowWithoutObservedIdle ?? false;
+    if (!allowWithoutObservedIdle && !(await hasObservedWrapperIdle())) {
       return;
     }
 
@@ -567,26 +682,24 @@ export function createMessageSettlementOutbox(
       return;
     }
 
-    const finalized: IdleBatchCallbackState = {
-      ...batch,
-      finalizedAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    await storage.put(idleBatchCallbackKey(finalized.batchId), finalized);
-    await storage.delete(CURRENT_IDLE_BATCH_CALLBACK_KEY);
-    logger
-      .withFields({
-        sessionId: getSessionIdForLogs(),
-        batchId: finalized.batchId,
-        representativeMessageId: finalized.representativeMessageId,
-        allowWithoutObservedIdle: options?.allowWithoutObservedIdle ?? false,
-      })
-      .info('Finalized idle-batch callback state');
+    await finalizeIdleBatchCallbackState(batch, allowWithoutObservedIdle);
+  }
 
-    if (!finalized.representativeMessageId) return;
-    const representative = await getSessionMessageState(storage, finalized.representativeMessageId);
-    if (!representative?.callbackRequired || representative.callbackEnqueuedAt) return;
-    await enqueueMessageCallbackNotification(representative);
+  async function finalizeTerminalWrapperRunCallbackIfReady(wrapperRunId: string): Promise<void> {
+    const batch = await getCurrentIdleBatchCallbackState();
+    if (!batch?.representativeMessageId) return;
+
+    const representative = await getSessionMessageState(storage, batch.representativeMessageId);
+    if (representative?.wrapperRunId !== wrapperRunId) return;
+
+    const acceptedMessages = await listNonTerminalAcceptedMessages(storage, wrapperRunId);
+    if (acceptedMessages.length > 0) return;
+
+    if (await shouldWaitForWrapperGateResult(batch)) {
+      return;
+    }
+
+    await finalizeIdleBatchCallbackState(batch, true);
   }
 
   async function listPendingIdleBatchCallbacks(): Promise<SessionMessageState[]> {
@@ -597,7 +710,8 @@ export function createMessageSettlementOutbox(
     for (const batch of batches.values()) {
       if (batch.finalizedAt === undefined || !batch.representativeMessageId) continue;
       const state = await getSessionMessageState(storage, batch.representativeMessageId);
-      if (!state?.callbackRequired || state.callbackEnqueuedAt) continue;
+      if (!state?.callbackRequired || state.callbackEnqueuedAt || state.callbackAbandonedAt)
+        continue;
       states.push(state);
     }
     return states;
@@ -608,7 +722,7 @@ export function createMessageSettlementOutbox(
       if (state.status === 'completed') {
         await emitSessionMessageCompleted(state, { gateResult: state.gateResult });
       } else if (state.status === 'failed' || state.status === 'interrupted') {
-        await emitSessionMessageFailed(state, { error: state.error });
+        await emitSessionMessageFailed(state);
       }
       await putSessionMessageState(storage, {
         ...state,
@@ -770,6 +884,7 @@ export function createMessageSettlementOutbox(
     releaseWrapperTerminalWaitForIdleBatchForWrapperRun,
     isWaitingForWrapperTerminalGateResult,
     finalizeIdleBatchCallbackIfReady,
+    finalizeTerminalWrapperRunCallbackIfReady,
     repairTerminalEffects,
     retryPendingCallbacks,
     nextCallbackDeadline,

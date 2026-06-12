@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useClawFileTree, useClawReadFile } from '../hooks/useClawHooks';
+import { useClawFileTree, useClawFileTreeLoader, useClawReadFile } from '../hooks/useClawHooks';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import type {
   FileWriteResponse,
@@ -75,6 +75,7 @@ export function WorkspaceFileEditor({
   enableOpenclawValidation: boolean;
 }) {
   const { data: tree, isLoading, error, refetch } = useClawFileTree(enabled);
+  const loadChildren = useClawFileTreeLoader(enabled);
 
   return (
     <FileEditorShell
@@ -82,6 +83,7 @@ export function WorkspaceFileEditor({
       isLoading={isLoading}
       error={error}
       refetch={refetch}
+      loadChildren={loadChildren}
       onClose={() => onOpenChange(false)}
       renderPane={(selectedPath, onDirtyChange) => (
         <UserFileEditorPane

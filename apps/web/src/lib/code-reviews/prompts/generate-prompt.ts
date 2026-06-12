@@ -60,6 +60,7 @@ const PromptTemplateSchema = z.object({
   workflow: z.string(),
   whatToReview: z.string(),
   commentFormat: z.string(),
+  inlineCommentFooter: z.string().optional(),
   summaryFormatIssuesFound: z.string(),
   summaryFormatNoIssues: z.string(),
   summaryMarkerNote: z.string(),
@@ -109,6 +110,10 @@ function mergeStyleOverrides<V>(
   return { ...local, ...remote };
 }
 
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+}
+
 /**
  * Merges a remote (PostHog) template with the local template.
  * Remote wins for all base prompt sections and for style override
@@ -126,6 +131,7 @@ export function resolveTemplate(
   return {
     template: {
       ...remoteTemplate,
+      inlineCommentFooter: remoteTemplate.inlineCommentFooter ?? localTemplate.inlineCommentFooter,
       incrementalReviewWorkflow:
         remoteTemplate.incrementalReviewWorkflow ?? localTemplate.incrementalReviewWorkflow,
       styleGuidance: mergeStyleOverrides(localTemplate.styleGuidance, remoteTemplate.styleGuidance),
@@ -313,6 +319,10 @@ export async function generateReviewPrompt(
   const commentFormat = template.commentFormatOverrides?.[reviewStyle] ?? template.commentFormat;
   prompt += commentFormat + '\n\n';
 
+  if (platform === 'github' && template.inlineCommentFooter) {
+    prompt += template.inlineCommentFooter + '\n\n';
+  }
+
   // 9. Dynamic context section (separator)
   prompt += '---\n\n# CONTEXT FOR THIS ' + platformConfig.prTerm + '\n\n';
   prompt += `**${platform === PLATFORM.GITLAB ? 'Project' : 'Repository'}:** ${repository}\n`;
@@ -335,7 +345,7 @@ export async function generateReviewPrompt(
     prompt += '| File | Line | Issue |\n|------|------|-------|\n';
 
     for (const c of active.slice(0, 20)) {
-      const firstLine = c.body.split('\n')[0].substring(0, 60).replace(/\|/g, '\\|');
+      const firstLine = escapeMarkdownTableCell(c.body.split('\n')[0].substring(0, 60));
       prompt += `| \`${c.path}\` | ${c.line ?? 'N/A'} | ${firstLine} |\n`;
     }
 

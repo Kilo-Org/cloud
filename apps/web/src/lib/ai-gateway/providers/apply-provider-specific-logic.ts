@@ -8,12 +8,16 @@ import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/prov
 import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
+  isClaudeModel,
+  isFableModel,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
+import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
@@ -21,9 +25,13 @@ import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import {
+  addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
+  scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
+import { logChatCompletionsOneOfSchemas } from '@/lib/ai-gateway/schema-logging';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -52,9 +60,13 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isGlmModel(requestedModel)) {
     return [
+      OpenRouterInferenceProviderIdSchema.enum.friendli,
       OpenRouterInferenceProviderIdSchema.enum.novita,
       OpenRouterInferenceProviderIdSchema.enum['z-ai'],
     ];
+  }
+  if (isQwenModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.alibaba];
   }
   return [];
 }
@@ -80,6 +92,19 @@ function applyPreferredProvider(
   }
 }
 
+export function applyGatewayModelsFallback(
+  providerId: ProviderId,
+  requestedModel: string,
+  requestToMutate: GatewayRequest
+) {
+  if (isFableModel(requestedModel) && (providerId === 'openrouter' || providerId === 'vercel')) {
+    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_CURRENT_MODEL_ID];
+    return;
+  }
+
+  delete requestToMutate.body.models;
+}
+
 export function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
@@ -88,13 +113,20 @@ export function applyProviderSpecificLogic(
   userByok: BYOKResult[] | null,
   originalHeaders: FraudDetectionHeaders,
   userId: string,
-  taskId: string | null
+  taskId: string | null,
+  organizationId: string | undefined
 ) {
+  applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
 
   if (requestToMutate.kind === 'chat_completions') {
+    if (isGlmModel(requestedModel) && !organizationId) {
+      logChatCompletionsOneOfSchemas(requestToMutate.body, requestedModel, provider.id);
+    }
+    scrubOpenCodeSpecificProperties(requestToMutate.body);
+
     // Mostly a workaround for bugs in the old extension.
     repairTools(requestToMutate.body);
 
@@ -131,7 +163,12 @@ export function applyProviderSpecificLogic(
     applyMistralModelSettings(requestToMutate);
   }
 
+  if (isQwenExplicitCacheModel(requestedModel)) {
+    addCacheBreakpoints(requestToMutate);
+  }
+
   provider.transformRequest({
+    provider,
     model: requestedModel,
     request: requestToMutate,
     originalHeaders,

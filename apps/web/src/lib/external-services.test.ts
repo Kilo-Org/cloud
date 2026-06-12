@@ -226,8 +226,8 @@ describe('external-services', () => {
 
       // Verify no calls to Stripe endpoints (only Customer.io and session worker calls)
       const fetchCalls = (global.fetch as jest.Mock).mock.calls;
-      const stripeCalls = fetchCalls.filter((call: [string, RequestInit]) =>
-        call[0].includes('api.stripe.com')
+      const stripeCalls = fetchCalls.filter(
+        (call: [string, RequestInit]) => new URL(call[0]).hostname === 'api.stripe.com'
       );
       expect(stripeCalls.length).toBe(0);
     });

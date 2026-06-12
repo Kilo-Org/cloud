@@ -492,4 +492,68 @@ describe('Event Storage', () => {
     expect(result.root?.info.id).toBe('msg_00000000000000000000000002');
     expect(result.missingRoot).toBeNull();
   });
+
+  it('should select and hydrate an assistant without time.completed', async () => {
+    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_9');
+    const stub = env.CLOUD_AGENT_SESSION.get(id);
+
+    const result = await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const events = createEventQueries(db, state.storage.sql);
+      const parentMessageId = 'msg_user_0000000000000000000001';
+      const olderAssistantId = 'msg_assistant_000000000000000001';
+      const latestAssistantId = 'msg_assistant_000000000000000002';
+
+      events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: {
+            info: {
+              id: olderAssistantId,
+              role: 'assistant',
+              sessionID: 'ses_root',
+              parentID: parentMessageId,
+              time: { completed: 1 },
+            },
+          },
+        }),
+        timestamp: 1,
+        entityId: `message/${olderAssistantId}`,
+      });
+      events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: {
+            info: {
+              id: latestAssistantId,
+              role: 'assistant',
+              sessionID: 'ses_root',
+              parentID: parentMessageId,
+            },
+          },
+        }),
+        timestamp: 2,
+        entityId: `message/${latestAssistantId}`,
+      });
+
+      return {
+        selected: events.getAssistantMessageForUserMessage('sess_1', 'ses_root', parentMessageId),
+        hydrated: events.getAssistantMessageById(
+          'sess_1',
+          'ses_root',
+          latestAssistantId,
+          parentMessageId
+        ),
+      };
+    });
+
+    expect(result.selected?.info.id).toBe('msg_assistant_000000000000000002');
+    expect(result.hydrated?.info.id).toBe('msg_assistant_000000000000000002');
+  });
 });

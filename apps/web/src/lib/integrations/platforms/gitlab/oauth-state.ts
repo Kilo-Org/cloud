@@ -8,10 +8,9 @@ const GITLAB_OAUTH_STATE_PREFIX = 'gitlab:';
 
 export const DEFAULT_GITLAB_OAUTH_INSTANCE_URL = 'https://gitlab.com';
 
-function isHttpInstanceUrl(value: string): boolean {
+function isHttpsInstanceUrl(value: string): boolean {
   try {
-    const protocol = new URL(value).protocol;
-    return protocol === 'http:' || protocol === 'https:';
+    return new URL(value).protocol === 'https:';
   } catch {
     return false;
   }
@@ -22,7 +21,7 @@ const GitLabOAuthStatePayloadSchema = z.object({
     z.object({ type: z.literal('user'), id: z.string().min(1) }),
     z.object({ type: z.literal('org'), id: z.string().min(1) }),
   ]),
-  instanceUrl: z.string().url().refine(isHttpInstanceUrl).optional(),
+  instanceUrl: z.string().url().refine(isHttpsInstanceUrl).optional(),
   customCredentialsRef: z.string().min(1).optional(),
   returnTo: z
     .string()

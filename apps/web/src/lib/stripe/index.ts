@@ -57,6 +57,7 @@ import {
 } from '@/lib/kiloclaw/stripe-handlers';
 import { enqueueImpactSaleReversalForCharge } from '@/lib/impact/affiliate-events';
 import { markPersonalKiloClawReferralPaymentAdverse } from '@/lib/impact/kiloclaw-referrals';
+import { markPersonalKiloPassReferralPaymentAdverse } from '@/lib/impact/kilo-pass-referrals';
 import { ImpactReferralPaymentProvider } from '@kilocode/db/schema-types';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
@@ -70,6 +71,7 @@ import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organiz
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import { successResult } from '@/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
+import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';
 
 type KiloClawChargeContext = {
   chargeId: string;
@@ -88,20 +90,6 @@ type StripeChargeBackedAbuseEventType =
 type AffiliateDisputeChargeContext = KiloClawChargeContext & {
   saleKind: AffiliateDisputeSaleKind;
 };
-
-async function getKiloClawChargeContext(chargeId: string): Promise<KiloClawChargeContext | null> {
-  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
-    await client.charges.retrieve(chargeId, { expand: ['invoice'] });
-  const invoice = charge.invoice;
-  if (!invoice || typeof invoice === 'string' || !invoiceLooksLikeKiloClawByPriceId(invoice)) {
-    return null;
-  }
-
-  return {
-    chargeId,
-    invoiceId: invoice.id,
-  };
-}
 
 function getAffiliateDisputeSaleKind(invoice: Stripe.Invoice): AffiliateDisputeSaleKind | null {
   if (invoiceLooksLikeKiloClawByPriceId(invoice)) {
@@ -735,6 +723,7 @@ async function handlePaymentMethodEvent(
 }
 
 type AutoTopUpOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
+type DisputeChargeWithInvoice = Stripe.Charge & { invoice?: string | Stripe.Invoice | null };
 
 async function releaseAutoTopUpAttemptLock(owner: AutoTopUpOwner): Promise<void> {
   if (owner.type === 'user') {
@@ -764,6 +753,44 @@ async function markAutoTopUpCompleted(owner: AutoTopUpOwner): Promise<void> {
     .update(auto_top_up_configs)
     .set({ last_auto_top_up_at: sql`NOW()`, attempt_started_at: null })
     .where(eq(auto_top_up_configs.owned_by_organization_id, owner.id));
+}
+
+async function syncStripeDisputeCaseFromWebhook(params: {
+  eventId: string;
+  eventCreated: number;
+  dispute: Stripe.Dispute;
+}): Promise<{ chargeId: string | undefined; disputeCharge: DisputeChargeWithInvoice | null }> {
+  const chargeId = stripeReferenceId(params.dispute.charge);
+
+  if (!chargeId) {
+    await observeStripeDisputeCreated({
+      eventId: params.eventId,
+      eventCreated: params.eventCreated,
+      dispute: params.dispute,
+    });
+    return { chargeId, disputeCharge: null };
+  }
+
+  let disputeCharge: DisputeChargeWithInvoice;
+  try {
+    disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+  } catch (error) {
+    await observeStripeDisputeCreated({
+      eventId: params.eventId,
+      eventCreated: params.eventCreated,
+      dispute: params.dispute,
+    });
+    throw error;
+  }
+
+  await observeStripeDisputeCreated({
+    eventId: params.eventId,
+    eventCreated: params.eventCreated,
+    dispute: params.dispute,
+    preFetchedCharge: disputeCharge,
+  });
+
+  return { chargeId, disputeCharge };
 }
 
 export async function processStripePaymentEventHook(event: Stripe.Event) {
@@ -928,14 +955,11 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'charge.dispute.created': {
       const dispute = event.data.object;
-      const chargeId =
-        typeof dispute.charge === 'string' ? dispute.charge : (dispute.charge?.id ?? null);
-
-      let disputeCharge: (Stripe.Charge & { invoice?: string | Stripe.Invoice | null }) | null =
-        null;
-      if (chargeId) {
-        disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
-      }
+      const { chargeId, disputeCharge } = await syncStripeDisputeCaseFromWebhook({
+        eventId: event.id,
+        eventCreated: event.created,
+        dispute,
+      });
 
       void reportChargeBackedStripeAbuseEvent({
         abuseEventType: 'stripe.charge.dispute.created',
@@ -986,7 +1010,25 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
           reason: 'chargeback',
           occurredAt: new Date(dispute.created * 1000),
         });
+      } else {
+        await markPersonalKiloPassReferralPaymentAdverse({
+          sourcePaymentId: affiliateDisputeCharge.invoiceId,
+          paymentProvider: ImpactReferralPaymentProvider.Stripe,
+          reason: 'chargeback',
+          occurredAt: new Date(dispute.created * 1000),
+        });
       }
+      break;
+    }
+
+    case 'charge.dispute.updated':
+    case 'charge.dispute.closed': {
+      const dispute = event.data.object;
+      await syncStripeDisputeCaseFromWebhook({
+        eventId: event.id,
+        eventCreated: event.created,
+        dispute,
+      });
       break;
     }
 
@@ -996,17 +1038,26 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      const kiloClawCharge = await getKiloClawChargeContext(charge.id);
-      if (!kiloClawCharge) {
+      const referralAdverseCharge = await getAffiliateDisputeChargeContext(charge.id);
+      if (!referralAdverseCharge) {
         break;
       }
 
-      await markPersonalKiloClawReferralPaymentAdverse({
-        sourcePaymentId: kiloClawCharge.invoiceId,
-        paymentProvider: ImpactReferralPaymentProvider.Stripe,
-        reason: 'refund',
-        occurredAt: new Date(charge.created * 1000),
-      });
+      if (referralAdverseCharge.saleKind === 'kiloclaw') {
+        await markPersonalKiloClawReferralPaymentAdverse({
+          sourcePaymentId: referralAdverseCharge.invoiceId,
+          paymentProvider: ImpactReferralPaymentProvider.Stripe,
+          reason: 'refund',
+          occurredAt: new Date(charge.created * 1000),
+        });
+      } else {
+        await markPersonalKiloPassReferralPaymentAdverse({
+          sourcePaymentId: referralAdverseCharge.invoiceId,
+          paymentProvider: ImpactReferralPaymentProvider.Stripe,
+          reason: 'refund',
+          occurredAt: new Date(charge.created * 1000),
+        });
+      }
       break;
     }
 
@@ -1019,17 +1070,26 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      const kiloClawCharge = await getKiloClawChargeContext(charge.id);
-      if (!kiloClawCharge) {
+      const referralAdverseCharge = await getAffiliateDisputeChargeContext(charge.id);
+      if (!referralAdverseCharge) {
         break;
       }
 
-      await markPersonalKiloClawReferralPaymentAdverse({
-        sourcePaymentId: kiloClawCharge.invoiceId,
-        paymentProvider: ImpactReferralPaymentProvider.Stripe,
-        reason: 'fraud',
-        occurredAt: new Date(charge.created * 1000),
-      });
+      if (referralAdverseCharge.saleKind === 'kiloclaw') {
+        await markPersonalKiloClawReferralPaymentAdverse({
+          sourcePaymentId: referralAdverseCharge.invoiceId,
+          paymentProvider: ImpactReferralPaymentProvider.Stripe,
+          reason: 'fraud',
+          occurredAt: new Date(charge.created * 1000),
+        });
+      } else {
+        await markPersonalKiloPassReferralPaymentAdverse({
+          sourcePaymentId: referralAdverseCharge.invoiceId,
+          paymentProvider: ImpactReferralPaymentProvider.Stripe,
+          reason: 'fraud',
+          occurredAt: new Date(charge.created * 1000),
+        });
+      }
       break;
     }
 

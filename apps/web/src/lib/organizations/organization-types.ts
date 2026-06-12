@@ -199,6 +199,13 @@ const OpenRouterModelSchema = z.object({
   // kilocode additions:
   preferredIndex: z.number().optional(),
   isFree: z.boolean().optional(),
+  mayTrainOnYourPrompts: z.boolean().optional(),
+  terminalBench: z
+    .object({
+      overallScore: z.number(),
+      avgAttemptCostUsd: z.number(),
+    })
+    .optional(),
   opencode: OpenCodeSettingsSchema.optional(),
 
   id: z.string(),

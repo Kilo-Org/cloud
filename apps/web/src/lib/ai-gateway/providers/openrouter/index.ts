@@ -5,6 +5,7 @@ import {
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import type { StoredModel } from '@kilocode/db';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,
@@ -12,7 +13,10 @@ import {
 } from '@/lib/organizations/organization-types';
 import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { convertFromKiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  convertFromKiloExclusiveModel,
+  type KiloExclusiveModel,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { getOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
@@ -20,6 +24,9 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
+import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
+import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -90,28 +97,57 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   return model.name;
 }
 
+type EndpointPricing = NonNullable<StoredModel['endpoints'][number]['pricing']>;
+
+export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
+  const { discount, ...prices } = pricing;
+  if (discount === undefined || discount <= 0) return pricing;
+  const factor = 1 - discount;
+  if (factor <= 0) return prices;
+  const result = { ...prices };
+  for (const key of Object.keys(prices) as (keyof typeof prices)[]) {
+    const value = prices[key];
+    if (value !== undefined) {
+      result[key] = (Number.parseFloat(value) / factor).toFixed(12);
+    }
+  }
+  return result;
+}
+
+export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {
+  return model.status !== 'disabled' || model.pricing === null;
+}
+
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadata();
+  const summaries = await getTerminalBenchSummaries();
   const enhancedModels = await Promise.all(
     models
       .filter(
         (model: OpenRouterModel) =>
-          !kiloExclusiveModels.some(m => m.public_id === model.id) &&
-          !isForbiddenFreeModel(model.id)
+          !kiloExclusiveModels.some(
+            m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
+          ) && !isForbiddenFreeModel(model.id)
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
         const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
-        const pricing = preferredProvider
-          ? (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
+        const rawPricing = !preferredProvider
+          ? endpoints[0]?.pricing
+          : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
             endpoints.find(
               e =>
                 normalizeInferenceProviderId(e.tag) ===
                 normalizeInferenceProviderId(preferredProvider)
-            )?.pricing)
-          : undefined;
-        return pricing ? { ...model, pricing } : model;
+            )?.pricing);
+        const pricing = rawPricing ? undoPricingDiscount(rawPricing) : rawPricing;
+        const terminalBench = terminalBenchFor(summaries, model.id);
+        return {
+          ...model,
+          ...(pricing && { pricing }),
+          ...(terminalBench && { terminalBench }),
+        };
       })
       .concat(
         kiloExclusiveModels
@@ -119,15 +155,22 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           .map(model => convertFromKiloExclusiveModel(model))
       )
       .concat(autoModels)
+      .map(applyCustomPricingToModel)
       .map(async (model: OpenRouterModel) => {
         const preferredIndex = preferredModels.indexOf(model.id);
         const addPdf =
           isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
+        const description = isFreeNemotronModel(model.id)
+          ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
+          : model.description;
+        const isFree = await isFreeModel(model.id);
         return {
           ...model,
           name: formatName(model, preferredIndex),
+          description,
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
-          isFree: await isFreeModel(model.id),
+          isFree: model.isFree ?? isFree,
+          mayTrainOnYourPrompts: model.mayTrainOnYourPrompts ?? isFree,
           opencode: model.opencode ?? getOpenCodeSettings(model.id),
           architecture: addPdf
             ? {

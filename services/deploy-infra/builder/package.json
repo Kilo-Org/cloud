@@ -7,7 +7,9 @@
     "deploy": "wrangler deploy --outdir dist --upload-source-maps --var SENTRY_RELEASE:$(sentry-cli releases propose-version)",
     "dev": "wrangler dev",
     "start": "wrangler dev",
-    "test": "jest",
+    "test": "pnpm run test:unit",
+    "test:unit": "jest",
+    "test:postgres": "pnpm --dir ../../../apps/web exec jest --runInBand --roots . ../../services/deploy-infra/builder/test-postgres --runTestsByPath ../../services/deploy-infra/builder/test-postgres/src/html-deploy-repository.postgres.test.ts",
     "test-deploy": "tsx test-deploy.ts",
     "deploy:local": "tsx scripts/deploy-local.ts",
     "types": "wrangler types",
@@ -17,8 +19,10 @@
     "postdeploy": "pnpm sentry:sourcemaps"
   },
   "dependencies": {
+    "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
+    "drizzle-orm": "catalog:",
     "zod": "catalog:",
     "@sentry/cloudflare": "10.43.0",
     "hono": "catalog:",

@@ -1,12 +1,36 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import {
   formatName,
+  getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
+  shouldSuppressOpenRouterModel,
+  undoPricingDiscount,
 } from '@/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
+import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
+import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
+import {
+  findKiloExclusiveModel,
+  isDeadFreeModel,
+  kiloExclusiveModels,
+} from '@/lib/ai-gateway/models';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+
+jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getOpenRouterModelsMetadata: jest.fn(() => Promise.resolve({})),
+}));
 
 const originalFetch = global.fetch;
+
+const disabledPaidModel = {
+  ...qwen36_plus_stealth_model,
+  public_id: 'vendor/disabled-paid-model',
+  internal_id: 'vendor/disabled-paid-model-internal',
+  display_name: 'Disabled Paid Kilo Model',
+  status: 'disabled',
+} satisfies KiloExclusiveModel;
 
 function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
   return {
@@ -87,6 +111,90 @@ describe('formatName', () => {
   it('returns the name unchanged when no markers apply', () => {
     const model = buildModel({ created: 0 });
     expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
+  });
+});
+
+describe('undoPricingDiscount', () => {
+  it('reverses the discount and drops the field without exponential output', () => {
+    const result = undoPricingDiscount({
+      prompt: '0.00000006',
+      completion: '0.0000006',
+      input_cache_read: '0.000000015',
+      discount: 0.7,
+    });
+    expect(result).toEqual({
+      prompt: '0.000000200000',
+      completion: '0.000002000000',
+      input_cache_read: '0.000000050000',
+    });
+    expect('discount' in result).toBe(false);
+    for (const value of Object.values(result)) {
+      expect(value).not.toMatch(/e/i);
+    }
+  });
+
+  it('leaves pricing untouched when there is no discount', () => {
+    const pricing = { prompt: '0.000001', completion: '0.000005' };
+    expect(undoPricingDiscount(pricing)).toBe(pricing);
+  });
+
+  it('leaves pricing untouched when the discount is zero', () => {
+    const pricing = { prompt: '0.000001', completion: '0.000005', discount: 0 };
+    expect(undoPricingDiscount(pricing)).toBe(pricing);
+  });
+
+  it('drops the field when the discount cannot be reversed', () => {
+    const result = undoPricingDiscount({
+      prompt: '0.000001',
+      completion: '0.000005',
+      discount: 1,
+    });
+    expect(result).toEqual({ prompt: '0.000001', completion: '0.000005' });
+  });
+});
+
+describe('shouldSuppressOpenRouterModel', () => {
+  it('does not suppress disabled paid Kilo-exclusive models returned by OpenRouter', () => {
+    expect(disabledPaidModel.pricing).not.toBeNull();
+    expect(shouldSuppressOpenRouterModel(disabledPaidModel)).toBe(false);
+  });
+
+  it('suppresses disabled free Kilo-exclusive models from OpenRouter', () => {
+    expect(seed_20_code_free_model.status).toBe('disabled');
+    expect(seed_20_code_free_model.pricing).toBeNull();
+    expect(shouldSuppressOpenRouterModel(seed_20_code_free_model)).toBe(true);
+  });
+
+  it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {
+    expect(morph_warp_grep_free_model.status).toBe('hidden');
+    expect(shouldSuppressOpenRouterModel(morph_warp_grep_free_model)).toBe(true);
+  });
+});
+
+describe('disabled paid Kilo-exclusive model fallback', () => {
+  beforeEach(() => {
+    kiloExclusiveModels.push(disabledPaidModel);
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: { data: [buildModel({ id: disabledPaidModel.public_id })] },
+        })
+      )
+    ) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    const modelIndex = kiloExclusiveModels.indexOf(disabledPaidModel);
+    if (modelIndex >= 0) kiloExclusiveModels.splice(modelIndex, 1);
+    global.fetch = originalFetch;
+  });
+
+  it('keeps the OpenRouter model available without Kilo-exclusive blocking or routing', async () => {
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === disabledPaidModel.public_id)).toBe(true);
+    expect(isDeadFreeModel(disabledPaidModel.public_id)).toBe(false);
+    expect(findKiloExclusiveModel(disabledPaidModel.public_id)).toBeNull();
   });
 });
 

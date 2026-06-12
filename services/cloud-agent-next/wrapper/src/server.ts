@@ -15,7 +15,6 @@
 
 import type { WrapperState, SessionContext } from './state.js';
 import type { WrapperKiloClient, WrapperPtySize } from './kilo-api.js';
-import type { PerTurnConfig } from './lifecycle.js';
 import { createLogUploader } from './log-uploader.js';
 import { configureCommitCoAuthorHook } from './commit-co-author-hook.js';
 import { logToFile } from './utils.js';
@@ -28,6 +27,8 @@ import {
   type WrapperSessionReadyRequest,
   type WrapperSessionReadyResponse,
 } from '../../src/shared/wrapper-bootstrap.js';
+import { createProxyRequest } from '../../src/shared/http-proxy.js';
+import type { SessionBoundFeedPolicy } from './global-feed-manager.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,10 +61,8 @@ export type ServerDependencies = {
   setAborted: () => void;
   /** Reset lifecycle state for a new execution */
   resetLifecycle: () => void;
-  /** Mark a submitted message complete when the wrapper handles a synchronous session action. */
-  onMessageComplete?: (messageId: string) => void;
-  /** Compatibility hook for callers that still construct wrapper server test deps. */
-  setPerTurnConfig?: (config: PerTurnConfig) => void;
+  /** Notify lifecycle after an acknowledgement guard clears. */
+  onDeliveryAcknowledged?: (kind: 'async-prompt' | 'sync-command' | 'failed') => void;
   /** Workspace/Kilo readiness path */
   readySession?: (request: WrapperSessionReadyRequest) => Promise<WrapperSessionReadyResponse>;
   /** Apply refreshed runtime variables to the active Kilo runtime. */
@@ -75,6 +74,8 @@ export type ServerDependencies = {
     workspacePath: string,
     commitCoAuthor: WrapperCommitCoAuthor | undefined
   ) => Promise<void>;
+  /** Called after a fresh or changed session binding has been stored. */
+  onSessionBound?: (feedPolicy: SessionBoundFeedPolicy) => void | Promise<void>;
 };
 
 export type SessionBinding = {
@@ -156,6 +157,21 @@ function errorResponse(error: string, message: string, status: number): Response
   return jsonResponse({ error, message }, status);
 }
 
+function wrapperFinalizingResponse(state: WrapperState): Response {
+  return jsonResponse(
+    {
+      error: 'WRAPPER_FINALIZING',
+      message: 'Wrapper batch is finalizing',
+      wrapperRunId: state.finalizingWrapperRunId,
+    },
+    409
+  );
+}
+
+function snapshotInitializationForPlatform(platform?: string): 'wait' | undefined {
+  return platform === 'cloud-agent-web' ? 'wait' : undefined;
+}
+
 async function applyCommitAttribution(
   workspacePath: string,
   commitCoAuthor: WrapperCommitCoAuthor | undefined,
@@ -220,12 +236,38 @@ function parsePtyPath(path: string): { ptyId: string; action?: 'connect' } | nul
   };
 }
 
+async function notifySessionBound(
+  deps: ServerDependencies,
+  feedPolicy: SessionBoundFeedPolicy
+): Promise<void> {
+  if (!deps.onSessionBound) return;
+  try {
+    await deps.onSessionBound(feedPolicy);
+  } catch (error) {
+    logToFile(
+      `session-bound callback failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 export async function bindSessionContext(
   binding: SessionBinding | undefined,
   config: ServerConfig,
-  deps: ServerDependencies
+  deps: ServerDependencies,
+  feedPolicy: SessionBoundFeedPolicy = 'restart'
 ): Promise<Response | null> {
   const { state } = deps;
+  const blockedWrapperRunId = state.finalizingWrapperRunId;
+  const isFreshRunAfterFinalization =
+    state.admissionsBlocked &&
+    !state.hasSession &&
+    blockedWrapperRunId !== undefined &&
+    binding?.wrapperRunId !== undefined &&
+    binding.wrapperRunId !== blockedWrapperRunId;
+
+  if (state.admissionsBlocked && !isFreshRunAfterFinalization) {
+    return wrapperFinalizingResponse(state);
+  }
 
   if (!binding) {
     if (!state.hasSession) {
@@ -293,6 +335,7 @@ export async function bindSessionContext(
     state.setLogUploader(logUploader);
     logUploader.start();
     logToFile(`session bound: sessionId=${config.sessionId}`);
+    await notifySessionBound(deps, feedPolicy);
     return null;
   }
 
@@ -308,6 +351,9 @@ export async function bindSessionContext(
     agentSessionId: config.agentSessionId,
   };
   const result = state.bindSession(sessionContext);
+  if (feedPolicy === 'close-until-runtime-ready') {
+    await notifySessionBound(deps, feedPolicy);
+  }
   if (result.changed) {
     logToFile(
       `session binding refreshed: generation=${binding.wrapperGeneration ?? 'none'} connectionId=${binding.wrapperConnectionId ?? 'none'}`
@@ -316,6 +362,9 @@ export async function bindSessionContext(
       await deps.closeConnection();
     }
     deps.resetLifecycle();
+    if (feedPolicy === 'restart') {
+      await notifySessionBound(deps, feedPolicy);
+    }
   }
   return null;
 }
@@ -371,9 +420,17 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
     const binding = body.session;
     const bindError = await bindSessionContext(binding, config, deps);
     if (bindError) return bindError;
+    if (!state.beginDeliveryAcknowledgement()) {
+      return wrapperFinalizingResponse(state);
+    }
+    const acknowledgeDelivery = (kind: 'async-prompt' | 'failed') => {
+      state.endDeliveryAcknowledgement();
+      deps.onDeliveryAcknowledged?.(kind);
+    };
 
     const session = state.currentSession;
     if (!session) {
+      acknowledgeDelivery('failed');
       return errorResponse('NO_SESSION', 'No session context available', 400);
     }
     const messageId = body.message.id;
@@ -387,6 +444,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         logToFile(`job/prompt: failed to materialize attachments: ${msg}`);
+        acknowledgeDelivery('failed');
         return errorResponse('SEND_ERROR', `Failed to materialize attachments: ${msg}`, 500);
       }
     }
@@ -396,7 +454,10 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
       prompt.finalization?.commitCoAuthor,
       deps.configureCommitCoAuthor ?? configureCommitCoAuthorHook
     );
-    if (attributionError) return attributionError;
+    if (attributionError) {
+      acknowledgeDelivery('failed');
+      return attributionError;
+    }
 
     if (!state.isConnected) {
       try {
@@ -405,11 +466,12 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         logToFile(`job/prompt: failed to open connection: ${msg}`);
+        acknowledgeDelivery('failed');
         return errorResponse('CONNECTION_ERROR', `Failed to open connection: ${msg}`, 500);
       }
     }
 
-    state.acceptMessage(messageId, {
+    const addedMessage = state.acceptMessage(messageId, {
       autoCommit: prompt.finalization?.autoCommit ?? false,
       condenseOnComplete: prompt.finalization?.condenseOnComplete ?? false,
       model: prompt.agent?.model?.modelID,
@@ -420,6 +482,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
     });
 
     try {
+      const snapshotInitialization = snapshotInitializationForPlatform(session.platform);
       await kiloClient.sendPromptAsync({
         sessionId: session.kiloSessionId,
         messageId,
@@ -430,10 +493,13 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
         model: prompt.agent?.model,
         system: prompt.agent?.system,
         tools: prompt.agent?.tools,
+        ...(snapshotInitialization ? { snapshotInitialization } : {}),
       });
       logToFile(`job/prompt: sent messageId=${messageId}`);
+      acknowledgeDelivery('async-prompt');
     } catch (error) {
-      state.removeMessage(messageId);
+      if (addedMessage) state.removeMessage(messageId);
+      acknowledgeDelivery('failed');
       const msg = error instanceof Error ? error.message : String(error);
       logToFile(`job/prompt: failed to send: ${msg}`);
       return errorResponse('SEND_ERROR', `Failed to send prompt: ${msg}`, 500);
@@ -456,17 +522,27 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
 
     const bindError = await bindSessionContext(body.session ?? body.execution, config, deps);
     if (bindError) return bindError;
+    if (!state.beginDeliveryAcknowledgement()) {
+      return wrapperFinalizingResponse(state);
+    }
+    const acknowledgeDelivery = (kind: 'sync-command' | 'failed') => {
+      state.endDeliveryAcknowledgement();
+      deps.onDeliveryAcknowledged?.(kind);
+    };
 
     const session = state.currentSession;
     if (!session) {
+      acknowledgeDelivery('failed');
       return errorResponse('NO_SESSION', 'No session context available', 400);
     }
 
     if (!body.command) {
+      acknowledgeDelivery('failed');
       return errorResponse('INVALID_REQUEST', 'command is required', 400);
     }
     const compactModel = body.command === 'compact' ? body.agent?.model : undefined;
     if (body.command === 'compact' && !compactModel?.modelID) {
+      acknowledgeDelivery('failed');
       return errorResponse('INVALID_REQUEST', 'model is required for compact', 400);
     }
 
@@ -475,19 +551,22 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
       body.commitCoAuthor,
       deps.configureCommitCoAuthor ?? configureCommitCoAuthorHook
     );
-    if (attributionError) return attributionError;
+    if (attributionError) {
+      acknowledgeDelivery('failed');
+      return attributionError;
+    }
 
     const binding = body.session ?? body.execution;
     const messageId = body.messageId;
-    if (messageId) {
-      state.acceptMessage(messageId, {
-        autoCommit: body.autoCommit ?? false,
-        condenseOnComplete: body.condenseOnComplete ?? false,
-        model: body.agent?.model?.modelID,
-        upstreamBranch: binding?.upstreamBranch,
-        ...(body.commitCoAuthor ? { commitCoAuthor: body.commitCoAuthor } : {}),
-      });
-    }
+    const addedMessage = messageId
+      ? state.acceptMessage(messageId, {
+          autoCommit: body.autoCommit ?? false,
+          condenseOnComplete: body.condenseOnComplete ?? false,
+          model: body.agent?.model?.modelID,
+          upstreamBranch: binding?.upstreamBranch,
+          ...(body.commitCoAuthor ? { commitCoAuthor: body.commitCoAuthor } : {}),
+        })
+      : false;
 
     if (!state.isConnected) {
       try {
@@ -496,7 +575,8 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         logToFile(`job/command: failed to open connection: ${msg}`);
-        if (messageId) state.removeMessage(messageId);
+        if (messageId && addedMessage) state.removeMessage(messageId);
+        acknowledgeDelivery('failed');
         return errorResponse('CONNECTION_ERROR', `Failed to open connection: ${msg}`, 500);
       }
     }
@@ -517,21 +597,24 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
             },
             timestamp: new Date().toISOString(),
           });
-          deps.onMessageComplete?.(messageId);
         }
       } else {
+        const snapshotInitialization = snapshotInitializationForPlatform(session.platform);
         result = await kiloClient.sendCommand({
           sessionId: session.kiloSessionId,
           command: body.command,
           args: body.args,
           messageId,
+          ...(snapshotInitialization ? { snapshotInitialization } : {}),
         });
       }
       state.updateActivity();
       logToFile(`job/command: sent command=${body.command}`);
+      acknowledgeDelivery('sync-command');
       return jsonResponse({ status: 'sent', result });
     } catch (error) {
-      if (messageId) state.removeMessage(messageId);
+      if (messageId && addedMessage) state.removeMessage(messageId);
+      acknowledgeDelivery('failed');
       const msg = error instanceof Error ? error.message : String(error);
       logToFile(`job/command: failed: ${msg}`);
       return errorResponse('COMMAND_ERROR', `Failed to send command: ${msg}`, 500);
@@ -905,7 +988,10 @@ export function createSessionReadyHandler(deps: ServerDependencies) {
         {
           error: result.error.code,
           message: result.error.message,
+          ...(result.error.subtype ? { subtype: result.error.subtype } : {}),
+          ...(result.error.detail ? { detail: result.error.detail } : {}),
           ...(result.error.retryable !== undefined ? { retryable: result.error.retryable } : {}),
+          ...(result.error.wrapperRunId ? { wrapperRunId: result.error.wrapperRunId } : {}),
         },
         status
       );
@@ -959,6 +1045,36 @@ export function createRuntimeEnvironmentHandler(deps: ServerDependencies) {
   };
 }
 
+export function isKiloProxyPath(path: string): boolean {
+  return path === '/kilo-proxy' || path.startsWith('/kilo-proxy/');
+}
+
+export function createKiloProxyHandler(deps: ServerDependencies) {
+  return async (req: Request): Promise<Response> => {
+    let serverUrl: string;
+    try {
+      serverUrl = deps.kiloClient.serverUrl;
+    } catch {
+      return errorResponse('KILO_RUNTIME_UNAVAILABLE', 'Kilo runtime is not bootstrapped', 503);
+    }
+
+    if (!serverUrl) {
+      return errorResponse('KILO_RUNTIME_UNAVAILABLE', 'Kilo runtime is not bootstrapped', 503);
+    }
+
+    const url = new URL(req.url);
+    const upstreamUrl = new URL(serverUrl);
+    const strippedPath =
+      url.pathname === '/kilo-proxy' ? '/' : url.pathname.slice('/kilo-proxy'.length);
+    upstreamUrl.pathname = strippedPath || '/';
+    upstreamUrl.search = url.search;
+
+    const upstreamRequest = createProxyRequest(req, upstreamUrl);
+    upstreamRequest.headers.set('Accept-Encoding', 'identity');
+    return fetch(upstreamRequest);
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Server Creation
 // ---------------------------------------------------------------------------
@@ -987,6 +1103,7 @@ export function createFetchHandler(
   const ptyCreateHandler = createPtyCreateHandler(config, deps);
   const sessionReadyHandler = createSessionReadyHandler(deps);
   const runtimeEnvironmentHandler = createRuntimeEnvironmentHandler(deps);
+  const kiloProxyHandler = createKiloProxyHandler(deps);
 
   // Route table
   type RouteHandler = (req: Request) => Response | Promise<Response>;
@@ -1038,6 +1155,14 @@ export function createFetchHandler(
       if (method === 'DELETE') {
         return createPtyDeleteHandler(deps, ptyPath.ptyId)(req);
       }
+    }
+
+    if (isKiloProxyPath(path)) {
+      return kiloProxyHandler(req).catch(error => {
+        const msg = error instanceof Error ? error.message : String(error);
+        logToFile(`kilo proxy error: ${msg}`);
+        return errorResponse('KILO_PROXY_ERROR', msg, 502);
+      });
     }
 
     // Look up route

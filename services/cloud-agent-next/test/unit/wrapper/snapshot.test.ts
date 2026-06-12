@@ -115,7 +115,6 @@ const createCodeReviewSessionContext = (): SessionContext =>
   createSessionContext({ platform: 'code-review' });
 
 const createCallbacks = (): ConnectionCallbacks => ({
-  onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),

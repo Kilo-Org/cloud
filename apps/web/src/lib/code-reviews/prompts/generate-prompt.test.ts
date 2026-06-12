@@ -15,6 +15,7 @@ const localTemplate = {
   workflow: 'local workflow',
   whatToReview: 'local what',
   commentFormat: 'local comment format',
+  inlineCommentFooter: 'local inline footer',
   summaryFormatIssuesFound: 'local issues',
   summaryFormatNoIssues: 'local no issues',
   summaryMarkerNote: 'local marker',
@@ -85,6 +86,12 @@ describe('resolveTemplate', () => {
     expect(result.template.summaryFormatOverrides).toEqual({
       roast: { issuesFound: 'roast issues', noIssues: 'roast no issues' },
     });
+  });
+
+  it('falls back to local inline comment footer when remote omits it', () => {
+    const result = resolveTemplate(remoteTemplateWithoutStyleOverrides, localTemplate);
+
+    expect(result.template.inlineCommentFooter).toBe('local inline footer');
   });
 
   it('remote wins for keys that both local and remote define', () => {
@@ -182,6 +189,25 @@ describe('generateReviewPrompt', () => {
     );
     expect(prompt.indexOf(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`)).toBeLessThan(
       prompt.indexOf('# FOCUS AREAS')
+    );
+  });
+
+  it('includes GitHub inline comment footer guidance after the comment format', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain('## Inline Comment Footer');
+    expect(prompt).toContain(
+      '<sub>Reply with `@kilocode-bot fix it` to have Kilo Code address this issue.</sub>'
+    );
+    expect(prompt).toContain('after any fenced `suggestion` block');
+    expect(prompt).toContain(
+      'Do not add this footer to the review summary, top-level review body, or any non-inline comment.'
+    );
+    expect(prompt.indexOf('# COMMENT FORMAT')).toBeLessThan(
+      prompt.indexOf('## Inline Comment Footer')
+    );
+    expect(prompt.indexOf('## Inline Comment Footer')).toBeLessThan(
+      prompt.indexOf('# CONTEXT FOR THIS PR')
     );
   });
 
@@ -453,5 +479,15 @@ describe('generateReviewPrompt (incremental review)', () => {
     );
     expect(prompt).not.toContain('DO NOT fetch or pull');
     expect(prompt).not.toContain('Do not run `git fetch`');
+  });
+
+  it('does not include GitHub inline comment footer guidance for GitLab prompts', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+    });
+
+    expect(prompt).not.toContain('## Inline Comment Footer');
+    expect(prompt).not.toContain('@kilocode-bot fix it');
   });
 });

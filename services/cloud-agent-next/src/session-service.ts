@@ -66,6 +66,7 @@ import {
   type WrapperSessionReadyRequest,
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
+import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
 import type {
   FencedLegacyExecutionRequest,
   FencedWrapperDispatchRequest,
@@ -117,6 +118,8 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'pwd',
   'find',
   'grep',
+  'rg',
+  'awk',
   'wc',
   'sort',
   'uniq',
@@ -129,6 +132,9 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'git pull',
   'gh pr diff',
   'gh pr view',
+  'gh api repos/*/pulls/*/reviews',
+  'gh api repos/*/pulls/*/comments',
+  'gh api repos/*/issues/*/comments',
   'gh api repos/*/issues/*/comments --input*',
   'gh api repos/*/issues/comments/* -X PATCH*',
   'gh api repos/*/pulls/*/reviews --input*',
@@ -162,6 +168,9 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'sed * -*i',
   'sed * --in-place',
   'sed * --in-place*',
+  'awk * -i*',
+  'awk * --in-place*',
+  'awk *system(*',
   'sort -o',
   'sort -o*',
   'sort -*o',
@@ -225,6 +234,25 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'gh issue',
   'gh repo create',
   'gh repo fork',
+  'gh api repos/*/pulls/*/reviews --method*',
+  'gh api repos/*/pulls/*/reviews -X*',
+  'gh api repos/*/pulls/*/reviews -f*',
+  'gh api repos/*/pulls/*/reviews -F*',
+  'gh api repos/*/pulls/*/reviews --field*',
+  'gh api repos/*/pulls/*/reviews --raw-field*',
+  'gh api repos/*/pulls/*/comments --method*',
+  'gh api repos/*/pulls/*/comments -X*',
+  'gh api repos/*/pulls/*/comments -f*',
+  'gh api repos/*/pulls/*/comments -F*',
+  'gh api repos/*/pulls/*/comments --field*',
+  'gh api repos/*/pulls/*/comments --raw-field*',
+  'gh api repos/*/pulls/*/comments --input*',
+  'gh api repos/*/issues/*/comments --method*',
+  'gh api repos/*/issues/*/comments -X*',
+  'gh api repos/*/issues/*/comments -f*',
+  'gh api repos/*/issues/*/comments -F*',
+  'gh api repos/*/issues/*/comments --field*',
+  'gh api repos/*/issues/*/comments --raw-field*',
   'glab auth',
   'glab mr approve',
   'glab mr close',
@@ -246,6 +274,101 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'vitest',
 ];
 
+const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
+  'ls',
+  'cat',
+  'echo',
+  'pwd',
+  'find',
+  'grep',
+  'rg',
+  'wc',
+  'sort',
+  'uniq',
+  'cut',
+  'tr',
+  'nl',
+  'jq',
+  'git',
+  'git status',
+  'git diff',
+  'git branch',
+  'git checkout',
+  'git switch',
+  'git add',
+  'git commit',
+  'git push',
+  'gh pr create',
+  'gh pr view',
+  'gh pr diff',
+  'npm',
+  'npm install',
+  'npm run',
+  'npm test',
+  'pnpm',
+  'pnpm install',
+  'pnpm run',
+  'pnpm test',
+  'bun',
+  'bun install',
+  'bun run',
+  'bun test',
+  'yarn',
+  'yarn install',
+  'yarn run',
+  'yarn test',
+  'python',
+  'python3',
+  'python -m',
+  'python3 -m',
+  'pip',
+  'pip3',
+  'pytest',
+  'go',
+  'go test',
+  'mvn',
+  'gradle',
+  'bundle',
+  'vitest',
+  'sed',
+  'cd',
+  'mkdir',
+  'touch',
+  'cp',
+  'mv',
+  'rm',
+];
+
+const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
+  'git reset --hard',
+  'git clean',
+  'git push --force',
+  'git push -f',
+  'git push * --force',
+  'git push * -f',
+  'git push --mirror',
+  'git remote set-url',
+  'git tag',
+  'git worktree',
+  'git stash',
+  'gh pr merge',
+  'gh pr close',
+  'gh pr edit',
+  'gh pr checkout',
+  'gh auth',
+  'gh repo',
+  'gh secret',
+  'curl',
+  'wget',
+  'ssh',
+  'scp',
+  'rsync',
+  'docker',
+  'kubectl',
+  'wrangler',
+  'vercel',
+];
+
 export type CommandGuardPolicy = {
   policyName: string;
   allowed: string[];
@@ -253,15 +376,23 @@ export type CommandGuardPolicy = {
 };
 
 export function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy | null {
-  if (createdOnPlatform !== 'code-review') {
-    return null;
+  if (createdOnPlatform === 'security-remediation') {
+    return {
+      policyName: 'security-remediation-pr',
+      allowed: SECURITY_REMEDIATION_ALLOWED_COMMANDS,
+      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS],
+    };
   }
 
-  return {
-    policyName: 'code-review-read-only',
-    allowed: CODE_REVIEW_ALLOWED_COMMANDS,
-    denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
-  };
+  if (createdOnPlatform === 'code-review') {
+    return {
+      policyName: 'code-review-read-only',
+      allowed: CODE_REVIEW_ALLOWED_COMMANDS,
+      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
+    };
+  }
+
+  return null;
 }
 
 export function buildCommandGuardBashPermissions(
@@ -515,11 +646,9 @@ export async function runSetupCommands(
   logger.info('Setup commands completed');
 }
 
-// Write Kilo auth file so the CLI's KiloSessions can call session ingest.
-// The CLI reads ~/.local/share/kilo/auth.json via Auth.get("kilo") but we
-// never run `kilo auth login` — credentials are injected purely via env vars
-// for config (KILO_CONFIG_CONTENT). The session ingest code path ignores the
-// provider config and only reads the auth file.
+// Persist Kilo auth for workspace preparation paths that do not receive the
+// wrapper process environment; wrapper-launched Kilo receives the same auth
+// shape through KILO_AUTH_CONTENT.
 export async function writeAuthFile(
   sandbox: SandboxInstance,
   sessionHome: string,
@@ -586,21 +715,7 @@ export async function writeGlobalRules(
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  const content = [
-    '# Cloud Agent Environment',
-    '',
-    "You are running inside a sandboxed cloud container, not on the user's local machine.",
-    'The filesystem is ephemeral and will not persist after the session ends.',
-    "Do not assume access to the user's local files, browsers, or desktop environment.",
-    '',
-    '## Temporary Files',
-    '',
-    `When you need to create temporary or scratch files, use \`/tmp/${sessionId}/\` as your scratch directory.`,
-    'This path is pre-approved for file access and will not trigger permission prompts.',
-    '',
-  ].join('\n');
-
-  await sandbox.writeFile(rulesPath, content);
+  await sandbox.writeFile(rulesPath, buildCloudAgentRules(sessionId));
 }
 
 /**
@@ -1027,6 +1142,7 @@ export class SessionService {
       SESSION_HOME: sessionHome,
       // Inject Kilocode credentials (with override support)
       KILOCODE_TOKEN: kilocodeToken,
+      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: originalToken } }),
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',
@@ -1095,7 +1211,7 @@ export class SessionService {
       //   question: handled above (line 564) for non-interactive sessions
       Object.assign(permission, {
         read: 'allow',
-        edit: 'deny',
+        edit: commandGuardPolicy.policyName === 'security-remediation-pr' ? 'allow' : 'deny',
         bash: bashPermissions,
         webfetch: 'deny',
         websearch: 'deny',
@@ -1121,7 +1237,7 @@ export class SessionService {
         },
       },
       autoupdate: false,
-      snapshot: false,
+      snapshot: createdOnPlatform === 'cloud-agent-web',
     };
     if (mcpServers && Object.keys(mcpServers).length > 0) {
       const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);

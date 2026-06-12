@@ -6,9 +6,11 @@ import {
 import { sendMagicLinkEmail } from '@/lib/email';
 import { findUserByEmail } from '@/lib/user';
 import { MAGIC_LINK_EMAIL_ERRORS } from '@/lib/schemas/email';
+import { checkRateLimit } from '@vercel/firewall';
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 
+jest.mock('@vercel/firewall');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
 jest.mock('@/lib/auth/magic-link-tokens');
 jest.mock('@/lib/email');
@@ -20,6 +22,7 @@ const mockVerifyTurnstileJWT = jest.mocked(verifyTurnstileJWT);
 const mockCreateMagicLinkToken = jest.mocked(createMagicLinkToken);
 const mockSendMagicLinkEmail = jest.mocked(sendMagicLinkEmail);
 const mockFindUserByEmail = jest.mocked(findUserByEmail);
+const mockCheckRateLimit = jest.mocked(checkRateLimit);
 
 describe('POST /api/auth/magic-link', () => {
   const createRequest = (body: unknown) =>
@@ -58,10 +61,13 @@ describe('POST /api/auth/magic-link', () => {
 
     // Default: User does not exist (new user signup)
     mockFindUserByEmail.mockResolvedValue(undefined);
+
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
   });
 
   it('should send magic link for valid email with valid JWT', async () => {
-    const response = await POST(createRequest({ email: 'user@example.com' }));
+    const request = createRequest({ email: 'user@example.com' });
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -71,8 +77,43 @@ describe('POST /api/auth/magic-link', () => {
     });
 
     expect(mockVerifyTurnstileJWT).toHaveBeenCalledWith('magic-link');
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('magic-link-email', {
+      request,
+      rateLimitKey: expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/),
+    });
     expect(mockCreateMagicLinkToken).toHaveBeenCalledWith('user@example.com');
     expect(mockSendMagicLinkEmail).toHaveBeenCalledWith(mockMagicLinkToken, undefined);
+  });
+
+  it('should return 429 when the email address is rate limited', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
+
+    const response = await POST(createRequest({ email: 'user@example.com' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data).toEqual({
+      success: false,
+      error: 'Rate limit exceeded. Please try again later.',
+    });
+    expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+    expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
+  });
+
+  it('should use the same rate limit key for different email casing', async () => {
+    mockFindUserByEmail.mockResolvedValue({
+      id: 'existing-user-id',
+      google_user_email: 'user@example.com',
+    } as Awaited<ReturnType<typeof findUserByEmail>>);
+
+    await POST(createRequest({ email: 'User@Example.com' }));
+    await POST(createRequest({ email: 'user@example.com' }));
+
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    expect(firstKey).toEqual(expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/));
+    expect(secondKey).toBe(firstKey);
   });
 
   it('should reject request with invalid Turnstile JWT', async () => {
@@ -91,6 +132,7 @@ describe('POST /api/auth/magic-link', () => {
 
     expect(response.status).toBe(401);
     expect(data).toEqual({ error: 'Security verification required' });
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
     expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
     expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
   });

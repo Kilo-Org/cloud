@@ -195,11 +195,9 @@ export function fixResponsesRequest(request: GatewayResponsesRequest) {
       continue;
     }
     if (!outputMsg.type) {
-      console.warn('[fixResponsesRequest] assistant message missing type, fixing');
       outputMsg.type = 'message';
     }
     if (!outputMsg.status) {
-      console.warn('[fixResponsesRequest] assistant message missing status, fixing');
       outputMsg.status = 'completed';
     }
   }

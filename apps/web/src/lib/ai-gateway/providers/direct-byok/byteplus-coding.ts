@@ -8,7 +8,8 @@ import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/
 export default {
   id: 'byteplus-coding',
   base_url: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
-  ai_sdk_provider: 'openai-compatible',
+  supported_chat_apis: ['chat_completions'],
+  default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {
     context.request.body.thinking = {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',

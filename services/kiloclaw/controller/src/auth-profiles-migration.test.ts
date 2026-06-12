@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   migrateKilocodeAuthProfilesToKeyRef,
+  hardenAuthProfileMigrationBackups,
   type AuthProfilesMigrationDeps,
 } from './auth-profiles-migration';
 
@@ -113,7 +114,12 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
 
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 1, filesModified: 1, profilesMigrated: 1 });
+    expect(report).toEqual({
+      filesScanned: 1,
+      filesModified: 1,
+      profilesMigrated: 1,
+      filesFailed: 0,
+    });
 
     const written = parseStore(fs.files.get(MAIN));
     expect(written.profiles['kilocode:default']).toEqual({
@@ -133,7 +139,12 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
     const before = fs.files.get(MAIN);
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 1, filesModified: 0, profilesMigrated: 0 });
+    expect(report).toEqual({
+      filesScanned: 1,
+      filesModified: 0,
+      profilesMigrated: 0,
+      filesFailed: 0,
+    });
     expect(fs.files.get(MAIN)).toBe(before);
   });
 
@@ -205,7 +216,12 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
 
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 2, filesModified: 2, profilesMigrated: 2 });
+    expect(report).toEqual({
+      filesScanned: 2,
+      filesModified: 2,
+      profilesMigrated: 2,
+      filesFailed: 0,
+    });
   });
 
   it('skips malformed JSON with a warning but does not throw', () => {
@@ -217,7 +233,12 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
 
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 1, filesModified: 0, profilesMigrated: 0 });
+    expect(report).toEqual({
+      filesScanned: 1,
+      filesModified: 0,
+      profilesMigrated: 0,
+      filesFailed: 0,
+    });
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
@@ -243,7 +264,38 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
 
     const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
 
-    expect(report).toEqual({ filesScanned: 0, filesModified: 0, profilesMigrated: 0 });
+    expect(report).toEqual({
+      filesScanned: 0,
+      filesModified: 0,
+      profilesMigrated: 0,
+      filesFailed: 0,
+    });
+  });
+
+  it('reports filesFailed (and migrates nothing) when the rewrite throws', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fs = createFs();
+    seedDir(fs, `${ROOT}/agents`);
+    seedDir(fs, `${ROOT}/agents/main`);
+    seedFile(fs, MAIN, JSON.stringify(plaintextStore()));
+    const deps: AuthProfilesMigrationDeps = {
+      ...fsDeps(fs),
+      writeFileSync: () => {
+        throw new Error('ENOSPC');
+      },
+    };
+
+    const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, deps);
+
+    expect(report).toEqual({
+      filesScanned: 1,
+      filesModified: 0,
+      profilesMigrated: 0,
+      filesFailed: 1,
+    });
+    // The plaintext is still on disk because the write failed.
+    expect(fs.files.get(MAIN)).toContain('secret-literal-key');
+    warnSpy.mockRestore();
   });
 
   it('preserves unrelated profile fields when migrating', () => {
@@ -278,5 +330,134 @@ describe('migrateKilocodeAuthProfilesToKeyRef', () => {
       email: 'user@example.com',
       metadata: { createdBy: 'onboard' },
     });
+  });
+
+  it('converts the historical api_key alias (not just key) to a keyRef', () => {
+    const fs = createFs();
+    seedDir(fs, `${ROOT}/agents`);
+    seedDir(fs, `${ROOT}/agents/main`);
+    seedFile(
+      fs,
+      MAIN,
+      JSON.stringify({
+        version: 1,
+        profiles: {
+          'kilocode:default': {
+            type: 'api_key',
+            provider: 'kilocode',
+            api_key: 'legacy-alias-key',
+          },
+        },
+      })
+    );
+
+    const report = migrateKilocodeAuthProfilesToKeyRef(ROOT, fsDeps(fs));
+
+    expect(report.profilesMigrated).toBe(1);
+    const profile = parseStore(fs.files.get(MAIN)).profiles['kilocode:default'];
+    expect(profile).toEqual({
+      type: 'api_key',
+      provider: 'kilocode',
+      keyRef: { source: 'env', provider: 'default', id: 'KILOCODE_API_KEY' },
+    });
+    expect(profile).not.toHaveProperty('api_key');
+    expect(profile).not.toHaveProperty('key');
+  });
+});
+
+describe('hardenAuthProfileMigrationBackups', () => {
+  const ROOT = '/root/.openclaw';
+  const AGENT_DIR = `${ROOT}/agents/main/agent`;
+  const BAK = `${AGENT_DIR}/auth-profiles.json.sqlite-import.1781117548412.bak`;
+
+  function seedAgentDir(fs: InMemoryFs): void {
+    seedDir(fs, `${ROOT}/agents`);
+    seedDir(fs, `${ROOT}/agents/main`);
+    seedDir(fs, AGENT_DIR);
+  }
+
+  it('tightens the sqlite-import backup to 0o600 and retains it (recovery copy)', () => {
+    const fs = createFs();
+    seedAgentDir(fs);
+    seedFile(fs, BAK, JSON.stringify(plaintextStore()));
+    const chmodSync = vi.fn();
+
+    const report = hardenAuthProfileMigrationBackups(ROOT, { ...fsDeps(fs), chmodSync });
+
+    expect(report).toEqual({ dirsScanned: 1, backupsHardened: 1, backupsFailed: 0 });
+    expect(chmodSync).toHaveBeenCalledWith(BAK, 0o600);
+    // The backup is retained, not deleted.
+    expect(fs.files.has(BAK)).toBe(true);
+  });
+
+  it('hardens every known migration backup suffix and leaves unrelated files alone', () => {
+    const fs = createFs();
+    seedAgentDir(fs);
+    const backups = [
+      `${AGENT_DIR}/auth-profiles.json.sqlite-import.1.bak`,
+      `${AGENT_DIR}/auth-profiles.json.legacy-flat.2.bak`,
+      `${AGENT_DIR}/auth-profiles.json.api-key-alias.3.bak`,
+      `${AGENT_DIR}/auth-profiles.json.aws-sdk-profile.4.bak`,
+      `${AGENT_DIR}/auth-profiles.json.openai-provider-unification.5.bak`,
+      `${AGENT_DIR}/auth-profiles.json.oauth-ref.6.bak`,
+    ];
+    for (const b of backups) seedFile(fs, b, JSON.stringify(plaintextStore()));
+    // Not migration backups — must be left untouched.
+    for (const keep of [
+      `${AGENT_DIR}/openclaw-agent.sqlite`,
+      `${AGENT_DIR}/models.json`,
+      `${AGENT_DIR}/unrelated.bak`,
+      `${AGENT_DIR}/auth-profiles.json.unknown-migration.7.bak`,
+    ]) {
+      seedFile(fs, keep, 'x');
+    }
+    const chmodSync = vi.fn();
+
+    const report = hardenAuthProfileMigrationBackups(ROOT, { ...fsDeps(fs), chmodSync });
+
+    expect(report.backupsHardened).toBe(backups.length);
+    expect(chmodSync).toHaveBeenCalledTimes(backups.length);
+    for (const b of backups) expect(chmodSync).toHaveBeenCalledWith(b, 0o600);
+  });
+
+  it('counts a failure when chmod throws, without throwing', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fs = createFs();
+    seedAgentDir(fs);
+    seedFile(fs, BAK, JSON.stringify(plaintextStore()));
+    const deps: AuthProfilesMigrationDeps = {
+      ...fsDeps(fs),
+      chmodSync: () => {
+        throw new Error('EPERM');
+      },
+    };
+
+    const report = hardenAuthProfileMigrationBackups(ROOT, deps);
+
+    expect(report).toEqual({ dirsScanned: 1, backupsHardened: 0, backupsFailed: 1 });
+    warnSpy.mockRestore();
+  });
+
+  it('scans multiple agent directories', () => {
+    const fs = createFs();
+    seedDir(fs, `${ROOT}/agents`);
+    for (const agent of ['main', 'coding']) {
+      seedDir(fs, `${ROOT}/agents/${agent}`);
+      seedDir(fs, `${ROOT}/agents/${agent}/agent`);
+      seedFile(fs, `${ROOT}/agents/${agent}/agent/auth-profiles.json.sqlite-import.99.bak`, 'x');
+    }
+    const chmodSync = vi.fn();
+
+    const report = hardenAuthProfileMigrationBackups(ROOT, { ...fsDeps(fs), chmodSync });
+
+    expect(report).toEqual({ dirsScanned: 2, backupsHardened: 2, backupsFailed: 0 });
+  });
+
+  it('is a no-op when no agent dirs exist', () => {
+    const fs = createFs();
+
+    const report = hardenAuthProfileMigrationBackups(ROOT, fsDeps(fs));
+
+    expect(report).toEqual({ dirsScanned: 0, backupsHardened: 0, backupsFailed: 0 });
   });
 });

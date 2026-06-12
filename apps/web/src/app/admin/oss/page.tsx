@@ -77,7 +77,7 @@ function extractRepoName(githubUrl: string): string | null {
       url = 'https://' + url;
     }
     const parsed = new URL(url);
-    if (!parsed.hostname.includes('github.com')) {
+    if (!['github.com', 'www.github.com'].includes(parsed.hostname.toLowerCase())) {
       return null;
     }
     const pathParts = parsed.pathname.split('/').filter(Boolean);

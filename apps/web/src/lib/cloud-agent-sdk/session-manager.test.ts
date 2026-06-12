@@ -61,6 +61,7 @@ const mockSessionCallbacks: {
     messageId: string,
     state: Extract<MessageDeliveryState, { status: 'failed' }>
   ) => void;
+  onError?: (message: string) => void;
 } = {};
 
 let latestStorage: JotaiSessionStorage | null = null;
@@ -84,6 +85,7 @@ jest.mock('./session', () => ({
         messageId: string,
         state: Extract<MessageDeliveryState, { status: 'failed' }>
       ) => void;
+      onError?: (message: string) => void;
       transport?: { userWebConnection?: unknown };
     }) => {
       latestStorage = sessionConfig.storage;
@@ -109,6 +111,7 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onMessageQueued = sessionConfig.onMessageQueued;
       mockSessionCallbacks.onMessageCompleted = sessionConfig.onMessageCompleted;
       mockSessionCallbacks.onMessageFailed = sessionConfig.onMessageFailed;
+      mockSessionCallbacks.onError = sessionConfig.onError;
       return mockSession;
     }
   ),
@@ -276,6 +279,7 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onMessageQueued = undefined;
     mockSessionCallbacks.onMessageCompleted = undefined;
     mockSessionCallbacks.onMessageFailed = undefined;
+    mockSessionCallbacks.onError = undefined;
   });
 
   // -------------------------------------------------------------------------
@@ -810,6 +814,44 @@ describe('createSessionManager', () => {
           message: 'Agent connection lost',
         })
       );
+    });
+
+    it('clears disconnected error and indicator after the transport reconnects', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.state.getStatus.mockReturnValue({ type: 'disconnected' });
+      mockSessionCallbacks.onError?.('Connection to agent lost');
+      notifyStateChange?.();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'Connection to agent lost'
+      );
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(
+        expect.objectContaining({
+          type: 'error',
+          message: 'Agent connection lost',
+        })
+      );
+
+      mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toBeNull();
     });
 
     it('passes variant through to session.send', async () => {

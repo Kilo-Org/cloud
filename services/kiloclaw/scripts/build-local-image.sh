@@ -98,11 +98,19 @@ else
   DOCKERFILE="$KILOCLAW_DIR/Dockerfile"
   if [ -n "$OPENCLAW_TAG" ]; then
     echo "Patching Dockerfile to use openclaw@$OPENCLAW_TAG ..."
-    # Create a temp Dockerfile with the overridden version
+    # Create a temp Dockerfile with the overridden version. Anchor on
+    # `openclaw@<version>` directly: the install line is
+    # `npm install -g pnpm openclaw@...`, so a `-g openclaw@` anchor silently
+    # matches nothing and would build the unchanged pin.
     DOCKERFILE="$(mktemp)"
     trap 'rm -f "$DOCKERFILE"' EXIT
-    sed "s/npm install -g openclaw@[^ ]*/npm install -g openclaw@$OPENCLAW_TAG/" \
+    sed "s/openclaw@[0-9][^ ]*/openclaw@$OPENCLAW_TAG/g" \
       "$KILOCLAW_DIR/Dockerfile" > "$DOCKERFILE"
+    # Fail loudly rather than silently building the wrong version.
+    if ! grep -qF "openclaw@$OPENCLAW_TAG" "$DOCKERFILE"; then
+      echo "Error: failed to patch openclaw pin to $OPENCLAW_TAG in Dockerfile" >&2
+      exit 1
+    fi
   fi
 fi
 

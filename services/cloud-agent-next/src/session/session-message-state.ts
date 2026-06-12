@@ -1,12 +1,28 @@
 import { z } from 'zod';
+import {
+  CloudAgentFailureCodeSchema,
+  CloudAgentFailureStageSchema,
+  WorkspaceFailureSubtypeSchema,
+  type CloudAgentFailureCode,
+  type CloudAgentFailureStage,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import type { CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { AttachmentsSchema } from '../persistence/schemas.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
+import {
+  WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH,
+  type WorkspaceFailureSubtype,
+} from '../shared/wrapper-bootstrap.js';
+import {
+  getWrapperRuntimeState,
+  hasCompleteWrapperRunMessageIndex,
+} from './wrapper-runtime-state.js';
 
 const SESSION_MESSAGE_STATE_PREFIX = 'session_message:';
+const WRAPPER_RUN_MESSAGE_INDEX_PREFIX = 'session_message_wrapper_run:';
 
 export type SessionMessageStatus = 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted';
 
@@ -23,50 +39,22 @@ export type SessionMessageCompletionSource = z.infer<typeof SessionMessageComple
 type AssertTrue<T extends true> = T;
 type CloudAgentRunFailureStage = NonNullable<CloudAgentRunStateReport['run']['failureStage']>;
 type CloudAgentRunFailureCode = NonNullable<CloudAgentRunStateReport['run']['failureCode']>;
+type StageContractMatchesReport = AssertTrue<
+  CloudAgentRunFailureStage extends CloudAgentFailureStage ? true : false
+>;
+type CodeContractMatchesReport = AssertTrue<
+  CloudAgentRunFailureCode extends CloudAgentFailureCode ? true : false
+>;
 
-export const SessionMessageFailureStageSchema = z.enum([
-  'pre_dispatch',
-  'post_dispatch_no_activity',
-  'agent_activity',
-  'interruption',
-  'unknown',
-] as const satisfies readonly CloudAgentRunFailureStage[]);
-export type SessionMessageFailureStage =
-  AssertTrue<
-    CloudAgentRunFailureStage extends z.infer<typeof SessionMessageFailureStageSchema>
-      ? true
-      : false
-  > extends true
-    ? z.infer<typeof SessionMessageFailureStageSchema>
-    : never;
+export const SessionMessageFailureStageSchema = CloudAgentFailureStageSchema;
+export type SessionMessageFailureStage = StageContractMatchesReport extends true
+  ? CloudAgentFailureStage
+  : never;
 
-export const SessionMessageFailureCodeSchema = z.enum([
-  'sandbox_connect_failed',
-  'workspace_setup_failed',
-  'kilo_server_failed',
-  'wrapper_start_failed',
-  'invalid_delivery_request',
-  'session_metadata_missing',
-  'model_missing',
-  'delivery_failure_unknown',
-  'wrapper_disconnected',
-  'wrapper_no_output',
-  'wrapper_ping_timeout',
-  'wrapper_error_before_activity',
-  'assistant_error',
-  'wrapper_error_after_activity',
-  'missing_assistant_reply',
-  'user_interrupt',
-  'container_shutdown',
-  'system_interrupt',
-  'unclassified',
-] as const satisfies readonly CloudAgentRunFailureCode[]);
-export type SessionMessageFailureCode =
-  AssertTrue<
-    CloudAgentRunFailureCode extends z.infer<typeof SessionMessageFailureCodeSchema> ? true : false
-  > extends true
-    ? z.infer<typeof SessionMessageFailureCodeSchema>
-    : never;
+export const SessionMessageFailureCodeSchema = CloudAgentFailureCodeSchema;
+export type SessionMessageFailureCode = CodeContractMatchesReport extends true
+  ? CloudAgentFailureCode
+  : never;
 export type SessionMessageDispatchAcceptanceKind = 'observed' | 'inferred_from_terminal';
 
 export type LegacyAdmissionConstraints = {
@@ -111,6 +99,8 @@ export type SessionMessageState = {
   completionSource?: SessionMessageCompletionSource;
   failureStage?: SessionMessageFailureStage;
   failureCode?: SessionMessageFailureCode;
+  failureSubtype?: WorkspaceFailureSubtype;
+  safeFailureMessage?: string;
   error?: string;
   failureReason?: string;
   attempts?: number;
@@ -118,6 +108,7 @@ export type SessionMessageState = {
   callbackRequired?: boolean;
   callbackTarget?: CallbackTarget;
   callbackEnqueuedAt?: number;
+  callbackAbandonedAt?: number;
   callbackLastError?: string;
   callbackAttempts?: number;
   callbackRetryAt?: number;
@@ -213,6 +204,8 @@ export const SessionMessageStateSchema = z
     completionSource: SessionMessageCompletionSourceSchema.optional(),
     failureStage: SessionMessageFailureStageSchema.optional(),
     failureCode: SessionMessageFailureCodeSchema.optional(),
+    failureSubtype: WorkspaceFailureSubtypeSchema.optional(),
+    safeFailureMessage: z.string().max(WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH).optional(),
     error: z.string().optional(),
     failureReason: z.string().optional(),
     attempts: z.number().int().nonnegative().optional(),
@@ -225,6 +218,7 @@ export const SessionMessageStateSchema = z
       })
       .optional(),
     callbackEnqueuedAt: z.number().optional(),
+    callbackAbandonedAt: z.number().optional(),
     callbackLastError: z.string().optional(),
     callbackAttempts: z.number().int().nonnegative().optional(),
     callbackRetryAt: z.number().optional(),
@@ -257,7 +251,14 @@ export const SessionMessageStateSchema = z
       })
       .optional(),
   })
-  .passthrough();
+  .passthrough()
+  .refine(
+    state => state.failureSubtype === undefined || state.failureCode === 'workspace_setup_failed',
+    {
+      message: 'Workspace failure subtype requires workspace_setup_failed failure code',
+      path: ['failureSubtype'],
+    }
+  );
 
 export type SessionMessageStorage = {
   get<T = unknown>(key: string): Promise<T | undefined>;
@@ -267,6 +268,14 @@ export type SessionMessageStorage = {
 
 function sessionMessageStateKey(messageId: string): string {
   return `${SESSION_MESSAGE_STATE_PREFIX}${messageId}`;
+}
+
+function wrapperRunMessageIndexPrefix(wrapperRunId: string): string {
+  return `${WRAPPER_RUN_MESSAGE_INDEX_PREFIX}${encodeURIComponent(wrapperRunId)}:`;
+}
+
+function wrapperRunMessageIndexKey(wrapperRunId: string, messageId: string): string {
+  return `${wrapperRunMessageIndexPrefix(wrapperRunId)}${messageId}`;
 }
 
 function normalizeLegacyAdmissionConstraints(
@@ -404,10 +413,14 @@ export async function putSessionMessageState(
   storage: SessionMessageStorage,
   state: SessionMessageState
 ): Promise<void> {
-  await storage.put(
-    sessionMessageStateKey(state.messageId),
-    SessionMessageStateSchema.parse(state)
-  );
+  const parsedState = SessionMessageStateSchema.parse(state);
+  if (parsedState.wrapperRunId) {
+    await storage.put(
+      wrapperRunMessageIndexKey(parsedState.wrapperRunId, parsedState.messageId),
+      true
+    );
+  }
+  await storage.put(sessionMessageStateKey(parsedState.messageId), parsedState);
 }
 
 export function createQueuedSessionMessageState(
@@ -495,6 +508,8 @@ export type MarkMessageFailedParams = {
   completionSource: SessionMessageCompletionSource;
   failureStage?: SessionMessageFailureStage;
   failureCode?: SessionMessageFailureCode;
+  failureSubtype?: WorkspaceFailureSubtype;
+  safeFailureMessage?: string;
   attempts?: number;
 };
 
@@ -516,6 +531,8 @@ export async function markMessageFailed(
     completionSource: params.completionSource,
     failureStage: params.failureStage,
     failureCode: params.failureCode,
+    failureSubtype: params.failureSubtype,
+    safeFailureMessage: params.safeFailureMessage,
     attempts: params.attempts,
   };
   await putSessionMessageState(storage, updated);
@@ -564,12 +581,40 @@ export async function listNonTerminalAcceptedMessages(
   storage: SessionMessageStorage,
   wrapperRunId?: string
 ): Promise<SessionMessageState[]> {
-  const entries = await listSessionMessageStates(storage);
-  return entries.filter(
-    state =>
-      state.status === 'accepted' &&
-      (wrapperRunId === undefined || state.wrapperRunId === wrapperRunId)
+  const entries =
+    wrapperRunId === undefined
+      ? await listSessionMessageStates(storage)
+      : await listMessagesForWrapperRun(storage, wrapperRunId);
+  return entries.filter(state => state.status === 'accepted');
+}
+
+async function listIndexedMessagesForWrapperRun(
+  storage: SessionMessageStorage,
+  wrapperRunId: string
+): Promise<SessionMessageState[]> {
+  const indexPrefix = wrapperRunMessageIndexPrefix(wrapperRunId);
+  const index = await storage.list<unknown>({ prefix: indexPrefix });
+  const messages = await Promise.all(
+    Array.from(index.keys()).map(async key => {
+      const messageId = key.slice(indexPrefix.length);
+      if (!messageId) return undefined;
+      const state = await getSessionMessageState(storage, messageId);
+      return state?.wrapperRunId === wrapperRunId ? state : undefined;
+    })
   );
+  return messages.filter(state => state !== undefined);
+}
+
+export async function listMessagesForWrapperRun(
+  storage: SessionMessageStorage,
+  wrapperRunId: string
+): Promise<SessionMessageState[]> {
+  if (hasCompleteWrapperRunMessageIndex(await getWrapperRuntimeState(storage), wrapperRunId)) {
+    return listIndexedMessagesForWrapperRun(storage, wrapperRunId);
+  }
+
+  const entries = await listSessionMessageStates(storage);
+  return entries.filter(state => state.wrapperRunId === wrapperRunId);
 }
 
 type NeverAcceptedTerminalQueuedMessageState = SessionMessageState & {
@@ -601,7 +646,11 @@ export async function listMessagesWithPendingCallbacks(
 ): Promise<SessionMessageState[]> {
   const entries = await listSessionMessageStates(storage);
   return entries.filter(
-    state => isTerminalStatus(state.status) && state.callbackRequired && !state.callbackEnqueuedAt
+    state =>
+      isTerminalStatus(state.status) &&
+      state.callbackRequired &&
+      !state.callbackEnqueuedAt &&
+      !state.callbackAbandonedAt
   );
 }
 
@@ -613,7 +662,10 @@ export async function listTerminalMessagesWithPendingEffects(
     .flatMap(state => {
       if (!isTerminalStatus(state.status)) return [];
       const normalized =
-        state.terminalEffects || !state.callbackRequired || state.callbackEnqueuedAt
+        state.terminalEffects ||
+        !state.callbackRequired ||
+        state.callbackEnqueuedAt ||
+        state.callbackAbandonedAt
           ? state
           : {
               ...state,
@@ -668,6 +720,8 @@ export type TerminalizeParams =
       completionSource: SessionMessageCompletionSource;
       failureStage?: SessionMessageFailureStage;
       failureCode?: SessionMessageFailureCode;
+      failureSubtype?: WorkspaceFailureSubtype;
+      safeFailureMessage?: string;
       attempts?: number;
     }
   | {
@@ -728,6 +782,8 @@ export async function terminalizeMessageOnce(
       completionSource: params.completionSource,
       failureStage: params.failureStage,
       failureCode: params.failureCode,
+      failureSubtype: params.failureSubtype,
+      safeFailureMessage: params.safeFailureMessage,
       attempts: params.attempts,
       terminalEffects,
     };

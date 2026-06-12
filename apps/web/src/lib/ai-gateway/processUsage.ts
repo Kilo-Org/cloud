@@ -21,7 +21,10 @@ import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import { findKiloExclusiveModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  shouldRedactModelNameInMicrodollarUsage,
+} from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
@@ -61,9 +64,11 @@ import {
   drainSseStream,
   extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  calculateCost_mUsd,
+  type KiloExclusiveModel,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
 
 const posthogClient = PostHogClient();
 
@@ -947,7 +952,7 @@ export function calculateKiloExclusiveCost_mUsd(
     });
   }
   return Math.round(
-    pricing.calculate_mUsd(
+    calculateCost_mUsd(
       {
         uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
         totalOutputTokens: usage.outputTokens,
@@ -987,9 +992,18 @@ export async function processTokenData(
       generation,
       usageStats.responseContent,
       usageContext.kiloUserId,
-      usageContext.requested_model,
       usageContext.provider
     );
+
+    if (usageContext.provider === 'vercel' && usageStats.inputTokens > 0) {
+      // It seems Vercel's /generation result does not include cache hit tokens in input tokens, unlike OpenRouter.
+      // Since it's not completely clear this is the case and in the past the numbers were inconsistent
+      // we keep the response usage data if we have it.
+      genStats.inputTokens = usageStats.inputTokens;
+      genStats.outputTokens = usageStats.outputTokens;
+      genStats.cacheHitTokens = usageStats.cacheHitTokens;
+      genStats.cacheWriteTokens = usageStats.cacheWriteTokens;
+    }
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.hasError = usageStats.hasError; // retain by choice
@@ -1003,20 +1017,12 @@ export async function processTokenData(
         [genStats.cacheDiscount_mUsd, usageStats.cacheDiscount_mUsd]
       );
     }
-    if (genStats.inputTokens < usageStats.inputTokens) {
-      console.warn(
-        'Suspicious: fewer input tokens in generation data compared to usage stats. Did provider return Anthropic-style token counts?'
-      );
-    }
     usageStats = genStats;
   }
 
-  if (usageStats.inputTokens - usageStats.cacheHitTokens > 100000)
-    console.warn(`Abuse?: Large uncached token request detected:`, usageStats);
-
   if (
     !usageStats.model || // fallback for failure cases
-    isKiloStealthModel(usageContext.requested_model) // this can probably be removed once we're sure we only present requested_model to users
+    shouldRedactModelNameInMicrodollarUsage(usageContext.provider, usageContext.requested_model)
   ) {
     usageStats.model = usageContext.requested_model;
   }
@@ -1026,6 +1032,8 @@ export async function processTokenData(
     usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
 
+  const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);
+
   // Report upstream cost to abuse service BEFORE zeroing for free/BYOK
   // (abuse service needs actual spend for heuristics like free_tier_exhausted)
   reportAbuseCost(usageContext, usageStats).catch(error => {
@@ -1034,6 +1042,7 @@ export async function processTokenData(
 
   // Preserve the real cost before zeroing for free/BYOK
   usageStats.market_cost = usageStats.cost_mUsd;
+  usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
   if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
@@ -1043,10 +1052,6 @@ export async function processTokenData(
   return logMicrodollarUsage(usageStats, usageContext);
 }
 
-function useAnthropicStyleTokenCounting(requestedModel: string, provider: ProviderId) {
-  return provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel));
-}
-
 async function useGenerationLookup(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
@@ -1054,24 +1059,34 @@ async function useGenerationLookup(
   const isGatewayProvider =
     usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
+  if (!isGatewayProvider || !isSuccessStatusCode) {
+    return false;
+  }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
     (await isFreeModel(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);
-  return (
-    isGatewayProvider &&
-    isSuccessStatusCode &&
-    (!hasOutputTokens || !hasCostWhenPaid || !hasInferenceProvider)
-  );
+  if (!hasOutputTokens) {
+    console.debug('[useGenerationLookup] token stats are missing');
+    return true;
+  }
+  if (!hasCostWhenPaid) {
+    console.debug('[useGenerationLookup] cost is missing');
+    return true;
+  }
+  if (!hasInferenceProvider) {
+    console.debug('[useGenerationLookup] inference provider is missing');
+    return true;
+  }
+  return false;
 }
 
 export const mapToUsageStats = (
   { data }: OpenRouterGeneration,
   responseContent: string,
   kiloUserId: string,
-  requestedModel: string,
   provider: ProviderId
 ): MicrodollarUsageStats => {
   let llmCostUsd;
@@ -1094,16 +1109,18 @@ export const mapToUsageStats = (
     hasError: false,
     model: data.model,
     responseContent,
-    inputTokens: useAnthropicStyleTokenCounting(requestedModel, provider)
-      ? (data.native_tokens_prompt ?? 0) +
-        (data.native_tokens_cached ?? 0) +
-        (data.native_tokens_cache_creation ?? 0)
-      : (data.native_tokens_prompt ?? 0),
+    inputTokens:
+      provider === 'vercel'
+        ? (data.native_tokens_prompt ?? 0) +
+          (data.native_tokens_cached ?? 0) +
+          (data.native_tokens_cache_creation ?? 0)
+        : (data.native_tokens_prompt ?? 0),
     cacheHitTokens: data.native_tokens_cached ?? 0,
     cacheWriteTokens: data.native_tokens_cache_creation ?? 0,
-    outputTokens: useAnthropicStyleTokenCounting(requestedModel, provider)
-      ? (data.native_tokens_completion ?? 0) + (data.native_tokens_reasoning ?? 0)
-      : (data.native_tokens_completion ?? 0),
+    outputTokens:
+      provider === 'vercel'
+        ? (data.native_tokens_completion ?? 0) + (data.native_tokens_reasoning ?? 0)
+        : (data.native_tokens_completion ?? 0),
     cost_mUsd: toMicrodollars(llmCostUsd),
     is_byok: data.is_byok ?? null,
     cacheDiscount_mUsd:

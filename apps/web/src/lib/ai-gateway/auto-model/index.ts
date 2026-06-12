@@ -6,7 +6,8 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 type AutoModel = {
   id: string;
@@ -76,16 +77,6 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: SONNET_FRONTIER,
 };
 
-export const BALANCED_RESPONSES_FALLBACK_MODEL: ResolvedAutoModel = {
-  model: 'openai/gpt-5.5',
-  reasoning: { enabled: true, effort: 'low' },
-};
-
-export const BALANCED_MESSAGES_FALLBACK_MODEL: ResolvedAutoModel = {
-  model: CLAUDE_SONNET_CURRENT_MODEL_ID,
-  reasoning: { enabled: true, effort: 'low' },
-};
-
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },
@@ -93,7 +84,7 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
 };
 
 export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
-  model: qwen36_plus_model.public_id,
+  model: QWEN37_PLUS_MODEL_ID,
   reasoning: { enabled: true },
 };
 
@@ -120,7 +111,8 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Auto Free',
   description:
-    'Rotates through available free models. Limited capability and no credits required.\n\n**Warning:** prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.\n\n[Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)',
+    'Rotates through available free models. Limited capability and no credits required. [Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)\n\n**Warning** Prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.\n\n**In particular** ' +
+    NVIDIA_TRIAL_TOS,
   context_length: 256_000,
   max_completion_tokens: 10_000,
   prompt_price: '0',
@@ -144,9 +136,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   input_cache_write_price: '0.00000040625',
   supports_images: true,
   supports_pdf: false,
-  opencode_settings: {
-    ai_sdk_provider: 'alibaba',
-  },
+  opencode_settings: undefined,
 };
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {

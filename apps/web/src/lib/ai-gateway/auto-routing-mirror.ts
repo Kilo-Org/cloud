@@ -1,5 +1,9 @@
 import { normalizeClassifierInput } from '@kilocode/auto-routing-contracts';
-import type { ClassifierApiKind, MirrorPayload } from '@kilocode/auto-routing-contracts';
+import type {
+  ClassifierApiKind,
+  MirrorPayload,
+  RoutingContext,
+} from '@kilocode/auto-routing-contracts';
 import { after } from 'next/server';
 import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { warnExceptInTest } from '@/lib/utils.server';
@@ -19,6 +23,9 @@ type ScheduleAutoRoutingMirrorParams = {
   clientRequestId: string | null;
   mode: string | null;
   userAgent: string | null;
+  // Present only for kilo-auto requests: the tier, its router candidates,
+  // and the model the static resolver picked.
+  routing?: RoutingContext | null;
   authContext?: Promise<{ organizationId?: string | null }>;
 };
 
@@ -62,6 +69,7 @@ async function sendAutoRoutingMirror(
     mode: params.mode,
     userAgent: params.userAgent,
     bodyBytes: params.bodyBytes,
+    routing: params.routing ?? null,
   };
 
   const response = await fetch(`${workerUrl}/decide`, {

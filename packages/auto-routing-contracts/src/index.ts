@@ -7,6 +7,23 @@ export {
   type NormalizedClassifierInput,
 } from './input';
 
+// Routing context for kilo-auto requests: which pseudo-model the user
+// selected, which models that tier may route among, and what the gateway's
+// static resolver picked. The worker uses it to produce (and score) routing
+// decisions; non-auto requests carry no routing context.
+export const RoutingContextSchema = z.object({
+  // The kilo-auto pseudo-model from the original request, e.g.
+  // 'kilo-auto/frontier'.
+  autoModel: z.string().trim().min(1),
+  // Kilo public model ids this tier may route among. The gateway owns this
+  // set so tier membership stays a product decision, not a worker default.
+  candidateModels: z.array(z.string().trim().min(1)).max(32),
+  // The model the static resolver picked for this request; the baseline a
+  // router decision is compared against.
+  resolvedModel: z.string().trim().min(1).nullable(),
+});
+export type RoutingContext = z.infer<typeof RoutingContextSchema>;
+
 // What the gateway mirrors to the auto-routing worker per request: the
 // already-normalized classifier input plus caller identity. The gateway
 // normalizes before sending so the multi-hundred-KB request body never
@@ -25,6 +42,8 @@ export const MirrorPayloadSchema = z.object({
   // Size of the original request body, kept as an analytics dimension now
   // that the body itself is no longer mirrored.
   bodyBytes: z.number().int().nonnegative(),
+  // Optional so gateway and worker deploys never have to coordinate.
+  routing: RoutingContextSchema.nullable().optional(),
 });
 export type MirrorPayload = z.infer<typeof MirrorPayloadSchema>;
 
@@ -96,9 +115,24 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
+// A routing decision produced by the Morph model router
+// (https://docs.morphllm.com/sdk/components/router). `model` is the Kilo
+// public id to serve; `routerModel` is the router-catalog id it mapped from.
+// Classification heads below their confidence threshold come back null.
+export const RouterDecisionSchema = z.object({
+  source: z.literal('morph_router'),
+  model: z.string().trim().min(1),
+  routerModel: z.string().trim().min(1),
+  difficulty: z.string().nullable(),
+  confidence: z.number().nullable(),
+  ambiguity: z.string().nullable(),
+  domain: z.string().nullable(),
+});
+export type RouterDecision = z.infer<typeof RouterDecisionSchema>;
+
 export const AutoRoutingDecisionResponseSchema = z.object({
   cost: z.number(),
-  decision: z.null(),
+  decision: RouterDecisionSchema.nullable(),
   classifierResult: z
     .object({
       classification: ClassifierOutputSchema,

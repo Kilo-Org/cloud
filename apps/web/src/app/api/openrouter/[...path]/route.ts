@@ -89,7 +89,11 @@ import {
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import {
+  getMorphRouterCandidates,
+  isKiloAutoModel,
+  KILO_AUTO_FREE_MODEL,
+} from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import {
@@ -731,6 +735,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     clientRequestId,
     mode: modeHeader,
     userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+    // effectiveModelIdLowerCased is final here: static auto resolution and
+    // any rules-engine override have both been applied.
+    routing: autoModel
+      ? {
+          autoModel,
+          candidateModels: [...getMorphRouterCandidates(autoModel)],
+          resolvedModel: effectiveModelIdLowerCased,
+        }
+      : null,
     authContext: Promise.resolve({ organizationId }),
   });
 

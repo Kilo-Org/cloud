@@ -1,9 +1,15 @@
 import { z } from 'zod';
 import {
+  CLAUDE_HAIKU_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
+import {
+  GEMINI_FLASH_CURRENT_MODEL_ID,
+  GEMINI_PRO_CURRENT_MODEL_ID,
+} from '@/lib/ai-gateway/providers/google';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
@@ -163,4 +169,36 @@ export const AUTO_MODELS = [
 
 export function isKiloAutoModel(model: string) {
   return AUTO_MODELS.some(m => m.id === model) || model === KILO_AUTO_LEGACY_MODEL;
+}
+
+// Models each kilo-auto tier may route among when a per-prompt router (the
+// Morph model router, consulted by the auto-routing worker) picks the model
+// instead of the static mode mapping. Membership here is a product decision:
+// frontier may roam across frontier-class models from any provider, balanced
+// across mid-priced models. Tiers absent from this map (free rotates by
+// availability, small is balance-based) keep static resolution only.
+//
+// Per .specs/model-experiments.md, experimented public ids must never be
+// added to these candidate sets.
+const MORPH_ROUTER_TIER_CANDIDATES: Record<string, readonly string[]> = {
+  [KILO_AUTO_FRONTIER_MODEL.id]: [
+    CLAUDE_OPUS_CURRENT_MODEL_ID,
+    CLAUDE_SONNET_CURRENT_MODEL_ID,
+    GPT_CURRENT_MODEL_ID,
+    GEMINI_PRO_CURRENT_MODEL_ID,
+  ],
+  [KILO_AUTO_BALANCED_MODEL.id]: [
+    QWEN37_PLUS_MODEL_ID,
+    CLAUDE_HAIKU_CURRENT_MODEL_ID,
+    GEMINI_FLASH_CURRENT_MODEL_ID,
+  ],
+  [KILO_AUTO_LEGACY_MODEL]: [
+    QWEN37_PLUS_MODEL_ID,
+    CLAUDE_HAIKU_CURRENT_MODEL_ID,
+    GEMINI_FLASH_CURRENT_MODEL_ID,
+  ],
+};
+
+export function getMorphRouterCandidates(autoModel: string): readonly string[] {
+  return MORPH_ROUTER_TIER_CANDIDATES[autoModel] ?? [];
 }

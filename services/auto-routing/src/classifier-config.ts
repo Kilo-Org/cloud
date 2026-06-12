@@ -4,6 +4,7 @@ import { ttlCached } from './ttl-cache';
 
 export const CLASSIFIER_MODEL_CONFIG_KEY = 'classifier_model';
 export const DECISION_LOG_SAMPLE_RATE_CONFIG_KEY = 'decision_log_sample_rate';
+export const MORPH_ROUTER_ENABLED_CONFIG_KEY = 'morph_router_enabled';
 
 // Successful decisions are high volume (~30/s) and only needed for latency
 // and cache hit-rate percentiles, so they are sampled by default. The rate
@@ -38,9 +39,18 @@ const decisionLogSampleRateCache = ttlCached(
   }
 );
 
+// Morph router decisions are off unless explicitly enabled, so the worker
+// never sends prompt prefixes to a third-party router without an operator
+// opting in. Same KV+TTL pattern as the classifier model.
+const morphRouterEnabledCache = ttlCached(CONFIG_CACHE_TTL_MS, async (env: ClassifierConfigEnv) => {
+  const configured = await env.AUTO_ROUTING_CONFIG.get(MORPH_ROUTER_ENABLED_CONFIG_KEY);
+  return configured?.trim() === 'true';
+});
+
 export function clearClassifierConfigCache(): void {
   classifierModelCache.clear();
   decisionLogSampleRateCache.clear();
+  morphRouterEnabledCache.clear();
 }
 
 // Config reads run before the guarded decision path. A transient KV failure
@@ -67,6 +77,10 @@ export function getDecisionLogSampleRate(env: ClassifierConfigEnv): Promise<numb
   return decisionLogSampleRateCache
     .get(env)
     .catch(failClosed(DECISION_LOG_SAMPLE_RATE_CONFIG_KEY, DEFAULT_DECISION_LOG_SAMPLE_RATE));
+}
+
+export function getMorphRouterEnabled(env: ClassifierConfigEnv): Promise<boolean> {
+  return morphRouterEnabledCache.get(env).catch(failClosed(MORPH_ROUTER_ENABLED_CONFIG_KEY, false));
 }
 
 export async function setClassifierModel(

@@ -1,0 +1,19 @@
+# Auto-routing worker local development secrets.
+#
+# Copy this file to .dev.vars to boot the worker locally:
+#   cp .dev.vars.example .dev.vars
+#
+# Wrangler serves these as the local values for the secrets-store bindings
+# declared in wrangler.jsonc.
+#
+# Bearer token the gateway uses to call this worker; any non-empty value
+# works locally as long as requests send the same one.
+INTERNAL_API_SECRET_PROD=local-dev-secret
+
+# OpenRouter key used by the prompt classifier (https://openrouter.ai/keys).
+OPENROUTER_API_KEY=replace-me
+
+# Morph key used by the model router (https://morphllm.com — dashboard > API
+# keys). Only consulted when the morph_router_enabled KV flag is 'true':
+#   wrangler kv key put morph_router_enabled true --binding AUTO_ROUTING_CONFIG --local
+MORPH_API_KEY=replace-me

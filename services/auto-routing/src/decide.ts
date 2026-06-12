@@ -3,12 +3,17 @@ import type {
   AutoRoutingDecisionResponse,
   MirrorPayload,
   NormalizedClassifierInput,
+  RouterDecision,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import type { ClassifierAnalyticsStatus } from './classifier-analytics';
-import { getClassifierModel, getDecisionLogSampleRate } from './classifier-config';
+import {
+  getClassifierModel,
+  getDecisionLogSampleRate,
+  getMorphRouterEnabled,
+} from './classifier-config';
 import type { ClassifierOutput } from './classifier-output';
 import {
   computeContentHashes,
@@ -17,9 +22,15 @@ import {
   hashIdentifierForTelemetry,
 } from './conversation-identity';
 import type { ContentHashes } from './conversation-identity';
-import { getCachedClassification, putCachedClassification } from './decision-cache';
+import {
+  getCachedClassification,
+  getCachedRouterDecision,
+  putCachedClassification,
+  putCachedRouterDecision,
+} from './decision-cache';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
+import { MorphRouterError, routeWithMorphRouter, routerConfigFingerprint } from './morph-router';
 import type { HonoEnv } from './hono-env';
 
 // Isolate-scoped request counter, used to correlate latency with isolate
@@ -29,19 +40,23 @@ let isolateRequestSeq = 0;
 function decisionResponse(
   cost: number,
   classification: ClassifierOutput,
-  normalized: NormalizedClassifierInput
+  normalized: NormalizedClassifierInput,
+  decision: RouterDecision | null
 ): AutoRoutingDecisionResponse {
   return {
     cost,
-    decision: null,
+    decision,
     classifierResult: { classification, normalized },
   };
 }
 
-function emptyDecisionResponse(cost = 0): AutoRoutingDecisionResponse {
+function emptyDecisionResponse(
+  cost = 0,
+  decision: RouterDecision | null = null
+): AutoRoutingDecisionResponse {
   return {
     cost,
-    decision: null,
+    decision,
     classifierResult: null,
   };
 }
@@ -248,6 +263,122 @@ function recordDecision(
   );
 }
 
+type RouterDecisionStatus = 'routed' | `skipped:${string}` | `router_error:${string}`;
+
+// Single sink for router telemetry, mirroring recordDecision: routed
+// outcomes (including cache hits) and skips are sampled, errors always log
+// at warn. Skips fire on every request of a tier with no routable
+// candidates, so they share the success sample rate.
+function recordRouterDecision(
+  ctx: DecisionContext,
+  durationMs: number,
+  status: RouterDecisionStatus,
+  decision: RouterDecision | null,
+  cacheHit: boolean,
+  details: Record<string, unknown>
+): void {
+  const isFailure = status.startsWith('router_error:');
+  if (!isFailure && Math.random() >= ctx.successSampleRate) {
+    return;
+  }
+  const log = isFailure ? console.warn : console.log;
+  log(
+    JSON.stringify({
+      event: 'auto_routing_router_decision',
+      status,
+      cacheHit,
+      autoModel: ctx.payload.routing?.autoModel ?? null,
+      resolvedModel: ctx.payload.routing?.resolvedModel ?? null,
+      routedModel: decision?.model ?? null,
+      routerModel: decision?.routerModel ?? null,
+      difficulty: decision?.difficulty ?? null,
+      confidence: decision?.confidence ?? null,
+      ambiguity: decision?.ambiguity ?? null,
+      domain: decision?.domain ?? null,
+      routerDurationMs: Math.round(durationMs),
+      requestedModel: ctx.payload.input.requestedModel,
+      apiKind: ctx.payload.input.apiKind,
+      sessionId: ctx.payload.sessionId,
+      clientRequestId: ctx.payload.clientRequestId,
+      userIdHash: ctx.userIdHash,
+      mode: ctx.payload.mode,
+      reqSeq: ctx.reqSeq,
+      colo: ctx.colo,
+      ...details,
+    })
+  );
+}
+
+// Produces the Morph router decision for kilo-auto requests that carry
+// routing context. Runs alongside classification and never throws: a router
+// failure must not cost the caller a classification (or vice versa), so all
+// failure modes collapse to a null decision plus telemetry.
+async function resolveRouterDecision(
+  env: Env,
+  ctx: DecisionContext,
+  waitUntil: (promise: Promise<unknown>) => void
+): Promise<RouterDecision | null> {
+  const routing = ctx.payload.routing;
+  if (!routing) return null;
+  if (!(await getMorphRouterEnabled(env))) return null;
+
+  const startedAt = performance.now();
+  const fingerprint = routerConfigFingerprint(routing);
+  const cached = await getCachedRouterDecision(
+    env,
+    ctx.conversationKey,
+    ctx.hashes.exact,
+    fingerprint
+  );
+  if (cached) {
+    recordRouterDecision(ctx, performance.now() - startedAt, 'routed', cached, true, {});
+    return cached;
+  }
+
+  try {
+    const outcome = await routeWithMorphRouter(env, routing, ctx.payload.input);
+    if (outcome.kind === 'skipped') {
+      recordRouterDecision(
+        ctx,
+        performance.now() - startedAt,
+        `skipped:${outcome.reason}`,
+        null,
+        false,
+        {}
+      );
+      return null;
+    }
+    waitUntil(
+      putCachedRouterDecision(
+        env,
+        ctx.conversationKey,
+        ctx.hashes.exact,
+        fingerprint,
+        outcome.decision
+      )
+    );
+    recordRouterDecision(ctx, performance.now() - startedAt, 'routed', outcome.decision, false, {
+      policy: outcome.policy,
+      candidateCount: outcome.candidateCount,
+    });
+    return outcome.decision;
+  } catch (error) {
+    const status: RouterDecisionStatus =
+      error instanceof MorphRouterError
+        ? `router_error:${error.failureStage}`
+        : 'router_error:unexpected_error';
+    recordRouterDecision(
+      ctx,
+      performance.now() - startedAt,
+      status,
+      null,
+      false,
+      formatError(error)
+    );
+    return null;
+  }
+}
+
 export const decideHandler: Handler<HonoEnv> = async c => {
   let rawBody: unknown;
   try {
@@ -281,6 +412,12 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     successSampleRate,
   };
 
+  // The router decision runs alongside the classification flow; both
+  // resolve before the response so the gateway gets one combined result.
+  const routerDecisionPromise = resolveRouterDecision(c.env, ctx, promise =>
+    c.executionCtx.waitUntil(promise)
+  );
+
   const cached = await getCachedClassification(
     c.env,
     ctx.conversationKey,
@@ -293,7 +430,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       classifierModel,
       classification: cached,
     });
-    return c.json(decisionResponse(0, cached, payload.input));
+    return c.json(decisionResponse(0, cached, payload.input, await routerDecisionPromise));
   }
 
   try {
@@ -312,14 +449,25 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       );
     }
     recordDecision(c.env, ctx, performance.now() - startedAt, { kind: 'model', classifier });
-    // When routing decisions are implemented, include the prior decision for
-    // this session as an input alongside classifier output.
-    return c.json(decisionResponse(classifier.cost ?? 0, classifier.classification, payload.input));
+    return c.json(
+      decisionResponse(
+        classifier.cost ?? 0,
+        classifier.classification,
+        payload.input,
+        await routerDecisionPromise
+      )
+    );
   } catch (error) {
     recordDecision(c.env, ctx, performance.now() - startedAt, { kind: 'error', error });
     // A failed run can still have billed the first attempt (e.g. a valid-but-
     // invalid response followed by a throwing retry), so report that cost
-    // even though there is no usable classifier result.
-    return c.json(emptyDecisionResponse(getClassifierFailureMetadata(error).cost ?? 0));
+    // even though there is no usable classifier result. A router decision is
+    // still useful without a classification, so it is returned regardless.
+    return c.json(
+      emptyDecisionResponse(
+        getClassifierFailureMetadata(error).cost ?? 0,
+        await routerDecisionPromise
+      )
+    );
   }
 };

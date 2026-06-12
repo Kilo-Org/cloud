@@ -55,6 +55,58 @@ describe('auto routing contracts', () => {
       })
     ).toEqual({ cost: 0, decision: null, classifierResult: null });
 
+    // Routing context is optional (deploys never coordinate) and validated
+    // when present.
+    const routing = {
+      autoModel: 'kilo-auto/frontier',
+      candidateModels: ['anthropic/claude-opus-4.8', 'openai/gpt-5.5'],
+      resolvedModel: 'anthropic/claude-opus-4.8',
+    };
+    expect(MirrorPayloadSchema.parse({ ...mirrorPayload, routing })).toMatchObject({ routing });
+    expect(MirrorPayloadSchema.parse({ ...mirrorPayload, routing: null })).toMatchObject({
+      routing: null,
+    });
+    expect(() =>
+      MirrorPayloadSchema.parse({ ...mirrorPayload, routing: { autoModel: '' } })
+    ).toThrow();
+    expect(() =>
+      MirrorPayloadSchema.parse({
+        ...mirrorPayload,
+        routing: { ...routing, candidateModels: [''] },
+      })
+    ).toThrow();
+
+    const routerDecision = {
+      source: 'morph_router',
+      model: 'anthropic/claude-sonnet-4.6',
+      routerModel: 'claude-sonnet-4-6',
+      difficulty: 'easy',
+      confidence: 0.97,
+      ambiguity: 'low',
+      domain: 'coding',
+    };
+    expect(
+      AutoRoutingDecisionResponseSchema.parse({
+        cost: 0,
+        decision: routerDecision,
+        classifierResult: null,
+      })
+    ).toMatchObject({ decision: { model: 'anthropic/claude-sonnet-4.6' } });
+    expect(
+      AutoRoutingDecisionResponseSchema.parse({
+        cost: 0,
+        decision: { ...routerDecision, difficulty: null, confidence: null },
+        classifierResult: null,
+      })
+    ).toMatchObject({ decision: { difficulty: null } });
+    expect(() =>
+      AutoRoutingDecisionResponseSchema.parse({
+        cost: 0,
+        decision: { ...routerDecision, source: 'other_router' },
+        classifierResult: null,
+      })
+    ).toThrow();
+
     expect(
       AutoRoutingDecisionResponseSchema.parse({
         cost: 0,

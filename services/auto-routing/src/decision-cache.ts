@@ -1,4 +1,9 @@
-import { ClassifierOutputSchema, type ClassifierOutput } from '@kilocode/auto-routing-contracts';
+import {
+  ClassifierOutputSchema,
+  RouterDecisionSchema,
+  type ClassifierOutput,
+  type RouterDecision,
+} from '@kilocode/auto-routing-contracts';
 import { DurableObject } from 'cloudflare:workers';
 
 // Mirrored agent sessions classify the same prompt prefixes on every API
@@ -13,13 +18,18 @@ const ENTRY_TTL_MS = 30 * 60 * 1000;
 // Cloudflare caps storage.delete() at 128 keys per call.
 const DELETE_BATCH_SIZE = 128;
 
+// Classifications and router decisions share one object per conversation;
+// entries may have been written by an older worker version, so read sites
+// validate values with the matching schema before serving them.
+type CacheableValue = ClassifierOutput | RouterDecision;
+
 type StoredEntry = {
-  value: ClassifierOutput;
+  value: CacheableValue;
   storedAt: number;
 };
 
 export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
-  async getEntry(key: string): Promise<ClassifierOutput | null> {
+  async getEntry(key: string): Promise<CacheableValue | null> {
     const entry = await this.ctx.storage.get<StoredEntry>(key);
     if (!entry) return null;
     if (Date.now() - entry.storedAt > ENTRY_TTL_MS) {
@@ -29,7 +39,7 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
     return entry.value;
   }
 
-  async putEntry(key: string, value: ClassifierOutput): Promise<void> {
+  async putEntry(key: string, value: CacheableValue): Promise<void> {
     await this.ctx.storage.put(key, { value, storedAt: Date.now() } satisfies StoredEntry);
     // A fixed-period sweep (rather than an idle alarm pushed out on every
     // write) so storage stays bounded even when distinct conversations
@@ -104,6 +114,47 @@ export async function putCachedClassification(
     await cacheStub(env, conversationKey).putEntry(
       entryKey(contentHash, classifierModel),
       classification
+    );
+  } catch {
+    // Cache writes are best effort and must not fail the decision.
+  }
+}
+
+function routerEntryKey(contentHash: string, configFingerprint: string): string {
+  // The candidate-set/policy fingerprint is part of the key so tier or
+  // policy changes never serve a model the new config would not pick.
+  return `morph:${configFingerprint}:${contentHash}`;
+}
+
+export async function getCachedRouterDecision(
+  env: DecisionCacheEnv,
+  conversationKey: string,
+  contentHash: string,
+  configFingerprint: string
+): Promise<RouterDecision | null> {
+  try {
+    const value = await cacheStub(env, conversationKey).getEntry(
+      routerEntryKey(contentHash, configFingerprint)
+    );
+    if (!value) return null;
+    const parsed = RouterDecisionSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function putCachedRouterDecision(
+  env: DecisionCacheEnv,
+  conversationKey: string,
+  contentHash: string,
+  configFingerprint: string,
+  decision: RouterDecision
+): Promise<void> {
+  try {
+    await cacheStub(env, conversationKey).putEntry(
+      routerEntryKey(contentHash, configFingerprint),
+      decision
     );
   } catch {
     // Cache writes are best effort and must not fail the decision.

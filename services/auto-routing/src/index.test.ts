@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearClassifierConfigCache } from './classifier-config';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
+import { clearMorphApiKeyCache, MORPH_ROUTER_ENDPOINT } from './morph-router';
 import type * as ModelClassifierModule from './model-classifier';
 
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
@@ -24,6 +25,9 @@ const mockedFetch = vi.fn<typeof globalThis.fetch>();
 const env = {
   INTERNAL_API_SECRET_PROD: {
     get: async () => 'classifier-token',
+  },
+  MORPH_API_KEY: {
+    get: async () => 'morph-key',
   },
   AUTO_ROUTING_CONFIG: {
     get: configGet,
@@ -117,6 +121,7 @@ function decideRequest(payload: unknown) {
 describe('auto routing worker', () => {
   beforeEach(() => {
     clearClassifierConfigCache();
+    clearMorphApiKeyCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
     writeDataPoint.mockReset();
@@ -382,6 +387,206 @@ describe('auto routing worker', () => {
         '',
       ],
       doubles: [expect.any(Number), 0.00000123, -1, 0],
+    });
+  });
+
+  describe('morph router decisions', () => {
+    const frontierRouting = {
+      autoModel: 'kilo-auto/frontier',
+      candidateModels: [
+        'anthropic/claude-opus-4.8',
+        'anthropic/claude-sonnet-4.6',
+        'openai/gpt-5.5',
+        'google/gemini-3.1-pro-preview',
+      ],
+      resolvedModel: 'anthropic/claude-opus-4.8',
+    };
+
+    const morphDecision = {
+      source: 'morph_router',
+      model: 'anthropic/claude-sonnet-4.6',
+      routerModel: 'claude-sonnet-4-6',
+      difficulty: 'easy',
+      confidence: 0.97,
+      ambiguity: 'low',
+      domain: 'coding',
+    };
+
+    function enableMorphRouter() {
+      configGet.mockImplementation(async (key: string) =>
+        key === 'morph_router_enabled' ? 'true' : null
+      );
+    }
+
+    function mockMorphResponse() {
+      mockedFetch.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            provider: 'anthropic',
+            difficulty: 'easy',
+            confidence: 0.97,
+            ambiguity: 'low',
+            domain: 'coding',
+          }),
+          { status: 200 }
+        )
+      );
+    }
+
+    it('returns a morph decision alongside the classification when enabled', async () => {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      enableMorphRouter();
+      mockMorphResponse();
+
+      const response = await decideRequest(mirrorPayload({ routing: frontierRouting }));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        cost: 0.00000123,
+        decision: morphDecision,
+        classifierResult: {
+          classification: mockClassification,
+          normalized: normalizedInput,
+        },
+      });
+      expect(mockedFetch).toHaveBeenCalledWith(
+        MORPH_ROUTER_ENDPOINT,
+        expect.objectContaining({ method: 'POST' })
+      );
+      // One classifier decision line and one router decision line.
+      const routerLog = logSpy.mock.calls
+        .map(call => JSON.parse(String(call[0])))
+        .find(line => line.event === 'auto_routing_router_decision');
+      expect(routerLog).toMatchObject({
+        status: 'routed',
+        cacheHit: false,
+        autoModel: 'kilo-auto/frontier',
+        resolvedModel: 'anthropic/claude-opus-4.8',
+        routedModel: 'anthropic/claude-sonnet-4.6',
+        routerModel: 'claude-sonnet-4-6',
+        difficulty: 'easy',
+        policy: 'capability_heavy',
+        candidateCount: 4,
+        userIdHash: expect.stringMatching(/^[0-9a-f]{16}$/),
+      });
+      expect(JSON.stringify(routerLog)).not.toContain('user-1');
+      // The fresh decision is cached for the conversation, scoped by the
+      // candidate-set fingerprint.
+      expect(cachePutEntry).toHaveBeenCalledWith(
+        expect.stringMatching(/^morph:capability_heavy:/),
+        morphDecision
+      );
+    });
+
+    it('returns a null decision without calling Morph when the flag is off', async () => {
+      const response = await decideRequest(mirrorPayload({ routing: frontierRouting }));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ decision: null });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('returns a null decision for payloads without routing context', async () => {
+      enableMorphRouter();
+
+      const response = await decideRequest(mirrorPayload());
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ decision: null });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('serves cached router decisions without calling Morph again', async () => {
+      enableMorphRouter();
+      cacheGetEntry.mockImplementation(async (key: string) =>
+        key.startsWith('morph:') ? morphDecision : null
+      );
+
+      const response = await decideRequest(mirrorPayload({ routing: frontierRouting }));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ decision: morphDecision });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(cachePutEntry).toHaveBeenCalledTimes(1); // classification only
+    });
+
+    it('still returns the classification when the router call fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      enableMorphRouter();
+      mockedFetch.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
+
+      const response = await decideRequest(mirrorPayload({ routing: frontierRouting }));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        cost: 0.00000123,
+        decision: null,
+        classifierResult: {
+          classification: mockClassification,
+          normalized: normalizedInput,
+        },
+      });
+      const routerLog = warnSpy.mock.calls
+        .map(call => JSON.parse(String(call[0])))
+        .find(line => line.event === 'auto_routing_router_decision');
+      expect(routerLog).toMatchObject({ status: 'router_error:http_503' });
+    });
+
+    it('still returns the router decision when the classifier fails', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      enableMorphRouter();
+      mockMorphResponse();
+      classifyNormalizedInput.mockRejectedValueOnce(
+        new ClassifierRunError('classifier exploded', {
+          cost: null,
+          classifierModel: 'google/gemini-2.5-flash-lite',
+        })
+      );
+
+      const response = await decideRequest(mirrorPayload({ routing: frontierRouting }));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        cost: 0,
+        decision: morphDecision,
+        classifierResult: null,
+      });
+    });
+
+    it('logs skipped routing for tiers without enough routable candidates', async () => {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      enableMorphRouter();
+
+      const response = await decideRequest(
+        mirrorPayload({
+          routing: {
+            autoModel: 'kilo-auto/balanced',
+            candidateModels: ['qwen/qwen3.7-plus'],
+            resolvedModel: 'qwen/qwen3.7-plus',
+          },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ decision: null });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      const routerLog = logSpy.mock.calls
+        .map(call => JSON.parse(String(call[0])))
+        .find(line => line.event === 'auto_routing_router_decision');
+      expect(routerLog).toMatchObject({ status: 'skipped:insufficient_candidates' });
+    });
+
+    it('rejects payloads with malformed routing context', async () => {
+      const response = await decideRequest(
+        mirrorPayload({ routing: { autoModel: 'kilo-auto/frontier' } })
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'Invalid classifier payload' });
     });
   });
 

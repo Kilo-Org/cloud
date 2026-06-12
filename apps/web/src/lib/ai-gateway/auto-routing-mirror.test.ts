@@ -85,6 +85,7 @@ describe('scheduleAutoRoutingMirror', () => {
       mode: 'code',
       userAgent: 'Kilo-Code/1.2.3',
       bodyBytes: 512,
+      routing: null,
     });
     // TypeScript cannot see the schema's runtime refinements (.trim().min(1)
     // etc.), so round-trip the built payload through the worker's validator.
@@ -93,6 +94,24 @@ describe('scheduleAutoRoutingMirror', () => {
     const headers = init?.headers as Headers;
     expect(headers.get('authorization')).toBe('Bearer classifier-token');
     expect(headers.get('content-type')).toBe('application/json');
+  });
+
+  it('passes the kilo-auto routing context through to the worker', async () => {
+    const routing = {
+      autoModel: 'kilo-auto/frontier',
+      candidateModels: ['anthropic/claude-opus-4.8', 'openai/gpt-5.5'],
+      resolvedModel: 'anthropic/claude-opus-4.8',
+    };
+    scheduleAutoRoutingMirror(
+      { ...makeParams(), routing },
+      work => scheduledWork.push(work),
+      options
+    );
+    await scheduledWork[0]();
+
+    const payload = JSON.parse(mockedFetch.mock.calls[0][1]?.body as string);
+    expect(payload.routing).toEqual(routing);
+    expect(() => MirrorPayloadSchema.parse(payload)).not.toThrow();
   });
 
   it('skips mirroring when the body cannot be normalized, with a log for visibility', async () => {

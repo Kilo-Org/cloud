@@ -477,7 +477,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       decision: {
         model: 'anthropic/claude-haiku-4',
         tier: 'low',
-        source: 'cache',
+        source: 'benchmark' as const,
         tableVersion: 'v1',
       },
       costUsd: 0,

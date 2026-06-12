@@ -877,7 +877,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     after(
       (async () => {
         try {
-          if (await isFreeModel(KILO_AUTO_EFFICIENT_MODEL.id)) return;
           const classifierStats: MicrodollarUsageStats = {
             messageId: null,
             model: 'auto-routing/classifier',

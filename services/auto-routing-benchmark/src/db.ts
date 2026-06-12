@@ -6,6 +6,7 @@ import type {
   RankedCandidate,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
+import type { BatchItem } from 'drizzle-orm/batch';
 import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import { and, count, desc, eq, inArray, lt } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
@@ -123,10 +124,7 @@ export async function replaceConfig(
   deciderModels: ConfigDeciderModelRow[]
 ): Promise<void> {
   const orm = drizzle(db);
-  // Build the batch as a plain array; the cast is required because drizzle's
-  // batch type is a readonly non-empty tuple, but we populate it conditionally.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stmts: any[] = [
+  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm
       .insert(benchmarkConfig)
       .values({ id: 1, ...config })
@@ -145,7 +143,7 @@ export async function replaceConfig(
   if (deciderModels.length > 0) {
     stmts.push(orm.insert(configDeciderModels).values(deciderModels));
   }
-  await orm.batch(stmts as unknown as Parameters<typeof orm.batch>[0]);
+  await orm.batch(stmts);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,8 +179,7 @@ export async function insertRun(
     return;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stmts: any[] = [insertRunStmt];
+  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [insertRunStmt];
 
   if (models.length > 0) {
     stmts.push(orm.insert(runModels).values(models));
@@ -207,7 +204,7 @@ export async function insertRun(
     );
   }
 
-  await orm.batch(stmts as unknown as Parameters<typeof orm.batch>[0]);
+  await orm.batch(stmts);
 }
 
 export async function getRunWithModels(
@@ -456,7 +453,10 @@ export function rowsToRoutingTable(
     tierMap[row.tier].push({
       model: row.model,
       accuracy: row.accuracy,
-      avgCostUsd: row.avg_cost_usd ?? 0,
+      // Pass through the stored value; a NULL here means corrupted data.
+      // getLatestRoutingTable runs RoutingTableSchema.safeParse which will
+      // reject the table rather than serving a null cost as 0 (cheapest).
+      avgCostUsd: row.avg_cost_usd as number,
       meetsThreshold: row.meets_threshold,
       supportedApiKinds: flagsToApiKinds(row),
       reasoningEffort: row.reasoning_effort as RankedCandidate['reasoningEffort'],
@@ -483,8 +483,7 @@ export async function saveRoutingTable(
   const orm = drizzle(db);
   const { tableRow, candidateRows } = routingTableToRows(table, publishedAt);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stmts: any[] = [
+  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm.delete(routingTableCandidates).where(eq(routingTableCandidates.run_id, table.version)),
     orm
       .insert(routingTables)
@@ -504,7 +503,7 @@ export async function saveRoutingTable(
     stmts.push(orm.insert(routingTableCandidates).values(candidateRows));
   }
 
-  await orm.batch(stmts as unknown as Parameters<typeof orm.batch>[0]);
+  await orm.batch(stmts);
 }
 
 export async function getLatestRoutingTable(

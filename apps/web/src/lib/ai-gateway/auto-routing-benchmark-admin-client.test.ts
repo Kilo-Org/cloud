@@ -34,25 +34,6 @@ const configResponse = {
     updatedAt: null,
     updatedBy: null,
   },
-  defaults: {
-    classifierModels: ['anthropic/claude-haiku-4'],
-    deciderModels: [
-      {
-        id: 'anthropic/claude-sonnet-4',
-        supportedApiKinds: ['chat_completions' as const] as (
-          | 'chat_completions'
-          | 'responses'
-          | 'messages'
-        )[],
-        reasoningEffort: null,
-      },
-    ],
-    minAccuracy: 0.8,
-    maxConcurrency: 4,
-    benchmarkUserId: null,
-    updatedAt: null,
-    updatedBy: null,
-  },
 };
 
 const runsResponse = {

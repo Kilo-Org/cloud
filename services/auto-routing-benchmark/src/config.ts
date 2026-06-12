@@ -1,45 +1,9 @@
 import type { BenchmarkConfig } from '@kilocode/auto-routing-contracts';
 import { apiKindsToFlags, getConfigRows, replaceConfig, type ConfigDeciderModelRow } from './db';
 
-export const DEFAULT_BENCHMARK_CONFIG: BenchmarkConfig = {
-  classifierModels: [
-    'google/gemini-2.5-flash-lite',
-    'google/gemini-2.5-flash',
-    'openai/gpt-5-mini',
-    'qwen/qwen3.7-plus',
-  ],
-  deciderModels: [
-    {
-      id: 'google/gemini-2.5-flash-lite',
-      supportedApiKinds: ['chat_completions'],
-      reasoningEffort: null,
-    },
-    {
-      id: 'google/gemini-2.5-flash',
-      supportedApiKinds: ['chat_completions'],
-      reasoningEffort: null,
-    },
-    { id: 'qwen/qwen3.7-plus', supportedApiKinds: ['chat_completions'], reasoningEffort: null },
-    {
-      id: 'openai/gpt-5.5',
-      supportedApiKinds: ['chat_completions', 'responses'],
-      reasoningEffort: null,
-    },
-    {
-      id: 'anthropic/claude-sonnet-4.6',
-      supportedApiKinds: ['chat_completions', 'messages', 'responses'],
-      reasoningEffort: null,
-    },
-  ],
-  minAccuracy: 0.7,
-  maxConcurrency: 4,
-  benchmarkUserId: null,
-  updatedAt: null,
-  updatedBy: null,
-};
-
 // Maps the three normalized config tables to the BenchmarkConfig contract.
-// Falls back to DEFAULT_BENCHMARK_CONFIG fields when no config row exists.
+// Null when no admin has saved a config yet — the worker never fabricates
+// one, and runs cannot start until a config exists.
 export function mapConfigRows(
   configRow: {
     min_accuracy: number;
@@ -50,9 +14,9 @@ export function mapConfigRows(
   } | null,
   classifierModels: string[],
   deciderModelRows: ConfigDeciderModelRow[]
-): BenchmarkConfig {
+): BenchmarkConfig | null {
   if (configRow === null || classifierModels.length === 0 || deciderModelRows.length === 0) {
-    return DEFAULT_BENCHMARK_CONFIG;
+    return null;
   }
 
   return {
@@ -75,7 +39,7 @@ export function mapConfigRows(
   };
 }
 
-export async function getBenchmarkConfig(db: D1Database): Promise<BenchmarkConfig> {
+export async function getBenchmarkConfig(db: D1Database): Promise<BenchmarkConfig | null> {
   const { config, classifierModels, deciderModels } = await getConfigRows(db);
   return mapConfigRows(config, classifierModels, deciderModels);
 }

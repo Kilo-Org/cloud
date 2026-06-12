@@ -16,7 +16,7 @@ import {
 import React, { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ChevronDown, ChevronRight, Play, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Play, Plus, Save, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -110,13 +110,24 @@ type DeciderModelRow = {
   reasoningEffort: ReasoningEffort | null;
 };
 
-function configToFormState(config: BenchmarkConfig): {
+function configToFormState(config: BenchmarkConfig | null): {
   classifierModels: string;
   deciderModels: DeciderModelRow[];
   minAccuracy: number;
   maxConcurrency: number;
   benchmarkUserId: string;
 } {
+  if (config === null) {
+    // No config saved yet: the worker fabricates nothing, so the form starts
+    // empty and the admin must enter and save a config before running.
+    return {
+      classifierModels: '',
+      deciderModels: [],
+      minAccuracy: 0.7,
+      maxConcurrency: 4,
+      benchmarkUserId: '',
+    };
+  }
   return {
     classifierModels: config.classifierModels.join('\n'),
     deciderModels: config.deciderModels.map(m => ({
@@ -131,7 +142,7 @@ function configToFormState(config: BenchmarkConfig): {
 
 function formStateToConfig(
   state: ReturnType<typeof configToFormState>,
-  base: BenchmarkConfig
+  base: BenchmarkConfig | null
 ): BenchmarkConfigUpdate {
   const classifierModels = state.classifierModels
     .split('\n')
@@ -150,8 +161,8 @@ function formStateToConfig(
     minAccuracy: state.minAccuracy,
     maxConcurrency: state.maxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
-    updatedAt: base.updatedAt,
-    updatedBy: base.updatedBy,
+    updatedAt: base?.updatedAt ?? null,
+    updatedBy: base?.updatedBy ?? null,
   };
 }
 
@@ -161,12 +172,10 @@ function formStateToConfig(
 
 function BenchmarkConfigEditor({
   config,
-  defaults,
   onSaved,
 }: {
-  config: BenchmarkConfig;
-  defaults: BenchmarkConfig;
-  onSaved: (next: { config: BenchmarkConfig; defaults: BenchmarkConfig }) => void;
+  config: BenchmarkConfig | null;
+  onSaved: (next: { config: BenchmarkConfig | null }) => void;
 }) {
   const [form, setForm] = useState(() => configToFormState(config));
 
@@ -185,10 +194,6 @@ function BenchmarkConfigEditor({
       toast.error(error instanceof Error ? error.message : 'Failed to save benchmark config');
     },
   });
-
-  const handleResetToDefaults = useCallback(() => {
-    setForm(configToFormState(defaults));
-  }, [defaults]);
 
   const handleAddDeciderRow = useCallback(() => {
     setForm(prev => ({
@@ -375,12 +380,12 @@ function BenchmarkConfigEditor({
               <Save className="size-4" />
               Save config
             </Button>
-            <Button type="button" variant="outline" onClick={handleResetToDefaults}>
-              <RotateCcw className="size-4" />
-              Reset to defaults
-            </Button>
           </div>
-          {config.updatedAt ? (
+          {config === null ? (
+            <p className="text-muted-foreground text-xs">
+              No config saved yet — runs cannot start until one is saved.
+            </p>
+          ) : config.updatedAt ? (
             <p className="text-muted-foreground text-xs">
               Last updated {config.updatedAt}
               {config.updatedBy ? ` by ${config.updatedBy}` : ''}
@@ -675,7 +680,7 @@ export function BenchmarksSection() {
   });
 
   const handleConfigSaved = useCallback(
-    (next: { config: BenchmarkConfig; defaults: BenchmarkConfig }) => {
+    (next: { config: BenchmarkConfig | null }) => {
       queryClient.setQueryData(['auto-routing', 'benchmark-config'], next);
     },
     [queryClient]
@@ -706,11 +711,7 @@ export function BenchmarksSection() {
             : 'Failed to load benchmark config'}
         </div>
       ) : configQuery.data ? (
-        <BenchmarkConfigEditor
-          config={configQuery.data.config}
-          defaults={configQuery.data.defaults}
-          onSaved={handleConfigSaved}
-        />
+        <BenchmarkConfigEditor config={configQuery.data.config} onSaved={handleConfigSaved} />
       ) : null}
 
       {/* Run controls */}

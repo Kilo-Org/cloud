@@ -80,6 +80,9 @@ export async function startRun(
   );
 
   const config = await getBenchmarkConfig(env.BENCH_DB);
+  if (!config) {
+    throw new Error('benchmark config not set: save it in the admin panel before starting a run');
+  }
   const models =
     kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id);
 

@@ -6,7 +6,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { zodJsonValidator } from '@kilocode/worker-utils';
 import type { Hono } from 'hono';
-import { DEFAULT_BENCHMARK_CONFIG, getBenchmarkConfig, saveBenchmarkConfig } from './config';
+import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
 import { fetchBenchmarkUserToken, startRun } from './run';
 import { getClassifierWinner, getLatestRoutingTable, listRuns } from './db';
@@ -18,12 +18,7 @@ const DebugCliRequestSchema = z.object({
 });
 
 export function registerAdminRoutes(app: Hono<HonoEnv>): void {
-  app.get('/admin/config', async c =>
-    c.json({
-      config: await getBenchmarkConfig(c.env.BENCH_DB),
-      defaults: DEFAULT_BENCHMARK_CONFIG,
-    })
-  );
+  app.get('/admin/config', async c => c.json({ config: await getBenchmarkConfig(c.env.BENCH_DB) }));
 
   app.put(
     '/admin/config',
@@ -31,7 +26,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     async c => {
       const updatedBy = c.req.header('x-updated-by') ?? null;
       const saved = await saveBenchmarkConfig(c.env.BENCH_DB, c.req.valid('json'), updatedBy);
-      return c.json({ config: saved, defaults: DEFAULT_BENCHMARK_CONFIG });
+      return c.json({ config: saved });
     }
   );
 
@@ -70,7 +65,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     zodJsonValidator(DebugCliRequestSchema, { errorMessage: 'Invalid debug request' }),
     async c => {
       const config = await getBenchmarkConfig(c.env.BENCH_DB);
-      if (!config.benchmarkUserId) {
+      if (!config?.benchmarkUserId) {
         return c.json({ error: 'benchmarkUserId is not configured' }, 400);
       }
       const kiloToken = await fetchBenchmarkUserToken(c.env, config.benchmarkUserId);

@@ -71,9 +71,10 @@ export const BenchmarkRunSchema = z.object({
 export type BenchmarkRun = z.infer<typeof BenchmarkRunSchema>;
 
 export const BenchmarkRunsResponseSchema = z.object({ runs: z.array(BenchmarkRunSchema) });
+// config is null until an admin saves one — the worker never fabricates a
+// default config, and runs cannot start without a saved one.
 export const BenchmarkConfigResponseSchema = z.object({
-  config: BenchmarkConfigSchema,
-  defaults: BenchmarkConfigSchema,
+  config: BenchmarkConfigSchema.nullable(),
 });
 export const StartBenchmarkRunRequestSchema = z.object({
   kind: BenchmarkKindSchema,

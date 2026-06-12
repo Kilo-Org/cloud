@@ -1,8 +1,48 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RoutingTable } from '@kilocode/auto-routing-contracts';
-import { DEFAULT_BENCHMARK_CONFIG } from './config';
+import type { BenchmarkConfig, RoutingTable } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import type * as DbModule from './db';
+
+const TEST_CONFIG: BenchmarkConfig = {
+  classifierModels: ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
+  deciderModels: [
+    {
+      id: 'google/gemini-2.5-flash-lite',
+      supportedApiKinds: ['chat_completions'],
+      reasoningEffort: null,
+    },
+    {
+      id: 'anthropic/claude-sonnet-4.6',
+      supportedApiKinds: ['chat_completions', 'messages', 'responses'],
+      reasoningEffort: null,
+    },
+  ],
+  minAccuracy: 0.7,
+  maxConcurrency: 4,
+  benchmarkUserId: null,
+  updatedAt: null,
+  updatedBy: null,
+};
+
+// getConfigRows result that mapConfigRows resolves back to TEST_CONFIG.
+const TEST_CONFIG_ROWS = {
+  config: {
+    id: 1 as const,
+    min_accuracy: TEST_CONFIG.minAccuracy,
+    max_concurrency: TEST_CONFIG.maxConcurrency,
+    benchmark_user_id: TEST_CONFIG.benchmarkUserId,
+    updated_at: '2026-06-01T00:00:00.000Z',
+    updated_by: null,
+  },
+  classifierModels: TEST_CONFIG.classifierModels,
+  deciderModels: TEST_CONFIG.deciderModels.map(m => ({
+    model: m.id,
+    reasoning_effort: m.reasoningEffort ?? null,
+    supports_chat_completions: m.supportedApiKinds.includes('chat_completions'),
+    supports_messages: m.supportedApiKinds.includes('messages'),
+    supports_responses: m.supportedApiKinds.includes('responses'),
+  })),
+};
 
 // ---------------------------------------------------------------------------
 // Stubs: the db module is mocked at its function boundary (drizzle generates
@@ -124,19 +164,16 @@ describe('auth middleware', () => {
 // ---------------------------------------------------------------------------
 
 describe('GET /admin/config', () => {
-  it('returns defaults when the DB rows are absent', async () => {
+  it('returns a null config when the DB rows are absent', async () => {
     // getConfigRows already returns null config by default
     const res = await authedGet('/admin/config');
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      config: DEFAULT_BENCHMARK_CONFIG,
-      defaults: DEFAULT_BENCHMARK_CONFIG,
-    });
+    await expect(res.json()).resolves.toEqual({ config: null });
   });
 
   it('returns the stored config when DB rows exist', async () => {
     const classifierModels = ['some/model'];
-    const deciderModels = DEFAULT_BENCHMARK_CONFIG.deciderModels.map(m => ({
+    const deciderModels = TEST_CONFIG.deciderModels.map(m => ({
       model: m.id,
       reasoning_effort: null,
       supports_chat_completions: m.supportedApiKinds.includes('chat_completions'),
@@ -193,9 +230,9 @@ describe('PUT /admin/config', () => {
     expect(replaceConfig).not.toHaveBeenCalled();
   });
 
-  it('persists a valid config and returns it with defaults', async () => {
+  it('persists a valid config and returns it', async () => {
     const validConfig = {
-      ...DEFAULT_BENCHMARK_CONFIG,
+      ...TEST_CONFIG,
       minAccuracy: 0.85,
       updatedAt: null,
       updatedBy: null,
@@ -208,12 +245,10 @@ describe('PUT /admin/config', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       config: { minAccuracy: number; updatedBy: string | null; updatedAt: string | null };
-      defaults: typeof DEFAULT_BENCHMARK_CONFIG;
     };
     expect(body.config.minAccuracy).toBe(0.85);
     expect(body.config.updatedBy).toBe('igor@kilocode.ai');
     expect(typeof body.config.updatedAt).toBe('string');
-    expect(body.defaults).toEqual(DEFAULT_BENCHMARK_CONFIG);
 
     expect(replaceConfig).toHaveBeenCalledOnce();
     const [, configArg] = vi.mocked(replaceConfig).mock.calls[0];
@@ -262,13 +297,22 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
+  it('rejects starting a run when no config has been saved', async () => {
+    // getConfigRows already returns null config by default
+    const res = await authedPost('/admin/runs', { kind: 'classifier' });
+    expect(res.status).toBe(500);
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
   it('starts a classifier run and returns runId + enqueuedModels', async () => {
     // No prior summaries → every configured model is enqueued.
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     const res = await authedPost('/admin/runs', { kind: 'classifier' });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { runId: string; enqueuedModels: number };
     expect(body.runId).toMatch(/^classifier-/);
-    expect(body.enqueuedModels).toBe(DEFAULT_BENCHMARK_CONFIG.classifierModels.length);
+    expect(body.enqueuedModels).toBe(TEST_CONFIG.classifierModels.length);
     expect(insertRun).toHaveBeenCalledOnce();
     expect(queueSendBatch).toHaveBeenCalledOnce();
   });

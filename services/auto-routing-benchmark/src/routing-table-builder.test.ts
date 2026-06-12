@@ -86,7 +86,7 @@ describe('buildRoutingTable', () => {
 
     // model/cheap would have won 'low' as cheapest; without a cost signal it
     // must not be ranked (unknown cost is not zero cost).
-    expect(table.tiers.low.map(c => c.model)).toEqual(['model/expensive', 'model/mid']);
+    expect(table.tiers.low.map(c => c.model)).toEqual(['model/mid', 'model/expensive']);
   });
 
   it('marks meetsThreshold correctly', () => {

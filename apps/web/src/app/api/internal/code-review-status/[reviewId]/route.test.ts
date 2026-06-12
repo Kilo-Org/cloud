@@ -71,6 +71,8 @@ const mockCaptureException = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockCaptureMessage = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockAppendPreviousReviewSummaryHistory = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockAppendReviewSummaryFooter = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRetryReviewFresh = jest.fn<any>();
@@ -138,6 +140,11 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 jest.mock('@sentry/nextjs', () => ({
   captureException: mockCaptureException,
   captureMessage: mockCaptureMessage,
+}));
+
+jest.mock('@/lib/code-reviews/summary/history', () => ({
+  appendPreviousReviewSummaryHistory: (...args: unknown[]) =>
+    mockAppendPreviousReviewSummaryHistory(...args),
 }));
 
 jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
@@ -225,6 +232,8 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     repository_review_instructions_used: false,
     repository_review_instructions_ref: null,
     repository_review_instructions_truncated: false,
+    previous_summary_body: null,
+    previous_summary_head_sha: null,
     model: null,
     total_tokens_in: null,
     total_tokens_out: null,
@@ -379,7 +388,11 @@ beforeEach(async () => {
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
-  mockAppendReviewSummaryFooter.mockReturnValue('body with footer');
+  mockAppendPreviousReviewSummaryHistory.mockImplementation((body: string) => body);
+  mockAppendReviewSummaryFooter.mockImplementation(
+    (body: string, footer: { usage?: unknown; reviewGuidance?: { used: boolean } }) =>
+      footer.usage || footer.reviewGuidance?.used ? 'body with footer' : body
+  );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   ({ POST } = await import('./route'));
 });
@@ -2395,6 +2408,35 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
   });
 
   describe('summary footer guidance', () => {
+    it('appends captured history to a completed GitHub summary', async () => {
+      const review = makeReview({
+        previous_summary_body: '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings',
+        previous_summary_head_sha: 'previous-head-sha',
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+      mockAppendPreviousReviewSummaryHistory.mockReturnValue('body with history');
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(mockAppendPreviousReviewSummaryHistory).toHaveBeenCalledWith(
+        'existing body',
+        review.previous_summary_body,
+        'previous-head-sha'
+      );
+      expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('body with history', {
+        usage: undefined,
+        reviewGuidance: { used: false, ref: null, truncated: false },
+      });
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        99,
+        'body with history',
+        'standard'
+      );
+    });
+
     it('updates completed GitHub summary with REVIEW.md guidance metadata when used', async () => {
       const review = makeReview({
         repository_review_instructions_used: true,
@@ -2498,7 +2540,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
-      expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
+      expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
+        usage: undefined,
+        reviewGuidance: { used: false, ref: null, truncated: false },
+      });
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
     });
   });

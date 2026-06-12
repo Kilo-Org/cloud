@@ -2,6 +2,7 @@ import {
   REVIEW_SUMMARY_HISTORY_END,
   REVIEW_SUMMARY_HISTORY_ENTRY,
   REVIEW_SUMMARY_HISTORY_START,
+  appendPreviousReviewSummaryHistory,
   buildPreviousReviewSummaryHistory,
   getCurrentReviewSummaryForContext,
   stripReviewSummaryHistory,
@@ -210,6 +211,30 @@ describe('buildPreviousReviewSummaryHistory', () => {
     expect(result).toContain('_[Snapshot truncated.]_');
     expect(result).toContain('Additional previous summary content was truncated');
     expect(result).toContain('</details>');
+  });
+});
+
+describe('appendPreviousReviewSummaryHistory', () => {
+  it('replaces model-supplied history with history built from the captured summary', () => {
+    const modelHistory = buildPreviousReviewSummaryHistory('model supplied history');
+    const currentBody = [cleanSummary, modelHistory, '', '---', '<!-- kilo-usage -->'].join('\n\n');
+
+    const result = appendPreviousReviewSummaryHistory(
+      currentBody,
+      summaryWithIssues,
+      'abcdef1234567890'
+    );
+
+    expect(result).toContain('**Status:** No Issues Found');
+    expect(result).toContain('**Status:** 2 Issues Found');
+    expect(result).not.toContain('model supplied history');
+    expect(result).not.toContain('<!-- kilo-usage -->');
+    expect(countOccurrences(result, REVIEW_SUMMARY_HISTORY_START)).toBe(1);
+    expect(result).toContain('### Previous review (commit abcdef1)');
+  });
+
+  it('leaves the current body unchanged when no previous summary was captured', () => {
+    expect(appendPreviousReviewSummaryHistory(cleanSummary, null, null)).toBe(cleanSummary);
   });
 });
 

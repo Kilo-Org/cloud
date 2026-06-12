@@ -12,6 +12,7 @@ const mockFetchGitLabRootTextFileAtRef = jest.fn();
 const mockFetchGitLabRepositorySize = jest.fn();
 const mockGetOrCreateProjectAccessToken = jest.fn();
 const mockFindPreviousCompletedReview = jest.fn();
+const mockUpdatePreviousReviewSummary = jest.fn();
 const mockUpdateRepositoryReviewInstructionsMetadata = jest.fn();
 const mockGenerateReviewPrompt = jest.fn();
 
@@ -51,6 +52,7 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => {
   return {
     ...actual,
     findPreviousCompletedReview: (...args: unknown[]) => mockFindPreviousCompletedReview(...args),
+    updatePreviousReviewSummary: (...args: unknown[]) => mockUpdatePreviousReviewSummary(...args),
     updateRepositoryReviewInstructionsMetadata: (...args: unknown[]) =>
       mockUpdateRepositoryReviewInstructionsMetadata(...args),
   };
@@ -173,6 +175,7 @@ describe('prepareReviewPayload', () => {
     mockFetchGitLabRepositorySize.mockResolvedValue('100 MB');
     mockGetOrCreateProjectAccessToken.mockResolvedValue('gitlab-project-token');
     mockFindPreviousCompletedReview.mockResolvedValue(null);
+    mockUpdatePreviousReviewSummary.mockResolvedValue(undefined);
     mockUpdateRepositoryReviewInstructionsMetadata.mockResolvedValue(undefined);
     mockGenerateReviewPrompt.mockResolvedValue({
       prompt: 'generated prompt',
@@ -199,6 +202,7 @@ describe('prepareReviewPayload', () => {
     mockFetchGitLabRepositorySize.mockReset();
     mockGetOrCreateProjectAccessToken.mockReset();
     mockFindPreviousCompletedReview.mockReset();
+    mockUpdatePreviousReviewSummary.mockReset();
     mockUpdateRepositoryReviewInstructionsMetadata.mockReset();
     mockGenerateReviewPrompt.mockReset();
   });
@@ -248,12 +252,47 @@ describe('prepareReviewPayload', () => {
     expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(REPO, 123, 'headsha123', {
       platform: 'github',
     });
+    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
+      body: null,
+      headSha: null,
+    });
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
       used: true,
       ref: 'main',
       truncated: false,
     });
     expect(mockUpdateRepositoryReviewInstructionsMetadata.mock.invocationCallOrder[0]).toBeLessThan(
+      mockGenerateReviewPrompt.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('captures the previous summary before generating the update prompt', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    const previousSummaryBody = '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings';
+    mockFindKiloReviewComment.mockResolvedValueOnce({
+      commentId: 99,
+      body: previousSummaryBody,
+    });
+    mockFindPreviousCompletedReview.mockResolvedValueOnce({
+      head_sha: 'previous-head-sha',
+      session_id: null,
+    });
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
+      body: previousSummaryBody,
+      headSha: 'previous-head-sha',
+    });
+    expect(mockUpdatePreviousReviewSummary.mock.invocationCallOrder[0]).toBeLessThan(
       mockGenerateReviewPrompt.mock.invocationCallOrder[0]
     );
   });

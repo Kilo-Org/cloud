@@ -59,6 +59,7 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
 import { appendReviewSummaryFooter } from '@/lib/code-reviews/summary/usage-footer';
 import { APP_URL } from '@/lib/constants';
 import type {
@@ -1234,7 +1235,7 @@ export async function POST(
         });
       }
 
-      // Add reaction to indicate review completion status AND update usage footer
+      // Add reaction to indicate review completion status and finalize summary metadata
       if (status === 'completed' || status === 'failed') {
         if (integration) {
           try {
@@ -1286,7 +1287,7 @@ export async function POST(
                 }
               }
 
-              // Usage footer (completed only)
+              // Summary history and footer (completed only)
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
                 const usage =
@@ -1295,19 +1296,24 @@ export async function POST(
                     : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
 
-                if (usage || reviewGuidance.used) {
-                  const existing = await findKiloReviewComment(
-                    integration.platform_installation_id,
-                    repoOwner,
-                    repoName,
-                    review.pr_number,
-                    appType
+                const existing = await findKiloReviewComment(
+                  integration.platform_installation_id,
+                  repoOwner,
+                  repoName,
+                  review.pr_number,
+                  appType
+                );
+                if (existing) {
+                  const bodyWithHistory = appendPreviousReviewSummaryHistory(
+                    existing.body,
+                    review.previous_summary_body,
+                    review.previous_summary_head_sha
                   );
-                  if (existing) {
-                    const updatedBody = appendReviewSummaryFooter(existing.body, {
-                      usage,
-                      reviewGuidance,
-                    });
+                  const updatedBody = appendReviewSummaryFooter(bodyWithHistory, {
+                    usage,
+                    reviewGuidance,
+                  });
+                  if (updatedBody !== existing.body) {
                     await updateKiloReviewComment(
                       integration.platform_installation_id,
                       repoOwner,
@@ -1317,19 +1323,9 @@ export async function POST(
                       appType
                     );
                     logExceptInTest(
-                      `[code-review-status] Updated summary comment footer on ${review.repo_full_name}#${review.pr_number}`
+                      `[code-review-status] Updated summary comment metadata on ${review.repo_full_name}#${review.pr_number}`
                     );
                   }
-                } else {
-                  logExceptInTest(
-                    '[code-review-status] Usage data not available for footer update',
-                    {
-                      reviewId,
-                      model,
-                      tokensIn,
-                      tokensOut,
-                    }
-                  );
                 }
               }
             } else if (platform === PLATFORM.GITLAB) {
@@ -1377,7 +1373,7 @@ export async function POST(
                 }
               }
 
-              // Usage footer (completed only)
+              // Summary history and footer (completed only)
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
                 const usage =
@@ -1386,18 +1382,23 @@ export async function POST(
                     : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
 
-                if (usage || reviewGuidance.used) {
-                  const existing = await findKiloReviewNote(
-                    accessToken,
-                    review.repo_full_name,
-                    review.pr_number,
-                    instanceUrl
+                const existing = await findKiloReviewNote(
+                  accessToken,
+                  review.repo_full_name,
+                  review.pr_number,
+                  instanceUrl
+                );
+                if (existing) {
+                  const bodyWithHistory = appendPreviousReviewSummaryHistory(
+                    existing.body,
+                    review.previous_summary_body,
+                    review.previous_summary_head_sha
                   );
-                  if (existing) {
-                    const updatedBody = appendReviewSummaryFooter(existing.body, {
-                      usage,
-                      reviewGuidance,
-                    });
+                  const updatedBody = appendReviewSummaryFooter(bodyWithHistory, {
+                    usage,
+                    reviewGuidance,
+                  });
+                  if (updatedBody !== existing.body) {
                     await updateKiloReviewNote(
                       accessToken,
                       review.repo_full_name,
@@ -1407,26 +1408,16 @@ export async function POST(
                       instanceUrl
                     );
                     logExceptInTest(
-                      `[code-review-status] Updated summary note footer on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+                      `[code-review-status] Updated summary note metadata on GitLab MR ${review.repo_full_name}!${review.pr_number}`
                     );
                   }
-                } else {
-                  logExceptInTest(
-                    '[code-review-status] Usage data not available for footer update',
-                    {
-                      reviewId,
-                      model,
-                      tokensIn,
-                      tokensOut,
-                    }
-                  );
                 }
               }
             }
           } catch (postCompletionError) {
             // Non-blocking - log but don't fail the callback
             logExceptInTest(
-              '[code-review-status] Failed to add completion reaction or usage footer:',
+              '[code-review-status] Failed to add completion reaction or summary metadata:',
               postCompletionError
             );
           }

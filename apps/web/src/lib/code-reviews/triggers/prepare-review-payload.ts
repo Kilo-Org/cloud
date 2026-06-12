@@ -43,6 +43,7 @@ import { getIntegrationById } from '@/lib/integrations/db/platform-integrations'
 import {
   getCodeReviewById,
   findPreviousCompletedReview,
+  updatePreviousReviewSummary,
   updateRepositoryReviewInstructionsMetadata,
   type ReviewContinuationScope,
 } from '../db/code-reviews';
@@ -475,11 +476,17 @@ export async function prepareReviewPayload(
       );
     }
 
-    await updateRepositoryReviewInstructionsMetadata(reviewId, {
-      used: repositoryReviewInstructionsLookup.used,
-      ref: repositoryReviewInstructionsLookup.ref,
-      truncated: repositoryReviewInstructionsLookup.truncated,
-    });
+    await Promise.all([
+      updatePreviousReviewSummary(reviewId, {
+        body: existingReviewState?.summaryComment?.body ?? null,
+        headSha: existingReviewState?.summaryComment ? previousHeadSha : null,
+      }),
+      updateRepositoryReviewInstructionsMetadata(reviewId, {
+        used: repositoryReviewInstructionsLookup.used,
+        ref: repositoryReviewInstructionsLookup.ref,
+        truncated: repositoryReviewInstructionsLookup.truncated,
+      }),
+    ]);
 
     // 5. Generate auth token for cloud agent with bot identifier
     const authToken = generateApiToken(user, { botId: 'reviewer' });

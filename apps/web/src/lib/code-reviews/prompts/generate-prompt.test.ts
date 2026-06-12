@@ -483,27 +483,21 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('123'); // commentId
   });
 
-  it('adds previous summary preservation instructions for update prompts', async () => {
+  it('does not send archived summary history through the model', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
       reviewId: 'review-123',
       existingReviewState: existingReviewStateWithSummary,
       previousHeadSha: 'abc123prev',
     });
 
-    expect(prompt).toContain('## Previous Summary Preservation');
-    expect(prompt).toContain(REVIEW_SUMMARY_HISTORY_START);
-    expect(prompt).toContain('<summary><b>Previous Review Summary</b> (commit abc123p)</summary>');
-    expect(prompt).toContain('### Previous review (commit abc123p)');
-    expect(prompt).toContain(
-      'The backend appends fresh usage/guidance footer metadata after completion.'
-    );
+    expect(prompt).toContain('2 Issues Found');
+    expect(prompt).toContain('UPDATE existing comment');
+    expect(prompt).not.toContain('## Previous Summary Preservation');
+    expect(prompt).not.toContain(REVIEW_SUMMARY_HISTORY_START);
     expect(prompt).not.toContain('old-model');
-    expect(prompt.indexOf('## Previous Summary Preservation')).toBeLessThan(
-      prompt.indexOf('UPDATE existing comment')
-    );
   });
 
-  it('adds previous summary preservation when updating without incremental mode', async () => {
+  it('does not add summary preservation instructions outside incremental mode', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
       reviewId: 'review-123',
       existingReviewState: existingReviewStateWithSummary,
@@ -511,10 +505,8 @@ describe('generateReviewPrompt (incremental review)', () => {
     });
 
     expect(prompt).not.toContain('INCREMENTAL REVIEW MODE');
-    expect(prompt).toContain('## Previous Summary Preservation');
-    expect(prompt).toContain('<summary><b>Previous Review Summary</b></summary>');
-    expect(prompt).not.toContain('commit null');
-    expect(prompt).not.toContain('commit undefined');
+    expect(prompt).not.toContain('## Previous Summary Preservation');
+    expect(prompt).not.toContain(REVIEW_SUMMARY_HISTORY_START);
   });
 
   it('does not add previous summary preservation for create prompts', async () => {
@@ -543,7 +535,7 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(previousSummaryContext).not.toContain('Archived WARNING');
     expect(previousSummaryContext).not.toContain(REVIEW_SUMMARY_HISTORY_START);
     expect(previousSummaryContext).not.toContain('stale-model');
-    expect(prompt).toContain('Archived WARNING');
+    expect(prompt).not.toContain('Archived WARNING');
   });
 
   it('works with GitLab platform in incremental mode', async () => {
@@ -564,7 +556,7 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).not.toContain('Do not run `git fetch`');
   });
 
-  it('adds previous summary preservation for GitLab update prompts', async () => {
+  it('does not send summary history through GitLab update prompts', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
       reviewId: 'review-456',
       existingReviewState: existingReviewStateWithSummary,
@@ -573,12 +565,9 @@ describe('generateReviewPrompt (incremental review)', () => {
       previousHeadSha: 'prevsha456',
     });
 
-    expect(prompt).toContain('## Previous Summary Preservation');
-    expect(prompt).toContain(REVIEW_SUMMARY_HISTORY_START);
-    expect(prompt).toContain('<summary><b>Previous Review Summary</b> (commit prevsha)</summary>');
-    expect(prompt.indexOf('## Previous Summary Preservation')).toBeLessThan(
-      prompt.indexOf('UPDATE existing note')
-    );
+    expect(prompt).toContain('UPDATE existing note');
+    expect(prompt).not.toContain('## Previous Summary Preservation');
+    expect(prompt).not.toContain(REVIEW_SUMMARY_HISTORY_START);
   });
 
   it('allows GitLab agents to fetch and pull latest changes in standard mode', async () => {

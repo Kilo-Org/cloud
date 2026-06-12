@@ -28,6 +28,25 @@ export function getCurrentReviewSummaryForContext(body: string): string {
   ).trim();
 }
 
+export function appendPreviousReviewSummaryHistory(
+  body: string,
+  previousSummaryBody: string | null,
+  previousHeadSha: string | null
+): string {
+  if (!previousSummaryBody) {
+    return body;
+  }
+
+  const currentSummary = stripReviewSummaryFooter(stripReviewSummaryHistory(body)).trimEnd();
+  const history = buildPreviousReviewSummaryHistory(previousSummaryBody, { previousHeadSha });
+
+  if (!history) {
+    return currentSummary;
+  }
+
+  return currentSummary ? `${currentSummary}\n\n${history}` : history;
+}
+
 export function buildPreviousReviewSummaryHistory(
   body: string,
   options: BuildPreviousReviewSummaryHistoryOptions = {}

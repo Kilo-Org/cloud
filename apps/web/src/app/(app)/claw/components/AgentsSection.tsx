@@ -27,6 +27,7 @@ import { AgentEditDialog } from './AgentEditDialog';
 import {
   AgentChannelsControl,
   AgentModelControl,
+  managedChannels,
   ownModelFallbacks,
   type ChannelCatalogEntry,
 } from './AgentInlineControls';
@@ -278,9 +279,17 @@ export function AgentsSection({
 }) {
   const { data, isLoading, error } = useClawAgents(enabled);
   const { deleteAgent, refetchAgents, updateAgent, updateBindings } = useClawAgentMutations();
-  // Shared across the whole list (subscribed once, not per row).
-  const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
-  const { data: catalog, isLoading: isLoadingChannels } = useClawChannelCatalog();
+  // Shared across the whole list (subscribed once, not per row), and gated so
+  // these fetches don't fire on a stopped machine (enabled=false) or for users
+  // who can't edit the thing (the picker / chips never render in those cases).
+  const {
+    modelOptions,
+    isLoading: isLoadingModels,
+    error: modelError,
+  } = useClawModelOptions(enabled && canUpdate);
+  const { data: catalog, isLoading: isLoadingChannels } = useClawChannelCatalog(
+    enabled && canBindings
+  );
 
   // Which agent's inline model / channels save is in flight, so only that row's
   // control shows pending (the mutations themselves are shared).
@@ -339,12 +348,10 @@ export function AgentsSection({
   // disables channels routed to a DIFFERENT agent.
   const channelOwner = useMemo(() => {
     const map = new Map<string, string>();
+    // Reuse managedChannels so the "managed default route" predicate lives in one
+    // place (shared with the picker); a drift here would wrongly enable/disable chips.
     for (const a of agents) {
-      for (const b of a.bindings) {
-        if (!b.advanced && b.accountId === null) {
-          map.set(b.channel.toLowerCase(), a.name ?? a.id);
-        }
-      }
+      for (const channel of managedChannels(a)) map.set(channel, a.name ?? a.id);
     }
     return map;
   }, [agents]);

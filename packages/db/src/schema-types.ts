@@ -1050,6 +1050,27 @@ export const SecuritySeverity = {
 
 export type SecuritySeverity = (typeof SecuritySeverity)[keyof typeof SecuritySeverity];
 
+export const SecurityFindingNotificationKind = {
+  NewFinding: 'new_finding',
+  SlaWarning: 'sla_warning',
+  SlaBreach: 'sla_breach',
+} as const;
+
+export type SecurityFindingNotificationKind =
+  (typeof SecurityFindingNotificationKind)[keyof typeof SecurityFindingNotificationKind];
+
+export const SecurityFindingNotificationStatus = {
+  Staged: 'staged',
+  Pending: 'pending',
+  Sending: 'sending',
+  Sent: 'sent',
+  Failed: 'failed',
+  Cancelled: 'cancelled',
+} as const;
+
+export type SecurityFindingNotificationStatus =
+  (typeof SecurityFindingNotificationStatus)[keyof typeof SecurityFindingNotificationStatus];
+
 export type DependabotAlertRaw = {
   number: number;
   state: DependabotAlertState;
@@ -1320,22 +1341,28 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
+export const CustomLlmApiConfigSchema = z.object({
+  internal_id: z.string().min(1),
+  base_url: z.url(),
+  add_cache_breakpoints: z.boolean().optional(),
+  remove_cache_breakpoints: z.boolean().optional(),
+  inject_reasoning_into_content: z.boolean().optional(),
+  extra_headers: CustomLlmExtraHeadersSchema.optional(),
+  extra_body: CustomLlmExtraBodySchema.optional(),
+  remove_from_body: z.array(z.string()).optional(),
+});
+
+export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
+
 export const CustomLlmDefinitionSchema = z
   .object({
-    internal_id: z.string(),
     display_name: z.string(),
-    base_url: z.url(),
     api_key: z.string(),
     organization_ids: z.array(z.string()),
-    add_cache_breakpoints: z.boolean().optional(),
-    remove_cache_breakpoints: z.boolean().optional(),
-    inject_reasoning_into_content: z.boolean().optional(),
-    extra_headers: CustomLlmExtraHeadersSchema.optional(),
-    extra_body: CustomLlmExtraBodySchema.optional(),
-    remove_from_body: z.array(z.string()).optional(),
     pricing: CustomLlmPricingSchema.optional(),
   })
-  .and(CustomLlmMetadataSchema);
+  .and(CustomLlmMetadataSchema)
+  .and(CustomLlmApiConfigSchema);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

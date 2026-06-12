@@ -381,11 +381,60 @@ function StartRolloutButton({
  * Data comes from the denormalized `tracked_image_tag` column on kiloclaw_instances,
  * which is written by the DO alarm reconciler and may lag ~30 min for idle instances.
  */
+// Surface only the headline buckets in the legend; collapse the rest below
+// this share into one "Other" segment. Without a cap, a slow fleet-wide
+// upgrade spreads instances across dozens of image tags and turns the legend
+// into an unreadable rainbow wall of `0% (n)` chips.
+const DISTRIBUTION_MAX_LEGEND_ROWS = 8;
+const DISTRIBUTION_MIN_SHARE_PCT = 2;
+
+type DistributionSegment = {
+  key: string;
+  color: string;
+  label: string;
+  pct: number;
+  count: number;
+  pinnedCount: number;
+  isLatest: boolean;
+  isUnknown: boolean;
+  isCandidate: boolean;
+  rolloutPercent: number | null;
+};
+
+/** One legend row — a color swatch, label, optional candidate badge, share %,
+ *  instance count, and pinned-anchor count. Shared by the top-level legend and
+ *  the expanded "Other" drawer so both render identically. */
+function DistributionLegendEntry({ seg }: { seg: DistributionSegment }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-sm ${seg.color}`} />
+      <span className={seg.isUnknown ? 'text-muted-foreground italic' : ''} title={seg.label}>
+        {seg.label.length > 22 ? `${seg.label.slice(0, 22)}…` : seg.label}
+      </span>
+      {seg.isCandidate && (
+        <Badge className="bg-purple-600 px-1 py-0 text-[10px] text-white">
+          <Rocket className="mr-0.5 h-2.5 w-2.5" />
+          {seg.rolloutPercent}%
+        </Badge>
+      )}
+      <span className="font-medium tabular-nums">{Math.round(seg.pct)}%</span>
+      <span className="text-muted-foreground tabular-nums">({seg.count})</span>
+      {seg.pinnedCount > 0 && (
+        <span className="text-muted-foreground inline-flex items-center gap-0.5">
+          <Anchor className="h-3 w-3" />
+          {seg.pinnedCount}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function InstanceDistributionPanel() {
   const trpc = useTRPC();
   const { data, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useQuery(
     trpc.admin.kiloclawVersions.getVersionDistribution.queryOptions()
   );
+  const [othersExpanded, setOthersExpanded] = useState(false);
 
   const total = data?.total ?? 0;
   const rows = data?.rows ?? [];
@@ -394,7 +443,7 @@ function InstanceDistributionPanel() {
   // blue = :latest, purple = candidate, red = disabled, amber = old/superseded,
   // muted = "no tag yet" (DO hasn't reconciled). `pct` is unrounded so the bar
   // segments stay proportional; the legend rounds for display.
-  const segments = rows.map((row, i) => {
+  const segments: DistributionSegment[] = rows.map((row, i) => {
     const isLatest = row.is_latest === true;
     const isDisabled = row.status === 'disabled';
     // Match the catalog table's predicate: a disabled row may retain a nonzero
@@ -420,11 +469,52 @@ function InstanceDistributionPanel() {
       pct,
       count: row.count,
       pinnedCount: row.pinned_count,
+      isLatest,
       isUnknown,
       isCandidate,
       rolloutPercent: row.rollout_percent,
     };
   });
+
+  // :latest and the active candidate always stay visible — they're the buckets
+  // ops is steering a rollout toward, regardless of how small their share is.
+  // Everything else is ranked by share; the biggest fill the remaining legend
+  // slots and the rest fold into "Other".
+  const latestAndCandidate = segments.filter(s => s.isLatest || s.isCandidate);
+  const tail = segments
+    .filter(s => !s.isLatest && !s.isCandidate)
+    .sort((a, b) => b.count - a.count);
+
+  const visibleTail: DistributionSegment[] = [];
+  const collapsedTail: DistributionSegment[] = [];
+  for (const seg of tail) {
+    const hasRoom = latestAndCandidate.length + visibleTail.length < DISTRIBUTION_MAX_LEGEND_ROWS;
+    if (hasRoom && seg.pct >= DISTRIBUTION_MIN_SHARE_PCT) {
+      visibleTail.push(seg);
+    } else {
+      collapsedTail.push(seg);
+    }
+  }
+  // Collapsing a lone straggler into "Other (1 version)" hides nothing and just
+  // costs a click — show it inline instead.
+  if (collapsedTail.length === 1) {
+    const only = collapsedTail.pop();
+    if (only) visibleTail.push(only);
+  }
+
+  const otherCount = collapsedTail.reduce((sum, s) => sum + s.count, 0);
+  const otherPinned = collapsedTail.reduce((sum, s) => sum + s.pinnedCount, 0);
+  const otherPct = collapsedTail.reduce((sum, s) => sum + s.pct, 0);
+  const hasOther = collapsedTail.length > 0;
+  // Count only real versions for the "N versions" label — the "no tag yet"
+  // bucket is unreconciled instances, not a version, so folding it into the
+  // tally would overstate how many image tags "Other" represents. Its
+  // instances still contribute to otherCount / otherPct.
+  const otherVersions = collapsedTail.filter(s => !s.isUnknown).length;
+
+  // Bar order mirrors the legend: headline buckets, then the biggest shares,
+  // then the single aggregated "Other" segment.
+  const visibleSegments = [...latestAndCandidate, ...visibleTail];
 
   return (
     <Card>
@@ -483,9 +573,10 @@ function InstanceDistributionPanel() {
         ) : (
           <div className="flex flex-col gap-3">
             {/* Single stacked bar — fixed height regardless of how many versions
-                are in the fleet, so it never pushes the catalog table down. */}
+                are in the fleet, so it never pushes the catalog table down. The
+                long tail is one aggregated "Other" segment. */}
             <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
-              {segments.map(seg => (
+              {visibleSegments.map(seg => (
                 <div
                   key={seg.key}
                   className={seg.color}
@@ -493,35 +584,55 @@ function InstanceDistributionPanel() {
                   title={`${seg.label}: ${seg.count} (${Math.round(seg.pct)}%)`}
                 />
               ))}
+              {hasOther && (
+                <div
+                  className="bg-zinc-500"
+                  style={{ width: `${otherPct}%`, minWidth: otherCount > 0 ? '3px' : 0 }}
+                  title={`Other (${otherVersions} version${otherVersions === 1 ? '' : 's'}): ${otherCount} (${Math.round(otherPct)}%)`}
+                />
+              )}
             </div>
-            {/* Compact wrapping legend — grows far slower than a row-per-version table. */}
+            {/* Compact wrapping legend — grows far slower than a row-per-version
+                table, and the long tail stays folded behind "Other". */}
             <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
-              {segments.map(seg => (
-                <div key={seg.key} className="flex items-center gap-1.5">
-                  <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-sm ${seg.color}`} />
-                  <span
-                    className={seg.isUnknown ? 'text-muted-foreground italic' : ''}
-                    title={seg.label}
-                  >
-                    {seg.label.length > 22 ? `${seg.label.slice(0, 22)}…` : seg.label}
+              {visibleSegments.map(seg => (
+                <DistributionLegendEntry key={seg.key} seg={seg} />
+              ))}
+              {hasOther && (
+                <button
+                  type="button"
+                  className="hover:text-foreground text-muted-foreground flex items-center gap-1.5 transition-colors"
+                  onClick={() => setOthersExpanded(v => !v)}
+                  aria-expanded={othersExpanded}
+                >
+                  <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-zinc-500" />
+                  <span>
+                    Other ({otherVersions} version{otherVersions === 1 ? '' : 's'})
                   </span>
-                  {seg.isCandidate && (
-                    <Badge className="bg-purple-600 px-1 py-0 text-[10px] text-white">
-                      <Rocket className="mr-0.5 h-2.5 w-2.5" />
-                      {seg.rolloutPercent}%
-                    </Badge>
-                  )}
-                  <span className="font-medium tabular-nums">{Math.round(seg.pct)}%</span>
-                  <span className="text-muted-foreground tabular-nums">({seg.count})</span>
-                  {seg.pinnedCount > 0 && (
-                    <span className="text-muted-foreground inline-flex items-center gap-0.5">
+                  <span className="font-medium tabular-nums">{Math.round(otherPct)}%</span>
+                  <span className="tabular-nums">({otherCount})</span>
+                  {otherPinned > 0 && (
+                    <span className="inline-flex items-center gap-0.5">
                       <Anchor className="h-3 w-3" />
-                      {seg.pinnedCount}
+                      {otherPinned}
                     </span>
                   )}
-                </div>
-              ))}
+                  {othersExpanded ? (
+                    <ChevronUp className="h-3 w-3" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3" />
+                  )}
+                </button>
+              )}
             </div>
+            {/* Expanded "Other" drawer — the folded long tail, indented. */}
+            {hasOther && othersExpanded && (
+              <div className="border-muted ml-1 flex flex-wrap gap-x-4 gap-y-1.5 border-l-2 pl-3 text-xs">
+                {collapsedTail.map(seg => (
+                  <DistributionLegendEntry key={seg.key} seg={seg} />
+                ))}
+              </div>
+            )}
             <p className="text-muted-foreground text-xs">
               {total} active instance{total === 1 ? '' : 's'} · grouped by each instance's{' '}
               <span className="font-medium">target</span> image tag (applied on next

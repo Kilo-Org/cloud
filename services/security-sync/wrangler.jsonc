@@ -23,9 +23,12 @@
   "vars": {
     "MANUAL_SYNC_COMMAND_ROUTING_ENABLED": "true",
     "DISMISS_FINDING_COMMAND_ROUTING_ENABLED": "true",
+    "BACKEND_API_URL": "https://app.kilo.ai",
+    "SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED": "true",
+    "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
   },
   "triggers": {
-    "crons": ["0 */6 * * *"],
+    "crons": ["0 */6 * * *", "15 * * * *"],
   },
   "queues": {
     "producers": [
@@ -71,9 +74,12 @@
       "vars": {
         "MANUAL_SYNC_COMMAND_ROUTING_ENABLED": "true",
         "DISMISS_FINDING_COMMAND_ROUTING_ENABLED": "true",
+        "BACKEND_API_URL": "http://localhost:3000",
+        "SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED": "true",
+        "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
       },
       "triggers": {
-        "crons": ["0 */6 * * *"],
+        "crons": ["0 */6 * * *", "15 * * * *"],
       },
       "queues": {
         "producers": [

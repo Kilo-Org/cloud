@@ -27,6 +27,7 @@ export const CLOUD_AGENT_FAILURE_CODES = [
   'assistant_error',
   'wrapper_error_after_activity',
   'missing_assistant_reply',
+  'payment_required',
   'user_interrupt',
   'container_shutdown',
   'system_interrupt',

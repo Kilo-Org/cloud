@@ -238,6 +238,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'cloudflare-git-token-service', 'nextjs'],
     dir: 'services/gastown',
   },
+  'cloudflare-wasteland': {
+    group: 'gastown',
+    dependsOn: ['postgres', 'nextjs'],
+    dir: 'services/wasteland',
+  },
 };
 
 function dockerComposeUp(service: string): string[] {

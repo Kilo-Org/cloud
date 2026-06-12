@@ -40,12 +40,12 @@ import {
   useSwapVariantVersion,
   useRotateApiKey,
 } from '@/app/admin/api/model-experiments/hooks';
-import {
-  ExperimentUpstreamSchema,
-  type ExperimentUpstream,
-} from '@/lib/ai-gateway/experiments/upstream-schema';
 import { parseMetadataJson } from '@/lib/ai-gateway/experiments/metadata-json';
-import { CustomLlmMetadataSchema } from '@kilocode/db/schema-types';
+import {
+  type CustomLlmApiConfig,
+  CustomLlmApiConfigSchema,
+  CustomLlmMetadataSchema,
+} from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { toast } from 'sonner';
 import { Plus, ChevronLeft, KeyRound, RefreshCw, Pencil } from 'lucide-react';
@@ -54,7 +54,7 @@ import * as z from 'zod';
 
 const StrictCustomLlmMetadataSchema = deepStrict(CustomLlmMetadataSchema);
 
-const INITIAL_UPSTREAM: ExperimentUpstream = {
+const INITIAL_UPSTREAM: CustomLlmApiConfig = {
   internal_id: '',
   base_url: '',
 };
@@ -724,7 +724,7 @@ function VariantsSection({
           {variants.map(variant => {
             const upstream =
               variant.current_version &&
-              ExperimentUpstreamSchema.safeParse(variant.current_version.upstream);
+              CustomLlmApiConfigSchema.safeParse(variant.current_version.upstream);
             const internalId = upstream && upstream.success ? upstream.data.internal_id : '—';
             const share =
               totalWeight > 0 ? `${Math.round((variant.weight / totalWeight) * 100)}%` : '—';
@@ -922,8 +922,8 @@ function SwapVersionDialog({
   initialUpstream: unknown;
   hasExistingVersion: boolean;
 }) {
-  const seed = useMemo<ExperimentUpstream>(() => {
-    const parsed = ExperimentUpstreamSchema.safeParse(initialUpstream);
+  const seed = useMemo<CustomLlmApiConfig>(() => {
+    const parsed = CustomLlmApiConfigSchema.safeParse(initialUpstream);
     return parsed.success ? parsed.data : INITIAL_UPSTREAM;
   }, [initialUpstream]);
 
@@ -940,7 +940,7 @@ function SwapVersionDialog({
       setError('Invalid JSON syntax');
       return;
     }
-    const result = ExperimentUpstreamSchema.safeParse(parsed);
+    const result = CustomLlmApiConfigSchema.safeParse(parsed);
     if (!result.success) {
       setError(z.prettifyError(result.error));
       return;
@@ -1005,8 +1005,8 @@ function SwapVersionDialog({
               />
             </div>
             <p className="text-muted-foreground mt-1 text-xs">
-              Validated against <code>ExperimentUpstreamSchema</code> (strict). Do not put the api
-              key in this blob — use the field below.
+              Validated against <code>CustomLlmApiConfigSchema</code> (strict). Do not put the api
+              key in this blob; use the field below.
             </p>
           </div>
 

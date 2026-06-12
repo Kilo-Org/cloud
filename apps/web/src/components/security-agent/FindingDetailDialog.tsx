@@ -131,18 +131,23 @@ type FindingDetailDialogProps = {
   onDismiss: () => void;
   canDismiss: boolean;
   organizationId?: string;
+  showSla?: boolean;
 };
 
 type FindingHeaderProps = {
   finding: SecurityFinding;
   analysis: FindingAnalysis;
   analysisStatus: string | null;
+  showSla: boolean;
 };
 
-function FindingHeader({ finding, analysis, analysisStatus }: FindingHeaderProps) {
+function FindingHeader({ finding, analysis, analysisStatus, showSla }: FindingHeaderProps) {
   const severity: Severity = isSeverity(finding.severity) ? finding.severity : 'medium';
   const isOverdue =
-    finding.status === 'open' && finding.sla_due_at && isPast(new Date(finding.sla_due_at));
+    showSla &&
+    finding.status === 'open' &&
+    finding.sla_due_at &&
+    isPast(new Date(finding.sla_due_at));
 
   return (
     <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
@@ -168,7 +173,7 @@ function FindingHeader({ finding, analysis, analysisStatus }: FindingHeaderProps
           <FindingStatusBadge status={finding.status} />
           <ExploitabilityBadge analysis={analysis} />
         </div>
-        <FindingTimeline finding={finding} isOverdue={Boolean(isOverdue)} />
+        <FindingTimeline finding={finding} isOverdue={Boolean(isOverdue)} showSla={showSla} />
         <span className="sr-only" aria-live="polite">
           Analysis status: {analysisStatus ?? 'not started'}
         </span>
@@ -177,8 +182,16 @@ function FindingHeader({ finding, analysis, analysisStatus }: FindingHeaderProps
   );
 }
 
-function FindingTimeline({ finding, isOverdue }: { finding: SecurityFinding; isOverdue: boolean }) {
-  if (finding.status === 'open' && finding.sla_due_at) {
+function FindingTimeline({
+  finding,
+  isOverdue,
+  showSla,
+}: {
+  finding: SecurityFinding;
+  isOverdue: boolean;
+  showSla: boolean;
+}) {
+  if (showSla && finding.status === 'open' && finding.sla_due_at) {
     return (
       <div className="text-left text-xs sm:text-right">
         <div className="flex items-center gap-1.5 sm:justify-end">
@@ -748,6 +761,7 @@ export function FindingDetailDialog({
   onDismiss,
   canDismiss,
   organizationId,
+  showSla = true,
 }: FindingDetailDialogProps) {
   const trpc = useTRPC();
   const isOrg = Boolean(organizationId);
@@ -981,7 +995,12 @@ export function FindingDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-4xl overflow-x-hidden overflow-y-auto p-4 sm:max-h-[90vh] sm:p-6">
-        <FindingHeader finding={finding} analysis={analysis} analysisStatus={analysisStatus} />
+        <FindingHeader
+          finding={finding}
+          analysis={analysis}
+          analysisStatus={analysisStatus}
+          showSla={showSla}
+        />
 
         <Tabs key={finding.id} defaultValue="details" className="min-w-0">
           <TabsList className="grid w-full grid-cols-4 sm:max-w-xl">

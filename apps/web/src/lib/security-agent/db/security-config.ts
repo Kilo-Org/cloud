@@ -4,7 +4,11 @@ import {
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import type { Owner } from '@/lib/code-reviews/core';
-import { DEFAULT_SECURITY_AGENT_CONFIG, parseSecurityAgentConfig } from '../core/constants';
+import {
+  DEFAULT_SECURITY_AGENT_CONFIG,
+  mergeSecurityAgentConfigPatch,
+  parseSecurityAgentConfig,
+} from '../core/constants';
 import { SecurityAgentConfigSchema, type SecurityAgentConfig } from '../core/types';
 import {
   setOwnerAutoAnalysisEnabledAtNow,
@@ -55,7 +59,7 @@ export async function upsertSecurityAgentConfig(
   platform: string = DEFAULT_PLATFORM
 ): Promise<void> {
   const existingConfig = await getSecurityAgentConfigWithStatus(owner, platform);
-  const fullConfig = parseSecurityAgentConfig({ ...existingConfig?.storedConfig, ...config });
+  const fullConfig = mergeSecurityAgentConfigPatch(existingConfig?.storedConfig, config);
 
   const wasAutoAnalysisEnabled = existingConfig?.config.auto_analysis_enabled ?? false;
   const isNowAutoAnalysisEnabled = fullConfig.auto_analysis_enabled;

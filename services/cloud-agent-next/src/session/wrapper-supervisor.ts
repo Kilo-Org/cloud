@@ -18,6 +18,7 @@ import {
   type SessionMessageState,
   type SessionMessageStorage,
 } from './session-message-state.js';
+import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
 import type { LatestAssistantMessage } from './types.js';
 import {
   clearCurrentWrapperRuntimeFailureState,
@@ -90,6 +91,7 @@ export type WrapperTerminalEvent = {
   error?: string;
   errorSource?: 'assistant';
   interruptionSource?: 'container_shutdown';
+  failureCode?: WrapperTerminalFailureCode;
   gateResult?: 'pass' | 'fail';
   messageIds?: string[];
 };
@@ -926,8 +928,16 @@ export function createWrapperSupervisor(
   }
 
   async function onTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
-    const { wrapperRunId, status, error, errorSource, interruptionSource, gateResult, messageIds } =
-      params;
+    const {
+      wrapperRunId,
+      status,
+      error,
+      errorSource,
+      interruptionSource,
+      failureCode: terminalFailureCode,
+      gateResult,
+      messageIds,
+    } = params;
     const sessionId = getSessionIdForLogs();
     const state = await getWrapperRuntimeState(storage);
     if (
@@ -971,7 +981,7 @@ export function createWrapperSupervisor(
               error: error ?? 'Assistant request failed',
               completionSource: 'wrapper_failure',
               failureStage: 'agent_activity',
-              failureCode: 'assistant_error',
+              failureCode: terminalFailureCode ?? 'assistant_error',
               safeFailureMessage: classifyAssistantFailureMessage(error),
             });
             continue;
@@ -984,9 +994,9 @@ export function createWrapperSupervisor(
             error: error ?? 'Wrapper error',
             completionSource: 'wrapper_failure',
             failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-            failureCode: activityObserved
-              ? 'wrapper_error_after_activity'
-              : 'wrapper_error_before_activity',
+            failureCode:
+              terminalFailureCode ??
+              (activityObserved ? 'wrapper_error_after_activity' : 'wrapper_error_before_activity'),
           });
           continue;
         }

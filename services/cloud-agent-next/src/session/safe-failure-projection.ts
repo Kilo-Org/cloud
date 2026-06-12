@@ -38,6 +38,7 @@ const GENERIC_FAILURE_MESSAGES = {
   assistant_error: 'Assistant request failed',
   wrapper_error_after_activity: 'Agent wrapper failed while processing the message',
   missing_assistant_reply: 'No assistant reply was produced',
+  payment_required: 'Assistant request failed: insufficient credits',
   user_interrupt: 'The message was interrupted by the user',
   container_shutdown: 'The agent container shut down',
   system_interrupt: 'The message was interrupted',

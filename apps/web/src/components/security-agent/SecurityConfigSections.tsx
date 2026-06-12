@@ -8,6 +8,7 @@ import {
   Clock,
   GitPullRequest,
   Info,
+  Mail,
   ScanSearch,
   Settings,
 } from 'lucide-react';
@@ -18,12 +19,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type {
   AnalysisMode,
   AutoAnalysisMinSeverity,
   AutoDismissConfidenceThreshold,
   AutoRemediationMinSeverity,
+  NotificationMinSeverity,
   SecurityConfigFormState,
   SecurityRepository,
   SlaConfig,
@@ -39,19 +42,36 @@ type SectionHeaderProps = {
   icon: typeof Settings;
   title: string;
   description: string;
+  titleAccessory?: React.ReactNode;
   action?: React.ReactNode;
+  hasContent?: boolean;
 };
 
-function SectionHeader({ icon: Icon, title, description, action }: SectionHeaderProps) {
+function SectionHeader({
+  icon: Icon,
+  title,
+  description,
+  titleAccessory,
+  action,
+  hasContent = true,
+}: SectionHeaderProps) {
   return (
-    <CardHeader className="pb-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
+    <CardHeader className={hasContent ? 'pb-3' : 'pb-6'}>
+      <div
+        className={cn(
+          'flex flex-col gap-3 sm:flex-row sm:justify-between',
+          hasContent ? 'sm:items-start' : 'sm:items-center'
+        )}
+      >
+        <div className={cn('flex gap-3', hasContent ? 'items-start' : 'items-center')}>
           <div className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
             <Icon className="size-5" aria-hidden="true" />
           </div>
           <div className="space-y-1">
-            <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+              {titleAccessory}
+            </div>
             <p className="text-muted-foreground text-xs">{description}</p>
           </div>
         </div>
@@ -98,6 +118,69 @@ function SwitchRow({
   );
 }
 
+function SectionToggle({
+  id,
+  label,
+  checked,
+  disabled,
+  onCheckedChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-3">
+      <span className="text-muted-foreground text-xs font-medium" aria-hidden="true">
+        {checked ? 'On' : 'Off'}
+      </span>
+      <Switch
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+        aria-label={label}
+      />
+    </div>
+  );
+}
+
+function SecondarySwitchRow({
+  id,
+  label,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  label: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="bg-muted/20 border-border/60 flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-1">
+        <Label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </Label>
+        <p id={`${id}-description`} className="text-muted-foreground text-xs">
+          {description}
+        </p>
+      </div>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        aria-describedby={`${id}-description`}
+        className="shrink-0 self-end sm:self-auto"
+      />
+    </div>
+  );
+}
+
 type RadioOption<Value extends string> = {
   value: Value;
   label: string;
@@ -109,34 +192,49 @@ function OptionGrid<Value extends string>({
   value,
   options,
   columns,
+  disabled,
   onChange,
 }: {
   name: string;
   value: Value;
   options: RadioOption<Value>[];
   columns: string;
+  disabled?: boolean;
   onChange: (value: Value) => void;
 }) {
   return (
     <RadioGroup value={value} onValueChange={next => onChange(next as Value)} className={columns}>
-      {options.map(option => (
-        <Label
-          key={option.value}
-          htmlFor={`${name}-${option.value}`}
-          className={cn(
-            'border-border bg-background hover:bg-muted flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-            value === option.value && 'bg-muted ring-ring ring-1'
-          )}
-        >
-          <RadioGroupItem value={option.value} id={`${name}-${option.value}`} className="mt-0.5" />
-          <span className="space-y-1">
-            <span className="block font-medium">{option.label}</span>
-            <span className="text-muted-foreground block text-xs font-normal">
-              {option.description}
+      {options.map(option => {
+        const selected = value === option.value;
+
+        return (
+          <Label
+            key={option.value}
+            htmlFor={`${name}-${option.value}`}
+            className={cn(
+              'border-border bg-background hover:bg-muted flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+              selected &&
+                'border-brand-primary/70 bg-brand-primary/15 hover:bg-brand-primary/20 ring-brand-primary/40 ring-1',
+              disabled && 'cursor-not-allowed opacity-60 hover:bg-background'
+            )}
+          >
+            <RadioGroupItem
+              value={option.value}
+              id={`${name}-${option.value}`}
+              className={cn('mt-0.5', selected && 'border-brand-primary text-brand-primary')}
+              disabled={disabled}
+            />
+            <span className="space-y-1">
+              <span className={cn('block font-medium', selected && 'text-brand-primary')}>
+                {option.label}
+              </span>
+              <span className="text-muted-foreground block text-xs font-normal">
+                {option.description}
+              </span>
             </span>
-          </span>
-        </Label>
-      ))}
+          </Label>
+        );
+      })}
     </RadioGroup>
   );
 }
@@ -191,6 +289,17 @@ const AUTO_REMEDIATION_OPTIONS: RadioOption<AutoRemediationMinSeverity>[] = [
     label: 'All severities',
     description: 'Open remediation PRs for every eligible exploitable finding.',
   },
+];
+
+const NOTIFICATION_SEVERITY_OPTIONS: RadioOption<NotificationMinSeverity>[] = [
+  { value: 'critical', label: 'Critical only', description: 'Email for critical findings.' },
+  { value: 'high', label: 'High and above', description: 'Email for high and critical findings.' },
+  {
+    value: 'medium',
+    label: 'Medium and above',
+    description: 'Email for medium, high, and critical findings.',
+  },
+  { value: 'low', label: 'Low and above', description: 'Email for every open severity.' },
 ];
 
 const DISMISS_OPTIONS: RadioOption<AutoDismissConfidenceThreshold>[] = [
@@ -283,35 +392,43 @@ export function RepositorySection({
 export function AgentStatusSection({
   enabled,
   isToggling,
+  availableRepositoryCount,
   repositoryCount,
+  slaEnabled,
   onToggle,
 }: {
   enabled: boolean;
   isToggling: boolean;
+  availableRepositoryCount: number;
   repositoryCount: number;
+  slaEnabled: boolean;
   onToggle: (enabled: boolean) => void;
 }) {
+  const description = enabled
+    ? repositoryCount > 0
+      ? `Sync Dependabot alerts every 6 hours for ${repositoryCount} ${repositoryCount === 1 ? 'repository' : 'repositories'}${slaEnabled ? ' and track SLAs' : ''}.`
+      : 'Choose repositories below to begin syncing Dependabot alerts.'
+    : availableRepositoryCount > 0
+      ? 'Turn on Security Agent to choose repositories and start syncing Dependabot alerts.'
+      : 'No repositories are available. Ensure GitHub App has access to your repositories.';
+
   return (
     <Card>
       <SectionHeader
         icon={Settings}
         title="Security Agent"
-        description="Enable automatic Dependabot alert syncing and SLA tracking."
+        description={description}
+        hasContent={false}
+        action={
+          <SectionToggle
+            id="security-agent-enabled"
+            label="Enable Security Agent"
+            checked={enabled}
+            disabled={isToggling || availableRepositoryCount === 0}
+            onCheckedChange={onToggle}
+          />
+        }
       />
-      <CardContent>
-        <SwitchRow
-          id="security-agent-enabled"
-          label="Enable Security Agent"
-          description={
-            repositoryCount > 0
-              ? `Sync Dependabot alerts every 6 hours for ${repositoryCount} ${repositoryCount === 1 ? 'repository' : 'repositories'}.`
-              : 'Select repositories above to enable Security Agent.'
-          }
-          checked={enabled}
-          disabled={isToggling || repositoryCount === 0}
-          onCheckedChange={onToggle}
-        />
-      </CardContent>
     </Card>
   );
 }
@@ -402,43 +519,43 @@ export function AutoAnalysisSection({ state, setState }: StateProps) {
         icon={ScanSearch}
         title="Auto-analysis"
         description="Automatically analyze findings as they are synced."
+        hasContent={state.autoAnalysisEnabled}
+        action={
+          <SectionToggle
+            id="auto-analysis-enabled"
+            label="Enable auto-analysis"
+            checked={state.autoAnalysisEnabled}
+            onCheckedChange={autoAnalysisEnabled =>
+              setState(current => ({ ...current, autoAnalysisEnabled }))
+            }
+          />
+        }
       />
-      <CardContent className="space-y-4">
-        <SwitchRow
-          id="auto-analysis-enabled"
-          label="Enable auto-analysis"
-          description="Automatically triage and analyze new findings using selected analysis mode."
-          checked={state.autoAnalysisEnabled}
-          onCheckedChange={autoAnalysisEnabled =>
-            setState(current => ({ ...current, autoAnalysisEnabled }))
-          }
-        />
-        {state.autoAnalysisEnabled && (
-          <>
-            <fieldset className="space-y-3">
-              <legend className="text-sm font-medium">Minimum severity</legend>
-              <OptionGrid
-                name="auto-analysis-severity"
-                value={state.autoAnalysisMinSeverity}
-                options={AUTO_ANALYSIS_OPTIONS}
-                columns="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-                onChange={autoAnalysisMinSeverity =>
-                  setState(current => ({ ...current, autoAnalysisMinSeverity }))
-                }
-              />
-            </fieldset>
-            <SwitchRow
-              id="auto-analysis-include-existing"
-              label="Include existing findings"
-              description="Also analyze previously synced findings. This may use additional credits."
-              checked={state.autoAnalysisIncludeExisting}
-              onCheckedChange={autoAnalysisIncludeExisting =>
-                setState(current => ({ ...current, autoAnalysisIncludeExisting }))
+      {state.autoAnalysisEnabled && (
+        <CardContent className="space-y-4">
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-medium">Minimum severity</legend>
+            <OptionGrid
+              name="auto-analysis-severity"
+              value={state.autoAnalysisMinSeverity}
+              options={AUTO_ANALYSIS_OPTIONS}
+              columns="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+              onChange={autoAnalysisMinSeverity =>
+                setState(current => ({ ...current, autoAnalysisMinSeverity }))
               }
             />
-          </>
-        )}
-      </CardContent>
+          </fieldset>
+          <SecondarySwitchRow
+            id="auto-analysis-include-existing"
+            label="Include existing findings"
+            description="Also analyze previously synced findings. This may use additional credits."
+            checked={state.autoAnalysisIncludeExisting}
+            onCheckedChange={autoAnalysisIncludeExisting =>
+              setState(current => ({ ...current, autoAnalysisIncludeExisting }))
+            }
+          />
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -450,43 +567,43 @@ export function AutoRemediationSection({ state, setState }: StateProps) {
         icon={GitPullRequest}
         title="Auto-remediation"
         description="Automatically open PRs for eligible exploitable findings."
+        hasContent={state.autoRemediationEnabled}
+        action={
+          <SectionToggle
+            id="auto-remediation-enabled"
+            label="Enable auto-remediation"
+            checked={state.autoRemediationEnabled}
+            onCheckedChange={autoRemediationEnabled =>
+              setState(current => ({ ...current, autoRemediationEnabled }))
+            }
+          />
+        }
       />
-      <CardContent className="space-y-4">
-        <SwitchRow
-          id="auto-remediation-enabled"
-          label="Enable auto-remediation"
-          description="Automatically queue remediation PRs after sandbox analysis confirms an eligible fix."
-          checked={state.autoRemediationEnabled}
-          onCheckedChange={autoRemediationEnabled =>
-            setState(current => ({ ...current, autoRemediationEnabled }))
-          }
-        />
-        {state.autoRemediationEnabled && (
-          <>
-            <fieldset className="space-y-3">
-              <legend className="text-sm font-medium">Minimum severity</legend>
-              <OptionGrid
-                name="auto-remediation-severity"
-                value={state.autoRemediationMinSeverity}
-                options={AUTO_REMEDIATION_OPTIONS}
-                columns="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-                onChange={autoRemediationMinSeverity =>
-                  setState(current => ({ ...current, autoRemediationMinSeverity }))
-                }
-              />
-            </fieldset>
-            <SwitchRow
-              id="auto-remediation-include-existing"
-              label="Include existing findings"
-              description="Also queue already-analyzed eligible findings. Duplicate PRs stay suppressed."
-              checked={state.autoRemediationIncludeExisting}
-              onCheckedChange={autoRemediationIncludeExisting =>
-                setState(current => ({ ...current, autoRemediationIncludeExisting }))
+      {state.autoRemediationEnabled && (
+        <CardContent className="space-y-4">
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-medium">Minimum severity</legend>
+            <OptionGrid
+              name="auto-remediation-severity"
+              value={state.autoRemediationMinSeverity}
+              options={AUTO_REMEDIATION_OPTIONS}
+              columns="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+              onChange={autoRemediationMinSeverity =>
+                setState(current => ({ ...current, autoRemediationMinSeverity }))
               }
             />
-          </>
-        )}
-      </CardContent>
+          </fieldset>
+          <SecondarySwitchRow
+            id="auto-remediation-include-existing"
+            label="Include existing findings"
+            description="Also queue already-analyzed eligible findings. Duplicate PRs stay suppressed."
+            checked={state.autoRemediationIncludeExisting}
+            onCheckedChange={autoRemediationIncludeExisting =>
+              setState(current => ({ ...current, autoRemediationIncludeExisting }))
+            }
+          />
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -498,18 +615,20 @@ export function AutoDismissSection({ state, setState }: StateProps) {
         icon={AlertTriangle}
         title="Auto-dismiss"
         description="Automatically dismiss findings AI determines are not exploitable."
+        hasContent={state.autoDismissEnabled}
+        action={
+          <SectionToggle
+            id="auto-dismiss-enabled"
+            label="Enable auto-dismiss"
+            checked={state.autoDismissEnabled}
+            onCheckedChange={autoDismissEnabled =>
+              setState(current => ({ ...current, autoDismissEnabled }))
+            }
+          />
+        }
       />
-      <CardContent className="space-y-4">
-        <SwitchRow
-          id="auto-dismiss-enabled"
-          label="Enable auto-dismiss"
-          description="Automatically dismiss findings AI recommends for dismissal."
-          checked={state.autoDismissEnabled}
-          onCheckedChange={autoDismissEnabled =>
-            setState(current => ({ ...current, autoDismissEnabled }))
-          }
-        />
-        {state.autoDismissEnabled && (
+      {state.autoDismissEnabled && (
+        <CardContent className="space-y-4">
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium">Confidence threshold</legend>
             <OptionGrid
@@ -522,8 +641,75 @@ export function AutoDismissSection({ state, setState }: StateProps) {
               }
             />
           </fieldset>
-        )}
-      </CardContent>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+export function NotificationSection({
+  state,
+  setState,
+  isOrganization,
+  disabled,
+}: StateProps & { isOrganization: boolean; disabled?: boolean }) {
+  const newFindingLabel = isOrganization
+    ? 'Email organization owners about new findings'
+    : 'Email me about new findings';
+
+  return (
+    <Card>
+      <SectionHeader
+        icon={Mail}
+        title="Finding Notifications"
+        description={`${newFindingLabel}.`}
+        hasContent={state.newFindingNotificationsEnabled}
+        titleAccessory={
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="About New-finding Notifications"
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <Info className="size-4" aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-80">
+              Existing alerts imported on first sync count as new. New-finding notifications use
+              minimum severity only.
+            </TooltipContent>
+          </Tooltip>
+        }
+        action={
+          <SectionToggle
+            id="new-finding-notifications-enabled"
+            label={newFindingLabel}
+            checked={state.newFindingNotificationsEnabled}
+            disabled={disabled}
+            onCheckedChange={newFindingNotificationsEnabled =>
+              setState(current => ({ ...current, newFindingNotificationsEnabled }))
+            }
+          />
+        }
+      />
+      {state.newFindingNotificationsEnabled && (
+        <CardContent className="space-y-5">
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-medium">New-finding minimum severity</legend>
+            <OptionGrid
+              name="new-finding-notification-severity"
+              value={state.newFindingNotificationMinSeverity}
+              options={NOTIFICATION_SEVERITY_OPTIONS}
+              columns="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+              disabled={disabled}
+              onChange={newFindingNotificationMinSeverity =>
+                setState(current => ({ ...current, newFindingNotificationMinSeverity }))
+              }
+            />
+          </fieldset>
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -555,51 +741,136 @@ const SEVERITIES: Array<{
   { key: 'low', label: 'Low', description: 'Minimal security impact.', icon: Info },
 ];
 
-export function SlaSection({ state, setState }: StateProps) {
+export function SlaSection({
+  state,
+  setState,
+  isOrganization,
+  disabled,
+}: StateProps & { isOrganization: boolean; disabled?: boolean }) {
+  const slaLabel = isOrganization
+    ? 'Email organization owners before and when findings breach SLA.'
+    : 'Email me before and when findings breach SLA.';
+
   return (
     <Card>
       <SectionHeader
         icon={Clock}
-        title="SLA configuration"
-        description="Set remediation deadlines by severity."
+        title="SLA Configuration"
+        description="Set remediation deadlines and SLA notification rules."
+        hasContent={state.slaEnabled}
+        action={
+          <SectionToggle
+            id="sla-enabled"
+            label="Enable SLA tracking"
+            checked={state.slaEnabled}
+            disabled={disabled}
+            onCheckedChange={slaEnabled => setState(current => ({ ...current, slaEnabled }))}
+          />
+        }
       />
-      <CardContent>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {SEVERITIES.map(({ key, label, description, icon: Icon }) => (
-            <div key={key} className="bg-background border-border space-y-3 rounded-lg border p-4">
-              <div className="flex items-start gap-3">
-                <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" aria-hidden="true" />
-                <div className="space-y-1">
-                  <Label htmlFor={`sla-${key}`}>{label}</Label>
-                  <p className="text-muted-foreground text-xs">{description}</p>
+      {state.slaEnabled && (
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {SEVERITIES.map(({ key, label, description, icon: Icon }) => (
+              <div
+                key={key}
+                className="bg-background border-border space-y-3 rounded-lg border p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <Icon
+                    className="text-muted-foreground mt-0.5 size-5 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor={`sla-${key}`}>{label}</Label>
+                    <p className="text-muted-foreground text-xs">{description}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pl-8">
+                  <Input
+                    id={`sla-${key}`}
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={state.slaConfig[key]}
+                    disabled={disabled}
+                    onChange={event => {
+                      const value = Number.parseInt(event.target.value, 10);
+                      if (Number.isNaN(value) || value < 1) return;
+                      setState(current => ({
+                        ...current,
+                        slaConfig: { ...current.slaConfig, [key]: value },
+                      }));
+                    }}
+                    className="w-20 text-center"
+                    aria-describedby={`sla-${key}-unit`}
+                  />
+                  <span id={`sla-${key}-unit`} className="text-muted-foreground text-sm">
+                    days
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 pl-8">
-                <Input
-                  id={`sla-${key}`}
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={state.slaConfig[key]}
-                  onChange={event => {
-                    const value = Number.parseInt(event.target.value, 10);
-                    if (Number.isNaN(value) || value < 1) return;
-                    setState(current => ({
-                      ...current,
-                      slaConfig: { ...current.slaConfig, [key]: value },
-                    }));
-                  }}
-                  className="w-20 text-center"
-                  aria-describedby={`sla-${key}-unit`}
+            ))}
+          </div>
+
+          <SwitchRow
+            id="sla-notifications-enabled"
+            label={slaLabel}
+            description="Turn on warning and breach emails for findings that approach or pass SLA deadlines."
+            checked={state.slaNotificationsEnabled}
+            disabled={disabled}
+            onCheckedChange={slaNotificationsEnabled =>
+              setState(current => ({ ...current, slaNotificationsEnabled }))
+            }
+          />
+
+          {state.slaNotificationsEnabled && (
+            <>
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-medium">SLA notification minimum severity</legend>
+                <OptionGrid
+                  name="sla-notification-severity"
+                  value={state.slaNotificationMinSeverity}
+                  options={NOTIFICATION_SEVERITY_OPTIONS}
+                  columns="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+                  disabled={disabled}
+                  onChange={slaNotificationMinSeverity =>
+                    setState(current => ({ ...current, slaNotificationMinSeverity }))
+                  }
                 />
-                <span id={`sla-${key}-unit`} className="text-muted-foreground text-sm">
-                  days
-                </span>
+              </fieldset>
+
+              <div className="bg-background border-border space-y-2 rounded-lg border p-4">
+                <Label htmlFor="sla-notification-warning-days">SLA warning lead time</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="sla-notification-warning-days"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={state.slaNotificationWarningDays}
+                    disabled={disabled}
+                    onChange={event => {
+                      const value = Number.parseInt(event.target.value, 10);
+                      if (Number.isNaN(value) || value < 1 || value > 365) return;
+                      setState(current => ({ ...current, slaNotificationWarningDays: value }));
+                    }}
+                    className="w-24 text-center"
+                    aria-describedby="sla-notification-warning-days-help"
+                  />
+                  <span className="text-muted-foreground text-sm">days</span>
+                </div>
+                <p
+                  id="sla-notification-warning-days-help"
+                  className="text-muted-foreground text-xs"
+                >
+                  Send SLA Warning Notifications this many whole days before persisted deadline.
+                </p>
               </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
+            </>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }

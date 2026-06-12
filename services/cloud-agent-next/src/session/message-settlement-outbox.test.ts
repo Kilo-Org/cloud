@@ -617,8 +617,31 @@ describe('MessageSettlementOutbox', () => {
         attempts: 2,
         message: 'Repository clone timed out: Clone exceeded the safe deadline',
       },
+      failureStage: 'pre_dispatch',
+      clientError: {
+        code: 'WORKSPACE_SETUP_FAILED',
+        message: 'Repository clone timed out: Clone exceeded the safe deadline',
+        retryable: true,
+      },
     });
     expect(JSON.stringify(harness.callbackJobs[0])).not.toContain('token=secret');
+  });
+
+  it('omits clientError from completed callback jobs', async () => {
+    const harness = createHarness();
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/completed' })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload.clientError).toBeUndefined();
+    expect(harness.callbackJobs[0].payload.failureStage).toBeUndefined();
   });
 
   it('finalizes a terminal wrapper-run callback while the next run remains pending', async () => {

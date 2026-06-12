@@ -80,6 +80,28 @@ describe('Cloud Agent report emitter', () => {
     expect(JSON.stringify(reports)).not.toContain('model/test');
   });
 
+  it.each([
+    ['agent_activity', 'payment_required', 'assistant_error'],
+    ['agent_activity', 'model_missing', 'assistant_error'],
+    ['post_dispatch_no_activity', 'payment_required', 'wrapper_error_before_activity'],
+    ['post_dispatch_no_activity', 'model_missing', 'wrapper_error_before_activity'],
+  ] as const)(
+    'maps %s/%s to persisted failure code %s',
+    async (failureStage, failureCode, expectedFailureCode) => {
+      const reports: CloudAgentQueueReport[] = [];
+      await emitRunStateReport({
+        queue: { send: async report => void reports.push(report) },
+        cloudAgentSessionId: 'agent_report',
+        state: { ...state, failureStage, failureCode },
+      });
+
+      expect(reports[0]?.run).toMatchObject({
+        failureStage,
+        failureCode: expectedFailureCode,
+      });
+    }
+  );
+
   it.each(WORKSPACE_FAILURE_DIAGNOSTICS)(
     'emits the allowlisted diagnostic for workspace subtype %s',
     async (failureSubtype, expectedDiagnostic) => {

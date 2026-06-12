@@ -10,6 +10,7 @@ import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import type { KiloPassTier } from '@/lib/kilo-pass/enums';
 import { recommendKiloPassTierFromAverageMonthlyUsageUsd } from '@/lib/kilo-pass/recommend-tier';
+import { KiloPassReferralButton } from '@/components/referrals/KiloPassReferralButton';
 import { KiloPassSubscribeCard } from '@/components/profile/kilo-pass/KiloPassSubscribeCard';
 import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
 import { SubscriptionGroup } from '@/components/subscriptions/SubscriptionGroup';
@@ -131,19 +132,26 @@ export function KiloPassGroup({
                 : undefined
           }
           statusNote={subscriptionDisplay.cardNotice}
+          action={<KiloPassReferralButton className="w-full sm:w-auto" />}
+          actionPlacement="top-right"
         />
       ) : (
-        <KiloPassSubscribeCard
-          cadence={cadence}
-          setCadence={setCadence}
-          pending={checkout.isPending}
-          showFirstMonthPromo={showFirstMonthPromo}
-          showSecondMonthPromo={showSecondMonthPromo}
-          recommendedTier={recommendedTier}
-          onSelectTier={tier => void startCheckout(tier)}
-          showHeader={false}
-          unframed
-        />
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <KiloPassReferralButton className="w-full sm:w-auto" />
+          </div>
+          <KiloPassSubscribeCard
+            cadence={cadence}
+            setCadence={setCadence}
+            pending={checkout.isPending}
+            showFirstMonthPromo={showFirstMonthPromo}
+            showSecondMonthPromo={showSecondMonthPromo}
+            recommendedTier={recommendedTier}
+            onSelectTier={tier => void startCheckout(tier)}
+            showHeader={false}
+            unframed
+          />
+        </div>
       )}
     </SubscriptionGroup>
   );

@@ -40,6 +40,8 @@ import {
   FeedbackSource,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityFindingNotificationKind,
+  SecurityFindingNotificationStatus,
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
@@ -104,6 +106,7 @@ import type {
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
   CustomLlmMetadata,
+  CustomLlmApiConfig,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -125,6 +128,8 @@ import type {
   ReviewMemoryProposalStatus,
   DependabotAlertRaw,
   SecurityFindingAnalysis,
+  SecurityFindingNotificationKind as SecurityFindingNotificationKindType,
+  SecurityFindingNotificationStatus as SecurityFindingNotificationStatusType,
   NormalizedOpenRouterResponse,
   OpenRouterModel,
   StripeSubscriptionStatus,
@@ -4357,6 +4362,7 @@ export type CloudAgentSessionRunFailureCode =
   | 'assistant_error'
   | 'wrapper_error_after_activity'
   | 'missing_assistant_reply'
+  | 'payment_required'
   | 'user_interrupt'
   | 'container_shutdown'
   | 'system_interrupt'
@@ -4767,8 +4773,14 @@ export const security_findings = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Unique constraint to prevent duplicates
-    unique('uq_security_findings_source').on(table.repo_full_name, table.source, table.source_id),
+    // Owner-scoped source identity. The same external source alert can exist
+    // independently for multiple Security Agent owners.
+    uniqueIndex('uq_security_findings_user_source')
+      .on(table.owned_by_user_id, table.repo_full_name, table.source, table.source_id)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('uq_security_findings_org_source')
+      .on(table.owned_by_organization_id, table.repo_full_name, table.source, table.source_id)
+      .where(sql`${table.owned_by_organization_id} IS NOT NULL`),
     // Indexes
     index('idx_security_findings_org_id').on(table.owned_by_organization_id),
     index('idx_security_findings_user_id').on(table.owned_by_user_id),
@@ -4800,6 +4812,87 @@ export const security_findings = pgTable(
 
 export type SecurityFinding = typeof security_findings.$inferSelect;
 export type NewSecurityFinding = typeof security_findings.$inferInsert;
+
+export const security_finding_notifications = pgTable(
+  'security_finding_notifications',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    finding_id: uuid().notNull(),
+    recipient_user_id: text().notNull(),
+    kind: text().$type<SecurityFindingNotificationKindType>().notNull(),
+    status: text().$type<SecurityFindingNotificationStatusType>().notNull().default('staged'),
+    attempt_count: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    error_message: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('uq_security_finding_notifications_finding_recipient_kind').on(
+      table.finding_id,
+      table.recipient_user_id,
+      table.kind
+    ),
+    foreignKey({
+      name: 'security_finding_notifications_finding_fk',
+      columns: [table.finding_id],
+      foreignColumns: [security_findings.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'security_finding_notifications_recipient_fk',
+      columns: [table.recipient_user_id],
+      foreignColumns: [kilocode_users.id],
+    }).onDelete('cascade'),
+    index('idx_security_finding_notifications_pending')
+      .on(table.next_attempt_at, table.created_at, table.id)
+      .where(sql`${table.status} = 'pending'`),
+    index('idx_security_finding_notifications_staged')
+      .on(table.created_at, table.id)
+      .where(sql`${table.status} = 'staged'`),
+    index('idx_security_finding_notifications_finding_id').on(table.finding_id),
+    index('idx_security_finding_notifications_recipient_user_id').on(table.recipient_user_id),
+    enumCheck(
+      'security_finding_notifications_kind_check',
+      table.kind,
+      SecurityFindingNotificationKind
+    ),
+    enumCheck(
+      'security_finding_notifications_status_check',
+      table.status,
+      SecurityFindingNotificationStatus
+    ),
+    check('security_finding_notifications_attempt_count_check', sql`${table.attempt_count} >= 0`),
+    check(
+      'security_finding_notifications_claimed_at_check',
+      sql`(
+        (${table.status} = 'sending' AND ${table.claimed_at} IS NOT NULL) OR
+        (${table.status} <> 'sending' AND ${table.claimed_at} IS NULL)
+      )`
+    ),
+    check(
+      'security_finding_notifications_sent_at_check',
+      sql`(
+        (${table.status} = 'sent' AND ${table.sent_at} IS NOT NULL) OR
+        (${table.status} <> 'sent' AND ${table.sent_at} IS NULL)
+      )`
+    ),
+    check(
+      'security_finding_notifications_error_message_length_check',
+      sql`${table.error_message} IS NULL OR length(${table.error_message}) <= 500`
+    ),
+  ]
+);
+
+export type SecurityFindingNotification = typeof security_finding_notifications.$inferSelect;
+export type NewSecurityFindingNotification = typeof security_finding_notifications.$inferInsert;
 
 export const security_analysis_queue = pgTable(
   'security_analysis_queue',
@@ -7717,10 +7810,11 @@ export type ModelExperimentVariant = typeof model_experiment_variant.$inferSelec
 export type NewModelExperimentVariant = typeof model_experiment_variant.$inferInsert;
 
 // Immutable per-variant version. New RC = new row. Never UPDATEd.
-// `upstream` is validated by ExperimentUpstreamSchema in app code. The
-// api key is stored separately in `encrypted_api_key` (same shape as
-// `byok_api_keys.encrypted_api_key`) so the JSONB blob never holds the
-// secret and reporting/admin views can simply omit the column.
+// `upstream` is typed as CustomLlmApiConfig and validated with
+// CustomLlmApiConfigSchema at application boundaries. The api key is stored
+// separately in `encrypted_api_key` (same shape as
+// `byok_api_keys.encrypted_api_key`) so the JSONB blob never holds the secret
+// and reporting/admin views can simply omit the column.
 export const model_experiment_variant_version = pgTable(
   'model_experiment_variant_version',
   {
@@ -7728,7 +7822,7 @@ export const model_experiment_variant_version = pgTable(
     variant_id: uuid()
       .notNull()
       .references(() => model_experiment_variant.id, { onDelete: 'cascade' }),
-    upstream: jsonb().notNull(),
+    upstream: jsonb().$type<CustomLlmApiConfig>().notNull(),
     encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
     effective_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     created_by: text().references(() => kilocode_users.id, { onDelete: 'set null' }),

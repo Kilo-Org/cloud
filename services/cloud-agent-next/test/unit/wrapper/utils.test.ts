@@ -83,6 +83,68 @@ describe('createSafeProcessDiagnostic', () => {
   ])('reports structured termination metadata', ({ result, expected }) => {
     expect(createSafeProcessDiagnostic(result)).toBe(expected);
   });
+
+  it('terminates a process after its output becomes inactive', async () => {
+    const result = await runProcess(process.execPath, ['-e', 'setTimeout(() => {}, 10_000)'], {
+      inactivityTimeoutMs: 50,
+      hardTimeoutMs: 5_000,
+      terminationGraceMs: 50,
+    });
+
+    expect(result.exitCode).toBe(124);
+    expect(result.terminationReason).toBe('inactivity_timeout');
+    expect(result.stderr).toContain('exec inactivity timeout reached');
+  });
+
+  it('keeps a process alive while it produces output', async () => {
+    const outputs: string[] = [];
+    const result = await runProcess(
+      process.execPath,
+      [
+        '-e',
+        'let count = 0; const timer = setInterval(() => { console.log(++count); if (count === 4) clearInterval(timer); }, 100)',
+      ],
+      {
+        inactivityTimeoutMs: 500,
+        hardTimeoutMs: 2_000,
+        onOutput: (_stream, output) => outputs.push(output),
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('4');
+    expect(outputs.join('')).toBe(result.stdout);
+  });
+
+  it('enforces a hard limit even while a process produces output', async () => {
+    const result = await runProcess(
+      process.execPath,
+      ['-e', 'console.log("active"); setInterval(() => console.log("active"), 100)'],
+      {
+        inactivityTimeoutMs: 2_000,
+        hardTimeoutMs: 1_000,
+        terminationGraceMs: 50,
+      }
+    );
+
+    expect(result.exitCode).toBe(124);
+    expect(result.terminationReason).toBe('hard_timeout');
+    expect(result.stderr).toContain('exec hard timeout reached');
+    expect(result.stdout).toContain('active');
+  });
+
+  it('retains only the tail of large process output', async () => {
+    const result = await runProcess(
+      process.execPath,
+      ['-e', 'process.stdout.write("x".repeat(1_100_000) + "END")'],
+      { timeoutMs: 5_000 }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(Buffer.byteLength(result.stdout)).toBeLessThanOrEqual(64 * 1_024);
+    expect(result.stdout.endsWith('END')).toBe(true);
+    expect(result.stdoutTruncated).toBe(true);
+  });
 });
 
 describe('git', () => {

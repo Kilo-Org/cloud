@@ -9,7 +9,6 @@ import { db } from '@/lib/drizzle';
 import { decryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
-import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
 import type {
   AllocationSubject,
   ExperimentStatus,
@@ -18,6 +17,7 @@ import type {
   ResolveResult,
   RoutingVariant,
 } from '@/lib/ai-gateway/experiments/pick-variant.types';
+import { CustomLlmApiConfigSchema } from '@kilocode/db';
 
 /**
  * Returns the routing-relevant experiment for `publicId` (status active or
@@ -139,7 +139,7 @@ async function loadExperimentFromDb(publicId: string): Promise<ResolveResult> {
       // Already verified above; this is a defensive belt-and-suspenders.
       return { kind: 'unavailable' };
     }
-    const parsedUpstream = ExperimentUpstreamSchema.safeParse(ver.upstream);
+    const parsedUpstream = CustomLlmApiConfigSchema.safeParse(ver.upstream);
     if (!parsedUpstream.success) {
       captureMessage('Failed to parse experiment variant upstream blob', {
         level: 'error',

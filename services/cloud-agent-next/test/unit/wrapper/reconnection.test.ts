@@ -1118,7 +1118,8 @@ describe('ingest WS reconnection', () => {
     );
     expect(sessionErrors).toHaveLength(1);
     expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-      error: 'Model not found: kilo/does-not-exist.',
+      code: 'model_missing',
+      message: 'Model not found: kilo/does-not-exist.',
       errorSource: 'assistant',
     });
   });
@@ -1148,7 +1149,7 @@ describe('ingest WS reconnection', () => {
       await vi.advanceTimersByTimeAsync(0);
 
       expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-        error: errorMessage,
+        message: errorMessage,
         errorSource: 'assistant',
       });
     }
@@ -1459,7 +1460,8 @@ describe('ingest WS reconnection', () => {
       expect(callbacks.onTerminalError).toHaveBeenCalledTimes(terminal ? 1 : 0);
       if (terminal) {
         expect(callbacks.onTerminalError).toHaveBeenCalledWith({
-          error: 'Insufficient credits',
+          ...(eventType === 'usage_limit_exceeded' ? {} : { code: 'payment_required' }),
+          message: 'Insufficient credits',
           errorSource: 'assistant',
         });
       }

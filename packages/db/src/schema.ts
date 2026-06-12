@@ -106,6 +106,7 @@ import type {
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
   CustomLlmMetadata,
+  CustomLlmApiConfig,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -7809,10 +7810,11 @@ export type ModelExperimentVariant = typeof model_experiment_variant.$inferSelec
 export type NewModelExperimentVariant = typeof model_experiment_variant.$inferInsert;
 
 // Immutable per-variant version. New RC = new row. Never UPDATEd.
-// `upstream` is validated by ExperimentUpstreamSchema in app code. The
-// api key is stored separately in `encrypted_api_key` (same shape as
-// `byok_api_keys.encrypted_api_key`) so the JSONB blob never holds the
-// secret and reporting/admin views can simply omit the column.
+// `upstream` is typed as CustomLlmApiConfig and validated with
+// CustomLlmApiConfigSchema at application boundaries. The api key is stored
+// separately in `encrypted_api_key` (same shape as
+// `byok_api_keys.encrypted_api_key`) so the JSONB blob never holds the secret
+// and reporting/admin views can simply omit the column.
 export const model_experiment_variant_version = pgTable(
   'model_experiment_variant_version',
   {
@@ -7820,7 +7822,7 @@ export const model_experiment_variant_version = pgTable(
     variant_id: uuid()
       .notNull()
       .references(() => model_experiment_variant.id, { onDelete: 'cascade' }),
-    upstream: jsonb().notNull(),
+    upstream: jsonb().$type<CustomLlmApiConfig>().notNull(),
     encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
     effective_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     created_by: text().references(() => kilocode_users.id, { onDelete: 'set null' }),

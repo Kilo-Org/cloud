@@ -48,6 +48,7 @@ const groups: ServiceGroup[] = [
   },
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
+  { id: 'auto-routing', label: 'Auto Routing', alwaysOn: false, sectionBreakBefore: true },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
 ];
@@ -74,16 +75,22 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // core
   nextjs: {
     group: 'core',
-    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe', 'auto-routing'],
+    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe'],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
   stripe: { group: 'core', dependsOn: [] },
+  // auto-routing (kilo-auto/efficient decision engine + benchmark runner)
   'auto-routing': {
-    group: 'core',
+    group: 'auto-routing',
     dependsOn: [],
     dir: 'services/auto-routing',
+  },
+  'auto-routing-benchmark': {
+    group: 'auto-routing',
+    dependsOn: [],
+    dir: 'services/auto-routing-benchmark',
   },
   // cloud-agent
   'cloud-agent-next': {

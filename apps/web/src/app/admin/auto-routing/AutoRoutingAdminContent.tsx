@@ -11,7 +11,6 @@ import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { BarChart3, Clock3, DollarSign, HelpCircle, RefreshCw, Route, Save } from 'lucide-react';
-import * as z from 'zod';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +31,7 @@ import {
 } from '@/lib/organizations/organization-types';
 import { cn } from '@/lib/utils';
 import { BenchmarksSection } from './BenchmarksSection';
+import { parseAdminResponse } from './admin-fetch';
 
 const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
   { value: '1h', label: '1h' },
@@ -39,24 +39,6 @@ const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
   { value: '7d', label: '7d' },
   { value: '30d', label: '30d' },
 ];
-
-const AdminApiErrorSchema = z.object({ error: z.string().optional() });
-
-async function parseAdminResponse<T extends object>(
-  response: Response,
-  schema: z.ZodType<T>
-): Promise<T> {
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const parsedError = AdminApiErrorSchema.safeParse(body);
-    throw new Error(
-      parsedError.success && parsedError.data.error
-        ? parsedError.data.error
-        : `Request failed: ${response.status}`
-    );
-  }
-  return schema.parse(body);
-}
 
 async function fetchClassifierModel() {
   const response = await fetch('/admin/api/auto-routing/classifier-model');
@@ -398,10 +380,12 @@ export function AutoRoutingAdminContent() {
   });
 
   useEffect(() => {
-    if (classifierModelQuery.data) {
-      setSelectedModel(classifierModelQuery.data.override ?? classifierModelQuery.data.model);
+    const override = classifierModelQuery.data?.override;
+    const model = classifierModelQuery.data?.model;
+    if (model !== undefined) {
+      setSelectedModel(override ?? model);
     }
-  }, [classifierModelQuery.data]);
+  }, [classifierModelQuery.data?.override, classifierModelQuery.data?.model]);
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (

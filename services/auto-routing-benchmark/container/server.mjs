@@ -120,6 +120,31 @@ const server = createServer((req, res) => {
       return;
     }
 
+    // One-time CLI warmup (sqlite migration on a fresh instance): a trivial
+    // serialized run so real cases never burn their timeout on it.
+    if (req.method === 'POST' && req.url === '/warmup') {
+      let parsed;
+      try {
+        parsed = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: 'invalid JSON body' });
+        return;
+      }
+      const { model, kiloToken } = parsed ?? {};
+      if (typeof model !== 'string' || typeof kiloToken !== 'string') {
+        sendJson(res, 400, { error: 'model and kiloToken are required strings' });
+        return;
+      }
+      const result = await runCaseSerialized({
+        model,
+        prompt: 'Reply with exactly: ok',
+        kiloToken,
+        timeoutMs: DEFAULT_TIMEOUT_MS,
+      });
+      sendJson(res, 200, { exitCode: result.exitCode, durationMs: result.durationMs });
+      return;
+    }
+
     if (req.method === 'POST' && req.url === '/run') {
       let parsed;
       try {

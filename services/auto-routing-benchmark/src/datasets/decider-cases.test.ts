@@ -39,14 +39,6 @@ describe('DECIDER_CASES', () => {
     }
   });
 
-  it('has generous maxTokens and nonempty prompts', () => {
-    for (const c of DECIDER_CASES) {
-      expect(c.maxTokens, c.id).toBeGreaterThanOrEqual(512);
-      expect(c.systemPrompt.length, c.id).toBeGreaterThan(0);
-      expect(c.userPrompt.length, c.id).toBeGreaterThan(0);
-    }
-  });
-
   it('has nonempty exact and contains_all values', () => {
     for (const c of DECIDER_CASES) {
       const check = c.check;

@@ -11,57 +11,16 @@ export {
   BenchmarkRoutingTableResponseSchema,
   type BenchmarkRoutingTableResponse,
 } from '@kilocode/auto-routing-contracts';
-import { AUTO_ROUTING_BENCHMARK_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
-import * as z from 'zod';
+import { AUTO_ROUTING_BENCHMARK_WORKER_URL } from '@/lib/config.server';
+import { createWorkerAdminFetch } from './worker-admin-fetch';
+import type { WorkerAdminResult } from './worker-admin-fetch';
 
-export type AutoRoutingAdminResult<T> = {
-  status: number;
-  body: T;
-};
+export type AutoRoutingAdminResult<T> = WorkerAdminResult<T>;
 
-type ErrorBody = { error: string };
-const ErrorBodySchema = z.object({ error: z.string() });
-
-type AutoRoutingBenchmarkAdminRequestInit = Omit<RequestInit, 'headers'> & {
-  headers?: Record<string, string>;
-};
-
-async function fetchBenchmarkAdmin<T>(
-  path: string,
-  init: AutoRoutingBenchmarkAdminRequestInit,
-  schema: z.ZodType<T>
-): Promise<AutoRoutingAdminResult<T | ErrorBody>> {
-  if (!AUTO_ROUTING_BENCHMARK_WORKER_URL || !INTERNAL_API_SECRET) {
-    return {
-      status: 500,
-      body: { error: 'Auto routing benchmark worker is not configured' },
-    };
-  }
-
-  const response = await fetch(`${AUTO_ROUTING_BENCHMARK_WORKER_URL}${path}`, {
-    ...init,
-    headers: {
-      authorization: `Bearer ${INTERNAL_API_SECRET}`,
-      ...init.headers,
-    },
-  });
-
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const parsedError = ErrorBodySchema.safeParse(body);
-    return {
-      status: response.status,
-      body: parsedError.success
-        ? parsedError.data
-        : { error: `Request failed: ${response.status}` },
-    };
-  }
-
-  return {
-    status: response.status,
-    body: schema.parse(body),
-  };
-}
+const fetchBenchmarkAdmin = createWorkerAdminFetch({
+  workerUrl: AUTO_ROUTING_BENCHMARK_WORKER_URL,
+  unconfiguredError: 'Auto routing benchmark worker is not configured',
+});
 
 export function getBenchmarkConfig() {
   return fetchBenchmarkAdmin('/admin/config', { method: 'GET' }, BenchmarkConfigResponseSchema);

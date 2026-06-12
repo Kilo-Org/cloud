@@ -30,7 +30,7 @@ import {
 import { gradeClassifierOutput, runDeciderCheck } from './grading';
 import { createOpenRouterClient } from './openrouter';
 import { buildRoutingTable } from './routing-table-builder';
-import { runDeciderCaseViaCli } from './cli-runner';
+import { runDeciderCaseViaCli, warmUpCliContainer } from './cli-runner';
 
 export type BenchmarkJobMessage = {
   runId: string;
@@ -126,7 +126,7 @@ export async function startRun(
     // Everything already has results: complete immediately and republish the
     // aggregate so config-only changes (model removed, threshold tweaked)
     // take effect without re-running any model.
-    await finalizeRunIfComplete(env, runId, kind);
+    await finalizeRunIfComplete(env, runId, kind, { config, runtime });
     return { runId, enqueuedModels: 0, skippedModels };
   }
 
@@ -171,7 +171,8 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
   }
 
   const message = parsed.data;
-  const config = await getRunConfig(env, message.runId);
+  const state = await getRunState(env, message.runId);
+  const { config } = state;
 
   if (message.kind === 'classifier') {
     // Create the OpenRouter client inside processJob — no module-scope transport clients.
@@ -209,7 +210,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
     await processDeciderJob(env, message, config);
   }
 
-  await finalizeRunIfComplete(env, message.runId, message.kind);
+  await finalizeRunIfComplete(env, message.runId, message.kind, state);
 }
 
 async function processDeciderJob(
@@ -217,31 +218,19 @@ async function processDeciderJob(
   message: BenchmarkJobMessage,
   config: BenchmarkConfig
 ): Promise<void> {
-  // Only the cases this message owns (chunked); fall back to the full set for
-  // legacy/un-chunked messages.
-  const cases =
-    message.caseIds && message.caseIds.length > 0
-      ? DECIDER_CASES.filter(c => message.caseIds?.includes(c.id))
-      : DECIDER_CASES;
-
-  // Defensive guard mirroring the startRun fail-fast: if the run snapshot has
-  // no benchmark user, every case in this chunk fails with a clear error so
-  // the run still completes and surfaces the misconfiguration.
-  if (!config.benchmarkUserId) {
-    for (const benchCase of cases) {
-      await upsertCaseResult(env.BENCH_DB, {
-        run_id: message.runId,
-        model: message.model,
-        case_id: benchCase.id,
-        tier: benchCase.tier,
-        score: 0,
-        latency_ms: 0,
-        cost_usd: null,
-        detail_json: null,
-        error: 'benchmark user not configured',
-      });
-    }
+  // Decider messages always carry their chunk's case ids; anything else is
+  // malformed and dropped (same policy as unparseable messages).
+  if (!message.caseIds?.length) {
+    console.warn(JSON.stringify({ event: 'benchmark_job_missing_case_ids', runId: message.runId }));
     return;
+  }
+  const caseIds = new Set(message.caseIds);
+  const cases = DECIDER_CASES.filter(c => caseIds.has(c.id));
+
+  if (!config.benchmarkUserId) {
+    // startRun fails fast before enqueueing, so this only happens if the run
+    // snapshot was tampered with; throwing lets the queue retry/dead-letter.
+    throw new Error(`run ${message.runId} has no benchmarkUserId`);
   }
 
   // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
@@ -251,24 +240,11 @@ async function processDeciderJob(
   const reasoningEffort =
     config.deciderModels.find(m => m.id === message.model)?.reasoningEffort ?? null;
 
-  // The CLI performs a one-time sqlite migration on each fresh container
-  // instance; concurrent first runs against the migrating database end with
-  // empty event streams (exit 0, zero events). One sequential warmup run
-  // completes the migration before the concurrent case loop starts.
-  await runDeciderCaseViaCli(env, {
-    instanceName,
-    model: message.model,
-    benchCase: {
-      id: 'warmup',
-      tier: 'low',
-      taskType: 'implementation',
-      systemPrompt: 'You are a terse assistant.',
-      userPrompt: 'Reply with exactly: ok',
-      maxTokens: 512,
-      check: { kind: 'exact', value: 'ok' },
-    },
-    kiloToken,
-  }).catch(() => {});
+  // Fresh container instances run the CLI's one-time sqlite migration; the
+  // container owns that via its /warmup endpoint so the first real case
+  // doesn't burn its timeout on it. Failures are non-fatal: the first case
+  // simply absorbs whatever warmup work remains.
+  await warmUpCliContainer(env, { instanceName, model: message.model, kiloToken }).catch(() => {});
 
   // Concurrency 1: the CLI's sqlite state in the container is not safe under
   // concurrent sessions (partial-migration crashes); the container serializes
@@ -380,10 +356,9 @@ function failedRow(
   };
 }
 
-async function getRunState(
-  env: Env,
-  runId: string
-): Promise<{ config: BenchmarkConfig; runtime: RunRuntime }> {
+type RunState = { config: BenchmarkConfig; runtime: RunRuntime };
+
+async function getRunState(env: Env, runId: string): Promise<RunState> {
   // Snapshots taken at startRun time so a mid-run admin edit can't skew them.
   const run = await getRun(env.BENCH_DB, runId);
   if (!run) throw new Error(`unknown run ${runId}`);
@@ -397,10 +372,6 @@ async function getRunState(
         carriedSummaries: [],
       };
   return { config, runtime };
-}
-
-async function getRunConfig(env: Env, runId: string): Promise<BenchmarkConfig> {
-  return (await getRunState(env, runId)).config;
 }
 
 export async function runCasesWithConcurrency<T>(
@@ -417,8 +388,13 @@ export async function runCasesWithConcurrency<T>(
   await Promise.all(workers);
 }
 
-async function finalizeRunIfComplete(env: Env, runId: string, kind: BenchmarkKind): Promise<void> {
-  const { config, runtime } = await getRunState(env, runId);
+async function finalizeRunIfComplete(
+  env: Env,
+  runId: string,
+  kind: BenchmarkKind,
+  state: RunState
+): Promise<void> {
+  const { config, runtime } = state;
   const caseCount = kind === 'classifier' ? CLASSIFIER_CASES.length : DECIDER_CASES.length;
   const expected = runtime.enqueuedModels.length * caseCount;
   const actual = await countCaseResults(env.BENCH_DB, runId);

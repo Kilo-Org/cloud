@@ -2,18 +2,19 @@
 
 import {
   BenchmarkConfigResponseSchema,
+  BenchmarkRoutingTableResponseSchema,
   BenchmarkRunsResponseSchema,
   StartBenchmarkRunResponseSchema,
   type BenchmarkConfig,
+  type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
   type BenchmarkModelSummary,
   type ReasoningEffort,
 } from '@kilocode/auto-routing-contracts';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, Play, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
-import * as z from 'zod';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,10 +38,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  BenchmarkRoutingTableResponseSchema,
-  type BenchmarkRoutingTableResponse,
-} from './BenchmarksSection.types';
+import { parseAdminResponse } from './admin-fetch';
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit tests)
@@ -57,28 +55,6 @@ export function formatUsd(n: number | null): string {
   // Trim trailing zeros after decimal, but leave at least one digit after dot
   const trimmed = fixed.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '.0');
   return `$${trimmed}`;
-}
-
-// ---------------------------------------------------------------------------
-// API error helper (mirrors the one in AutoRoutingAdminContent.tsx)
-// ---------------------------------------------------------------------------
-
-const AdminApiErrorSchema = z.object({ error: z.string().optional() });
-
-async function parseAdminResponse<T extends object>(
-  response: Response,
-  schema: z.ZodType<T>
-): Promise<T> {
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const parsedError = AdminApiErrorSchema.safeParse(body);
-    throw new Error(
-      parsedError.success && parsedError.data.error
-        ? parsedError.data.error
-        : `Request failed: ${response.status}`
-    );
-  }
-  return schema.parse(body);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,12 +186,8 @@ function BenchmarkConfigEditor({
   const [form, setForm] = useState(() => configToFormState(config));
 
   // Sync when config changes from outside (initial load / after save)
-  const prevConfigRef = useRef(config);
   useEffect(() => {
-    if (prevConfigRef.current !== config) {
-      prevConfigRef.current = config;
-      setForm(configToFormState(config));
-    }
+    setForm(configToFormState(config));
   }, [config]);
 
   const saveMutation = useMutation({
@@ -478,15 +450,16 @@ function BenchmarkConfigEditor({
 // Run summaries expandable table
 // ---------------------------------------------------------------------------
 
+const TIER_ORDER = { low: 0, medium: 1, high: 2, '*': 3 } as const;
+
 function RunSummariesTable({ run }: { run: BenchmarkRun }) {
   const isDecider = run.kind === 'decider';
 
   const sortedSummaries: BenchmarkModelSummary[] = isDecider
     ? [...run.summaries].sort((a, b) => {
-        const tierOrder = { low: 0, medium: 1, high: 2, '*': 3 };
         const tierDiff =
-          (tierOrder[a.tier as keyof typeof tierOrder] ?? 3) -
-          (tierOrder[b.tier as keyof typeof tierOrder] ?? 3);
+          (TIER_ORDER[a.tier as keyof typeof TIER_ORDER] ?? 3) -
+          (TIER_ORDER[b.tier as keyof typeof TIER_ORDER] ?? 3);
         if (tierDiff !== 0) return tierDiff;
         return b.accuracy - a.accuracy;
       })

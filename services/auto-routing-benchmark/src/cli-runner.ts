@@ -122,3 +122,22 @@ export async function debugRunCli(
     parsed: parseKiloRunEvents(body.stdoutLines ?? []),
   };
 }
+
+// Asks the container to run its one-time CLI warmup (sqlite migration etc.)
+// before the case loop starts. Best-effort: callers ignore failures.
+export async function warmUpCliContainer(
+  env: Env,
+  params: { instanceName: string; model: string; kiloToken: string }
+): Promise<void> {
+  const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(params.instanceName));
+  const response = await stub.fetch(
+    new Request('http://container/warmup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: params.model, kiloToken: params.kiloToken }),
+    })
+  );
+  if (!response.ok) {
+    throw new Error(`container /warmup failed: HTTP ${response.status}`);
+  }
+}

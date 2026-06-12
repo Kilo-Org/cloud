@@ -73,6 +73,22 @@ describe('buildRoutingTable', () => {
     expect(table.tiers.high[2].model).toBe('model/cheap'); // below threshold
   });
 
+  it('excludes a model whose tier summary has no cost signal', () => {
+    const table = buildRoutingTable({
+      runId: 'test-run-nocost',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.7,
+      deciderModels: DECIDER_MODELS,
+      summaries: ALL_TIERS_SUMMARIES.map(s =>
+        s.model === 'model/cheap' && s.tier === 'low' ? { ...s, avgCostUsd: null } : s
+      ),
+    });
+
+    // model/cheap would have won 'low' as cheapest; without a cost signal it
+    // must not be ranked (unknown cost is not zero cost).
+    expect(table.tiers.low.map(c => c.model)).toEqual(['model/expensive', 'model/mid']);
+  });
+
   it('marks meetsThreshold correctly', () => {
     const table = buildRoutingTable({
       runId: 'test-run-2',

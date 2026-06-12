@@ -8,9 +8,12 @@ import {
 } from '@kilocode/auto-routing-contracts';
 
 // Builds the routing table from per-(model, tier) decider summaries. Models
-// with zero graded cases in a tier are excluded from that tier. Throws when
-// any tier ends up empty so the caller keeps the previous published table.
-// deciderModels/minAccuracy come from the run's snapshot, not live config.
+// with zero graded cases in a tier are excluded from that tier, as are
+// models with no cost signal at all (avgCostUsd null means every case failed
+// to report cost; ranking such a model as cheapest would hand it the tier).
+// Throws when any tier ends up empty so the caller keeps the previous
+// published table. deciderModels/minAccuracy come from the run's snapshot,
+// not live config.
 export function buildRoutingTable(params: {
   runId: string;
   generatedAt: string;
@@ -24,7 +27,7 @@ export function buildRoutingTable(params: {
   const tierCandidates = (t: DifficultyTier) =>
     rankCandidates(
       summaries
-        .filter(s => s.tier === t && s.cases > 0)
+        .filter(s => s.tier === t && s.cases > 0 && s.avgCostUsd !== null)
         .map(s => ({
           model: s.model,
           accuracy: s.accuracy,

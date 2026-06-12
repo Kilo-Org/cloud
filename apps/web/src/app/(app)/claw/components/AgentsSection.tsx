@@ -13,7 +13,7 @@ import type {
 } from '@/lib/kiloclaw/types';
 
 import {
-  isAmbiguousAgentMutationError,
+  reconcileAmbiguousMutation,
   useClawAgentMutations,
   useClawAgents,
 } from '../hooks/useClawHooks';
@@ -222,19 +222,17 @@ export function AgentsSection({
       setDeleteTarget(null);
     } catch (err) {
       // Delete can time out at the gateway after the controller already removed
-      // the agent (fire-and-forget). Reconcile only ambiguous (timeout/internal)
-      // failures; a deterministic typed error surfaces as-is.
-      if (isAmbiguousAgentMutationError(err)) {
-        try {
-          const list = await refetchAgents();
-          if (!list.agents.some(a => a.id === id)) {
-            toast.success(`Deleted ${label}`);
-            setDeleteTarget(null);
-            return;
-          }
-        } catch {
-          // fall through to the original error
-        }
+      // the agent (fire-and-forget); reconcile ambiguous failures against the
+      // live list (the agent being gone = applied).
+      const applied = await reconcileAmbiguousMutation(
+        err,
+        refetchAgents,
+        list => !list.agents.some(a => a.id === id)
+      );
+      if (applied) {
+        toast.success(`Deleted ${label}`);
+        setDeleteTarget(null);
+        return;
       }
       toast.error(err instanceof Error ? err.message : 'Failed to delete agent', {
         duration: 10000,
@@ -294,11 +292,14 @@ export function AgentsSection({
 
       {/* Mounted only while open so its model-catalog/version queries don't run
           on every page visit (incl. read-only and stopped-machine states). */}
-      {createOpen && (
+      {/* Gate the mount on `data` (the trigger button already requires it) so
+          the pre-existence guard is always backed by a real loaded list — never
+          a `?? []` fallback that would silently disable it. */}
+      {createOpen && data && (
         <AgentCreateDialog
           open
           onOpenChange={setCreateOpen}
-          existingIds={data?.agents.map(a => a.id) ?? []}
+          existingIds={data.agents.map(a => a.id)}
         />
       )}
 

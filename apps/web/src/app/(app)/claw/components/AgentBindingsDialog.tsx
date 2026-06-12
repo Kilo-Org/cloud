@@ -20,9 +20,14 @@ import type { AgentSummary } from '@/lib/kiloclaw/types';
 import { useClawAgentMutations, useClawChannelCatalog } from '../hooks/useClawHooks';
 
 // The channels this endpoint manages for an agent: plain default-account routes
-// (not account-scoped or advanced — those are managed in OpenClaw).
+// (not account-scoped or advanced — those are managed in OpenClaw). Lowercased
+// to match the controller's managed-set computation (managedChannelSet in
+// openclaw-agent-bindings.ts) and the lowercase catalog channel ids, so a
+// mixed-case stored binding can't desync the initial / owned-by-other sets.
 function managedChannels(agent: AgentSummary): string[] {
-  return agent.bindings.filter(b => !b.advanced && b.accountId === null).map(b => b.channel);
+  return agent.bindings
+    .filter(b => !b.advanced && b.accountId === null)
+    .map(b => b.channel.toLowerCase());
 }
 
 export function AgentBindingsDialog({

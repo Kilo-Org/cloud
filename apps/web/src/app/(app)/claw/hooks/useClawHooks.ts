@@ -142,10 +142,38 @@ export function useClawAgents(enabled = true) {
 export function isAmbiguousAgentMutationError(err: unknown): boolean {
   if (err instanceof TRPCClientError) {
     const code = err.data?.code;
-    return code === 'INTERNAL_SERVER_ERROR' || code === 'TIMEOUT';
+    // A server-originated DETERMINISTIC error (CONFLICT agent_exists,
+    // BAD_REQUEST reserved_agent_id, etc.) always carries a `data.code` set by
+    // the tRPC error formatter. A missing code means TRPCClientError.from
+    // wrapped a raw transport failure with no JSON body — a plain-text edge 504
+    // or a dropped connection, i.e. exactly the fire-and-forget timeout the
+    // reconcile exists for — so treat undefined as ambiguous too, alongside the
+    // explicit timeout/internal codes.
+    return code === undefined || code === 'INTERNAL_SERVER_ERROR' || code === 'TIMEOUT';
   }
-  // Non-tRPC (e.g. raw network) errors: treat as ambiguous.
+  // Non-tRPC (e.g. raw thrown) errors: can't classify, treat as ambiguous.
   return true;
+}
+
+/**
+ * Shared reconcile policy for the fire-and-forget agent create/delete flows. A
+ * mutation can time out at the gateway AFTER the controller already applied it;
+ * on an AMBIGUOUS error we refetch the list and check whether the intended end
+ * state holds. Returns true when the mutation can be treated as applied. A
+ * deterministic error (or a refetch failure) returns false so the caller
+ * surfaces the original error instead of a false success.
+ */
+export async function reconcileAmbiguousMutation(
+  err: unknown,
+  refetch: () => Promise<AgentConfigListResponse>,
+  isApplied: (list: AgentConfigListResponse) => boolean
+): Promise<boolean> {
+  if (!isAmbiguousAgentMutationError(err)) return false;
+  try {
+    return isApplied(await refetch());
+  } catch {
+    return false;
+  }
 }
 
 export function useClawAgentMutations() {

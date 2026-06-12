@@ -16,34 +16,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { isAmbiguousAgentMutationError, useClawAgentMutations } from '../hooks/useClawHooks';
+import { normalizeAgentId, workspaceFromName } from '@/lib/kiloclaw/agent-id';
+import { reconcileAmbiguousMutation, useClawAgentMutations } from '../hooks/useClawHooks';
 import { useClawModelOptions } from '../hooks/useClawModelOptions';
 import { addKilocodeModelPrefix } from './modelSupport';
-
-// Mirror of the controller's normalizeAgentId (openclaw-agent-config.ts) so the
-// derived workspace is 1:1 with the agent id the controller will assign. Using
-// the controller's exact charset (underscores preserved, not collapsed to '-')
-// is what keeps distinct agents like `foo_bar` and `foo-bar` from sharing a
-// workspace directory.
-function normalizeAgentId(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return 'main';
-  const lower = trimmed.toLowerCase();
-  if (/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(trimmed)) return lower;
-  return (
-    lower
-      .replace(/[^a-z0-9_-]+/g, '-')
-      .replace(/^-+/, '')
-      .replace(/-+$/, '')
-      .slice(0, 64) || 'main'
-  );
-}
-
-// Derive a stable, unix-safe workspace path from the agent name so users never
-// have to type a machine path. Keyed on the normalized agent id for uniqueness.
-function workspaceFromName(name: string): string {
-  return `/root/.openclaw/workspace-${normalizeAgentId(name)}`;
-}
 
 export function AgentCreateDialog({
   open,
@@ -92,22 +68,25 @@ export function AgentCreateDialog({
       onOpenChange(false);
     } catch (err) {
       // Create can time out at the gateway after the controller already made the
-      // agent (fire-and-forget). Reconcile only for ambiguous (timeout/internal)
-      // failures, and only if the id didn't already exist before submit — so a
-      // deterministic conflict (`agent_exists`, even one a concurrent writer
-      // caused) or reserved `main` is reported as the real error, never success.
-      if (isAmbiguousAgentMutationError(err) && !existingIds.includes(expectedId)) {
-        try {
-          const list = await refetchAgents();
-          if (list.agents.some(a => a.id === expectedId)) {
-            toast.success(`Created agent ${trimmedName} (took a moment)`);
-            reset();
-            onOpenChange(false);
-            return;
-          }
-        } catch {
-          // fall through to the original error
-        }
+      // agent (fire-and-forget). Reconcile only when the id did NOT already exist
+      // before submit, so a deterministic conflict (`agent_exists`) or reserved
+      // `main` is reported as the real error, never a false success.
+      //
+      // Residual race we accept: if THIS request is lost before reaching the
+      // controller while a concurrent writer creates the same id, the refetch can
+      // still find it and report success for an agent the other writer made
+      // (possibly with a different model). Narrow (same name, simultaneous,
+      // request lost pre-controller) and self-correcting on the next list view.
+      const applied =
+        !existingIds.includes(expectedId) &&
+        (await reconcileAmbiguousMutation(err, refetchAgents, list =>
+          list.agents.some(a => a.id === expectedId)
+        ));
+      if (applied) {
+        toast.success(`Created agent ${trimmedName} (took a moment)`);
+        reset();
+        onOpenChange(false);
+        return;
       }
       toast.error(err instanceof Error ? err.message : 'Failed to create agent', {
         duration: 10000,

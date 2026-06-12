@@ -18,7 +18,12 @@ import {
   hashIdentifierForTelemetry,
 } from './conversation-identity';
 import type { ContentHashes } from './conversation-identity';
-import { getCachedClassification, putCachedClassification } from './decision-cache';
+import {
+  getCachedClassification,
+  getStickyDecision,
+  putCachedClassification,
+  putStickyDecision,
+} from './decision-cache';
 import { computeDecision } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
@@ -251,6 +256,7 @@ function recordDecision(
       decidedModel: decision?.model ?? null,
       decidedTier: decision?.tier ?? null,
       decisionSource: decision?.source ?? null,
+      sticky: decision?.sticky ?? null,
       ...summary.details,
     })
   );
@@ -290,14 +296,16 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     successSampleRate,
   };
 
-  const cached = await getCachedClassification(
-    c.env,
-    ctx.conversationKey,
-    hashes.exact,
-    classifierModel
-  );
+  // Both live in the conversation's Durable Object; fetch them together.
+  const [cached, stickyModel] = await Promise.all([
+    getCachedClassification(c.env, ctx.conversationKey, hashes.exact, classifierModel),
+    getStickyDecision(c.env, ctx.conversationKey),
+  ]);
   if (cached) {
-    const decision = computeDecision(cached, payload.input.apiKind, routingTable);
+    const decision = computeDecision(cached, payload.input.apiKind, routingTable, stickyModel);
+    if (decision) {
+      c.executionCtx.waitUntil(putStickyDecision(c.env, ctx.conversationKey, decision.model));
+    }
     recordDecision(
       c.env,
       ctx,
@@ -326,8 +334,12 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const decision = computeDecision(
       classifier.classification,
       payload.input.apiKind,
-      routingTable
+      routingTable,
+      stickyModel
     );
+    if (decision) {
+      c.executionCtx.waitUntil(putStickyDecision(c.env, ctx.conversationKey, decision.model));
+    }
     recordDecision(
       c.env,
       ctx,

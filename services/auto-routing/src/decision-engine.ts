@@ -9,17 +9,47 @@ import {
 export function computeDecision(
   classification: ClassifierOutput,
   apiKind: NormalizedClassifierInput['apiKind'],
-  table: RoutingTable | null
+  table: RoutingTable | null,
+  incumbentModel: string | null
 ): AutoRoutingDecision | null {
   if (!table) return null;
   const tier = deriveDifficultyTier(classification);
-  const candidate = table.tiers[tier].find(c => c.supportedApiKinds.includes(apiKind));
-  if (!candidate) return null;
+  const candidates = table.tiers[tier];
+  const freshPick = candidates.find(c => c.supportedApiKinds.includes(apiKind));
+  if (!freshPick) return null;
+
+  // Keep the session on its incumbent model when it is still good enough for
+  // the current tier. A model switch discards the provider's prompt cache,
+  // and rebuilding it costs full-price input tokens (4-10x cache-read rates)
+  // on a context that dominates agent-session spend — so a switch is only
+  // worth it when the fresh pick's recurring per-turn savings clearly exceed
+  // that one-time penalty, i.e. it is cheaper by more than switchCostFactor.
+  const incumbent =
+    incumbentModel === null
+      ? undefined
+      : candidates.find(c => c.model === incumbentModel && c.supportedApiKinds.includes(apiKind));
+  if (
+    incumbent &&
+    incumbent.meetsThreshold &&
+    incumbent.model !== freshPick.model &&
+    !(freshPick.avgCostUsd * table.switchCostFactor < incumbent.avgCostUsd)
+  ) {
+    return {
+      model: incumbent.model,
+      tier,
+      source: table.source,
+      tableVersion: table.version,
+      reasoningEffort: incumbent.reasoningEffort ?? null,
+      sticky: true,
+    };
+  }
+
   return {
-    model: candidate.model,
+    model: freshPick.model,
     tier,
     source: table.source,
     tableVersion: table.version,
-    reasoningEffort: candidate.reasoningEffort ?? null,
+    reasoningEffort: freshPick.reasoningEffort ?? null,
+    sticky: false,
   };
 }

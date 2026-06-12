@@ -30,6 +30,13 @@ export const BenchmarkConfigSchema = z.object({
   // The Kilo user whose identity/billing the decider CLI runs execute under.
   // Null until an admin configures it; decider runs fail fast while null.
   benchmarkUserId: z.string().trim().min(1).nullable(),
+  // Session stickiness knob carried into published routing tables: a session
+  // stays on its incumbent model while it meets the tier's accuracy
+  // threshold, unless the fresh pick is cheaper by more than this factor.
+  // Model switches discard provider prompt caches (cache reads are far
+  // cheaper than fresh input tokens), so switching only pays off when the
+  // recurring savings clearly outweigh the cache-rebuild penalty.
+  switchCostFactor: z.number().min(1).max(100),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });

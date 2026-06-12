@@ -22,6 +22,9 @@ export const RoutingTableSchema = z.object({
   version: z.string().min(1),
   generatedAt: z.string().min(1),
   minAccuracy: z.number().min(0).max(1),
+  // Keep a session's incumbent model unless the fresh pick is cheaper by
+  // more than this factor (see BenchmarkConfigSchema.switchCostFactor).
+  switchCostFactor: z.number().min(1),
   source: z.enum(['benchmark']),
   tiers: z.object({
     low: z.array(RankedCandidateSchema).min(1),

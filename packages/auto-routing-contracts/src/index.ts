@@ -104,6 +104,10 @@ export const AutoRoutingDecisionSchema = z.object({
   tableVersion: z.string(),
   // Mirrors the effort the chosen model was benchmarked with, when set.
   reasoningEffort: ReasoningEffortSchema.nullable().optional(),
+  // True when the session's incumbent model was kept over a cheaper fresh
+  // pick. Defaulted so responses from a not-yet-redeployed worker still
+  // parse.
+  sticky: z.boolean().default(false),
 });
 export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 

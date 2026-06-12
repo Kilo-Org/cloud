@@ -85,6 +85,7 @@ const benchmarkRoutingTable = {
   version: 'bench-run-1',
   generatedAt: '2026-06-12T00:00:00.000Z',
   minAccuracy: 0.7,
+  switchCostFactor: 3,
   source: 'benchmark',
   tiers: {
     low: [
@@ -104,6 +105,17 @@ const benchmarkRoutingTable = {
         avgCostUsd: 0.002,
         meetsThreshold: true,
         supportedApiKinds: ['chat_completions'],
+        reasoningEffort: null,
+      },
+      // The high-tier model also qualifies for medium, within the 3x
+      // switch-cost factor of the fresh pick (0.002 * 3 >= 0.005): a session
+      // de-escalating from high stays on it.
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        accuracy: 0.8,
+        avgCostUsd: 0.005,
+        meetsThreshold: true,
+        supportedApiKinds: ['chat_completions', 'messages', 'responses'],
         reasoningEffort: null,
       },
     ],
@@ -231,6 +243,7 @@ describe('auto routing worker', () => {
         source: 'benchmark',
         tableVersion: 'bench-run-1',
         reasoningEffort: null,
+        sticky: false,
       },
       classifierResult: {
         classification: mockClassification,
@@ -274,6 +287,7 @@ describe('auto routing worker', () => {
       mode: 'code',
       uaPrefix: 'Kilo-Code/4.106.0',
       bodyBytes: 2048,
+      sticky: false,
     });
     // The raw user id (which embeds the client IP for anonymous users) must
     // never reach persisted logs.
@@ -294,12 +308,16 @@ describe('auto routing worker', () => {
         source: 'benchmark',
         tableVersion: 'bench-run-1',
         reasoningEffort: null,
+        sticky: false,
       },
       classifierResult: { classification: mockClassification },
     });
     expect(cacheIdFromName).toHaveBeenCalledWith('user:user-1:task:task-123');
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
-    expect(cachePutEntry).not.toHaveBeenCalled();
+    // The classification is not re-cached; only the served model is
+    // remembered for session stickiness.
+    expect(cachePutEntry).toHaveBeenCalledTimes(1);
+    expect(cachePutEntry).toHaveBeenCalledWith('sticky', { model: expect.any(String) });
     expect(writeDataPoint).toHaveBeenCalledWith(
       expect.objectContaining({
         doubles: [0, 0, mockClassification.confidence, 1],
@@ -315,6 +333,44 @@ describe('auto routing worker', () => {
       expect.stringMatching(/^google\/gemini-2\.5-flash-lite:[0-9a-f]{16}$/),
       expect.objectContaining({ taskType: 'implementation' })
     );
+  });
+
+  it('keeps the session on the incumbent model when the tier de-escalates', async () => {
+    // Back the mocked DO stub with real storage so the sticky model written
+    // by the first request is visible to the second.
+    const store = new Map<string, unknown>();
+    cacheGetEntry.mockImplementation(async (key: string) => store.get(key) ?? null);
+    cachePutEntry.mockImplementation(async (key: string, value: unknown) => {
+      store.set(key, value);
+    });
+
+    classifyNormalizedInput.mockResolvedValueOnce({
+      ...mockClassifierResult,
+      classification: {
+        ...mockClassification,
+        reasoningComplexity: 'high',
+        contextComplexity: 'large',
+        executionMode: 'multi_step_project',
+      },
+    });
+    const first = await decideRequest(mirrorPayload());
+    expect(first.status).toBe(200);
+    await expect(first.json()).resolves.toMatchObject({
+      decision: { model: 'anthropic/claude-sonnet-4.6', tier: 'high', sticky: false },
+    });
+
+    // The second turn (different prompt, same session) classifies as medium.
+    // The fresh medium pick is cheaper, but not by more than the switch-cost
+    // factor, so the session keeps its incumbent.
+    const second = await decideRequest(
+      mirrorPayload({
+        input: { ...normalizedInput, userPromptPrefix: 'Now a much easier follow-up.' },
+      })
+    );
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toMatchObject({
+      decision: { model: 'anthropic/claude-sonnet-4.6', tier: 'medium', sticky: true },
+    });
   });
 
   it('falls back to a machine-scoped conversation key without a session id', async () => {
@@ -423,6 +479,8 @@ describe('auto routing worker', () => {
       decision: null,
       classifierResult: { classification: mockClassification },
     });
+    // A null decision must not overwrite the session's sticky model.
+    expect(cachePutEntry).not.toHaveBeenCalledWith('sticky', expect.anything());
   });
 
   it('returns a null classifier result when the classifier request fails', async () => {

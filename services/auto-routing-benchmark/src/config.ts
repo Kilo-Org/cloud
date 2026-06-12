@@ -1,5 +1,5 @@
-import { BenchmarkConfigSchema, type BenchmarkConfig } from '@kilocode/auto-routing-contracts';
-import { getConfigRow, saveConfigRow } from './db';
+import type { BenchmarkConfig } from '@kilocode/auto-routing-contracts';
+import { apiKindsToFlags, getConfigRows, replaceConfig, type ConfigDeciderModelRow } from './db';
 
 export const DEFAULT_BENCHMARK_CONFIG: BenchmarkConfig = {
   classifierModels: [
@@ -38,20 +38,46 @@ export const DEFAULT_BENCHMARK_CONFIG: BenchmarkConfig = {
   updatedBy: null,
 };
 
-// Pure so the fallback path is unit-testable without D1.
-export function parseConfigJson(raw: string | null): BenchmarkConfig {
-  if (raw === null) return DEFAULT_BENCHMARK_CONFIG;
-  try {
-    const parsed = BenchmarkConfigSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : DEFAULT_BENCHMARK_CONFIG;
-  } catch {
+// Maps the three normalized config tables to the BenchmarkConfig contract.
+// Falls back to DEFAULT_BENCHMARK_CONFIG fields when no config row exists.
+export function mapConfigRows(
+  configRow: {
+    min_accuracy: number;
+    max_concurrency: number;
+    benchmark_user_id: string | null;
+    updated_at: string;
+    updated_by: string | null;
+  } | null,
+  classifierModels: string[],
+  deciderModelRows: ConfigDeciderModelRow[]
+): BenchmarkConfig {
+  if (configRow === null || classifierModels.length === 0 || deciderModelRows.length === 0) {
     return DEFAULT_BENCHMARK_CONFIG;
   }
+
+  return {
+    classifierModels,
+    deciderModels: deciderModelRows.map(r => ({
+      id: r.model,
+      supportedApiKinds: [
+        ...(r.supports_chat_completions ? (['chat_completions'] as const) : []),
+        ...(r.supports_messages ? (['messages'] as const) : []),
+        ...(r.supports_responses ? (['responses'] as const) : []),
+      ],
+      reasoningEffort:
+        r.reasoning_effort as BenchmarkConfig['deciderModels'][number]['reasoningEffort'],
+    })),
+    minAccuracy: configRow.min_accuracy,
+    maxConcurrency: configRow.max_concurrency,
+    benchmarkUserId: configRow.benchmark_user_id,
+    updatedAt: configRow.updated_at,
+    updatedBy: configRow.updated_by,
+  };
 }
 
 export async function getBenchmarkConfig(db: D1Database): Promise<BenchmarkConfig> {
-  const row = await getConfigRow(db);
-  return parseConfigJson(row?.config_json ?? null);
+  const { config, classifierModels, deciderModels } = await getConfigRows(db);
+  return mapConfigRows(config, classifierModels, deciderModels);
 }
 
 export async function saveBenchmarkConfig(
@@ -61,6 +87,25 @@ export async function saveBenchmarkConfig(
 ): Promise<BenchmarkConfig> {
   const updatedAt = new Date().toISOString();
   const stamped: BenchmarkConfig = { ...config, updatedAt, updatedBy };
-  await saveConfigRow(db, JSON.stringify(stamped), updatedAt, updatedBy);
+
+  const deciderModelRows: ConfigDeciderModelRow[] = config.deciderModels.map(m => ({
+    model: m.id,
+    reasoning_effort: m.reasoningEffort ?? null,
+    ...apiKindsToFlags(m.supportedApiKinds),
+  }));
+
+  await replaceConfig(
+    db,
+    {
+      min_accuracy: config.minAccuracy,
+      max_concurrency: config.maxConcurrency,
+      benchmark_user_id: config.benchmarkUserId,
+      updated_at: updatedAt,
+      updated_by: updatedBy,
+    },
+    config.classifierModels,
+    deciderModelRows
+  );
+
   return stamped;
 }

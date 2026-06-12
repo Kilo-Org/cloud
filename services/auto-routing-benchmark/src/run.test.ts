@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CaseResultRow } from './db';
-import { chunkArray, pickClassifierWinner, runCasesWithConcurrency, summarize } from './run';
+import { chunkArray, runCasesWithConcurrency, summarize } from './run';
+import { pickClassifierWinner } from './winner';
 
 function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
   return {
@@ -11,8 +12,13 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     score: 1,
     latency_ms: 100,
     cost_usd: 0.001,
-    detail_json: null,
     error: null,
+    fallback_reason: null,
+    retried: null,
+    exit_code: null,
+    output_prefix: null,
+    event_count: null,
+    last_event_types: null,
     ...overrides,
   };
 }

@@ -94,3 +94,8 @@ export const ClassifierWinnerSchema = z.object({
 export type ClassifierWinner = z.infer<typeof ClassifierWinnerSchema>;
 
 export const CLASSIFIER_WINNER_KV_KEY = 'classifier_benchmark_winner';
+
+export const ClassifierWinnerResponseSchema = z.object({
+  winner: ClassifierWinnerSchema.nullable(),
+});
+export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSchema>;

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RoutingTable } from '@kilocode/auto-routing-contracts';
 import { DEFAULT_BENCHMARK_CONFIG } from './config';
 import { app } from './index';
 import type * as DbModule from './db';
@@ -12,10 +13,11 @@ vi.mock('./db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
   return {
     ...actual,
-    getConfigRow: vi.fn(),
-    saveConfigRow: vi.fn(),
+    getConfigRows: vi.fn(),
+    replaceConfig: vi.fn(),
     listRuns: vi.fn(),
     getLatestRoutingTable: vi.fn(),
+    getClassifierWinner: vi.fn(),
     getLatestSummariesByModel: vi.fn(),
     insertRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
@@ -23,13 +25,14 @@ vi.mock('./db', async importOriginal => {
 });
 
 import {
-  getConfigRow,
+  getConfigRows,
+  getClassifierWinner,
   getLatestRoutingTable,
   getLatestSummariesByModel,
   insertRun,
   listRuns,
   markStaleRunsFailed,
-  saveConfigRow,
+  replaceConfig,
 } from './db';
 
 const tokenGet = vi.fn<() => Promise<string>>();
@@ -39,7 +42,7 @@ const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
   BENCH_DB: {} as D1Database,
   BENCH_QUEUE: { sendBatch: queueSendBatch },
-  AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn() },
+  AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn(), delete: vi.fn() },
 } as unknown as Env;
 
 const executionCtx = {
@@ -82,10 +85,15 @@ function authedPut(path: string, body: unknown, extraHeaders: Record<string, str
 beforeEach(() => {
   vi.clearAllMocks();
   tokenGet.mockResolvedValue('bench-token');
-  vi.mocked(getConfigRow).mockResolvedValue(null);
-  vi.mocked(saveConfigRow).mockResolvedValue(undefined);
+  vi.mocked(getConfigRows).mockResolvedValue({
+    config: null,
+    classifierModels: [],
+    deciderModels: [],
+  });
+  vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
+  vi.mocked(getClassifierWinner).mockResolvedValue(null);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
@@ -116,8 +124,8 @@ describe('auth middleware', () => {
 // ---------------------------------------------------------------------------
 
 describe('GET /admin/config', () => {
-  it('returns defaults when the DB row is absent', async () => {
-    // getConfigRow already returns null by default
+  it('returns defaults when the DB rows are absent', async () => {
+    // getConfigRows already returns null config by default
     const res = await authedGet('/admin/config');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -126,22 +134,33 @@ describe('GET /admin/config', () => {
     });
   });
 
-  it('returns the stored config when a DB row exists', async () => {
-    const storedConfig = {
-      ...DEFAULT_BENCHMARK_CONFIG,
-      minAccuracy: 0.9,
-      updatedAt: '2026-06-01T00:00:00.000Z',
-      updatedBy: 'admin@example.com',
-    };
-    vi.mocked(getConfigRow).mockResolvedValueOnce({
-      config_json: JSON.stringify(storedConfig),
-      updated_at: '2026-06-01T00:00:00.000Z',
-      updated_by: 'admin@example.com',
+  it('returns the stored config when DB rows exist', async () => {
+    const classifierModels = ['some/model'];
+    const deciderModels = DEFAULT_BENCHMARK_CONFIG.deciderModels.map(m => ({
+      model: m.id,
+      reasoning_effort: null,
+      supports_chat_completions: m.supportedApiKinds.includes('chat_completions'),
+      supports_messages: m.supportedApiKinds.includes('messages'),
+      supports_responses: m.supportedApiKinds.includes('responses'),
+    }));
+    vi.mocked(getConfigRows).mockResolvedValueOnce({
+      config: {
+        id: 1,
+        min_accuracy: 0.9,
+        max_concurrency: 4,
+        benchmark_user_id: null,
+        updated_at: '2026-06-01T00:00:00.000Z',
+        updated_by: 'admin@example.com',
+      },
+      classifierModels,
+      deciderModels,
     });
 
     const res = await authedGet('/admin/config');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { config: typeof storedConfig };
+    const body = (await res.json()) as {
+      config: { minAccuracy: number; updatedBy: string | null };
+    };
     expect(body.config.minAccuracy).toBe(0.9);
     expect(body.config.updatedBy).toBe('admin@example.com');
   });
@@ -161,8 +180,6 @@ describe('PUT /admin/config', () => {
       },
       body: 'not json {{{',
     });
-    // Malformed JSON surfaces via the framework error handler (same behavior
-    // as the other zodJsonValidator-based services).
     expect(res.status).toBe(500);
   });
 
@@ -173,7 +190,7 @@ describe('PUT /admin/config', () => {
       success: false,
       error: 'Invalid benchmark config',
     });
-    expect(saveConfigRow).not.toHaveBeenCalled();
+    expect(replaceConfig).not.toHaveBeenCalled();
   });
 
   it('persists a valid config and returns it with defaults', async () => {
@@ -193,18 +210,16 @@ describe('PUT /admin/config', () => {
       config: { minAccuracy: number; updatedBy: string | null; updatedAt: string | null };
       defaults: typeof DEFAULT_BENCHMARK_CONFIG;
     };
-    // Returned config carries the stamped fields.
     expect(body.config.minAccuracy).toBe(0.85);
     expect(body.config.updatedBy).toBe('igor@kilocode.ai');
     expect(typeof body.config.updatedAt).toBe('string');
     expect(body.defaults).toEqual(DEFAULT_BENCHMARK_CONFIG);
 
-    // The row was persisted with the stamped config and updatedBy.
-    expect(saveConfigRow).toHaveBeenCalledOnce();
-    const [, configJson, updatedAt, updatedBy] = vi.mocked(saveConfigRow).mock.calls[0];
-    expect(JSON.parse(configJson).minAccuracy).toBe(0.85);
-    expect(typeof updatedAt).toBe('string');
-    expect(updatedBy).toBe('igor@kilocode.ai');
+    expect(replaceConfig).toHaveBeenCalledOnce();
+    const [, configArg] = vi.mocked(replaceConfig).mock.calls[0];
+    expect(configArg.min_accuracy).toBe(0.85);
+    expect(typeof configArg.updated_at).toBe('string');
+    expect(configArg.updated_by).toBe('igor@kilocode.ai');
   });
 });
 
@@ -214,7 +229,6 @@ describe('PUT /admin/config', () => {
 
 describe('GET /admin/runs', () => {
   it('returns an empty runs array when the table is empty', async () => {
-    // listRuns returns [] by default
     const res = await authedGet('/admin/runs');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ runs: [] });
@@ -235,8 +249,6 @@ describe('POST /admin/runs', () => {
       },
       body: '<<<',
     });
-    // Malformed JSON surfaces via the framework error handler (same behavior
-    // as the other zodJsonValidator-based services).
     expect(res.status).toBe(500);
   });
 
@@ -268,7 +280,6 @@ describe('POST /admin/runs', () => {
 
 describe('GET /admin/routing-table', () => {
   it('returns {table: null, publishedAt: null} when no rows exist', async () => {
-    // getLatestRoutingTable already returns null by default
     const res = await authedGet('/admin/routing-table');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ table: null, publishedAt: null });
@@ -290,9 +301,8 @@ describe('GET /admin/routing-table', () => {
       tiers: { low: [candidate], medium: [candidate], high: [candidate] },
     };
     vi.mocked(getLatestRoutingTable).mockResolvedValueOnce({
-      run_id: 'run-123',
-      published_at: '2026-06-01T10:00:00.000Z',
-      table_json: JSON.stringify(tableData),
+      table: tableData as RoutingTable,
+      publishedAt: '2026-06-01T10:00:00.000Z',
     });
 
     const res = await authedGet('/admin/routing-table');
@@ -301,5 +311,31 @@ describe('GET /admin/routing-table', () => {
       table: tableData,
       publishedAt: '2026-06-01T10:00:00.000Z',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /admin/classifier-winner
+// ---------------------------------------------------------------------------
+
+describe('GET /admin/classifier-winner', () => {
+  it('returns {winner: null} when no completed classifier run exists', async () => {
+    const res = await authedGet('/admin/classifier-winner');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ winner: null });
+  });
+
+  it('returns the winner when a completed classifier run exists', async () => {
+    const winner = {
+      model: 'google/gemini-2.5-flash-lite',
+      runId: 'classifier-2026-06-01T00-00-00-000Z',
+      accuracy: 0.92,
+      generatedAt: '2026-06-01T10:00:00.000Z',
+    };
+    vi.mocked(getClassifierWinner).mockResolvedValueOnce(winner);
+
+    const res = await authedGet('/admin/classifier-winner');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ winner });
   });
 });

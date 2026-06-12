@@ -1543,6 +1543,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260514.1
+      drizzle-kit:
+        specifier: 'catalog:'
+        version: 0.31.10
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

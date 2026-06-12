@@ -9,6 +9,7 @@
     "types": "wrangler types --include-runtime=false",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/auto-routing-benchmark/src",
+    "db:generate": "drizzle-kit generate",
     "test": "vitest run"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

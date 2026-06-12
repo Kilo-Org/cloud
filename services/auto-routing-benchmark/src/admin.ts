@@ -1,7 +1,6 @@
 import * as z from 'zod';
 import {
   BenchmarkConfigSchema,
-  RoutingTableSchema,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
 } from '@kilocode/auto-routing-contracts';
@@ -10,7 +9,7 @@ import type { Hono } from 'hono';
 import { DEFAULT_BENCHMARK_CONFIG, getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
 import { fetchBenchmarkUserToken, startRun } from './run';
-import { getLatestRoutingTable, listRuns } from './db';
+import { getClassifierWinner, getLatestRoutingTable, listRuns } from './db';
 import type { HonoEnv } from './hono-env';
 
 const DebugCliRequestSchema = z.object({
@@ -53,13 +52,15 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
 
   app.get('/admin/routing-table', async c => {
     const latest = await getLatestRoutingTable(c.env.BENCH_DB);
-    // Validated at publish time, but re-validate before crossing the contract
-    // boundary so a schema change can never surface a stale incompatible table.
-    const parsed = latest ? RoutingTableSchema.safeParse(JSON.parse(latest.table_json)) : null;
     return c.json({
-      table: parsed?.success ? parsed.data : null,
-      publishedAt: parsed?.success ? (latest?.published_at ?? null) : null,
+      table: latest?.table ?? null,
+      publishedAt: latest?.publishedAt ?? null,
     });
+  });
+
+  app.get('/admin/classifier-winner', async c => {
+    const winner = await getClassifierWinner(c.env.BENCH_DB);
+    return c.json({ winner });
   });
 
   // Runs one ad-hoc prompt through the kilo CLI container and returns raw

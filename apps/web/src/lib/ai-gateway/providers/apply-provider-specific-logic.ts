@@ -113,7 +113,8 @@ export function applyProviderSpecificLogic(
   userByok: BYOKResult[] | null,
   originalHeaders: FraudDetectionHeaders,
   userId: string,
-  taskId: string | null
+  taskId: string | null,
+  organizationId: string | undefined
 ) {
   applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
@@ -121,7 +122,9 @@ export function applyProviderSpecificLogic(
   sanitizeBinaryToolResults(requestToMutate);
 
   if (requestToMutate.kind === 'chat_completions') {
-    logChatCompletionsOneOfSchemas(requestToMutate.body, requestedModel, provider.id);
+    if (isGlmModel(requestedModel) && !organizationId) {
+      logChatCompletionsOneOfSchemas(requestToMutate.body, requestedModel, provider.id);
+    }
     scrubOpenCodeSpecificProperties(requestToMutate.body);
 
     // Mostly a workaround for bugs in the old extension.

@@ -700,7 +700,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     effectiveProviderContext.userByok,
     fraudHeaders,
     user.id,
-    taskId ?? null
+    taskId ?? null,
+    organizationId
   );
 
   const toolsAvailable = getToolsAvailable(requestBodyParsed);

@@ -9,6 +9,7 @@ type OneOfSchemaLogDetails = {
   one_of_occurrences: number;
   tool_schema_count: number;
   response_format_schema: boolean;
+  schema: unknown;
 };
 
 type OneOfSchemaLogger = (message: string, details: OneOfSchemaLogDetails) => void;
@@ -40,14 +41,15 @@ function countOneOfOccurrences(schema: unknown): number {
   return occurrences;
 }
 
-export function logChatCompletionsOneOfSchemas(
+function logChatCompletionsOneOfSchemasUnsafe(
   request: OpenRouterChatCompletionRequest,
   model: string,
   provider: ProviderId,
-  log: OneOfSchemaLogger = warnExceptInTest
+  log: OneOfSchemaLogger
 ): void {
   let oneOfOccurrences = 0;
   let toolSchemaCount = 0;
+  let matchingSchema: unknown;
 
   if (Array.isArray(request.tools)) {
     for (const tool of request.tools) {
@@ -58,6 +60,7 @@ export function logChatCompletionsOneOfSchemas(
 
       oneOfOccurrences += occurrences;
       toolSchemaCount += 1;
+      matchingSchema ??= tool.function.parameters;
     }
   }
 
@@ -72,6 +75,7 @@ export function logChatCompletionsOneOfSchemas(
     if (occurrences > 0) {
       oneOfOccurrences += occurrences;
       responseFormatSchema = true;
+      matchingSchema ??= responseFormat.json_schema.schema;
     }
   }
 
@@ -84,5 +88,19 @@ export function logChatCompletionsOneOfSchemas(
     one_of_occurrences: oneOfOccurrences,
     tool_schema_count: toolSchemaCount,
     response_format_schema: responseFormatSchema,
+    schema: matchingSchema,
   });
+}
+
+export function logChatCompletionsOneOfSchemas(
+  request: OpenRouterChatCompletionRequest,
+  model: string,
+  provider: ProviderId,
+  log: OneOfSchemaLogger = warnExceptInTest
+): void {
+  try {
+    logChatCompletionsOneOfSchemasUnsafe(request, model, provider, log);
+  } catch {
+    // Diagnostics must never interrupt request forwarding.
+  }
 }

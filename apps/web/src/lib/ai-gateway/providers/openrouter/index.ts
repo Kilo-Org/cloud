@@ -32,7 +32,7 @@ import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 function buildAutoModels(): OpenRouterModel[] {
-  return AUTO_MODELS.map(m => {
+  return AUTO_MODELS.filter(m => m.status === 'public').map(m => {
     const input_modalities = ['text'];
     if (m.supports_images) {
       input_modalities.push('image');

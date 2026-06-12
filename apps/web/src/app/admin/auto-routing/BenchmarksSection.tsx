@@ -8,9 +8,9 @@ import {
   type BenchmarkConfig,
   type BenchmarkKind,
   type BenchmarkRoutingTableResponse,
+  type BenchmarkConfigUpdate,
   type BenchmarkRun,
   type BenchmarkModelSummary,
-  type ClassifierApiKind,
   type ReasoningEffort,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -68,7 +68,7 @@ async function fetchBenchmarkConfig() {
   return parseAdminResponse(response, BenchmarkConfigResponseSchema);
 }
 
-async function saveBenchmarkConfig(config: BenchmarkConfig) {
+async function saveBenchmarkConfig(config: BenchmarkConfigUpdate) {
   const response = await fetch('/admin/api/auto-routing/benchmark-config', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
@@ -103,11 +103,10 @@ async function fetchBenchmarkRoutingTable() {
 // Local form state type for decider model rows
 // ---------------------------------------------------------------------------
 
+// supportedApiKinds is intentionally absent: it is derived server-side from
+// gateway provider definitions when the config is saved.
 type DeciderModelRow = {
   id: string;
-  chat_completions: boolean;
-  responses: boolean;
-  messages: boolean;
   reasoningEffort: ReasoningEffort | null;
 };
 
@@ -122,9 +121,6 @@ function configToFormState(config: BenchmarkConfig): {
     classifierModels: config.classifierModels.join('\n'),
     deciderModels: config.deciderModels.map(m => ({
       id: m.id,
-      chat_completions: m.supportedApiKinds.includes('chat_completions'),
-      responses: m.supportedApiKinds.includes('responses'),
-      messages: m.supportedApiKinds.includes('messages'),
       reasoningEffort: m.reasoningEffort ?? null,
     })),
     minAccuracy: config.minAccuracy,
@@ -136,24 +132,17 @@ function configToFormState(config: BenchmarkConfig): {
 function formStateToConfig(
   state: ReturnType<typeof configToFormState>,
   base: BenchmarkConfig
-): BenchmarkConfig {
+): BenchmarkConfigUpdate {
   const classifierModels = state.classifierModels
     .split('\n')
     .map(s => s.trim())
     .filter(s => s.length > 0);
   const deciderModels = state.deciderModels
     .filter(row => row.id.trim().length > 0)
-    .map(row => {
-      const kinds: ClassifierApiKind[] = [];
-      if (row.chat_completions) kinds.push('chat_completions');
-      if (row.responses) kinds.push('responses');
-      if (row.messages) kinds.push('messages');
-      return {
-        id: row.id.trim(),
-        supportedApiKinds: kinds.length ? kinds : ['chat_completions' as const],
-        reasoningEffort: row.reasoningEffort ?? null,
-      };
-    });
+    .map(row => ({
+      id: row.id.trim(),
+      reasoningEffort: row.reasoningEffort ?? null,
+    }));
   const benchmarkUserId = state.benchmarkUserId.trim();
   return {
     classifierModels,
@@ -204,16 +193,7 @@ function BenchmarkConfigEditor({
   const handleAddDeciderRow = useCallback(() => {
     setForm(prev => ({
       ...prev,
-      deciderModels: [
-        ...prev.deciderModels,
-        {
-          id: '',
-          chat_completions: true,
-          responses: false,
-          messages: false,
-          reasoningEffort: null,
-        },
-      ],
+      deciderModels: [...prev.deciderModels, { id: '', reasoningEffort: null }],
     }));
   }, []);
 
@@ -264,9 +244,6 @@ function BenchmarkConfigEditor({
               <TableHeader>
                 <TableRow>
                   <TableHead>Model ID</TableHead>
-                  <TableHead className="w-32 text-center">chat_completions</TableHead>
-                  <TableHead className="w-24 text-center">responses</TableHead>
-                  <TableHead className="w-24 text-center">messages</TableHead>
                   <TableHead className="w-36">Reasoning effort</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
@@ -281,33 +258,6 @@ function BenchmarkConfigEditor({
                         className="h-8 font-mono text-xs"
                         placeholder="openai/gpt-4o"
                         aria-label={`Decider model ${index + 1} ID`}
-                      />
-                    </TableCell>
-                    <TableCell className="py-2 text-center">
-                      <Checkbox
-                        checked={row.chat_completions}
-                        onCheckedChange={checked =>
-                          handleDeciderRowChange(index, { chat_completions: checked === true })
-                        }
-                        aria-label={`Model ${index + 1} supports chat_completions`}
-                      />
-                    </TableCell>
-                    <TableCell className="py-2 text-center">
-                      <Checkbox
-                        checked={row.responses}
-                        onCheckedChange={checked =>
-                          handleDeciderRowChange(index, { responses: checked === true })
-                        }
-                        aria-label={`Model ${index + 1} supports responses`}
-                      />
-                    </TableCell>
-                    <TableCell className="py-2 text-center">
-                      <Checkbox
-                        checked={row.messages}
-                        onCheckedChange={checked =>
-                          handleDeciderRowChange(index, { messages: checked === true })
-                        }
-                        aria-label={`Model ${index + 1} supports messages`}
                       />
                     </TableCell>
                     <TableCell className="py-2">

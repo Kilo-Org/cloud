@@ -35,6 +35,14 @@ export const BenchmarkConfigSchema = z.object({
 });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 
+// Admin-save payload: deciderModels carry no supportedApiKinds — the web
+// layer derives them from gateway provider definitions before forwarding the
+// full BenchmarkConfig to the benchmark worker.
+export const BenchmarkConfigUpdateSchema = BenchmarkConfigSchema.extend({
+  deciderModels: z.array(BenchmarkDeciderModelSchema.omit({ supportedApiKinds: true })).min(1),
+});
+export type BenchmarkConfigUpdate = z.infer<typeof BenchmarkConfigUpdateSchema>;
+
 export const BenchmarkRunStatusSchema = z.enum(['running', 'completed', 'failed']);
 export type BenchmarkRunStatus = z.infer<typeof BenchmarkRunStatusSchema>;
 

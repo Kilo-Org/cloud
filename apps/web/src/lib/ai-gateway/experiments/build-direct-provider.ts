@@ -3,35 +3,8 @@ import {
   injectReasoningIntoContent,
   removeCacheBreakpoints,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { CustomLlmProvider } from '@kilocode/db';
+import type { CustomLlmApiConfig } from '@kilocode/db';
 import type { GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
-import type { ExperimentUpstream } from '@/lib/ai-gateway/experiments/upstream-schema';
-
-/**
- * Maps adapter settings to the supported chat APIs for the resulting Provider.
- * Mirrors the same inference performed for `custom_llm2` rows in
- * `apps/web/src/lib/ai-gateway/providers/get-provider.ts`.
- */
-export function inferSupportedChatApis(
-  aiSdkProvider: CustomLlmProvider | undefined
-): ReadonlyArray<GatewayChatApiKind> {
-  if (aiSdkProvider === 'openai') {
-    return ['responses'];
-  }
-  if (aiSdkProvider === 'anthropic') {
-    return ['messages'];
-  }
-  if (
-    aiSdkProvider === 'openai-compatible' ||
-    aiSdkProvider === 'alibaba' ||
-    aiSdkProvider === 'mistral' ||
-    aiSdkProvider === 'openrouter' ||
-    aiSdkProvider === undefined
-  ) {
-    return ['chat_completions'];
-  }
-  return [];
-}
 
 /**
  * Plain in-memory shape: an `ExperimentUpstream` (no key) merged with the
@@ -42,18 +15,7 @@ export function inferSupportedChatApis(
  * plaintext with the upstream blob for the outbound provider request. The
  * plaintext NEVER touches Postgres, Redis, or any tRPC response.
  */
-export type ResolvedExperimentUpstream = ExperimentUpstream & { api_key: string };
-
-/**
- * Input to `buildDirectProvider`. A superset of `ResolvedExperimentUpstream`
- * that also accepts `extra_headers`, which is used by the custom_llm2
- * (`kilo-internal/...`) code path but not by experiments. Experiment
- * upstreams must NOT pass `extra_headers` — see
- * `ExperimentUpstreamSchema`.
- */
-export type DirectProviderInput = ResolvedExperimentUpstream & {
-  extra_headers?: Record<string, string>;
-};
+export type ResolvedExperimentUpstream = CustomLlmApiConfig & { api_key: string };
 
 /**
  * Builds a `Provider` that points directly at a partner-issued upstream.
@@ -69,13 +31,14 @@ export type DirectProviderInput = ResolvedExperimentUpstream & {
  */
 export function buildDirectProvider(
   id: 'custom' | 'experiment',
-  upstream: DirectProviderInput
+  supportedChatApis: ReadonlyArray<GatewayChatApiKind>,
+  upstream: ResolvedExperimentUpstream
 ): Provider {
   return {
     id,
     apiUrl: upstream.base_url,
     apiKey: upstream.api_key,
-    supportedChatApis: inferSupportedChatApis(upstream.opencode_settings?.ai_sdk_provider),
+    supportedChatApis,
     transformRequest(context) {
       if (upstream.remove_from_body) {
         const body = context.request.body as Record<string, unknown>;

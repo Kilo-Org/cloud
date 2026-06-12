@@ -106,6 +106,7 @@ import type {
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
   CustomLlmMetadata,
+  CustomLlmApiConfig,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -7819,7 +7820,7 @@ export const model_experiment_variant_version = pgTable(
     variant_id: uuid()
       .notNull()
       .references(() => model_experiment_variant.id, { onDelete: 'cascade' }),
-    upstream: jsonb().notNull(),
+    upstream: jsonb().$type<CustomLlmApiConfig>().notNull(),
     encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
     effective_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     created_by: text().references(() => kilocode_users.id, { onDelete: 'set null' }),

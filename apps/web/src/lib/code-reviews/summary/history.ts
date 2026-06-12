@@ -63,7 +63,9 @@ function createHistoryBlockPattern(): RegExp {
 }
 
 function prepareVisibleSummaryForHistory(body: string): string {
-  return stripLeadingCodeReviewHeading(getCurrentReviewSummaryForContext(body)).trim();
+  return stripFixLinkSection(
+    stripLeadingCodeReviewHeading(getCurrentReviewSummaryForContext(body))
+  ).trim();
 }
 
 function extractExistingHistoryEntries(body: string): HistoryEntry[] {
@@ -87,7 +89,9 @@ function normalizeExistingHistoryEntry(entry: string): HistoryEntry | null {
   const withoutNestedHistory = stripReviewSummaryFooter(stripReviewSummaryHistory(entry))
     .replaceAll(REVIEW_SUMMARY_HISTORY_ENTRY, '')
     .trim();
-  const withoutMarker = stripLeadingKiloReviewMarker(withoutNestedHistory).trim();
+  const withoutMarker = stripFixLinkSection(
+    stripLeadingKiloReviewMarker(withoutNestedHistory)
+  ).trim();
   const lines = withoutMarker.split('\n');
   const headingLine = lines[0]?.trim();
 
@@ -250,6 +254,13 @@ function stripLeadingCodeReviewHeading(body: string): string {
     .trimStart()
     .replace(/^##[ \t]+Code Review[^\r\n]*(?:\r?\n)+/, '')
     .trimStart();
+}
+
+function stripFixLinkSection(body: string): string {
+  return body.replace(
+    /^##[ \t]+Fix Link(?:[ \t]*\([^\r\n]*\))?[ \t]*(?:\r?\n|$)[\s\S]*?(?=^##[ \t]+|(?![\s\S]))/gim,
+    ''
+  );
 }
 
 function stripFinalOuterDetails(value: string): string {

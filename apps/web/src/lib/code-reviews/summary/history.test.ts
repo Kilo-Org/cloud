@@ -83,6 +83,58 @@ describe('buildPreviousReviewSummaryHistory', () => {
     expect(countOccurrences(result, REVIEW_SUMMARY_HISTORY_ENTRY)).toBe(1);
   });
 
+  it('removes stale Fix Link sections from archived summaries', () => {
+    const summaryWithFixLink = [
+      summaryWithIssues,
+      '',
+      '[Keep this context link](https://example.com/context)',
+      '',
+      '## Fix Link (include if issues found)',
+      '',
+      '[Fix these issues in Kilo Cloud](https://kilo.ai/cloud-agent-fork/review/old-review)',
+      '',
+      '## Follow-up',
+      '',
+      'Content after the Fix Link section.',
+    ].join('\n');
+
+    const result = buildPreviousReviewSummaryHistory(summaryWithFixLink);
+
+    expect(result).toContain('[Keep this context link](https://example.com/context)');
+    expect(result).toContain('## Follow-up');
+    expect(result).toContain('Content after the Fix Link section.');
+    expect(result).not.toContain('## Fix Link');
+    expect(result).not.toContain('old-review');
+  });
+
+  it('removes stale Fix Link sections from existing history entries', () => {
+    const staleHistory = [
+      REVIEW_SUMMARY_HISTORY_START,
+      '<details>',
+      '<summary><b>Previous Review Summary</b> (commit oldsha1)</summary>',
+      '',
+      '_Current summary above is authoritative. Previous snapshots are kept for context only._',
+      '',
+      REVIEW_SUMMARY_HISTORY_ENTRY,
+      '### Previous review (commit oldsha1)',
+      '',
+      '**Status:** 1 Issue Found',
+      '',
+      '## Fix Link (include if issues found)',
+      '',
+      '[Fix these issues in Kilo Cloud](https://kilo.ai/cloud-agent-fork/review/stale-review)',
+      '',
+      '</details>',
+      REVIEW_SUMMARY_HISTORY_END,
+    ].join('\n');
+
+    const result = buildPreviousReviewSummaryHistory([cleanSummary, staleHistory].join('\n\n'));
+
+    expect(result).toContain('**Status:** 1 Issue Found');
+    expect(result).not.toContain('## Fix Link');
+    expect(result).not.toContain('stale-review');
+  });
+
   it('does not render null or undefined commit labels when no previous SHA is available', () => {
     const result = buildPreviousReviewSummaryHistory(cleanSummary);
 

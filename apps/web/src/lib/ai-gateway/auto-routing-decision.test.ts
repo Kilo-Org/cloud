@@ -50,6 +50,7 @@ const validDecision = {
   tier: 'low' as const,
   source: 'benchmark' as const,
   tableVersion: 'v1',
+  sticky: false,
 };
 
 const validResponse = {

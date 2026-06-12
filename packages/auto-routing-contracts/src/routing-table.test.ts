@@ -6,7 +6,6 @@ const candidate = (model: string, accuracy: number, avgCostUsd: number) => ({
   accuracy,
   avgCostUsd,
   meetsThreshold: false,
-  supportedApiKinds: ['chat_completions' as const],
 });
 
 describe('rankCandidates', () => {

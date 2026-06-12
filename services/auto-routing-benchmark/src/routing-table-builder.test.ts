@@ -6,13 +6,9 @@ import type {
 import { buildRoutingTable } from './routing-table-builder';
 
 const DECIDER_MODELS: BenchmarkDeciderModel[] = [
-  { id: 'model/cheap', supportedApiKinds: ['chat_completions'], reasoningEffort: null },
-  {
-    id: 'model/expensive',
-    supportedApiKinds: ['chat_completions', 'responses'],
-    reasoningEffort: null,
-  },
-  { id: 'model/mid', supportedApiKinds: ['chat_completions', 'messages'], reasoningEffort: null },
+  { id: 'model/cheap', reasoningEffort: null },
+  { id: 'model/expensive', reasoningEffort: 'medium' },
+  { id: 'model/mid', reasoningEffort: null },
 ];
 
 function summary(
@@ -135,7 +131,7 @@ describe('buildRoutingTable', () => {
     expect(highModels).toContain('model/mid');
   });
 
-  it('carries supportedApiKinds from the run snapshot', () => {
+  it('carries reasoningEffort from the run snapshot', () => {
     const table = buildRoutingTable({
       runId: 'test-run-4',
       generatedAt: '2026-01-01T00:00:00.000Z',
@@ -146,13 +142,13 @@ describe('buildRoutingTable', () => {
     });
 
     const expensiveInLow = table.tiers.low.find(c => c.model === 'model/expensive');
-    expect(expensiveInLow?.supportedApiKinds).toEqual(['chat_completions', 'responses']);
+    expect(expensiveInLow?.reasoningEffort).toBe('medium');
 
     const midInLow = table.tiers.low.find(c => c.model === 'model/mid');
-    expect(midInLow?.supportedApiKinds).toEqual(['chat_completions', 'messages']);
+    expect(midInLow?.reasoningEffort).toBeNull();
   });
 
-  it('defaults supportedApiKinds to chat_completions when model missing from the snapshot', () => {
+  it('defaults reasoningEffort to null when model missing from the snapshot', () => {
     const summaries: BenchmarkModelSummary[] = [
       summary('model/unknown', 'low', 0.9),
       summary('model/cheap', 'low', 0.8),
@@ -172,7 +168,7 @@ describe('buildRoutingTable', () => {
     });
 
     const unknown = table.tiers.low.find(c => c.model === 'model/unknown');
-    expect(unknown?.supportedApiKinds).toEqual(['chat_completions']);
+    expect(unknown?.reasoningEffort).toBeNull();
   });
 
   it('throws when a tier has no candidates', () => {

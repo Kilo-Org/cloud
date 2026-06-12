@@ -2,7 +2,6 @@ import type {
   BenchmarkKind,
   BenchmarkModelSummary,
   BenchmarkRun,
-  ClassifierApiKind,
   ClassifierWinner,
   RankedCandidate,
   RoutingTable,
@@ -29,36 +28,6 @@ export type RunRow = typeof benchmarkRuns.$inferSelect;
 export type RunModelRow = typeof runModels.$inferSelect;
 export type ConfigDeciderModelRow = typeof configDeciderModels.$inferSelect;
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
-
-// ---------------------------------------------------------------------------
-// ApiKind flag helpers
-// ---------------------------------------------------------------------------
-
-const ALL_API_KINDS: ClassifierApiKind[] = ['chat_completions', 'messages', 'responses'];
-
-export function apiKindsToFlags(kinds: ClassifierApiKind[]): {
-  supports_chat_completions: boolean;
-  supports_messages: boolean;
-  supports_responses: boolean;
-} {
-  return {
-    supports_chat_completions: kinds.includes('chat_completions'),
-    supports_messages: kinds.includes('messages'),
-    supports_responses: kinds.includes('responses'),
-  };
-}
-
-export function flagsToApiKinds(flags: {
-  supports_chat_completions: boolean;
-  supports_messages: boolean;
-  supports_responses: boolean;
-}): ClassifierApiKind[] {
-  return ALL_API_KINDS.filter(k => {
-    if (k === 'chat_completions') return flags.supports_chat_completions;
-    if (k === 'messages') return flags.supports_messages;
-    return flags.supports_responses;
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Row mapping helpers
@@ -435,7 +404,6 @@ export function routingTableToRows(
         avg_cost_usd: c.avgCostUsd,
         meets_threshold: c.meetsThreshold,
         reasoning_effort: c.reasoningEffort ?? null,
-        ...apiKindsToFlags(c.supportedApiKinds),
       });
     });
   }
@@ -459,7 +427,6 @@ export function rowsToRoutingTable(
       accuracy: row.accuracy,
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
-      supportedApiKinds: flagsToApiKinds(row),
       reasoningEffort: row.reasoning_effort as RankedCandidate['reasoningEffort'],
     });
   }

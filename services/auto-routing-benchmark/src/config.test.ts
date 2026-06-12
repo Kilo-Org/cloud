@@ -16,9 +16,6 @@ const deciderRows: ConfigDeciderModelRow[] = [
   {
     model: 'some/decider',
     reasoning_effort: 'high',
-    supports_chat_completions: true,
-    supports_messages: true,
-    supports_responses: false,
   },
 ];
 
@@ -51,6 +48,5 @@ describe('mapConfigRows', () => {
     expect(result?.deciderModels).toHaveLength(1);
     expect(result?.deciderModels[0].id).toBe('some/decider');
     expect(result?.deciderModels[0].reasoningEffort).toBe('high');
-    expect(result?.deciderModels[0].supportedApiKinds).toEqual(['chat_completions', 'messages']);
   });
 });

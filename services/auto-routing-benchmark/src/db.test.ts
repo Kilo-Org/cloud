@@ -1,96 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
-import {
-  apiKindsToFlags,
-  flagsToApiKinds,
-  mapRunRow,
-  mapSummaryRow,
-  routingTableToRows,
-  rowsToRoutingTable,
-} from './db';
+import { mapRunRow, mapSummaryRow, routingTableToRows, rowsToRoutingTable } from './db';
 import type { BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
-
-// ---------------------------------------------------------------------------
-// apiKindsToFlags / flagsToApiKinds round-trip
-// ---------------------------------------------------------------------------
-
-describe('apiKindsToFlags', () => {
-  it('maps all three kinds to true when all present', () => {
-    expect(apiKindsToFlags(['chat_completions', 'messages', 'responses'])).toEqual({
-      supports_chat_completions: true,
-      supports_messages: true,
-      supports_responses: true,
-    });
-  });
-
-  it('maps an empty array to all false', () => {
-    expect(apiKindsToFlags([])).toEqual({
-      supports_chat_completions: false,
-      supports_messages: false,
-      supports_responses: false,
-    });
-  });
-
-  it('maps a single kind correctly', () => {
-    expect(apiKindsToFlags(['chat_completions'])).toEqual({
-      supports_chat_completions: true,
-      supports_messages: false,
-      supports_responses: false,
-    });
-  });
-});
-
-describe('flagsToApiKinds', () => {
-  it('returns all three kinds when all flags are true', () => {
-    expect(
-      flagsToApiKinds({
-        supports_chat_completions: true,
-        supports_messages: true,
-        supports_responses: true,
-      })
-    ).toEqual(['chat_completions', 'messages', 'responses']);
-  });
-
-  it('returns empty array when all flags are false', () => {
-    expect(
-      flagsToApiKinds({
-        supports_chat_completions: false,
-        supports_messages: false,
-        supports_responses: false,
-      })
-    ).toEqual([]);
-  });
-
-  it('returns only the set flags in order: chat_completions, messages, responses', () => {
-    expect(
-      flagsToApiKinds({
-        supports_chat_completions: false,
-        supports_messages: true,
-        supports_responses: true,
-      })
-    ).toEqual(['messages', 'responses']);
-  });
-});
-
-describe('apiKindsToFlags / flagsToApiKinds round-trip', () => {
-  const cases: Parameters<typeof apiKindsToFlags>[0][] = [
-    [],
-    ['chat_completions'],
-    ['messages'],
-    ['responses'],
-    ['chat_completions', 'messages'],
-    ['chat_completions', 'responses'],
-    ['messages', 'responses'],
-    ['chat_completions', 'messages', 'responses'],
-  ];
-
-  for (const kinds of cases) {
-    it(`round-trips [${kinds.join(', ')}]`, () => {
-      expect(flagsToApiKinds(apiKindsToFlags(kinds))).toEqual(kinds);
-    });
-  }
-});
 
 // ---------------------------------------------------------------------------
 // mapSummaryRow
@@ -213,7 +125,6 @@ const candidate = (model: string): RankedCandidate => ({
   accuracy: 0.9,
   avgCostUsd: 0.001,
   meetsThreshold: true,
-  supportedApiKinds: ['chat_completions', 'messages'],
   reasoningEffort: null,
 });
 
@@ -249,14 +160,6 @@ describe('routingTableToRows', () => {
     expect(lowRows[0].rank).toBe(0);
     expect(lowRows[1].model).toBe('model-b');
     expect(lowRows[1].rank).toBe(1);
-  });
-
-  it('maps supportedApiKinds to boolean flags', () => {
-    const { candidateRows } = routingTableToRows(sampleTable, '2026-06-01T11:00:00.000Z');
-    const row = candidateRows[0];
-    expect(row.supports_chat_completions).toBe(true);
-    expect(row.supports_messages).toBe(true);
-    expect(row.supports_responses).toBe(false);
   });
 });
 

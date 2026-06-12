@@ -10,7 +10,6 @@ export const RankedCandidateSchema = z.object({
   // Average observed OpenRouter cost per benchmark case, in USD credits.
   avgCostUsd: z.number().nonnegative(),
   meetsThreshold: z.boolean(),
-  supportedApiKinds: z.array(ClassifierApiKindSchema).min(1),
   // Reasoning effort the model was benchmarked with; serving mirrors it.
   // Optional so tables published before this field existed stay valid.
   reasoningEffort: ReasoningEffortSchema.nullable().optional(),

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fcf958da-88cb-4c79-af3d-4709268e140c",
+  "id": "20295052-406c-424a-956f-77acc985f44a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "benchmark_config": {
@@ -293,27 +293,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "supports_chat_completions": {
-          "name": "supports_chat_completions",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "supports_messages": {
-          "name": "supports_messages",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "supports_responses": {
-          "name": "supports_responses",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
         }
       },
       "indexes": {},
@@ -470,27 +449,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "supports_chat_completions": {
-          "name": "supports_chat_completions",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "supports_messages": {
-          "name": "supports_messages",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "supports_responses": {
-          "name": "supports_responses",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
         }
       },
       "indexes": {},
@@ -589,27 +547,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false
-        },
-        "supports_chat_completions": {
-          "name": "supports_chat_completions",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "supports_messages": {
-          "name": "supports_messages",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "supports_responses": {
-          "name": "supports_responses",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
           "autoincrement": false
         }
       },

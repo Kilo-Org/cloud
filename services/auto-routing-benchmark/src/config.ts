@@ -1,5 +1,5 @@
 import type { BenchmarkConfig } from '@kilocode/auto-routing-contracts';
-import { apiKindsToFlags, getConfigRows, replaceConfig, type ConfigDeciderModelRow } from './db';
+import { getConfigRows, replaceConfig, type ConfigDeciderModelRow } from './db';
 
 // Maps the three normalized config tables to the BenchmarkConfig contract.
 // Null when no admin has saved a config yet — the worker never fabricates
@@ -24,11 +24,6 @@ export function mapConfigRows(
     classifierModels,
     deciderModels: deciderModelRows.map(r => ({
       id: r.model,
-      supportedApiKinds: [
-        ...(r.supports_chat_completions ? (['chat_completions'] as const) : []),
-        ...(r.supports_messages ? (['messages'] as const) : []),
-        ...(r.supports_responses ? (['responses'] as const) : []),
-      ],
       reasoningEffort:
         r.reasoning_effort as BenchmarkConfig['deciderModels'][number]['reasoningEffort'],
     })),
@@ -57,7 +52,6 @@ export async function saveBenchmarkConfig(
   const deciderModelRows: ConfigDeciderModelRow[] = config.deciderModels.map(m => ({
     model: m.id,
     reasoning_effort: m.reasoningEffort ?? null,
-    ...apiKindsToFlags(m.supportedApiKinds),
   }));
 
   await replaceConfig(

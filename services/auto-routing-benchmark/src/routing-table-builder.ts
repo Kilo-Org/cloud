@@ -33,10 +33,6 @@ export function buildRoutingTable(params: {
           model: s.model,
           accuracy: s.accuracy,
           avgCostUsd: s.avgCostUsd ?? 0,
-          // Spread into a mutable array so tsgo is happy with the readonly type.
-          supportedApiKinds: [
-            ...(modelConfigById.get(s.model)?.supportedApiKinds ?? (['chat_completions'] as const)),
-          ],
           reasoningEffort: modelConfigById.get(s.model)?.reasoningEffort ?? null,
         })),
       minAccuracy

@@ -113,9 +113,8 @@ export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 
 export const AutoRoutingDecisionResponseSchema = z.object({
   cost: z.number(),
-  // Null when classification failed, no routing table is published, or no
-  // table candidate supports the request's API kind; the gateway then falls
-  // back to its static balanced defaults.
+  // Null when classification failed or no routing table is published; the
+  // gateway then falls back to its static balanced defaults.
   decision: AutoRoutingDecisionSchema.nullable(),
   classifierResult: z
     .object({

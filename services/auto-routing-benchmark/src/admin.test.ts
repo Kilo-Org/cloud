@@ -6,16 +6,8 @@ import type * as DbModule from './db';
 const TEST_CONFIG: BenchmarkConfig = {
   classifierModels: ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
   deciderModels: [
-    {
-      id: 'google/gemini-2.5-flash-lite',
-      supportedApiKinds: ['chat_completions'],
-      reasoningEffort: null,
-    },
-    {
-      id: 'anthropic/claude-sonnet-4.6',
-      supportedApiKinds: ['chat_completions', 'messages', 'responses'],
-      reasoningEffort: null,
-    },
+    { id: 'google/gemini-2.5-flash-lite', reasoningEffort: null },
+    { id: 'anthropic/claude-sonnet-4.6', reasoningEffort: null },
   ],
   minAccuracy: 0.7,
   switchCostFactor: 3,
@@ -40,9 +32,6 @@ const TEST_CONFIG_ROWS = {
   deciderModels: TEST_CONFIG.deciderModels.map(m => ({
     model: m.id,
     reasoning_effort: m.reasoningEffort ?? null,
-    supports_chat_completions: m.supportedApiKinds.includes('chat_completions'),
-    supports_messages: m.supportedApiKinds.includes('messages'),
-    supports_responses: m.supportedApiKinds.includes('responses'),
   })),
 };
 
@@ -178,9 +167,6 @@ describe('GET /admin/config', () => {
     const deciderModels = TEST_CONFIG.deciderModels.map(m => ({
       model: m.id,
       reasoning_effort: null,
-      supports_chat_completions: m.supportedApiKinds.includes('chat_completions'),
-      supports_messages: m.supportedApiKinds.includes('messages'),
-      supports_responses: m.supportedApiKinds.includes('responses'),
     }));
     vi.mocked(getConfigRows).mockResolvedValueOnce({
       config: {
@@ -342,7 +328,6 @@ describe('GET /admin/routing-table', () => {
       accuracy: 1,
       avgCostUsd: 0.1,
       meetsThreshold: true,
-      supportedApiKinds: ['chat_completions'],
     };
     const tableData = {
       version: 'test-v1',

@@ -21,9 +21,6 @@ export const configClassifierModels = sqliteTable('config_classifier_models', {
 export const configDeciderModels = sqliteTable('config_decider_models', {
   model: text('model').primaryKey(),
   reasoning_effort: text('reasoning_effort'),
-  supports_chat_completions: integer('supports_chat_completions', { mode: 'boolean' }).notNull(),
-  supports_messages: integer('supports_messages', { mode: 'boolean' }).notNull(),
-  supports_responses: integer('supports_responses', { mode: 'boolean' }).notNull(),
 });
 
 export const benchmarkRuns = sqliteTable('benchmark_runs', {
@@ -48,9 +45,6 @@ export const runModels = sqliteTable(
     // enqueued=false means the model was skipped (had prior results).
     enqueued: integer('enqueued', { mode: 'boolean' }).notNull(),
     reasoning_effort: text('reasoning_effort'),
-    supports_chat_completions: integer('supports_chat_completions', { mode: 'boolean' }).notNull(),
-    supports_messages: integer('supports_messages', { mode: 'boolean' }).notNull(),
-    supports_responses: integer('supports_responses', { mode: 'boolean' }).notNull(),
   },
   table => [primaryKey({ columns: [table.run_id, table.model] })]
 );
@@ -121,9 +115,6 @@ export const routingTableCandidates = sqliteTable(
     avg_cost_usd: real('avg_cost_usd').notNull(),
     meets_threshold: integer('meets_threshold', { mode: 'boolean' }).notNull(),
     reasoning_effort: text('reasoning_effort'),
-    supports_chat_completions: integer('supports_chat_completions', { mode: 'boolean' }).notNull(),
-    supports_messages: integer('supports_messages', { mode: 'boolean' }).notNull(),
-    supports_responses: integer('supports_responses', { mode: 'boolean' }).notNull(),
   },
   table => [primaryKey({ columns: [table.run_id, table.tier, table.rank] })]
 );

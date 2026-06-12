@@ -17,17 +17,7 @@ global.fetch = mockFetch;
 const configResponse = {
   config: {
     classifierModels: ['anthropic/claude-haiku-4'],
-    deciderModels: [
-      {
-        id: 'anthropic/claude-sonnet-4',
-        supportedApiKinds: ['chat_completions' as const] as (
-          | 'chat_completions'
-          | 'responses'
-          | 'messages'
-        )[],
-        reasoningEffort: null,
-      },
-    ],
+    deciderModels: [{ id: 'anthropic/claude-sonnet-4', reasoningEffort: null }],
     minAccuracy: 0.8,
     switchCostFactor: 3,
     maxConcurrency: 4,

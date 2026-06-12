@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { ClassifierApiKindSchema, RoutingTableSchema } from './routing-table';
+import { RoutingTableSchema } from './routing-table';
 import { DifficultyTierSchema, ReasoningEffortSchema } from './tiers';
 
 export { ReasoningEffortSchema } from './tiers';
@@ -10,9 +10,6 @@ export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
 
 export const BenchmarkDeciderModelSchema = z.object({
   id: z.string().trim().min(1),
-  // Which gateway API kinds this model can serve when chosen by the router.
-  // The benchmark itself always exercises chat completions.
-  supportedApiKinds: z.array(ClassifierApiKindSchema).min(1).default(['chat_completions']),
   // Passed to the kilo CLI as --variant during the benchmark and carried into
   // the routing table so serving uses the same effort the model was graded
   // with. Null for models without (or not using) configurable reasoning.
@@ -41,14 +38,6 @@ export const BenchmarkConfigSchema = z.object({
   updatedBy: z.string().nullable(),
 });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
-
-// Admin-save payload: deciderModels carry no supportedApiKinds — the web
-// layer derives them from gateway provider definitions before forwarding the
-// full BenchmarkConfig to the benchmark worker.
-export const BenchmarkConfigUpdateSchema = BenchmarkConfigSchema.extend({
-  deciderModels: z.array(BenchmarkDeciderModelSchema.omit({ supportedApiKinds: true })).min(1),
-});
-export type BenchmarkConfigUpdate = z.infer<typeof BenchmarkConfigUpdateSchema>;
 
 export const BenchmarkRunStatusSchema = z.enum(['running', 'completed', 'failed']);
 export type BenchmarkRunStatus = z.infer<typeof BenchmarkRunStatusSchema>;

@@ -13,8 +13,6 @@ import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import type { RunModelRow } from './db';
 import {
-  apiKindsToFlags,
-  flagsToApiKinds,
   countCaseResults,
   getCaseResults,
   getLatestSummariesByModel,
@@ -107,27 +105,15 @@ export async function startRun(
   const runId = `${kind}-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 
   // Build run_models rows for ALL models of this run's kind.
-  const runModelRows: RunModelRow[] = models.map(modelId => {
-    if (kind === 'classifier') {
-      return {
-        run_id: runId,
-        model: modelId,
-        enqueued: enqueuedModelIds.includes(modelId),
-        reasoning_effort: null,
-        supports_chat_completions: false,
-        supports_messages: false,
-        supports_responses: false,
-      };
-    }
-    const deciderModel = config.deciderModels.find(m => m.id === modelId);
-    return {
-      run_id: runId,
-      model: modelId,
-      enqueued: enqueuedModelIds.includes(modelId),
-      reasoning_effort: deciderModel?.reasoningEffort ?? null,
-      ...apiKindsToFlags(deciderModel?.supportedApiKinds ?? ['chat_completions']),
-    };
-  });
+  const runModelRows: RunModelRow[] = models.map(modelId => ({
+    run_id: runId,
+    model: modelId,
+    enqueued: enqueuedModelIds.includes(modelId),
+    reasoning_effort:
+      kind === 'classifier'
+        ? null
+        : (config.deciderModels.find(m => m.id === modelId)?.reasoningEffort ?? null),
+  }));
 
   await insertRun(
     env.BENCH_DB,
@@ -486,7 +472,6 @@ async function finalizeRunIfComplete(
       // admin edit can't skew the published table.
       const deciderModels: BenchmarkDeciderModel[] = state.models.map(m => ({
         id: m.model,
-        supportedApiKinds: flagsToApiKinds(m),
         reasoningEffort: m.reasoning_effort as BenchmarkDeciderModel['reasoningEffort'],
       }));
       const table = buildRoutingTable({

@@ -302,7 +302,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     getStickyDecision(c.env, ctx.conversationKey),
   ]);
   if (cached) {
-    const decision = computeDecision(cached, payload.input.apiKind, routingTable, stickyModel);
+    const decision = computeDecision(cached, routingTable, stickyModel);
     if (decision) {
       c.executionCtx.waitUntil(putStickyDecision(c.env, ctx.conversationKey, decision.model));
     }
@@ -331,12 +331,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         )
       );
     }
-    const decision = computeDecision(
-      classifier.classification,
-      payload.input.apiKind,
-      routingTable,
-      stickyModel
-    );
+    const decision = computeDecision(classifier.classification, routingTable, stickyModel);
     if (decision) {
       c.executionCtx.waitUntil(putStickyDecision(c.env, ctx.conversationKey, decision.model));
     }

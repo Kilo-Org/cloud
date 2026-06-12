@@ -8,7 +8,6 @@ import {
   type BenchmarkConfig,
   type BenchmarkKind,
   type BenchmarkRoutingTableResponse,
-  type BenchmarkConfigUpdate,
   type BenchmarkRun,
   type BenchmarkModelSummary,
   type ReasoningEffort,
@@ -68,7 +67,7 @@ async function fetchBenchmarkConfig() {
   return parseAdminResponse(response, BenchmarkConfigResponseSchema);
 }
 
-async function saveBenchmarkConfig(config: BenchmarkConfigUpdate) {
+async function saveBenchmarkConfig(config: BenchmarkConfig) {
   const response = await fetch('/admin/api/auto-routing/benchmark-config', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
@@ -103,8 +102,6 @@ async function fetchBenchmarkRoutingTable() {
 // Local form state type for decider model rows
 // ---------------------------------------------------------------------------
 
-// supportedApiKinds is intentionally absent: it is derived server-side from
-// gateway provider definitions when the config is saved.
 type DeciderModelRow = {
   id: string;
   reasoningEffort: ReasoningEffort | null;
@@ -146,7 +143,7 @@ function configToFormState(config: BenchmarkConfig | null): {
 function formStateToConfig(
   state: ReturnType<typeof configToFormState>,
   base: BenchmarkConfig | null
-): BenchmarkConfigUpdate {
+): BenchmarkConfig {
   const classifierModels = state.classifierModels
     .split('\n')
     .map(s => s.trim())
@@ -610,7 +607,6 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
                   <TableHead className="text-right">Accuracy</TableHead>
                   <TableHead className="text-right">Avg cost</TableHead>
                   <TableHead>Threshold</TableHead>
-                  <TableHead>API kinds</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -627,15 +623,6 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
                       <Badge variant={c.meetsThreshold ? 'default' : 'secondary'}>
                         {c.meetsThreshold ? 'meets' : 'below'}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <div className="flex flex-wrap gap-1">
-                        {c.supportedApiKinds.map(kind => (
-                          <Badge key={kind} variant="outline" className="font-mono text-xs px-1">
-                            {kind}
-                          </Badge>
-                        ))}
-                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

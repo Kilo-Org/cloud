@@ -45,10 +45,7 @@ CREATE TABLE `config_classifier_models` (
 --> statement-breakpoint
 CREATE TABLE `config_decider_models` (
 	`model` text PRIMARY KEY NOT NULL,
-	`reasoning_effort` text,
-	`supports_chat_completions` integer NOT NULL,
-	`supports_messages` integer NOT NULL,
-	`supports_responses` integer NOT NULL
+	`reasoning_effort` text
 );
 --> statement-breakpoint
 CREATE TABLE `model_summaries` (
@@ -74,9 +71,6 @@ CREATE TABLE `routing_table_candidates` (
 	`avg_cost_usd` real NOT NULL,
 	`meets_threshold` integer NOT NULL,
 	`reasoning_effort` text,
-	`supports_chat_completions` integer NOT NULL,
-	`supports_messages` integer NOT NULL,
-	`supports_responses` integer NOT NULL,
 	PRIMARY KEY(`run_id`, `tier`, `rank`)
 );
 --> statement-breakpoint
@@ -94,8 +88,5 @@ CREATE TABLE `run_models` (
 	`model` text NOT NULL,
 	`enqueued` integer NOT NULL,
 	`reasoning_effort` text,
-	`supports_chat_completions` integer NOT NULL,
-	`supports_messages` integer NOT NULL,
-	`supports_responses` integer NOT NULL,
 	PRIMARY KEY(`run_id`, `model`)
 );

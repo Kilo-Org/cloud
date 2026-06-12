@@ -5,6 +5,7 @@ import {
   REVIEW_INSTRUCTIONS_FILE,
   normalizeRepositoryReviewInstructions,
 } from './repository-review-instructions';
+import { REVIEW_SUMMARY_HISTORY_START } from '../summary/history';
 
 // --- Fixtures ---
 
@@ -349,6 +350,48 @@ const existingReviewStateNoSummary: ExistingReviewState = {
   headCommitSha: 'currentsha123',
 };
 
+const existingReviewStateWithHistory: ExistingReviewState = {
+  summaryComment: {
+    commentId: 456,
+    body: [
+      '<!-- kilo-review -->',
+      '## Code Review Summary',
+      '',
+      '**Status:** No Issues Found | **Recommendation:** Merge',
+      '',
+      '<details>',
+      '<summary><b>Files Reviewed (1 file)</b></summary>',
+      '',
+      '- `src/current.ts`',
+      '',
+      '</details>',
+      '',
+      '<!-- kilo-review-history -->',
+      '<details>',
+      '<summary><b>Previous Review Summary</b> (commit oldwarn)</summary>',
+      '',
+      '_Current summary above is authoritative. Previous snapshots are kept for context only._',
+      '',
+      '<!-- kilo-review-history-entry -->',
+      '### Previous review (commit oldwarn)',
+      '',
+      '**Status:** 1 Issue Found | **Recommendation:** Address before merge',
+      '',
+      'Archived WARNING that should not be active context.',
+      '',
+      '</details>',
+      '<!-- /kilo-review-history -->',
+      '',
+      '---',
+      '<!-- kilo-usage -->',
+      '<sub>Reviewed by stale-model - 123 tokens</sub>',
+    ].join('\n'),
+  },
+  inlineComments: [],
+  previousStatus: 'no-issues',
+  headCommitSha: 'currentsha123',
+};
+
 describe('generateReviewPrompt (incremental review)', () => {
   it('uses incremental workflow when previousHeadSha and summary comment are provided', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
@@ -440,6 +483,69 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('123'); // commentId
   });
 
+  it('adds previous summary preservation instructions for update prompts', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain('## Previous Summary Preservation');
+    expect(prompt).toContain(REVIEW_SUMMARY_HISTORY_START);
+    expect(prompt).toContain('<summary><b>Previous Review Summary</b> (commit abc123p)</summary>');
+    expect(prompt).toContain('### Previous review (commit abc123p)');
+    expect(prompt).toContain(
+      'The backend appends fresh usage/guidance footer metadata after completion.'
+    );
+    expect(prompt).not.toContain('old-model');
+    expect(prompt.indexOf('## Previous Summary Preservation')).toBeLessThan(
+      prompt.indexOf('UPDATE existing comment')
+    );
+  });
+
+  it('adds previous summary preservation when updating without incremental mode', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: null,
+    });
+
+    expect(prompt).not.toContain('INCREMENTAL REVIEW MODE');
+    expect(prompt).toContain('## Previous Summary Preservation');
+    expect(prompt).toContain('<summary><b>Previous Review Summary</b></summary>');
+    expect(prompt).not.toContain('commit null');
+    expect(prompt).not.toContain('commit undefined');
+  });
+
+  it('does not add previous summary preservation for create prompts', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateNoSummary,
+      previousHeadSha: null,
+    });
+
+    expect(prompt).not.toContain('## Previous Summary Preservation');
+    expect(prompt).toContain('CREATE new comment');
+  });
+
+  it('excludes archived history from incremental previous-summary context', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithHistory,
+      previousHeadSha: 'abc123prev',
+    });
+    const previousSummaryStart = prompt.indexOf('## Previous Review Summary');
+    const previousSummaryEnd = prompt.indexOf('## Previous Inline Comments');
+    const previousSummaryContext = prompt.slice(previousSummaryStart, previousSummaryEnd);
+
+    expect(previousSummaryContext).toContain('No Issues Found');
+    expect(previousSummaryContext).toContain('src/current.ts');
+    expect(previousSummaryContext).not.toContain('Archived WARNING');
+    expect(previousSummaryContext).not.toContain(REVIEW_SUMMARY_HISTORY_START);
+    expect(previousSummaryContext).not.toContain('stale-model');
+    expect(prompt).toContain('Archived WARNING');
+  });
+
   it('works with GitLab platform in incremental mode', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
       reviewId: 'review-456',
@@ -456,6 +562,23 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('git diff prevsha456..HEAD');
     expect(prompt).not.toContain('DO NOT fetch or pull');
     expect(prompt).not.toContain('Do not run `git fetch`');
+  });
+
+  it('adds previous summary preservation for GitLab update prompts', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      reviewId: 'review-456',
+      existingReviewState: existingReviewStateWithSummary,
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+      previousHeadSha: 'prevsha456',
+    });
+
+    expect(prompt).toContain('## Previous Summary Preservation');
+    expect(prompt).toContain(REVIEW_SUMMARY_HISTORY_START);
+    expect(prompt).toContain('<summary><b>Previous Review Summary</b> (commit prevsha)</summary>');
+    expect(prompt.indexOf('## Previous Summary Preservation')).toBeLessThan(
+      prompt.indexOf('UPDATE existing note')
+    );
   });
 
   it('allows GitLab agents to fetch and pull latest changes in standard mode', async () => {

@@ -258,6 +258,98 @@ describe('prepareReviewPayload', () => {
     );
   });
 
+  it('infers no-issues status from the current summary without archived warnings', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    mockFindKiloReviewComment.mockResolvedValueOnce({
+      commentId: 99,
+      body: [
+        '<!-- kilo-review -->',
+        '## Code Review Summary',
+        '',
+        '**Status:** No Issues Found | **Recommendation:** Merge',
+        '',
+        '<!-- kilo-review-history -->',
+        '<details>',
+        '<summary><b>Previous Review Summary</b></summary>',
+        '',
+        '<!-- kilo-review-history-entry -->',
+        '### Previous review',
+        '',
+        '**Status:** 1 Issue Found',
+        '',
+        'Archived WARNING',
+        '',
+        '</details>',
+        '<!-- /kilo-review-history -->',
+      ].join('\n'),
+    });
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
+      expect.any(Object),
+      REPO,
+      123,
+      expect.objectContaining({
+        existingReviewState: expect.objectContaining({ previousStatus: 'no-issues' }),
+      })
+    );
+  });
+
+  it('infers issues-found status from the current summary without archived no-issues text', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    mockFindKiloReviewComment.mockResolvedValueOnce({
+      commentId: 99,
+      body: [
+        '<!-- kilo-review -->',
+        '## Code Review Summary',
+        '',
+        '**Status:** 1 Issue Found | **Recommendation:** Address before merge',
+        '',
+        'WARNING in current summary',
+        '',
+        '<!-- kilo-review-history -->',
+        '<details>',
+        '<summary><b>Previous Review Summary</b></summary>',
+        '',
+        '<!-- kilo-review-history-entry -->',
+        '### Previous review',
+        '',
+        '**Status:** No Issues Found | **Recommendation:** Merge',
+        '',
+        '</details>',
+        '<!-- /kilo-review-history -->',
+      ].join('\n'),
+    });
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
+      expect.any(Object),
+      REPO,
+      123,
+      expect.objectContaining({
+        existingReviewState: expect.objectContaining({ previousStatus: 'issues-found' }),
+      })
+    );
+  });
+
   it('fetches GitLab REVIEW.md from the base ref when enabled', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)

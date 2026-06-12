@@ -56,6 +56,7 @@ import {
   normalizeRepositoryReviewInstructions,
   REVIEW_INSTRUCTIONS_FILE,
 } from '../prompts/repository-review-instructions';
+import { getCurrentReviewSummaryForContext } from '../summary/history';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 
@@ -685,15 +686,13 @@ function buildReviewState(
   // Determine previous status from summary body
   let previousStatus: PreviousReviewStatus = 'no-review';
   if (summaryComment) {
-    if (
-      summaryComment.body.includes('No Issues Found') ||
-      summaryComment.body.includes('No New Issues')
-    ) {
+    const currentSummary = getCurrentReviewSummaryForContext(summaryComment.body);
+    if (currentSummary.includes('No Issues Found') || currentSummary.includes('No New Issues')) {
       previousStatus = 'no-issues';
     } else if (
-      summaryComment.body.includes('Issues Found') ||
-      summaryComment.body.includes('WARNING') ||
-      summaryComment.body.includes('CRITICAL')
+      currentSummary.includes('Issues Found') ||
+      currentSummary.includes('WARNING') ||
+      currentSummary.includes('CRITICAL')
     ) {
       previousStatus = 'issues-found';
     }

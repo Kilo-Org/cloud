@@ -24,7 +24,10 @@ import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-help
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { sanitizeUserInput } from './prompt-utils';
 import { formatRepositoryReviewInstructions } from './repository-review-instructions';
-import { stripReviewSummaryFooter } from '../summary/usage-footer';
+import {
+  buildPreviousReviewSummaryHistory,
+  getCurrentReviewSummaryForContext,
+} from '../summary/history';
 
 /**
  * Inline comment info for duplicate detection
@@ -112,6 +115,28 @@ function mergeStyleOverrides<V>(
 
 function escapeMarkdownTableCell(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+}
+
+function formatPromptMarkdownFence(value: string): string {
+  const backtickRuns = value.match(/`+/g) ?? [];
+  const delimiterLength = Math.max(3, ...backtickRuns.map(run => run.length + 1));
+  const delimiter = '`'.repeat(delimiterLength);
+
+  return `${delimiter}markdown\n${value}\n${delimiter}`;
+}
+
+function formatPreviousSummaryPreservationSection(historyBlock: string): string {
+  return [
+    '## Previous Summary Preservation',
+    '',
+    'You are updating an existing Kilo summary. Keep the new/current review summary at the top.',
+    'After the current summary content and after the Fix Link (if included), append the markdown block below exactly once.',
+    'Do NOT place this block inside Issue Details, Files Reviewed, or any other `<details>` section.',
+    'Do NOT include old `<!-- kilo-usage -->` or `<!-- kilo-review-guidance -->` footers. The backend appends fresh usage/guidance footer metadata after completion.',
+    'Append only the markdown inside this fence:',
+    '',
+    formatPromptMarkdownFence(historyBlock),
+  ].join('\n');
 }
 
 /**
@@ -279,7 +304,9 @@ export async function generateReviewPrompt(
     existingReviewState?.summaryComment
   ) {
     const activeCount = existingReviewState.inlineComments?.filter(c => !c.isOutdated).length ?? 0;
-    const previousSummary = stripReviewSummaryFooter(existingReviewState.summaryComment.body);
+    const previousSummary = getCurrentReviewSummaryForContext(
+      existingReviewState.summaryComment.body
+    );
     const incrementalWorkflow = template.incrementalReviewWorkflow
       .replace(/{PREVIOUS_SHA}/g, previousHeadSha)
       .replace(/{PREVIOUS_SUMMARY}/g, previousSummary)
@@ -363,6 +390,14 @@ export async function generateReviewPrompt(
   // 12. Summary marker note and command (CREATE or UPDATE)
   prompt += template.summaryMarkerNote + '\n\n';
   if (existingReviewState?.summaryComment) {
+    const previousHistoryBlock = buildPreviousReviewSummaryHistory(
+      existingReviewState.summaryComment.body,
+      { previousHeadSha }
+    );
+    if (previousHistoryBlock) {
+      prompt += formatPreviousSummaryPreservationSection(previousHistoryBlock) + '\n\n';
+    }
+
     prompt +=
       replacePlaceholders(
         template.summaryCommandUpdate,

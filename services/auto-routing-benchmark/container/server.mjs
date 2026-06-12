@@ -54,6 +54,11 @@ function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
       // Reasoning effort: forwarded as the CLI's provider-specific variant.
       if (typeof variant === 'string' && variant.length > 0) args.push('--variant', variant);
       args.push(prompt);
+      // detached: the `kilo` bin is a wrapper that spawns the real CLI binary
+      // as a grandchild. Killing only the wrapper orphans the grandchild: it
+      // keeps running (and spending) and holds the stdout/stderr pipes open,
+      // so 'close' never fires and the case hangs forever. A detached child
+      // leads its own process group, letting the timeout kill the whole tree.
       const child = spawn('kilo', args, {
         cwd: dir,
         env: {
@@ -62,11 +67,18 @@ function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
           NO_COLOR: '1',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
       });
 
-      const killTimer = setTimeout(() => {
-        child.kill('SIGKILL');
-      }, timeoutMs);
+      const killProcessTree = () => {
+        // Negative pid = the child's whole process group (wrapper + real CLI).
+        try {
+          process.kill(-child.pid, 'SIGKILL');
+        } catch {
+          child.kill('SIGKILL');
+        }
+      };
+      const killTimer = setTimeout(killProcessTree, timeoutMs);
 
       child.stdout.on('data', chunk => {
         if (stdoutTruncated) return;
@@ -108,6 +120,13 @@ function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
       });
       child.on('close', code => {
         void finish(code ?? -1);
+      });
+      // Backstop for 'close' never firing: a stray process that survives the
+      // group kill (e.g. a tool process that moved to its own group) can hold
+      // the stdio pipes open indefinitely. After the child itself has exited,
+      // give the streams a short grace to flush, then finish regardless.
+      child.on('exit', code => {
+        setTimeout(() => void finish(code ?? -1), 5_000).unref();
       });
     })();
   });

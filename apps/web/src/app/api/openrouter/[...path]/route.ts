@@ -1,6 +1,6 @@
-import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
+import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { stripRequiredPrefix } from '@/lib/utils';
+import { stripRequiredPrefix, toMicrodollars } from '@/lib/utils';
 import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
 import {
@@ -96,7 +96,11 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
-import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
+import type {
+  MicrodollarUsageContext,
+  MicrodollarUsageStats,
+} from '@/lib/ai-gateway/processUsage.types';
+import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import {
   getMaxTokens,
   hasMiddleOutTransform,
@@ -266,13 +270,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   let autoModel: string | null = null;
+  let classifierCostUsd = 0;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     const efficientDecision =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id
         ? async () => {
             const user = (await authPromise).user;
-            return fetchEfficientAutoDecision({
+            const result = await fetchEfficientAutoDecision({
               apiKind: requestBodyParsed.kind,
               body: requestBodyParsed.body,
               requestedModel,
@@ -285,6 +290,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               mode: modeHeader,
               userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
             });
+            classifierCostUsd = result?.costUsd ?? 0;
+            return result?.decision ?? null;
           }
         : undefined;
     const autoResult = await applyResolvedAutoModel(
@@ -865,6 +872,72 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+
+  if (classifierCostUsd > 0 && !usageContext.user_byok) {
+    after(
+      (async () => {
+        try {
+          if (await isFreeModel(KILO_AUTO_EFFICIENT_MODEL.id)) return;
+          const classifierStats: MicrodollarUsageStats = {
+            messageId: null,
+            model: 'auto-routing/classifier',
+            responseContent: '',
+            hasError: false,
+            inference_provider: null,
+            upstream_id: null,
+            finish_reason: null,
+            latency: null,
+            moderation_latency: null,
+            generation_time: null,
+            streamed: false,
+            cancelled: false,
+            status_code: 200,
+            cost_mUsd: toMicrodollars(classifierCostUsd),
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheWriteTokens: 0,
+            cacheHitTokens: 0,
+            is_byok: false,
+          };
+          const classifierContext: MicrodollarUsageContext = {
+            api_kind: usageContext.api_kind,
+            kiloUserId: usageContext.kiloUserId,
+            fraudHeaders: usageContext.fraudHeaders,
+            organizationId: usageContext.organizationId,
+            provider: 'openrouter',
+            requested_model: KILO_AUTO_EFFICIENT_MODEL.id,
+            promptInfo: {
+              system_prompt_prefix: '',
+              system_prompt_length: 0,
+              user_prompt_prefix: '',
+            },
+            max_tokens: null,
+            has_middle_out_transform: null,
+            isStreaming: false,
+            prior_microdollar_usage: usageContext.prior_microdollar_usage,
+            posthog_distinct_id: usageContext.posthog_distinct_id,
+            project_id: usageContext.project_id,
+            status_code: 200,
+            editor_name: usageContext.editor_name,
+            machine_id: usageContext.machine_id,
+            user_byok: false,
+            has_tools: false,
+            botId: usageContext.botId,
+            tokenSource: usageContext.tokenSource,
+            feature: usageContext.feature,
+            session_id: usageContext.session_id,
+            mode: usageContext.mode,
+            auto_model: autoModel,
+            ttfb_ms: null,
+            clientRequestId,
+          };
+          await logMicrodollarUsage(classifierStats, classifierContext);
+        } catch (error) {
+          console.error('Failed to bill classifier cost for kilo-auto/efficient', error);
+        }
+      })()
+    );
+  }
 
   await handleRequestLogging({
     clonedResponse: response.clone(),

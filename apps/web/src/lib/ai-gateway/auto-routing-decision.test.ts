@@ -80,7 +80,7 @@ describe('fetchEfficientAutoDecision', () => {
     const headers = init?.headers as Headers;
     expect(headers.get('authorization')).toBe('Bearer classifier-token');
     expect(headers.get('content-type')).toBe('application/json');
-    expect(result).toEqual(validDecision);
+    expect(result).toEqual({ decision: validDecision, costUsd: 0.001 });
   });
 
   it('returns null and calls onError on a non-OK response', async () => {
@@ -151,7 +151,7 @@ describe('fetchEfficientAutoDecision', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null (not the decision object) when the worker returns a null decision', async () => {
+  it('returns decision: null with costUsd when the worker returns a null decision', async () => {
     mockedFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ cost: 0.001, decision: null, classifierResult: null }), {
         status: 200,
@@ -160,6 +160,6 @@ describe('fetchEfficientAutoDecision', () => {
 
     const result = await fetchEfficientAutoDecision(makeParams(), options);
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ decision: null, costUsd: 0.001 });
   });
 });

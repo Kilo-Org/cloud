@@ -24,7 +24,7 @@ type FetchEfficientDecisionOptions = {
 export async function fetchEfficientAutoDecision(
   params: EfficientDecisionParams,
   options: FetchEfficientDecisionOptions = {}
-): Promise<AutoRoutingDecision | null> {
+): Promise<{ decision: AutoRoutingDecision | null; costUsd: number } | null> {
   const workerUrl = options.workerUrl ?? AUTO_ROUTING_WORKER_URL;
   const authToken = options.authToken ?? INTERNAL_API_SECRET;
   const onError = options.onError ?? warnExceptInTest;
@@ -52,7 +52,7 @@ export async function fetchEfficientAutoDecision(
       onError('Efficient auto decision response invalid', { error: 'invalid_response' });
       return null;
     }
-    return parsed.data.decision;
+    return { decision: parsed.data.decision, costUsd: parsed.data.cost };
   } catch (error) {
     onError('Efficient auto decision request failed', {
       error: error instanceof Error ? error.message : String(error),

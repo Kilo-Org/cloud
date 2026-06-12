@@ -45,6 +45,7 @@ function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
     void (async () => {
       const dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
       const startedAt = Date.now();
+      let timedOut = false;
 
       let stdout = '';
       let stdoutTruncated = false;
@@ -78,7 +79,10 @@ function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
           child.kill('SIGKILL');
         }
       };
-      const killTimer = setTimeout(killProcessTree, timeoutMs);
+      const killTimer = setTimeout(() => {
+        timedOut = true;
+        killProcessTree();
+      }, timeoutMs);
 
       child.stdout.on('data', chunk => {
         if (stdoutTruncated) return;
@@ -111,6 +115,7 @@ function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
           durationMs: Date.now() - startedAt,
           stdoutLines,
           stderrTail: redactedStderrTail,
+          timedOut,
         });
       };
 

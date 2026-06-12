@@ -18,8 +18,10 @@ describe('mapSummaryRow', () => {
       avg_cost_usd: 0.0015,
       avg_latency_ms: 320.5,
       p50_latency_ms: 300.0,
+      p95_latency_ms: 300.0,
       cases: 50,
       errors: 2,
+      timeouts: 0,
       carried: false,
     };
     const result = mapSummaryRow(row);
@@ -30,8 +32,10 @@ describe('mapSummaryRow', () => {
       avgCostUsd: 0.0015,
       avgLatencyMs: 320.5,
       p50LatencyMs: 300.0,
+      p95LatencyMs: 300.0,
       cases: 50,
       errors: 2,
+      timeouts: 0,
     });
   });
 
@@ -44,15 +48,19 @@ describe('mapSummaryRow', () => {
       avg_cost_usd: null,
       avg_latency_ms: 150.0,
       p50_latency_ms: null,
+      p95_latency_ms: null,
       cases: 30,
       errors: 0,
+      timeouts: 0,
       carried: false,
     };
     const result = mapSummaryRow(row);
     expect(result.avgCostUsd).toBeNull();
     expect(result.p50LatencyMs).toBeNull();
+    expect(result.p95LatencyMs).toBeNull();
     expect(result.tier).toBe('*');
     expect(result.errors).toBe(0);
+    expect(result.timeouts).toBe(0);
   });
 });
 
@@ -73,6 +81,8 @@ describe('mapRunRow', () => {
       switch_cost_factor: 3,
       max_concurrency: 4,
       benchmark_user_id: null,
+      repetitions: 1,
+      classifier_max_p95_latency_ms: null,
     };
     const summaries: BenchmarkModelSummary[] = [
       {
@@ -82,8 +92,10 @@ describe('mapRunRow', () => {
         avgCostUsd: 0.0002,
         avgLatencyMs: 120,
         p50LatencyMs: 110,
+        p95LatencyMs: null,
         cases: 100,
         errors: 5,
+        timeouts: 0,
       },
     ];
     const result = mapRunRow(runRow, summaries);
@@ -109,6 +121,8 @@ describe('mapRunRow', () => {
       switch_cost_factor: 3,
       max_concurrency: 4,
       benchmark_user_id: null,
+      repetitions: 1,
+      classifier_max_p95_latency_ms: null,
     };
     const result = mapRunRow(runRow, []);
     expect(result.summaries).toEqual([]);

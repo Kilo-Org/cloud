@@ -9,6 +9,7 @@ export type CliRunResult = {
   stderrTail: string;
   eventCount: number;
   lastEventTypes: string[];
+  timedOut: boolean;
 };
 
 const DECIDER_CLI_TIMEOUT_MS = 180_000;
@@ -24,6 +25,7 @@ type ContainerRunResponse = {
   durationMs: number;
   stdoutLines: string[];
   stderrTail: string;
+  timedOut?: boolean;
 };
 
 /**
@@ -79,6 +81,7 @@ export async function runDeciderCaseViaCli(
     stderrTail: body.stderrTail ?? '',
     eventCount,
     lastEventTypes,
+    timedOut: body.timedOut ?? false,
   };
 }
 

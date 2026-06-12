@@ -40,6 +40,8 @@ export type BenchmarkJobMessage = {
   // index used to key the container instance. Absent for classifier messages.
   caseIds?: string[];
   chunk?: number;
+  // Repetition index (0-based). Absent for classifier messages.
+  rep?: number;
 };
 
 export const BenchmarkJobMessageSchema = z.object({
@@ -48,12 +50,13 @@ export const BenchmarkJobMessageSchema = z.object({
   model: z.string().min(1),
   caseIds: z.array(z.string().min(1)).optional(),
   chunk: z.number().int().min(0).optional(),
+  rep: z.number().int().min(0).optional(),
 });
 
 // Decider cases run through the real `kilo` CLI in a container (up to ~3 min
 // each). Chunking caps how many cases a single queue invocation processes so
 // each stays well under CF's wall-clock limit.
-const DECIDER_CHUNK_SIZE = 10;
+const DECIDER_CHUNK_SIZE = 5;
 
 export function chunkArray<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -81,6 +84,8 @@ export async function startRun(
   if (!config) {
     throw new Error('benchmark config not set: save it in the admin panel before starting a run');
   }
+  const repetitions =
+    kind === 'classifier' ? config.classifierRepetitions : config.deciderRepetitions;
   const models =
     kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id);
 
@@ -125,6 +130,9 @@ export async function startRun(
       switch_cost_factor: config.switchCostFactor,
       max_concurrency: config.maxConcurrency,
       benchmark_user_id: config.benchmarkUserId,
+      repetitions,
+      classifier_max_p95_latency_ms:
+        kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
     },
     runModelRows,
     carriedSummaries
@@ -151,6 +159,8 @@ export async function startRun(
       switchCostFactor: config.switchCostFactor,
       benchmarkUserId: config.benchmarkUserId,
       models: runModelRows,
+      repetitions,
+      classifierMaxP95LatencyMs: kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
     });
     return { runId, enqueuedModels: 0, skippedModels };
   }
@@ -164,19 +174,22 @@ export async function startRun(
     return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
   }
 
-  // Decider: one message per (model, chunk) so each queue invocation stays
-  // bounded. finalizeRunIfComplete expects enqueuedModels × DECIDER_CASES rows.
+  // Decider: one message per (model, rep, chunk) so each queue invocation stays
+  // bounded. finalizeRunIfComplete expects enqueuedModels × DECIDER_CASES × repetitions rows.
   const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
   const messages = enqueuedModelIds.flatMap(model =>
-    chunks.map((chunkCases, chunk) => ({
-      body: {
-        runId,
-        kind,
-        model,
-        chunk,
-        caseIds: chunkCases.map(c => c.id),
-      } satisfies BenchmarkJobMessage,
-    }))
+    Array.from({ length: repetitions }, (_, rep) =>
+      chunks.map((chunkCases, chunk) => ({
+        body: {
+          runId,
+          kind,
+          model,
+          chunk,
+          rep,
+          caseIds: chunkCases.map(c => c.id),
+        } satisfies BenchmarkJobMessage,
+      }))
+    ).flat()
   );
   await env.BENCH_QUEUE.sendBatch(messages);
   return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
@@ -203,36 +216,49 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
   if (message.kind === 'classifier') {
     // Create the OpenRouter client inside processJob — no module-scope transport clients.
     const client = await createOpenRouterClient(env);
-    await runCasesWithConcurrency(CLASSIFIER_CASES, state.maxConcurrency, async benchCase => {
-      const startedAt = performance.now();
-      try {
-        const result = await classifyWithOpenRouter(client, benchCase.input, message.model);
-        const score = result.fallback
-          ? 0
-          : gradeClassifierOutput(benchCase.expected, result.classification);
-        await upsertCaseResult(env.BENCH_DB, {
-          run_id: message.runId,
-          model: message.model,
-          case_id: benchCase.id,
-          tier: null,
-          score,
-          latency_ms: Math.round(performance.now() - startedAt),
-          cost_usd: result.cost,
-          error: null,
-          fallback_reason: result.fallback?.reason ?? null,
-          retried: result.retried ?? false,
-          exit_code: null,
-          output_prefix: null,
-          event_count: null,
-          last_event_types: null,
-        });
-      } catch (error) {
-        await upsertCaseResult(
-          env.BENCH_DB,
-          failedRow(message, benchCase.id, null, startedAt, error)
-        );
+    // Expand cases × repetitions into a flat work list.
+    const expandedItems: { benchCase: (typeof CLASSIFIER_CASES)[number]; rep: number }[] = [];
+    for (let rep = 0; rep < state.repetitions; rep++) {
+      for (const benchCase of CLASSIFIER_CASES) {
+        expandedItems.push({ benchCase, rep });
       }
-    });
+    }
+    await runCasesWithConcurrency(
+      expandedItems,
+      state.maxConcurrency,
+      async ({ benchCase, rep }) => {
+        const startedAt = performance.now();
+        try {
+          const result = await classifyWithOpenRouter(client, benchCase.input, message.model);
+          const score = result.fallback
+            ? 0
+            : gradeClassifierOutput(benchCase.expected, result.classification);
+          await upsertCaseResult(env.BENCH_DB, {
+            run_id: message.runId,
+            model: message.model,
+            case_id: benchCase.id,
+            tier: null,
+            score,
+            latency_ms: Math.round(performance.now() - startedAt),
+            cost_usd: result.cost,
+            error: null,
+            fallback_reason: result.fallback?.reason ?? null,
+            retried: result.retried ?? false,
+            exit_code: null,
+            output_prefix: null,
+            event_count: null,
+            last_event_types: null,
+            rep,
+            timed_out: 0,
+          });
+        } catch (error) {
+          await upsertCaseResult(
+            env.BENCH_DB,
+            failedRow(message, benchCase.id, null, startedAt, error, rep)
+          );
+        }
+      }
+    );
   } else {
     await processDeciderJob(env, message, state);
   }
@@ -246,6 +272,8 @@ type RunState = {
   switchCostFactor: number;
   benchmarkUserId: string | null;
   models: RunModelRow[];
+  repetitions: number;
+  classifierMaxP95LatencyMs: number | null;
 };
 
 async function getRunState(env: Env, runId: string): Promise<RunState> {
@@ -259,6 +287,8 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     switchCostFactor: run.switch_cost_factor,
     benchmarkUserId: run.benchmark_user_id,
     models,
+    repetitions: run.repetitions,
+    classifierMaxP95LatencyMs: run.classifier_max_p95_latency_ms,
   };
 }
 
@@ -285,7 +315,8 @@ async function processDeciderJob(
   // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
   // queue retries the message. The token is never logged.
   const kiloToken = await fetchBenchmarkUserToken(env, state.benchmarkUserId);
-  const instanceName = `${message.runId}:${message.model}:${message.chunk ?? 0}`;
+  const rep = message.rep ?? 0;
+  const instanceName = `${message.runId}:${message.model}:${rep}:${message.chunk ?? 0}`;
 
   // Reasoning effort comes from the run snapshot (run_models row), not live config.
   const modelRow = state.models.find(m => m.model === message.model);
@@ -348,11 +379,13 @@ async function processDeciderJob(
         output_prefix: result.text.slice(0, 200),
         event_count: result.eventCount,
         last_event_types: result.lastEventTypes.join(' '),
+        rep,
+        timed_out: result.timedOut ? 1 : 0,
       });
     } catch (error) {
       await upsertCaseResult(
         env.BENCH_DB,
-        failedRow(message, benchCase.id, benchCase.tier, startedAt, error)
+        failedRow(message, benchCase.id, benchCase.tier, startedAt, error, rep)
       );
     }
   });
@@ -391,7 +424,8 @@ function failedRow(
   caseId: string,
   tier: string | null,
   startedAt: number,
-  error: unknown
+  error: unknown,
+  rep: number = 0
 ): CaseResultRow {
   return {
     run_id: message.runId,
@@ -408,6 +442,8 @@ function failedRow(
     output_prefix: null,
     event_count: null,
     last_event_types: null,
+    rep,
+    timed_out: 0,
   };
 }
 
@@ -434,7 +470,7 @@ async function finalizeRunIfComplete(
 ): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
   const caseCount = kind === 'classifier' ? CLASSIFIER_CASES.length : DECIDER_CASES.length;
-  const expected = enqueuedModels.length * caseCount;
+  const expected = enqueuedModels.length * caseCount * state.repetitions;
   const actual = await countCaseResults(env.BENCH_DB, runId);
 
   if (actual < expected) return;
@@ -453,7 +489,11 @@ async function finalizeRunIfComplete(
   const allSummaries = await getSummaries(env.BENCH_DB, runId);
 
   if (kind === 'classifier') {
-    const winner = pickClassifierWinner(allSummaries, state.minAccuracy);
+    const winner = pickClassifierWinner(
+      allSummaries,
+      state.minAccuracy,
+      state.classifierMaxP95LatencyMs
+    );
     if (winner) {
       console.log(
         JSON.stringify({ event: 'classifier_winner_published', runId, model: winner.model })
@@ -529,6 +569,11 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
     const [model, tier] = key.split('\0');
     const latencies = group.map(r => r.latency_ms).toSorted((a, b) => a - b);
     const costs = group.filter(r => r.cost_usd !== null);
+    const p95LatencyMs =
+      latencies.length > 0
+        ? (latencies[Math.min(latencies.length - 1, Math.ceil(0.95 * latencies.length) - 1)] ??
+          null)
+        : null;
     return {
       model,
       tier: tier as BenchmarkModelSummary['tier'],
@@ -538,8 +583,10 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
         : null,
       avgLatencyMs: Math.round(group.reduce((a, r) => a + r.latency_ms, 0) / group.length),
       p50LatencyMs: latencies[Math.floor(latencies.length / 2)] ?? null,
+      p95LatencyMs,
       cases: group.length,
       errors: group.filter(r => r.error !== null).length,
+      timeouts: group.filter(r => r.timed_out).length,
     };
   });
 }

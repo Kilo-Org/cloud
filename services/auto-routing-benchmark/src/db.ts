@@ -41,8 +41,10 @@ export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
     avgCostUsd: row.avg_cost_usd,
     avgLatencyMs: row.avg_latency_ms,
     p50LatencyMs: row.p50_latency_ms,
+    p95LatencyMs: row.p95_latency_ms,
     cases: row.cases,
     errors: row.errors,
+    timeouts: row.timeouts,
   };
 }
 
@@ -87,6 +89,9 @@ export async function replaceConfig(
     switch_cost_factor: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
+    classifier_repetitions: number;
+    decider_repetitions: number;
+    classifier_max_p95_latency_ms: number | null;
     updated_at: string;
     updated_by: string | null;
   },
@@ -130,6 +135,8 @@ export async function insertRun(
     switch_cost_factor: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
+    repetitions: number;
+    classifier_max_p95_latency_ms: number | null;
   },
   models: RunModelRow[],
   carriedSummaries: BenchmarkModelSummary[]
@@ -144,6 +151,8 @@ export async function insertRun(
     switch_cost_factor: run.switch_cost_factor,
     max_concurrency: run.max_concurrency,
     benchmark_user_id: run.benchmark_user_id,
+    repetitions: run.repetitions,
+    classifier_max_p95_latency_ms: run.classifier_max_p95_latency_ms,
   });
 
   if (models.length === 0 && carriedSummaries.length === 0) {
@@ -168,8 +177,10 @@ export async function insertRun(
           avg_cost_usd: s.avgCostUsd,
           avg_latency_ms: s.avgLatencyMs,
           p50_latency_ms: s.p50LatencyMs,
+          p95_latency_ms: s.p95LatencyMs,
           cases: s.cases,
           errors: s.errors,
+          timeouts: s.timeouts,
           carried: true,
         }))
       )
@@ -201,7 +212,7 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
     .insert(caseResults)
     .values(row)
     .onConflictDoUpdate({
-      target: [caseResults.run_id, caseResults.model, caseResults.case_id],
+      target: [caseResults.run_id, caseResults.model, caseResults.case_id, caseResults.rep],
       set: {
         tier: row.tier,
         score: row.score,
@@ -214,6 +225,8 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         output_prefix: row.output_prefix,
         event_count: row.event_count,
         last_event_types: row.last_event_types,
+        rep: row.rep,
+        timed_out: row.timed_out,
       },
     });
 }
@@ -261,8 +274,10 @@ export async function replaceModelSummaries(
         avg_cost_usd: s.avgCostUsd,
         avg_latency_ms: s.avgLatencyMs,
         p50_latency_ms: s.p50LatencyMs,
+        p95_latency_ms: s.p95LatencyMs,
         cases: s.cases,
         errors: s.errors,
+        timeouts: s.timeouts,
         carried: false,
       }))
     ),
@@ -349,8 +364,10 @@ export async function getLatestSummariesByModel(
       avg_cost_usd: modelSummaries.avg_cost_usd,
       avg_latency_ms: modelSummaries.avg_latency_ms,
       p50_latency_ms: modelSummaries.p50_latency_ms,
+      p95_latency_ms: modelSummaries.p95_latency_ms,
       cases: modelSummaries.cases,
       errors: modelSummaries.errors,
+      timeouts: modelSummaries.timeouts,
       carried: modelSummaries.carried,
     })
     .from(modelSummaries)
@@ -535,13 +552,18 @@ export async function getClassifierWinner(db: D1Database): Promise<ClassifierWin
     .where(and(eq(modelSummaries.run_id, runRow.id), eq(modelSummaries.tier, '*')));
 
   const summaries = summaryRows.map(mapSummaryRow);
-  const winner = pickClassifierWinner(summaries, runRow.min_accuracy);
+  const winner = pickClassifierWinner(
+    summaries,
+    runRow.min_accuracy,
+    runRow.classifier_max_p95_latency_ms
+  );
   if (!winner) return null;
 
   return {
     model: winner.model,
     runId: runRow.id,
     accuracy: winner.accuracy,
+    p95LatencyMs: winner.p95LatencyMs,
     generatedAt: runRow.completed_at ?? new Date().toISOString(),
   };
 }

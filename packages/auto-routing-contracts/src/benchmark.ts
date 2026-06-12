@@ -34,6 +34,14 @@ export const BenchmarkConfigSchema = z.object({
   // cheaper than fresh input tokens), so switching only pays off when the
   // recurring savings clearly outweigh the cache-rebuild penalty.
   switchCostFactor: z.number().min(1).max(100),
+  // How many times to repeat each case for classifier / decider benchmarks.
+  // Repeated runs reduce variance; the default of 1 preserves the current
+  // single-pass behaviour.
+  classifierRepetitions: z.number().int().min(1).max(5).default(1),
+  deciderRepetitions: z.number().int().min(1).max(5).default(1),
+  // Maximum acceptable p95 latency for the classifier winner; null means no
+  // constraint (cost-only selection).
+  classifierMaxP95LatencyMs: z.number().int().positive().nullable().default(1000),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });
@@ -50,8 +58,10 @@ export const BenchmarkModelSummarySchema = z.object({
   avgCostUsd: z.number().nullable(),
   avgLatencyMs: z.number(),
   p50LatencyMs: z.number().nullable(),
+  p95LatencyMs: z.number().nullable(),
   cases: z.number().int(),
   errors: z.number().int(),
+  timeouts: z.number().int().default(0),
 });
 export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 
@@ -96,6 +106,7 @@ export const ClassifierWinnerSchema = z.object({
   model: z.string().trim().min(1),
   runId: z.string(),
   accuracy: z.number(),
+  p95LatencyMs: z.number().nullable().default(null),
   generatedAt: z.string(),
 });
 export type ClassifierWinner = z.infer<typeof ClassifierWinnerSchema>;

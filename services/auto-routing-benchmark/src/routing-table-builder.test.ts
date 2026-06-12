@@ -24,8 +24,10 @@ function summary(
     avgCostUsd,
     avgLatencyMs: 500,
     p50LatencyMs: 450,
+    p95LatencyMs: null,
     cases: 10,
     errors: 0,
+    timeouts: 0,
   };
 }
 

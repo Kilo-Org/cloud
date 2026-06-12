@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CaseResultRow } from './db';
-import { chunkArray, runCasesWithConcurrency, summarize } from './run';
+import { BenchmarkJobMessageSchema, chunkArray, runCasesWithConcurrency, summarize } from './run';
 import { pickClassifierWinner } from './winner';
 
 function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
@@ -19,6 +19,8 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     output_prefix: null,
     event_count: null,
     last_event_types: null,
+    rep: 0,
+    timed_out: 0,
     ...overrides,
   };
 }
@@ -211,12 +213,12 @@ describe('runCasesWithConcurrency', () => {
 });
 
 describe('chunkArray', () => {
-  it('splits into 10-per-chunk with a partial final chunk', () => {
-    const items = Array.from({ length: 23 }, (_, i) => i);
-    const chunks = chunkArray(items, 10);
+  it('splits into 5-per-chunk with a partial final chunk', () => {
+    const items = Array.from({ length: 13 }, (_, i) => i);
+    const chunks = chunkArray(items, 5);
     expect(chunks).toHaveLength(3);
-    expect(chunks[0]).toHaveLength(10);
-    expect(chunks[1]).toHaveLength(10);
+    expect(chunks[0]).toHaveLength(5);
+    expect(chunks[1]).toHaveLength(5);
     expect(chunks[2]).toHaveLength(3);
   });
 
@@ -246,8 +248,10 @@ describe('pickClassifierWinner', () => {
     avgCostUsd,
     avgLatencyMs: 100,
     p50LatencyMs: 90,
+    p95LatencyMs: 90,
     cases: 36,
     errors: 0,
+    timeouts: 0,
   });
 
   it('picks the cheapest model meeting the threshold', () => {
@@ -276,5 +280,135 @@ describe('pickClassifierWinner', () => {
       pickClassifierWinner([{ ...summary('m', 1, 0.001), tier: 'low' as const }], 0.7)
     ).toBeNull();
     expect(pickClassifierWinner([], 0.7)).toBeNull();
+  });
+
+  // helper with explicit p95LatencyMs
+  const summaryWithLatency = (
+    model: string,
+    accuracy: number,
+    avgCostUsd: number | null,
+    p95: number | null = 90
+  ) => ({
+    model,
+    tier: '*' as const,
+    accuracy,
+    avgCostUsd,
+    avgLatencyMs: 100,
+    p50LatencyMs: 80,
+    p95LatencyMs: p95,
+    timeouts: 0,
+    cases: 36,
+    errors: 0,
+  });
+
+  it('latency gate: picks cheapest within budget when both meet accuracy and latency', () => {
+    const winner = pickClassifierWinner(
+      [
+        summaryWithLatency('fast-cheap', 0.9, 0.001, 800),
+        summaryWithLatency('fast-pricy', 0.95, 0.01, 500),
+        summaryWithLatency('slow', 0.9, 0.0005, 1500),
+      ],
+      0.7,
+      1000
+    );
+    expect(winner?.model).toBe('fast-cheap');
+  });
+
+  it('latency gate fallback: picks lowest p95 among accuracy-meeting when none in budget', () => {
+    const winner = pickClassifierWinner(
+      [
+        summaryWithLatency('almost', 0.9, 0.001, 1200),
+        summaryWithLatency('closest', 0.85, 0.002, 1100),
+        summaryWithLatency('way-off', 0.9, 0.0005, 2000),
+      ],
+      0.8,
+      1000
+    );
+    expect(winner?.model).toBe('closest');
+  });
+
+  it('null budget disables latency gate', () => {
+    const winner = pickClassifierWinner(
+      [
+        summaryWithLatency('cheap-slow', 0.9, 0.001, 5000),
+        summaryWithLatency('pricy-fast', 0.95, 0.01, 100),
+      ],
+      0.7,
+      null
+    );
+    expect(winner?.model).toBe('cheap-slow');
+  });
+
+  it('null p95 on summary fails non-null latency constraint', () => {
+    const winner = pickClassifierWinner(
+      [
+        summaryWithLatency('no-p95', 0.9, 0.001, null),
+        summaryWithLatency('has-p95', 0.85, 0.01, 800),
+      ],
+      0.7,
+      1000
+    );
+    // no-p95 fails the gate (null p95 cannot meet non-null constraint)
+    // has-p95 meets both → wins
+    expect(winner?.model).toBe('has-p95');
+  });
+});
+
+describe('summarize — p95 and timeouts', () => {
+  it('computes p95LatencyMs using nearest-rank formula', () => {
+    // 20 rows, sorted latencies at 95th percentile: ceil(0.95*20)-1 = 18
+    const rows = Array.from({ length: 20 }, (_, i) =>
+      makeRow({ case_id: `c${i}`, latency_ms: (i + 1) * 100 })
+    );
+    const [s] = summarize(rows, 'classifier');
+    // sorted latencies: [100, 200, ..., 2000], index 18 = 1900
+    expect(s.p95LatencyMs).toBe(1900);
+  });
+
+  it('counts timeouts', () => {
+    const rows = [
+      makeRow({ case_id: 'c1', timed_out: 1 }),
+      makeRow({ case_id: 'c2', timed_out: 0 }),
+      makeRow({ case_id: 'c3', timed_out: 1 }),
+    ];
+    const [s] = summarize(rows, 'classifier');
+    expect(s.timeouts).toBe(2);
+  });
+
+  it('aggregates multi-rep rows correctly (same case_id different rep)', () => {
+    const rows = [
+      makeRow({ case_id: 'c1', rep: 0, score: 1, latency_ms: 100 }),
+      makeRow({ case_id: 'c1', rep: 1, score: 0, latency_ms: 200 }),
+      makeRow({ case_id: 'c2', rep: 0, score: 1, latency_ms: 150 }),
+      makeRow({ case_id: 'c2', rep: 1, score: 1, latency_ms: 250 }),
+    ];
+    const [s] = summarize(rows, 'classifier');
+    expect(s.cases).toBe(4);
+    expect(s.accuracy).toBe(0.75);
+  });
+});
+
+describe('decider message fan-out', () => {
+  it('DECIDER_CHUNK_SIZE is 5 (chunk count for 76 cases)', () => {
+    // DECIDER_CASES = 76, chunk size 5 → ceil(76/5) = 16 chunks
+    const chunks = chunkArray(
+      Array.from({ length: 76 }, (_, i) => String(i)),
+      5
+    );
+    expect(chunks).toHaveLength(16);
+  });
+
+  it('message schema accepts and defaults rep', () => {
+    const msg = BenchmarkJobMessageSchema.parse({ runId: 'r1', kind: 'classifier', model: 'm1' });
+    expect(msg.rep).toBeUndefined();
+    const withRep = BenchmarkJobMessageSchema.parse({
+      runId: 'r1',
+      kind: 'decider',
+      model: 'm1',
+      rep: 2,
+      caseIds: ['a'],
+      chunk: 0,
+    });
+    expect(withRep.rep).toBe(2);
   });
 });

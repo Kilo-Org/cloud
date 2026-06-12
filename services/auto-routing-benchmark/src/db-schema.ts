@@ -10,6 +10,9 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   switch_cost_factor: real('switch_cost_factor').notNull(),
   max_concurrency: integer('max_concurrency').notNull(),
   benchmark_user_id: text('benchmark_user_id'),
+  classifier_repetitions: integer('classifier_repetitions').notNull().default(1),
+  decider_repetitions: integer('decider_repetitions').notNull().default(1),
+  classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
   updated_at: text('updated_at').notNull(),
   updated_by: text('updated_by'),
 });
@@ -35,6 +38,8 @@ export const benchmarkRuns = sqliteTable('benchmark_runs', {
   switch_cost_factor: real('switch_cost_factor').notNull(),
   max_concurrency: integer('max_concurrency').notNull(),
   benchmark_user_id: text('benchmark_user_id'),
+  repetitions: integer('repetitions').notNull().default(1),
+  classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
 });
 
 export const runModels = sqliteTable(
@@ -61,6 +66,8 @@ export const modelSummaries = sqliteTable(
     p50_latency_ms: real('p50_latency_ms'),
     cases: integer('cases').notNull(),
     errors: integer('errors').notNull(),
+    p95_latency_ms: real('p95_latency_ms'),
+    timeouts: integer('timeouts').notNull().default(0),
     // carried=true rows are prior-run summaries copied in at startRun for skipped models.
     carried: integer('carried', { mode: 'boolean' }).notNull().default(false),
   },
@@ -86,10 +93,14 @@ export const caseResults = sqliteTable(
     output_prefix: text('output_prefix'),
     event_count: integer('event_count'),
     last_event_types: text('last_event_types'),
+    // Repetition index (0-based); together with run_id/model/case_id forms the PK.
+    rep: integer('rep').notNull().default(0),
+    // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
+    timed_out: integer('timed_out').notNull().default(0),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups
   // (count/fetch by run); no separate run_id index is needed.
-  table => [primaryKey({ columns: [table.run_id, table.model, table.case_id] })]
+  table => [primaryKey({ columns: [table.run_id, table.model, table.case_id, table.rep] })]
 );
 
 export const routingTables = sqliteTable('routing_tables', {

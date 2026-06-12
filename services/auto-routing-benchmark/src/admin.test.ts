@@ -13,6 +13,9 @@ const TEST_CONFIG: BenchmarkConfig = {
   switchCostFactor: 3,
   maxConcurrency: 4,
   benchmarkUserId: null,
+  classifierRepetitions: 1,
+  deciderRepetitions: 1,
+  classifierMaxP95LatencyMs: 1000,
   updatedAt: null,
   updatedBy: null,
 };
@@ -25,6 +28,9 @@ const TEST_CONFIG_ROWS = {
     switch_cost_factor: TEST_CONFIG.switchCostFactor,
     max_concurrency: TEST_CONFIG.maxConcurrency,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
+    classifier_repetitions: TEST_CONFIG.classifierRepetitions,
+    decider_repetitions: TEST_CONFIG.deciderRepetitions,
+    classifier_max_p95_latency_ms: TEST_CONFIG.classifierMaxP95LatencyMs,
     updated_at: '2026-06-01T00:00:00.000Z',
     updated_by: null,
   },
@@ -175,6 +181,9 @@ describe('GET /admin/config', () => {
         switch_cost_factor: 3,
         max_concurrency: 4,
         benchmark_user_id: null,
+        classifier_repetitions: 1,
+        decider_repetitions: 1,
+        classifier_max_p95_latency_ms: null,
         updated_at: '2026-06-01T00:00:00.000Z',
         updated_by: 'admin@example.com',
       },
@@ -367,6 +376,7 @@ describe('GET /admin/classifier-winner', () => {
       model: 'google/gemini-2.5-flash-lite',
       runId: 'classifier-2026-06-01T00-00-00-000Z',
       accuracy: 0.92,
+      p95LatencyMs: null,
       generatedAt: '2026-06-01T10:00:00.000Z',
     };
     vi.mocked(getClassifierWinner).mockResolvedValueOnce(winner);

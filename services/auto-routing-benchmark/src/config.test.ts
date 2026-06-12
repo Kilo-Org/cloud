@@ -8,6 +8,9 @@ const configRow = {
   switch_cost_factor: 3,
   max_concurrency: 8,
   benchmark_user_id: 'user-123',
+  classifier_repetitions: 1,
+  decider_repetitions: 1,
+  classifier_max_p95_latency_ms: null,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: 'admin@example.com',
 };
@@ -48,5 +51,8 @@ describe('mapConfigRows', () => {
     expect(result?.deciderModels).toHaveLength(1);
     expect(result?.deciderModels[0].id).toBe('some/decider');
     expect(result?.deciderModels[0].reasoningEffort).toBe('high');
+    expect(result?.classifierRepetitions).toBe(1);
+    expect(result?.deciderRepetitions).toBe(1);
+    expect(result?.classifierMaxP95LatencyMs).toBeNull();
   });
 });

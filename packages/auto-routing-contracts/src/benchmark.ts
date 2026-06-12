@@ -92,8 +92,9 @@ export const BenchmarkRoutingTableResponseSchema = z.object({
 });
 export type BenchmarkRoutingTableResponse = z.infer<typeof BenchmarkRoutingTableResponseSchema>;
 
-// Published to the auto-routing KV namespace when a classifier benchmark run
-// completes: the cheapest candidate meeting the accuracy threshold.
+// The cheapest classifier candidate meeting the accuracy threshold, derived
+// on read from the latest completed classifier run (served via
+// /admin/classifier-winner and cached in the auto-routing KV namespace).
 export const ClassifierWinnerSchema = z.object({
   model: z.string().trim().min(1),
   runId: z.string(),

@@ -105,13 +105,9 @@ export function rewriteChatCompletionsOneOfAsAnyOf(
 
   if (rewritten === 0) return;
 
-  try {
-    log('Rewrote JSON Schema oneOf as anyOf for Friendli', {
-      event: 'ai_gateway_chat_completions_one_of_rewritten',
-      model: request.model,
-      count: rewritten,
-    });
-  } catch {
-    // Diagnostics must never interrupt request forwarding.
-  }
+  log('Rewrote JSON Schema oneOf as anyOf for Friendli', {
+    event: 'ai_gateway_chat_completions_one_of_rewritten',
+    model: request.model,
+    count: rewritten,
+  });
 }

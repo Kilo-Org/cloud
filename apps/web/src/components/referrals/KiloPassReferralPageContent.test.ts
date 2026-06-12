@@ -132,9 +132,14 @@ describe('KiloPassReferralPageContent', () => {
     );
     expect(cancelingHtml).toContain('Manage subscription');
 
-    expect(unsubscribedHtml).toContain('Pending until monthly subscription resumes or activates');
+    expect(unsubscribedHtml).not.toContain(
+      'Pending until monthly subscription resumes or activates'
+    );
     expect(unsubscribedHtml).toContain('Choose monthly Kilo Pass');
-    expect(unsubscribedHtml).toContain('Any Kilo user can share');
+    expect(unsubscribedHtml).toContain(
+      'Any Kilo user can refer! Redeem your reward with an active Kilo Pass.'
+    );
+    expect(unsubscribedHtml).toContain('More info: Kilo Pass referral reward mechanics');
   });
 
   it('summarizes pending, applied, history, and cap-reached reward states', () => {

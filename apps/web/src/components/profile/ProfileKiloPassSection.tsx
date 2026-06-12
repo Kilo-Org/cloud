@@ -74,20 +74,16 @@ export function ProfileKiloPassSection() {
         : null;
 
     return (
-      <div className="space-y-3">
-        <div className="flex justify-end">
-          <KiloPassReferralButton className="w-full sm:w-auto" />
-        </div>
-        <KiloPassSubscribeCard
-          cadence={cadence}
-          setCadence={setCadence}
-          pending={pending}
-          showFirstMonthPromo={showFirstMonthPromo}
-          showSecondMonthPromo={showSecondMonthPromo}
-          recommendedTier={recommendedTier}
-          onSelectTier={tier => checkoutMutation.mutate({ tier, cadence })}
-        />
-      </div>
+      <KiloPassSubscribeCard
+        cadence={cadence}
+        setCadence={setCadence}
+        pending={pending}
+        showFirstMonthPromo={showFirstMonthPromo}
+        showSecondMonthPromo={showSecondMonthPromo}
+        headerAction={<KiloPassReferralButton className="w-full sm:w-auto" />}
+        recommendedTier={recommendedTier}
+        onSelectTier={tier => checkoutMutation.mutate({ tier, cadence })}
+      />
     );
   }
 

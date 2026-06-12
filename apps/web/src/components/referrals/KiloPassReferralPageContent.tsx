@@ -70,7 +70,8 @@ type StatusPresentation = {
 
 type EligibilityPresentation = {
   title: string;
-  description: string;
+  description: string | null;
+  details: string | null;
   action: {
     href: string;
     label: string;
@@ -150,9 +151,10 @@ export function getKiloPassReferralEligibilityPresentation(
 ): EligibilityPresentation {
   if (!subscriptionContext || isTerminalKiloPassStatus(subscriptionContext.status)) {
     return {
-      title: 'Pending until monthly subscription resumes or activates',
-      description:
-        'Any Kilo user can share. Earned rewards stay pending and the oldest eligible reward applies automatically when you start an eligible personal monthly Kilo Pass.',
+      title: 'Any Kilo user can refer! Redeem your reward with an active Kilo Pass.',
+      description: null,
+      details:
+        'When a brand-new Kilo user uses your referral and completes their first eligible paid personal monthly Kilo Pass purchase, you earn a pending reward. It applies automatically to your next eligible monthly base issuance while you have an active monthly Kilo Pass.',
       action: {
         href: '/subscriptions#kilo-pass',
         label: 'Choose monthly Kilo Pass',
@@ -165,6 +167,7 @@ export function getKiloPassReferralEligibilityPresentation(
       title: 'Annual subscription cannot consume reward',
       description:
         'You can keep sharing and earning. Pending rewards apply automatically only to a future eligible personal monthly Kilo Pass base issuance.',
+      details: null,
       action: {
         href: '/subscriptions/kilo-pass',
         label: 'Manage subscription',
@@ -177,6 +180,7 @@ export function getKiloPassReferralEligibilityPresentation(
       title: 'Canceling or paused subscription needs future eligible issuance',
       description:
         'You can keep sharing. Earned rewards stay pending until your monthly Kilo Pass resumes or renews with an eligible base issuance, then the oldest pending reward applies automatically.',
+      details: null,
       action: {
         href: '/subscriptions/kilo-pass',
         label: 'Manage subscription',
@@ -189,6 +193,7 @@ export function getKiloPassReferralEligibilityPresentation(
       title: 'Pending until monthly subscription resumes or activates',
       description:
         'You can keep sharing. Earned rewards stay pending until an eligible personal monthly Kilo Pass base issuance is created, then the oldest pending reward applies automatically.',
+      details: null,
       action: {
         href: '/subscriptions/kilo-pass',
         label: 'Manage subscription',
@@ -200,6 +205,7 @@ export function getKiloPassReferralEligibilityPresentation(
     title: 'Ready for future eligible monthly issuance',
     description:
       'You can share now. Earned rewards stay pending until the next eligible personal monthly Kilo Pass base issuance, then the oldest pending reward applies automatically.',
+    details: null,
     action: null,
   };
 }
@@ -280,15 +286,35 @@ function KiloPassReferralEligibility({
   return (
     <section
       aria-labelledby="kilo-pass-referral-eligibility-heading"
-      className="flex flex-col gap-3 rounded-lg border border-border bg-input/20 p-4 sm:flex-row sm:items-start sm:justify-between"
+      className="flex flex-col gap-3 rounded-lg border border-border bg-input/20 p-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="space-y-1.5">
-        <h2 id="kilo-pass-referral-eligibility-heading" className="text-sm font-semibold">
-          {presentation.title}
-        </h2>
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          {presentation.description}
-        </p>
+        <div className="flex max-w-3xl items-start gap-1.5">
+          <h2 id="kilo-pass-referral-eligibility-heading" className="min-w-0 text-sm font-semibold">
+            {presentation.title}
+          </h2>
+          {presentation.details ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="More info: Kilo Pass referral reward mechanics"
+                  className="mt-0.5 rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Info className="size-3.5" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80 text-left text-balance">
+                {presentation.details}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+        </div>
+        {presentation.description ? (
+          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+            {presentation.description}
+          </p>
+        ) : null}
       </div>
       {presentation.action ? (
         <Button asChild variant="outline" className="shrink-0 sm:self-center">

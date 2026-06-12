@@ -1,16 +1,52 @@
 import { describe, expect, it } from 'vitest';
+import { classifierTaxonomy } from '@kilocode/auto-routing-contracts/classifier';
 import { DECIDER_CASES } from './decider-cases';
 
+const TAXONOMY_PAIRS = classifierTaxonomy.taskTypes.flatMap(taskType =>
+  taskType.subtypes.map(subtype => ({ taskType: taskType.id, subtaskType: subtype.id }))
+);
+
+const SUBTYPES_BY_TASK_TYPE = new Map(
+  classifierTaxonomy.taskTypes.map(taskType => [
+    taskType.id,
+    new Set(taskType.subtypes.map(subtype => subtype.id)),
+  ])
+);
+
 describe('DECIDER_CASES', () => {
-  it('has exactly 30 cases with unique ids', () => {
-    expect(DECIDER_CASES.length).toBe(30);
+  it('covers all 18 taxonomy pairs', () => {
+    expect(TAXONOMY_PAIRS.length).toBe(18);
+  });
+
+  it('has exactly 76 cases with unique ids', () => {
+    expect(DECIDER_CASES.length).toBe(76);
     const ids = new Set(DECIDER_CASES.map(c => c.id));
     expect(ids.size).toBe(DECIDER_CASES.length);
   });
 
-  it('has exactly 10 cases per tier', () => {
+  it('has at least 4 cases per (taskType, subtaskType) pair', () => {
+    for (const pair of TAXONOMY_PAIRS) {
+      const count = DECIDER_CASES.filter(
+        c => c.taskType === pair.taskType && c.subtaskType === pair.subtaskType
+      ).length;
+      expect(count, `${pair.taskType}/${pair.subtaskType}`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('labels every case with a subtaskType that belongs to its taskType', () => {
+    for (const c of DECIDER_CASES) {
+      const subtypes = SUBTYPES_BY_TASK_TYPE.get(c.taskType);
+      expect(subtypes, `unknown taskType in case ${c.id}`).toBeDefined();
+      expect(
+        subtypes?.has(c.subtaskType),
+        `case ${c.id}: ${c.subtaskType} does not belong to ${c.taskType}`
+      ).toBe(true);
+    }
+  });
+
+  it('has at least 20 cases per tier', () => {
     for (const tier of ['low', 'medium', 'high'] as const) {
-      expect(DECIDER_CASES.filter(c => c.tier === tier).length, tier).toBe(10);
+      expect(DECIDER_CASES.filter(c => c.tier === tier).length, tier).toBeGreaterThanOrEqual(20);
     }
   });
 

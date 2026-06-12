@@ -233,6 +233,10 @@ async function main() {
   let connectionManager: ReturnType<typeof createConnectionManager> | undefined;
   let lifecycleManager: ReturnType<typeof createLifecycleManager> | undefined;
   let runtimeWorkspacePath = initialWorkspacePath;
+  let isShuttingDown = false;
+  const workspaceBootstrapController = new AbortController();
+  const activeWorkspaceBootstraps = new Set<ReturnType<typeof prepareWrapperBootstrapWorkspace>>();
+  const activeRuntimeStartups = new Set<Promise<void>>();
 
   const unavailableKiloClient = new Proxy(
     {},
@@ -392,11 +396,16 @@ async function main() {
       state,
       { kiloClient: nextKiloClient },
       {
-        onTerminalError: terminalError => {
-          logToFile(`terminal error: ${terminalError.error}`);
+        onTerminalError: failure => {
+          logToFile(`terminal error: ${failure.message}`);
           state.sendToIngest({
             streamEventType: 'error',
-            data: { ...terminalError, fatal: true },
+            data: {
+              error: failure.message,
+              errorSource: failure.errorSource,
+              fatal: true,
+              ...(failure.code ? { failureCode: failure.code } : {}),
+            },
             timestamp: new Date().toISOString(),
           });
           const session = state.currentSession;
@@ -504,9 +513,22 @@ async function main() {
     }
   }
 
+  function wrapperFinalizingResponse(): WrapperSessionReadyResponse {
+    return {
+      status: 'error',
+      error: {
+        code: 'WRAPPER_FINALIZING',
+        message: 'Wrapper is shutting down',
+        retryable: true,
+      },
+    };
+  }
+
   async function readySession(
     request: WrapperSessionReadyRequest
   ): Promise<WrapperSessionReadyResponse> {
+    if (isShuttingDown) return wrapperFinalizingResponse();
+
     const readyStartedAt = Date.now();
     let progressChannel: Awaited<ReturnType<typeof openIngestProgressChannel>> | undefined;
     logToFile(
@@ -549,16 +571,29 @@ async function main() {
         progressChannel = await openIngestProgressChannel(state);
       }
 
+      if (isShuttingDown) return wrapperFinalizingResponse();
+
       logToFile(
         `session/ready bootstrap workspace starting kiloSessionId=${request.kiloSessionId}`
       );
-      await prepareWrapperBootstrapWorkspace(request, (step, message) => {
-        state.sendToIngest({
-          streamEventType: 'preparing',
-          data: { step, message },
-          timestamp: new Date().toISOString(),
-        });
-      });
+      const workspaceBootstrap = prepareWrapperBootstrapWorkspace(
+        request,
+        (step, message) => {
+          state.sendToIngest({
+            streamEventType: 'preparing',
+            data: { step, message },
+            timestamp: new Date().toISOString(),
+          });
+        },
+        {},
+        workspaceBootstrapController.signal
+      );
+      activeWorkspaceBootstraps.add(workspaceBootstrap);
+      try {
+        await workspaceBootstrap;
+      } finally {
+        activeWorkspaceBootstraps.delete(workspaceBootstrap);
+      }
       logToFile(
         `session/ready bootstrap workspace finished kiloSessionId=${request.kiloSessionId}`
       );
@@ -566,7 +601,17 @@ async function main() {
       progressChannel?.close();
       progressChannel = undefined;
 
-      await startKiloRuntime(request.workspace.workspacePath, request.kiloSessionId);
+      if (isShuttingDown) return wrapperFinalizingResponse();
+      const runtimeStartup = startKiloRuntime(
+        request.workspace.workspacePath,
+        request.kiloSessionId
+      );
+      activeRuntimeStartups.add(runtimeStartup);
+      try {
+        await runtimeStartup;
+      } finally {
+        activeRuntimeStartups.delete(runtimeStartup);
+      }
       if (!kiloClient) {
         throw kiloServerBootstrapError('Kilo server did not start');
       }
@@ -586,6 +631,12 @@ async function main() {
         },
       };
     } catch (error) {
+      if (isShuttingDown) {
+        logToFile(
+          `session/ready aborted by shutdown kiloSessionId=${request.kiloSessionId} elapsedMs=${Date.now() - readyStartedAt}`
+        );
+        return wrapperFinalizingResponse();
+      }
       const bootstrapError =
         error instanceof WrapperBootstrapError
           ? error
@@ -632,7 +683,6 @@ async function main() {
   // ---------------------------------------------------------------------------
   // Graceful shutdown
   // ---------------------------------------------------------------------------
-  let isShuttingDown = false;
 
   async function handleShutdown(signal: string): Promise<void> {
     if (isShuttingDown) return;
@@ -641,7 +691,14 @@ async function main() {
     logToFile(`shutdown signal: ${signal}`);
     console.error(`Received ${signal}, shutting down...`);
 
-    // Send interrupted event if connected
+    // Force exit after timeout
+    setTimeout(() => {
+      logToFile('force exit after timeout');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+
+    // Send interrupted event if connected — before waiting on startup cleanup,
+    // which can outlast the force-exit window
     state.sendToIngest({
       streamEventType: 'interrupted',
       data: {
@@ -651,15 +708,21 @@ async function main() {
       timestamp: new Date().toISOString(),
     });
 
+    workspaceBootstrapController.abort();
+    const workspaceBootstraps = [...activeWorkspaceBootstraps];
+    const runtimeStartups = [...activeRuntimeStartups];
+    const pendingStartupOperations = [...workspaceBootstraps, ...runtimeStartups];
+    if (pendingStartupOperations.length > 0) {
+      logToFile(
+        `shutdown waiting for startup cleanup workspaceBootstraps=${workspaceBootstraps.length} runtimeStartups=${runtimeStartups.length}`
+      );
+      await Promise.allSettled(pendingStartupOperations);
+      logToFile('shutdown startup cleanup finished');
+    }
+
     // Stop lifecycle timers
     lifecycleManager?.stop();
     globalFeedManager.close();
-
-    // Force exit after timeout
-    setTimeout(() => {
-      logToFile('force exit after timeout');
-      process.exit(1);
-    }, SHUTDOWN_TIMEOUT_MS);
 
     // Best-effort final log upload
     const uploader = state.logUploader;

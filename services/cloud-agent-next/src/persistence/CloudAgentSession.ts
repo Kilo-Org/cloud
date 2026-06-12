@@ -15,6 +15,7 @@ import {
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
+import { projectTerminalClientError } from '../session/terminal-error-projector.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { logger } from '../logger.js';
 import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
@@ -345,6 +346,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       executionId: execution.executionId,
       status,
       errorMessage: error,
+      ...(status === 'completed'
+        ? {}
+        : { clientError: projectTerminalClientError({ status, error }) }),
       lastSeenBranch: metadata.repository?.upstreamBranch,
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,

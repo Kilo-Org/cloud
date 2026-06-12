@@ -1,3 +1,5 @@
+import type { CloudAgentFailureStage } from '@kilocode/worker-utils/cloud-agent-failure';
+import type { ClientError } from '@kilocode/worker-utils/client-error';
 import type { SafeFailureProjection } from '../session/safe-failure-projection.js';
 
 export type CallbackTarget = {
@@ -20,6 +22,8 @@ export type ExecutionCallbackPayload = {
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
   failure?: SafeFailureProjection;
+  failureStage?: CloudAgentFailureStage;
+  clientError?: ClientError;
   /** Present when errorMessage was shortened to fit the callback queue. */
   errorMessageTruncation?: CallbackTextTruncation;
   lastSeenBranch?: string;

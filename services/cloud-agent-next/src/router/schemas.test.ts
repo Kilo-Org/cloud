@@ -387,9 +387,31 @@ describe('getMessageResult contract', () => {
         acceptedAt: 3,
         terminalAt: 4,
         completionSource: 'wrapper_failure',
-        failure: { stage: 'agent_activity', code: 'assistant_error', attempts: 2 },
+        failure: {
+          stage: 'agent_activity',
+          code: 'assistant_error',
+          attempts: 2,
+          retryable: false,
+        },
       }).success
     ).toBe(true);
+  });
+
+  it('requires retryability on failed and interrupted failure details', () => {
+    expect(
+      GetMessageResultOutput.safeParse({
+        ...baseOutput,
+        status: 'interrupted',
+        failure: { retryable: true },
+      }).success
+    ).toBe(true);
+    expect(
+      GetMessageResultOutput.safeParse({
+        ...baseOutput,
+        status: 'failed',
+        failure: { code: 'assistant_error' },
+      }).success
+    ).toBe(false);
   });
 
   it('fails closed on contradictory lifecycle result fields', () => {
@@ -397,7 +419,7 @@ describe('getMessageResult contract', () => {
       { ...baseOutput, status: 'queued', acceptedAt: 2 },
       { ...baseOutput, status: 'queued', terminalAt: 2 },
       { ...baseOutput, status: 'running', completionSource: 'assistant_message_event' },
-      { ...baseOutput, status: 'queued', failure: { attempts: 1 } },
+      { ...baseOutput, status: 'queued', failure: { attempts: 1, retryable: true } },
       { ...baseOutput, status: 'failed', assistant: { messageId: 'assistant_1', text: 'wrong' } },
       { ...baseOutput, status: 'interrupted', gateResult: 'fail' },
     ]) {

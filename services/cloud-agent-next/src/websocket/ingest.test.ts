@@ -1228,6 +1228,32 @@ describe('createIngestHandler', () => {
       expect(doContext.wrapperSupervisor.observeFinalizing).toHaveBeenCalledWith(WRAPPER_RUN_ID);
     });
 
+    it.each([
+      { failureCode: 'payment_required' as const, error: 'Insufficient credits' },
+      { failureCode: 'model_missing' as const, error: 'Model not found' },
+    ])('forwards $failureCode wrapper failures to the session coordinator', async failure => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', { fatal: true, ...failure })
+      );
+
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        ...failure,
+      });
+    });
+
     it('does NOT terminalize on wrapper complete event (new path)', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();

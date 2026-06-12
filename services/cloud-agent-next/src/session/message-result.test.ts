@@ -246,7 +246,34 @@ describe('resolveSessionMessageResult', () => {
           subtype: 'git_clone_timeout',
           attempts: 2,
           message: 'Repository clone timed out: Clone exceeded the safe deadline',
+          retryable: true,
         },
+      },
+    });
+  });
+
+  it('projects retryable failure details for legacy terminal state without classification', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      lifecycleState(messageA, {
+        status: 'interrupted',
+        terminalAt: 4,
+        completionSource: 'interrupt',
+        error: 'private raw error',
+      })
+    );
+
+    await expect(resolveSessionMessageResult(storage, messageA)).resolves.toEqual({
+      type: 'found',
+      result: {
+        messageId: messageA,
+        status: 'interrupted',
+        createdAt: 1,
+        queuedAt: 1,
+        terminalAt: 4,
+        completionSource: 'interrupt',
+        failure: { retryable: true },
       },
     });
   });

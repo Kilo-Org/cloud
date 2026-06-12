@@ -1,7 +1,6 @@
 'use client';
 
-import { Info } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { AnimatedDots } from './AnimatedDots';
@@ -24,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   REASONING_OPTIONS,
   THINKING_OPTIONS,
@@ -60,33 +58,6 @@ function ownModel(agent: AgentSummary): { primary: string; fallbacks: string[] }
   return { primary: '', fallbacks: [] };
 }
 
-// A field label with an optional info (ⓘ) tooltip. These per-agent behaviors map
-// to OpenClaw config knobs that aren't surfaced on the main Settings page, so the
-// tooltip is where we explain what each does and what the values mean.
-function FieldLabel({ label, hint }: { label: string; hint?: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <Label>{label}</Label>
-      {hint && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label={`About ${label}`}
-              className="text-muted-foreground hover:text-foreground inline-flex cursor-help"
-            >
-              <Info className="h-3.5 w-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">
-            <p>{hint}</p>
-          </TooltipContent>
-        </Tooltip>
-      )}
-    </div>
-  );
-}
-
 function LabeledSelect<T extends string>({
   label,
   hint,
@@ -104,16 +75,26 @@ function LabeledSelect<T extends string>({
   // (INHERIT, which is always rendered, or one of the options) before calling
   // onChange instead of casting, so an unexpected value can't reach the patch.
   const isValue = (v: string): v is T => v === INHERIT || options.some(opt => opt === v);
+  // Visible helper text wired via aria-describedby — the documented forms
+  // convention (interaction-design.md), not a hover-only tooltip.
+  const baseId = useId();
+  const triggerId = `${baseId}-trigger`;
+  const hintId = `${baseId}-hint`;
   return (
     <div className="flex flex-col gap-1.5">
-      <FieldLabel label={label} hint={hint} />
+      <Label htmlFor={triggerId}>{label}</Label>
+      {hint && (
+        <p id={hintId} className="text-muted-foreground text-xs">
+          {hint}
+        </p>
+      )}
       <Select
         value={value}
         onValueChange={v => {
           if (isValue(v)) onChange(v);
         }}
       >
-        <SelectTrigger>
+        <SelectTrigger id={triggerId} aria-describedby={hint ? hintId : undefined}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -129,20 +110,19 @@ function LabeledSelect<T extends string>({
   );
 }
 
-// Plain-language explanations of the OpenClaw per-agent knobs, surfaced as the
-// (ⓘ) tooltips. "Inherit default = fleet-wide setting" is already covered by the
-// dialog description, so it isn't repeated here.
+// Plain-language explanations of the OpenClaw per-agent knobs, shown as inline
+// helper text under each control. These map to config that isn't surfaced on the
+// main Settings page. Kept terse for inline use; "Inherit default = fleet-wide
+// setting" is already covered by the dialog description, so it isn't repeated.
 const HINTS = {
-  model:
-    'Which model this agent runs on. Uncheck to choose a specific model; checked uses the fleet-wide default model.',
+  model: 'The model this agent runs on. Uncheck to choose a specific model.',
   thinking:
-    'How much reasoning effort the model spends before it replies. More effort is better on hard tasks but slower and uses more tokens. off → minimal → low → medium → high → xhigh increase the effort; adaptive lets the model vary effort per task; max is the highest.',
+    'Reasoning effort before replying — higher helps on hard tasks but is slower. adaptive varies per task; max is the most.',
   reasoning:
-    'Whether the model’s thinking is shown to the user — separate from how much it thinks. on posts it as a separate “Reasoning:” message; off hides it; stream is Telegram-only and streams it into the draft as the reply is generated.',
+    'Whether the model’s thinking is shown (separate from how much it thinks). on = a separate “Reasoning:” message; stream = Telegram only.',
   verbose:
-    'Whether the agent posts its tool activity into the channel. off shows only the final answer; on posts a short note when each tool starts; full also posts each tool’s output.',
-  fastMode:
-    'Optimizes the agent for responsiveness and speed. This is a separate knob from Thinking.',
+    'Whether the agent posts its tool activity to the channel. on = a note when each tool starts; full = also its output.',
+  fastMode: 'Optimizes for responsiveness. Separate knob from Thinking.',
 } as const;
 
 export function AgentEditDialog({
@@ -283,7 +263,8 @@ export function AgentEditDialog({
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <FieldLabel label="Model" hint={HINTS.model} />
+            <Label>Model</Label>
+            <p className="text-muted-foreground text-xs">{HINTS.model}</p>
             <div className="flex items-center gap-2">
               <Checkbox
                 id="agent-edit-inherit-model"

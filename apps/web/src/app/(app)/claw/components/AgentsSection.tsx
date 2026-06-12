@@ -46,7 +46,8 @@ function AgentModelLabel({ model }: { model: AgentSummary['model'] }) {
   }
   return (
     <span className="text-foreground">
-      {label}
+      {/* Model refs are identifiers — Roboto Mono per typography.md. */}
+      <span className="font-mono">{label}</span>
       {model.source === 'defaults' && <span className="text-muted-foreground"> (inherited)</span>}
     </span>
   );
@@ -81,7 +82,9 @@ function AgentRow({
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <span className="text-sm font-medium">{agent.name ?? agent.id}</span>
-          {agent.name && <span className="text-muted-foreground text-xs">{agent.id}</span>}
+          {agent.name && (
+            <span className="text-muted-foreground font-mono text-xs">{agent.id}</span>
+          )}
           {!agent.configured && (
             <Badge variant="secondary" className="px-1.5 py-0 text-[10px] leading-4">
               Default
@@ -93,34 +96,34 @@ function AgentRow({
             {showChannels && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2"
+                size="icon"
+                className="h-8 w-8"
                 onClick={onEditChannels}
                 aria-label="Edit channels"
               >
-                <Radio className="h-3.5 w-3.5" />
+                <Radio className="h-4 w-4" />
               </Button>
             )}
             {canUpdate && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2"
+                size="icon"
+                className="h-8 w-8"
                 onClick={onEdit}
                 aria-label="Edit agent"
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil className="h-4 w-4" />
               </Button>
             )}
             {deletable && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive h-7 px-2"
+                size="icon"
+                className="text-destructive hover:text-destructive h-8 w-8"
                 onClick={onDelete}
                 aria-label="Delete agent"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="h-4 w-4" />
               </Button>
             )}
           </div>
@@ -170,7 +173,8 @@ function DefaultsRow({ defaults }: { defaults: AgentDefaultsSummary }) {
 
   return (
     <div className="text-muted-foreground bg-muted/30 px-4 py-3 text-xs">
-      <span className="font-medium">Inherited defaults</span> · Model: {modelLabel}
+      <span className="font-medium">Inherited defaults</span> · Model:{' '}
+      <span className="font-mono">{modelLabel}</span>
       {settings.length > 0 && ` · ${settings.join(' · ')}`}
     </div>
   );
@@ -244,7 +248,7 @@ export function AgentsSection({
         <div className="mb-3 flex justify-end">
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
-            New agent
+            Create agent
           </Button>
         </div>
       )}
@@ -262,7 +266,9 @@ export function AgentsSection({
         ) : error ? (
           <div className="text-destructive px-4 py-3 text-xs">Failed to load agents.</div>
         ) : !data || data.agents.length === 0 ? (
-          <div className="text-muted-foreground px-4 py-3 text-xs">No agents configured.</div>
+          <div className="text-muted-foreground px-4 py-3 text-xs">
+            No agents yet. Create one to give a channel its own assistant.
+          </div>
         ) : (
           <div className="[&>*+*]:border-t">
             {data.agents.map(agent => (
@@ -326,11 +332,12 @@ export function AgentsSection({
         }}
         title="Delete agent"
         description={`Delete "${deleteTarget?.name ?? deleteTarget?.id ?? ''}"? This removes the agent and its channel routing. Workspace files on the machine may remain.`}
-        confirmLabel="Delete"
+        confirmLabel="Delete agent"
+        confirmVariant="destructive"
+        cancelLabel="Keep agent"
         isPending={deleteAgent.isPending}
         pendingLabel="Deleting"
         onConfirm={onConfirmDelete}
-        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
       />
     </div>
   );

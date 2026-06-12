@@ -119,7 +119,7 @@ export function AgentCreateDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>New agent</DialogTitle>
+          <DialogTitle>Create agent</DialogTitle>
           <DialogDescription>
             Stands up a new agent on your machine. You can route channels to it after it is created.
           </DialogDescription>
@@ -138,7 +138,7 @@ export function AgentCreateDialog({
             />
             {trimmedName.length > 0 && (
               <p className="text-muted-foreground text-xs">
-                Workspace: {workspaceFromName(trimmedName)}
+                Workspace: <span className="font-mono">{workspaceFromName(trimmedName)}</span>
               </p>
             )}
           </div>

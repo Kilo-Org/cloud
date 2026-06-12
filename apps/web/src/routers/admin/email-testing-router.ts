@@ -210,7 +210,6 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         ghsaId: 'GHSA-abcd-1234-wxyz',
         cvssScore: 8.1,
         actionUrl: `${NEXTAUTH_URL}/security-agent/findings`,
-        manageNotificationsUrl: `${NEXTAUTH_URL}/security-agent/config?tab=notifications`,
       });
     case 'securityFindingSlaWarning':
     case 'securityFindingSlaBreach':
@@ -225,7 +224,6 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         cvssScore: 9.8,
         slaDeadline: 'Jun 14, 2026, 17:00 UTC',
         actionUrl: `${NEXTAUTH_URL}/security-agent/findings`,
-        manageNotificationsUrl: `${NEXTAUTH_URL}/security-agent/config?tab=sla`,
       });
   }
   throw new Error(`Unknown template: ${template}`);

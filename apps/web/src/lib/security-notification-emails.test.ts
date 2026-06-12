@@ -30,7 +30,6 @@ describe('Security Agent notification emails', () => {
         cvssScore: 7.5,
         slaDeadline: 'Jun 14, 2026, 17:00 UTC',
         actionUrl: 'https://app.example.test/security-agent/findings',
-        manageNotificationsUrl: 'https://app.example.test/security-agent/config?tab=notifications',
       }),
       year: '2026',
     });
@@ -43,7 +42,7 @@ describe('Security Agent notification emails', () => {
     expect(html).not.toContain('A <strong>bad</strong> vulnerability');
   });
 
-  it('renders linked finding metadata and Security Agent CTA', () => {
+  it('renders plain finding metadata and one Security Agent CTA', () => {
     const html = renderTemplate('securityFindingNew', {
       ...securityFindingTemplateVars({
         severity: 'critical',
@@ -54,26 +53,26 @@ describe('Security Agent notification emails', () => {
         ghsaId: 'GHSA-abcd-1234-wxyz',
         cvssScore: 9.8,
         actionUrl: 'https://app.example.test/security-agent/findings',
-        manageNotificationsUrl: 'https://app.example.test/security-agent/config?tab=notifications',
       }),
       year: '2026',
     });
 
-    expect(html).toContain('href="https://github.com/acme/api"');
-    expect(html).toContain('href="https://www.cve.org/CVERecord?id=CVE-2026-0001"');
-    expect(html).toContain('href="https://github.com/advisories/GHSA-ABCD-1234-WXYZ"');
+    expect(html).toContain('acme/api');
+    expect(html).toContain('CVE-2026-0001');
+    expect(html).toContain('GHSA-ABCD-1234-WXYZ');
+    expect(html).not.toContain('href="https://github.com/acme/api"');
+    expect(html).not.toContain('href="https://www.cve.org/CVERecord?id=CVE-2026-0001"');
+    expect(html).not.toContain('href="https://github.com/advisories/GHSA-ABCD-1234-WXYZ"');
     expect(html).toContain('CVSS 9.8');
     expect(html).toContain('Repository search input can alter SQL query structure.');
     expect(html).not.toContain('Description</td>');
     expect(html).toContain('Resolve with Security Agent');
-    expect(html).toContain('Manage your security agent notifications');
-    expect(html).toContain(
-      'href="https://app.example.test/security-agent/config?tab=notifications"'
-    );
+    expect(html).toContain('href="https://app.example.test/security-agent/findings"');
+    expect(html).not.toContain('Manage your security agent notifications');
     expect(html).not.toContain('Review findings');
   });
 
-  it('links SLA notification management to the SLA tab', () => {
+  it('renders SLA notification details without a management link', () => {
     const html = renderTemplate('securityFindingSlaWarning', {
       ...securityFindingTemplateVars({
         severity: 'critical',
@@ -86,15 +85,17 @@ describe('Security Agent notification emails', () => {
         cvssScore: 9.8,
         slaDeadline: 'Jun 14, 2026, 17:00 UTC',
         actionUrl: 'https://app.example.test/security-agent/findings',
-        manageNotificationsUrl: 'https://app.example.test/security-agent/config?tab=sla',
       }),
       year: '2026',
     });
 
-    expect(html).toContain('href="https://app.example.test/security-agent/config?tab=sla"');
+    expect(html).toContain('Jun 14, 2026, 17:00 UTC');
+    expect(html).toContain('href="https://app.example.test/security-agent/findings"');
+    expect(html).not.toContain('Manage your security agent notifications');
     expect(html).not.toContain(
       'href="https://app.example.test/security-agent/config?tab=notifications"'
     );
+    expect(html).not.toContain('href="https://app.example.test/security-agent/config?tab=sla"');
   });
 
   it('renders missing advisory IDs without broken links', () => {
@@ -108,7 +109,6 @@ describe('Security Agent notification emails', () => {
         ghsaId: null,
         cvssScore: null,
         actionUrl: 'https://app.example.test/security-agent/findings',
-        manageNotificationsUrl: 'https://app.example.test/security-agent/config?tab=notifications',
       }),
       year: '2026',
     });

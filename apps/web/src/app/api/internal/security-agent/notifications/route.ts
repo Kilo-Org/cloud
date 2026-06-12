@@ -9,6 +9,7 @@ import {
   security_findings,
   security_finding_notifications,
 } from '@kilocode/db/schema';
+import type { SecurityFindingNotificationKind } from '@kilocode/db/schema-types';
 import { db } from '@/lib/drizzle';
 import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
 import { send as sendEmail, type TemplateName } from '@/lib/email';
@@ -31,7 +32,7 @@ const notificationKindToTemplate = {
   new_finding: 'securityFindingNew',
   sla_warning: 'securityFindingSlaWarning',
   sla_breach: 'securityFindingSlaBreach',
-} as const satisfies Record<string, TemplateName>;
+} as const satisfies Record<SecurityFindingNotificationKind, TemplateName>;
 
 function secretMatches(provided: string | null, expected: string): boolean {
   if (!provided) return false;
@@ -71,15 +72,6 @@ function actionUrl(finding: {
   ownedByUserId: string | null;
 }): string {
   return securityAgentUrl(finding, 'findings');
-}
-
-function manageNotificationsUrl(finding: {
-  kind: 'new_finding' | 'sla_warning' | 'sla_breach';
-  ownedByOrganizationId: string | null;
-  ownedByUserId: string | null;
-}): string {
-  const tab = finding.kind === 'new_finding' ? 'notifications' : 'sla';
-  return securityAgentUrl(finding, `config?tab=${tab}`);
 }
 
 async function recipientStillAuthorized(row: {
@@ -270,7 +262,6 @@ export async function POST(req: NextRequest) {
       cvssScore: row.cvssScore,
       slaDeadline: formatDeadline(row.slaDueAt),
       actionUrl: actionUrl(row),
-      manageNotificationsUrl: manageNotificationsUrl(row),
     }),
   }).catch(() => null);
 

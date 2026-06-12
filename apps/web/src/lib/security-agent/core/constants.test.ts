@@ -27,6 +27,24 @@ describe('security agent config', () => {
     expect(parseSecurityAgentConfig({}).sla_enabled).toBe(true);
   });
 
+  it('tolerates malformed notification fields during general config reads', () => {
+    expect(() =>
+      parseSecurityAgentConfig({
+        sla_notification_warning_days: 0,
+        new_finding_notification_min_severity: 'all',
+      })
+    ).not.toThrow();
+    expect(
+      parseSecurityAgentConfig({
+        sla_notification_warning_days: 0,
+        new_finding_notification_min_severity: 'all',
+      })
+    ).toMatchObject({
+      sla_notification_warning_days: 3,
+      new_finding_notification_min_severity: 'high',
+    });
+  });
+
   it('preserves stored notification settings when patch values are omitted', () => {
     const merged = mergeSecurityAgentConfigPatch(
       {

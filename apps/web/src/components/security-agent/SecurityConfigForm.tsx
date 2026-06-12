@@ -82,7 +82,7 @@ const DEFAULT_NOTIFICATION_CONFIG = {
 const DEFAULT_FORM_CONFIG: SecurityConfigFormState = {
   slaConfig: DEFAULT_SLA_CONFIG,
   slaEnabled: true,
-  repositorySelectionMode: 'all',
+  repositorySelectionMode: 'selected',
   selectedRepositoryIds: [],
   triageModelSlug: DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
   analysisModelSlug: DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,

@@ -808,7 +808,7 @@ export function createConnectionManager(
   }
 
   function isModelNotFoundMessage(message: string): boolean {
-    return /\bmodel\s+(?:was\s+)?not\s+found\b/i.test(message);
+    return /\b(model\s+(?:was\s+)?not\s+found|unknown\s+model|invalid\s+model)\b/i.test(message);
   }
 
   function shouldFetchModelNotFoundDiagnostics(

@@ -1,0 +1,26 @@
+name: Deploy Web to Staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy-app:
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      target_environment: staging
+      vercel_project_id_var: VERCEL_PROJECT_ID_APP
+    secrets: inherit
+
+  deploy-global-app:
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      target_environment: staging
+      vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
+    secrets: inherit

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "20295052-406c-424a-956f-77acc985f44a",
+  "id": "d5601eb8-dce7-4679-bd48-f73b4f88e2d3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "benchmark_config": {
@@ -38,6 +38,29 @@
         "benchmark_user_id": {
           "name": "benchmark_user_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "classifier_repetitions": {
+          "name": "classifier_repetitions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "decider_repetitions": {
+          "name": "decider_repetitions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "classifier_max_p95_latency_ms": {
+          "name": "classifier_max_p95_latency_ms",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -132,6 +155,21 @@
         "benchmark_user_id": {
           "name": "benchmark_user_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "repetitions": {
+          "name": "repetitions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "classifier_max_p95_latency_ms": {
+          "name": "classifier_max_p95_latency_ms",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -243,18 +281,35 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "rep": {
+          "name": "rep",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "timed_out": {
+          "name": "timed_out",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "case_results_run_id_model_case_id_pk": {
+        "case_results_run_id_model_case_id_rep_pk": {
           "columns": [
             "run_id",
             "model",
-            "case_id"
+            "case_id",
+            "rep"
           ],
-          "name": "case_results_run_id_model_case_id_pk"
+          "name": "case_results_run_id_model_case_id_rep_pk"
         }
       },
       "uniqueConstraints": {},
@@ -366,6 +421,21 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "p95_latency_ms": {
+          "name": "p95_latency_ms",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "timeouts": {
+          "name": "timeouts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "carried": {
           "name": "carried",

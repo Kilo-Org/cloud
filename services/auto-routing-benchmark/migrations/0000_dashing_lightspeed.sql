@@ -4,6 +4,9 @@ CREATE TABLE `benchmark_config` (
 	`switch_cost_factor` real NOT NULL,
 	`max_concurrency` integer NOT NULL,
 	`benchmark_user_id` text,
+	`classifier_repetitions` integer DEFAULT 1 NOT NULL,
+	`decider_repetitions` integer DEFAULT 1 NOT NULL,
+	`classifier_max_p95_latency_ms` integer,
 	`updated_at` text NOT NULL,
 	`updated_by` text
 );
@@ -18,7 +21,9 @@ CREATE TABLE `benchmark_runs` (
 	`min_accuracy` real NOT NULL,
 	`switch_cost_factor` real NOT NULL,
 	`max_concurrency` integer NOT NULL,
-	`benchmark_user_id` text
+	`benchmark_user_id` text,
+	`repetitions` integer DEFAULT 1 NOT NULL,
+	`classifier_max_p95_latency_ms` integer
 );
 --> statement-breakpoint
 CREATE TABLE `case_results` (
@@ -36,7 +41,9 @@ CREATE TABLE `case_results` (
 	`output_prefix` text,
 	`event_count` integer,
 	`last_event_types` text,
-	PRIMARY KEY(`run_id`, `model`, `case_id`)
+	`rep` integer DEFAULT 0 NOT NULL,
+	`timed_out` integer DEFAULT 0 NOT NULL,
+	PRIMARY KEY(`run_id`, `model`, `case_id`, `rep`)
 );
 --> statement-breakpoint
 CREATE TABLE `config_classifier_models` (
@@ -58,6 +65,8 @@ CREATE TABLE `model_summaries` (
 	`p50_latency_ms` real,
 	`cases` integer NOT NULL,
 	`errors` integer NOT NULL,
+	`p95_latency_ms` real,
+	`timeouts` integer DEFAULT 0 NOT NULL,
 	`carried` integer DEFAULT false NOT NULL,
 	PRIMARY KEY(`run_id`, `model`, `tier`)
 );

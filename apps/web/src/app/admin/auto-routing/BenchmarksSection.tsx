@@ -114,6 +114,9 @@ function configToFormState(config: BenchmarkConfig | null): {
   switchCostFactor: number;
   maxConcurrency: number;
   benchmarkUserId: string;
+  classifierRepetitions: number;
+  deciderRepetitions: number;
+  classifierMaxP95LatencyMs: string;
 } {
   if (config === null) {
     // No config saved yet: the worker fabricates nothing, so the form starts
@@ -125,6 +128,9 @@ function configToFormState(config: BenchmarkConfig | null): {
       switchCostFactor: 3,
       maxConcurrency: 4,
       benchmarkUserId: '',
+      classifierRepetitions: 1,
+      deciderRepetitions: 1,
+      classifierMaxP95LatencyMs: '1000',
     };
   }
   return {
@@ -137,6 +143,10 @@ function configToFormState(config: BenchmarkConfig | null): {
     switchCostFactor: config.switchCostFactor,
     maxConcurrency: config.maxConcurrency,
     benchmarkUserId: config.benchmarkUserId ?? '',
+    classifierRepetitions: config.classifierRepetitions,
+    deciderRepetitions: config.deciderRepetitions,
+    classifierMaxP95LatencyMs:
+      config.classifierMaxP95LatencyMs !== null ? String(config.classifierMaxP95LatencyMs) : '',
   };
 }
 
@@ -155,6 +165,8 @@ function formStateToConfig(
       reasoningEffort: row.reasoningEffort ?? null,
     }));
   const benchmarkUserId = state.benchmarkUserId.trim();
+  const rawLatency = state.classifierMaxP95LatencyMs.trim();
+  const classifierMaxP95LatencyMs = rawLatency.length > 0 ? parseInt(rawLatency, 10) || null : null;
   return {
     classifierModels,
     deciderModels,
@@ -162,6 +174,9 @@ function formStateToConfig(
     switchCostFactor: state.switchCostFactor,
     maxConcurrency: state.maxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
+    classifierRepetitions: state.classifierRepetitions,
+    deciderRepetitions: state.deciderRepetitions,
+    classifierMaxP95LatencyMs,
     updatedAt: base?.updatedAt ?? null,
     updatedBy: base?.updatedBy ?? null,
   };
@@ -372,6 +387,46 @@ function BenchmarkConfigEditor({
               className="h-8 w-40 tabular-nums"
             />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-classifier-repetitions" className="text-sm font-medium">
+              Classifier repetitions (1–5)
+            </Label>
+            <Input
+              id="benchmark-classifier-repetitions"
+              type="number"
+              min={1}
+              max={5}
+              step={1}
+              value={form.classifierRepetitions}
+              onChange={e =>
+                setForm(prev => ({
+                  ...prev,
+                  classifierRepetitions: parseInt(e.target.value, 10) || 1,
+                }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-decider-repetitions" className="text-sm font-medium">
+              Decider repetitions (1–5)
+            </Label>
+            <Input
+              id="benchmark-decider-repetitions"
+              type="number"
+              min={1}
+              max={5}
+              step={1}
+              value={form.deciderRepetitions}
+              onChange={e =>
+                setForm(prev => ({
+                  ...prev,
+                  deciderRepetitions: parseInt(e.target.value, 10) || 1,
+                }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+          </div>
         </div>
 
         {/* Benchmark user id */}
@@ -388,6 +443,28 @@ function BenchmarkConfigEditor({
           />
           <p className="text-muted-foreground text-xs">
             Kilo user the decider CLI runs bill to; decider runs fail until set.
+          </p>
+        </div>
+
+        {/* Classifier max p95 latency */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="benchmark-classifier-max-p95-latency" className="text-sm font-medium">
+            Classifier max p95 latency (ms)
+          </Label>
+          <Input
+            id="benchmark-classifier-max-p95-latency"
+            type="number"
+            min={1}
+            step={1}
+            value={form.classifierMaxP95LatencyMs}
+            onChange={e =>
+              setForm(prev => ({ ...prev, classifierMaxP95LatencyMs: e.target.value }))
+            }
+            className="h-8 w-40 tabular-nums"
+            placeholder="(no limit)"
+          />
+          <p className="text-muted-foreground text-xs">
+            Winner must classify under this p95 latency; empty disables the latency gate.
           </p>
         </div>
 
@@ -437,7 +514,7 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
   if (sortedSummaries.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={6} className="text-muted-foreground h-10 text-center text-xs">
+        <TableCell colSpan={8} className="text-muted-foreground h-10 text-center text-xs">
           No summaries
         </TableCell>
       </TableRow>
@@ -447,7 +524,7 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
   return (
     <>
       <TableRow className="bg-muted/30">
-        <TableCell colSpan={6} className="px-4 py-2">
+        <TableCell colSpan={8} className="px-4 py-2">
           <Table>
             <TableHeader>
               <TableRow>
@@ -457,8 +534,10 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
                 <TableHead className="text-right text-xs">Avg cost</TableHead>
                 <TableHead className="text-right text-xs">Avg latency</TableHead>
                 <TableHead className="text-right text-xs">p50 latency</TableHead>
+                <TableHead className="text-right text-xs">p95 latency</TableHead>
                 <TableHead className="text-right text-xs">Cases</TableHead>
                 <TableHead className="text-right text-xs">Errors</TableHead>
+                <TableHead className="text-right text-xs">Timeouts</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -480,8 +559,12 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
                   <TableCell className="text-right tabular-nums text-xs">
                     {s.p50LatencyMs !== null ? `${s.p50LatencyMs.toFixed(0)} ms` : '—'}
                   </TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">
+                    {s.p95LatencyMs !== null ? `${s.p95LatencyMs.toFixed(0)} ms` : '—'}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums text-xs">{s.cases}</TableCell>
                   <TableCell className="text-right tabular-nums text-xs">{s.errors}</TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">{s.timeouts}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -107,7 +107,7 @@ type DeciderModelRow = {
   reasoningEffort: ReasoningEffort | null;
 };
 
-function configToFormState(config: BenchmarkConfig | null): {
+export function configToFormState(config: BenchmarkConfig | null): {
   classifierModels: string;
   deciderModels: DeciderModelRow[];
   minAccuracy: number;
@@ -150,7 +150,7 @@ function configToFormState(config: BenchmarkConfig | null): {
   };
 }
 
-function formStateToConfig(
+export function formStateToConfig(
   state: ReturnType<typeof configToFormState>,
   base: BenchmarkConfig | null
 ): BenchmarkConfig {
@@ -514,7 +514,7 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
   if (sortedSummaries.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={8} className="text-muted-foreground h-10 text-center text-xs">
+        <TableCell colSpan={6} className="text-muted-foreground h-10 text-center text-xs">
           No summaries
         </TableCell>
       </TableRow>
@@ -524,7 +524,7 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
   return (
     <>
       <TableRow className="bg-muted/30">
-        <TableCell colSpan={8} className="px-4 py-2">
+        <TableCell colSpan={6} className="px-4 py-2">
           <Table>
             <TableHeader>
               <TableRow>

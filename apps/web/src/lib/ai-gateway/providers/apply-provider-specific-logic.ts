@@ -31,7 +31,6 @@ import {
   scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
-import { logChatCompletionsOneOfSchemas } from '@/lib/ai-gateway/schema-logging';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -113,8 +112,7 @@ export function applyProviderSpecificLogic(
   userByok: BYOKResult[] | null,
   originalHeaders: FraudDetectionHeaders,
   userId: string,
-  taskId: string | null,
-  organizationId: string | undefined
+  taskId: string | null
 ) {
   applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
@@ -122,9 +120,6 @@ export function applyProviderSpecificLogic(
   sanitizeBinaryToolResults(requestToMutate);
 
   if (requestToMutate.kind === 'chat_completions') {
-    if (isGlmModel(requestedModel) && !organizationId) {
-      logChatCompletionsOneOfSchemas(requestToMutate.body, requestedModel, provider.id);
-    }
     scrubOpenCodeSpecificProperties(requestToMutate.body);
 
     // Mostly a workaround for bugs in the old extension.

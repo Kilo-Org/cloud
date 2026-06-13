@@ -21,9 +21,13 @@ import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import { isOpenCodeGoAnthropicMessagesModel } from '@/lib/ai-gateway/providers/direct-byok/opencode-go';
 
+const REASONING_VARIANTS_THINKING_ONLY = {
+  thinking: { reasoning: { enabled: true, effort: 'high' } },
+} as const;
+
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
-  thinking: { reasoning: { enabled: true, effort: 'high' } },
+  ...REASONING_VARIANTS_THINKING_ONLY,
 } as const;
 
 export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
@@ -99,6 +103,9 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   }
   if (model.includes('mistral-medium-3-5')) {
     return REASONING_VARIANTS_BINARY;
+  }
+  if (model.includes('kimi-k2.7-code')) {
+    return REASONING_VARIANTS_THINKING_ONLY;
   }
   if (
     isMinimaxModel(model) ||

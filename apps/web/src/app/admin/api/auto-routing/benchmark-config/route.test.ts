@@ -5,7 +5,8 @@ import {
   updateBenchmarkConfig,
 } from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import { getUserFromAuth } from '@/lib/user/server';
-import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import type * as ModelsModule from '@/lib/ai-gateway/models';
 
 jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
@@ -15,6 +16,31 @@ jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkConfig: jest.fn(),
   updateBenchmarkConfig: jest.fn(),
 }));
+
+// Stub the catalog so tests don't depend on any specific provider file.
+// 'test-exclusive/alibaba-only' maps to the alibaba gateway (chat_completions only).
+jest.mock('@/lib/ai-gateway/models', () => {
+  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
+  const stubModel: KiloExclusiveModel = {
+    public_id: 'test-exclusive/alibaba-only',
+    display_name: 'Test Alibaba-only',
+    description: 'stub for unit tests',
+    context_length: 8192,
+    max_completion_tokens: 4096,
+    status: 'public',
+    flags: [],
+    gateway: 'alibaba',
+    internal_id: 'stub-internal',
+    pricing: null,
+    exclusive_to: [],
+    inference_provider_restriction: [],
+  };
+  return {
+    ...actual,
+    findKiloExclusiveModel: (id: string) =>
+      id === 'test-exclusive/alibaba-only' ? stubModel : actual.findKiloExclusiveModel(id),
+  };
+});
 
 import { PUT } from './route';
 
@@ -75,14 +101,14 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
         ...validConfig,
         deciderModels: [
           { id: 'openai/gpt-5-mini', reasoningEffort: null },
-          { id: morph_warp_grep_free_model.public_id, reasoningEffort: null },
+          { id: 'test-exclusive/alibaba-only', reasoningEffort: null },
         ],
       })
     );
 
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: string };
-    expect(body.error).toContain(morph_warp_grep_free_model.public_id);
+    expect(body.error).toContain('test-exclusive/alibaba-only');
     expect(body.error).toContain('chat_completions');
     expect(body.error).not.toContain('openai/gpt-5-mini (');
     expect(mockUpdateBenchmarkConfig).not.toHaveBeenCalled();

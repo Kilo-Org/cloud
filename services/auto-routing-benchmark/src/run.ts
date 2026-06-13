@@ -68,6 +68,32 @@ export function chunkArray<T>(items: readonly T[], size: number): T[][] {
 
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 
+/** Pure helper: produces the sendBatch bodies for a decider run fan-out.
+ * Extracted for unit-testability; the shape is models × reps × chunks messages.
+ */
+export function buildDeciderMessages(
+  runId: string,
+  kind: BenchmarkKind,
+  modelIds: string[],
+  repetitions: number,
+  chunks: readonly (readonly { id: string }[])[]
+): { body: BenchmarkJobMessage }[] {
+  return modelIds.flatMap(model =>
+    Array.from({ length: repetitions }, (_, rep) =>
+      chunks.map((chunkCases, chunk) => ({
+        body: {
+          runId,
+          kind,
+          model,
+          chunk,
+          rep,
+          caseIds: chunkCases.map(c => c.id),
+        } satisfies BenchmarkJobMessage,
+      }))
+    ).flat()
+  );
+}
+
 export async function startRun(
   env: Env,
   kind: BenchmarkKind,
@@ -177,20 +203,7 @@ export async function startRun(
   // Decider: one message per (model, rep, chunk) so each queue invocation stays
   // bounded. finalizeRunIfComplete expects enqueuedModels × DECIDER_CASES × repetitions rows.
   const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
-  const messages = enqueuedModelIds.flatMap(model =>
-    Array.from({ length: repetitions }, (_, rep) =>
-      chunks.map((chunkCases, chunk) => ({
-        body: {
-          runId,
-          kind,
-          model,
-          chunk,
-          rep,
-          caseIds: chunkCases.map(c => c.id),
-        } satisfies BenchmarkJobMessage,
-      }))
-    ).flat()
-  );
+  const messages = buildDeciderMessages(runId, kind, enqueuedModelIds, repetitions, chunks);
   await env.BENCH_QUEUE.sendBatch(messages);
   return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
 }

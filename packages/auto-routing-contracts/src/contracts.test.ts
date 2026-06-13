@@ -6,6 +6,7 @@ import {
   MirrorPayloadSchema,
   UpdateClassifierModelRequestSchema,
 } from './index';
+import { BenchmarkConfigSchema } from './benchmark';
 
 describe('auto routing contracts', () => {
   it('validates the cross-service request and response contracts', () => {
@@ -126,5 +127,24 @@ describe('auto routing contracts', () => {
         classifierModelBreakdown: [],
       })
     ).toMatchObject({ period: '24h' });
+  });
+});
+
+describe('BenchmarkConfigSchema defaults', () => {
+  it('applies defaults of 1/1/1000 for classifierRepetitions, deciderRepetitions, classifierMaxP95LatencyMs', () => {
+    const result = BenchmarkConfigSchema.parse({
+      classifierModels: ['model/a'],
+      deciderModels: [{ id: 'model/b' }],
+      minAccuracy: 0.8,
+      maxConcurrency: 4,
+      benchmarkUserId: null,
+      switchCostFactor: 2,
+      updatedAt: null,
+      updatedBy: null,
+      // classifierRepetitions, deciderRepetitions, classifierMaxP95LatencyMs intentionally omitted
+    });
+    expect(result.classifierRepetitions).toBe(1);
+    expect(result.deciderRepetitions).toBe(1);
+    expect(result.classifierMaxP95LatencyMs).toBe(1000);
   });
 });

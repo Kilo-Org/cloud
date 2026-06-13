@@ -19,7 +19,7 @@ CREATE TABLE `__new_case_results` (
 	PRIMARY KEY(`run_id`, `model`, `case_id`, `rep`)
 );
 --> statement-breakpoint
-INSERT INTO `__new_case_results`("run_id", "model", "case_id", "tier", "score", "latency_ms", "cost_usd", "error", "fallback_reason", "retried", "exit_code", "output_prefix", "event_count", "last_event_types", "rep", "timed_out") SELECT "run_id", "model", "case_id", "tier", "score", "latency_ms", "cost_usd", "error", "fallback_reason", "retried", "exit_code", "output_prefix", "event_count", "last_event_types", "rep", "timed_out" FROM `case_results`;--> statement-breakpoint
+INSERT INTO `__new_case_results`("run_id", "model", "case_id", "tier", "score", "latency_ms", "cost_usd", "error", "fallback_reason", "retried", "exit_code", "output_prefix", "event_count", "last_event_types", "rep", "timed_out") SELECT "run_id", "model", "case_id", "tier", "score", "latency_ms", "cost_usd", "error", "fallback_reason", "retried", "exit_code", "output_prefix", "event_count", "last_event_types", 0, 0 FROM `case_results`;--> statement-breakpoint
 DROP TABLE `case_results`;--> statement-breakpoint
 ALTER TABLE `__new_case_results` RENAME TO `case_results`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint

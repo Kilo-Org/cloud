@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { CaseResultRow } from './db';
-import { BenchmarkJobMessageSchema, chunkArray, runCasesWithConcurrency, summarize } from './run';
+import {
+  BenchmarkJobMessageSchema,
+  buildDeciderMessages,
+  chunkArray,
+  runCasesWithConcurrency,
+  summarize,
+} from './run';
 import { pickClassifierWinner } from './winner';
 
 function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
@@ -410,5 +416,40 @@ describe('decider message fan-out', () => {
       chunk: 0,
     });
     expect(withRep.rep).toBe(2);
+  });
+
+  it('buildDeciderMessages: produces models × reps × ceil(76/5) messages with correct rep', () => {
+    // 76 cases, chunk size 5 → 16 chunks
+    const cases76 = Array.from({ length: 76 }, (_, i) => ({ id: `case-${i}` }));
+    const chunks = chunkArray(cases76, 5);
+    expect(chunks).toHaveLength(16);
+
+    const models = ['model/a', 'model/b'];
+    const repetitions = 3;
+    const messages = buildDeciderMessages('run-test', 'decider', models, repetitions, chunks);
+
+    // Total: 2 models × 3 reps × 16 chunks = 96 messages
+    expect(messages).toHaveLength(models.length * repetitions * chunks.length);
+
+    // Each rep index (0..2) should appear exactly models.length × chunks.length times
+    for (let rep = 0; rep < repetitions; rep++) {
+      const forRep = messages.filter(m => m.body.rep === rep);
+      expect(forRep).toHaveLength(models.length * chunks.length);
+    }
+
+    // Every message carries the correct rep in its body
+    for (const { body } of messages) {
+      expect(typeof body.rep).toBe('number');
+      expect(body.rep).toBeGreaterThanOrEqual(0);
+      expect(body.rep).toBeLessThan(repetitions);
+    }
+
+    // caseIds on each message match the chunk
+    for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+      const forChunk = messages.filter(m => m.body.chunk === chunkIdx);
+      for (const { body } of forChunk) {
+        expect(body.caseIds).toEqual(chunks[chunkIdx].map(c => c.id));
+      }
+    }
   });
 });

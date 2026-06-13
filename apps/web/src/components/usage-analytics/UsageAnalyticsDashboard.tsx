@@ -28,6 +28,7 @@ import {
   UsageAnalyticsSidebar,
   type PersonalView,
 } from './UsageAnalyticsSidebar';
+import { UsageProfileHero } from './UsageProfileHero';
 import {
   EMPTY_FILTERS,
   defaultGranularityForPeriod,
@@ -38,6 +39,7 @@ import {
   useUsageSummary,
   useUsageTable,
   useUsageTimeseries,
+  useUsageProfile,
   type UsageFilters,
   type ViewAs,
 } from './hooks';
@@ -273,6 +275,13 @@ export function UsageAnalyticsDashboard({
     groupBy: tableGroupBy,
     limit: 500,
   });
+
+  // Profile hook - only enabled for personal context
+  const {
+    data: usageProfile,
+    isLoading: usageProfileLoading,
+    error: usageProfileError,
+  } = useUsageProfile(context === 'personal');
 
   // Resolve user ID -> email for labels whenever there is an effective org
   // scope. Key off `effectiveOrgId` (not the prop `organizationId`) so that
@@ -536,6 +545,13 @@ export function UsageAnalyticsDashboard({
 
         <div className="flex-1 overflow-y-auto">
           <div className="m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
+            {context === 'personal' && (
+              <UsageProfileHero
+                profile={usageProfile}
+                loading={usageProfileLoading}
+                error={usageProfileError}
+              />
+            )}
             <UsageWarning />
 
             {isOrgContext && organizationId && (

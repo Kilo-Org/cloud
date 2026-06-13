@@ -41,6 +41,8 @@ export type UsageBreakdown = RouterOutputs['usageAnalytics']['getBreakdown'];
 
 export type UsageTable = RouterOutputs['usageAnalytics']['getTable'];
 
+export type UsageProfile = RouterOutputs['usageAnalytics']['getProfile'];
+
 export const PERIOD_LABELS: Record<PeriodOption, string> = {
   today: 'Today',
   yesterday: 'Yesterday',

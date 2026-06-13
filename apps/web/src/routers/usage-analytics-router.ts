@@ -626,6 +626,21 @@ const BreakdownOutputSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Profile (lifetime tokens, peak, daily activity for personal hero)
+// ---------------------------------------------------------------------------
+
+const ProfileOutputSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+  imageUrl: z.string(),
+  lifetimeTokens: z.number(),
+  peakTokens: z.number(),
+  dailyActivity: z.array(z.object({ date: z.string(), tokens: z.number() })),
+});
+
+type ProfileOutput = z.infer<typeof ProfileOutputSchema>;
+
+// ---------------------------------------------------------------------------
 // Table
 // ---------------------------------------------------------------------------
 
@@ -1078,6 +1093,119 @@ export const usageAnalyticsRouter = createTRPCRouter({
           };
         }),
         effectiveGranularity: meta.effectiveGranularity,
+      };
+    }),
+
+  /**
+   * Get personal usage profile data for the hero section.
+   * Returns lifetime tokens, daily peak, and recent daily activity for heatmap.
+   */
+  getProfile: baseProcedure
+    .output(ProfileOutputSchema)
+    .query(async ({ ctx }): Promise<ProfileOutput> => {
+      const config = resolveSnowflakeConfig();
+
+      // Return zeros/empty when Snowflake config is unavailable.
+      if (!config) {
+        return {
+          name: ctx.user.google_user_name ?? '',
+          email: ctx.user.google_user_email ?? '',
+          imageUrl: ctx.user.google_user_image_url ?? '',
+          lifetimeTokens: 0,
+          peakTokens: 0,
+          dailyActivity: [],
+        };
+      }
+
+      const table = 'MICRODOLLAR_USAGE_DAILY';
+      const userId = ctx.user.id;
+
+      // Compute lifetime totals and peak.
+      const lifetimeStmt = `
+        SELECT
+          COALESCE(SUM(total_tokens), 0),
+          COALESCE(MAX(total_tokens), 0)
+        FROM ${table}
+        WHERE kilo_user_id = ?
+          AND organization_id = ''
+      `;
+      const lifetimeBindings: SnowflakeBinding[] = [{ type: 'TEXT', value: userId }];
+
+      const lifetimeRows = await timedSnowflakeQuery(
+        {
+          route: 'usageAnalytics.getProfile',
+          queryLabel: 'profile_lifetime',
+          scope: 'user',
+          period: 'all-time',
+        },
+        signal =>
+          executeSnowflakeStatement({
+            config,
+            statement: lifetimeStmt,
+            bindings: lifetimeBindings,
+            timeoutSeconds: Math.ceil(defaultTimeoutForScope('user') / 1000),
+            signal,
+          })
+      );
+
+      const lifetimeTokens = toSafeNumber(lifetimeRows[0]?.[0] ?? 0);
+      const peakTokens = toSafeNumber(lifetimeRows[0]?.[1] ?? 0);
+
+      // Get daily activity for the last 365 days (UTC calendar days).
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().slice(0, 10);
+
+      const yearAgo = new Date(today);
+      yearAgo.setUTCFullYear(yearAgo.getUTCFullYear() - 1);
+      const yearAgoStr = yearAgo.toISOString().slice(0, 10);
+
+      const activityStmt = `
+        SELECT
+          usage_date,
+          COALESCE(SUM(total_tokens), 0)
+        FROM ${table}
+        WHERE kilo_user_id = ?
+          AND organization_id = ''
+          AND usage_date >= ?
+          AND usage_date <= ?
+        GROUP BY usage_date
+        ORDER BY usage_date
+      `;
+
+      const activityRows = await timedSnowflakeQuery(
+        {
+          route: 'usageAnalytics.getProfile',
+          queryLabel: 'profile_activity',
+          scope: 'user',
+          period: `${yearAgoStr}/${todayStr}`,
+        },
+        signal =>
+          executeSnowflakeStatement({
+            config,
+            statement: activityStmt,
+            bindings: [
+              { type: 'TEXT', value: userId },
+              { type: 'TEXT', value: yearAgoStr },
+              { type: 'TEXT', value: todayStr },
+            ],
+            timeoutSeconds: Math.ceil(defaultTimeoutForScope('user') / 1000),
+            signal,
+          })
+      );
+
+      const dailyActivity = activityRows.map(row => ({
+        date: row[0] ?? '',
+        tokens: toSafeNumber(row[1]),
+      }));
+
+      return {
+        name: ctx.user.google_user_name ?? '',
+        email: ctx.user.google_user_email ?? '',
+        imageUrl: ctx.user.google_user_image_url ?? '',
+        lifetimeTokens,
+        peakTokens,
+        dailyActivity,
       };
     }),
 

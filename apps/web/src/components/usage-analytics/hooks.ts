@@ -230,3 +230,11 @@ export function useResolveOrgUsers(organizationId: string | null, userIds: strin
     )
   );
 }
+
+export function useUsageProfile(enabled: boolean = true) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.usageAnalytics.getProfile.queryOptions(),
+    enabled,
+  });
+}

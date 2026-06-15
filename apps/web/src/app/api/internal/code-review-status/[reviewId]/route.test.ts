@@ -1383,6 +1383,229 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it('allows one fresh retry for a pre-dispatch sandbox connection failure when usage is unavailable', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-sandbox-connect-failed',
+        cliSessionId: 'ses_sandbox_connect_failed',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'sandbox_connect_failed',
+            attempts: 2,
+            message: 'Sandbox connection failed after 2 attempts',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_sandbox_connect_failed',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: 'Could not connect to the sandbox',
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('does not infer the unavailable-usage exception from sandbox connection error text', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-sandbox-connect-text-only',
+        cliSessionId: 'ses_sandbox_connect_text_only',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_sandbox_connect_text_only',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'sandbox_error' })
+      );
+    });
+
+    it.each([
+      {
+        name: 'sandbox connection failure after dispatch',
+        failure: { stage: 'agent_activity', code: 'sandbox_connect_failed' },
+      },
+      {
+        name: 'different pre-dispatch failure code',
+        failure: { stage: 'pre_dispatch', code: 'workspace_setup_failed' },
+      },
+      {
+        name: 'incomplete failure data',
+        failure: { stage: 'pre_dispatch' },
+      },
+      {
+        name: 'future-shaped failure data',
+        failure: {
+          stage: 'pre_dispatch',
+          code: 'sandbox_connect_failed',
+          diagnostic: 'future field',
+        },
+      },
+    ])('keeps unavailable usage fail-closed for $name', async ({ failure }) => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-sandbox-connect-near-miss',
+        cliSessionId: 'ses_sandbox_connect_near_miss',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+          failure,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_sandbox_connect_near_miss',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'sandbox_error' })
+      );
+    });
+
+    it('ignores structured failure fields on legacy orchestrator payloads', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-legacy-sandbox-connect',
+        cliSessionId: 'ses_legacy_sandbox_connect',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          sessionId: retryFlow.sessionId,
+          cliSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'sandbox_connect_failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_legacy_sandbox_connect',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'sandbox_error' })
+      );
+    });
+
+    it('applies measured usage thresholds to pre-dispatch sandbox connection failures', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-expensive-sandbox-connect',
+        cliSessionId: 'ses_expensive_sandbox_connect',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue({
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 99_999,
+        totalTokensOut: 0,
+        totalCostMusd: 200_000,
+      });
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'sandbox_connect_failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_expensive_sandbox_connect',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'sandbox_error' })
+      );
+    });
+
     it.each([
       {
         name: 'cost and tokens are below thresholds',
@@ -1748,7 +1971,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
 
-    it('terminalizes the parent when the infra retry attempt fails', async () => {
+    it('terminalizes a retry attempt with the targeted pre-dispatch sandbox failure', async () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ status: 'running', session_id: 'agent-second-failure' })
       );
@@ -1757,6 +1980,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           id: '00000000-0000-0000-0000-000000000403',
           status: 'failed',
           session_id: 'agent-second-failure',
+          cli_session_id: 'ses_second_failure',
           retry_reason: 'infra_failure',
           retry_of_attempt_id: '00000000-0000-0000-0000-000000000402',
         })
@@ -1766,6 +1990,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           id: '00000000-0000-0000-0000-000000000403',
           status: 'failed',
           session_id: 'agent-second-failure',
+          cli_session_id: 'ses_second_failure',
           retry_reason: 'infra_failure',
           retry_of_attempt_id: '00000000-0000-0000-0000-000000000402',
         })
@@ -1775,8 +2000,13 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeRequest({
           status: 'failed',
           cloudAgentSessionId: 'agent-second-failure',
+          kiloSessionId: 'ses_second_failure',
           errorMessage: 'Unexpected backend failure after prior infra retry',
           terminalReason: 'upstream_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'sandbox_connect_failed',
+          },
         }),
         makeParams(REVIEW_ID)
       );

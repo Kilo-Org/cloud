@@ -77,6 +77,10 @@ import {
 } from '@kilocode/db/schema-types';
 import { isCloudAgentNextBillingErrorBody } from '@kilocode/worker-utils/cloud-agent-next-client';
 import {
+  CloudAgentCallbackFailureSchema,
+  type CloudAgentSafeFailure,
+} from '@kilocode/worker-utils/cloud-agent-failure';
+import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
   getCodeReviewActionRequiredCopy,
@@ -109,6 +113,7 @@ type CloudAgentNextCallbackPayload = {
   errorMessage?: string;
   terminalReason?: CodeReviewTerminalReason;
   modelNotFoundRuntimeDiagnostics?: unknown;
+  failure?: unknown;
   lastSeenBranch?: string;
   gateResult?: 'pass' | 'fail';
 };
@@ -260,6 +265,7 @@ function normalizePayload(raw: StatusUpdatePayload): {
   errorMessage?: string;
   terminalReason?: CodeReviewTerminalReason;
   gateResult?: 'pass' | 'fail';
+  failure?: CloudAgentSafeFailure;
 } {
   // Map cloud-agent-next 'interrupted' → 'cancelled'
   let status: 'running' | 'completed' | 'failed' | 'cancelled' =
@@ -276,6 +282,8 @@ function normalizePayload(raw: StatusUpdatePayload): {
   // Map cloud-agent-next 'cloudAgentSessionId' → 'sessionId' as fallback
   const sessionId =
     raw.sessionId ?? ('cloudAgentSessionId' in raw ? raw.cloudAgentSessionId : undefined);
+  const failure =
+    'cloudAgentSessionId' in raw ? CloudAgentCallbackFailureSchema.parse(raw.failure) : undefined;
 
   // Validate terminalReason against allowlist to prevent free-form text in the DB
   const validReasons: ReadonlySet<string> = new Set(CODE_REVIEW_TERMINAL_REASONS);
@@ -325,6 +333,7 @@ function normalizePayload(raw: StatusUpdatePayload): {
     errorMessage: raw.errorMessage,
     terminalReason,
     gateResult: raw.gateResult,
+    failure,
   };
 }
 
@@ -421,6 +430,10 @@ function isInfraRetryAttempt(attempt: CloudAgentCodeReviewAttempt): boolean {
   return attempt.retry_reason === 'infra_failure' || attempt.retry_of_attempt_id !== null;
 }
 
+function isPreDispatchSandboxConnectFailure(failure?: CloudAgentSafeFailure): boolean {
+  return failure?.stage === 'pre_dispatch' && failure.code === 'sandbox_connect_failed';
+}
+
 type FailedSessionUsage = NonNullable<Awaited<ReturnType<typeof getSessionUsageFromBilling>>>;
 
 function failedSessionTokenCount(usage: FailedSessionUsage): number {
@@ -439,6 +452,7 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
   failedAttemptId: string;
   failedCliSessionId?: string | null;
   reviewCreatedAt: string;
+  failure?: CloudAgentSafeFailure;
 }): Promise<boolean> {
   if (!params.failedCliSessionId) {
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
@@ -451,13 +465,17 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
 
   const usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
   if (!usage) {
+    const allowUnavailableUsage = isPreDispatchSandboxConnectFailure(params.failure);
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
       reviewId: params.reviewId,
       failedAttemptId: params.failedAttemptId,
       cliSessionId: params.failedCliSessionId,
       reason: 'usage_unavailable',
+      failureStage: params.failure?.stage,
+      failureCode: params.failure?.code,
+      allowUnavailableUsage,
     });
-    return true;
+    return !allowUnavailableUsage;
   }
 
   const failedSessionTokens = failedSessionTokenCount(usage);
@@ -964,7 +982,7 @@ export async function POST(
 
     const rawPayload: StatusUpdatePayload = await req.json();
     const attemptId = callbackAttemptId || undefined;
-    const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult } =
+    const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult, failure } =
       normalizePayload(rawPayload);
     const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;
 
@@ -1116,6 +1134,7 @@ export async function POST(
           failedAttemptId: attempt.id,
           failedCliSessionId,
           reviewCreatedAt: review.created_at,
+          failure,
         });
 
         if (!skipRetryForSessionUsage) {

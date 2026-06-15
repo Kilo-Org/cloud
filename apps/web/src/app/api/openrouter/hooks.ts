@@ -104,6 +104,7 @@ export function useModelSelectorList(organizationId: string | undefined, enabled
   const query = useQuery({
     enabled,
     queryKey: ['openrouter-models', organizationId],
+    enabled,
     queryFn: async (): Promise<OpenRouterModelsResponse> => {
       const response = await fetch(
         organizationId ? `/api/organizations/${organizationId}/models` : '/api/openrouter/models'

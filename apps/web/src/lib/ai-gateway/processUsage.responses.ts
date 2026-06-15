@@ -24,6 +24,7 @@ import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
 type ResponsesApiUsage = OpenAI.Responses.ResponseUsage & {
   cost?: number;
+  market_cost?: number;
   is_byok?: boolean | null;
   cost_details?: { upstream_inference_cost: number };
 };
@@ -55,13 +56,21 @@ export function processResponsesApiUsage(
   const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
 
   // OpenRouter path: cost fields are present directly in usage
-  if (usage?.cost != null || usage?.is_byok != null) {
-    const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
+  if (usage?.cost != null || usage?.market_cost != null || usage?.is_byok != null) {
+    const { cost_mUsd, market_cost, is_byok } = computeOpenRouterCostFields(
       usage,
       coreProps,
       'responses_sse_processing'
     );
-    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens: 0, cost_mUsd, is_byok };
+    return {
+      inputTokens,
+      outputTokens,
+      cacheHitTokens,
+      cacheWriteTokens: 0,
+      cost_mUsd,
+      market_cost,
+      is_byok,
+    };
   }
 
   // Vercel path: cost is in provider_metadata.gateway

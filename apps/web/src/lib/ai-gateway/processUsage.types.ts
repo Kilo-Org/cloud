@@ -6,6 +6,7 @@ import type { OpenAI } from 'openai';
 
 export type OpenRouterUsage = {
   cost?: number;
+  market_cost?: number;
   is_byok?: boolean | null;
   cost_details?: { upstream_inference_cost: number };
   completion_tokens: number;
@@ -92,7 +93,7 @@ export type NotYetCostedUsageStats = {
 export type JustTheCostsUsageStats = {
   cost_mUsd: number;
   cacheDiscount_mUsd?: number;
-  /** The real cost before any free/BYOK/promo zeroing. Set by processTokenData. */
+  /** The real market cost before any free/BYOK/promo zeroing. */
   market_cost?: number;
   inputTokens: number;
   outputTokens: number;

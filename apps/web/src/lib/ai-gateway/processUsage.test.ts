@@ -53,6 +53,7 @@ describe('processOpenRouterUsage', () => {
   test('should correctly process usage for a non-byok case', () => {
     const usage = {
       cost: 0.001,
+      market_cost: 0.0025,
       is_byok: false,
       cost_details: { upstream_inference_cost: 0.7 },
       completion_tokens: 100,
@@ -65,6 +66,7 @@ describe('processOpenRouterUsage', () => {
     const result = processOpenRouterUsage(usage, coreProps);
 
     expect(result.cost_mUsd).toBe(1000);
+    expect(result.market_cost).toBe(2500);
     expect(result.is_byok).toBe(false);
   });
 

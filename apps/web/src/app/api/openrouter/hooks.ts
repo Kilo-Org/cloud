@@ -102,7 +102,6 @@ export function useOpenRouterProviders() {
 
 export function useModelSelectorList(organizationId: string | undefined, enabled = true) {
   const query = useQuery({
-    enabled,
     queryKey: ['openrouter-models', organizationId],
     enabled,
     queryFn: async (): Promise<OpenRouterModelsResponse> => {

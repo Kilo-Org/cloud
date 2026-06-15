@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { OpenclawImportCard } from './OpenclawImportCard';
+import { AgentCardIcon } from './icons/AgentCardIcon';
 
 import { usePostHog } from 'posthog-js/react';
 import Link from 'next/link';
@@ -221,85 +222,165 @@ function OnePasswordSetupGuide() {
 }
 
 // ---------------------------------------------------------------------------
-// AgentCard setup guide dialog
+// AgentCard (OAuth "Connect" button — replaces the legacy paste-a-token flow)
 // ---------------------------------------------------------------------------
 
-function AgentCardSetupGuide() {
+// Capabilities the agent gains once connected, mirrored from AgentCard's MCP
+// tool set (create_card, list_cards, check_balance, …).
+const AGENTCARD_FEATURES: Array<{ included: boolean; label: string }> = [
+  { included: true, label: 'Create and manage virtual debit cards for your agent' },
+  { included: true, label: 'Check balances and review transactions' },
+  { included: true, label: 'Per-task spend limits enforced by Agentcard' },
+];
+
+/**
+ * Settings card for connecting AgentCard via OAuth. Connect/disconnect reuse
+ * the /api/integrations/agentcard/{connect,disconnect} routes; disconnect is a
+ * native same-origin form POST so the route's Origin check passes and the 303
+ * redirect lands back on settings with a success/error param.
+ *
+ * This replaces the old "paste your AgentCard API key" flow: the user clicks
+ * Connect, authenticates with their own AgentCard account (magic-link +
+ * consent), and Kilo stores a per-user OAuth token — Kilo never sees a
+ * long-lived API key.
+ */
+function AgentCardCard({
+  connected,
+  oauthStatus,
+  accountEmail,
+  organizationId,
+}: {
+  connected: boolean;
+  oauthStatus: 'active' | 'action_required' | 'disconnected';
+  accountEmail: string | null;
+  organizationId: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const disconnectFormRef = useRef<HTMLFormElement>(null);
+
+  const settingsPath = organizationId
+    ? `/organizations/${organizationId}/claw/settings`
+    : '/claw/settings';
+  const connectParams = new URLSearchParams({ returnTo: settingsPath });
+  if (organizationId) {
+    connectParams.set('organizationId', organizationId);
+  }
+  const connectUrl = `/api/integrations/agentcard/connect?${connectParams.toString()}`;
+  const disconnectAction = organizationId
+    ? `/api/integrations/agentcard/disconnect?organizationId=${encodeURIComponent(organizationId)}`
+    : '/api/integrations/agentcard/disconnect';
+
+  const needsReconnect = oauthStatus === 'action_required';
+  const isHealthyConnected = connected && !needsReconnect;
+
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Info className="h-3.5 w-3.5" />
-          Advanced Setup Required
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>AgentCard Setup</DialogTitle>
-          <DialogDescription>
-            Give your agent the ability to create and spend virtual debit cards.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 text-sm">
-          <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
-            <p className="text-amber-400 text-xs font-medium">
-              Warning: this can permit your agent to spend real money. Use caution.
-            </p>
-            <p className="text-amber-400/70 mt-1 text-xs">
-              AgentCard is currently in beta. Card issuance may be limited or waitlisted.
-            </p>
-          </div>
-
-          <div>
-            <p className="mb-2 font-medium">1. Create an AgentCard account</p>
-            <p className="text-muted-foreground text-xs">Run these commands:</p>
-            <pre className="bg-muted mt-1 rounded-md p-2 text-xs">
-              <code>npm install -g agent-cards{'\n'}agent-cards signup</code>
-            </pre>
-          </div>
-
-          <div>
-            <p className="mb-2 font-medium">2. Add a payment method</p>
-            <p className="text-muted-foreground text-xs">
-              Run <code className="bg-muted rounded px-1">agent-cards payment-method</code> to link
-              a card via Stripe. This funds any virtual cards your agent creates.
-            </p>
-          </div>
-
-          <div>
-            <p className="mb-2 font-medium">3. Copy your API key</p>
-            <p className="text-muted-foreground text-xs">
-              Open <code className="bg-muted rounded px-1">~/.agent-cards/config.json</code> and
-              copy the <strong>jwt</strong> value into the field above.
-            </p>
-          </div>
-
-          <div>
-            <p className="mb-2 font-medium">4. Upgrade your instance</p>
-            <p className="text-muted-foreground text-xs">
-              This feature requires the most recent version of OpenClaw. After saving your
-              credentials, use <strong>Upgrade</strong> (not Redeploy) to install the latest image
-              and activate AgentCard. Your agent will then have access to tools like{' '}
-              <code className="bg-muted rounded px-1">create_card</code>,{' '}
-              <code className="bg-muted rounded px-1">list_cards</code>, and{' '}
-              <code className="bg-muted rounded px-1">check_balance</code>.
-            </p>
-          </div>
-
-          <p className="text-muted-foreground border-t pt-3 text-xs">
-            Learn more at{' '}
-            <a
-              href="https://agentcard.sh"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
+    <>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="rounded-lg border">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-colors"
             >
-              agentcard.sh
-            </a>
-          </p>
+              <AgentCardIcon className="h-5 w-auto shrink-0" />
+              <div className="flex min-w-0 flex-1 flex-col items-start">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Agentcard</span>
+                  <Badge
+                    variant={isHealthyConnected ? 'default' : 'secondary'}
+                    className="px-1.5 py-0 text-[10px] leading-4"
+                  >
+                    {connected ? (needsReconnect ? 'Reconnect' : 'Connected') : 'Not connected'}
+                  </Badge>
+                </div>
+                <span className="text-muted-foreground text-xs">
+                  Virtual debit cards for agent spending · via Agentcard OAuth
+                </span>
+              </div>
+              <ChevronDown
+                className={`text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+              />
+            </button>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <Separator />
+            <div className="space-y-4 px-4 py-3">
+              <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                <p className="text-amber-400 text-xs font-medium">
+                  Warning: this can permit your agent to spend real money. Use caution.
+                </p>
+              </div>
+              {isHealthyConnected ? (
+                <>
+                  <p className="text-muted-foreground text-xs">
+                    {accountEmail ? `Connected as ${accountEmail}` : 'Connected'} · your agent can
+                    create and spend virtual cards.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isDisconnecting}
+                    onClick={() => setConfirmDisconnect(true)}
+                  >
+                    <X className="h-4 w-4" />
+                    {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {needsReconnect && (
+                    <p className="text-xs text-amber-500">
+                      Your AgentCard connection needs to be re-authorized. Reconnect to resume
+                      access.
+                    </p>
+                  )}
+                  <ul className="space-y-2">
+                    {AGENTCARD_FEATURES.map(feature => (
+                      <li key={feature.label} className="flex items-start gap-2">
+                        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                        <span className="text-muted-foreground text-xs">{feature.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button asChild size="sm">
+                    <Link href={connectUrl}>
+                      {needsReconnect ? 'Reconnect Agentcard' : 'Connect Agentcard'}
+                    </Link>
+                  </Button>
+                </>
+              )}
+            </div>
+          </CollapsibleContent>
         </div>
-      </DialogContent>
-    </Dialog>
+      </Collapsible>
+
+      {/* Native form POST so the disconnect route's same-origin Origin check
+          passes; the 303 redirect navigates back to settings. */}
+      <form ref={disconnectFormRef} method="POST" action={disconnectAction} className="hidden" />
+
+      <ConfirmActionDialog
+        open={confirmDisconnect}
+        onOpenChange={setConfirmDisconnect}
+        title="Disconnect Agentcard"
+        description="This removes your agent's access to Agentcard virtual cards. You can reconnect anytime."
+        confirmLabel="Disconnect"
+        confirmIcon={<X className="mr-1 h-4 w-4" />}
+        isPending={isDisconnecting}
+        pendingLabel="Disconnecting..."
+        onConfirm={() => {
+          const form = disconnectFormRef.current;
+          if (!form) {
+            toast.error('Could not disconnect Agentcard. Please try again.');
+            return;
+          }
+          setIsDisconnecting(true);
+          form.submit();
+        }}
+      />
+    </>
   );
 }
 
@@ -2604,28 +2685,17 @@ export function SettingsTab({
       )}
 
       {/* ── Payments ── */}
-      {toolEntries.some(e => e.id === 'agentcard') && (
-        <div>
-          <h2 className="text-foreground mb-3 text-base font-semibold">Payments</h2>
-          <div className="space-y-3">
-            {toolEntries
-              .filter(e => e.id === 'agentcard')
-              .map(entry => (
-                <SecretEntrySection
-                  key={entry.id}
-                  entry={entry}
-                  configured={configuredSecrets[entry.id] ?? false}
-                  mutations={mutations}
-                  onSecretsChanged={onSecretsChanged}
-                  isDirty={dirtySecrets.has(entry.id)}
-                  onRedeploy={onRequestUpgrade ?? onRedeploy}
-                  redeployLabel="Upgrade"
-                  actionRowExtra={<AgentCardSetupGuide />}
-                />
-              ))}
-          </div>
+      <div>
+        <h2 className="text-foreground mb-3 text-base font-semibold">Payments</h2>
+        <div className="space-y-3">
+          <AgentCardCard
+            connected={status.agentcardOAuthConnected ?? false}
+            oauthStatus={status.agentcardOAuthStatus ?? 'disconnected'}
+            accountEmail={status.agentcardOAuthAccountEmail ?? null}
+            organizationId={organizationId ?? null}
+          />
         </div>
-      )}
+      </div>
 
       {/* ── Password Managers ── */}
       {toolEntries.some(e => e.id === 'onepassword') && (

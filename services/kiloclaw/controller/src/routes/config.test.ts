@@ -6,6 +6,7 @@ import type { Supervisor } from '../supervisor';
 vi.mock('../config-writer', () => ({
   backupConfigFile: vi.fn(),
   writeBaseConfig: vi.fn(),
+  writeMcporterConfig: vi.fn(),
 }));
 
 vi.mock('../bootstrap', async importOriginal => {
@@ -28,7 +29,7 @@ vi.mock('node:fs', () => {
   };
 });
 
-import { backupConfigFile, writeBaseConfig } from '../config-writer';
+import { backupConfigFile, writeBaseConfig, writeMcporterConfig } from '../config-writer';
 import { seedExecApprovalsDefaults } from '../bootstrap';
 import { atomicWrite } from '../atomic-write';
 import fs from 'node:fs';
@@ -116,6 +117,9 @@ describe('/_kilo/config/restore routes', () => {
     expect(await resp.json()).toEqual({ ok: true, signaled: true });
 
     expect(writeBaseConfig).toHaveBeenCalledWith(process.env);
+    // Restore also regenerates the MCP server config so credential changes
+    // (e.g. connecting Agentcard) activate without a redeploy.
+    expect(writeMcporterConfig).toHaveBeenCalledWith(process.env);
     expect(supervisor.signal).toHaveBeenCalledWith('SIGUSR1');
   });
 

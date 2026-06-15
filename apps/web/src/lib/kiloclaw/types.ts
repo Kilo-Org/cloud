@@ -931,6 +931,15 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
    * cancelled" comes through email/push, not the live status field.
    */
   scheduledAction: KiloClawScheduledActionStatusBlock | null;
+  /**
+   * AgentCard OAuth connection state, sourced from Kilo's own DB (the
+   * kiloclaw_agentcard_oauth_connections table) rather than the worker.
+   * Optional so existing PlatformStatusResponse mocks need no changes;
+   * undefined is treated as "not connected".
+   */
+  agentcardOAuthConnected?: boolean;
+  agentcardOAuthStatus?: 'active' | 'action_required' | 'disconnected';
+  agentcardOAuthAccountEmail?: string | null;
 };
 
 export type KiloClawScheduledActionStatusBlock = {

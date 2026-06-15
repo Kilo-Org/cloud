@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { atomicWrite } from '../atomic-write';
 import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
-import { backupConfigFile, writeBaseConfig } from '../config-writer';
+import { backupConfigFile, writeBaseConfig, writeMcporterConfig } from '../config-writer';
 import { GOG_SECTION_CONFIG, seedExecApprovalsDefaults, updateToolsMdSection } from '../bootstrap';
 import { getBearerToken } from './gateway';
 import { registerAgentConfigRoutes } from './config-agents';
@@ -111,6 +111,12 @@ export function registerConfigRoutes(
 
     try {
       writeBaseConfig(process.env);
+      // Also regenerate the mcporter (MCP servers) config from the current
+      // env so credential changes that toggle managed MCP servers — e.g.
+      // connecting/disconnecting Agentcard (AGENTCARD_API_KEY) — take effect
+      // on restore instead of only at bootstrap. Without this the
+      // `agentcard` MCP server wouldn't appear until the next redeploy.
+      writeMcporterConfig(process.env);
       const gatewayState = supervisor.getState();
       const signaled = gatewayState === 'running' && supervisor.signal('SIGUSR1');
       if (!signaled) {

@@ -5921,6 +5921,68 @@ export type KiloClawGoogleOAuthConnection = typeof kiloclaw_google_oauth_connect
 export type NewKiloClawGoogleOAuthConnection =
   typeof kiloclaw_google_oauth_connections.$inferInsert;
 
+// ---------------------------------------------------------------------------
+// AgentCard OAuth connection (per-instance). Stores the OAuth 2.1 tokens
+// obtained from AgentCard's authorization server (mcp.agentcard.sh) so the
+// "Connect AgentCard" button can replace the legacy paste-a-token flow.
+//
+// Unlike the Google connection (whose worker uses a token broker), the
+// OpenClaw gateway talks to the AgentCard MCP server directly with a static
+// Bearer header. So the *access* token is pushed to the worker as the
+// AGENTCARD_API_KEY secret, and both tokens are stored here symmetric-
+// encrypted (web-readable) so the web app can refresh the short-lived
+// (~1h) access token and re-push it.
+// ---------------------------------------------------------------------------
+export type KiloClawAgentCardOAuthStatus = 'active' | 'action_required' | 'disconnected';
+
+export const kiloclaw_agentcard_oauth_connections = pgTable(
+  'kiloclaw_agentcard_oauth_connections',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    instance_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_instances.id),
+    provider: text().notNull().default('agentcard'),
+    // The OAuth user's email, when known (AgentCard issues opaque tokens and
+    // has no userinfo endpoint, so this may be null).
+    account_email: text(),
+    // The dynamically-registered (or pre-configured) OAuth client_id used.
+    oauth_client_id: text().notNull(),
+    access_token_encrypted: text().notNull(),
+    refresh_token_encrypted: text(),
+    token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    scopes: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    status: text().$type<KiloClawAgentCardOAuthStatus>().notNull().default('active'),
+    last_error: text(),
+    last_error_at: timestamp({ withTimezone: true, mode: 'string' }),
+    connected_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_agentcard_oauth_connections_instance').on(table.instance_id),
+    index('IDX_kiloclaw_agentcard_oauth_connections_status').on(table.status),
+    check(
+      'kiloclaw_agentcard_oauth_connections_status_check',
+      sql`${table.status} IN ('active', 'action_required', 'disconnected')`
+    ),
+  ]
+);
+
+export type KiloClawAgentCardOAuthConnection =
+  typeof kiloclaw_agentcard_oauth_connections.$inferSelect;
+export type NewKiloClawAgentCardOAuthConnection =
+  typeof kiloclaw_agentcard_oauth_connections.$inferInsert;
+
 export const kiloclaw_inbound_email_reserved_aliases = pgTable(
   'kiloclaw_inbound_email_reserved_aliases',
   {

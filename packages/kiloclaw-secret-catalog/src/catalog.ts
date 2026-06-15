@@ -139,27 +139,10 @@ const SECRET_CATALOG_RAW = [
     helpText: 'Manage your token from the GitHub developer settings.',
     helpUrl: 'https://github.com/settings/tokens?type=beta',
   },
-  {
-    id: 'agentcard',
-    label: 'AgentCard',
-    category: 'tool',
-    icon: 'credit-card',
-    order: 2,
-    fields: [
-      {
-        key: 'agentcardApiKey',
-        label: 'API Key (JWT)',
-        placeholder: 'eyJ...',
-        placeholderConfigured: 'Enter new JWT to replace',
-        envVar: 'AGENTCARD_API_KEY',
-        validationPattern: '^eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$',
-        validationMessage: 'Enter the JWT from ~/.agent-cards/config.json (starts with eyJ).',
-        maxLength: 2000,
-      },
-    ],
-    helpText: 'Virtual debit cards for autonomous agent spending. See setup guide for details.',
-    helpUrl: 'https://agentcard.sh',
-  },
+  // AgentCard is no longer a paste-a-token secret. It connects via OAuth — see
+  // AgentCardCard in SettingsTab.tsx and /api/integrations/agentcard/*. The
+  // worker still reads the AGENTCARD_API_KEY secret (now an OAuth access token
+  // pushed by the callback route), so config-writer is unchanged.
   {
     id: 'onepassword',
     label: '1Password',

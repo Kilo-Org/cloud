@@ -211,14 +211,15 @@ describe('Secret Catalog', () => {
     });
 
     it('returns all tool entries sorted by order', () => {
+      // AgentCard moved from a paste-a-token secret to an OAuth connection
+      // (see AgentCardCard in SettingsTab), so it's no longer a catalog entry.
       const tools = getEntriesByCategory('tool');
-      expect(tools.length).toBe(6);
+      expect(tools.length).toBe(5);
       expect(tools[0].id).toBe('github');
-      expect(tools[1].id).toBe('agentcard');
-      expect(tools[2].id).toBe('onepassword');
-      expect(tools[3].id).toBe('brave-search');
-      expect(tools[4].id).toBe('linear');
-      expect(tools[5].id).toBe('composio');
+      expect(tools[1].id).toBe('onepassword');
+      expect(tools[2].id).toBe('brave-search');
+      expect(tools[3].id).toBe('linear');
+      expect(tools[4].id).toBe('composio');
     });
 
     it('returns empty array for categories with no entries', () => {
@@ -243,12 +244,11 @@ describe('Secret Catalog', () => {
       expect(keys).toContain('githubUsername');
       expect(keys).toContain('githubEmail');
       expect(keys).toContain('linearApiKey');
-      expect(keys).toContain('agentcardApiKey');
       expect(keys).toContain('onepasswordServiceAccountToken');
       expect(keys).toContain('braveSearchApiKey');
       expect(keys).toContain('composioUserApiKey');
       expect(keys).toContain('composioOrg');
-      expect(keys.size).toBe(9);
+      expect(keys.size).toBe(8);
     });
 
     it('returns empty set for categories with no entries', () => {

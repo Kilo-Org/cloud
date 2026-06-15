@@ -19,6 +19,7 @@ export type CreateSecurityAgentCommandInput = {
   owner: SecurityAgentCommandOwner;
   findingId?: string;
   repoFullName?: string;
+  resultMetadata?: Record<string, unknown>;
 };
 
 export type TransitionSecurityAgentCommandInput = {
@@ -27,7 +28,29 @@ export type TransitionSecurityAgentCommandInput = {
   status: SecurityAgentCommandStatus;
   resultCode?: string | null;
   lastErrorRedacted?: string | null;
+  resultMetadata?: Record<string, unknown> | null;
 };
+
+export type SecurityAgentCommandTransitionOutcome =
+  | { transitioned: true; command: SecurityAgentCommand }
+  | { transitioned: false; command: SecurityAgentCommand | null };
+
+export function isTerminalSecurityAgentCommandTransitionOutcome(
+  outcome: SecurityAgentCommandTransitionOutcome
+): outcome is { transitioned: false; command: SecurityAgentCommand } {
+  return (
+    !outcome.transitioned && Boolean(outcome.command && isTerminalStatus(outcome.command.status))
+  );
+}
+
+export function requireSecurityAgentCommandTransitionOrTerminal(
+  outcome: SecurityAgentCommandTransitionOutcome,
+  transition: 'running' | 'terminal'
+): 'transitioned' | 'terminal' {
+  if (outcome.transitioned) return 'transitioned';
+  if (isTerminalSecurityAgentCommandTransitionOutcome(outcome)) return 'terminal';
+  throw new Error(`Security Agent command ${transition} transition rejected`);
+}
 
 function ownerValues(owner: SecurityAgentCommandOwner) {
   return {
@@ -59,6 +82,7 @@ export async function createSecurityAgentCommand(
       ...ownerValues(input.owner),
       finding_id: input.findingId,
       repo_full_name: input.repoFullName,
+      result_metadata: input.resultMetadata,
       status: 'accepted',
     })
     .returning();
@@ -78,6 +102,7 @@ export async function transitionSecurityAgentCommand(
     .set({
       status: input.status,
       result_code: input.resultCode,
+      result_metadata: input.resultMetadata,
       last_error_redacted: input.lastErrorRedacted,
       started_at:
         input.status === 'running'
@@ -97,6 +122,22 @@ export async function transitionSecurityAgentCommand(
   return command ?? null;
 }
 
+export async function transitionSecurityAgentCommandWithCurrentState(
+  db: SecurityAgentCommandDb,
+  input: TransitionSecurityAgentCommandInput
+): Promise<SecurityAgentCommandTransitionOutcome> {
+  const transitioned = await transitionSecurityAgentCommand(db, input);
+  if (transitioned) return { transitioned: true, command: transitioned };
+
+  const [command] = await db
+    .select()
+    .from(security_agent_commands)
+    .where(eq(security_agent_commands.id, input.commandId))
+    .limit(1);
+
+  return { transitioned: false, command: command ?? null };
+}
+
 export async function markSecurityAgentCommandQueueAdmissionFailed(
   db: SecurityAgentCommandDb,
   commandId: string,
@@ -108,6 +149,19 @@ export async function markSecurityAgentCommandQueueAdmissionFailed(
     status: 'failed',
     resultCode: 'QUEUE_ADMISSION_FAILED',
     lastErrorRedacted,
+  });
+}
+
+export async function markSecurityAgentCommandRetriesExhausted(
+  db: SecurityAgentCommandDb,
+  commandId: string
+): Promise<SecurityAgentCommandTransitionOutcome> {
+  return transitionSecurityAgentCommandWithCurrentState(db, {
+    commandId,
+    fromStatuses: ['accepted', 'running'],
+    status: 'failed',
+    resultCode: 'QUEUE_RETRIES_EXHAUSTED',
+    lastErrorRedacted: 'Queue command failed after maximum delivery attempts',
   });
 }
 

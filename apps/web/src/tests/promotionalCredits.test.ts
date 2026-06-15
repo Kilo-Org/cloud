@@ -60,6 +60,47 @@ describe('grantCreditForCategory', () => {
     expect(result.message).toContain('Successfully added');
   });
 
+  it('stores an explicitly provided creator and leaves omitted creators null', async () => {
+    const recipient = await insertTestUser();
+    const creator = await insertTestUser({ is_admin: true });
+
+    const attributedResult = await grantCreditForCategory(recipient, {
+      credit_category: 'custom',
+      amount_usd: 10,
+      counts_as_selfservice: false,
+      created_by_kilo_user_id: creator.id,
+    });
+    const attributedGrant = assertNoError(attributedResult);
+
+    const unattributedResult = await grantCreditForCategory(recipient, {
+      credit_category: 'custom',
+      amount_usd: 5,
+      counts_as_selfservice: false,
+    });
+    const unattributedGrant = assertNoError(unattributedResult);
+
+    const transactions = await db
+      .select({
+        id: credit_transactions.id,
+        created_by_kilo_user_id: credit_transactions.created_by_kilo_user_id,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, recipient.id));
+
+    expect(transactions).toEqual(
+      expect.arrayContaining([
+        {
+          id: attributedGrant.credit_transaction_id,
+          created_by_kilo_user_id: creator.id,
+        },
+        {
+          id: unattributedGrant.credit_transaction_id,
+          created_by_kilo_user_id: null,
+        },
+      ])
+    );
+  });
+
   it('should grant valid self-serviceable promo codes', async () => {
     const freshUser: User = await insertTestUser();
 
@@ -84,7 +125,13 @@ describe('grantCreditForCategory', () => {
       validPromoConfig
     );
 
-    expect(result.success).toBe(true);
+    const grant = assertNoError(result);
+
+    const [transaction] = await db
+      .select({ created_by_kilo_user_id: credit_transactions.created_by_kilo_user_id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.id, grant.credit_transaction_id));
+    expect(transaction.created_by_kilo_user_id).toBeNull();
   });
 
   it('should reject expired self-serviceable promo codes', async () => {

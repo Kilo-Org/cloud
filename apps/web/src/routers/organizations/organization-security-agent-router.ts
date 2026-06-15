@@ -60,6 +60,15 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
   startAnalysis: organizationMemberMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.startAnalysis.inputSchema))
     .mutation(handlers.startAnalysis.handler),
+  startRemediation: organizationMemberMutationProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.startRemediation.inputSchema))
+    .mutation(handlers.startRemediation.handler),
+  retryRemediation: organizationMemberMutationProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.retryRemediation.inputSchema))
+    .mutation(handlers.retryRemediation.handler),
+  cancelRemediation: organizationMemberMutationProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.cancelRemediation.inputSchema))
+    .mutation(handlers.cancelRemediation.handler),
   getAnalysis: organizationMemberProcedure
     .input(OrganizationIdInputSchema.merge(handlers.getAnalysis.inputSchema))
     .query(handlers.getAnalysis.handler),

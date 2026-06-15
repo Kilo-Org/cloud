@@ -38,7 +38,7 @@ function StatCard({
   isLoading,
 }: StatCardProps) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-gray-800 bg-gray-900/50 p-4 transition-all hover:border-gray-700 hover:bg-gray-900/70">
+    <div className="bg-card border-border hover:bg-muted relative overflow-hidden rounded-xl border p-4 transition-colors">
       <div className="flex items-center gap-3">
         <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', iconBgColor)}>
           <div className={iconColor}>{icon}</div>
@@ -48,7 +48,9 @@ function StatCard({
           {isLoading ? (
             <Skeleton className="mt-1 h-7 w-12" />
           ) : (
-            <span className={cn('text-2xl font-bold', valueColor)}>{value}</span>
+            <span className={cn('font-mono text-2xl font-bold tabular-nums', valueColor)}>
+              {value}
+            </span>
           )}
         </div>
       </div>
@@ -120,12 +122,12 @@ export function SecurityStatsSummary({ stats, isLoading }: SecurityStatsSummaryP
           isLoading={isLoading}
         />
         <StatCard
-          label="Ignored"
+          label="Dismissed"
           value={stats.ignored}
           icon={<XCircle className="h-5 w-5" />}
-          iconBgColor="bg-gray-500/20"
-          iconColor="text-gray-400"
-          valueColor="text-gray-400"
+          iconBgColor="bg-zinc-500/20"
+          iconColor="text-zinc-400"
+          valueColor="text-zinc-400"
           isLoading={isLoading}
         />
       </div>

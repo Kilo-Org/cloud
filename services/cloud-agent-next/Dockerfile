@@ -1,4 +1,4 @@
-FROM docker.io/cloudflare/sandbox:0.10.3
+FROM docker.io/cloudflare/sandbox:0.11.0
 
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
@@ -72,5 +72,5 @@ RUN cd /tmp/wrapper-build/wrapper && \
     rm -rf /tmp/wrapper-build
 
 # DO NOT override USER, WORKDIR, or ENTRYPOINT from the base image
-# The Cloudflare sandbox base image has its own startup.sh script that must run
+# The Cloudflare sandbox base image entrypoint must run its control server
 # Installing packages globally makes them accessible regardless of the user

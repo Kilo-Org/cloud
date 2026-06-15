@@ -1,3 +1,4 @@
+import { ExecutionError } from '../execution/errors.js';
 import { ExecutionOrchestrator } from '../execution/orchestrator.js';
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import type {
@@ -37,7 +38,8 @@ import {
   type WrapperLease,
 } from './wrapper-runtime-state.js';
 
-export const WRAPPER_NO_OUTPUT_TIMEOUT_MS = 5 * 60 * 1000;
+// Allow the five-minute provider timeout to finish event delivery and stable-idle handling before our watchdog fires.
+export const WRAPPER_NO_OUTPUT_TIMEOUT_MS = 330_000;
 export const WRAPPER_PING_INTERVAL_MS = 60_000;
 export const WRAPPER_STARTUP_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -219,6 +221,11 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         });
         await putWrapperLease(storage, cleanupLease);
         await dependencies.requestAlarmAtOrBefore?.(now);
+        if (observation.status === 'inspection-failed') {
+          throw ExecutionError.sandboxConnectFailed(
+            'Sandbox connection failed during wrapper discovery'
+          );
+        }
         throw cleanupBlockedError(cleanupLease);
       }
     }
@@ -243,6 +250,11 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       });
       await putWrapperLease(storage, cleanupLease);
       await dependencies.requestAlarmAtOrBefore?.(now);
+      if (observation.status === 'inspection-failed') {
+        throw ExecutionError.sandboxConnectFailed(
+          'Sandbox connection failed during wrapper discovery'
+        );
+      }
       throw cleanupBlockedError(cleanupLease);
     }
 

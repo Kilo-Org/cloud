@@ -13,6 +13,7 @@
   "routes": [
     {
       "pattern": "notifications.kiloapps.io",
+      "zone_name": "kiloapps.io",
       "custom_domain": true,
     },
   ],

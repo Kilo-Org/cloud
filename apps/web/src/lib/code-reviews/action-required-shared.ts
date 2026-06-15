@@ -3,6 +3,7 @@ export const CODE_REVIEW_ACTION_REQUIRED_RUNTIME_STATE_KEY = 'code_review_action
 export const CODE_REVIEW_ACTION_REQUIRED_REASONS = [
   'github_installation_required',
   'github_ip_allow_list',
+  'gitlab_project_access_required',
   'byok_invalid_key',
   'selected_model_unavailable',
 ] as const;
@@ -51,15 +52,26 @@ const COPY_BY_REASON = {
       'Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact hi@kilocode.ai, then enable Code Reviewer again.',
     gitlabDescription: 'GitHub IP allow list blocks Code Reviewer',
   },
+  gitlab_project_access_required: {
+    title: 'Code Reviewer needs attention',
+    description:
+      'Code Reviewer was disabled because Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens, then enable Code Reviewer again.',
+    recoveryLabel: 'Update GitLab integration',
+    emailReason: 'Kilo cannot create a GitLab Project Access Token for this project.',
+    checkTitle: 'GitLab Project Access Token required',
+    checkSummary:
+      'Code Reviewer was disabled because Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens, then enable Code Reviewer again.',
+    gitlabDescription: 'GitLab Project Access Token required for Code Reviewer',
+  },
   byok_invalid_key: {
     title: 'Code Reviewer needs attention',
     description:
-      'Code Reviewer was disabled because the selected BYOK API key is invalid or has been revoked. Update the key or choose another model, then enable Code Reviewer again.',
+      'Code Reviewer was disabled because the selected BYOK API key is invalid, revoked, or lacks permission for this resource. Update the key or choose another model, then enable Code Reviewer again.',
     recoveryLabel: 'Update BYOK settings',
-    emailReason: 'The selected BYOK API key is invalid or has been revoked.',
+    emailReason: 'The selected BYOK API key is invalid, revoked, or lacks permission.',
     checkTitle: 'BYOK API key needs attention',
     checkSummary:
-      'Code Reviewer was disabled because the selected BYOK API key is invalid or has been revoked. Update the key or choose another model, then enable Code Reviewer again.',
+      'Code Reviewer was disabled because the selected BYOK API key is invalid, revoked, or lacks permission for this resource. Update the key or choose another model, then enable Code Reviewer again.',
     gitlabDescription: 'BYOK API key needs attention for Code Reviewer',
   },
   selected_model_unavailable: {
@@ -101,6 +113,12 @@ export function getCodeReviewActionRequiredRecoveryHref(
 
   if (reason === 'github_ip_allow_list') {
     return 'mailto:hi@kilocode.ai?subject=GitHub%20IP%20allow%20list%20for%20Code%20Reviewer';
+  }
+
+  if (reason === 'gitlab_project_access_required') {
+    return organizationId
+      ? `/organizations/${organizationId}/integrations/gitlab`
+      : '/integrations/gitlab';
   }
 
   if (reason === 'selected_model_unavailable') {

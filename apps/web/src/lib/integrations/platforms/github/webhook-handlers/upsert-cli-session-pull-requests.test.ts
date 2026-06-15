@@ -425,6 +425,84 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     expect(rows[0].pr_state).toBe('draft');
   });
 
+  it('starts a new open state when a branch is reused after a merged pull request', async () => {
+    const branch = 'feature/reused-after-merge';
+    await seedSession({ branch, owner: testOwner });
+
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 208,
+        state: 'closed',
+        merged: true,
+        headRef: branch,
+        headSha: 'sha-208',
+        title: 'Merged old PR',
+      }),
+      testOwner
+    );
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 209,
+        state: 'open',
+        headRef: branch,
+        headSha: 'sha-209',
+        title: 'Open new PR',
+      }),
+      testOwner
+    );
+
+    const rows = await readUserRow({ userId: testUserId, branch });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      pr_number: 209,
+      pr_url: `https://github.com/${REPO}/pull/209`,
+      pr_title: 'Open new PR',
+      pr_head_sha: 'sha-209',
+      pr_state: 'open',
+    });
+  });
+
+  it('starts a new open state when a branch is reused after a closed pull request', async () => {
+    const branch = 'feature/reused-after-close';
+    await seedSession({ branch, owner: testOwner });
+
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 210,
+        state: 'closed',
+        merged: false,
+        headRef: branch,
+        headSha: 'sha-210',
+        title: 'Closed old PR',
+      }),
+      testOwner
+    );
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 211,
+        state: 'open',
+        headRef: branch,
+        headSha: 'sha-211',
+        title: 'Open replacement PR',
+      }),
+      testOwner
+    );
+
+    const rows = await readUserRow({ userId: testUserId, branch });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      pr_number: 211,
+      pr_url: `https://github.com/${REPO}/pull/211`,
+      pr_title: 'Open replacement PR',
+      pr_head_sha: 'sha-211',
+      pr_state: 'open',
+    });
+  });
+
   it('does not demote pr_state=merged back to open on an out-of-order redelivery', async () => {
     const branch = 'feature/monotonic-merged';
     await seedSession({ branch, owner: testOwner });

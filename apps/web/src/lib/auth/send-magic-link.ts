@@ -1,5 +1,3 @@
-import { captureException } from '@sentry/nextjs';
-
 export type SendMagicLinkResult = { success: true } | { success: false; error: string };
 
 /**
@@ -33,7 +31,6 @@ export async function sendMagicLink(
     };
   } catch (error) {
     console.error('Magic link request error:', error);
-    captureException(error, { tags: { source: 'magic_link_request' } });
     return {
       success: false,
       error: 'Failed to send magic link. Please try again.',

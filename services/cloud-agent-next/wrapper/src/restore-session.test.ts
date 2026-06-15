@@ -257,13 +257,14 @@ describe('restoreSession', () => {
     }
   });
 
-  it('returns download error when fetch throws', async () => {
-    globalThis.fetch = asFetch(() => Promise.reject(new Error('network failure')));
+  it('returns a fixed download error when fetch throws', async () => {
+    globalThis.fetch = asFetch(() => Promise.reject(new Error('network token secret')));
     const result = await restoreSession(SESSION_ID, workspace);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error).toContain('network failure');
+      expect(result.error).toBe('snapshot download failed');
+      expect(result.error).not.toContain('network token secret');
       expect(result.code).toBeNull();
       expect(result.step).toBe('download');
     }
@@ -346,7 +347,9 @@ describe('restoreSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.step).toBe('import');
+      expect(result.subtype).toBe('kilo_import_failed');
       expect(result.error).toContain('kilo import failed');
+      expect(result.detail).toContain('exit code 1');
     }
   });
 
@@ -359,8 +362,33 @@ describe('restoreSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.step).toBe('import');
+      expect(result.subtype).toBe('kilo_import_timeout');
       expect(result.error).toContain('kilo import timed out');
+      expect(result.detail).toContain('timeout');
     }
+    expect(fs.existsSync(TMP_PATH)).toBe(false);
+  });
+
+  it('terminates kilo import when the workspace deadline is aborted', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeSlowMockKilo(binDir);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 50);
+    const startedAt = Date.now();
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      importTimeoutMs: 5_000,
+      importTerminationGraceMs: 50,
+      signal: controller.signal,
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.step).toBe('import');
+      expect(result.error).toContain('kilo import failed');
+    }
+    expect(elapsedMs).toBeLessThan(800);
     expect(fs.existsSync(TMP_PATH)).toBe(false);
   });
 
@@ -752,6 +780,23 @@ describe('extractDiffs', () => {
 
     const diffs = await extractDiffs(filePath);
     expect(diffs).toEqual([]);
+  });
+
+  it('does not start diff extraction after the workspace deadline expires', async () => {
+    const filePath = path.join(tmpDir, 'snapshot.json');
+    fs.writeFileSync(filePath, JSON.stringify({ messages: [] }));
+    const controller = new AbortController();
+    const deadlineError = new Error('workspace deadline reached');
+    controller.abort(deadlineError);
+    let caughtError: unknown;
+
+    try {
+      await extractDiffs(filePath, controller.signal);
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBe(deadlineError);
   });
 
   it('returns null on invalid JSON', async () => {

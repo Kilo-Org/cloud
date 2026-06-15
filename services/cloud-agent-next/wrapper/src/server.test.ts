@@ -5,6 +5,7 @@ import {
   bindSessionContext,
   createFetchHandler,
   createServer,
+  createSessionReadyHandler,
   resolvePtyClientClose,
   type WrapperServer,
 } from './server';
@@ -102,6 +103,64 @@ function createTestFetch(overrides?: {
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map(server => server.stop()));
+});
+
+describe('session readiness errors', () => {
+  it('forwards validated workspace subtype and safe diagnostic fields', async () => {
+    const { fetchHandler } = createTestFetch();
+    const handler = createSessionReadyHandler({
+      state: new WrapperState(),
+      kiloClient: {} as WrapperKiloClient,
+      openConnection: async () => {},
+      closeConnection: async () => {},
+      setAborted: () => {},
+      resetLifecycle: () => {},
+      readySession: async () => ({
+        status: 'error',
+        error: {
+          code: 'WORKSPACE_SETUP_FAILED',
+          subtype: 'git_clone_timeout',
+          message: 'Repository clone timed out',
+          detail: 'termination timeout, elapsed 120000ms, output truncated',
+          retryable: true,
+        },
+      }),
+    });
+    const request = new Request('http://wrapper.test/session/ready', {
+      method: 'POST',
+      body: JSON.stringify({
+        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+        userId: 'user_test',
+        sandboxId: 'sandbox_test',
+        kiloSessionId: 'kilo_test',
+        workspace: {
+          workspacePath: '/workspace/repo',
+          sessionHome: '/home/session',
+          branchName: 'main',
+        },
+        materialized: { env: {} },
+        session: {
+          ingestUrl: 'wss://example.test/ingest',
+          workerAuthToken: 'secret',
+          wrapperRunId: 'wr_test',
+          wrapperGeneration: 1,
+          wrapperConnectionId: 'conn_test',
+        },
+      }),
+    });
+
+    const response = await handler(request);
+    const body: unknown = await response.json();
+
+    expect(body).toMatchObject({
+      error: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_clone_timeout',
+      message: 'Repository clone timed out',
+      detail: 'termination timeout, elapsed 120000ms, output truncated',
+      retryable: true,
+    });
+    expect(fetchHandler).toBeDefined();
+  });
 });
 
 describe('wrapper health', () => {

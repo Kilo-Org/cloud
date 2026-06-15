@@ -24,6 +24,7 @@ beforeEach(() => {
 const CALLBACK_SECRET = 'callback-token-secret';
 const FINDING_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const OTHER_FINDING_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const REMEDIATION_ATTEMPT_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const ATTEMPT_TOKEN = 'attempt-token-123';
 
 function callbackRequest(headers: Record<string, string> = {}): Request {
@@ -51,6 +52,17 @@ async function callbackTokenFor(
     secret: CALLBACK_SECRET,
     scope: 'security-analysis-callback',
     resourceParts: [findingId, attemptToken],
+  });
+}
+
+async function remediationCallbackTokenFor(
+  attemptId = REMEDIATION_ATTEMPT_ID,
+  attemptToken = ATTEMPT_TOKEN
+): Promise<string> {
+  return deriveCallbackToken({
+    secret: CALLBACK_SECRET,
+    scope: 'security-remediation-callback',
+    resourceParts: [attemptId, attemptToken],
   });
 }
 
@@ -237,6 +249,84 @@ describe('security analysis callback ingress', () => {
       findingId: FINDING_ID,
       actorUserId: 'user-123',
       retrySandboxOnly: true,
+    });
+  });
+
+  it('accepts apply auto-remediation commands by enqueuing command orchestration', async () => {
+    const queued: MessageSendRequest<unknown>[][] = [];
+    const commandId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    const response = await worker.fetch(
+      new Request('https://security-auto-analysis/internal/apply-auto-remediation', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'worker-secret',
+        },
+        body: JSON.stringify({
+          schemaVersion: 1,
+          commandId,
+          owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+          actorUserId: 'user-123',
+        }),
+      }),
+      {
+        INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+        REMEDIATION_COMMAND_QUEUE: {
+          sendBatch: async batch => {
+            queued.push(batch);
+          },
+        },
+      } as CloudflareEnv
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      accepted: true,
+      commandId,
+    });
+    expect(queued[0]?.[0]?.body).toMatchObject({
+      commandId,
+      actorUserId: 'user-123',
+    });
+  });
+
+  it('accepts authenticated remediation callbacks by enqueuing durable finalization', async () => {
+    const queued: MessageSendRequest<unknown>[][] = [];
+    const response = await worker.fetch(
+      new Request(
+        `https://security-auto-analysis/internal/security-remediation-callback/${REMEDIATION_ATTEMPT_ID}?attempt=${ATTEMPT_TOKEN}`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'X-Callback-Token': await remediationCallbackTokenFor(),
+          },
+          body: JSON.stringify({
+            sessionId: 'session-123',
+            cloudAgentSessionId: 'agent-123',
+            executionId: 'exec-123',
+            status: 'completed',
+            lastAssistantMessageText:
+              '{"status":"pr_opened","prUrl":"https://github.com/kilo/repo/pull/1","summary":"Opened draft PR","validation":[]}',
+          }),
+        }
+      ),
+      {
+        CALLBACK_TOKEN_SECRET: { get: async () => CALLBACK_SECRET },
+        REMEDIATION_CALLBACK_QUEUE: {
+          sendBatch: async batch => {
+            queued.push(batch);
+          },
+        },
+      } as CloudflareEnv
+    );
+
+    expect(response.status).toBe(202);
+    expect(queued[0]?.[0]?.body).toMatchObject({
+      attemptId: REMEDIATION_ATTEMPT_ID,
+      attemptToken: ATTEMPT_TOKEN,
+      payload: { status: 'completed' },
     });
   });
 });

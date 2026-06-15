@@ -711,6 +711,22 @@ export async function fetchGitHubRepositoryDefaultBranch(params: {
   return data.default_branch;
 }
 
+export async function fetchGitHubRepositorySize(params: {
+  token: string;
+  owner: string;
+  repo: string;
+}): Promise<string | null> {
+  const { token, owner, repo } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data } = await octokit.repos.get({ owner, repo });
+
+  if (typeof data.size !== 'number') {
+    return null;
+  }
+
+  return `${Math.round(data.size / 1024)} MiB`;
+}
+
 export async function createGitHubBranch(params: {
   token: string;
   owner: string;

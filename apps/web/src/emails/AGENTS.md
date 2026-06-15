@@ -96,3 +96,6 @@ Every template must include this branding footer below the content table:
 | `accountDeletionRequest.html` | `email`, `year` | — |
 | `creditsTopUp.html` | `heading`, `intro`, `amount_usd`, `credits_usd`, `purchase_date`, `credits_url`, `receipt_section`, `year`. Org variants render org-specific copy into `intro` before template rendering; when provided, the organization name is interpolated there rather than passed as a separate template variable. | — |
 | `kiloClawSubscriptionStarted.html` | `plan_name`, `price_usd`, `billing_period`, `next_billing_date`, `manage_url`, `year` | — |
+| `securityFindingNew.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `action_url`, `manage_notifications_url`, `year` | — |
+| `securityFindingSlaWarning.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `sla_deadline`, `action_url`, `manage_notifications_url`, `year` | — |
+| `securityFindingSlaBreach.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `sla_deadline`, `action_url`, `manage_notifications_url`, `year` | — |

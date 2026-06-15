@@ -13,6 +13,17 @@ import {
   SecurityAnalysisCallbackPayloadSchema,
 } from './callbacks.js';
 import { consumeManualAnalysisBatch, ManualAnalysisStartRequestSchema } from './manual-analysis.js';
+import {
+  ApplyAutoRemediationCommandSchema,
+  CancelRemediationRequestSchema,
+  consumeApplyAutoRemediationBatch,
+  consumeRemediationAttemptBatch,
+  consumeRemediationCallbackBatch,
+  ManualRemediationStartRequestSchema,
+  SecurityRemediationCallbackPayloadSchema,
+  cancelRemediation,
+  startManualRemediation,
+} from './remediation.js';
 
 async function sendBetterStackHeartbeat(
   heartbeatUrl: string | undefined,
@@ -113,6 +124,168 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     return Response.json({ success: true, accepted: true, commandId: command.id }, { status: 202 });
   }
 
+  if (request.method === 'POST' && url.pathname === '/internal/remediation/start') {
+    const internalSecret = await env.INTERNAL_API_SECRET.get();
+    const authHeader = request.headers.get('x-internal-api-key');
+    if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const parsedPayload = ManualRemediationStartRequestSchema.safeParse(payload);
+    if (!parsedPayload.success) {
+      return Response.json(
+        { error: 'Invalid remediation command', issues: parsedPayload.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const result = await startManualRemediation({ env, request: parsedPayload.data });
+    if (!result.admitted) {
+      return Response.json(
+        { success: false, accepted: false, admitted: false, reason: result.reason },
+        { status: 409 }
+      );
+    }
+    return Response.json(
+      {
+        success: true,
+        accepted: true,
+        admitted: true,
+        remediationId: result.remediationId,
+        attemptId: result.attemptId,
+        attemptNumber: result.attemptNumber,
+      },
+      { status: 202 }
+    );
+  }
+
+  if (request.method === 'POST' && url.pathname === '/internal/remediation/cancel') {
+    const internalSecret = await env.INTERNAL_API_SECRET.get();
+    const authHeader = request.headers.get('x-internal-api-key');
+    if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const parsedPayload = CancelRemediationRequestSchema.safeParse(payload);
+    if (!parsedPayload.success) {
+      return Response.json(
+        { error: 'Invalid remediation cancellation', issues: parsedPayload.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const result = await cancelRemediation({ env, request: parsedPayload.data });
+    return Response.json(result, { status: 202 });
+  }
+
+  if (request.method === 'POST' && url.pathname === '/internal/apply-auto-remediation') {
+    const internalSecret = await env.INTERNAL_API_SECRET.get();
+    const authHeader = request.headers.get('x-internal-api-key');
+    if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const parsedPayload = ApplyAutoRemediationCommandSchema.safeParse(payload);
+    if (!parsedPayload.success) {
+      return Response.json(
+        { error: 'Invalid apply auto-remediation command', issues: parsedPayload.error.issues },
+        { status: 400 }
+      );
+    }
+
+    try {
+      await env.REMEDIATION_COMMAND_QUEUE.sendBatch([
+        { body: parsedPayload.data, contentType: 'json' },
+      ]);
+    } catch (error) {
+      const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
+      await markSecurityAgentCommandQueueAdmissionFailed(
+        db,
+        parsedPayload.data.commandId,
+        'Queue admission failed'
+      );
+      throw error;
+    }
+    return Response.json(
+      { success: true, accepted: true, commandId: parsedPayload.data.commandId },
+      { status: 202 }
+    );
+  }
+
+  const remediationCallbackMatch = url.pathname.match(
+    /^\/internal\/security-remediation-callback\/([0-9a-fA-F-]+)$/
+  );
+  if (request.method === 'POST' && remediationCallbackMatch) {
+    if (env.SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED === 'false') {
+      return Response.json(
+        { error: 'Security remediation Worker callback ingress is disabled' },
+        { status: 503 }
+      );
+    }
+    const attemptId = remediationCallbackMatch[1];
+    if (!attemptId) {
+      return Response.json({ error: 'Missing remediation attempt id' }, { status: 400 });
+    }
+    const attemptToken = url.searchParams.get('attempt');
+    if (!attemptToken) {
+      return Response.json({ error: 'Missing callback attempt token' }, { status: 400 });
+    }
+    const callbackTokenSecret = await env.CALLBACK_TOKEN_SECRET.get();
+    const callbackToken = request.headers.get('X-Callback-Token');
+    const validCallbackToken =
+      !!callbackTokenSecret &&
+      (await verifyCallbackToken({
+        token: callbackToken,
+        secret: callbackTokenSecret,
+        scope: 'security-remediation-callback',
+        resourceParts: [attemptId, attemptToken],
+      }));
+    if (!validCallbackToken) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const parsedPayload = SecurityRemediationCallbackPayloadSchema.safeParse(payload);
+    if (!parsedPayload.success) {
+      return Response.json(
+        { error: 'Invalid remediation callback payload', issues: parsedPayload.error.issues },
+        { status: 400 }
+      );
+    }
+
+    await env.REMEDIATION_CALLBACK_QUEUE.sendBatch([
+      {
+        body: { attemptId, attemptToken, payload: parsedPayload.data },
+        contentType: 'json',
+      },
+    ]);
+    return Response.json({ success: true, accepted: true }, { status: 202 });
+  }
+
   const callbackMatch = url.pathname.match(
     /^\/internal\/security-analysis-callback\/([0-9a-fA-F-]+)$/
   );
@@ -194,6 +367,18 @@ export default {
   },
 
   async queue(batch: MessageBatch<unknown>, env: CloudflareEnv): Promise<void> {
+    if (batch.queue.startsWith('security-remediation-attempt-queue')) {
+      await consumeRemediationAttemptBatch(batch, env);
+      return;
+    }
+    if (batch.queue.startsWith('security-remediation-command-queue')) {
+      await consumeApplyAutoRemediationBatch(batch, env);
+      return;
+    }
+    if (batch.queue.startsWith('security-remediation-callback-queue')) {
+      await consumeRemediationCallbackBatch(batch, env);
+      return;
+    }
     if (batch.queue.startsWith('security-auto-analysis-callback-queue')) {
       await consumeAnalysisCallbackBatch(batch, env);
       return;

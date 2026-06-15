@@ -1,7 +1,7 @@
 import type { ModelExperiment } from '@kilocode/db/schema';
 import type { EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import type { ResolvedExperimentUpstream } from '@/lib/ai-gateway/experiments/build-direct-provider';
-import type { ExperimentUpstream } from '@/lib/ai-gateway/experiments/upstream-schema';
+import type { CustomLlmApiConfig } from '@kilocode/db';
 
 export type ExperimentStatus = 'active' | 'paused';
 
@@ -9,7 +9,7 @@ export type RoutingVariant = {
   variantId: string;
   weight: number;
   variantVersionId: string;
-  upstream: ExperimentUpstream;
+  upstream: CustomLlmApiConfig;
   encryptedApiKey: EncryptedData;
 };
 

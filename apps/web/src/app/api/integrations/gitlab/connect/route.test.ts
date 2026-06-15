@@ -198,36 +198,17 @@ describe('GET /api/integrations/gitlab/connect', () => {
     expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
   });
 
-  test('supports authenticated legacy GET self-hosted credentials during rollout', async () => {
+  test('does not accept self-hosted credentials through authenticated GET query parameters', async () => {
     const response = await callGitLabConnect(
       makeRequest(
         '/api/integrations/gitlab/connect?instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
       )
     );
 
-    expect(response.headers.get('location')).toBe(
-      'https://gitlab.com/oauth/authorize?state=signed'
-    );
-    expect(mockedStoreGitLabOAuthCredentials).toHaveBeenCalledWith({
-      clientId: 'client-id',
-      clientSecret: 'client-secret',
-    });
-    expect(mockedCreateGitLabOAuthState).toHaveBeenCalledWith(
-      {
-        owner: { type: 'user', id: USER_ID },
-        instanceUrl: 'https://gitlab.example.com',
-        customCredentialsRef: 'cached-credentials-ref',
-      },
-      USER_ID
-    );
-    expect(mockedBuildGitLabOAuthUrl).toHaveBeenCalledWith(
-      'signed-gitlab-state',
-      'https://gitlab.example.com',
-      {
-        clientId: 'client-id',
-        clientSecret: 'client-secret',
-      }
-    );
+    expectRedirectLocation(response, '/integrations/gitlab?error=oauth_init_failed');
+    expect(mockedStoreGitLabOAuthCredentials).not.toHaveBeenCalled();
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
   });
 
   test('preserves a valid returnTo in signed OAuth state', async () => {

@@ -148,6 +148,21 @@ function getFrontmatterValue(frontmatter: string, key: string): string | null {
   return null;
 }
 
+function isFrontmatterDelimiterLine(line: string): boolean {
+  if (!line.startsWith('---')) {
+    return false;
+  }
+
+  for (let index = 3; index < line.length; index += 1) {
+    const char = line[index];
+    if (char !== ' ' && char !== '\t') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /**
  * Extract YAML frontmatter `name` and `description` from SKILL.md.
  * Supports both --- and +++ delimiters. Returns `null` if no frontmatter.
@@ -156,11 +171,41 @@ export function parseSkillFrontmatter(rawMarkdown: string): {
   name: string | null;
   description: string | null;
 } {
-  const match = rawMarkdown.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n/);
-  if (!match) {
+  const firstLineEnd = rawMarkdown.indexOf('\n');
+  if (firstLineEnd === -1) {
     return { name: null, description: null };
   }
-  const frontmatter = match[1];
+
+  const firstRawLine = rawMarkdown.slice(0, firstLineEnd);
+  const firstLine = firstRawLine.endsWith('\r') ? firstRawLine.slice(0, -1) : firstRawLine;
+  if (!isFrontmatterDelimiterLine(firstLine)) {
+    return { name: null, description: null };
+  }
+
+  let lineStart = firstLineEnd + 1;
+  let frontmatterEnd: number | null = null;
+  while (lineStart < rawMarkdown.length) {
+    const lineEnd = rawMarkdown.indexOf('\n', lineStart);
+    if (lineEnd === -1) {
+      break;
+    }
+
+    const rawLine = rawMarkdown.slice(lineStart, lineEnd);
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+    if (isFrontmatterDelimiterLine(line)) {
+      frontmatterEnd =
+        lineStart > 0 && rawMarkdown[lineStart - 1] === '\r' ? lineStart - 1 : lineStart;
+      break;
+    }
+
+    lineStart = lineEnd + 1;
+  }
+
+  if (frontmatterEnd === null) {
+    return { name: null, description: null };
+  }
+
+  const frontmatter = rawMarkdown.slice(firstLineEnd + 1, frontmatterEnd);
   const name = getFrontmatterValue(frontmatter, 'name');
   const description = getFrontmatterValue(frontmatter, 'description');
   const stripQuotes = (v: string): string => {

@@ -209,6 +209,7 @@ describe('agent config mutation routes', () => {
     expect(response.status).toBe(200);
     expect(serializedMutations).toBe(1);
     expect(deps.deleteViaCli).toHaveBeenCalledWith('research');
+    // Per spec rule 11 the controller MUST NOT claim verified deletion/retention.
     expect(await response.json()).toMatchObject({
       ok: true,
       agentId: 'research',

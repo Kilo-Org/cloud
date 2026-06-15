@@ -14,6 +14,7 @@ import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import type { User, Organization } from '@kilocode/db/schema';
 
 let adminUser: User;
+let adminWithoutCreditAccess: User;
 let nonAdminUser: User;
 let testOrganization: Organization;
 
@@ -22,6 +23,13 @@ describe('organization admin router', () => {
     adminUser = await insertTestUser({
       google_user_email: 'admin-org-admin@admin.example.com',
       google_user_name: 'Admin Org Admin User',
+      is_admin: true,
+      can_manage_credits: true,
+    });
+
+    adminWithoutCreditAccess = await insertTestUser({
+      google_user_email: 'admin-without-credit-access@admin.example.com',
+      google_user_name: 'Admin Without Credit Access',
       is_admin: true,
     });
 
@@ -142,6 +150,7 @@ describe('organization admin router', () => {
       expect(creditTransaction.is_free).toBe(true);
       expect(creditTransaction.credit_category).toBe('organization_custom');
       expect(creditTransaction.description).toBe('Admin credit nullification');
+      expect(creditTransaction.created_by_kilo_user_id).toBe(adminUser.id);
     });
 
     it('should use custom description when provided', async () => {
@@ -192,6 +201,16 @@ describe('organization admin router', () => {
         .where(eq(credit_transactions.organization_id, testOrganization.id));
 
       expect(creditTransaction.description).toBe('Admin credit nullification');
+    });
+
+    it('should reject admins without credit management access', async () => {
+      const caller = await createCallerForUser(adminWithoutCreditAccess.id);
+
+      await expect(
+        caller.organizations.admin.nullifyCredits({
+          organizationId: testOrganization.id,
+        })
+      ).rejects.toThrow('Credit management access required');
     });
 
     it('should reject non-admin users', async () => {
@@ -274,6 +293,12 @@ describe('organization admin router', () => {
       );
       // total_microdollars_acquired should also increase by the grant amount
       expect(updatedOrg.total_microdollars_acquired).toBe(amount * 1_000_000);
+
+      const [creditTransaction] = await db
+        .select({ created_by_kilo_user_id: credit_transactions.created_by_kilo_user_id })
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+      expect(creditTransaction.created_by_kilo_user_id).toBe(adminUser.id);
     });
 
     it('should successfully grant negative credits with description', async () => {
@@ -302,6 +327,7 @@ describe('organization admin router', () => {
 
       expect(creditTransaction).toBeDefined();
       expect(creditTransaction.description).toBe(description);
+      expect(creditTransaction.created_by_kilo_user_id).toBe(adminUser.id);
     });
 
     it('should fail to grant negative credits without description', async () => {
@@ -314,6 +340,17 @@ describe('organization admin router', () => {
           amount_usd: amount,
         })
       ).rejects.toThrow();
+    });
+
+    it('should reject admins without credit management access', async () => {
+      const caller = await createCallerForUser(adminWithoutCreditAccess.id);
+
+      await expect(
+        caller.organizations.admin.grantCredit({
+          organizationId: testOrganization.id,
+          amount_usd: 10,
+        })
+      ).rejects.toThrow('Credit management access required');
     });
 
     it('should fail to grant zero credits', async () => {
@@ -480,6 +517,30 @@ describe('organization admin router', () => {
 
       expect(txn.original_baseline_microdollars_used).toBe(2_000_000);
       expect(txn.expiration_baseline_microdollars_used).toBe(2_000_000);
+    });
+  });
+
+  describe('creditTransactions', () => {
+    it('returns creator details to admins without requiring credit management access', async () => {
+      await db
+        .delete(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+      await db.insert(credit_transactions).values({
+        kilo_user_id: adminUser.id,
+        created_by_kilo_user_id: adminUser.id,
+        organization_id: testOrganization.id,
+        amount_microdollars: 1_000_000,
+        is_free: true,
+      });
+
+      const caller = await createCallerForUser(adminWithoutCreditAccess.id);
+      const [transaction] = await caller.organizations.admin.creditTransactions({
+        organizationId: testOrganization.id,
+      });
+
+      expect(transaction.created_by_kilo_user_id).toBe(adminUser.id);
+      expect(transaction.created_by_user_name).toBe(adminUser.google_user_name);
+      expect(transaction.created_by_user_email).toBe(adminUser.google_user_email);
     });
   });
 

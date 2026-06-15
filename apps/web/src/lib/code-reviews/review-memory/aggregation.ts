@@ -149,7 +149,8 @@ Return strict JSON in one of these shapes:
 
 Rules:
 - Classify each maintainer reply as positive, negative, or neutral.
-- Propose one concise REVIEW.md guidance addition only when there is a clear, repeated pattern.
+- Propose the smallest possible REVIEW.md change only when there is a clear, repeated pattern.
+- Make your proposed markdown precise and evidence-backed: prefer one sentence or bullet that names the specific file pattern, API, workflow, or review rule from the feedback; avoid broad rewrites or generic best practices.
 - Return status "no_change" when the signal is weak, one-off, contradictory, or already too repo-specific to generalize.
 - Do not mention Review Memory, Kilo, feedback systems, this analysis, or LLMs in proposedMarkdown.
 - Do not create a catch-all section. Write standalone repository guidance that a maintainer could edit.

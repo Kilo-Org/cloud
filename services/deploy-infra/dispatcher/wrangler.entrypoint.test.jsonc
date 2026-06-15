@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kilo-deploy-dispatcher-entrypoint-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "SESSION_DURATION_SECONDS": 2592000,
+    "HOSTNAME_SUFFIX": ".d.kiloapps.io",
+    "BANNER_LINK_URL": "https://app.kilo.ai/app-builder",
+    "JWT_SECRET": "test-jwt-secret",
+    "BACKEND_AUTH_TOKEN": "test-backend-auth-token",
+  },
+  "kv_namespaces": [
+    {
+      "binding": "DEPLOY_KV",
+      "id": "test-deploy-kv",
+    },
+  ],
+}

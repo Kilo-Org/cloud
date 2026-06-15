@@ -3,6 +3,7 @@ import { db } from '@/lib/drizzle';
 import {
   kiloclaw_image_catalog,
   kiloclaw_instances,
+  kiloclaw_subscriptions,
   kiloclaw_version_pins,
   kilocode_users,
 } from '@kilocode/db/schema';
@@ -557,6 +558,75 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       const candidate = rows.find(r => !r.is_latest && r.rollout_percent > 0) ?? null;
       return { latest, candidate };
     }),
+
+  /**
+   * Returns a breakdown of the ACTIVE fleet grouped by each instance's
+   * `tracked_image_tag`. Joined with the catalog so callers can classify each
+   * bucket as :latest, candidate, old-available, disabled, or "no tag yet"
+   * (null — DO hasn't reconciled yet).
+   *
+   * "Active" uses the same predicate as admin instance listing and fleet-upgrade
+   * logic — not destroyed, not trial-stopped, and not suspended — so these
+   * counts match the billable fleet rather than inflating percentages with
+   * suspended/trial-stopped instances. The subscriptions inner join is safe for
+   * COUNT(*): `instance_id` is unique on kiloclaw_subscriptions
+   * (UQ_kiloclaw_subscriptions_instance), so it never multiplies instance rows.
+   *
+   * IMPORTANT: `tracked_image_tag` is the instance's TARGET tag — the image it
+   * will run on its next provision/restart/redeploy — not necessarily the image
+   * currently executing. `applyPinnedVersion` (and rollout selection) write the
+   * resolved tag into DO state without restarting the machine, and the alarm
+   * later denormalizes it here. So this is a "target version" distribution, not
+   * a live-running census; an instance can appear in a new bucket before it has
+   * actually redeployed. The UI labels it accordingly.
+   *
+   * `pinned_count` tells how many instances in that bucket have an admin pin —
+   * useful when assessing rollout coverage since pinned instances are immune to
+   * the rollout selector.
+   *
+   * Note: denormalized by the DO alarm reconciler; may lag up to ~30 min for
+   * idle instances.
+   */
+  getVersionDistribution: adminProcedure.query(async () => {
+    const rows = await db
+      .select({
+        tracked_image_tag: kiloclaw_instances.tracked_image_tag,
+        count: sql<number>`COUNT(*)::int`,
+        pinned_count: sql<number>`COUNT(${kiloclaw_version_pins.id})::int`,
+        openclaw_version: kiloclaw_image_catalog.openclaw_version,
+        is_latest: kiloclaw_image_catalog.is_latest,
+        rollout_percent: kiloclaw_image_catalog.rollout_percent,
+        status: kiloclaw_image_catalog.status,
+      })
+      .from(kiloclaw_instances)
+      .innerJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+      )
+      .leftJoin(
+        kiloclaw_image_catalog,
+        eq(kiloclaw_instances.tracked_image_tag, kiloclaw_image_catalog.image_tag)
+      )
+      .leftJoin(kiloclaw_version_pins, eq(kiloclaw_instances.id, kiloclaw_version_pins.instance_id))
+      .where(
+        and(
+          isNull(kiloclaw_instances.destroyed_at),
+          isNull(kiloclaw_instances.inactive_trial_stopped_at),
+          isNull(kiloclaw_subscriptions.suspended_at)
+        )
+      )
+      .groupBy(
+        kiloclaw_instances.tracked_image_tag,
+        kiloclaw_image_catalog.openclaw_version,
+        kiloclaw_image_catalog.is_latest,
+        kiloclaw_image_catalog.rollout_percent,
+        kiloclaw_image_catalog.status
+      )
+      .orderBy(sql`count(*) desc`);
+
+    const total = rows.reduce((sum, r) => sum + r.count, 0);
+    return { rows, total };
+  }),
 
   syncCatalog: adminProcedure.mutation(async () => {
     const client = new KiloClawInternalClient();

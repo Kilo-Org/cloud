@@ -6,7 +6,7 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-import { qwen37_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 type AutoModel = {
@@ -22,6 +22,9 @@ type AutoModel = {
   supports_images: boolean;
   supports_pdf: boolean;
   opencode_settings: OpenCodeSettings | undefined;
+  // Mirrors KiloExclusiveModel['status']. 'hidden' auto models are excluded
+  // from the /models listing but stay usable by anyone who knows the id.
+  status: 'public' | 'hidden';
 };
 
 export type ResolvedAutoModel = {
@@ -77,16 +80,6 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: SONNET_FRONTIER,
 };
 
-export const BALANCED_RESPONSES_FALLBACK_MODEL: ResolvedAutoModel = {
-  model: 'openai/gpt-5.5',
-  reasoning: { enabled: true, effort: 'low' },
-};
-
-export const BALANCED_MESSAGES_FALLBACK_MODEL: ResolvedAutoModel = {
-  model: CLAUDE_SONNET_CURRENT_MODEL_ID,
-  reasoning: { enabled: true, effort: 'low' },
-};
-
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },
@@ -94,7 +87,7 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
 };
 
 export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
-  model: qwen37_plus_model.public_id,
+  model: QWEN37_PLUS_MODEL_ID,
   reasoning: { enabled: true },
 };
 
@@ -115,6 +108,7 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
     family: 'claude',
     prompt: 'anthropic',
   },
+  status: 'public',
 };
 
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
@@ -132,6 +126,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   supports_images: false,
   supports_pdf: false,
   opencode_settings: undefined,
+  status: 'public',
 };
 
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
@@ -146,9 +141,8 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   input_cache_write_price: '0.00000040625',
   supports_images: true,
   supports_pdf: false,
-  opencode_settings: {
-    ai_sdk_provider: 'alibaba',
-  },
+  opencode_settings: undefined,
+  status: 'public',
 };
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {
@@ -164,11 +158,24 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   supports_images: true,
   supports_pdf: false,
   opencode_settings: undefined,
+  status: 'public',
+};
+
+// Same catalog properties as balanced (it is intended to eventually replace
+// it); hidden while the routing engine is validated on Kilo team traffic.
+export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
+  ...KILO_AUTO_BALANCED_MODEL,
+  id: 'kilo-auto/efficient',
+  name: 'Auto Efficient',
+  description:
+    'Routes each request to the cheapest model that gets the job done, based on continuously benchmarked accuracy and cost.',
+  status: 'hidden',
 };
 
 export const AUTO_MODELS = [
   KILO_AUTO_FRONTIER_MODEL,
   KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
 ];

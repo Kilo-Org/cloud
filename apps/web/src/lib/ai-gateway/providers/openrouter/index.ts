@@ -26,12 +26,14 @@ import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-prov
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
+import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
+import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 function buildAutoModels(): OpenRouterModel[] {
-  return AUTO_MODELS.map(m => {
+  return AUTO_MODELS.filter(m => m.status === 'public').map(m => {
     const input_modalities = ['text'];
     if (m.supports_images) {
       input_modalities.push('image');
@@ -127,7 +129,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         (model: OpenRouterModel) =>
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
-          ) && !isForbiddenFreeModel(model.id)
+          ) &&
+          !isForbiddenFreeModel(model.id) &&
+          !isFableModel(model.id)
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
@@ -154,6 +158,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           .map(model => convertFromKiloExclusiveModel(model))
       )
       .concat(autoModels)
+      .map(applyCustomPricingToModel)
       .map(async (model: OpenRouterModel) => {
         const preferredIndex = preferredModels.indexOf(model.id);
         const addPdf =
@@ -161,12 +166,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         const description = isFreeNemotronModel(model.id)
           ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
           : model.description;
+        const isFree = await isFreeModel(model.id);
         return {
           ...model,
           name: formatName(model, preferredIndex),
           description,
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
-          isFree: await isFreeModel(model.id),
+          isFree: model.isFree ?? isFree,
+          mayTrainOnYourPrompts: model.mayTrainOnYourPrompts ?? isFree,
           opencode: model.opencode ?? getOpenCodeSettings(model.id),
           architecture: addPdf
             ? {

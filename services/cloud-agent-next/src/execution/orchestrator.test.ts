@@ -227,6 +227,24 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
     expect(prompt).not.toHaveBeenCalled();
   });
 
+  it('preserves non-retryable workspace setup failures from the wrapper', async () => {
+    const { orchestrator, prompt } = createOrchestrator();
+    prompt.mockRejectedValueOnce(
+      new WrapperError('Requested repository branch was not found', 'WORKSPACE_SETUP_FAILED', 503, {
+        workspaceFailureSubtype: 'git_branch_missing',
+        safeDetail: 'Requested repository branch was not found',
+        retryable: false,
+      })
+    );
+
+    await expect(orchestrator.execute(basePlan)).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: false,
+      workspaceFailureSubtype: 'git_branch_missing',
+      safeFailureMessage: 'Requested repository branch was not found',
+    } satisfies Partial<ExecutionError>);
+  });
+
   it('keeps ordinary wrapper bootstrap failure retryable', async () => {
     const { orchestrator, ensureWrapper } = createOrchestrator();
     ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));

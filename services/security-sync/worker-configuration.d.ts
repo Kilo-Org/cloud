@@ -4,6 +4,7 @@ declare type Hyperdrive = {
 
 declare type Message<T> = {
   body: T;
+  attempts: number;
   ack(): void;
   retry(): void;
 };
@@ -48,4 +49,7 @@ declare type CloudflareEnv = {
   GIT_TOKEN_SERVICE: GitTokenService;
   MANUAL_SYNC_COMMAND_ROUTING_ENABLED: string | undefined;
   DISMISS_FINDING_COMMAND_ROUTING_ENABLED: string | undefined;
+  BACKEND_API_URL: string | undefined;
+  SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED: string | undefined;
+  SECURITY_NOTIFICATION_DISPATCH_ENABLED: string | undefined;
 };

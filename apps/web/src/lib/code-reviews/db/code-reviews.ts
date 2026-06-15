@@ -1104,6 +1104,28 @@ export async function updateCodeReviewUsage(
   }
 }
 
+export async function updatePreviousReviewSummary(
+  reviewId: string,
+  summary: { body: string | null; headSha: string | null }
+): Promise<void> {
+  try {
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        previous_summary_body: summary.body,
+        previous_summary_head_sha: summary.headSha,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updatePreviousReviewSummary' },
+      extra: { reviewId, hasBody: summary.body !== null, headSha: summary.headSha },
+    });
+    throw error;
+  }
+}
+
 /**
  * Updates REVIEW.md usage metadata for a code review.
  */

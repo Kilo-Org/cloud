@@ -34,6 +34,38 @@
     "BACKEND_EVENTS_URL": "https://app.kilo.ai/api/user-deployments/webhook",
     "SENTRY_DSN": "https://1f07992a2811f3e5fc4d578527ab3d64@o4509356317474816.ingest.us.sentry.io/4510379756945409",
     "ENVIRONMENT": "production",
+    "WORKER_ENV": "production",
+    "DEPLOY_HOSTNAME_BASE": "d.kiloapps.io",
+  },
+  "secrets_store_secrets": [
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET_PROD",
+    },
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  "services": [
+    {
+      "binding": "DeployDispatcher",
+      "service": "kilo-deploy-dispatcher",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "HtmlDeployRateLimiter",
+      "namespace_id": "1003",
+      "simple": { "limit": 10, "period": 60 },
+    },
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"],
   },
   "containers": [
     {

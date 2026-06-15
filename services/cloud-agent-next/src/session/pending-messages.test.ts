@@ -371,26 +371,44 @@ describe('recordPendingFlushFailure', () => {
     expect(delays).toEqual([2_000, undefined]);
   });
 
-  it('schedules only one cold-init retry', async () => {
+  it('retries a sandbox connection failure once after exactly five seconds', async () => {
     const storage = createMemoryStorage();
-    let message = makeMessage();
+    let message = makeMessage({ createdAt: 100_000 });
     await storePendingSessionMessage(storage, message);
 
-    const delays: (number | undefined)[] = [];
-    const now = 100_000;
+    const firstFailure = await recordPendingFlushFailure(storage, message, 'error', 100_000, {
+      policy: 'cold-init',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
+    message = firstFailure.message;
+    const secondFailure = await recordPendingFlushFailure(storage, message, 'error', 105_000, {
+      policy: 'cold-init',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
 
-    for (let i = 0; i < 2; i++) {
-      const result = await recordPendingFlushFailure(storage, message, 'error', now, {
-        policy: 'cold-init',
-        code: 'SANDBOX_CONNECT_FAILED',
-      });
-      delays.push(
-        result.nextFlushAttemptAt !== undefined ? result.nextFlushAttemptAt - now : undefined
-      );
-      message = result.message;
-    }
+    expect(firstFailure.nextFlushAttemptAt).toBe(105_000);
+    expect(firstFailure.exhausted).toBe(false);
+    expect(secondFailure.attempts).toBe(2);
+    expect(secondFailure.nextFlushAttemptAt).toBeUndefined();
+    expect(secondFailure.exhausted).toBe(true);
+  });
 
-    expect(delays).toEqual([2_000, undefined]);
+  it('starts sandbox retry attempts independently from earlier failure categories', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage({
+      createdAt: 1,
+      flushAttempts: 2,
+      lastFlushFailureCode: 'WORKSPACE_SETUP_FAILED',
+    });
+    await storePendingSessionMessage(storage, message);
+
+    const result = await recordPendingFlushFailure(storage, message, 'error', 100_000, {
+      policy: 'cold-init',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
+
+    expect(result.attempts).toBe(1);
+    expect(result.exhausted).toBe(false);
   });
 
   it('exhausts immediately for non-retryable codes', async () => {
@@ -449,32 +467,76 @@ describe('recordPendingFlushFailure', () => {
     expect(exhausted.message.lastFlushFailureCode).toBe('BAD_REQUEST');
   });
 
-  it('preserves a structured retryable delivery cause through unknown-code exhaustion', async () => {
+  it.each([
+    { label: 'missing', code: undefined },
+    { label: 'UNKNOWN', code: 'UNKNOWN' as const },
+    { label: 'INTERNAL', code: 'INTERNAL' as const },
+  ])(
+    'preserves a structured retryable delivery cause through $label-code exhaustion',
+    async ({ code }) => {
+      const storage = createMemoryStorage();
+      let message = makeMessage();
+      await storePendingSessionMessage(storage, message);
+
+      const retry = await recordPendingFlushFailure(
+        storage,
+        message,
+        'workspace temporarily failed',
+        100_000,
+        {
+          policy: 'warm-followup',
+          code: 'WORKSPACE_SETUP_FAILED',
+          subtype: 'git_clone_timeout',
+          safeFailureMessage: 'Repository clone timed out',
+        }
+      );
+      message = retry.message;
+      const exhausted = await recordPendingFlushFailure(
+        storage,
+        message,
+        'retry transport failed without a specific cause',
+        102_000,
+        { policy: 'warm-followup', code }
+      );
+
+      expect(exhausted.exhausted).toBe(true);
+      expect(exhausted.message).toMatchObject({
+        lastFlushFailureCode: 'WORKSPACE_SETUP_FAILED',
+        lastFlushError: 'workspace temporarily failed',
+        lastFlushFailureSubtype: 'git_clone_timeout',
+        safeFailureMessage: 'Repository clone timed out',
+      });
+    }
+  );
+
+  it('replaces the failure code and error together for a newer specific cause', async () => {
     const storage = createMemoryStorage();
-    let message = makeMessage();
+    const message = makeMessage({
+      flushAttempts: 1,
+      lastFlushFailureCode: 'WORKSPACE_SETUP_FAILED',
+      lastFlushError: 'workspace temporarily failed',
+      lastFlushFailureSubtype: 'git_clone_timeout',
+      safeFailureMessage: 'Repository clone timed out',
+    });
     await storePendingSessionMessage(storage, message);
 
-    const retry = await recordPendingFlushFailure(
+    const result = await recordPendingFlushFailure(
       storage,
       message,
-      'workspace temporarily failed',
-      100_000,
+      'wrapper failed to start',
+      102_000,
       {
         policy: 'warm-followup',
-        code: 'WORKSPACE_SETUP_FAILED',
+        code: 'WRAPPER_START_FAILED',
       }
     );
-    message = retry.message;
-    const exhausted = await recordPendingFlushFailure(
-      storage,
-      message,
-      'retry transport failed without code',
-      102_000,
-      { policy: 'warm-followup' }
-    );
 
-    expect(exhausted.exhausted).toBe(true);
-    expect(exhausted.message.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
+    expect(result.message).toMatchObject({
+      lastFlushFailureCode: 'WRAPPER_START_FAILED',
+      lastFlushError: 'wrapper failed to start',
+    });
+    expect(result.message.lastFlushFailureSubtype).toBeUndefined();
+    expect(result.message.safeFailureMessage).toBeUndefined();
   });
 
   it('keeps the message in storage when not exhausted', async () => {

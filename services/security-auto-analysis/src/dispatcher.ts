@@ -6,16 +6,18 @@ import {
 import { getWorkerDb } from '@kilocode/db/client';
 import { discoverDueOwners, reconcileStaleAnalysisQueueRows } from './db/queries.js';
 import { logger } from './logger.js';
+import { getSecurityAgentCommandLifecycleConfig } from './command-lifecycle-config.js';
+import { discoverQueuedRemediationAttempts } from './remediation.js';
 
 const DISPATCH_OWNER_LIMIT = 100;
-const ACCEPTED_COMMAND_TIMEOUT_MS = 5 * 60 * 1000;
-const RUNNING_COMMAND_TIMEOUT_MS = 30 * 60 * 1000;
-const COMMAND_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const DISPATCH_REMEDIATION_ATTEMPT_LIMIT = 100;
 
 export async function dispatchDueOwners(env: CloudflareEnv): Promise<{
   dispatchId: string;
   discoveredOwners: number;
   enqueuedMessages: number;
+  discoveredRemediationAttempts: number;
+  enqueuedRemediationMessages: number;
 }> {
   const dispatchId = randomUUID();
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
@@ -27,13 +29,14 @@ export async function dispatchDueOwners(env: CloudflareEnv): Promise<{
   });
 
   const now = Date.now();
+  const commandLifecycleConfig = getSecurityAgentCommandLifecycleConfig(env);
   const commandReconciliation = await reconcileStaleSecurityAgentCommands(db, {
-    acceptedBefore: new Date(now - ACCEPTED_COMMAND_TIMEOUT_MS),
-    runningBefore: new Date(now - RUNNING_COMMAND_TIMEOUT_MS),
+    acceptedBefore: new Date(now - commandLifecycleConfig.acceptedCommandTimeoutMs),
+    runningBefore: new Date(now - commandLifecycleConfig.runningCommandTimeoutMs),
   });
   const deletedCommandCount = await deleteRetainedSecurityAgentCommands(
     db,
-    new Date(now - COMMAND_RETENTION_MS)
+    new Date(now - commandLifecycleConfig.commandRetentionMs)
   );
   logger.info('Reconciled stale security agent commands before owner dispatch', {
     stale_accepted_command_ids: commandReconciliation.staleAccepted.map(command => command.id),
@@ -58,15 +61,37 @@ export async function dispatchDueOwners(env: CloudflareEnv): Promise<{
     await env.OWNER_QUEUE.sendBatch(messages.slice(i, i + QUEUE_SEND_BATCH_LIMIT));
   }
 
+  const remediationAttemptIds = await discoverQueuedRemediationAttempts(
+    db,
+    DISPATCH_REMEDIATION_ATTEMPT_LIMIT
+  );
+  const remediationMessages = remediationAttemptIds.map(attemptId => ({
+    body: {
+      attemptId,
+      dispatchId,
+      enqueuedAt: new Date().toISOString(),
+    },
+    contentType: 'json' as const,
+  }));
+  for (let i = 0; i < remediationMessages.length; i += QUEUE_SEND_BATCH_LIMIT) {
+    await env.REMEDIATION_ATTEMPT_QUEUE.sendBatch(
+      remediationMessages.slice(i, i + QUEUE_SEND_BATCH_LIMIT)
+    );
+  }
+
   logger.info('Dispatched due owners to queue', {
     dispatch_id: dispatchId,
     discovered_owners: owners.length,
     enqueued_messages: messages.length,
+    discovered_remediation_attempts: remediationAttemptIds.length,
+    enqueued_remediation_messages: remediationMessages.length,
   });
 
   return {
     dispatchId,
     discoveredOwners: owners.length,
     enqueuedMessages: messages.length,
+    discoveredRemediationAttempts: remediationAttemptIds.length,
+    enqueuedRemediationMessages: remediationMessages.length,
   };
 }

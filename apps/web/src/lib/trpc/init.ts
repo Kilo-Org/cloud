@@ -4,6 +4,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
+import { userCanManageCredits } from '@/lib/admin/credit-management';
 // Define the context type
 export type TRPCContext = {
   user: User;
@@ -106,5 +107,16 @@ export const adminProcedure = baseProcedure.use(async ({ ctx, next }) => {
       message: 'Admin access required',
     });
   }
+  return next();
+});
+
+export const creditManagerProcedure = adminProcedure.use(async ({ ctx, next }) => {
+  if (!userCanManageCredits(ctx.user)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Credit management access required',
+    });
+  }
+
   return next();
 });

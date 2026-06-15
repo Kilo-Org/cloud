@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { microdollar_usage, type MicrodollarUsage } from '@kilocode/db/schema';
 import {
   toInsertableDbUsageRecord,
@@ -39,7 +40,7 @@ function defineDefaultUsageStats(): MicrodollarUsageStats {
 
 function defineDefaultContextInfo(): UsageContextInfo {
   return {
-    kilo_user_id: `test-user-${Math.random()}`,
+    kilo_user_id: `test-user-${randomUUID()}`,
     organization_id: null,
     http_x_forwarded_for: 'nobody',
     http_x_vercel_ip_city: 'Test City',

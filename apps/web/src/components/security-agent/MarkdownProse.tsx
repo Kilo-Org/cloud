@@ -11,7 +11,7 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-blue-400 hover:underline"
+      className="focus-visible:ring-ring rounded-sm text-blue-400 underline decoration-blue-400/40 underline-offset-4 hover:text-blue-300 focus-visible:ring-2 focus-visible:outline-none"
     >
       {children}
     </a>

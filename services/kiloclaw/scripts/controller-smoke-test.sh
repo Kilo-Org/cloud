@@ -126,31 +126,25 @@ CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
 check "env patch (empty body) -> 400" "400" "$CODE"
 
 echo
-echo "--- auth-profiles SecretRef mode ---"
+echo "--- auth store SecretRef mode (SQLite) ---"
 
-# After onboard with --secret-input-mode ref, auth-profiles.json must store
-# an env-backed keyRef, never a plaintext key. Regression here would put the
-# literal KILOCODE_API_KEY back on disk, shadowing env-based rotation.
-PROFILE_PATH="/root/.openclaw/agents/main/agent/auth-profiles.json"
-PROFILE_JSON=$(docker exec "$CID" cat "$PROFILE_PATH" 2>/dev/null || echo "")
+# Onboard runs with --secret-input-mode ref, so the kilocode key is stored as an
+# env-backed keyRef, never as a plaintext literal on disk. OpenClaw 2026.6.1+
+# keeps auth profiles in the per-agent SQLite store (openclaw-agent.sqlite)
+# rather than auth-profiles.json. A regression that wrote the literal
+# KILOCODE_API_KEY to disk would shadow env-based rotation.
+AGENT_DIR="/root/.openclaw/agents/main/agent"
 
-if echo "$PROFILE_JSON" | grep -q '"keyRef"'; then
-  check "auth-profiles.json stores keyRef" "1" "1"
+if docker exec "$CID" sh -c "[ -f '$AGENT_DIR/openclaw-agent.sqlite' ]"; then
+  check "SQLite auth store present" "1" "1"
 else
-  check "auth-profiles.json stores keyRef" "1" "0"
-  echo "  actual: $PROFILE_JSON"
+  check "SQLite auth store present" "1" "0"
 fi
 
-if echo "$PROFILE_JSON" | python3 -c "
-import sys, json
-doc = json.load(sys.stdin)
-profile = doc.get('profiles', {}).get('kilocode:default', {})
-sys.exit(0 if 'key' not in profile else 1)
-" 2>/dev/null; then
-  check "auth-profiles.json has no plaintext key" "1" "1"
-else
-  check "auth-profiles.json has no plaintext key" "1" "0"
-fi
+# The literal onboarding key (KILOCODE_API_KEY=smoke-key) must never be written
+# to disk under the agent dir — the keyRef points back at the env var instead.
+PLAINTEXT_HITS=$(docker exec "$CID" sh -c "grep -ral 'smoke-key' '$AGENT_DIR' 2>/dev/null | wc -l | tr -d ' '")
+check "no plaintext kilocode key on disk" "0" "$PLAINTEXT_HITS"
 
 echo
 echo "--- env patch rotation semantics ---"

@@ -12,10 +12,9 @@ import {
 } from '@kilocode/db/schema';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
-import { CustomLlmMetadataSchema } from '@kilocode/db/schema-types';
+import { CustomLlmApiConfigSchema, CustomLlmMetadataSchema } from '@kilocode/db/schema-types';
 import {
   CUSTOM_LLM_PREFIX,
   KILOCLAW_KILO_PROVIDER_PREFIX,
@@ -281,7 +280,7 @@ const UpdateVariantLabelSchema = z.object({
 
 const SwapVariantVersionSchema = z.object({
   variantId: z.string().uuid(),
-  upstream: ExperimentUpstreamSchema,
+  upstream: deepStrict(CustomLlmApiConfigSchema),
   // Optional: if omitted, the prior version's encrypted_api_key is reused
   // (so admins can hot-swap the upstream config without retyping the key).
   // Required when the variant has no prior version.
@@ -676,7 +675,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
       );
     }
 
-    const validated = ExperimentUpstreamSchema.safeParse(previousUpstream);
+    const validated = CustomLlmApiConfigSchema.safeParse(previousUpstream);
     if (!validated.success) {
       trpcThrow('INTERNAL_SERVER_ERROR', 'Latest variant version has an invalid upstream blob');
     }

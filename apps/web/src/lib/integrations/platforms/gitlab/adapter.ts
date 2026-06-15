@@ -1850,6 +1850,53 @@ export async function getGitLabProject(
   return (await response.json()) as GitLabProject;
 }
 
+export async function fetchGitLabRepositorySize(
+  accessToken: string,
+  projectPath: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<string | null> {
+  const encodedPath = encodeURIComponent(projectPath);
+
+  const response = await fetchGitLab(
+    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedPath}`, { statistics: true }),
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab project repository size fetch failed:', {
+      status: response.status,
+      error,
+    });
+    throw new Error(`GitLab project repository size fetch failed: ${response.status}`);
+  }
+
+  const repositorySizeBytes = readGitLabRepositorySizeBytes(await response.json());
+  if (repositorySizeBytes === null) {
+    return null;
+  }
+
+  return `${Math.round(repositorySizeBytes / (1024 * 1024))} MiB`;
+}
+
+function readGitLabRepositorySizeBytes(data: unknown): number | null {
+  if (typeof data !== 'object' || data === null || !('statistics' in data)) {
+    return null;
+  }
+
+  const { statistics } = data;
+  if (typeof statistics !== 'object' || statistics === null || !('repository_size' in statistics)) {
+    return null;
+  }
+
+  const { repository_size: repositorySize } = statistics;
+  return typeof repositorySize === 'number' ? repositorySize : null;
+}
+
 // ============================================================================
 // Instance Validation
 // ============================================================================

@@ -19,6 +19,13 @@ scripts/          CI and one-off scripts
 - **tRPC routers**: `apps/web/src/routers/`
 - **Env vars**: `.env.local` at repo root (pulled via `vercel env pull`)
 
+## Domain Context
+
+Before changing domain behavior, read `CONTEXT.md`.
+Use canonical terms from `CONTEXT.md` in code, docs, task descriptions, tests, and agent outputs.
+Do not introduce synonyms for existing concepts unless updating `CONTEXT.md` first.
+Do not duplicate the full context contract inside `AGENTS.md`.
+
 ## Verification
 
 After making changes, verify your work with the narrowest relevant checks. Avoid running the full `pnpm typecheck` by default; it is slow enough to make development environments unusable. Prefer targeted package checks or `scripts/typecheck-all.sh --changes-only`, and mention in your final response when the full typecheck was skipped for this reason. Run the full suite when appropriate. **Always run `pnpm format` before committing** — CI will reject unformatted code.
@@ -37,7 +44,7 @@ Target a specific test file: `pnpm test -- <path>`. Run tests for a specific ser
 
 ## apps/web UI Work
 
-Before making or reviewing UI changes under `apps/web` — components, routes/pages, layouts, styling, Storybook, visual polish, UX copy, interaction states, responsive behavior, theming, or accessibility — read `DESIGN.md` and use `.agents/skills/kilo-design/SKILL.md`. This applies even when the prompt does not explicitly mention design. Skip only for backend-only or non-visual logic changes.
+When editing UI files in `apps/web` — React components, pages, layouts, or styles (`.tsx`/`.css`) — use the `/kilo-design` skill.
 
 ## Coding Standards
 
@@ -127,6 +134,7 @@ Business-rule specs live in `.specs/`. Before making **any** changes to a domain
 | `.specs/kiloclaw-controller.md` | KiloClaw controller/machine lifecycle, bootstrap, Docker image |
 | `.specs/kiloclaw-datamodel.md` | KiloClaw data model — instance/subscription tables, invariants |
 | `.specs/model-experiments.md` | Model experiment routing, bucketing, lifecycle, prompt retention, and reporting rules |
+| `.specs/security-agent.md` | Security Agent Auto Remediation and finding/SLA notification guarantees |
 | `.specs/subscription-center.md` | Subscription Center ownership, states, and user-facing behavior |
 | `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management |
 | `.specs/impact-affiliate-tracking.md` | Impact.com affiliate conversion tracking |

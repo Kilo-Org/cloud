@@ -31,6 +31,7 @@ describe('submitManualAnalysisStart', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actorUserId: 'user-123',
         requestedModels: { analysisModel: 'analysis/model' },
+        forceSandbox: true,
         retrySandboxOnly: true,
       })
     ).resolves.toEqual({
@@ -52,6 +53,7 @@ describe('submitManualAnalysisStart', () => {
           owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
           actorUserId: 'user-123',
           requestedModels: { analysisModel: 'analysis/model' },
+          forceSandbox: true,
           retrySandboxOnly: true,
         }),
       })

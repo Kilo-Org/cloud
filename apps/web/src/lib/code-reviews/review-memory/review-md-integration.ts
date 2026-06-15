@@ -109,6 +109,8 @@ Return strict JSON with this shape:
 Rules:
 - Preserve existing guidance, ordering, and voice as much as possible.
 - Integrate the proposal into the most relevant existing section when one exists.
+- Make the smallest possible textual change to REVIEW.md; prefer adding or editing one sentence or bullet.
+- Do not reorganize, rewrite, reformat, rename headings, or change unrelated guidance.
 - Add a new normal guidance section only when no existing section fits.
 - Do not add a catch-all Review Memory section.
 - Do not mention Review Memory, Kilo Review Memory, feedback aggregation, proposal systems, or LLMs in updatedReviewMd.

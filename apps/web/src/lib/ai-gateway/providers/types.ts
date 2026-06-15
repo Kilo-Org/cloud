@@ -10,7 +10,6 @@ export type ProviderId =
   | 'inception'
   | 'martian'
   | 'mistral'
-  | 'morph'
   | 'vercel'
   | 'custom'
   | 'experiment'
@@ -22,6 +21,7 @@ export type BYOKResult = {
 };
 
 export type TransformRequestContext = {
+  provider: Provider;
   model: string;
   request: GatewayRequest;
   originalHeaders: FraudDetectionHeaders;

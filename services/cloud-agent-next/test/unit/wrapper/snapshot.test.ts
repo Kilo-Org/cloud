@@ -140,6 +140,7 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getPermissions: vi.fn().mockResolvedValue([]),
     getNetworkWaits: vi.fn().mockResolvedValue([]),
     resumeNetworkWait: vi.fn().mockResolvedValue(true),
+    listEffectiveModels: vi.fn().mockResolvedValue([]),
     subscribeEvents: vi.fn().mockResolvedValue({
       stream: (async function* () {
         await new Promise(() => {});

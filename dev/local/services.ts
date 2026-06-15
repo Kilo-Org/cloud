@@ -48,6 +48,7 @@ const groups: ServiceGroup[] = [
   },
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
+  { id: 'auto-routing', label: 'Auto Routing', alwaysOn: false, sectionBreakBefore: true },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
 ];
@@ -72,11 +73,25 @@ type ServiceMeta = {
 
 const serviceMeta: Record<string, ServiceMeta> = {
   // core
-  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'redis-http', 'stripe'] },
+  nextjs: {
+    group: 'core',
+    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe'],
+  },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
   stripe: { group: 'core', dependsOn: [] },
+  // auto-routing (kilo-auto/efficient decision engine + benchmark runner)
+  'auto-routing': {
+    group: 'auto-routing',
+    dependsOn: [],
+    dir: 'services/auto-routing',
+  },
+  'auto-routing-benchmark': {
+    group: 'auto-routing',
+    dependsOn: [],
+    dir: 'services/auto-routing-benchmark',
+  },
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
@@ -230,6 +245,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'cloudflare-git-token-service', 'nextjs'],
     dir: 'services/gastown',
   },
+  'cloudflare-wasteland': {
+    group: 'gastown',
+    dependsOn: ['postgres', 'nextjs'],
+    dir: 'services/wasteland',
+  },
 };
 
 function dockerComposeUp(service: string): string[] {
@@ -352,6 +372,23 @@ export function getInfraProfile(serviceName: string): string | undefined {
 
 export function getAllInfraProfiles(): string[] {
   return [...new Set(Object.values(INFRA_PROFILES))];
+}
+
+// Wrangler always pulls its container egress-interceptor sidecar
+// (cloudflare/proxy-everything) with --platform linux/amd64. On Apple Silicon
+// the emulated amd64 proxy crashes at startup ("setsockopt: protocol not
+// available" — its transparent-proxy socket options don't survive Rosetta),
+// which surfaces as "Failed to start container" for every local container.
+// Point wrangler at the same proxy version's linux/arm64 manifest instead:
+// pulling a single-platform manifest digest with --platform amd64 only warns.
+// Keep the digest in sync with DEFAULT_CONTAINER_EGRESS_INTERCEPTOR_IMAGE in
+// the pinned wrangler/miniflare version (tag 3cb1195).
+const CONTAINER_EGRESS_IMAGE_ARM64 =
+  'cloudflare/proxy-everything:3cb1195@sha256:78c7910f4575a511d928d7824b1cbcaec6b7c4bf4dbb3fafaeeae3104030e73c';
+
+function containerEgressImageEnvPrefix(): string[] {
+  if (process.arch !== 'arm64') return [];
+  return ['env', `MINIFLARE_CONTAINER_EGRESS_IMAGE=${CONTAINER_EGRESS_IMAGE_ARM64}`];
 }
 
 function buildServiceDefs(): ServiceDef[] {
@@ -500,6 +537,7 @@ function buildServiceDefs(): ServiceDef[] {
     const inspectorPort = port + 10000;
 
     const command = [
+      ...containerEgressImageEnvPrefix(),
       'pnpm',
       'run',
       'dev',
@@ -550,7 +588,10 @@ export function resolveTransitiveDeps(targets: string[]): string[] {
   const stack = [...targets];
 
   while (stack.length > 0) {
-    const name = stack.pop()!;
+    const name = stack.pop();
+    if (name === undefined) {
+      break;
+    }
     if (result.has(name)) continue;
     const svc = services.get(name);
     if (!svc) throw new Error(`Unknown service: ${name}`);
@@ -581,7 +622,11 @@ export function topologicalSort(serviceNames: string[]): string[] {
     if (!svc) throw new Error(`Unknown service: ${name}`);
     for (const dep of svc.dependsOn) {
       if (!nameSet.has(dep)) continue;
-      adjacency.get(dep)!.push(name);
+      const neighbors = adjacency.get(dep);
+      if (!neighbors) {
+        throw new Error(`Unknown dependency in service graph: ${dep}`);
+      }
+      neighbors.push(name);
       inDegree.set(name, (inDegree.get(name) ?? 0) + 1);
     }
   }
@@ -593,7 +638,10 @@ export function topologicalSort(serviceNames: string[]): string[] {
 
   const sorted: string[] = [];
   while (queue.length > 0) {
-    const current = queue.shift()!;
+    const current = queue.shift();
+    if (current === undefined) {
+      break;
+    }
     sorted.push(current);
     for (const neighbor of adjacency.get(current) ?? []) {
       const newDegree = (inDegree.get(neighbor) ?? 1) - 1;
@@ -615,11 +663,11 @@ export function resolveTargets(targets: string[]): string[] {
   const groupIdsToExpand: string[] = [];
   for (const target of targets) {
     if (target in shortcuts) {
-      groupIdsToExpand.push(...shortcuts[target].map(name => services.get(name)!.group));
+      groupIdsToExpand.push(...shortcuts[target].map(name => getService(name).group));
     } else if (groupIds.has(target)) {
       groupIdsToExpand.push(target);
     } else if (services.has(target)) {
-      groupIdsToExpand.push(services.get(target)!.group);
+      groupIdsToExpand.push(getService(target).group);
     } else {
       const validTargets = [...services.keys(), ...groupIds, ...Object.keys(shortcuts)].join(', ');
       throw new Error(`Unknown target: ${target}. Valid targets: ${validTargets}`);
@@ -668,7 +716,10 @@ export function resolveGroupTransitiveDeps(groupIds: string[]): string[] {
   const result = new Set<string>();
   const stack = [...groupIds];
   while (stack.length > 0) {
-    const id = stack.pop()!;
+    const id = stack.pop();
+    if (id === undefined) {
+      break;
+    }
     if (result.has(id)) continue;
     const group = groups.find(g => g.id === id);
     if (!group) throw new Error(`Unknown group: ${id}`);

@@ -45,13 +45,18 @@ describe('resolveSecurityAgentModels', () => {
         triage_model_slug: 'triage/model',
         analysis_model_slug: 'analysis/model',
       })
-    ).toEqual({ triageModel: 'triage/model', analysisModel: 'analysis/model' });
+    ).toEqual({
+      triageModel: 'triage/model',
+      analysisModel: 'analysis/model',
+      remediationModel: 'analysis/model',
+    });
   });
 
   it('uses legacy model_slug as fallback for both Worker launch phases', () => {
     expect(resolveSecurityAgentModels({ model_slug: 'legacy/model' })).toEqual({
       triageModel: 'legacy/model',
       analysisModel: 'legacy/model',
+      remediationModel: 'legacy/model',
     });
   });
 });

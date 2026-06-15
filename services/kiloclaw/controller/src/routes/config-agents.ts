@@ -190,6 +190,9 @@ export function registerAgentConfigRoutes(app: Hono, deps: AgentRouteDeps = defa
   app.delete('/_kilo/config/agents/:agentId', async c => {
     try {
       const deleted = await deps.serializeMutation(() => deps.deleteViaCli(c.req.param('agentId')));
+      // Per .specs/kiloclaw-controller.md rule 11, the response MUST NOT claim
+      // verified filesystem deletion or retention — filesystem disposition is
+      // determined by the installed OpenClaw CLI/runtime, not the controller.
       return c.json({ ok: true, ...deleted, filesystemDisposition: 'unverified' });
     } catch (error) {
       return respondError(c, error);

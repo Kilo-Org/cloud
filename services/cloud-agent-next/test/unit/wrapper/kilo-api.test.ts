@@ -104,6 +104,50 @@ describe('createWrapperKiloClient prompt handoff', () => {
     });
   });
 
+  it('lists exact deduplicated effective model IDs for the requested provider', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            id: 'kilo',
+            models: {
+              'openai/gpt-5.1': {},
+              'anthropic/claude-sonnet-4-20250514': {},
+            },
+          },
+          {
+            id: 'openai',
+            models: {
+              'gpt-5.1': {},
+            },
+          },
+          {
+            id: 'kilo',
+            models: {
+              'openai/gpt-5.1': {},
+              'google/gemini-3-pro': {},
+            },
+          },
+        ]),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+
+    await expect(client.listEffectiveModels('kilo')).resolves.toEqual([
+      'anthropic/claude-sonnet-4-20250514',
+      'google/gemini-3-pro',
+      'openai/gpt-5.1',
+    ]);
+    const request = fetchMock.mock.calls[0]?.[0];
+    expect(request).toBeInstanceOf(Request);
+    const url = new URL((request as Request).url);
+    expect(url.pathname).toBe('/config/providers');
+    expect(url.searchParams.get('directory')).toBe(workspacePath);
+    expect(url.searchParams.get('workspace')).toBe(workspacePath);
+  });
+
   it('passes snapshot wait policy through command requests', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({}), {

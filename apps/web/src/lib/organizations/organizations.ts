@@ -21,7 +21,7 @@ import { auto_deleted_at, db, sql } from '@/lib/drizzle';
 import { and, eq, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { randomUUID } from 'crypto';
-import { fromMicrodollars } from '@/lib/utils';
+import { fromMicrodollars, normalizeEmail } from '@/lib/utils';
 import { logExceptInTest } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -562,6 +562,24 @@ export async function acceptOrganizationInvite(
       // Check if invitation is already accepted
       if (invitation.accepted_at) {
         return failureResult('Invitation has already been accepted');
+      }
+
+      const [acceptingUser] = await tx
+        .select({
+          email: kilocode_users.google_user_email,
+          normalizedEmail: kilocode_users.normalized_email,
+        })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, userId))
+        .limit(1);
+
+      if (!acceptingUser) {
+        return failureResult('User not found');
+      }
+
+      const acceptedEmail = acceptingUser.normalizedEmail ?? normalizeEmail(acceptingUser.email);
+      if (acceptedEmail !== normalizeEmail(invitation.email)) {
+        return failureResult('Invitation is for a different email address');
       }
 
       // Fetch the organization to check the require_seats flag

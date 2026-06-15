@@ -41,12 +41,17 @@ export {
   createSecurityAgentCommand,
   deleteRetainedSecurityAgentCommands,
   getSecurityAgentCommandForOwner,
+  isTerminalSecurityAgentCommandTransitionOutcome,
   listActiveSecurityAgentCommandsForOwner,
   markSecurityAgentCommandQueueAdmissionFailed,
+  markSecurityAgentCommandRetriesExhausted,
   reconcileStaleSecurityAgentCommands,
+  requireSecurityAgentCommandTransitionOrTerminal,
   transitionSecurityAgentCommand,
+  transitionSecurityAgentCommandWithCurrentState,
   type CreateSecurityAgentCommandInput,
   type SecurityAgentCommandOwner,
+  type SecurityAgentCommandTransitionOutcome,
   type TransitionSecurityAgentCommandInput,
 } from './security-agent-command-repository';
 export {

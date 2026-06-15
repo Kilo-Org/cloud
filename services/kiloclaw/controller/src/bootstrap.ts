@@ -22,7 +22,10 @@ import {
 } from './config-writer';
 import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
-import { migrateKilocodeAuthProfilesToKeyRef } from './auth-profiles-migration';
+import {
+  migrateKilocodeAuthProfilesToKeyRef,
+  hardenAuthProfileMigrationBackups,
+} from './auth-profiles-migration';
 import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 
 const CONFIG_DIR = '/root/.openclaw';
@@ -798,9 +801,52 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   } else {
     console.log('Using existing config, running doctor...');
     sanitizeExistingConfigBeforeDoctor(deps);
-    deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
-      stdio: 'inherit',
-    });
+
+    // OpenClaw 2026.6.1+ `doctor --fix` imports auth-profiles.json into per-agent
+    // SQLite as one of its steps, and a plaintext `key` with no `keyRef` is
+    // imported verbatim (plaintext is stripped only when a keyRef is present).
+    // Convert any legacy plaintext kilocode key to an env-backed keyRef BEFORE
+    // doctor runs so the SQLite import lands a keyRef, never plaintext. The
+    // post-doctor call below stays for self-healing on versions that still read
+    // the JSON; this idempotent migration no-ops when there is nothing to fix.
+    const preDoctorMigration = migrateKilocodeAuthProfilesToKeyRef(
+      CONFIG_DIR,
+      toAuthProfilesMigrationDeps(deps)
+    );
+    if (preDoctorMigration.profilesMigrated > 0) {
+      console.log(
+        `[controller] pre-doctor auth-profiles migration: ${preDoctorMigration.profilesMigrated} profile(s) across ${preDoctorMigration.filesModified} file(s)`
+      );
+    }
+    // Fail closed: if a detected plaintext profile could not be rewritten, abort
+    // BEFORE doctor — otherwise doctor would import that plaintext into SQLite
+    // and defeat key rotation. The post-doctor self-healing call stays
+    // best-effort. (Onboard, the fresh-install path, never reaches this branch.)
+    if (preDoctorMigration.filesFailed > 0) {
+      throw new Error(
+        `pre-doctor auth-profiles migration failed to rewrite ${preDoctorMigration.filesFailed} file(s) with a plaintext kilocode key; aborting before doctor to keep plaintext out of SQLite`
+      );
+    }
+
+    try {
+      deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
+        stdio: 'inherit',
+      });
+    } finally {
+      // Harden any credential backups doctor created — even on a nonzero doctor
+      // exit, which would otherwise throw past this into degraded mode leaving
+      // world-readable (0o644) plaintext backups on disk. Kept (not deleted) as
+      // OpenClaw's recovery copy; tightened to owner-only.
+      const backupHarden = hardenAuthProfileMigrationBackups(
+        CONFIG_DIR,
+        toAuthProfilesMigrationDeps(deps)
+      );
+      if (backupHarden.backupsHardened > 0 || backupHarden.backupsFailed > 0) {
+        console.log(
+          `[controller] auth-profile backup hardening: hardened ${backupHarden.backupsHardened}, failed ${backupHarden.backupsFailed}`
+        );
+      }
+    }
 
     // Patch the config with env-var-derived fields
     const config = generateBaseConfig(env, CONFIG_PATH, cwDeps);
@@ -843,6 +889,9 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
       `[controller] auth-profiles migration: ${migrationReport.profilesMigrated} profile(s) across ${migrationReport.filesModified} file(s)`
     );
   }
+
+  // Backup hardening runs in the doctor finally above (so it also covers a
+  // nonzero doctor exit); nothing to do here.
 
   writeBotIdentityFile(env, deps);
   writeUserProfileFile(env, deps);

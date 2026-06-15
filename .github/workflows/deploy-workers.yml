@@ -1,12 +1,16 @@
 name: Deploy Cloudflare Workers
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       worker:
         description: 'Worker folder to deploy (e.g. services/app-builder)'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      base_sha:
+        description: 'Base SHA to diff against when detecting changed workers'
         required: true
         type: string
 
@@ -14,11 +18,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-workers-${{ github.ref }}
+  group: deploy-workers
   cancel-in-progress: false
 
 jobs:
-  # ── Manual dispatch: deploy a single specified worker ──────────────────────
   deploy-manual:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -46,11 +49,14 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ inputs.worker }}
+          # Workers that define a `predeploy` script (e.g. D1 migrations) run it
+          # right before deploy; all other workers are unaffected.
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: deploy
 
-  # ── Push to main: detect changed workers, deploy each one ─────────────────
   detect-changes:
-    if: github.event_name == 'push'
+    if: inputs.base_sha != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -70,7 +76,7 @@ jobs:
           # Diff against the SHA before the push so that multi-commit pushes
           # (e.g. a merge commit that squashes several commits) don't miss workers
           # that were only touched in earlier commits of the same push.
-          BASE_SHA="${{ github.event.before }}"
+          BASE_SHA="${{ inputs.base_sha }}"
 
           # Workers excluded from this workflow (they have custom deploy pipelines):
           EXCLUDED=(
@@ -148,4 +154,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ matrix.worker }}
+          # Workers that define a `predeploy` script (e.g. D1 migrations) run it
+          # right before deploy; all other workers are unaffected.
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: deploy

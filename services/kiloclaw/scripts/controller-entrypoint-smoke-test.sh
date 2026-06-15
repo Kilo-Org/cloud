@@ -178,6 +178,7 @@ check "PUT bindings can clear routes" "True" "$CLEAR_EMPTY"
 DELETE_RESP=$(curl -sS -X DELETE \
   -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:${PORT}/_kilo/config/agents/crud-smoke")
+# Per spec rule 11 the controller MUST NOT claim verified deletion/retention.
 DELETE_DISPOSITION=$(echo "$DELETE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('filesystemDisposition',''))" 2>/dev/null || echo "")
 check "delete reports unverified filesystem disposition" "unverified" "$DELETE_DISPOSITION"
 
@@ -187,10 +188,12 @@ LIST_AFTER_DELETE=$(curl -sS \
 LIST_STILL_HAS_AGENT=$(echo "$LIST_AFTER_DELETE" | python3 -c "import sys,json; print(any(a.get('id') == 'crud-smoke' and a.get('configured') for a in json.load(sys.stdin).get('agents', [])))" 2>/dev/null || echo "")
 check "deleted agent is no longer configured" "False" "$LIST_STILL_HAS_AGENT"
 
-if [ -d "$ROOTDIR/.openclaw/workspace-crud-smoke" ]; then
-  check "packaged no-trash baseline retains deleted workspace" "1" "1"
+# OpenClaw 2026.6.x prunes the agent workspace on delete (informational — this is
+# OpenClaw CLI behavior; the controller does not assert it, per spec rule 11).
+if [ ! -d "$ROOTDIR/.openclaw/workspace-crud-smoke" ]; then
+  check "openclaw pruned the deleted agent workspace" "1" "1"
 else
-  check "packaged no-trash baseline retains deleted workspace" "1" "0"
+  check "openclaw pruned the deleted agent workspace" "1" "0"
 fi
 
 echo
@@ -216,25 +219,41 @@ CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/")
 check "root without proxy token (REQUIRE_PROXY_TOKEN=true) -> 401" "401" "$CODE"
 
 echo
-echo "--- auth-profiles migration (doctor path) ---"
+echo "--- auth-profiles migration (doctor path -> SQLite) ---"
 
-# The seeded file had a plaintext kilocode key. After bootstrap's migration
-# runs, the on-disk file must carry a keyRef and no plaintext.
-MIGRATED=$(cat "$ROOTDIR/.openclaw/agents/main/agent/auth-profiles.json" 2>/dev/null || echo "")
+# The seeded auth-profiles.json carried a plaintext kilocode key. The controller
+# converts it to an env-backed keyRef BEFORE `openclaw doctor --fix` runs, so
+# doctor's SQLite import stores a keyRef and never the plaintext. doctor then
+# removes the JSON and leaves a `*.sqlite-import.*.bak`; the controller keeps it
+# (OpenClaw's only recovery copy) but tightens it to 0o600.
+AGENT_DIR="$ROOTDIR/.openclaw/agents/main/agent"
 
-if echo "$MIGRATED" | grep -q '"keyRef"'; then
-  check "legacy plaintext migrated to keyRef" "1" "1"
+if [ ! -f "$AGENT_DIR/auth-profiles.json" ]; then
+  check "legacy auth-profiles.json imported into SQLite" "1" "1"
 else
-  check "legacy plaintext migrated to keyRef" "1" "0"
-  echo "  actual: $MIGRATED"
+  check "legacy auth-profiles.json imported into SQLite" "1" "0"
 fi
 
-if echo "$MIGRATED" | grep -q "legacy-plaintext-must-be-rewritten"; then
-  check "legacy plaintext removed from disk" "1" "0"
-  echo "  actual: $MIGRATED"
+if [ -f "$AGENT_DIR/openclaw-agent.sqlite" ]; then
+  check "SQLite auth store present" "1" "1"
 else
-  check "legacy plaintext removed from disk" "1" "1"
+  check "SQLite auth store present" "1" "0"
 fi
+
+# The migration backup is retained (recovery copy) but must be owner-only.
+# Permissions and binary content are checked inside the container — macOS
+# Docker bind mounts do not faithfully reflect Linux file modes to the host.
+CDIR='/root/.openclaw/agents/main/agent'
+BAK_COUNT=$(docker exec "$CID" sh -c "find $CDIR -name '*.sqlite-import.*.bak' 2>/dev/null | wc -l | tr -d ' '")
+check "migration backup retained as recovery copy" "1" "$([ "${BAK_COUNT:-0}" -ge 1 ] && echo 1 || echo 0)"
+LOOSE_BAKS=$(docker exec "$CID" sh -c "find $CDIR -name '*.sqlite-import.*.bak' -perm /077 2>/dev/null | wc -l | tr -d ' '")
+check "migration backups hardened to owner-only (0600)" "0" "${LOOSE_BAKS:-0}"
+
+# The seeded plaintext key must not survive in the SQLite auth store (the
+# pre-doctor keyRef conversion ran, so the import never received plaintext).
+# -a scans the binary SQLite files as text.
+PLAINTEXT_HITS=$(docker exec "$CID" sh -c "grep -ral 'legacy-plaintext-must-be-rewritten' $CDIR/openclaw-agent.sqlite* 2>/dev/null | wc -l | tr -d ' '")
+check "no plaintext kilocode key in SQLite auth store" "0" "${PLAINTEXT_HITS:-0}"
 
 echo
 echo "=== Results: $PASS passed, $FAIL failed ==="

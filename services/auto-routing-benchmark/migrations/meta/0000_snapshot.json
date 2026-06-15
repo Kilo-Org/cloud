@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d5601eb8-dce7-4679-bd48-f73b4f88e2d3",
+  "id": "ba559fc8-fdd3-4c96-b116-53573fb79c74",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "benchmark_config": {
@@ -173,9 +173,26 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "engine_identity": {
+          "name": "engine_identity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "UQ_benchmark_runs_one_running_per_kind": {
+          "name": "UQ_benchmark_runs_one_running_per_kind",
+          "columns": [
+            "kind"
+          ],
+          "isUnique": true,
+          "where": "\"benchmark_runs\".\"status\" = 'running'"
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

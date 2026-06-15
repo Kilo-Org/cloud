@@ -78,6 +78,8 @@ vi.mock('./db', async importOriginal => {
     getLatestSummariesByModel: vi.fn(),
     insertRun: vi.fn(),
     markStaleRunsFailed: vi.fn(),
+    getRunningRun: vi.fn(),
+    existsNewerCompletedRun: vi.fn(),
   };
 });
 
@@ -86,6 +88,8 @@ import {
   getClassifierWinner,
   getLatestRoutingTable,
   getLatestSummariesByModel,
+  getRunningRun,
+  existsNewerCompletedRun,
   insertRun,
   listRuns,
   markStaleRunsFailed,
@@ -154,6 +158,8 @@ beforeEach(() => {
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
   vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
+  vi.mocked(getRunningRun).mockResolvedValue(undefined);
+  vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   queueSendBatch.mockResolvedValue(undefined);
 });
 
@@ -302,6 +308,12 @@ describe('GET /admin/runs', () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ runs: [] });
   });
+
+  it('sweeps stale runs before listing so a wedged run is recovered', async () => {
+    await authedGet('/admin/runs');
+    // sweepStaleRuns → markStaleRunsFailed runs on list, independent of starting.
+    expect(markStaleRunsFailed).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -328,6 +340,33 @@ describe('POST /admin/runs', () => {
       success: false,
       error: 'Invalid run request',
     });
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when a run of the same kind is already in progress', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(getRunningRun).mockResolvedValue({
+      id: 'classifier-2026-06-15T00-00-00-000Z',
+      kind: 'classifier',
+      status: 'running',
+      started_at: '2026-06-15T00:00:00.000Z',
+      completed_at: null,
+      error: null,
+      min_accuracy: 0.7,
+      switch_cost_factor: 3,
+      max_concurrency: 4,
+      benchmark_user_id: null,
+      repetitions: 1,
+      classifier_max_p95_latency_ms: 1000,
+      engine_identity: 'v1:deadbeef',
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'classifier' });
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('already in progress'),
+    });
+    expect(insertRun).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 

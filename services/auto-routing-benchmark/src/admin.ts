@@ -8,7 +8,7 @@ import { zodJsonValidator } from '@kilocode/worker-utils';
 import type { Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
-import { fetchBenchmarkUserToken, startRun } from './run';
+import { fetchBenchmarkUserToken, RunAlreadyActiveError, startRun, sweepStaleRuns } from './run';
 import { getClassifierWinner, getLatestRoutingTable, listRuns } from './db';
 import type { HonoEnv } from './hono-env';
 
@@ -31,6 +31,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   );
 
   app.get('/admin/runs', async c => {
+    // Sweep stale runs first so a dead/wedged run surfaces as 'failed' (and
+    // frees the one-active-run slot) without needing a new run to be started.
+    await sweepStaleRuns(c.env.BENCH_DB);
     const limit = Math.min(Number(c.req.query('limit') ?? 20) || 20, 100);
     const runs: BenchmarkRun[] = await listRuns(c.env.BENCH_DB, limit);
     return c.json({ runs });
@@ -48,7 +51,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           400
         );
       }
-      return c.json(await startRun(c.env, kind, { force }));
+      try {
+        return c.json(await startRun(c.env, kind, { force }));
+      } catch (error) {
+        // One active run per kind: surface the conflict as 409 so automated
+        // callers don't treat it as a transient 5xx and retry.
+        if (error instanceof RunAlreadyActiveError) {
+          return c.json({ error: error.message }, 409);
+        }
+        throw error;
+      }
     }
   );
 

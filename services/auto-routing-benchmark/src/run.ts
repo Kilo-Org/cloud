@@ -14,8 +14,10 @@ import { DECIDER_CASES } from './datasets/decider-cases';
 import type { RunModelRow } from './db';
 import {
   countCaseResults,
+  existsNewerCompletedRun,
   getCaseResults,
   getLatestSummariesByModel,
+  getRunningRun,
   getRunWithModels,
   getSummaries,
   insertRun,
@@ -98,6 +100,14 @@ async function enqueueRunMessages(
 
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 
+// Fails any run still 'running' past the stale threshold (queue retries
+// exhausted / dead-lettered). Called both before starting a run and when
+// listing runs, so a wedged run is recovered without depending on a new run
+// being started (the UI disables Start while a run shows 'running').
+export async function sweepStaleRuns(db: D1Database): Promise<void> {
+  await markStaleRunsFailed(db, new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString());
+}
+
 // Bump when grading logic, the CLI invocation/variant handling, the container
 // image's pinned CLI, or any other execution input NOT captured by the dataset
 // hash changes in a way that invalidates prior measurements. Forces every
@@ -153,21 +163,38 @@ export function buildDeciderMessages(
   );
 }
 
+// Thrown when a run of the same kind is already active. The admin route maps
+// it to HTTP 409 so automated callers can distinguish it from a 5xx fault.
+export class RunAlreadyActiveError extends Error {
+  constructor(
+    readonly kind: BenchmarkKind,
+    readonly activeRunId: string
+  ) {
+    super(`a ${kind} benchmark run is already in progress (${activeRunId})`);
+    this.name = 'RunAlreadyActiveError';
+  }
+}
+
 export async function startRun(
   env: Env,
   kind: BenchmarkKind,
   options: { force?: boolean } = {}
 ): Promise<{ runId: string; enqueuedModels: number; skippedModels: string[] }> {
-  // Stale-run sweeper: anything still 'running' after 6h is dead (queue
-  // retries exhausted); fail it so the admin panel shows the truth.
-  await markStaleRunsFailed(
-    env.BENCH_DB,
-    new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString()
-  );
+  // Stale-run sweeper: fail dead 'running' runs first so a wedged run can't
+  // block new ones and the admin panel shows the truth.
+  await sweepStaleRuns(env.BENCH_DB);
 
   const config = await getBenchmarkConfig(env.BENCH_DB);
   if (!config) {
     throw new Error('benchmark config not set: save it in the admin panel before starting a run');
+  }
+
+  // One active run per kind. The unique partial index is the atomic backstop;
+  // this pre-check turns the common case (a run already going) into a clean
+  // RunAlreadyActiveError instead of an insert-constraint failure.
+  const activeRun = await getRunningRun(env.BENCH_DB, kind);
+  if (activeRun) {
+    throw new RunAlreadyActiveError(kind, activeRun.id);
   }
   const repetitions =
     kind === 'classifier' ? config.classifierRepetitions : config.deciderRepetitions;
@@ -211,7 +238,8 @@ export async function startRun(
     );
   }
 
-  const runId = `${kind}-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+  const startedAt = new Date().toISOString();
+  const runId = `${kind}-${startedAt.replace(/[:.]/g, '-')}`;
 
   // Build run_models rows for ALL models of this run's kind.
   const runModelRows: RunModelRow[] = models.map(modelId => ({
@@ -221,24 +249,35 @@ export async function startRun(
     reasoning_effort: reasoningEffortFor(modelId),
   }));
 
-  await insertRun(
-    env.BENCH_DB,
-    {
-      id: runId,
-      kind,
-      startedAt: new Date().toISOString(),
-      min_accuracy: config.minAccuracy,
-      switch_cost_factor: config.switchCostFactor,
-      max_concurrency: config.maxConcurrency,
-      benchmark_user_id: config.benchmarkUserId,
-      repetitions,
-      classifier_max_p95_latency_ms:
-        kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
-      engine_identity: engineIdentity,
-    },
-    runModelRows,
-    carriedSummaries
-  );
+  try {
+    await insertRun(
+      env.BENCH_DB,
+      {
+        id: runId,
+        kind,
+        startedAt,
+        min_accuracy: config.minAccuracy,
+        switch_cost_factor: config.switchCostFactor,
+        max_concurrency: config.maxConcurrency,
+        benchmark_user_id: config.benchmarkUserId,
+        repetitions,
+        classifier_max_p95_latency_ms:
+          kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
+        engine_identity: engineIdentity,
+      },
+      runModelRows,
+      carriedSummaries
+    );
+  } catch (error) {
+    // The pre-check already passed, so an insert failure is almost certainly a
+    // race losing the one-running-per-kind unique index. Re-read the winner and
+    // surface a clean conflict rather than a 500.
+    const winner = await getRunningRun(env.BENCH_DB, kind).catch(() => undefined);
+    if (winner && winner.id !== runId) {
+      throw new RunAlreadyActiveError(kind, winner.id);
+    }
+    throw error;
+  }
 
   console.log(
     JSON.stringify({
@@ -263,6 +302,7 @@ export async function startRun(
       models: runModelRows,
       repetitions,
       classifierMaxP95LatencyMs: kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
+      startedAt,
     });
     return { runId, enqueuedModels: 0, skippedModels };
   }
@@ -365,6 +405,7 @@ type RunState = {
   models: RunModelRow[];
   repetitions: number;
   classifierMaxP95LatencyMs: number | null;
+  startedAt: string;
 };
 
 async function getRunState(env: Env, runId: string): Promise<RunState> {
@@ -380,6 +421,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     models,
     repetitions: run.repetitions,
     classifierMaxP95LatencyMs: run.classifier_max_p95_latency_ms,
+    startedAt: run.started_at,
   };
 }
 
@@ -579,7 +621,21 @@ async function finalizeRunIfComplete(
   // Read back all summaries (fresh + carried) for publishing.
   const allSummaries = await getSummaries(env.BENCH_DB, runId);
 
-  if (kind === 'classifier') {
+  // Don't let a slow older run overwrite a newer run's already-published table
+  // or classifier winner. Publication is selected by publish time, so an older
+  // run finishing last would otherwise win. The run is still marked completed
+  // above (it did finish); only its publication is suppressed.
+  const supersededByNewer = await existsNewerCompletedRun(
+    env.BENCH_DB,
+    kind,
+    state.startedAt,
+    runId
+  );
+  if (supersededByNewer) {
+    console.warn(JSON.stringify({ event: 'benchmark_publish_skipped_superseded', runId, kind }));
+  }
+
+  if (kind === 'classifier' && !supersededByNewer) {
     const winner = pickClassifierWinner(
       allSummaries,
       state.minAccuracy,
@@ -596,7 +652,7 @@ async function finalizeRunIfComplete(
     await env.AUTO_ROUTING_CONFIG.delete(CLASSIFIER_WINNER_KV_KEY);
   }
 
-  if (kind === 'decider') {
+  if (kind === 'decider' && !supersededByNewer) {
     const generatedAt = new Date().toISOString();
     try {
       // Built from the run's own model snapshot, not live config, so a mid-run

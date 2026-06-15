@@ -23,9 +23,11 @@ CREATE TABLE `benchmark_runs` (
 	`max_concurrency` integer NOT NULL,
 	`benchmark_user_id` text,
 	`repetitions` integer DEFAULT 1 NOT NULL,
-	`classifier_max_p95_latency_ms` integer
+	`classifier_max_p95_latency_ms` integer,
+	`engine_identity` text DEFAULT '' NOT NULL
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `UQ_benchmark_runs_one_running_per_kind` ON `benchmark_runs` (`kind`) WHERE "benchmark_runs"."status" = 'running';--> statement-breakpoint
 CREATE TABLE `case_results` (
 	`run_id` text NOT NULL,
 	`model` text NOT NULL,

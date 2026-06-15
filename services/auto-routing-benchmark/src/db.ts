@@ -8,7 +8,7 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
-import { and, count, desc, eq, inArray, lt } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, lt, ne } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
   benchmarkConfig,
@@ -344,6 +344,43 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
     .update(benchmarkRuns)
     .set({ status: 'failed', error: 'timed out' })
     .where(and(eq(benchmarkRuns.status, 'running'), lt(benchmarkRuns.started_at, olderThanIso)));
+}
+
+// The currently-running run of a kind, if any (used for the one-active-run-per-kind
+// admission pre-check). Stale runs are swept to 'failed' before this is consulted.
+export async function getRunningRun(
+  db: D1Database,
+  kind: BenchmarkKind
+): Promise<RunRow | undefined> {
+  return drizzle(db)
+    .select()
+    .from(benchmarkRuns)
+    .where(and(eq(benchmarkRuns.kind, kind), eq(benchmarkRuns.status, 'running')))
+    .get();
+}
+
+// True when a run of the same kind started later than this one has already
+// completed. Used to skip publishing so a slow older run can't overwrite a
+// newer run's published routing table / classifier winner.
+export async function existsNewerCompletedRun(
+  db: D1Database,
+  kind: BenchmarkKind,
+  startedAt: string,
+  runId: string
+): Promise<boolean> {
+  const newer = await drizzle(db)
+    .select({ id: benchmarkRuns.id })
+    .from(benchmarkRuns)
+    .where(
+      and(
+        eq(benchmarkRuns.kind, kind),
+        eq(benchmarkRuns.status, 'completed'),
+        gt(benchmarkRuns.started_at, startedAt),
+        ne(benchmarkRuns.id, runId)
+      )
+    )
+    .get();
+  return newer !== undefined;
 }
 
 export async function markRunFailed(db: D1Database, runId: string, error: string): Promise<void> {

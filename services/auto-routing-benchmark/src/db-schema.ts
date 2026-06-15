@@ -1,4 +1,5 @@
-import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import { integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import type { BenchmarkKind, BenchmarkRunStatus } from '@kilocode/auto-routing-contracts';
 
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
@@ -26,27 +27,38 @@ export const configDeciderModels = sqliteTable('config_decider_models', {
   reasoning_effort: text('reasoning_effort'),
 });
 
-export const benchmarkRuns = sqliteTable('benchmark_runs', {
-  id: text('id').primaryKey(),
-  kind: text('kind').$type<BenchmarkKind>().notNull(),
-  status: text('status').$type<BenchmarkRunStatus>().notNull(),
-  started_at: text('started_at').notNull(),
-  completed_at: text('completed_at'),
-  error: text('error'),
-  // Config snapshot taken at startRun time so mid-run edits can't skew results.
-  min_accuracy: real('min_accuracy').notNull(),
-  switch_cost_factor: real('switch_cost_factor').notNull(),
-  max_concurrency: integer('max_concurrency').notNull(),
-  benchmark_user_id: text('benchmark_user_id'),
-  repetitions: integer('repetitions').notNull().default(1),
-  classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
-  // Benchmark-identity snapshot: dataset content hash + engine version. A prior
-  // model's summaries may only be carried into a new run when this matches (and
-  // repetitions + the model's reasoning_effort match), so changes to the
-  // dataset, grading, or CLI/image pinning re-benchmark instead of pairing
-  // current serving config with measurements taken under different conditions.
-  engine_identity: text('engine_identity').notNull().default(''),
-});
+export const benchmarkRuns = sqliteTable(
+  'benchmark_runs',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind').$type<BenchmarkKind>().notNull(),
+    status: text('status').$type<BenchmarkRunStatus>().notNull(),
+    started_at: text('started_at').notNull(),
+    completed_at: text('completed_at'),
+    error: text('error'),
+    // Config snapshot taken at startRun time so mid-run edits can't skew results.
+    min_accuracy: real('min_accuracy').notNull(),
+    switch_cost_factor: real('switch_cost_factor').notNull(),
+    max_concurrency: integer('max_concurrency').notNull(),
+    benchmark_user_id: text('benchmark_user_id'),
+    repetitions: integer('repetitions').notNull().default(1),
+    classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
+    // Benchmark-identity snapshot: dataset content hash + engine version. A prior
+    // model's summaries may only be carried into a new run when this matches (and
+    // repetitions + the model's reasoning_effort match), so changes to the
+    // dataset, grading, or CLI/image pinning re-benchmark instead of pairing
+    // current serving config with measurements taken under different conditions.
+    engine_identity: text('engine_identity').notNull().default(''),
+  },
+  table => [
+    // At most one running run per kind — the atomic backstop for the
+    // server-side "one active run per kind" admission rule (concurrent POSTs /
+    // multiple tabs that slip past the pre-check still can't both claim).
+    uniqueIndex('UQ_benchmark_runs_one_running_per_kind')
+      .on(table.kind)
+      .where(sql`${table.status} = 'running'`),
+  ]
+);
 
 export const runModels = sqliteTable(
   'run_models',

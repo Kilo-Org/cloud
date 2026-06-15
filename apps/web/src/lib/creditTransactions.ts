@@ -2,7 +2,6 @@ import { eq, desc, and, isNull, gt, notExists } from 'drizzle-orm';
 import { db, readDb, sql } from './drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import { credit_transactions, kilo_pass_issuance_items, kilocode_users } from '@kilocode/db/schema';
-import type { AdminCreditTransaction } from '@/types/admin';
 
 type CreditSummary = {
   total_promotional_musd: number;
@@ -95,7 +94,7 @@ export async function getCreditTransactionsForOrganization(organizationId: Organ
 
 export async function getAdminCreditTransactionsForOrganization(
   organizationId: Organization['id']
-): Promise<AdminCreditTransaction[]> {
+) {
   const transactions = await db
     .select({
       id: credit_transactions.id,

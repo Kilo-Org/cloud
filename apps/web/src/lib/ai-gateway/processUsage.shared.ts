@@ -27,8 +27,7 @@ export function computeOpenRouterCostFields(
   const openrouterCost_USD = usage.cost ?? 0;
   const upstream_inference_cost_USD = usage.cost_details?.upstream_inference_cost ?? 0;
   const cost_mUsd = toMicrodollars(is_byok ? upstream_inference_cost_USD : openrouterCost_USD);
-  const market_cost =
-    usage.market_cost == null ? undefined : toMicrodollars(usage.market_cost);
+  const market_cost = usage.market_cost == null ? undefined : toMicrodollars(usage.market_cost);
   const inferredUpstream_USD = openrouterCost_USD * OPENROUTER_BYOK_COST_MULTIPLIER;
   const microdollar_error = (inferredUpstream_USD - upstream_inference_cost_USD) * 1000000;
   if (

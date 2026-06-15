@@ -64,6 +64,10 @@ export const kiloExtras = {
       type: 'string',
       enum: ['expanded', 'collapsed'],
     },
+    hide_prompt_training_models: {
+      description: 'Hide Kilo Gateway models that may train on your prompts from model listings',
+      type: 'boolean',
+    },
     commit_message: {
       description: 'Configuration for AI-generated commit messages',
       type: 'object',

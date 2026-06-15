@@ -35,6 +35,10 @@ import {
   scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
+import {
+  rewriteChatCompletionsOneOfAsAnyOf,
+  isFriendliChatCompletionsRequest,
+} from '@/lib/ai-gateway/schema-rewrite';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -156,6 +160,12 @@ export function applyProviderSpecificLogic(
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     applyPreferredProvider(requestedModel, requestToMutate.body);
+  }
+
+  // Friendli does not support JSON Schema `oneOf`, so downgrade every `oneOf`
+  // to `anyOf` for any chat completions request routed through it.
+  if (isFriendliChatCompletionsRequest(requestToMutate)) {
+    rewriteChatCompletionsOneOfAsAnyOf(requestToMutate.body);
   }
 
   if (isKimiModel(requestedModel)) {

@@ -51,13 +51,10 @@ export function buildReviewGuidanceFooter(guidance: ReviewGuidanceFooterData): s
   return `${REVIEW_GUIDANCE_FOOTER_MARKER}\n<sub>Review guidance: REVIEW.md from base branch${ref}${truncated}</sub>`;
 }
 
-export function appendReviewSummaryFooter(
-  existingBody: string,
-  footer: {
-    usage?: UsageFooterData;
-    reviewGuidance?: ReviewGuidanceFooterData;
-  }
-): string {
+export function buildReviewSummaryFooter(footer: {
+  usage?: UsageFooterData;
+  reviewGuidance?: ReviewGuidanceFooterData;
+}): string {
   const footerLines: string[] = [];
 
   if (footer.usage) {
@@ -70,13 +67,17 @@ export function appendReviewSummaryFooter(
     footerLines.push(buildReviewGuidanceFooter(footer.reviewGuidance));
   }
 
-  const bodyWithoutFooter = stripReviewSummaryFooter(existingBody);
+  return footerLines.length > 0 ? `\n\n---\n${footerLines.join('\n')}` : '';
+}
 
-  if (footerLines.length === 0) {
-    return bodyWithoutFooter;
+export function appendReviewSummaryFooter(
+  existingBody: string,
+  footer: {
+    usage?: UsageFooterData;
+    reviewGuidance?: ReviewGuidanceFooterData;
   }
-
-  return `${bodyWithoutFooter}\n\n---\n${footerLines.join('\n')}`;
+): string {
+  return `${stripReviewSummaryFooter(existingBody)}${buildReviewSummaryFooter(footer)}`;
 }
 
 export function stripReviewSummaryFooter(existingBody: string): string {

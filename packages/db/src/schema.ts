@@ -3938,6 +3938,10 @@ export const cloud_agent_code_reviews = pgTable(
     repository_review_instructions_ref: text(),
     repository_review_instructions_truncated: boolean().notNull().default(false),
 
+    // Previous summary captured before the agent updates the platform comment
+    previous_summary_body: text(),
+    previous_summary_head_sha: text(),
+
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
     total_tokens_in: integer(), // Total input tokens across all LLM calls

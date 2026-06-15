@@ -18,6 +18,8 @@ import type {
 import { trimPayload } from '../../src/shared/trim-payload.js';
 import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
+import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-model-diagnostics.js';
+import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -170,6 +172,7 @@ export type WrapperTerminalFailure = {
   code?: WrapperTerminalFailureCode;
   message: string;
   errorSource: 'assistant';
+  modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
 };
 
 export type ConnectionCallbacks = {
@@ -237,6 +240,7 @@ const RECONNECT_BASE_DELAY_MS = 1_000;
  *  a silently stuck HTTP stream. */
 const SUBSCRIBE_HANDSHAKE_TIMEOUT_MS = 5_000;
 const INGEST_INITIAL_CONNECT_TIMEOUT_MS = 10_000;
+const MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS = 1_000;
 
 function buildIngestWebSocketUrl(session: NonNullable<WrapperState['currentSession']>): string {
   const url = new URL(session.ingestUrl);
@@ -762,15 +766,15 @@ export function createConnectionManager(
       return undefined;
     }
 
+    const terminalErrorText = getTerminalErrorText(eventType, properties);
     let code: WrapperTerminalFailureCode | undefined;
     if (eventType === 'payment_required' || eventType === 'insufficient_funds') {
       code = 'payment_required';
     } else if (eventType !== 'usage_limit_exceeded') {
       const error = properties.error;
       if (error) {
-        const errorStr = typeof error === 'string' ? error : JSON.stringify(error);
-        const normalizedError = errorStr.toLowerCase();
-        if (eventType === 'session.error' && normalizedError.includes('model not found')) {
+        const normalizedError = JSON.stringify(error).toLowerCase();
+        if (eventType === 'session.error' && isModelNotFoundMessage(terminalErrorText)) {
           code = 'model_missing';
         } else if (
           normalizedError.includes('payment') ||
@@ -797,7 +801,7 @@ export function createConnectionManager(
 
     return {
       ...(code ? { code } : {}),
-      message: getTerminalErrorText(eventType, properties),
+      message: terminalErrorText,
       errorSource: 'assistant',
     };
   }
@@ -822,6 +826,82 @@ export function createConnectionManager(
     }
 
     return `Insufficient credits: ${eventType}`;
+  }
+
+  function isModelNotFoundMessage(message: string): boolean {
+    return /\b(model\s+(?:was\s+)?not\s+found|unknown\s+model|invalid\s+model)\b/i.test(message);
+  }
+
+  function shouldFetchModelNotFoundDiagnostics(
+    eventType: string,
+    properties: Record<string, unknown>,
+    terminalErrorText: string
+  ): boolean {
+    if (eventType !== 'session.error') return false;
+    if (!isCodeReviewJob(state)) return false;
+    if (properties.sessionID !== state.currentSession?.kiloSessionId) return false;
+    return isModelNotFoundMessage(terminalErrorText);
+  }
+
+  function logModelDiagnosticUnavailable(reason: string, requestedModel?: string): void {
+    logToFile(
+      JSON.stringify({
+        message: 'model_not_found_runtime_diagnostics_unavailable',
+        reason,
+        agentSessionId: state.currentSession?.agentSessionId,
+        kiloSessionId: state.currentSession?.kiloSessionId,
+        requestedModel,
+      })
+    );
+  }
+
+  async function listEffectiveModelsForDiagnostics(
+    requestedModel: string
+  ): Promise<string[] | undefined> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<undefined>(resolve => {
+      timeoutId = setTimeout(() => {
+        logModelDiagnosticUnavailable(
+          `timed out after ${MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS}ms`,
+          requestedModel
+        );
+        resolve(undefined);
+      }, MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS);
+    });
+
+    try {
+      return await Promise.race([config.kiloClient.listEffectiveModels('kilo'), timeout]);
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
+  }
+
+  async function maybeBuildModelNotFoundDiagnostics(
+    eventType: string,
+    properties: Record<string, unknown>,
+    terminalErrorText: string
+  ): Promise<ModelNotFoundRuntimeDiagnostics | undefined> {
+    if (!shouldFetchModelNotFoundDiagnostics(eventType, properties, terminalErrorText)) {
+      return undefined;
+    }
+
+    const requestedModel = state.batchFinalizationConfig?.model?.trim();
+    if (!requestedModel) {
+      logModelDiagnosticUnavailable('missing_requested_model');
+      return undefined;
+    }
+
+    try {
+      const availableModels = await listEffectiveModelsForDiagnostics(requestedModel);
+      if (!availableModels) return undefined;
+      return buildModelNotFoundRuntimeDiagnostics(requestedModel, availableModels);
+    } catch (error) {
+      logModelDiagnosticUnavailable(
+        error instanceof Error ? error.message : String(error),
+        requestedModel
+      );
+      return undefined;
+    }
   }
 
   function maybeResumeNetworkWait(eventType: string, properties: Record<string, unknown>): void {
@@ -1047,7 +1127,15 @@ export function createConnectionManager(
           // Terminal error detection
           const terminalFailure = getTerminalFailure(eventType, properties);
           if (terminalFailure) {
-            callbacks.onTerminalError(terminalFailure);
+            const modelNotFoundRuntimeDiagnostics = await maybeBuildModelNotFoundDiagnostics(
+              eventType,
+              properties,
+              terminalFailure.message
+            );
+            callbacks.onTerminalError({
+              ...terminalFailure,
+              ...(modelNotFoundRuntimeDiagnostics ? { modelNotFoundRuntimeDiagnostics } : {}),
+            });
             return;
           }
 

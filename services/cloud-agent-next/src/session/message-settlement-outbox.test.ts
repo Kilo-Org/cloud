@@ -384,6 +384,52 @@ describe('MessageSettlementOutbox', () => {
     );
   });
 
+  it('sends model diagnostics privately in callbacks while keeping failure text generic', async () => {
+    const harness = createHarness();
+    const diagnostics = {
+      requestedModel: 'kilo/retired-model',
+      availableModelCount: 3,
+      availableModels: ['vendor/alpha', 'vendor/beta', 'vendor/gamma'],
+      suggestedModels: ['vendor/alpha', 'vendor/beta'],
+      suggestionSource: 'fuzzy' as const,
+    };
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/model-diagnostics' })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'failed',
+      reason: 'assistant_error',
+      error: 'Model not found: kilo/retired-model',
+      completionSource: 'wrapper_failure',
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      safeFailureMessage: 'Assistant request failed: model not found',
+      modelNotFoundRuntimeDiagnostics: diagnostics,
+    });
+
+    expect(harness.events).toHaveLength(1);
+    expect(JSON.parse(harness.events[0].payload)).toMatchObject({
+      error: 'Assistant request failed: model not found',
+      failure: {
+        code: 'assistant_error',
+        message: 'Assistant request failed: model not found',
+      },
+    });
+    expect(harness.events[0].payload).not.toContain('vendor/alpha');
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      errorMessage:
+        'Model not found: kilo/retired-model. Available runtime models: 3. Closest matches: vendor/alpha, vendor/beta.',
+      modelNotFoundRuntimeDiagnostics: diagnostics,
+      failure: {
+        code: 'assistant_error',
+        message: 'Assistant request failed: model not found',
+      },
+    });
+  });
+
   it('preserves allowlisted legacy reasons and replaces arbitrary reasons with status text', () => {
     const state = {
       ...acceptedMessageState(firstMessageId),

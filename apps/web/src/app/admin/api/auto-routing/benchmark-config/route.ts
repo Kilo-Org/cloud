@@ -9,6 +9,7 @@ import {
   gatewayChatApisForModel,
   modelServesAllGatewayChatApis,
 } from '@/lib/ai-gateway/model-api-kinds';
+import { findExperimentReservedModelIds } from '@/lib/ai-gateway/experiments/reserved-ids';
 import { getUserFromAuth } from '@/lib/user/server';
 
 export async function GET() {
@@ -33,6 +34,22 @@ export async function PUT(request: NextRequest) {
   const parsed = BenchmarkConfigSchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid benchmark config' }, { status: 400 });
+  }
+
+  // Model-experiment public ids are dedicated preview ids that users must
+  // explicitly select; per .specs/model-experiments.md they must never enter
+  // kilo-auto candidate sets, so they can't be saved as decider candidates
+  // (the routing table feeds kilo-auto/efficient automatic selection). Checked
+  // across all experiment statuses — ownership, not just routing membership.
+  const deciderModelIds = parsed.data.deciderModels.map(m => m.id);
+  const reservedExperimentIds = await findExperimentReservedModelIds(deciderModelIds);
+  if (reservedExperimentIds.length > 0) {
+    return NextResponse.json(
+      {
+        error: `Decider models must not be model-experiment public ids (reserved for explicit user selection): ${reservedExperimentIds.join(', ')}`,
+      },
+      { status: 400 }
+    );
   }
 
   // Routing-table candidates carry no per-protocol metadata, so every decider

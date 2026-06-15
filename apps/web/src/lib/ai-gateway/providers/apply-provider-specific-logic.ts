@@ -22,7 +22,7 @@ import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
-import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
+import { repairTools, repairMessagesTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import {
   addCacheBreakpoints,
@@ -129,6 +129,10 @@ export function applyProviderSpecificLogic(
       // Workaround for bugs in the chat completions client.
       fixOpenCodeDuplicateReasoning(requestedModel, requestToMutate.body, taskId ?? undefined);
     }
+  }
+
+  if (requestToMutate.kind === 'messages') {
+    repairMessagesTools(requestToMutate.body);
   }
 
   if (requestToMutate.kind === 'responses') {

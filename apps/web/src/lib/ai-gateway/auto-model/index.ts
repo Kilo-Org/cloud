@@ -6,7 +6,7 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 type AutoModel = {

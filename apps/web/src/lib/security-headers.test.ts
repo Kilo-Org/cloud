@@ -3,8 +3,6 @@ import {
   getConfiguredConnectSrcOrigins,
   getContentSecurityPolicyHeaderName,
   getContentSecurityPolicyMode,
-  getSecurityPolicyReportingHeaders,
-  getSentrySecurityReportUri,
 } from '@/lib/security-headers';
 
 function getPolicyDirective(policy: string, directive: string): string {
@@ -82,8 +80,6 @@ describe('security headers', () => {
       NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL: 'wss://next-agent.example.com/path',
       NEXT_PUBLIC_SESSION_INGEST_WS_URL: 'wss://ingest.example.com/path',
       NEXT_PUBLIC_GASTOWN_URL: 'https://gastown.example.com/api',
-      NEXT_PUBLIC_SENTRY_DSN:
-        'https://27ef80847dcd5e044283c8f88d95ffc9@o4509356317474816.ingest.us.sentry.io/4509565130637312',
     };
 
     expect(getConfiguredConnectSrcOrigins(env)).toEqual([
@@ -92,7 +88,6 @@ describe('security headers', () => {
       'wss://ingest.example.com',
       'https://gastown.example.com',
       'wss://gastown.example.com',
-      'https://o4509356317474816.ingest.us.sentry.io',
     ]);
   });
 
@@ -102,56 +97,6 @@ describe('security headers', () => {
         NEXT_PUBLIC_GASTOWN_URL: 'http://localhost:8787/api',
       })
     ).toEqual(['http://localhost:8787', 'ws://localhost:8787']);
-  });
-
-  it('adds Sentry security policy reporting directives when DSN is configured', () => {
-    const policy = buildContentSecurityPolicy({
-      env: {
-        NEXT_PUBLIC_SENTRY_DSN:
-          'https://27ef80847dcd5e044283c8f88d95ffc9@o4509356317474816.ingest.us.sentry.io/4509565130637312',
-        SENTRY_ENVIRONMENT: 'production',
-        SENTRY_RELEASE: 'web-2026-04-24',
-      },
-    });
-
-    const reportUri =
-      'https://o4509356317474816.ingest.us.sentry.io/api/4509565130637312/security/?sentry_key=27ef80847dcd5e044283c8f88d95ffc9&sentry_environment=production&sentry_release=web-2026-04-24';
-
-    expect(policy).toContain(`report-uri ${reportUri}`);
-    expect(policy).toContain('report-to csp-endpoint');
-    expect(policy).toContain('https://o4509356317474816.ingest.us.sentry.io');
-  });
-
-  it('builds Sentry security policy reporting headers', () => {
-    const reportUri = getSentrySecurityReportUri({
-      NEXT_PUBLIC_SENTRY_DSN:
-        'https://27ef80847dcd5e044283c8f88d95ffc9@o4509356317474816.ingest.us.sentry.io/4509565130637312',
-      VERCEL_ENV: 'preview',
-    });
-
-    expect(reportUri).toBe(
-      'https://o4509356317474816.ingest.us.sentry.io/api/4509565130637312/security/?sentry_key=27ef80847dcd5e044283c8f88d95ffc9&sentry_environment=preview'
-    );
-
-    const headers = getSecurityPolicyReportingHeaders({
-      NEXT_PUBLIC_SENTRY_DSN:
-        'https://27ef80847dcd5e044283c8f88d95ffc9@o4509356317474816.ingest.us.sentry.io/4509565130637312',
-      VERCEL_ENV: 'preview',
-    });
-
-    expect(headers['Reporting-Endpoints']).toBe(`csp-endpoint="${reportUri}"`);
-    expect(JSON.parse(headers['Report-To'] ?? '')).toEqual({
-      group: 'csp-endpoint',
-      max_age: 10886400,
-      endpoints: [{ url: reportUri }],
-      include_subdomains: true,
-    });
-  });
-
-  it('omits Sentry security policy reporting when DSN is missing', () => {
-    expect(getSentrySecurityReportUri({})).toBeNull();
-    expect(getSecurityPolicyReportingHeaders({})).toEqual({});
-    expect(buildContentSecurityPolicy({ env: {} })).not.toContain('report-uri');
   });
 
   it('supports enforcement, report-only, and off modes', () => {

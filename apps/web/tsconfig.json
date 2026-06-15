@@ -45,7 +45,6 @@
     ".next/types/**/*.ts",
     "jest.config.ts",
     "knip.ts",
-    "instrumentation-client.ts",
     "sentry.edge.config.ts",
     "sentry.server.config.ts",
     ".next/dev/types/**/*.ts",

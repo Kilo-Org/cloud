@@ -87,19 +87,18 @@ export function useClawControllerVersion(enabled: boolean) {
   // The controller version (and the capabilities it advertises) changes out of
   // band on a redeploy. A long staleTime made the cached capabilities survive an
   // upgrade — e.g. /claw/agents showing "not available on this machine version"
-  // until a hard refresh, because the redeploy's invalidation refetched while the
-  // controller was still restarting and nothing refetched once it was back up.
-  // Keep it short and poll on a bounded interval while running so it self-heals:
-  // refetch on mount/re-enable, and pick up the new build within ~30s.
+  // until a hard refresh, because nothing refetched once the controller was back
+  // up. `staleTime: 0` makes it self-heal WITHOUT a steady poll: it refetches on
+  // mount, on window focus, and when the query re-enables as the instance returns
+  // to `running` after a restart (status leaves+re-enters `running`), plus the
+  // existing lifecycle invalidation (invalidateStatus invalidates this query).
   const STALE_TIME = 0;
-  const REFETCH_INTERVAL = 30_000;
 
   const personal = useQuery({
     ...trpc.kiloclaw.controllerVersion.queryOptions(undefined, {
       staleTime: STALE_TIME,
     }),
     enabled: enabled && !organizationId,
-    refetchInterval: enabled && !organizationId ? REFETCH_INTERVAL : false,
   });
 
   const org = useQuery({
@@ -108,7 +107,6 @@ export function useClawControllerVersion(enabled: boolean) {
       { staleTime: STALE_TIME }
     ),
     enabled: enabled && !!organizationId,
-    refetchInterval: enabled && !!organizationId ? REFETCH_INTERVAL : false,
   });
 
   return organizationId ? org : personal;

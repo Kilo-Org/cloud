@@ -7,6 +7,7 @@ import {
   AgentConfigError,
   AgentDefaultsPatchBodySchema,
   AgentSettingsPatchBodySchema,
+  normalizeAgentId,
   readAgentConfigSnapshot,
   readAgentSummary,
   serializeAgentConfigMutation,
@@ -14,6 +15,39 @@ import {
   updateAgentDefaults,
   updateAgentSettings,
 } from './openclaw-agent-config';
+
+// PARITY CORPUS — the web app re-declares normalizeAgentId in
+// apps/web/src/lib/kiloclaw/agent-id.ts (the architecture wall blocks importing
+// this controller code into apps/web). Both sides must agree, because the web
+// create-timeout reconcile predicts the id from the typed name. This is the same
+// input→output corpus asserted in agent-id.test.ts; if EITHER implementation
+// drifts, its test breaks here or there. Keep the two corpora in sync.
+const NORMALIZE_AGENT_ID_CORPUS: ReadonlyArray<[input: string, expected: string]> = [
+  ['', 'main'],
+  ['   ', 'main'],
+  ['research', 'research'],
+  ['Research', 'research'],
+  ['foo_bar', 'foo_bar'],
+  ['foo-bar', 'foo-bar'],
+  ['My Agent!', 'my-agent'],
+  ['  spaces  here ', 'spaces-here'],
+  ['a@@@b', 'a-b'],
+  ['@@@', 'main'],
+];
+
+describe('normalizeAgentId (parity with web agent-id.test.ts)', () => {
+  it.each(NORMALIZE_AGENT_ID_CORPUS)('normalizes %j -> %j', (input, expected) => {
+    expect(normalizeAgentId(input)).toBe(expected);
+  });
+
+  it('keeps underscore and hyphen names distinct', () => {
+    expect(normalizeAgentId('foo_bar')).not.toBe(normalizeAgentId('foo-bar'));
+  });
+
+  it('caps at 64 chars', () => {
+    expect(normalizeAgentId('a'.repeat(100))).toHaveLength(64);
+  });
+});
 
 const tempDirs: string[] = [];
 

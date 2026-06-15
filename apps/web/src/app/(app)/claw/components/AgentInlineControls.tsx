@@ -9,6 +9,9 @@ import { stripKilocodeModelPrefix } from './modelSupport';
 // Sentinel option meaning "clear the agent's own model and inherit the default".
 // Mapped back to a model unset by the caller.
 export const USE_DEFAULT_MODEL = '__default__';
+// Marker for a fallback-only override (rawModel set, no primary). Shown so the
+// override isn't misrendered as the default; selecting it is a no-op.
+const FALLBACK_ONLY = '__fallbacks__';
 
 // The agent's OWN primary model id (bare, un-prefixed), '' if it has none.
 export function ownPrimaryModel(agent: AgentSummary): string {
@@ -58,12 +61,33 @@ export function AgentModelControl({
   onChange: (value: string | null) => void;
 }) {
   const primary = ownPrimaryModel(agent);
-  // An agent owns a model when rawModel is set; show its primary, else the
-  // sentinel. (A rare fallback-only model has no primary to show, so it reads as
-  // the default here; selecting a model still preserves its fallbacks.)
-  const value = agent.rawModel != null && primary !== '' ? primary : USE_DEFAULT_MODEL;
+  const hasOwnModel = agent.rawModel != null;
+
+  // Reserve USE_DEFAULT_MODEL for an agent that TRULY inherits (rawModel === null).
+  // An agent that owns a model must never display as the default — otherwise the
+  // combobox falls back to the placeholder and selecting it would silently clear
+  // the override. So surface real overrides as their own options:
+  //  - a primary that isn't in the current catalog (so it doesn't show the placeholder)
+  //  - a fallback-only model (no primary) as an explicit, non-default entry
+  const extra: ModelOption[] = [];
+  let value: string;
+  if (!hasOwnModel) {
+    value = USE_DEFAULT_MODEL;
+  } else if (primary !== '') {
+    value = primary;
+    if (!models.some(m => m.id === primary)) {
+      extra.push({ id: primary, name: `${primary} (not in catalog)` });
+    }
+  } else {
+    value = FALLBACK_ONLY;
+    extra.push({
+      id: FALLBACK_ONLY,
+      name: `Fallbacks only: ${ownModelFallbacks(agent).join(', ') || '(none)'}`,
+    });
+  }
   const options: ModelOption[] = [
     { id: USE_DEFAULT_MODEL, name: 'Use the default model' },
+    ...extra,
     ...models,
   ];
   return (
@@ -72,7 +96,12 @@ export function AgentModelControl({
       variant="compact"
       models={options}
       value={value}
-      onValueChange={v => onChange(v === USE_DEFAULT_MODEL ? null : v)}
+      onValueChange={v => {
+        // Re-selecting the fallback-only marker is a no-op (it's the current
+        // state, and it carries no primary to write).
+        if (v === FALLBACK_ONLY) return;
+        onChange(v === USE_DEFAULT_MODEL ? null : v);
+      }}
       isLoading={isLoading}
       error={error}
       disabled={disabled || saving}

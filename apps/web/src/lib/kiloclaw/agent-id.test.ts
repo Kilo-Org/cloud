@@ -1,5 +1,11 @@
 import { normalizeAgentId, workspaceFromName } from './agent-id';
 
+// PARITY: the controller owns the authoritative normalizeAgentId
+// (services/kiloclaw/controller/src/openclaw-agent-config.ts) and asserts the
+// same input→output corpus in openclaw-agent-config.test.ts. The architecture
+// wall prevents sharing one module, so these two test corpora are the drift
+// guard — if either implementation changes, keep both corpora in sync.
+
 describe('normalizeAgentId', () => {
   it('maps empty / whitespace-only to main', () => {
     expect(normalizeAgentId('')).toBe('main');

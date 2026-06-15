@@ -1,13 +1,10 @@
 export type ContentSecurityPolicyOptions = {
   isDevelopment?: boolean;
   connectSrcUrls?: Array<string | undefined>;
-  env?: Record<string, string | undefined>;
 };
 
 export type ContentSecurityPolicyMode = 'enforce' | 'report-only' | 'off';
 
-const CSP_REPORTING_GROUP = 'csp-endpoint';
-const SENTRY_SECURITY_REPORT_MAX_AGE_SECONDS = 10886400;
 const KILO_CHAT_R2_ATTACHMENT_ORIGIN =
   'https://e115e769bcdd4c3d66af59d3332cb394.r2.cloudflarestorage.com';
 
@@ -38,61 +35,6 @@ function webSocketOriginFromUrl(value: string | undefined): string | null {
   }
 }
 
-function getSentryEnvironment(value: string | undefined): string | null {
-  const trimmed = value?.trim();
-  if (!trimmed || trimmed.length > 64 || /[\s/]/.test(trimmed) || trimmed === 'None') return null;
-  return trimmed;
-}
-
-function getOptionalQueryValue(value: string | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed || null;
-}
-
-export function getSentrySecurityReportUri(
-  env: Record<string, string | undefined> = process.env
-): string | null {
-  const dsn = env.NEXT_PUBLIC_SENTRY_DSN;
-  if (!dsn) return null;
-
-  try {
-    const url = new URL(dsn);
-    const projectId = url.pathname.split('/').filter(Boolean).at(-1);
-    const sentryKey = url.username;
-    if (!projectId || !sentryKey) return null;
-
-    const reportUri = new URL(`/api/${projectId}/security/`, url.origin);
-    reportUri.searchParams.set('sentry_key', sentryKey);
-
-    const sentryEnvironment = getSentryEnvironment(env.SENTRY_ENVIRONMENT ?? env.VERCEL_ENV);
-    if (sentryEnvironment) reportUri.searchParams.set('sentry_environment', sentryEnvironment);
-
-    const sentryRelease = getOptionalQueryValue(env.SENTRY_RELEASE);
-    if (sentryRelease) reportUri.searchParams.set('sentry_release', sentryRelease);
-
-    return reportUri.toString();
-  } catch {
-    return null;
-  }
-}
-
-export function getSecurityPolicyReportingHeaders(
-  env: Record<string, string | undefined> = process.env
-): Record<string, string> {
-  const reportUri = getSentrySecurityReportUri(env);
-  if (!reportUri) return {};
-
-  return {
-    'Report-To': JSON.stringify({
-      group: CSP_REPORTING_GROUP,
-      max_age: SENTRY_SECURITY_REPORT_MAX_AGE_SECONDS,
-      endpoints: [{ url: reportUri }],
-      include_subdomains: true,
-    }),
-    'Reporting-Endpoints': `${CSP_REPORTING_GROUP}="${reportUri}"`,
-  };
-}
-
 export function getConfiguredConnectSrcOrigins(
   env: Record<string, string | undefined> = process.env
 ): string[] {
@@ -102,7 +44,6 @@ export function getConfiguredConnectSrcOrigins(
     originFromUrl(env.NEXT_PUBLIC_SESSION_INGEST_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
     webSocketOriginFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
-    originFromUrl(env.NEXT_PUBLIC_SENTRY_DSN),
   ]);
 }
 
@@ -129,9 +70,8 @@ export function getContentSecurityPolicyHeaderName(mode: ContentSecurityPolicyMo
 export function buildContentSecurityPolicy({
   isDevelopment = false,
   connectSrcUrls,
-  env = process.env,
 }: ContentSecurityPolicyOptions = {}): string {
-  const configuredConnectSrcUrls = connectSrcUrls ?? getConfiguredConnectSrcOrigins(env);
+  const configuredConnectSrcUrls = connectSrcUrls ?? getConfiguredConnectSrcOrigins();
   const scriptSrc = compactUnique([
     "'self'",
     "'unsafe-inline'",
@@ -171,8 +111,6 @@ export function buildContentSecurityPolicy({
     isDevelopment ? 'ws://localhost:*' : null,
     ...configuredConnectSrcUrls.map(originFromUrl),
   ]);
-
-  const reportUri = getSentrySecurityReportUri(env);
 
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
@@ -221,7 +159,6 @@ export function buildContentSecurityPolicy({
     'worker-src': ["'self'", 'blob:'],
     'media-src': ["'self'", 'blob:'],
     'manifest-src': ["'self'"],
-    ...(reportUri ? { 'report-uri': [reportUri], 'report-to': [CSP_REPORTING_GROUP] } : {}),
   };
 
   return Object.entries(directives)

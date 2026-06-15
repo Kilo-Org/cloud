@@ -34,7 +34,9 @@ export function useGrantOrganizationCredit() {
           queryKey: ['organization', variables.organizationId],
         });
         void queryClient.invalidateQueries({
-          queryKey: ['organization', variables.organizationId, 'credit-transactions'],
+          queryKey: trpc.organizations.admin.creditTransactions.queryKey({
+            organizationId: variables.organizationId,
+          }),
         });
         void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
         void invalidate();
@@ -55,7 +57,9 @@ export function useNullifyOrganizationCredits() {
           queryKey: ['organization', variables.organizationId],
         });
         void queryClient.invalidateQueries({
-          queryKey: ['organization', variables.organizationId, 'credit-transactions'],
+          queryKey: trpc.organizations.admin.creditTransactions.queryKey({
+            organizationId: variables.organizationId,
+          }),
         });
         void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
         void invalidate();
@@ -116,6 +120,15 @@ export function useAdminOrganizationDetails(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.admin.getDetails.queryOptions({
+      organizationId,
+    })
+  );
+}
+
+export function useAdminOrganizationCreditTransactions(organizationId: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.creditTransactions.queryOptions({
       organizationId,
     })
   );

@@ -25,6 +25,7 @@ export type GrantCreditOptions = Pick<PromoCreditCategoryConfig, 'credit_categor
    * When provided, all DB writes are executed on this transaction.
    */
   dbOrTx?: DbOrTx;
+  created_by_kilo_user_id?: User['id'];
 } & Partial<
     Pick<
       PromoCreditCategoryConfig,
@@ -175,6 +176,7 @@ export async function grantCreditForCategoryConfig(
       id: new_credit_transaction_id,
       kilo_user_id: user.id,
       organization_id: organization_id,
+      created_by_kilo_user_id: options.created_by_kilo_user_id,
       is_free: true,
       amount_microdollars: toMicrodollars(amount_usd),
       description: description,

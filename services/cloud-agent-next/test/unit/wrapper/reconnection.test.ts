@@ -167,6 +167,7 @@ const createMockKiloClient = (overrides: Partial<WrapperKiloClient> = {}): Wrapp
   getPermissions: vi.fn().mockResolvedValue([]),
   getNetworkWaits: vi.fn().mockResolvedValue([]),
   resumeNetworkWait: vi.fn().mockResolvedValue(true),
+  listEffectiveModels: vi.fn().mockResolvedValue([]),
   // Return a stream that never yields — keeps event subscription alive
   subscribeEvents: vi.fn().mockResolvedValue({
     stream: (async function* () {
@@ -1091,8 +1092,26 @@ describe('ingest WS reconnection', () => {
     expect(callbacks2.onReconnecting).toHaveBeenCalledWith(1);
   });
 
-  it('surfaces model-not-found session errors as terminal wrapper errors', async () => {
+  it('surfaces code-review model-not-found session errors with runtime diagnostics', async () => {
+    state = new WrapperState();
+    state.bindSession(createCodeReviewSessionContext());
+    state.acceptMessage('msg_0123456789abMODELNOTFOUND', {
+      autoCommit: false,
+      condenseOnComplete: false,
+      model: 'kilo/zzzzzzzz',
+    });
+    const listEffectiveModels = vi
+      .fn()
+      .mockResolvedValue([
+        'vendor/theta',
+        'vendor/beta',
+        'vendor/epsilon',
+        'vendor/delta',
+        'vendor/alpha',
+        'vendor/gamma',
+      ]);
     const kiloClient = createMockKiloClient({
+      listEffectiveModels,
       subscribeEvents: vi.fn().mockResolvedValue({
         stream: createEventStream([
           {
@@ -1101,7 +1120,7 @@ describe('ingest WS reconnection', () => {
               sessionID: 'kilo_sess_456',
               error: {
                 name: 'UnknownError',
-                data: { message: 'Model not found: kilo/does-not-exist.' },
+                data: { message: 'Model not found: kilo/zzzzzzzz.' },
               },
             },
           },
@@ -1117,9 +1136,191 @@ describe('ingest WS reconnection', () => {
       event => event.streamEventType === 'kilocode' && event.data.event === 'session.error'
     );
     expect(sessionErrors).toHaveLength(1);
+    expect(listEffectiveModels).toHaveBeenCalledWith('kilo');
     expect(callbacks.onTerminalError).toHaveBeenCalledWith({
       code: 'model_missing',
-      message: 'Model not found: kilo/does-not-exist.',
+      message: 'Model not found: kilo/zzzzzzzz.',
+      errorSource: 'assistant',
+      modelNotFoundRuntimeDiagnostics: {
+        requestedModel: 'kilo/zzzzzzzz',
+        availableModelCount: 6,
+        availableModels: [
+          'vendor/alpha',
+          'vendor/beta',
+          'vendor/delta',
+          'vendor/epsilon',
+          'vendor/gamma',
+          'vendor/theta',
+        ],
+        suggestedModels: [
+          'vendor/alpha',
+          'vendor/beta',
+          'vendor/delta',
+          'vendor/epsilon',
+          'vendor/gamma',
+        ],
+        suggestionSource: 'first-five',
+      },
+    });
+  });
+
+  it('preserves the terminal model-not-found error when runtime diagnostics lookup fails', async () => {
+    state = new WrapperState();
+    state.bindSession(createCodeReviewSessionContext());
+    state.acceptMessage('msg_0123456789abLOOKUPFAILS', {
+      autoCommit: false,
+      condenseOnComplete: false,
+      model: 'kilo/retired-model',
+    });
+    const listEffectiveModels = vi.fn().mockRejectedValue(new Error('config unavailable'));
+    const kiloClient = createMockKiloClient({
+      listEffectiveModels,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: { data: { message: 'Model not found: kilo/retired-model.' } },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(listEffectiveModels).toHaveBeenCalledWith('kilo');
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'model_missing',
+      message: 'Model not found: kilo/retired-model.',
+      errorSource: 'assistant',
+    });
+  });
+
+  it('preserves the terminal model-not-found error when runtime diagnostics lookup hangs', async () => {
+    state = new WrapperState();
+    state.bindSession(createCodeReviewSessionContext());
+    state.acceptMessage('msg_0123456789abLOOKUPHANGS', {
+      autoCommit: false,
+      condenseOnComplete: false,
+      model: 'kilo/retired-model',
+    });
+    const listEffectiveModels = vi.fn().mockReturnValue(new Promise<string[]>(() => {}));
+    const kiloClient = createMockKiloClient({
+      listEffectiveModels,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: { data: { message: 'Model not found: kilo/retired-model.' } },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(listEffectiveModels).toHaveBeenCalledWith('kilo');
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'model_missing',
+      message: 'Model not found: kilo/retired-model.',
+      errorSource: 'assistant',
+    });
+  });
+
+  it('does not fetch model diagnostics for non-code-review model-not-found errors', async () => {
+    const listEffectiveModels = vi.fn().mockResolvedValue(['vendor/model']);
+    const kiloClient = createMockKiloClient({
+      listEffectiveModels,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: { data: { message: 'Model not found: kilo/retired-model.' } },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(listEffectiveModels).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'model_missing',
+      message: 'Model not found: kilo/retired-model.',
+      errorSource: 'assistant',
+    });
+  });
+
+  it('does not fetch model diagnostics for child-session model-not-found errors', async () => {
+    state = new WrapperState();
+    state.bindSession(createCodeReviewSessionContext());
+    const listEffectiveModels = vi.fn().mockResolvedValue(['vendor/model']);
+    const kiloClient = createMockKiloClient({
+      listEffectiveModels,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_child_789',
+              error: { data: { message: 'Model not found: kilo/retired-model.' } },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(listEffectiveModels).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('detects billing markers in full session error objects', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                name: 'PaymentRequiredError',
+                data: { message: 'Request failed' },
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'payment_required',
+      message: 'Request failed',
       errorSource: 'assistant',
     });
   });

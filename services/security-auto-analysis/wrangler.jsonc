@@ -17,6 +17,7 @@
   "routes": [
     {
       "pattern": "security-auto-analysis.kilosessions.ai",
+      "zone_name": "kilosessions.ai",
       "custom_domain": true,
     },
   ],

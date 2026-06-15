@@ -6,6 +6,7 @@ import {
   MirrorPayloadSchema,
   UpdateClassifierModelRequestSchema,
 } from './index';
+import { BenchmarkConfigSchema } from './benchmark';
 
 describe('auto routing contracts', () => {
   it('validates the cross-service request and response contracts', () => {
@@ -94,6 +95,8 @@ describe('auto routing contracts', () => {
     expect(
       AutoRoutingClassifierModelResponseSchema.parse({
         model: 'google/gemini-2.5-flash-lite',
+        override: null,
+        benchmarkWinner: 'google/gemini-2.5-flash-lite',
         defaultModel: 'google/gemini-2.5-flash-lite',
       })
     ).toMatchObject({ model: 'google/gemini-2.5-flash-lite' });
@@ -124,5 +127,71 @@ describe('auto routing contracts', () => {
         classifierModelBreakdown: [],
       })
     ).toMatchObject({ period: '24h' });
+  });
+});
+
+describe('BenchmarkConfigSchema defaults', () => {
+  it('applies defaults of 1/1/1000 for classifierRepetitions, deciderRepetitions, classifierMaxP95LatencyMs', () => {
+    const result = BenchmarkConfigSchema.parse({
+      classifierModels: ['model/a'],
+      deciderModels: [{ id: 'model/b' }],
+      minAccuracy: 0.8,
+      maxConcurrency: 4,
+      benchmarkUserId: null,
+      switchCostFactor: 2,
+      updatedAt: null,
+      updatedBy: null,
+      // classifierRepetitions, deciderRepetitions, classifierMaxP95LatencyMs intentionally omitted
+    });
+    expect(result.classifierRepetitions).toBe(1);
+    expect(result.deciderRepetitions).toBe(1);
+    expect(result.classifierMaxP95LatencyMs).toBe(1000);
+  });
+});
+
+describe('BenchmarkConfigSchema duplicate model ids', () => {
+  const base = {
+    minAccuracy: 0.8,
+    maxConcurrency: 4,
+    benchmarkUserId: null,
+    switchCostFactor: 2,
+    updatedAt: null,
+    updatedBy: null,
+  };
+
+  it('rejects duplicate classifier model ids with a field-specific issue', () => {
+    const result = BenchmarkConfigSchema.safeParse({
+      ...base,
+      classifierModels: ['model/a', 'model/a'],
+      deciderModels: [{ id: 'model/b' }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(i => i.path[0] === 'classifierModels');
+      expect(issue?.path).toEqual(['classifierModels', 1]);
+      expect(issue?.message).toContain('Duplicate model id');
+    }
+  });
+
+  it('rejects duplicate decider model ids (trim-normalized)', () => {
+    const result = BenchmarkConfigSchema.safeParse({
+      ...base,
+      classifierModels: ['model/a'],
+      deciderModels: [{ id: 'model/b' }, { id: '  model/b  ' }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(i => i.path[0] === 'deciderModels');
+      expect(issue?.path).toEqual(['deciderModels', 1]);
+    }
+  });
+
+  it('accepts distinct model ids', () => {
+    const result = BenchmarkConfigSchema.safeParse({
+      ...base,
+      classifierModels: ['model/a', 'model/b'],
+      deciderModels: [{ id: 'model/c' }, { id: 'model/d' }],
+    });
+    expect(result.success).toBe(true);
   });
 });

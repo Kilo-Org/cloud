@@ -43,6 +43,7 @@ import { getIntegrationById } from '@/lib/integrations/db/platform-integrations'
 import {
   getCodeReviewById,
   findPreviousCompletedReview,
+  updatePreviousReviewSummary,
   updateRepositoryReviewInstructionsMetadata,
   type ReviewContinuationScope,
 } from '../db/code-reviews';
@@ -56,6 +57,7 @@ import {
   normalizeRepositoryReviewInstructions,
   REVIEW_INSTRUCTIONS_FILE,
 } from '../prompts/repository-review-instructions';
+import { getCurrentReviewSummaryForContext } from '../summary/history';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 
@@ -474,11 +476,17 @@ export async function prepareReviewPayload(
       );
     }
 
-    await updateRepositoryReviewInstructionsMetadata(reviewId, {
-      used: repositoryReviewInstructionsLookup.used,
-      ref: repositoryReviewInstructionsLookup.ref,
-      truncated: repositoryReviewInstructionsLookup.truncated,
-    });
+    await Promise.all([
+      updatePreviousReviewSummary(reviewId, {
+        body: existingReviewState?.summaryComment?.body ?? null,
+        headSha: existingReviewState?.summaryComment ? previousHeadSha : null,
+      }),
+      updateRepositoryReviewInstructionsMetadata(reviewId, {
+        used: repositoryReviewInstructionsLookup.used,
+        ref: repositoryReviewInstructionsLookup.ref,
+        truncated: repositoryReviewInstructionsLookup.truncated,
+      }),
+    ]);
 
     // 5. Generate auth token for cloud agent with bot identifier
     const authToken = generateApiToken(user, { botId: 'reviewer' });
@@ -685,15 +693,13 @@ function buildReviewState(
   // Determine previous status from summary body
   let previousStatus: PreviousReviewStatus = 'no-review';
   if (summaryComment) {
-    if (
-      summaryComment.body.includes('No Issues Found') ||
-      summaryComment.body.includes('No New Issues')
-    ) {
+    const currentSummary = getCurrentReviewSummaryForContext(summaryComment.body);
+    if (currentSummary.includes('No Issues Found') || currentSummary.includes('No New Issues')) {
       previousStatus = 'no-issues';
     } else if (
-      summaryComment.body.includes('Issues Found') ||
-      summaryComment.body.includes('WARNING') ||
-      summaryComment.body.includes('CRITICAL')
+      currentSummary.includes('Issues Found') ||
+      currentSummary.includes('WARNING') ||
+      currentSummary.includes('CRITICAL')
     ) {
       previousStatus = 'issues-found';
     }

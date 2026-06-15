@@ -49,6 +49,10 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ inputs.worker }}
+          # Workers that define a `predeploy` script (e.g. D1 migrations) run it
+          # right before deploy; all other workers are unaffected.
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: deploy
 
   detect-changes:
@@ -150,4 +154,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ matrix.worker }}
+          # Workers that define a `predeploy` script (e.g. D1 migrations) run it
+          # right before deploy; all other workers are unaffected.
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: deploy

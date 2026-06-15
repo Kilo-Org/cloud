@@ -2,9 +2,11 @@ import {
   appendReviewSummaryFooter,
   appendUsageFooter,
   buildReviewGuidanceFooter,
+  buildReviewSummaryFooter,
   buildUsageFooter,
   stripReviewSummaryFooter,
 } from './usage-footer';
+import { REVIEW_SUMMARY_HISTORY_END, REVIEW_SUMMARY_HISTORY_START } from './history';
 
 describe('buildUsageFooter', () => {
   it('strips provider prefix from model slug', () => {
@@ -53,6 +55,23 @@ describe('buildReviewGuidanceFooter', () => {
     expect(footer).toContain('&lt;tag&gt;&amp;');
     expect(footer).not.toContain('<tag>');
     expect(footer).toContain('`` feat/`tick`-&lt;tag&gt;&amp; ``');
+  });
+});
+
+describe('buildReviewSummaryFooter', () => {
+  it('returns the exact suffix appended to the summary body', () => {
+    const footerData = {
+      usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 5000, tokensOut: 1000 },
+      reviewGuidance: { used: true, ref: 'main', truncated: false },
+    };
+    const footer = buildReviewSummaryFooter(footerData);
+
+    expect(`body${footer}`).toBe(appendReviewSummaryFooter('body', footerData));
+    expect(footer).toMatch(/^\n\n---\n<!-- kilo-usage -->/);
+  });
+
+  it('returns an empty suffix when no footer metadata is available', () => {
+    expect(buildReviewSummaryFooter({})).toBe('');
   });
 });
 
@@ -150,6 +169,33 @@ describe('appendReviewSummaryFooter', () => {
     expect(result).toContain('`new`');
     expect(result).not.toContain('`old`');
     expect(result.match(/<!-- kilo-review-guidance -->/g)?.length).toBe(1);
+  });
+
+  it('preserves summary history before appending a fresh backend footer', () => {
+    const body = [
+      '## Summary',
+      '',
+      'Current content',
+      '',
+      REVIEW_SUMMARY_HISTORY_START,
+      '<details>',
+      '<summary><b>Previous Review Summary</b></summary>',
+      '',
+      '**Status:** 1 Issue Found',
+      '',
+      '</details>',
+      REVIEW_SUMMARY_HISTORY_END,
+    ].join('\n');
+    const result = appendReviewSummaryFooter(body, {
+      usage: { model: 'x/m', tokensIn: 1, tokensOut: 2 },
+    });
+
+    expect(result).toContain(REVIEW_SUMMARY_HISTORY_START);
+    expect(result).toContain('**Status:** 1 Issue Found');
+    expect(result.indexOf(REVIEW_SUMMARY_HISTORY_END)).toBeLessThan(
+      result.indexOf('<!-- kilo-usage -->')
+    );
+    expect(result.match(/<!-- kilo-usage -->/g)?.length).toBe(1);
   });
 });
 

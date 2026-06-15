@@ -1,0 +1,34 @@
+{
+  "name": "auto-routing-benchmark",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "predeploy": "wrangler d1 migrations apply auto-routing-benchmark --remote",
+    "dev": "wrangler dev",
+    "types": "wrangler types --include-runtime=false",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/auto-routing-benchmark/src",
+    "db:generate": "drizzle-kit generate",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.1.1",
+    "@kilocode/auto-routing-contracts": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "@openrouter/sdk": "^0.12.79",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

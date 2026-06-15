@@ -234,7 +234,9 @@ export async function POST(request: NextRequest) {
   }
 
   const systemKey = getSystemApiKey(fimProvider);
-  const userByokEntry = userByok?.at(0);
+  const userByokEntry = byokProviderKeys
+    .map(providerId => userByok?.find(entry => entry.providerId === providerId))
+    .find(entry => entry !== undefined);
   const apiKey = userByokEntry?.decryptedAPIKey ?? systemKey;
   const upstreamUrl = resolveFimUpstreamUrl(fimProvider, userByokEntry?.providerId === 'codestral');
 

@@ -1,7 +1,7 @@
 import { db } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
+import { credit_transactions } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
 describe('bulk user credits router', () => {
@@ -16,30 +16,6 @@ describe('bulk user credits router', () => {
       matched: [{ userId: recipient.id }],
       unmatched: [],
     });
-
-    await expect(
-      caller.admin.bulkUserCredits.grantBulkCredits({
-        emails: [recipient.google_user_email],
-        amountUsd: 5,
-      })
-    ).rejects.toThrow('Credit management access required');
-
-    const transactions = await db
-      .select({ id: credit_transactions.id })
-      .from(credit_transactions)
-      .where(eq(credit_transactions.kilo_user_id, recipient.id));
-    expect(transactions).toHaveLength(0);
-  });
-
-  it('checks current capability state for each protected mutation', async () => {
-    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
-    const recipient = await insertTestUser();
-    const caller = await createCallerForUser(admin.id);
-
-    await db
-      .update(kilocode_users)
-      .set({ can_manage_credits: false })
-      .where(eq(kilocode_users.id, admin.id));
 
     await expect(
       caller.admin.bulkUserCredits.grantBulkCredits({

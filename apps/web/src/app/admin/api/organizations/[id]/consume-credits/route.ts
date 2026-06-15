@@ -19,7 +19,7 @@ export async function POST(
   const id = (await params).id;
   const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
-  if (!operator || !(await userCanManageCredits(operator.id))) {
+  if (!operator || !userCanManageCredits(operator)) {
     return NextResponse.json({ error: 'Credit management access required' }, { status: 403 });
   }
 

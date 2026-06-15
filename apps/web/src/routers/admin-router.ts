@@ -353,8 +353,8 @@ const CancelKiloClawSubscriptionSchema = z.object({
 });
 
 export const adminRouter = createTRPCRouter({
-  getPermissions: adminProcedure.query(async ({ ctx }) => ({
-    canManageCredits: await userCanManageCredits(ctx.user.id),
+  getPermissions: adminProcedure.query(({ ctx }) => ({
+    canManageCredits: userCanManageCredits(ctx.user),
   })),
   kiloclawReferrals: adminKiloclawReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,

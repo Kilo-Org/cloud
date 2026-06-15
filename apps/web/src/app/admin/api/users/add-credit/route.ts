@@ -13,7 +13,7 @@ export async function POST(
 ): Promise<NextResponse<{ error: string } | { message: string }>> {
   const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
-  if (!operator || !(await userCanManageCredits(operator.id))) {
+  if (!operator || !userCanManageCredits(operator)) {
     return NextResponse.json({ error: 'Credit management access required' }, { status: 403 });
   }
 

@@ -57,10 +57,7 @@ export async function getOrganizationByokProviderIds(
     .select({ provider_id: byok_api_keys.provider_id })
     .from(byok_api_keys)
     .where(
-      and(
-        eq(byok_api_keys.organization_id, organizationId),
-        eq(byok_api_keys.is_enabled, true)
-      )
+      and(eq(byok_api_keys.organization_id, organizationId), eq(byok_api_keys.is_enabled, true))
     );
 
   return rows.map(row => UserByokProviderIdSchema.parse(row.provider_id));

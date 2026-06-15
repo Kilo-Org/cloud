@@ -10,10 +10,7 @@ import { getDirectByokModelsForOrganization } from '@/lib/ai-gateway/providers/d
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
-import {
-  addUserByokAvailability,
-  getOrganizationByokProviderIds,
-} from '@/lib/ai-gateway/byok';
+import { addUserByokAvailability, getOrganizationByokProviderIds } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
 
 export async function getAvailableModelsForOrganization(

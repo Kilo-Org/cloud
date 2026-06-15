@@ -198,7 +198,7 @@ describe('generateReviewPrompt', () => {
 
     expect(prompt).toContain('## Inline Comment Footer');
     expect(prompt).toContain(
-      '<sub>Reply with `@kilocode-bot fix it` to have Kilo Code address this issue.</sub>'
+      'Reply with `@kilocode-bot fix it` to have Kilo Code address this issue.'
     );
     expect(prompt).toContain('after any fenced `suggestion` block');
     expect(prompt).toContain(

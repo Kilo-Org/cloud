@@ -182,7 +182,7 @@ export function KiloPassDetail() {
           backLabel="Back to subscriptions"
           title="Kilo Pass"
           status={subscriptionDisplay.status}
-          actions={isKiloPassTerminal(subscription.status) ? null : <KiloPassReferralButton />}
+          actions={<KiloPassReferralButton />}
         />
 
         {subscriptionDisplay.detailAlert ? (

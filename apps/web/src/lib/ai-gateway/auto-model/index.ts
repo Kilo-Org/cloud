@@ -77,16 +77,6 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: SONNET_FRONTIER,
 };
 
-export const BALANCED_RESPONSES_FALLBACK_MODEL: ResolvedAutoModel = {
-  model: 'openai/gpt-5.5',
-  reasoning: { enabled: true, effort: 'low' },
-};
-
-export const BALANCED_MESSAGES_FALLBACK_MODEL: ResolvedAutoModel = {
-  model: CLAUDE_SONNET_CURRENT_MODEL_ID,
-  reasoning: { enabled: true, effort: 'low' },
-};
-
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },

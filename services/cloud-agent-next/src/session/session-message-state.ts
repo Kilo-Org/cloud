@@ -20,9 +20,18 @@ import {
   getWrapperRuntimeState,
   hasCompleteWrapperRunMessageIndex,
 } from './wrapper-runtime-state.js';
+import {
+  parseModelNotFoundRuntimeDiagnostics,
+  type ModelNotFoundRuntimeDiagnostics,
+} from '../shared/runtime-model-diagnostics.js';
 
 const SESSION_MESSAGE_STATE_PREFIX = 'session_message:';
 const WRAPPER_RUN_MESSAGE_INDEX_PREFIX = 'session_message_wrapper_run:';
+
+const ModelNotFoundRuntimeDiagnosticsSchema = z.custom<ModelNotFoundRuntimeDiagnostics>(
+  value => parseModelNotFoundRuntimeDiagnostics(value).success,
+  'Invalid model-not-found runtime diagnostics'
+);
 
 export type SessionMessageStatus = 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted';
 
@@ -101,6 +110,7 @@ export type SessionMessageState = {
   failureCode?: SessionMessageFailureCode;
   failureSubtype?: WorkspaceFailureSubtype;
   safeFailureMessage?: string;
+  modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
   error?: string;
   failureReason?: string;
   attempts?: number;
@@ -206,6 +216,7 @@ export const SessionMessageStateSchema = z
     failureCode: SessionMessageFailureCodeSchema.optional(),
     failureSubtype: WorkspaceFailureSubtypeSchema.optional(),
     safeFailureMessage: z.string().max(WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH).optional(),
+    modelNotFoundRuntimeDiagnostics: ModelNotFoundRuntimeDiagnosticsSchema.optional(),
     error: z.string().optional(),
     failureReason: z.string().optional(),
     attempts: z.number().int().nonnegative().optional(),
@@ -510,6 +521,7 @@ export type MarkMessageFailedParams = {
   failureCode?: SessionMessageFailureCode;
   failureSubtype?: WorkspaceFailureSubtype;
   safeFailureMessage?: string;
+  modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
   attempts?: number;
 };
 
@@ -533,6 +545,7 @@ export async function markMessageFailed(
     failureCode: params.failureCode,
     failureSubtype: params.failureSubtype,
     safeFailureMessage: params.safeFailureMessage,
+    modelNotFoundRuntimeDiagnostics: params.modelNotFoundRuntimeDiagnostics,
     attempts: params.attempts,
   };
   await putSessionMessageState(storage, updated);
@@ -722,6 +735,7 @@ export type TerminalizeParams =
       failureCode?: SessionMessageFailureCode;
       failureSubtype?: WorkspaceFailureSubtype;
       safeFailureMessage?: string;
+      modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
       attempts?: number;
     }
   | {
@@ -784,6 +798,7 @@ export async function terminalizeMessageOnce(
       failureCode: params.failureCode,
       failureSubtype: params.failureSubtype,
       safeFailureMessage: params.safeFailureMessage,
+      modelNotFoundRuntimeDiagnostics: params.modelNotFoundRuntimeDiagnostics,
       attempts: params.attempts,
       terminalEffects,
     };

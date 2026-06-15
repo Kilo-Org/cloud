@@ -155,6 +155,10 @@ const GetAverageMonthlyUsageLast3MonthsOutputSchema = z.object({
   averageMonthlyUsageUsd: z.number(),
 });
 
+const SidebarPromoEligibilityOutputSchema = z.object({
+  showPromoBanner: z.boolean(),
+});
+
 const KiloPassReferralRewardSummaryOutputSchema = z.object({
   totals: z.object({
     totalRewards: z.number(),
@@ -863,6 +867,13 @@ export const kiloPassRouter = createTRPCRouter({
 
       const averageMonthlyUsageUsd = roundToCents(fromMicrodollars(totalCost_mUsd) / 3);
       return { averageMonthlyUsageUsd };
+    }),
+
+  getSidebarPromoEligibility: baseProcedure
+    .output(SidebarPromoEligibilityOutputSchema)
+    .query(async ({ ctx }) => {
+      const subscription = await getKiloPassStateForUser(readDb, ctx.user.id);
+      return { showPromoBanner: !subscription || isStripeSubscriptionEnded(subscription.status) };
     }),
 
   getReferralRewardSummary: baseProcedure

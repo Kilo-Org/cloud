@@ -274,6 +274,27 @@ function ClawOnboardingFlowInner({
     posthog?.capture('claw_setup_done_viewed');
   }, [mode, flowState.postProvisioningReady, posthog]);
 
+  // Warn before an accidental reload/close while a fresh instance is
+  // provisioning. The wizard step and bot identity live only in component
+  // state (see the `useState` above) and nothing durable backs them, so a
+  // full-page refresh during this window drops the user back to the identity
+  // step. Re-submitting there fires a SECOND provision against the instance
+  // that's already coming up — which the backend rejects with an error. The
+  // native prompt gives the user a chance to stay put. Scope the listener to
+  // create-first provisioning so it never nags on the complete step (where we
+  // auto-redirect to chat) or in plain post-provisioning reloads. Browsers
+  // ignore custom text, so we only need to opt into the prompt.
+  useEffect(() => {
+    const provisioningInFlight = flowState.createSetupActive && flowState.renderStep !== 'complete';
+    if (!provisioningInFlight) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [flowState.createSetupActive, flowState.renderStep]);
+
   const resetWizardSelections = useCallback(() => {
     setOnboardingStep('identity');
     setBotIdentity(null);

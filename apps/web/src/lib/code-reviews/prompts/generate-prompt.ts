@@ -24,7 +24,7 @@ import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-help
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { sanitizeUserInput } from './prompt-utils';
 import { formatRepositoryReviewInstructions } from './repository-review-instructions';
-import { stripReviewSummaryFooter } from '../summary/usage-footer';
+import { getCurrentReviewSummaryForContext } from '../summary/history';
 
 /**
  * Inline comment info for duplicate detection
@@ -279,7 +279,9 @@ export async function generateReviewPrompt(
     existingReviewState?.summaryComment
   ) {
     const activeCount = existingReviewState.inlineComments?.filter(c => !c.isOutdated).length ?? 0;
-    const previousSummary = stripReviewSummaryFooter(existingReviewState.summaryComment.body);
+    const previousSummary = getCurrentReviewSummaryForContext(
+      existingReviewState.summaryComment.body
+    );
     const incrementalWorkflow = template.incrementalReviewWorkflow
       .replace(/{PREVIOUS_SHA}/g, previousHeadSha)
       .replace(/{PREVIOUS_SUMMARY}/g, previousSummary)

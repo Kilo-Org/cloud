@@ -1341,22 +1341,28 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
+export const CustomLlmApiConfigSchema = z.object({
+  internal_id: z.string().min(1),
+  base_url: z.url(),
+  add_cache_breakpoints: z.boolean().optional(),
+  remove_cache_breakpoints: z.boolean().optional(),
+  inject_reasoning_into_content: z.boolean().optional(),
+  extra_headers: CustomLlmExtraHeadersSchema.optional(),
+  extra_body: CustomLlmExtraBodySchema.optional(),
+  remove_from_body: z.array(z.string()).optional(),
+});
+
+export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
+
 export const CustomLlmDefinitionSchema = z
   .object({
-    internal_id: z.string(),
     display_name: z.string(),
-    base_url: z.url(),
     api_key: z.string(),
     organization_ids: z.array(z.string()),
-    add_cache_breakpoints: z.boolean().optional(),
-    remove_cache_breakpoints: z.boolean().optional(),
-    inject_reasoning_into_content: z.boolean().optional(),
-    extra_headers: CustomLlmExtraHeadersSchema.optional(),
-    extra_body: CustomLlmExtraBodySchema.optional(),
-    remove_from_body: z.array(z.string()).optional(),
     pricing: CustomLlmPricingSchema.optional(),
   })
-  .and(CustomLlmMetadataSchema);
+  .and(CustomLlmMetadataSchema)
+  .and(CustomLlmApiConfigSchema);
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

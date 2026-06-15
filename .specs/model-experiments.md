@@ -105,7 +105,7 @@ The v1 reporting surface is intentionally limited. Aggregate live stats, Analyti
 
 Partner API keys MUST NOT be stored in upstream JSON blobs, Redis, prompt bodies, logs, reporting views, admin response payloads, or client-visible responses. They are stored only in the dedicated encrypted key field for a variant version and decrypted only for the selected variant when building the direct upstream provider.
 
-The accepted upstream schema MUST remain a strict allowlisted subset. Arbitrary `extra_headers` are excluded in v1. If a provider later requires a non-secret custom header, add an explicit allowlisted field for that concrete requirement rather than reopening arbitrary header storage.
+Experiment upstream configuration MUST use the shared `CustomLlmApiConfig` schema. Its `extra_headers` field MAY contain non-secret upstream headers, but API keys and other credentials MUST remain in the dedicated encrypted key field and MUST NOT be stored in the upstream JSON blob.
 
 ## V1 Exclusions
 
@@ -119,4 +119,4 @@ The following are intentionally out of scope for v1 and MUST NOT be treated as a
 - Stable aggregate reporting views unless a concrete consumer is added.
 - Partner trace export and replay workflows.
 - Automatic prompt retention enforcement and R2 orphan garbage collection.
-- Arbitrary upstream headers or plaintext/API-key-bearing upstream payloads.
+- Plaintext API keys or other credentials in upstream configuration payloads.

@@ -242,7 +242,9 @@ function DefaultsRow({
 
   return (
     <div className="bg-muted/30 flex items-center justify-between gap-2 px-4 py-3">
-      <p className="text-muted-foreground text-xs">
+      {/* min-w-0 + truncate so a long model id / fallback list ellipsizes instead
+          of pushing the shrink-0 edit button off-screen on narrow viewports. */}
+      <p className="text-muted-foreground min-w-0 truncate text-xs">
         <span className="font-medium">Inherited defaults</span> · Model:{' '}
         <span className="font-mono">{modelLabel}</span>
         {settings.length > 0 && ` · ${settings.join(' · ')}`}
@@ -346,7 +348,14 @@ export function AgentsSection({
   // Freeze the config-wide etag when opening the defaults editor (same reason as
   // the per-agent editors: a background refetch must not advance it under a
   // stale form and let a save bypass the concurrency check).
-  const [defaultsTarget, setDefaultsTarget] = useState<{ etag: string } | null>(null);
+  // Freeze BOTH the defaults baseline and its etag at open time. Passing live
+  // `data.defaults` into the open dialog would let a background refetch shift the
+  // form's baseline under the user while the etag stayed pinned, making a stale
+  // patch look valid.
+  const [defaultsTarget, setDefaultsTarget] = useState<{
+    defaults: AgentDefaultsSummary;
+    etag: string;
+  } | null>(null);
 
   const onConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -571,7 +580,7 @@ export function AgentsSection({
             <DefaultsRow
               defaults={data.defaults}
               canEdit={canEditDefaults}
-              onEdit={() => setDefaultsTarget({ etag: data.etag })}
+              onEdit={() => setDefaultsTarget({ defaults: data.defaults, etag: data.etag })}
             />
           </div>
         )}
@@ -606,13 +615,13 @@ export function AgentsSection({
         />
       )}
 
-      {defaultsTarget && data && (
+      {defaultsTarget && (
         <AgentDefaultsDialog
           open
           onOpenChange={open => {
             if (!open) setDefaultsTarget(null);
           }}
-          defaults={data.defaults}
+          defaults={defaultsTarget.defaults}
           etag={defaultsTarget.etag}
           onApplied={() => bumpPendingChange()}
         />

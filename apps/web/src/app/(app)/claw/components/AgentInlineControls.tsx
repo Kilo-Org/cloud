@@ -1,5 +1,7 @@
 'use client';
 
+import { useId } from 'react';
+
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import type { AgentSummary } from '@/lib/kiloclaw/types';
@@ -133,6 +135,8 @@ export function AgentChannelsControl({
   saving: boolean;
   onChange: (channels: string[]) => void;
 }) {
+  // Namespace the per-chip reason ids so multiple rows on the page don't collide.
+  const reasonBaseId = useId();
   if (isLoading) {
     return <span className="text-muted-foreground text-xs">Loading channels…</span>;
   }
@@ -154,31 +158,45 @@ export function AgentChannelsControl({
         // Owned by another agent (not this one) → can't route here until moved.
         const ownedElsewhere = owner !== undefined && !isSelected;
         const blocked = saving || ownedElsewhere;
+        // Why a chip is unavailable, exposed via a visually-hidden description
+        // (and aria-describedby) rather than a hover-only `title`, which screen
+        // readers and touch users can't reach. The chip stays focusable via
+        // aria-disabled (a native `disabled` button is skipped by the tab order),
+        // and onClick no-ops while blocked.
+        const reason = ownedElsewhere
+          ? `Routed to ${owner}`
+          : !channel.configured
+            ? 'Channel not configured'
+            : undefined;
+        const reasonId = reason ? `${reasonBaseId}-${channel.id}` : undefined;
         return (
-          <button
-            key={channel.id}
-            type="button"
-            disabled={blocked}
-            aria-pressed={isSelected}
-            onClick={() => toggle(channel.id)}
-            title={
-              ownedElsewhere
-                ? `Routed to ${owner}`
-                : !channel.configured
-                  ? 'Channel not configured'
-                  : undefined
-            }
-            className={cn(
-              'rounded-full border px-2 py-0.5 text-xs transition-colors',
-              isSelected
-                ? 'border-border bg-accent text-foreground'
-                : 'border-border text-muted-foreground hover:bg-accent/50',
-              !channel.configured && !isSelected && 'opacity-60',
-              blocked && 'cursor-not-allowed opacity-50'
+          <span key={channel.id} className="contents">
+            <button
+              type="button"
+              aria-disabled={blocked || undefined}
+              aria-pressed={isSelected}
+              aria-describedby={reasonId}
+              onClick={() => {
+                if (blocked) return;
+                toggle(channel.id);
+              }}
+              className={cn(
+                'rounded-full border px-2 py-0.5 text-xs transition-colors',
+                isSelected
+                  ? 'border-border bg-accent text-foreground'
+                  : 'border-border text-muted-foreground hover:bg-accent/50',
+                !channel.configured && !isSelected && 'opacity-60',
+                blocked && 'cursor-not-allowed opacity-50'
+              )}
+            >
+              {channel.label}
+            </button>
+            {reason && (
+              <span id={reasonId} className="sr-only">
+                {channel.label}: {reason}
+              </span>
             )}
-          >
-            {channel.label}
-          </button>
+          </span>
         );
       })}
     </div>

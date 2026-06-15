@@ -181,11 +181,21 @@ export function AgentDefaultsDialog({
   const canSubmit = hasChanges && !modelInvalid && !updateDefaults.isPending;
 
   // Does a refetched defaults snapshot reflect the patch we tried to write?
-  // (Primary + thinking/verbose + unsets are the signal; deep fallback compare is
-  // skipped — a primary match is enough to confirm the write landed.)
+  // The whole requested model shape must match: a fallback-only write (no
+  // primary) would otherwise pass trivially against any snapshot, so compare the
+  // primary AND exact fallback array for every field the patch actually set.
   const defaultsApplied = (d: AgentDefaultsSummary): boolean => {
     const { set, unset } = patch;
-    if (set.model?.primary !== undefined && d.model?.primary !== set.model.primary) return false;
+    if (set.model !== undefined) {
+      if (d.model == null) return false;
+      if (set.model.primary !== undefined && d.model.primary !== set.model.primary) return false;
+      if (set.model.fallbacks !== undefined) {
+        const want = set.model.fallbacks;
+        const got = d.model.fallbacks;
+        if (got.length !== want.length) return false;
+        if (want.some((f, i) => got[i] !== f)) return false;
+      }
+    }
     if (set.thinkingDefault !== undefined && d.settings.thinkingDefault !== set.thinkingDefault)
       return false;
     if (set.verboseDefault !== undefined && d.settings.verboseDefault !== set.verboseDefault)
@@ -225,7 +235,9 @@ export function AgentDefaultsDialog({
 
   return (
     <Dialog open={open} onOpenChange={updateDefaults.isPending ? undefined : onOpenChange}>
-      <DialogContent className="max-w-md">
+      {/* Cap height and scroll the body so the always-visible helper text can't
+          push the footer off-screen on short viewports / large text settings. */}
+      <DialogContent className="grid max-h-[85vh] max-w-md grid-rows-[auto_minmax(0,1fr)_auto]">
         <DialogHeader>
           <DialogTitle>Inherited defaults</DialogTitle>
           <DialogDescription>
@@ -233,7 +245,7 @@ export function AgentDefaultsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
           <div className="flex flex-col gap-2">
             <Label>Model</Label>
             <p className="text-muted-foreground text-xs">{HINTS.model}</p>

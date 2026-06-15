@@ -232,7 +232,9 @@ export function AgentEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={updateAgent.isPending ? undefined : onOpenChange}>
-      <DialogContent className="max-w-md">
+      {/* Cap height and scroll the body so the always-visible helper text can't
+          push the footer off-screen on short viewports / large text settings. */}
+      <DialogContent className="grid max-h-[85vh] max-w-md grid-rows-[auto_minmax(0,1fr)_auto]">
         <DialogHeader>
           <DialogTitle>Advanced settings · {agent.name ?? agent.id}</DialogTitle>
           <DialogDescription>
@@ -241,7 +243,7 @@ export function AgentEditDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
           <LabeledSelect
             label="Thinking"
             hint={HINTS.thinking}

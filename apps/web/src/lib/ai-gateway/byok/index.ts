@@ -29,7 +29,7 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
     return [];
   }
   if (isCodestralModel(modelId)) {
-    providers.splice(0, 0, 'codestral');
+    providers.unshift('codestral');
   }
   console.debug('[getModelUserByokProviders] found user byok providers for %s', modelId, providers);
   return providers;

@@ -1,0 +1,15 @@
+{
+  "_comment": "SINGLE SOURCE OF TRUTH for normalizeAgentId parity. The controller owns the authoritative normalizeAgentId (openclaw-agent-config.ts) and apps/web re-declares it (lib/kiloclaw/agent-id.ts) because the architecture wall blocks importing controller code into the web app. BOTH test suites load THIS file and assert their implementation produces `expected` for each `input` (controller: openclaw-agent-config.test.ts; web: lib/kiloclaw/agent-id.test.ts). Because the corpus is shared, changing either implementation's output for a listed input fails that side, and changing the rule means updating this file AND both implementations or the other side fails. Keep it as a pure input->expected list.",
+  "cases": [
+    { "input": "", "expected": "main" },
+    { "input": "   ", "expected": "main" },
+    { "input": "research", "expected": "research" },
+    { "input": "Research", "expected": "research" },
+    { "input": "foo_bar", "expected": "foo_bar" },
+    { "input": "foo-bar", "expected": "foo-bar" },
+    { "input": "My Agent!", "expected": "my-agent" },
+    { "input": "  spaces  here ", "expected": "spaces-here" },
+    { "input": "a@@@b", "expected": "a-b" },
+    { "input": "@@@", "expected": "main" }
+  ]
+}

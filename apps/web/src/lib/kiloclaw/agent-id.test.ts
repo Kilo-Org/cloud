@@ -1,40 +1,49 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { normalizeAgentId, workspaceFromName } from './agent-id';
 
 // PARITY: the controller owns the authoritative normalizeAgentId
-// (services/kiloclaw/controller/src/openclaw-agent-config.ts) and asserts the
-// same input→output corpus in openclaw-agent-config.test.ts. The architecture
-// wall prevents sharing one module, so these two test corpora are the drift
-// guard — if either implementation changes, keep both corpora in sync.
+// (services/kiloclaw/controller/src/openclaw-agent-config.ts) and this is a
+// re-declared mirror (the architecture wall blocks importing controller code
+// into apps/web). Instead of two hand-maintained corpora that can silently
+// drift, BOTH suites load the SAME shared corpus file (the controller's
+// openclaw-agent-config.test.ts reads it too). A single source of truth means
+// changing either implementation's output for a listed input fails that side,
+// and changing the rule requires updating the shared file plus both impls.
+const corpusPath = join(
+  __dirname,
+  '..',
+  '..',
+  '..',
+  '..',
+  '..',
+  'services',
+  'kiloclaw',
+  'controller',
+  'src',
+  'agent-id-corpus.json'
+);
+const NORMALIZE_AGENT_ID_CORPUS = (
+  JSON.parse(readFileSync(corpusPath, 'utf8')) as {
+    cases: ReadonlyArray<{ input: string; expected: string }>;
+  }
+).cases;
 
 describe('normalizeAgentId', () => {
-  it('maps empty / whitespace-only to main', () => {
-    expect(normalizeAgentId('')).toBe('main');
-    expect(normalizeAgentId('   ')).toBe('main');
-  });
-
-  it('lowercases already-valid ids and preserves underscores/hyphens', () => {
-    expect(normalizeAgentId('research')).toBe('research');
-    expect(normalizeAgentId('Research')).toBe('research');
-    expect(normalizeAgentId('foo_bar')).toBe('foo_bar');
-    expect(normalizeAgentId('foo-bar')).toBe('foo-bar');
-  });
+  it.each(NORMALIZE_AGENT_ID_CORPUS)(
+    'normalizes $input -> $expected (shared parity corpus)',
+    ({ input, expected }) => {
+      expect(normalizeAgentId(input)).toBe(expected);
+    }
+  );
 
   it('keeps underscore and hyphen names distinct (no workspace collision)', () => {
     expect(normalizeAgentId('foo_bar')).not.toBe(normalizeAgentId('foo-bar'));
   });
 
-  it('collapses invalid chars to single hyphens and trims edges', () => {
-    expect(normalizeAgentId('My Agent!')).toBe('my-agent');
-    expect(normalizeAgentId('  spaces  here ')).toBe('spaces-here');
-    expect(normalizeAgentId('a@@@b')).toBe('a-b');
-  });
-
   it('caps at 64 chars', () => {
     expect(normalizeAgentId('a'.repeat(100))).toHaveLength(64);
-  });
-
-  it('falls back to main when nothing usable remains', () => {
-    expect(normalizeAgentId('@@@')).toBe('main');
   });
 });
 

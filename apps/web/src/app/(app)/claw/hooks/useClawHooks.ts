@@ -136,16 +136,6 @@ export function useClawAgents(enabled = true) {
 }
 
 /**
- * Agent lifecycle mutations (create / update / delete / bindings), context-aware.
- * Callers pass the base input; the org variant injects organizationId.
- *
- * Because an agent mutation can time out at the edge gateway AFTER the
- * controller already applied it (fire-and-forget), the list must refresh even on
- * error. update/bindings invalidate on settled; create/delete invalidate on
- * success and reconcile errors via `refetchAgents` in their own handlers (so the
- * list isn't fetched twice on a failed create/delete).
- */
-/**
  * Controller error codes that map to tRPC INTERNAL_SERVER_ERROR but represent a
  * DEFINITE failure — the mutation did not apply, or left state the controller
  * could not roll back. These must NOT be reconciled into a false success even
@@ -258,6 +248,17 @@ export function useRestartRequired(instanceId: string | null) {
   return { count, bump, clear };
 }
 
+/**
+ * Agent lifecycle mutations (create / update / delete / bindings / defaults),
+ * context-aware. Callers pass the base input; the org variant injects
+ * organizationId.
+ *
+ * Because an agent mutation can time out at the edge gateway AFTER the
+ * controller already applied it (fire-and-forget), the list must refresh even on
+ * error. Every mutation invalidates on success and reconciles errors via
+ * `refetchAgents` in its own catch handler — so the list is fetched exactly once
+ * per outcome (no onSettled refresh that would double-fetch on the error path).
+ */
 export function useClawAgentMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -271,36 +272,37 @@ export function useClawAgentMutations() {
   const refetchAgents = (): Promise<AgentConfigListResponse> =>
     queryClient.fetchQuery({ ...listOptions, staleTime: 0 });
 
-  // create/delete reconcile explicitly in their own catch handlers (they refetch
-  // to resolve ambiguous timeouts), so they only need success-path invalidation —
-  // avoids a redundant second list fetch on failure.
+  // EVERY agent mutation (create/update/delete/bindings/defaults) reconciles in
+  // its own catch handler via reconcileAmbiguousMutation, which on an ambiguous
+  // failure issues the single authoritative error-path refetch (staleTime: 0).
+  // So all of them use success-only invalidation — an onSettled refresh here
+  // would fire a SECOND list request on the error path, and each list fetch runs
+  // the controller's openclaw agents-bindings subprocess. Success-only keeps it
+  // to exactly one refresh per outcome.
   const successOpts = { onSuccess: invalidateAgents };
-  // update/bindings have no reconcile handler, so refresh on settled (success OR
-  // error) to surface a change that a gateway timeout still applied server-side.
-  const settledOpts = { onSettled: invalidateAgents };
   const personalCreate = useMutation(trpc.kiloclaw.createAgent.mutationOptions(successOpts));
   const orgCreate = useMutation(
     trpc.organizations.kiloclaw.createAgent.mutationOptions(successOpts)
   );
-  const personalUpdate = useMutation(trpc.kiloclaw.updateAgent.mutationOptions(settledOpts));
+  const personalUpdate = useMutation(trpc.kiloclaw.updateAgent.mutationOptions(successOpts));
   const orgUpdate = useMutation(
-    trpc.organizations.kiloclaw.updateAgent.mutationOptions(settledOpts)
+    trpc.organizations.kiloclaw.updateAgent.mutationOptions(successOpts)
   );
   const personalDelete = useMutation(trpc.kiloclaw.deleteAgent.mutationOptions(successOpts));
   const orgDelete = useMutation(
     trpc.organizations.kiloclaw.deleteAgent.mutationOptions(successOpts)
   );
   const personalBindings = useMutation(
-    trpc.kiloclaw.updateAgentBindings.mutationOptions(settledOpts)
+    trpc.kiloclaw.updateAgentBindings.mutationOptions(successOpts)
   );
   const orgBindings = useMutation(
-    trpc.organizations.kiloclaw.updateAgentBindings.mutationOptions(settledOpts)
+    trpc.organizations.kiloclaw.updateAgentBindings.mutationOptions(successOpts)
   );
   const personalDefaults = useMutation(
-    trpc.kiloclaw.updateAgentDefaults.mutationOptions(settledOpts)
+    trpc.kiloclaw.updateAgentDefaults.mutationOptions(successOpts)
   );
   const orgDefaults = useMutation(
-    trpc.organizations.kiloclaw.updateAgentDefaults.mutationOptions(settledOpts)
+    trpc.organizations.kiloclaw.updateAgentDefaults.mutationOptions(successOpts)
   );
 
   return {

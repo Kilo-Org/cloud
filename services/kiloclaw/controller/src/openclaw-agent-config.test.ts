@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AgentConfigError,
@@ -19,24 +20,21 @@ import {
 // PARITY CORPUS — the web app re-declares normalizeAgentId in
 // apps/web/src/lib/kiloclaw/agent-id.ts (the architecture wall blocks importing
 // this controller code into apps/web). Both sides must agree, because the web
-// create-timeout reconcile predicts the id from the typed name. This is the same
-// input→output corpus asserted in agent-id.test.ts; if EITHER implementation
-// drifts, its test breaks here or there. Keep the two corpora in sync.
-const NORMALIZE_AGENT_ID_CORPUS: ReadonlyArray<[input: string, expected: string]> = [
-  ['', 'main'],
-  ['   ', 'main'],
-  ['research', 'research'],
-  ['Research', 'research'],
-  ['foo_bar', 'foo_bar'],
-  ['foo-bar', 'foo-bar'],
-  ['My Agent!', 'my-agent'],
-  ['  spaces  here ', 'spaces-here'],
-  ['a@@@b', 'a-b'],
-  ['@@@', 'main'],
-];
+// create-timeout reconcile predicts the id from the typed name. Rather than two
+// hand-maintained corpora that can silently drift, both suites load THIS shared
+// file (agent-id.test.ts reads the same JSON), so a single source of truth
+// drives both implementations' assertions.
+const NORMALIZE_AGENT_ID_CORPUS = (
+  JSON.parse(
+    fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'agent-id-corpus.json'),
+      'utf8'
+    )
+  ) as { cases: ReadonlyArray<{ input: string; expected: string }> }
+).cases;
 
 describe('normalizeAgentId (parity with web agent-id.test.ts)', () => {
-  it.each(NORMALIZE_AGENT_ID_CORPUS)('normalizes %j -> %j', (input, expected) => {
+  it.each(NORMALIZE_AGENT_ID_CORPUS)('normalizes $input -> $expected', ({ input, expected }) => {
     expect(normalizeAgentId(input)).toBe(expected);
   });
 

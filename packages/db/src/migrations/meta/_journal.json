@@ -1156,6 +1156,13 @@
       "when": 1781269418527,
       "tag": "0164_lazy_lady_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 165,
+      "version": "7",
+      "when": 1781527420968,
+      "tag": "0165_clear_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

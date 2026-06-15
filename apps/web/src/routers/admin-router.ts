@@ -1,5 +1,6 @@
 // admin-router.ts
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
 import {
@@ -352,6 +353,9 @@ const CancelKiloClawSubscriptionSchema = z.object({
 });
 
 export const adminRouter = createTRPCRouter({
+  getPermissions: adminProcedure.query(({ ctx }) => ({
+    canManageCredits: userCanManageCredits(ctx.user),
+  })),
   kiloclawReferrals: adminKiloclawReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({

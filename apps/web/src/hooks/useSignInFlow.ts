@@ -3,7 +3,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { signIn } from 'next-auth/react';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
-import { captureException } from '@sentry/nextjs';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 import { useSignInHint, type SignInHint } from '@/hooks/useSignInHint';
@@ -307,9 +306,6 @@ export function useSignInFlow({
       setShowTurnstile(false);
     } catch (error) {
       console.error('[SignInForm] Error during email check:', error);
-      captureException(error, {
-        tags: { source: 'email_lookup' },
-      });
       setIsVerifying(false);
       setShowTurnstile(false);
       setError('An error occurred. Please try again.');
@@ -389,9 +385,6 @@ export function useSignInFlow({
       }
     } catch (error) {
       console.error('[SignInForm] Magic link request failed:', error);
-      captureException(error, {
-        tags: { source: 'magic_link_request' },
-      });
       setError('Failed to send magic link. Please try again.');
     }
   }, [email, params, saveHint]);
@@ -477,9 +470,6 @@ export function useSignInFlow({
         setFlowState('landing');
       } catch (error) {
         console.error('[SignInForm] Error during sign-in flow:', error);
-        captureException(error, {
-          tags: { source: 'turnstile_verification' },
-        });
         setError('An error occurred. Please try again.');
         setShowTurnstile(false);
         setFlowState('landing');
@@ -539,9 +529,6 @@ export function useSignInFlow({
         await signIn(provider, { callbackUrl });
       } catch (error) {
         console.error('[SignInForm] OAuth sign-in failed:', error);
-        captureException(error, {
-          tags: { source: 'oauth_signin' },
-        });
         setError('Failed to sign in. Please try again.');
         setFlowState('provider-select');
       }

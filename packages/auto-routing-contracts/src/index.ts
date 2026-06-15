@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
+import { DifficultyTierSchema, ReasoningEffortSchema } from './tiers';
 
 export {
   NormalizedClassifierInputSchema,
@@ -96,9 +97,25 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
+export const AutoRoutingDecisionSchema = z.object({
+  model: z.string(),
+  tier: DifficultyTierSchema,
+  source: z.enum(['benchmark']),
+  tableVersion: z.string(),
+  // Mirrors the effort the chosen model was benchmarked with, when set.
+  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
+  // True when the session's incumbent model was kept over a cheaper fresh
+  // pick. Defaulted so responses from a not-yet-redeployed worker still
+  // parse.
+  sticky: z.boolean().default(false),
+});
+export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
+
 export const AutoRoutingDecisionResponseSchema = z.object({
   cost: z.number(),
-  decision: z.null(),
+  // Null when classification failed or no routing table is published; the
+  // gateway then falls back to its static balanced defaults.
+  decision: AutoRoutingDecisionSchema.nullable(),
   classifierResult: z
     .object({
       classification: ClassifierOutputSchema,
@@ -108,13 +125,17 @@ export const AutoRoutingDecisionResponseSchema = z.object({
 });
 export type AutoRoutingDecisionResponse = z.infer<typeof AutoRoutingDecisionResponseSchema>;
 
+// model: null clears the admin override (benchmark winner takes effect).
 export const UpdateClassifierModelRequestSchema = z.object({
-  model: z.string().trim().min(1),
+  model: z.string().trim().min(1).nullable(),
 });
 export type UpdateClassifierModelRequest = z.infer<typeof UpdateClassifierModelRequestSchema>;
 
 export const AutoRoutingClassifierModelResponseSchema = z.object({
+  // Effective model used by /decide: override ?? benchmark winner ?? default.
   model: z.string(),
+  override: z.string().nullable(),
+  benchmarkWinner: z.string().nullable(),
   defaultModel: z.string(),
 });
 export type AutoRoutingClassifierModelResponse = z.infer<
@@ -158,3 +179,7 @@ export type AutoRoutingClassifierAnalyticsResponse = z.infer<
 >;
 
 export { normalizeClassifierInput, redactProviderHints, type ClassifierApiKind } from './normalize';
+
+export * from './tiers';
+export * from './routing-table';
+export * from './benchmark';

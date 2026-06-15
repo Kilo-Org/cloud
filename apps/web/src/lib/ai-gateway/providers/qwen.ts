@@ -45,6 +45,9 @@ function makeTieredPricing(
 
 const TOKENS_256K = 256 * 1024;
 
+export const QWEN37_MAX_MODEL_ID = 'qwen/qwen3.7-max';
+export const QWEN37_PLUS_MODEL_ID = 'qwen/qwen3.7-plus';
+
 export const qwen36_plus_stealth_model: KiloExclusiveModel = {
   public_id: 'stealth/qwen3.6-plus',
   display_name: 'Stealth: Qwen3.6 Plus (50% off)',

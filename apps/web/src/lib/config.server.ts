@@ -369,6 +369,11 @@ export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_U
 // Auto routing worker
 export const AUTO_ROUTING_WORKER_URL = getEnvVariable('AUTO_ROUTING_WORKER_URL') || '';
 
+// Auto routing benchmark worker
+export const AUTO_ROUTING_BENCHMARK_WORKER_URL =
+  getEnvVariable('AUTO_ROUTING_BENCHMARK_WORKER_URL') ||
+  'https://auto-routing-benchmark.kiloapps.io';
+
 // Security Agent sync Worker command ingress
 export const SECURITY_SYNC_WORKER_URL = getEnvVariable('SECURITY_SYNC_WORKER_URL') || '';
 // Security Agent auto-analysis Worker command ingress

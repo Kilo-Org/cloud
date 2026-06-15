@@ -65,6 +65,17 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     showIn: ['extension', 'cli'],
   },
   {
+    id: 'kilo-console-beta',
+    title: 'Try Kilo Console (Beta)',
+    message: 'Manage git worktrees, sessions, and all CLI settings from a browser-based UI.',
+    action: {
+      actionText: 'How to install',
+      actionURL:
+        'https://blog.kilo.ai/p/kilo-console-beta-is-live?utm_source=kilo-cli&utm_medium=notifications&utm_campaign=cli-tips',
+    },
+    showIn: ['cli'],
+  },
+  {
     id: 'app-builder-promo-mar-6',
     title: 'Try App Builder',
     message: "Don't feel like coding? Try App Builder to build with natural language from the web",

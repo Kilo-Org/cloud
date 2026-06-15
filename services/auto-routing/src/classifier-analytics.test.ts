@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
-import type { ClassifierOutput } from './classifier-output';
+import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
 
 const classification = {
   taskType: 'debugging',

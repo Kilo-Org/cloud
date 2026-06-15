@@ -29,8 +29,7 @@ import {
   GEMINI_PRO_CURRENT_MODEL_ID,
   gemma_4_26b_a4b_it_free_model,
 } from '@/lib/ai-gateway/providers/google';
-import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
-import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { QWEN37_PLUS_MODEL_ID, qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';

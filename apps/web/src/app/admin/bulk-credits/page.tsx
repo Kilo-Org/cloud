@@ -34,6 +34,8 @@ import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { KiloclawExtendTrial } from '@/app/admin/components/KiloclawExtendTrial';
 import { downloadCsv } from '@/lib/admin-csv';
+import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
+import { CreditManagementAccessOverlay } from '@/app/admin/components/CreditManagementAccessOverlay';
 
 type MatchedUser = {
   email: string;
@@ -112,6 +114,7 @@ const isValidTab = (value: string | null): value is Tab =>
 
 function BulkCreditsTab() {
   const trpc = useTRPC();
+  const { canManageCredits } = useAdminCreditManagementPermission();
 
   // CSV upload state
   const [isDragging, setIsDragging] = useState(false);
@@ -218,7 +221,7 @@ function BulkCreditsTab() {
   };
 
   const handleGrantCredits = () => {
-    if (matchedUsers.length === 0) return;
+    if (!canManageCredits || matchedUsers.length === 0) return;
     const amount = parseFloat(amountUsd);
     if (isNaN(amount) || amount <= 0) {
       toast.error('Please enter a valid credit amount');
@@ -447,59 +450,76 @@ function BulkCreditsTab() {
             {/* Credit allocation form */}
             {matchedUsers.length > 0 && (
               <div className="space-y-4 rounded-lg border p-4">
-                <h3 className="flex items-center gap-2 font-medium">
-                  <DollarSign className="h-4 w-4" />
-                  Credit Allocation
-                </h3>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <Label htmlFor="amount">Amount (USD) *</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      placeholder="Enter amount"
-                      value={amountUsd}
-                      onChange={e => setAmountUsd(e.target.value)}
-                      min="0.01"
-                      step="0.01"
-                    />
+                <div className="relative">
+                  {!canManageCredits && (
+                    <CreditManagementAccessOverlay message="You don't have access to grant bulk credits. File an access request before handing out credits." />
+                  )}
+                  <h3
+                    className={`flex items-center gap-2 font-medium ${
+                      canManageCredits ? '' : 'pointer-events-none select-none opacity-35'
+                    }`}
+                  >
+                    <DollarSign className="h-4 w-4" />
+                    Credit Allocation
+                  </h3>
+                  <div
+                    className={`mt-4 grid gap-4 sm:grid-cols-3 ${
+                      canManageCredits ? '' : 'pointer-events-none select-none opacity-35'
+                    }`}
+                  >
+                    <div>
+                      <Label htmlFor="amount">Amount (USD) *</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={amountUsd}
+                        onChange={e => setAmountUsd(e.target.value)}
+                        min="0.01"
+                        step="0.01"
+                        disabled={!canManageCredits}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="expiration" className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Expiration Date
+                      </Label>
+                      <Input
+                        id="expiration"
+                        type="date"
+                        value={expirationDate}
+                        onChange={e => setExpirationDate(e.target.value)}
+                        disabled={!canManageCredits}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="description">Description</Label>
+                      <Input
+                        id="description"
+                        type="text"
+                        placeholder="Optional description"
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                        disabled={!canManageCredits}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="expiration" className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Expiration Date
-                    </Label>
-                    <Input
-                      id="expiration"
-                      type="date"
-                      value={expirationDate}
-                      onChange={e => setExpirationDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Input
-                      id="description"
-                      type="text"
-                      placeholder="Optional description"
-                      value={description}
-                      onChange={e => setDescription(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
                   <Button
+                    className={`mt-4 ${
+                      canManageCredits ? '' : 'pointer-events-none select-none opacity-35'
+                    }`}
                     onClick={handleGrantCredits}
-                    disabled={!isFormValid || grantCreditsMutation.isPending}
+                    disabled={!canManageCredits || !isFormValid || grantCreditsMutation.isPending}
                   >
                     {grantCreditsMutation.isPending
                       ? 'Sending Credits...'
                       : `Send Credits to ${matchedUsers.length} Users`}
                   </Button>
-                  <Button variant="outline" onClick={handleClear}>
-                    Clear & Start Over
-                  </Button>
                 </div>
+                <Button variant="outline" onClick={handleClear}>
+                  Clear & Start Over
+                </Button>
               </div>
             )}
           </CardContent>

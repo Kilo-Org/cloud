@@ -94,6 +94,7 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
     content = (
       <AgentsSection
         enabled={false}
+        instanceId={status?.instanceId ?? null}
         canCreate={false}
         canUpdate={false}
         canDelete={false}
@@ -130,6 +131,7 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
     content = (
       <AgentsSection
         enabled
+        instanceId={status?.instanceId ?? null}
         canCreate={has('config.agents.create.basic.cli')}
         canUpdate={has('config.agents.update')}
         canDelete={has('config.agents.delete.cli')}

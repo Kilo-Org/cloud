@@ -269,6 +269,7 @@ function DefaultsRow({
  */
 export function AgentsSection({
   enabled,
+  instanceId,
   canCreate,
   canUpdate,
   canDelete,
@@ -276,6 +277,10 @@ export function AgentsSection({
   canEditDefaults,
 }: {
   enabled: boolean;
+  // Postgres id of the instance whose agents these are; keys the persisted
+  // "restart required" count so it tracks the actual instance, not the
+  // org/personal context. Null until status loads (count falls back to memory).
+  instanceId: string | null;
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
@@ -318,7 +323,7 @@ export function AgentsSection({
     count: pendingChangeCount,
     bump: bumpPendingChange,
     clear: clearPendingChange,
-  } = useRestartRequired(organizationId ?? 'personal');
+  } = useRestartRequired(instanceId);
 
   const onRestartToApply = async () => {
     try {

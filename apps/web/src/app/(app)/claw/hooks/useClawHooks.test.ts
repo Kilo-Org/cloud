@@ -42,7 +42,9 @@ describe('getClawDiskUsageQueryOptions', () => {
 });
 
 // Construct a TRPCClientError the way the client surfaces each failure class.
-function clientError(code: string | undefined): unknown {
+// `upstreamCode` mirrors the controller code the router attaches via
+// UpstreamApiError (exposed as data.upstreamCode by the error formatter).
+function clientError(code: string | undefined, upstreamCode?: string): unknown {
   if (code === undefined) {
     // A raw transport failure (plain-text edge 504, dropped connection) has no
     // JSON body, so TRPCClientError.from leaves `.data` undefined.
@@ -50,7 +52,9 @@ function clientError(code: string | undefined): unknown {
   }
   // A server-originated tRPC error always carries data.code via the formatter.
   return new TRPCClientError('boom', {
-    result: { error: { code: -32600, message: 'boom', data: { code, httpStatus: 409 } } },
+    result: {
+      error: { code: -32600, message: 'boom', data: { code, upstreamCode, httpStatus: 409 } },
+    },
   } as never);
 }
 
@@ -63,14 +67,37 @@ describe('isAmbiguousAgentMutationError', () => {
     expect(isAmbiguousAgentMutationError(clientError(undefined))).toBe(true);
   });
 
-  test('treats explicit timeout / internal codes as ambiguous', () => {
+  test('treats an explicit timeout as ambiguous', () => {
     expect(isAmbiguousAgentMutationError(clientError('TIMEOUT'))).toBe(true);
+  });
+
+  test('treats a bare INTERNAL_SERVER_ERROR (no upstream code) as ambiguous', () => {
+    // An edge/worker 504 with a JSON body but no controller code — may have applied.
     expect(isAmbiguousAgentMutationError(clientError('INTERNAL_SERVER_ERROR'))).toBe(true);
+  });
+
+  test('treats INTERNAL_SERVER_ERROR with a genuine timeout upstream code as ambiguous', () => {
+    expect(
+      isAmbiguousAgentMutationError(clientError('INTERNAL_SERVER_ERROR', 'openclaw_cli_timeout'))
+    ).toBe(true);
+  });
+
+  test('treats INTERNAL_SERVER_ERROR with an explicit failure upstream code as NOT ambiguous', () => {
+    // The CLI reported failure / rollback failed — must never reconcile to success.
+    expect(
+      isAmbiguousAgentMutationError(clientError('INTERNAL_SERVER_ERROR', 'openclaw_cli_failed'))
+    ).toBe(false);
+    expect(
+      isAmbiguousAgentMutationError(
+        clientError('INTERNAL_SERVER_ERROR', 'agent_binding_rollback_failed')
+      )
+    ).toBe(false);
   });
 
   test('treats deterministic typed errors as NOT ambiguous', () => {
     expect(isAmbiguousAgentMutationError(clientError('CONFLICT'))).toBe(false);
     expect(isAmbiguousAgentMutationError(clientError('BAD_REQUEST'))).toBe(false);
+    expect(isAmbiguousAgentMutationError(clientError('NOT_FOUND'))).toBe(false);
   });
 
   test('treats a non-tRPC error as ambiguous', () => {

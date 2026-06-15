@@ -146,23 +146,49 @@ export function useClawAgents(enabled = true) {
  * list isn't fetched twice on a failed create/delete).
  */
 /**
+ * Controller error codes that map to tRPC INTERNAL_SERVER_ERROR but represent a
+ * DEFINITE failure — the mutation did not apply, or left state the controller
+ * could not roll back. These must NOT be reconciled into a false success even
+ * though they share the INTERNAL_SERVER_ERROR tRPC code with the genuine timeout
+ * (`openclaw_cli_timeout`, which may have applied). The router propagates the
+ * controller code as `data.upstreamCode` (see handleFileOperationError). Extend
+ * this set when adding a new non-reconcilable INTERNAL controller code.
+ */
+const NON_RECONCILABLE_UPSTREAM_CODES = new Set([
+  // The CLI ran but reported failure — the agent/binding write did not land.
+  'openclaw_cli_failed',
+  // A binding write failed AND the rollback failed — state is uncertain and
+  // must surface as an error, never be silently treated as applied.
+  'agent_binding_rollback_failed',
+]);
+
+/**
  * Whether an agent-mutation error is worth reconciling by refetching: an
  * ambiguous transport/internal failure (e.g. a gateway timeout that may have
  * still applied server-side). Deterministic typed failures — `agent_exists`,
- * `reserved_agent_id`, conflicts, etc. (any non-500 tRPC code) — are NOT
- * reconciled, so we never convert a real conflict into a false success.
+ * `reserved_agent_id`, conflicts, etc. — and EXPLICIT controller failures
+ * (`openclaw_cli_failed`, `agent_binding_rollback_failed`) are NOT reconciled,
+ * so we never convert a real failure into a false success.
  */
 export function isAmbiguousAgentMutationError(err: unknown): boolean {
   if (err instanceof TRPCClientError) {
-    const code = err.data?.code;
-    // A server-originated DETERMINISTIC error (CONFLICT agent_exists,
-    // BAD_REQUEST reserved_agent_id, etc.) always carries a `data.code` set by
-    // the tRPC error formatter. A missing code means TRPCClientError.from
-    // wrapped a raw transport failure with no JSON body — a plain-text edge 504
-    // or a dropped connection, i.e. exactly the fire-and-forget timeout the
-    // reconcile exists for — so treat undefined as ambiguous too, alongside the
-    // explicit timeout/internal codes.
-    return code === undefined || code === 'INTERNAL_SERVER_ERROR' || code === 'TIMEOUT';
+    const code = err.data?.code as string | undefined;
+    // A missing code means TRPCClientError.from wrapped a raw transport failure
+    // with no JSON body — a plain-text edge 504 or a dropped connection, i.e.
+    // exactly the fire-and-forget timeout the reconcile exists for.
+    if (code === undefined) return true;
+    if (code === 'TIMEOUT') return true;
+    // INTERNAL_SERVER_ERROR is overloaded: it covers genuine gateway/CLI
+    // timeouts that MAY have applied (reconcilable) AND explicit controller
+    // failures that definitely did not (not reconcilable). The upstream code,
+    // when present, disambiguates — only explicit failures are denied.
+    if (code === 'INTERNAL_SERVER_ERROR') {
+      const upstream = err.data?.upstreamCode as string | undefined;
+      return upstream === undefined || !NON_RECONCILABLE_UPSTREAM_CODES.has(upstream);
+    }
+    // Any other server-originated DETERMINISTIC error (CONFLICT agent_exists,
+    // BAD_REQUEST reserved_agent_id, NOT_FOUND, etc.) is never reconciled.
+    return false;
   }
   // Non-tRPC (e.g. raw thrown) errors: can't classify, treat as ambiguous.
   return true;
@@ -194,15 +220,21 @@ export async function reconcileAmbiguousMutation(
  * survives navigating away / refreshing — the underlying agent config change is
  * persistent and only goes live after a gateway restart, so the warning must
  * outlive the component. `bump` on each saved-but-unapplied change, `clear` after
- * a confirmed restart. Keyed per context (personal vs a given org instance).
+ * a confirmed restart.
+ *
+ * Keyed by the Postgres instance id so the count tracks the actual instance
+ * whose config changed, not the org/personal context (a since-replaced instance
+ * must not inherit a stale count). When the id is unknown (status not yet
+ * loaded), fall back to a non-persistent in-memory counter — the warning still
+ * works for the session but isn't written under a bogus key.
  */
-export function useRestartRequired(instanceKey: string) {
-  const storageKey = `kiloclaw:restart-required:${instanceKey}`;
+export function useRestartRequired(instanceId: string | null) {
+  const storageKey = instanceId ? `kiloclaw:restart-required:${instanceId}` : null;
   // Init 0 (SSR-safe) and read localStorage on the client to avoid a hydration
-  // mismatch; re-read when the instance key changes.
+  // mismatch; re-read when the storage key changes (incl. id becoming known).
   const [count, setCount] = useState(0);
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || storageKey === null) return;
     const raw = window.localStorage.getItem(storageKey);
     const n = raw ? Number.parseInt(raw, 10) : 0;
     setCount(Number.isFinite(n) && n > 0 ? n : 0);
@@ -211,14 +243,16 @@ export function useRestartRequired(instanceKey: string) {
   const bump = useCallback(() => {
     setCount(prev => {
       const next = prev + 1;
-      if (typeof window !== 'undefined') window.localStorage.setItem(storageKey, String(next));
+      if (storageKey !== null && typeof window !== 'undefined')
+        window.localStorage.setItem(storageKey, String(next));
       return next;
     });
   }, [storageKey]);
 
   const clear = useCallback(() => {
     setCount(0);
-    if (typeof window !== 'undefined') window.localStorage.removeItem(storageKey);
+    if (storageKey !== null && typeof window !== 'undefined')
+      window.localStorage.removeItem(storageKey);
   }, [storageKey]);
 
   return { count, bump, clear };

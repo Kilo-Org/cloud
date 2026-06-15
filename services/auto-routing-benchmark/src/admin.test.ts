@@ -295,10 +295,13 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('rejects starting a run when no config has been saved', async () => {
+  it('returns 400 when no config has been saved', async () => {
     // getConfigRows already returns null config by default
     const res = await authedPost('/admin/runs', { kind: 'classifier' });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: 'benchmark config not set: save it in the admin panel before starting a run',
+    });
     expect(insertRun).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
   });

@@ -41,6 +41,13 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     zodJsonValidator(StartBenchmarkRunRequestSchema, { errorMessage: 'Invalid run request' }),
     async c => {
       const { kind, force } = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      if (!config) {
+        return c.json(
+          { error: 'benchmark config not set: save it in the admin panel before starting a run' },
+          400
+        );
+      }
       return c.json(await startRun(c.env, kind, { force }));
     }
   );

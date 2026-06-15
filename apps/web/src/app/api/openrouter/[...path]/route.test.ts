@@ -471,6 +471,10 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(stats.outputTokens).toBe(0);
     expect(ctx.requested_model).toBe('kilo-auto/efficient');
     expect(ctx.user_byok).toBe(false);
+    // The internal classifier-overhead row must not carry a posthog distinct id,
+    // so it can't emit generic first_usage lifecycle events or be mistaken for
+    // the user's first model usage.
+    expect(ctx.posthog_distinct_id).toBeUndefined();
   });
 
   it('does not bill when classifier cost is 0 (cache hit)', async () => {

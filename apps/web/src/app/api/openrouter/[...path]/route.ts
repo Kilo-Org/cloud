@@ -914,7 +914,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
             has_middle_out_transform: null,
             isStreaming: false,
             prior_microdollar_usage: usageContext.prior_microdollar_usage,
-            posthog_distinct_id: usageContext.posthog_distinct_id,
+            // No posthog_distinct_id: this internal overhead row must not emit
+            // the generic first_usage / first_microdollar_usage lifecycle
+            // events (those are gated on posthog_distinct_id in processUsage).
+            // Otherwise the classifier row could race the primary usage row and
+            // mis-attribute `auto-routing/classifier` as the user's first model.
+            // DB billing is unaffected — it keys on kiloUserId.
+            posthog_distinct_id: undefined,
             project_id: usageContext.project_id,
             status_code: 200,
             editor_name: usageContext.editor_name,

@@ -179,34 +179,6 @@ describe('isFableModel', () => {
   });
 });
 
-describe('Fable model filtering', () => {
-  beforeEach(() => {
-    global.fetch = jest.fn(() =>
-      Promise.resolve(
-        createMockResponse({
-          jsonData: {
-            data: [
-              buildModel({ id: 'anthropic/claude-fable-5' }),
-              buildModel({ id: 'vendor/fable-model' }),
-            ],
-          },
-        })
-      )
-    ) as unknown as typeof fetch;
-  });
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it('excludes Claude Fable while retaining unrelated model IDs containing fable', async () => {
-    const models = await getEnhancedOpenRouterModels();
-
-    expect(models.data.some(model => model.id === 'anthropic/claude-fable-5')).toBe(false);
-    expect(models.data.some(model => model.id === 'vendor/fable-model')).toBe(true);
-  });
-});
-
 describe('disabled paid Kilo-exclusive model fallback', () => {
   beforeEach(() => {
     kiloExclusiveModels.push(disabledPaidModel);

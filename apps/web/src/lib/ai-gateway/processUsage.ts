@@ -745,7 +745,7 @@ export function processOpenRouterUsage(
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
-  const { cost_mUsd, market_cost, is_byok } = computeOpenRouterCostFields(
+  const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
     usage ?? {},
     coreProps,
     'sse_processing'
@@ -760,7 +760,6 @@ export function processOpenRouterUsage(
       0,
     outputTokens: usage?.completion_tokens ?? 0,
     cost_mUsd,
-    market_cost,
     is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };
 }
@@ -965,15 +964,6 @@ export function calculateKiloExclusiveCost_mUsd(
   );
 }
 
-export function applyKiloExclusiveModelPricing(
-  model: KiloExclusiveModel,
-  usage: JustTheCostsUsageStats
-): void {
-  const reportedMarketCost = usage.market_cost;
-  usage.cost_mUsd = calculateKiloExclusiveCost_mUsd(model, usage);
-  usage.market_cost = reportedMarketCost ?? usage.cost_mUsd;
-}
-
 export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
@@ -1039,7 +1029,8 @@ export async function processTokenData(
 
   const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
   if (kiloExclusiveModel?.pricing) {
-    applyKiloExclusiveModelPricing(kiloExclusiveModel, usageStats);
+    usageStats.market_cost = usageStats.cost_mUsd;
+    usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
 
   const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);

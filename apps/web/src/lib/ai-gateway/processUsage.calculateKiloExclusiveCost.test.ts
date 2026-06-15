@@ -1,5 +1,5 @@
 import { test, describe, expect } from '@jest/globals';
-import { applyKiloExclusiveModelPricing, calculateKiloExclusiveCost_mUsd } from './processUsage';
+import { calculateKiloExclusiveCost_mUsd } from './processUsage';
 import type { JustTheCostsUsageStats } from './processUsage.types';
 import { claude_opus_4_7_stealth_model } from '@/lib/ai-gateway/providers/anthropic.constants';
 
@@ -33,27 +33,5 @@ describe('calculateKiloExclusiveCost_mUsd with stealth Claude Opus 4.7', () => {
       })
     );
     expect(result).toBe(735_000);
-  });
-
-  test('retains market cost reported in the usage block', () => {
-    const usage = makeUsage({
-      market_cost: 750_000,
-      inputTokens: 100_000,
-      outputTokens: 10_000,
-    });
-
-    applyKiloExclusiveModelPricing(claude_opus_4_7_stealth_model, usage);
-
-    expect(usage.cost_mUsd).toBe(600_000);
-    expect(usage.market_cost).toBe(750_000);
-  });
-
-  test('uses configured pricing as market cost when usage omits it', () => {
-    const usage = makeUsage({ inputTokens: 100_000, outputTokens: 10_000 });
-
-    applyKiloExclusiveModelPricing(claude_opus_4_7_stealth_model, usage);
-
-    expect(usage.cost_mUsd).toBe(600_000);
-    expect(usage.market_cost).toBe(600_000);
   });
 });

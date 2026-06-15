@@ -24,6 +24,7 @@ import {
   KILO_CLI_SECTION_CONFIG,
   OP_SECTION_CONFIG,
   LINEAR_SECTION_CONFIG,
+  AGENTCARD_SECTION_CONFIG,
   COMPOSIO_SECTION_CONFIG,
   KILOCLAW_MITIGATIONS_SECTION_CONFIG,
   PLUGIN_INSTALL_SECTION_CONFIG,
@@ -1670,6 +1671,7 @@ describe('TOOLS.md section configs', () => {
     KILO_CLI_SECTION_CONFIG,
     OP_SECTION_CONFIG,
     LINEAR_SECTION_CONFIG,
+    AGENTCARD_SECTION_CONFIG,
     COMPOSIO_SECTION_CONFIG,
     KILOCLAW_MITIGATIONS_SECTION_CONFIG,
     PLUGIN_INSTALL_SECTION_CONFIG,
@@ -1682,6 +1684,26 @@ describe('TOOLS.md section configs', () => {
       expect(config.section).toContain(config.endMarker);
     });
   }
+
+  // AgentCard discoverability: gated on AGENTCARD_API_KEY, so the section must
+  // append when a token is present and drop out when it isn't, and it must point
+  // the agent at the agentcard skill.
+  it('AgentCard: appends when enabled and removes when disabled', () => {
+    const enabled = fakeDeps();
+    (enabled.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');
+    updateToolsMdSection(true, AGENTCARD_SECTION_CONFIG, enabled.deps);
+    expect(enabled.writeCalls).toHaveLength(1);
+    expect(enabled.writeCalls[0]!.data).toContain('<!-- BEGIN:agentcard -->');
+    expect(enabled.writeCalls[0]!.data).toContain('agentcard');
+
+    const disabled = fakeDeps();
+    (disabled.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# TOOLS\n<!-- BEGIN:agentcard -->\nold\n<!-- END:agentcard -->\n'
+    );
+    updateToolsMdSection(false, AGENTCARD_SECTION_CONFIG, disabled.deps);
+    expect(disabled.writeCalls).toHaveLength(1);
+    expect(disabled.writeCalls[0]!.data).not.toContain('<!-- BEGIN:agentcard -->');
+  });
 
   // Smoke test on the KiloClaw-specific sections we just added — pin the
   // key directives so a drive-by edit that strips the substance (but keeps

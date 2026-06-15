@@ -1168,6 +1168,22 @@ You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
   <!-- END:linear -->`,
 };
 
+export const AGENTCARD_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'AgentCard',
+  beginMarker: '<!-- BEGIN:agentcard -->',
+  endMarker: '<!-- END:agentcard -->',
+  section: `
+<!-- BEGIN:agentcard -->
+## AgentCard
+
+AgentCard is connected. Use it to create and manage virtual debit cards — for
+example when the user wants to create a card, check a balance, review transactions,
+or close a card.
+You can interact with the \`agentcard\` MCP server using your \`agentcard\` skill (which
+calls it via \`mcporter\`).
+<!-- END:agentcard -->`,
+};
+
 export const COMPOSIO_SECTION_CONFIG: ToolsMdSectionConfig = {
   name: 'Composio',
   beginMarker: '<!-- BEGIN:composio -->',
@@ -1342,6 +1358,7 @@ export async function bootstrapNonCritical(
         updateToolsMdSection(googleWorkspaceToolsEnabled, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
+        updateToolsMdSection(!!env.AGENTCARD_API_KEY, AGENTCARD_SECTION_CONFIG, deps);
         updateToolsMdSection(
           !!env.COMPOSIO_USER_API_KEY && !!env.COMPOSIO_ORG,
           COMPOSIO_SECTION_CONFIG,

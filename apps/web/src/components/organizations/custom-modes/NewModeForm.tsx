@@ -11,6 +11,7 @@ type NewModeFormProps = {
   organizationId: string;
   defaultModeSlug?: string;
   isDefaultModelConfigEnabled?: boolean;
+  canSetDefaultModel?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 };
@@ -19,6 +20,7 @@ export function NewModeForm({
   organizationId,
   defaultModeSlug: propDefaultModeSlug,
   isDefaultModelConfigEnabled = false,
+  canSetDefaultModel = true,
   onSuccess,
   onCancel,
 }: NewModeFormProps) {
@@ -80,6 +82,7 @@ export function NewModeForm({
       isSubmitting={createMutation.isPending}
       isEditingBuiltIn={!!defaultMode}
       isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+      canSetDefaultModel={canSetDefaultModel}
       existingModes={modesData?.modes || []}
       onCancel={onCancel}
       renderButtons={() => null}

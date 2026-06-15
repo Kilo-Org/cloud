@@ -17,6 +17,7 @@ type EditModeFormProps = {
   modeId: string;
   defaultModeSlug?: string;
   isDefaultModelConfigEnabled?: boolean;
+  canSetDefaultModel?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 };
@@ -33,7 +34,7 @@ function normalizeGroups(groups: unknown): string[] | undefined {
   return groups.map(group => JSON.stringify(group)).sort();
 }
 
-function matchesBuiltInModeState(formData: ModeFormData, defaultModeSlug: string): boolean {
+export function matchesBuiltInModeState(formData: ModeFormData, defaultModeSlug: string): boolean {
   const defaultMode = DEFAULT_MODES.find(mode => mode.slug === defaultModeSlug);
   if (!defaultMode) {
     return false;
@@ -56,6 +57,7 @@ export function EditModeForm({
   modeId,
   defaultModeSlug,
   isDefaultModelConfigEnabled = false,
+  canSetDefaultModel = true,
   onSuccess,
   onCancel,
 }: EditModeFormProps) {
@@ -132,6 +134,7 @@ export function EditModeForm({
       isSubmitting={updateMutation.isPending || deleteMutation.isPending}
       isEditingBuiltIn={!!defaultModeSlug}
       isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+      canSetDefaultModel={canSetDefaultModel}
       existingModes={modesData?.modes || []}
       onCancel={onCancel}
       renderButtons={() => null}

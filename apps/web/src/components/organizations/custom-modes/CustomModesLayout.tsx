@@ -2,7 +2,11 @@
 
 import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { useOrganizationModes, useDeleteOrganizationMode } from '@/app/api/organizations/hooks';
+import {
+  useOrganizationModes,
+  useDeleteOrganizationMode,
+  useOrganizationWithMembers,
+} from '@/app/api/organizations/hooks';
 import { Button } from '@/components/ui/button';
 import { LockableContainer } from '../LockableContainer';
 import { Badge } from '@/components/ui/badge';
@@ -162,6 +166,7 @@ function ModesList({
 
 export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
   const { data, isLoading, error } = useOrganizationModes(organizationId);
+  const { data: organizationData } = useOrganizationWithMembers(organizationId);
   const deleteMutation = useDeleteOrganizationMode();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [modeToDelete, setModeToDelete] = useState<DisplayMode | null>(null);
@@ -172,6 +177,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
   const isDefaultModelFeatureEnabled = useFeatureFlagEnabled('org-default-model-config');
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isDefaultModelConfigEnabled = isDevelopment || isDefaultModelFeatureEnabled === true;
+  const canSetDefaultModel = organizationData?.plan === 'enterprise';
   const readonly = isReadOnly;
 
   // Separate built-in modes and custom modes
@@ -404,6 +410,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
                 editingMode?.isDefault && !editingMode?.isOverridden ? editingMode.slug : undefined
               }
               isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+              canSetDefaultModel={canSetDefaultModel}
               onSuccess={handleDrawerClose}
               onCancel={handleDrawerClose}
             />
@@ -413,6 +420,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
               modeId={editingMode.id}
               defaultModeSlug={editingMode.isDefault ? editingMode.slug : undefined}
               isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+              canSetDefaultModel={canSetDefaultModel}
               onSuccess={handleDrawerClose}
               onCancel={handleDrawerClose}
             />

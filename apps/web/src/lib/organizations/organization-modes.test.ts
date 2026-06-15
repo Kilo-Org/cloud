@@ -6,6 +6,7 @@ import { createOrganization } from './organizations';
 import {
   createOrganizationMode,
   getAllOrganizationModes,
+  getOrganizationModeById,
   updateOrganizationMode,
 } from './organization-modes';
 
@@ -198,6 +199,33 @@ describe('updateOrganizationMode', () => {
       roleDefinition: 'You are a coding assistant',
       description: 'Write code',
       groups: ['read', 'edit'],
+    });
+  });
+
+  test('should not lose concurrent partial config updates', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Test Org', user.id);
+    const mode = await createOrganizationMode(organization.id, user.id, 'Code Mode', 'code', {
+      roleDefinition: 'You are a coding assistant',
+      groups: ['read'],
+    });
+
+    await Promise.all([
+      updateOrganizationMode(organization.id, mode!.id, {
+        config: { description: 'Write code' },
+      }),
+      updateOrganizationMode(organization.id, mode!.id, {
+        config: { defaultModel: 'openai/gpt-4o' },
+      }),
+    ]);
+
+    const updatedMode = await getOrganizationModeById(organization.id, mode!.id);
+
+    expect(updatedMode?.config).toEqual({
+      roleDefinition: 'You are a coding assistant',
+      groups: ['read'],
+      description: 'Write code',
+      defaultModel: 'openai/gpt-4o',
     });
   });
 

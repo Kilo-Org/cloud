@@ -58,6 +58,7 @@ type ModeFormProps = {
   isSubmitting: boolean;
   isEditingBuiltIn?: boolean;
   isDefaultModelConfigEnabled?: boolean;
+  canSetDefaultModel?: boolean;
   existingModes?: OrganizationMode[];
   onCancel?: () => void;
   renderButtons?: (props: { isDirty: boolean; isSubmitting: boolean }) => React.ReactNode;
@@ -103,6 +104,7 @@ export function ModeForm({
   isSubmitting,
   isEditingBuiltIn = false,
   isDefaultModelConfigEnabled = false,
+  canSetDefaultModel = true,
   existingModes = [],
   onCancel,
   renderButtons,
@@ -150,13 +152,18 @@ export function ModeForm({
     data: modelsData,
     isLoading: modelsLoading,
     error: modelsError,
-  } = useModelSelectorList(organizationId, isDefaultModelConfigEnabled);
+  } = useModelSelectorList(organizationId, isDefaultModelConfigEnabled && canSetDefaultModel);
   const modelOptions = useMemo(() => modelsData?.data || [], [modelsData?.data]);
   const hasCurrentDefaultModelOption =
-    !!formData.defaultModel && modelOptions.some(model => model.id === formData.defaultModel);
+    canSetDefaultModel &&
+    !!formData.defaultModel &&
+    modelOptions.some(model => model.id === formData.defaultModel);
   const shouldRenderCurrentDefaultModel = !!formData.defaultModel && !hasCurrentDefaultModelOption;
   const hasUnavailableDefaultModel =
-    shouldRenderCurrentDefaultModel && !modelsLoading && !modelsError;
+    canSetDefaultModel && shouldRenderCurrentDefaultModel && !modelsLoading && !modelsError;
+  const shouldShowDefaultModelControl =
+    isDefaultModelConfigEnabled && (canSetDefaultModel || !!formData.defaultModel);
+  const defaultModelChanged = formData.defaultModel !== initialFormData.defaultModel;
 
   // Update form data when mode prop changes
   useEffect(() => {
@@ -261,7 +268,7 @@ export function ModeForm({
       newErrors.slug = `A mode with the slug "${formData.slug}" already exists`;
     }
 
-    if (isDefaultModelConfigEnabled && hasUnavailableDefaultModel) {
+    if (defaultModelChanged && hasUnavailableDefaultModel) {
       newErrors.defaultModel = 'Choose an allowed model or clear this value.';
     }
 
@@ -447,7 +454,7 @@ export function ModeForm({
             </p>
           </div>
 
-          {isDefaultModelConfigEnabled && (
+          {shouldShowDefaultModelControl && (
             <div className="space-y-2">
               <Label htmlFor="defaultModel">Mode Default Model</Label>
               <Select
@@ -463,7 +470,14 @@ export function ModeForm({
                 <SelectTrigger
                   id="defaultModel"
                   className="w-full"
-                  aria-describedby="defaultModel-help"
+                  aria-describedby={[
+                    'defaultModel-help',
+                    hasUnavailableDefaultModel ? 'defaultModel-warning' : undefined,
+                    errors.defaultModel ? 'defaultModel-error' : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  aria-invalid={Boolean(errors.defaultModel)}
                 >
                   <SelectValue
                     placeholder={modelsLoading ? 'Loading models...' : 'No default model'}
@@ -476,42 +490,53 @@ export function ModeForm({
                       <div className="flex flex-col">
                         <span className="font-mono text-sm">{formData.defaultModel}</span>
                         <span className="text-muted-foreground text-xs">
-                          {modelsLoading
-                            ? 'Checking organization policy...'
-                            : modelsError
-                              ? 'Unable to verify organization policy'
-                              : 'Unavailable under current organization policy'}
+                          {!canSetDefaultModel
+                            ? 'Existing default; clear only while on Teams plan'
+                            : modelsLoading
+                              ? 'Checking organization policy...'
+                              : modelsError
+                                ? 'Unable to verify organization policy'
+                                : 'Unavailable under current organization policy'}
                         </span>
                       </div>
                     </SelectItem>
                   )}
-                  {modelOptions.map(model => (
-                    <SelectItem key={model.id} value={model.id}>
-                      <div className="flex flex-col">
-                        <span className="font-mono text-sm">{model.id}</span>
-                        {model.name !== model.id && (
-                          <span className="text-muted-foreground text-xs">{model.name}</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {canSetDefaultModel &&
+                    modelOptions.map(model => (
+                      <SelectItem key={model.id} value={model.id}>
+                        <div className="flex flex-col">
+                          <span className="font-mono text-sm">{model.id}</span>
+                          {model.name !== model.id && (
+                            <span className="text-muted-foreground text-xs">{model.name}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <p id="defaultModel-help" className="text-muted-foreground text-xs">
-                {modelsLoading
-                  ? 'Loading organization-allowed models...'
-                  : modelsError
-                    ? 'Unable to load organization models.'
-                    : modelOptions.length === 0
-                      ? 'No organization-allowed models are available.'
-                      : 'Members can still override this locally in Kilo Code.'}
+                {!canSetDefaultModel
+                  ? 'This organization must be on Enterprise to set mode defaults. Existing defaults can still be cleared.'
+                  : modelsLoading
+                    ? 'Loading organization-allowed models...'
+                    : modelsError
+                      ? 'Unable to load organization models.'
+                      : modelOptions.length === 0
+                        ? 'No organization-allowed models are available.'
+                        : 'Members can still override this locally in Kilo Code.'}
               </p>
               {hasUnavailableDefaultModel && (
-                <p className="text-sm text-amber-600">
-                  Choose an allowed model or clear this value before saving.
+                <p id="defaultModel-warning" className="text-sm text-amber-600">
+                  {defaultModelChanged
+                    ? 'Choose an allowed model or clear this value before saving.'
+                    : 'This model is no longer allowed by current organization policy. Leave it unchanged to preserve it, or clear or replace it.'}
                 </p>
               )}
-              {errors.defaultModel && <p className="text-sm text-red-600">{errors.defaultModel}</p>}
+              {errors.defaultModel && (
+                <p id="defaultModel-error" className="text-sm text-red-600" role="alert">
+                  {errors.defaultModel}
+                </p>
+              )}
             </div>
           )}
 

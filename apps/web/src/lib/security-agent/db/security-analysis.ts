@@ -5,11 +5,10 @@ import {
   security_analysis_owner_state,
   type SecurityFinding,
 } from '@kilocode/db/schema';
-import { eq, and, sql, count, isNotNull, desc, or, isNull, inArray, not, like } from 'drizzle-orm';
+import { eq, and, sql, count, isNotNull, desc, or, isNull, not, like } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type {
   AutoAnalysisMinSeverity,
-  SecurityFindingStatus,
   SecuritySeverity,
   SecurityReviewOwner,
   SecurityFindingAnalysis,
@@ -50,14 +49,6 @@ export type AutoAnalysisFailureCode =
   | 'START_CALL_AMBIGUOUS'
   | 'RUN_LOST';
 
-export type AutoAnalysisQueueSyncResult = {
-  enqueueCount: number;
-  eligibleCount: number;
-  boundarySkipCount: number;
-  unknownSeverityCount: number;
-};
-
-export const AUTO_ANALYSIS_REOPEN_REQUEUE_CAP = 2;
 export const AUTO_ANALYSIS_OWNER_CAP = 2;
 export const AUTO_ANALYSIS_MAX_ATTEMPTS = 5;
 
@@ -79,50 +70,6 @@ function minSeverityToMaxRank(minSeverity: AutoAnalysisMinSeverity): number {
     case 'all':
       return severityRankBySeverity.low;
   }
-}
-
-export function getSeverityRank(severity: string | null | undefined): number | null {
-  if (severity === 'critical') return severityRankBySeverity.critical;
-  if (severity === 'high') return severityRankBySeverity.high;
-  if (severity === 'medium') return severityRankBySeverity.medium;
-  if (severity === 'low') return severityRankBySeverity.low;
-  return null;
-}
-
-export function isFindingEligibleForAutoAnalysis(params: {
-  findingCreatedAt: string;
-  findingStatus: string;
-  severity: string | null;
-  ownerAutoAnalysisEnabledAt: string | null;
-  isAgentEnabled: boolean;
-  autoAnalysisEnabled: boolean;
-  autoAnalysisMinSeverity: AutoAnalysisMinSeverity;
-  autoAnalysisIncludeExisting?: boolean;
-}): { eligible: boolean; severityRank: number | null } {
-  const severityRank = getSeverityRank(params.severity);
-
-  if (!params.isAgentEnabled || !params.autoAnalysisEnabled) {
-    return { eligible: false, severityRank };
-  }
-  if (params.findingStatus !== 'open') {
-    return { eligible: false, severityRank };
-  }
-  if (!params.ownerAutoAnalysisEnabledAt) {
-    return { eligible: false, severityRank };
-  }
-  if (
-    !params.autoAnalysisIncludeExisting &&
-    Date.parse(params.findingCreatedAt) < Date.parse(params.ownerAutoAnalysisEnabledAt)
-  ) {
-    return { eligible: false, severityRank };
-  }
-  // Treat null/unknown severity as eligible with lowest rank (low=3) so these
-  // findings are not silently skipped. They still respect the severity threshold
-  // — if the threshold is stricter than 'all' they will be filtered out by rank.
-  const effectiveRank = severityRank ?? severityRankBySeverity.low;
-
-  const maxRank = minSeverityToMaxRank(params.autoAnalysisMinSeverity);
-  return { eligible: effectiveRank <= maxRank, severityRank: effectiveRank };
 }
 
 /**
@@ -393,24 +340,6 @@ export async function countSecurityFindingsWithAnalysis(
   }
 }
 
-export async function getOwnerAutoAnalysisEnabledAt(
-  owner: SecurityReviewOwner
-): Promise<string | null> {
-  const ownerConverted = toOwner(owner);
-  const ownerCondition =
-    ownerConverted.type === 'org'
-      ? eq(security_analysis_owner_state.owned_by_organization_id, ownerConverted.id)
-      : eq(security_analysis_owner_state.owned_by_user_id, ownerConverted.id);
-
-  const [state] = await db
-    .select({ autoAnalysisEnabledAt: security_analysis_owner_state.auto_analysis_enabled_at })
-    .from(security_analysis_owner_state)
-    .where(ownerCondition)
-    .limit(1);
-
-  return state?.autoAnalysisEnabledAt ?? null;
-}
-
 export async function setOwnerAutoAnalysisEnabledAtNow(owner: SecurityReviewOwner): Promise<void> {
   const ownerConverted = toOwner(owner);
   const ownerCondition =
@@ -463,148 +392,6 @@ export async function resetOwnerAutoAnalysisEnabledAt(owner: SecurityReviewOwner
     .where(ownerCondition);
 }
 
-export async function syncAutoAnalysisQueueForFinding(params: {
-  owner: SecurityReviewOwner;
-  findingId: string;
-  findingCreatedAt: string;
-  previousStatus: SecurityFindingStatus | null;
-  currentStatus: SecurityFindingStatus;
-  severity: string | null;
-  isAgentEnabled: boolean;
-  autoAnalysisEnabled: boolean;
-  autoAnalysisMinSeverity: AutoAnalysisMinSeverity;
-  ownerAutoAnalysisEnabledAt: string | null;
-  autoAnalysisIncludeExisting?: boolean;
-}): Promise<AutoAnalysisQueueSyncResult> {
-  const ownerConverted = toOwner(params.owner);
-  const { eligible, severityRank } = isFindingEligibleForAutoAnalysis({
-    findingCreatedAt: params.findingCreatedAt,
-    findingStatus: params.currentStatus,
-    severity: params.severity,
-    ownerAutoAnalysisEnabledAt: params.ownerAutoAnalysisEnabledAt,
-    isAgentEnabled: params.isAgentEnabled,
-    autoAnalysisEnabled: params.autoAnalysisEnabled,
-    autoAnalysisMinSeverity: params.autoAnalysisMinSeverity,
-    autoAnalysisIncludeExisting: params.autoAnalysisIncludeExisting,
-  });
-  const isBoundarySkip =
-    !params.autoAnalysisIncludeExisting &&
-    params.ownerAutoAnalysisEnabledAt != null &&
-    Date.parse(params.findingCreatedAt) < Date.parse(params.ownerAutoAnalysisEnabledAt);
-  const unknownSeverityCount = severityRank == null ? 1 : 0;
-  let enqueueCount = 0;
-
-  await db.transaction(async tx => {
-    if (severityRank != null) {
-      await tx
-        .update(security_analysis_queue)
-        .set({
-          severity_rank: severityRank,
-          updated_at: sql`now()`,
-        })
-        .where(
-          and(
-            eq(security_analysis_queue.finding_id, params.findingId),
-            eq(security_analysis_queue.queue_status, 'queued')
-          )
-        );
-    }
-
-    if (!eligible) {
-      await tx
-        .update(security_analysis_queue)
-        .set({
-          queue_status: 'completed',
-          failure_code: 'SKIPPED_NO_LONGER_ELIGIBLE',
-          claim_token: null,
-          claimed_at: null,
-          claimed_by_job_id: null,
-          updated_at: sql`now()`,
-        })
-        .where(
-          and(
-            eq(security_analysis_queue.finding_id, params.findingId),
-            eq(security_analysis_queue.queue_status, 'queued')
-          )
-        );
-    }
-
-    const isReopened =
-      (params.previousStatus === 'fixed' || params.previousStatus === 'ignored') &&
-      params.currentStatus === 'open';
-
-    if (isReopened && eligible) {
-      await tx
-        .update(security_analysis_queue)
-        .set({
-          queue_status: 'queued',
-          queued_at: sql`now()`,
-          attempt_count: 0,
-          next_retry_at: null,
-          failure_code: null,
-          last_error_redacted: null,
-          claimed_at: null,
-          claimed_by_job_id: null,
-          claim_token: null,
-          reopen_requeue_count: sql`${security_analysis_queue.reopen_requeue_count} + 1`,
-          updated_at: sql`now()`,
-        })
-        .where(
-          and(
-            eq(security_analysis_queue.finding_id, params.findingId),
-            or(
-              eq(security_analysis_queue.queue_status, 'completed'),
-              eq(security_analysis_queue.queue_status, 'failed')
-            ),
-            sql`${security_analysis_queue.reopen_requeue_count} < ${AUTO_ANALYSIS_REOPEN_REQUEUE_CAP}`
-          )
-        );
-
-      await tx
-        .update(security_analysis_queue)
-        .set({
-          queue_status: 'failed',
-          failure_code: 'REOPEN_LOOP_GUARD',
-          updated_at: sql`now()`,
-        })
-        .where(
-          and(
-            eq(security_analysis_queue.finding_id, params.findingId),
-            or(
-              eq(security_analysis_queue.queue_status, 'completed'),
-              eq(security_analysis_queue.queue_status, 'failed')
-            ),
-            sql`${security_analysis_queue.reopen_requeue_count} >= ${AUTO_ANALYSIS_REOPEN_REQUEUE_CAP}`
-          )
-        );
-    }
-
-    if (eligible) {
-      const inserted = await tx
-        .insert(security_analysis_queue)
-        .values({
-          finding_id: params.findingId,
-          owned_by_organization_id: ownerConverted.type === 'org' ? ownerConverted.id : null,
-          owned_by_user_id: ownerConverted.type === 'user' ? ownerConverted.id : null,
-          queue_status: 'queued',
-          severity_rank: severityRank ?? severityRankBySeverity.low,
-          queued_at: sql`now()`,
-          updated_at: sql`now()`,
-        })
-        .onConflictDoNothing()
-        .returning({ id: security_analysis_queue.id });
-      enqueueCount = inserted.length;
-    }
-  });
-
-  return {
-    enqueueCount,
-    eligibleCount: eligible ? 1 : 0,
-    boundarySkipCount: isBoundarySkip ? 1 : 0,
-    unknownSeverityCount,
-  };
-}
-
 export async function tryAcquireAnalysisStartLease(findingId: string): Promise<boolean> {
   const [lease] = await db
     .update(security_findings)
@@ -654,7 +441,7 @@ export async function enqueueBacklogFindings(params: {
       : sql`${security_findings.owned_by_user_id} = ${ownerConverted.id}`;
 
   // Use a single INSERT ... SELECT to bulk-enqueue eligible findings.
-  // severity_rank maps null severity to low (3) to match isFindingEligibleForAutoAnalysis.
+  // severity_rank maps null severity to low (3).
   const result = await db.execute<{ id: string }>(sql`
     INSERT INTO ${security_analysis_queue} (
       finding_id,
@@ -704,65 +491,9 @@ export async function enqueueBacklogFindings(params: {
   return result.rows.length;
 }
 
-/**
- * Remove superseded findings from the auto-analysis queue so the worker
- * doesn't analyze findings that are no longer open.
- *
- * Targets both `queued` and `pending` (claimed but not yet running) rows
- * because the auto-analysis worker may claim rows between per-finding
- * enqueue and this repo-level cleanup.
- *
- * Clears `analysis_status` for `pending` findings so they no longer count
- * against the owner's concurrency cap. Already-running analyses are left
- * alone — the callback route transitions their queue rows when the job
- * reports back, releasing the concurrency slot at that point.
- */
-export async function dequeueSupersededFindings(findingIds: string[]): Promise<number> {
-  if (findingIds.length === 0) return 0;
-
-  const result = await db
-    .update(security_analysis_queue)
-    .set({
-      queue_status: 'completed',
-      failure_code: 'SKIPPED_NO_LONGER_ELIGIBLE',
-      claim_token: null,
-      claimed_at: null,
-      claimed_by_job_id: null,
-      updated_at: sql`now()`,
-    })
-    .where(
-      and(
-        inArray(security_analysis_queue.finding_id, findingIds),
-        or(
-          eq(security_analysis_queue.queue_status, 'queued'),
-          eq(security_analysis_queue.queue_status, 'pending')
-        )
-      )
-    )
-    .returning({ id: security_analysis_queue.id });
-
-  // Clear pending analysis_status so countRunningAnalyses no longer counts
-  // these superseded findings against the owner's concurrency cap.
-  // Running analyses are left alone — the callback route transitions their
-  // queue rows when the job completes, releasing the concurrency slot.
-  await db
-    .update(security_findings)
-    .set({
-      analysis_status: null,
-      updated_at: sql`now()`,
-    })
-    .where(
-      and(
-        inArray(security_findings.id, findingIds),
-        eq(security_findings.analysis_status, 'pending')
-      )
-    );
-
-  return result.length;
-}
-
 export async function transitionAutoAnalysisQueueFromCallback(params: {
   findingId: string;
+  attemptToken?: string;
   toStatus: 'completed' | 'failed';
   failureCode?: AutoAnalysisFailureCode;
   errorMessage?: string;
@@ -785,6 +516,9 @@ export async function transitionAutoAnalysisQueueFromCallback(params: {
     .where(
       and(
         eq(security_analysis_queue.finding_id, params.findingId),
+        params.attemptToken
+          ? eq(security_analysis_queue.claim_token, params.attemptToken)
+          : undefined,
         or(
           eq(security_analysis_queue.queue_status, 'running'),
           eq(security_analysis_queue.queue_status, 'pending')

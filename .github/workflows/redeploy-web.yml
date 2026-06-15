@@ -1,0 +1,52 @@
+name: Redeploy Web to Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  verify-main:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify main branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
+            exit 1
+          fi
+
+  stage-app:
+    needs: verify-main
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      vercel_project_id_var: VERCEL_PROJECT_ID_APP
+    secrets: inherit
+
+  stage-global-app:
+    needs: verify-main
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
+    secrets: inherit
+
+  promote-app:
+    needs: stage-app
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
+    secrets: inherit
+
+  promote-global-app:
+    needs: stage-global-app
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
+    secrets: inherit

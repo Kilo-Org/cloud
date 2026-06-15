@@ -22,6 +22,7 @@ export type ModeOption<T extends string = string> = {
   value: T;
   label: string;
   description: string;
+  deprecated?: boolean;
 };
 
 /**
@@ -44,7 +45,12 @@ export const NEXT_MODE_OPTIONS: ModeOption<'code' | 'plan' | 'debug' | 'orchestr
   { value: 'code', label: 'Code', description: 'Write and modify code' },
   { value: 'plan', label: 'Plan', description: 'Plan and design solutions' },
   { value: 'debug', label: 'Debug', description: 'Find and fix issues' },
-  { value: 'orchestrator', label: 'Orchestrator', description: 'Coordinate complex tasks' },
+  {
+    value: 'orchestrator',
+    label: 'Orchestrator',
+    description: 'Coordinate complex tasks',
+    deprecated: true,
+  },
   { value: 'ask', label: 'Ask', description: 'Get answers and explanations' },
 ];
 
@@ -215,8 +221,15 @@ function ModeComboboxGroups<T extends string>({
     >
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate">{mode.label}</span>
-        {mode.description && (
-          <span className="text-muted-foreground truncate text-xs">{mode.description}</span>
+        {(mode.deprecated || mode.description) && (
+          <span
+            className={cn(
+              'truncate text-xs',
+              mode.deprecated ? 'text-amber-400/80' : 'text-muted-foreground'
+            )}
+          >
+            {mode.deprecated ? 'Deprecated' : mode.description}
+          </span>
         )}
       </div>
       <Check

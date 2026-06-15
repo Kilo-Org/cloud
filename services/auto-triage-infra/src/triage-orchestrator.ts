@@ -157,6 +157,7 @@ export class TriageOrchestrator extends DurableObject<Env> {
 
     if (payload.status !== 'completed') {
       const errorMessage =
+        payload.failure?.message ??
         payload.errorMessage ??
         `Classification session ended with status '${payload.status}' without an error message.`;
       await this.updateStatus('failed', { errorMessage });

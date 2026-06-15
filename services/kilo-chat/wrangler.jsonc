@@ -78,5 +78,10 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "R2_SECRET_ACCESS_KEY_KILOCHAT_MEDIA",
     },
+    {
+      "binding": "INTERNAL_API_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
   ],
 }

@@ -1,18 +1,58 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, gte, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2 } from '@kilocode/db/schema';
+import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
+import {
+  createSessionForCloudAgentSchema,
+  deleteSessionForCloudAgentSchema,
+  getCloudAgentRootSessionMessagesSchema,
+  kiloSdkSessionSnapshotOutcomeSchema,
+  listCloudAgentRootSessionsSchema,
+  persistedKiloSdkMessageHistorySchema,
+  resolveCloudAgentRootSessionSchema,
+  type CloudAgentRootSessionSnapshot,
+  type CloudAgentRootSessionSummary,
+  type CreateSessionForCloudAgentParams,
+  type DeleteSessionForCloudAgentParams,
+  type GetCloudAgentRootSessionMessagesParams,
+  type GetCloudAgentRootSessionMessagesResult,
+  type GetCloudAgentRootSessionSnapshotParams,
+  type GetCloudAgentRootSessionSnapshotResult,
+  type ListCloudAgentRootSessionsParams,
+  type ResolveCloudAgentRootSessionForKiloSessionParams,
+  type ResolveCloudAgentRootSessionForKiloSessionResult,
+  type SessionIngestRpcMethods,
+} from '@kilocode/session-ingest-contracts';
 
 import type { Env } from './env';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { withDORetry } from '@kilocode/worker-utils';
 import { app } from './app';
+import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
 
-const sessionIdSchema = z.string().startsWith('ses_').length(30);
+const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 
-export class SessionIngestRPC extends WorkerEntrypoint<Env> {
+function databaseTimestampToMilliseconds(value: string): number {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) {
+    throw new Error('Invalid Cloud Agent root session timestamp');
+  }
+  return timestamp;
+}
+
+function organizationMembershipJoinCondition(kiloUserId: string) {
+  return and(
+    eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
+    eq(organization_memberships.kilo_user_id, kiloUserId)
+  );
+}
+
+function personalOrAccessibleOrganizationCondition() {
+  return or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id));
+}
+
+export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIngestRpcMethods {
   // Delegate HTTP requests to the Hono app so callers using the service
   // binding can `.fetch()` against this entrypoint (not just call RPC methods).
   fetch(request: Request): Response | Promise<Response> {
@@ -26,28 +66,30 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
    * Uses ON CONFLICT DO UPDATE to set cloud_agent_session_id (and organization_id
    * if provided), matching the behavior previously in the backend routers.
    */
-  async createSessionForCloudAgent(params: {
-    sessionId: string;
-    kiloUserId: string;
-    cloudAgentSessionId: string;
-    organizationId?: string;
-    createdOnPlatform: string;
-    title?: string;
-  }): Promise<void> {
-    const parsed = z
-      .object({
-        sessionId: sessionIdSchema,
-        kiloUserId: z.string().min(1),
-        cloudAgentSessionId: z.string().min(1),
-        organizationId: z.string().optional(),
-        createdOnPlatform: z.string().min(1),
-        title: z.string().optional(),
-      })
-      .parse(params);
+  async createSessionForCloudAgent(params: CreateSessionForCloudAgentParams): Promise<void> {
+    const parsed = createSessionForCloudAgentSchema.parse(params);
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
-    await db
+    const existingRows = await db
+      .select()
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+        )
+      )
+      .limit(1);
+    const existingRow = existingRows[0];
+
+    const hasMeaningfulChange = existingRow
+      ? existingRow.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
+        (parsed.organizationId !== undefined &&
+          existingRow.organization_id !== parsed.organizationId)
+      : true;
+
+    const [persistedRow] = await db
       .insert(cli_sessions_v2)
       .values({
         session_id: parsed.sessionId,
@@ -66,7 +108,21 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
             ? { organization_id: parsed.organizationId }
             : {}),
         },
-      });
+      })
+      .returning();
+
+    if (hasMeaningfulChange && persistedRow) {
+      const session = mapSessionEventRow(persistedRow);
+      notifyUserSessionEvent(
+        this.env,
+        parsed.kiloUserId,
+        {
+          type: existingRow ? 'session.updated' : 'session.created',
+          data: { source: 'v2', session, changedAt: session.updatedAt },
+        },
+        this.ctx
+      );
+    }
 
     // Warm the session cache so subsequent ingests can skip Postgres.
     // Best-effort: cache miss is acceptable; don't fail the create if the DO is unavailable.
@@ -85,24 +141,157 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
     }
   }
 
+  async resolveCloudAgentRootSessionForKiloSession(
+    params: ResolveCloudAgentRootSessionForKiloSessionParams
+  ): Promise<ResolveCloudAgentRootSessionForKiloSessionResult> {
+    const parsed = resolveCloudAgentRootSessionSchema.parse(params);
+    const mapping = await this.findOwnedRootCloudAgentMapping(parsed);
+    return mapping ? { cloudAgentSessionId: mapping.cloudAgentSessionId } : null;
+  }
+
+  async getCloudAgentRootSessionSnapshot(
+    params: GetCloudAgentRootSessionSnapshotParams
+  ): Promise<GetCloudAgentRootSessionSnapshotResult> {
+    const parsed = resolveCloudAgentRootSessionSchema.parse(params);
+    const mapping = await this.findOwnedRootCloudAgentMapping(parsed);
+    if (!mapping) {
+      return null;
+    }
+
+    return this.hydrateCloudAgentRootSessionSnapshot({
+      kiloUserId: parsed.kiloUserId,
+      kiloSessionId: parsed.kiloSessionId,
+      cloudAgentSessionId: mapping.cloudAgentSessionId,
+    });
+  }
+
+  async getCloudAgentRootSessionMessages(
+    params: GetCloudAgentRootSessionMessagesParams
+  ): Promise<GetCloudAgentRootSessionMessagesResult> {
+    const parsed = getCloudAgentRootSessionMessagesSchema.parse(params);
+    const mapping = await this.findOwnedRootCloudAgentMapping(parsed);
+    if (!mapping) {
+      return null;
+    }
+
+    const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+      () =>
+        getSessionIngestDO(this.env, {
+          kiloUserId: parsed.kiloUserId,
+          sessionId: parsed.kiloSessionId,
+        }),
+      stub => stub.readKiloSdkMessages({ limit: parsed.limit, before: parsed.before }),
+      'SessionIngestDO.readKiloSdkMessages'
+    );
+    const parsedHistory = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
+
+    return {
+      kiloSessionId: parsed.kiloSessionId,
+      cloudAgentSessionId: mapping.cloudAgentSessionId,
+      history: parsedHistory.success ? parsedHistory.data : { kind: 'invalid_data' },
+    };
+  }
+
+  async listCloudAgentRootSessions(
+    params: ListCloudAgentRootSessionsParams
+  ): Promise<CloudAgentRootSessionSummary[]> {
+    const parsed = listCloudAgentRootSessionsSchema.parse(params);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const conditions = [
+      eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
+      isNull(cli_sessions_v2.parent_session_id),
+      isNotNull(cli_sessions_v2.cloud_agent_session_id),
+      personalOrAccessibleOrganizationCondition(),
+    ];
+    if (parsed.start !== undefined) {
+      conditions.push(gte(cli_sessions_v2.updated_at, new Date(parsed.start).toISOString()));
+    }
+
+    const rows = await db
+      .select({
+        kiloSessionId: cli_sessions_v2.session_id,
+        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+        title: sql<
+          string | null
+        >`left(${cli_sessions_v2.title}, ${MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS})`,
+        createdAt: cli_sessions_v2.created_at,
+        updatedAt: cli_sessions_v2.updated_at,
+      })
+      .from(cli_sessions_v2)
+      .leftJoin(organization_memberships, organizationMembershipJoinCondition(parsed.kiloUserId))
+      .where(and(...conditions))
+      .orderBy(desc(cli_sessions_v2.updated_at), desc(cli_sessions_v2.session_id))
+      .limit(parsed.limit);
+
+    const sessions: CloudAgentRootSessionSummary[] = [];
+    for (const row of rows) {
+      if (!row.cloudAgentSessionId) continue;
+      sessions.push({
+        kiloSessionId: row.kiloSessionId,
+        cloudAgentSessionId: row.cloudAgentSessionId,
+        title: row.title?.slice(0, MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS) ?? null,
+        created: databaseTimestampToMilliseconds(row.createdAt),
+        updated: databaseTimestampToMilliseconds(row.updatedAt),
+      });
+    }
+    return sessions;
+  }
+
+  private async hydrateCloudAgentRootSessionSnapshot(params: {
+    kiloUserId: string;
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+  }): Promise<CloudAgentRootSessionSnapshot> {
+    const rawSnapshot = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+      () =>
+        getSessionIngestDO(this.env, {
+          kiloUserId: params.kiloUserId,
+          sessionId: params.kiloSessionId,
+        }),
+      stub => stub.readKiloSdkSessionSnapshot(),
+      'SessionIngestDO.readKiloSdkSessionSnapshot'
+    );
+    const snapshot = kiloSdkSessionSnapshotOutcomeSchema.safeParse(rawSnapshot);
+
+    return {
+      kiloSessionId: params.kiloSessionId,
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      snapshot: snapshot.success ? snapshot.data : { kind: 'invalid_data' },
+    };
+  }
+
+  private async findOwnedRootCloudAgentMapping(params: {
+    kiloUserId: string;
+    kiloSessionId: string;
+  }): Promise<{ cloudAgentSessionId: string } | null> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const rows = await db
+      .select({ cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id })
+      .from(cli_sessions_v2)
+      .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, params.kiloSessionId),
+          eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
+          isNull(cli_sessions_v2.parent_session_id),
+          isNotNull(cli_sessions_v2.cloud_agent_session_id),
+          personalOrAccessibleOrganizationCondition()
+        )
+      )
+      .limit(1);
+
+    const cloudAgentSessionId = rows[0]?.cloudAgentSessionId;
+    return cloudAgentSessionId ? { cloudAgentSessionId } : null;
+  }
+
   /**
    * RPC method: delete a cli_sessions_v2 record for a cloud-agent-next session.
    * Called via service binding from cloud-agent-next for rollback when DO prepare() fails.
    *
    * Scoped to the user (composite PK: session_id + kilo_user_id).
    */
-  async deleteSessionForCloudAgent(params: {
-    sessionId: string;
-    kiloUserId: string;
-    onlyIfEmpty?: boolean;
-  }): Promise<void> {
-    const parsed = z
-      .object({
-        sessionId: sessionIdSchema,
-        kiloUserId: z.string().min(1),
-        onlyIfEmpty: z.boolean().optional(),
-      })
-      .parse(params);
+  async deleteSessionForCloudAgent(params: DeleteSessionForCloudAgentParams): Promise<void> {
+    const parsed = deleteSessionForCloudAgentSchema.parse(params);
 
     // When onlyIfEmpty is set, atomically check emptiness and clear within a
     // single DO request to prevent a TOCTOU race where ingest data arrives
@@ -124,6 +313,18 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
+    const deletedRows = await db
+      .select()
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+        )
+      )
+      .limit(1);
+    const deletedRow = deletedRows[0];
+
     await db
       .delete(cli_sessions_v2)
       .where(
@@ -132,6 +333,27 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
           eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
         )
       );
+
+    if (deletedRow) {
+      notifyUserSessionEvent(
+        this.env,
+        parsed.kiloUserId,
+        {
+          type: 'session.deleted',
+          data: {
+            source: 'v2',
+            sessionId: deletedRow.session_id,
+            parentSessionId: deletedRow.parent_session_id,
+            organizationId: deletedRow.organization_id,
+            gitUrl: deletedRow.git_url,
+            gitBranch: deletedRow.git_branch,
+            createdOnPlatform: deletedRow.created_on_platform,
+            deletedAt: new Date().toISOString(),
+          },
+        },
+        this.ctx
+      );
+    }
 
     // Clear caches — best-effort; don't fail the delete if DOs are unavailable.
     const cacheErrors: string[] = [];

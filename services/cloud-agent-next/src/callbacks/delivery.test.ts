@@ -117,6 +117,26 @@ describe('deliverCallbackJob', () => {
   });
 
   describe('successful delivery', () => {
+    it('delivers Security Agent callbacks through the configured HTTP target', async () => {
+      const callbackFetch = vi.fn().mockResolvedValue(new Response('', { status: 202 }));
+      globalThis.fetch = callbackFetch;
+      const target: CallbackTarget = {
+        url: 'https://security-analysis.test/internal/security-analysis-callback/finding-123',
+        headers: { 'X-Internal-Secret': 'secret' },
+      };
+
+      const result = await deliverCallbackJob(target, mockPayload, 1);
+
+      expect(result.type).toBe('success');
+      expect(callbackFetch).toHaveBeenCalledWith(
+        'https://security-analysis.test/internal/security-analysis-callback/finding-123',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(mockPayload),
+        })
+      );
+    });
+
     it('should succeed on 200 response', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
@@ -144,18 +164,30 @@ describe('deliverCallbackJob', () => {
       expect(result.type).toBe('success');
     });
 
-    it('should send correct payload to fetch', async () => {
+    it('forwards optional structured failure unchanged', async () => {
       const mockFetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
       globalThis.fetch = mockFetch;
       const target: CallbackTarget = { url: 'https://example.com/callback' };
+      const payload: ExecutionCallbackPayload = {
+        ...mockPayload,
+        status: 'failed',
+        errorMessage: 'legacy error',
+        failure: {
+          stage: 'pre_dispatch',
+          code: 'workspace_setup_failed',
+          subtype: 'git_clone_timeout',
+          attempts: 2,
+          message: 'Repository clone timed out',
+        },
+      };
 
-      await deliverCallbackJob(target, mockPayload, 1);
+      await deliverCallbackJob(target, payload, 1);
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://example.com/callback',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify(mockPayload),
+          body: JSON.stringify(payload),
         })
       );
     });

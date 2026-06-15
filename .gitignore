@@ -67,6 +67,7 @@ yarn-error.log*
 /.plans/*
 !/.plans/experimental-models-1.md
 !/.plans/experimental-models-2.md
+!/.plans/kilo-pass-welcome-promo-card-fingerprint-guard.md
 /.plan/
 .kilo/plans
 .superpowers/
@@ -99,6 +100,9 @@ supabase/.temp
 # linter cache
 .eslintcache
 
+# Expo cache (any Expo app in the repo)
+**/.expo/
+
 # husky generated hook shims
 .husky/_/
 
@@ -108,6 +112,13 @@ supabase/.temp
 # beads task workspace (per-agent local state)
 .beads/
 
+# generated SBOMs (produced in CI / locally, never committed)
+*sbom*.json
+*sbom*.json.gz
+*.cyclonedx.json
+*.cyclonedx.json.gz
+*.spdx.json
+
 # misc
 TMP_CI_commit_msg.txt
 *.csv
@@ -116,3 +127,10 @@ run-milvus-test.sh
 .beads/
 .env*.local
 .tests/
+
+# Ignore stray .env-prefixed files but preserve committed example/test/envrc files.
+.env*
+!.env.example
+!.env.*.example
+!.env.test
+!.envrc

@@ -26,14 +26,14 @@ app shell with marketing-scale spacing.
 
 Kilo defines a radius scale:
 
-| Token         | Value                       | Use                           |
-| ------------- | --------------------------- | ----------------------------- |
-| `--radius`    | `0.625rem`                  | Base                          |
-| `--radius-sm` | `calc(var(--radius) - 4px)` | Tight inline chips            |
-| `--radius-md` | `calc(var(--radius) - 2px)` | Buttons, inputs               |
-| `--radius-lg` | `var(--radius)`             | Popovers, medium containers   |
-| `--radius-xl` | `calc(var(--radius) + 4px)` | Cards, dialogs                |
-| (full)        | `rounded-full`              | Badges, avatars, status pills |
+| Token | Value | Use |
+|---|---|---|
+| `--radius` | `0.625rem` | Base |
+| `--radius-sm` | `calc(var(--radius) - 4px)` | Tight inline chips |
+| `--radius-md` | `calc(var(--radius) - 2px)` | Buttons, inputs |
+| `--radius-lg` | `var(--radius)` | Popovers, medium containers |
+| `--radius-xl` | `calc(var(--radius) + 4px)` | Cards, dialogs |
+| (full) | `rounded-full` | Badges, avatars, status pills |
 
 Do not introduce new radius values.
 
@@ -96,13 +96,13 @@ If everything looks the same weight blurred, you have a hierarchy problem.
 
 Do not rely on size alone. Combine:
 
-| Tool         | Strong hierarchy         | Weak hierarchy    |
-| ------------ | ------------------------ | ----------------- |
-| **Size**     | 3:1 ratio or more        | <2:1 ratio        |
-| **Weight**   | Bold vs Regular          | Medium vs Regular |
-| **Color**    | High contrast            | Similar tones     |
-| **Position** | Top / left (primary)     | Bottom / right    |
-| **Space**    | Surrounded by whitespace | Crowded           |
+| Tool | Strong hierarchy | Weak hierarchy |
+|---|---|---|
+| **Size** | 3:1 ratio or more | <2:1 ratio |
+| **Weight** | Bold vs Regular | Medium vs Regular |
+| **Color** | High contrast | Similar tones |
+| **Position** | Top / left (primary) | Bottom / right |
+| **Space** | Surrounded by whitespace | Crowded |
 
 The best hierarchy uses 2–3 dimensions at once: a heading that's larger,
 bolder, AND has more space above it.

@@ -33,7 +33,7 @@ import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import { isKiloStealthModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel, shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -147,23 +147,21 @@ export function dataCollectionRequiredResponse() {
 
 export function apiKindNotSupportedResponse(
   apiKind: GatewayChatApiKind,
-  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
-  fraudHeaders: FraudDetectionHeaders
+  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>
 ) {
-  const error = isRooCodeBasedClient(fraudHeaders)
-    ? 'This model requires Kilo v7 or newer. Please upgrade Kilo and try again.'
-    : `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  const error = `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  warnExceptInTest(`[apiKindNotSupportedResponse] ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.api_kind_not_supported, message: error },
     { status: 400 }
   );
 }
 
-async function stealthModelError(response: Response) {
-  const error = 'Stealth model unable to process request';
+async function redactedErrorResponse(response: Response) {
+  const error = 'The upstream provider was unable to process the request';
   warnExceptInTest(`Responding with ${response.status} ${error}`);
   return NextResponse.json(
-    { error, error_type: ProxyErrorType.stealth_model_error, message: error },
+    { error, error_type: ProxyErrorType.upstream_error, message: error },
     { status: response.status }
   );
 }
@@ -180,11 +178,13 @@ function byokErrorMessage(status: number): string | undefined {
 }
 
 export async function makeErrorReadable({
+  providerId,
   requestedModel,
   request,
   response,
   isUserByok,
 }: {
+  providerId: ProviderId;
   requestedModel: string;
   request: GatewayRequest;
   response: Response;
@@ -212,8 +212,8 @@ export async function makeErrorReadable({
   const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
   if (overflowResponse) return overflowResponse;
 
-  if (isKiloStealthModel(requestedModel)) {
-    return await stealthModelError(response);
+  if (shouldRedactErrorResponse(providerId, requestedModel)) {
+    return await redactedErrorResponse(response);
   }
 
   return undefined;
@@ -265,7 +265,7 @@ export function noFreeModelsAvailableResponse() {
 }
 
 export function featureExclusiveModelResponse(modelId: string) {
-  const exclusiveTo = kiloExclusiveModels.find(m => m.public_id === modelId)?.exclusive_to ?? [];
+  const exclusiveTo = findKiloExclusiveModel(modelId)?.exclusive_to ?? [];
   const error = `${modelId} is only available for ${exclusiveTo.join(', ')}. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;
   return NextResponse.json(
     { error, error_type: ProxyErrorType.feature_exclusive_model, message: error },
@@ -691,6 +691,147 @@ export function countAndStoreFimUsage(
       }
 
       // Use the same logMicrodollarUsage as OpenRouter!
+      return logMicrodollarUsage(usageStats, usageContext);
+    })
+  );
+}
+
+// ============================================================================
+// Edit-Specific Code
+// ============================================================================
+
+type EditMessage = { role: string; content: string };
+
+export function extractEditPromptInfo(body: { messages: EditMessage[] }): PromptInfo {
+  const lastUser = [...body.messages].reverse().find(m => m.role === 'user');
+  const content = lastUser?.content ?? '';
+  return {
+    system_prompt_prefix: '', // /v1/edit/completions bakes its system prompt in server-side
+    system_prompt_length: 0,
+    user_prompt_prefix: content.slice(0, 100),
+  };
+}
+
+type EditUsage = FimUsage & {
+  cached_input_tokens?: number;
+};
+
+type MercuryEditCompletionResponse = {
+  id?: string;
+  model?: string;
+  usage?: EditUsage;
+  choices?: Array<{
+    index?: number;
+    message?: { role?: string; content?: string };
+    finish_reason?: string | null;
+  }>;
+};
+
+function getEditCacheHitTokens(usage: EditUsage): number {
+  return Math.min(usage.prompt_tokens, Math.max(usage.cached_input_tokens ?? 0, 0));
+}
+
+function computeEditMicrodollarCost(usage: EditUsage, provider: ProviderId): number {
+  switch (provider) {
+    case 'inception': {
+      // Inception Mercury Edit 2 published rates (per 1M tokens):
+      //   $0.25 input  →  0.25 mUSD/token
+      //   $0.025 cached input  →  0.025 mUSD/token
+      //   $0.75 output  →  0.75 mUSD/token
+      // Sources:
+      //   https://www.inceptionlabs.ai/models
+      //   https://www.inceptionlabs.ai/blog/introducing-mercury-edit-2
+      // Mercury 2 (chat) shares the same per-token rates.
+      const cacheHitTokens = getEditCacheHitTokens(usage);
+      const uncachedInputTokens = usage.prompt_tokens - cacheHitTokens;
+      return Math.round(
+        uncachedInputTokens * 0.25 + cacheHitTokens * 0.025 + usage.completion_tokens * 0.75
+      );
+    }
+    default:
+      console.error('Unknown provider for edit cost calculation', provider);
+      return 0;
+  }
+}
+
+export function parseEditUsageFromResponse(
+  response: string,
+  provider: ProviderId,
+  statusCode: number
+): MicrodollarUsageStats {
+  const json: MercuryEditCompletionResponse = JSON.parse(response);
+  const usage = json.usage;
+  const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
+  return {
+    messageId: json.id ?? null,
+    model: json.model ?? null,
+    responseContent: json.choices?.[0]?.message?.content || '',
+    hasError: !json.model || statusCode >= 400,
+    inference_provider: provider,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    cacheHitTokens,
+    cacheWriteTokens: 0,
+    cost_mUsd: usage ? computeEditMicrodollarCost(usage, provider) : 0,
+    cacheDiscount_mUsd:
+      usage && provider === 'inception' ? Math.round(cacheHitTokens * (0.25 - 0.025)) : undefined,
+    is_byok: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: statusCode,
+  };
+}
+
+export function countAndStoreEditUsage(
+  clonedResponse: Response,
+  usageContext: MicrodollarUsageContext,
+  requestSpan: Span | undefined
+) {
+  debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
+
+  const statusCode = usageContext.status_code ?? 0;
+  const usageStatsPromise = !clonedResponse.body
+    ? Promise.resolve(null)
+    : clonedResponse
+        .text()
+        .then(content => parseEditUsageFromResponse(content, usageContext.provider, statusCode))
+        .catch(error => {
+          captureException(error, {
+            tags: { source: 'edit_usage_processing' },
+            extra: { statusCode },
+          });
+          return null;
+        });
+
+  after(
+    usageStatsPromise.then(usageStats => {
+      requestSpan?.end();
+      if (!usageStats) {
+        captureMessage('SUSPICIOUS: No edit usage information', {
+          level: 'error',
+          tags: { source: 'edit_usage_processing' },
+          extra: { usageContext },
+        });
+        return;
+      }
+
+      usageStats.market_cost = usageStats.cost_mUsd;
+
+      // Mirror the canonical chat path in `processOpenRouterUsage`: when the
+      // request is BYOK we don't bill the user, so the cache discount we
+      // would otherwise have given them must be zeroed too. Otherwise the
+      // usage row would claim a discount on spend that never happened and
+      // distort "money saved by caching" reporting.
+      if (usageContext.user_byok) {
+        usageStats.cost_mUsd = 0;
+        usageStats.cacheDiscount_mUsd = 0;
+      }
+
       return logMicrodollarUsage(usageStats, usageContext);
     })
   );

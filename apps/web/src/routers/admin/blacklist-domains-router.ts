@@ -1,5 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { redisGet, redisSet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import {
   BlacklistDomainsConfigSchema,
   BlacklistDomainsInputSchema,
@@ -12,10 +12,17 @@ import { TRPCError } from '@trpc/server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
+import * as z from 'zod';
+
+const SuspiciousDomainsInputSchema = z
+  .object({
+    hideLegitimateProviders: z.boolean().default(true),
+  })
+  .optional();
 
 async function readConfig(): Promise<BlacklistDomainsConfig> {
   try {
-    const raw = await redisGet(BLACKLIST_DOMAINS_REDIS_KEY);
+    const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
     if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
     return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
   } catch {
@@ -40,7 +47,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       updated_by: ctx.user.id,
       updated_by_email: ctx.user.google_user_email,
     };
-    const written = await redisSet(BLACKLIST_DOMAINS_REDIS_KEY, JSON.stringify(config));
+    const written = await redisClient.set(BLACKLIST_DOMAINS_REDIS_KEY, JSON.stringify(config));
     if (!written) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -67,9 +74,10 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     return computeBlacklistStats(domains, emailDomainCounts);
   }),
 
-  suspicious: adminProcedure.query(async () => {
+  suspicious: adminProcedure.input(SuspiciousDomainsInputSchema).query(async ({ input }) => {
     const blacklistedDomains = await getBlacklistedDomains();
     const normalizedBlacklist = blacklistedDomains.map(d => d.toLowerCase());
+    const hideLegitimateProviders = input?.hideLegitimateProviders ?? true;
 
     const blockedCountExpr = sql<number>`count(*) FILTER (WHERE ${kilocode_users.blocked_reason} IS NOT NULL)`;
     // Hide noise: require at least 30% of users on the domain to have been
@@ -77,7 +85,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     // hotmail, etc.) from showing up.
     const minBlockedPercent = sql`${blockedCountExpr} * 100 >= count(*) * 30`;
 
-    const rows = await db
+    const query = db
       .select({
         email_domain: kilocode_users.email_domain,
         account_count: count(),
@@ -87,8 +95,9 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       })
       .from(kilocode_users)
       .where(isNotNull(kilocode_users.email_domain))
-      .groupBy(kilocode_users.email_domain)
-      .having(minBlockedPercent)
+      .groupBy(kilocode_users.email_domain);
+
+    const rows = await (hideLegitimateProviders ? query.having(minBlockedPercent) : query)
       .orderBy(desc(blockedCountExpr), desc(count()))
       .limit(100);
 

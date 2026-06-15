@@ -7,7 +7,6 @@ import {
 } from './utils';
 
 import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
-import { getGitHubTokenForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { createSecurityAgentHandlers } from '@/lib/security-agent/router/shared-handlers';
 
 const handlers = createSecurityAgentHandlers<{ organizationId: string }>({
@@ -24,8 +23,6 @@ const handlers = createSecurityAgentHandlers<{ organizationId: string }>({
     finding.owned_by_organization_id === input.organizationId,
   getIntegration: async (_ctx, input) =>
     await getIntegrationForOrganization(input.organizationId, 'github'),
-  getGitHubToken: async (_ctx, input) =>
-    (await getGitHubTokenForOrganization(input.organizationId)) ?? null,
   trackingExtras: (_ctx, input) => ({
     organizationId: input.organizationId,
   }),
@@ -63,9 +60,22 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
   startAnalysis: organizationMemberMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.startAnalysis.inputSchema))
     .mutation(handlers.startAnalysis.handler),
+  startRemediation: organizationMemberMutationProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.startRemediation.inputSchema))
+    .mutation(handlers.startRemediation.handler),
+  retryRemediation: organizationMemberMutationProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.retryRemediation.inputSchema))
+    .mutation(handlers.retryRemediation.handler),
+  cancelRemediation: organizationMemberMutationProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.cancelRemediation.inputSchema))
+    .mutation(handlers.cancelRemediation.handler),
   getAnalysis: organizationMemberProcedure
     .input(OrganizationIdInputSchema.merge(handlers.getAnalysis.inputSchema))
     .query(handlers.getAnalysis.handler),
+  getCommandStatus: organizationMemberProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.getCommandStatus.inputSchema))
+    .query(handlers.getCommandStatus.handler),
+  listActiveCommands: organizationMemberProcedure.query(handlers.listActiveCommands),
   getOrphanedRepositories: organizationMemberProcedure.query(handlers.getOrphanedRepositories),
   deleteFindingsByRepository: organizationBillingMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.deleteFindingsByRepository.inputSchema))

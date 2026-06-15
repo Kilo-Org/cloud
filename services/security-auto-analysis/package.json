@@ -9,7 +9,8 @@
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/security-auto-analysis/src",
     "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",

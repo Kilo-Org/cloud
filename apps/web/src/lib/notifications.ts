@@ -37,6 +37,14 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
+    id: 'stealth-opus-discount-may-25',
+    title: 'Claude Opus 4.7 at 20% Off — Only in Kilo Code!',
+    message:
+      'A stealth provider is offering Claude Opus 4.7 at 20% off list price, exclusively in Kilo Code.',
+    suggestModelId: 'stealth/claude-opus-4.7',
+    expiresAt: '2026-06-08T08:00:00Z',
+  },
+  {
     id: 'kilo-cli-jan-5',
     title: 'Kilo CLI',
     message: 'Prefer the terminal? Install the Kilo CLI with npm install -g @kilocode/cli',
@@ -108,6 +116,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
     generateKiloPassNotification,
+    generateKiloPassPromoMay29Notification,
   ];
 
   const resolvedConditionalNotifications = (
@@ -248,21 +257,87 @@ async function generateByokProvidersNotification(
       return [];
     }
 
+    // Maps an extension `apiProvider` id to a user-facing label. Multiple ids can
+    // refer to the same underlying service (regional/plan/legacy variants), and we
+    // only list ids for services we actually support BYOK for via Kilo Gateway
+    // (see UserByokProviderIdSchema).
     const names = {
+      // Anthropic / Claude
       anthropic: 'Claude API Key',
+      claude: 'Claude API Key',
+
+      // Amazon Bedrock
       bedrock: 'Amazon Bedrock API Key',
+      'amazon-bedrock': 'Amazon Bedrock API Key',
+
+      // Chutes
       chutes: 'Chutes API Key',
+
+      // DeepSeek
       deepseek: 'DeepSeek API Key',
+      deepseek1: 'DeepSeek API Key',
+      'deepseek-v4': 'DeepSeek API Key',
+      'deepseek-v4-pro': 'DeepSeek API Key',
+
+      // Fireworks
       fireworks: 'Fireworks API Key',
+      'fireworks-ai': 'Fireworks API Key',
+
+      // Google AI (Gemini)
       gemini: 'Google AI API Key',
+      google: 'Google AI API Key',
+
+      // OpenAI
       'openai-native': 'OpenAI API Key',
+      openai: 'OpenAI API Key',
+      'openai-responses': 'OpenAI API Key',
+
+      // Moonshot AI / Kimi
       moonshot: 'Moonshot AI API Key',
+      moonshotai: 'Moonshot AI API Key',
+      kimi: 'Moonshot AI API Key',
+      'kimi-for-coding': 'Kimi Code Plan',
+
+      // MiniMax
       minimax: 'MiniMax Coding Plan',
+      'minimax-coding-plan': 'MiniMax Coding Plan',
+
+      // Mistral
       mistral: 'Mistral AI API Key',
+
+      // Novita
       novita: 'Novita AI API Key',
+
+      // xAI
       xai: 'xAI API Key',
+
+      // Z.ai / Zhipu (GLM)
       zai: 'GLM Coding Plan',
+      'z-ai': 'GLM Coding Plan',
+      'zai-coding-plan': 'GLM Coding Plan',
+      glm: 'GLM Coding Plan',
+      zhipuai: 'GLM Coding Plan',
+      'zhipuai-coding-plan': 'GLM Coding Plan',
+
+      // Xiaomi MiMo
+      xiaomi: 'Xiaomi MiMo API Key',
+      'xiaomi-mimo': 'Xiaomi MiMo API Key',
+      xiaomimimo: 'Xiaomi MiMo API Key',
+      mimo: 'Xiaomi MiMo API Key',
+      'xiaomi-token-plan-sgp': 'Xiaomi Token Plan',
+      'xiaomi-token-plan-ams': 'Xiaomi Token Plan',
+
+      // Ollama Cloud
+      'ollama-cloud': 'Ollama Cloud API Key',
     } as Record<string, string>;
+
+    const providerName = names[provider];
+    if (!providerName) {
+      console.debug(
+        `[generateByokProvidersNotification] unknown BYOK supported provider ${provider}`
+      );
+      return [];
+    }
 
     console.debug(
       `[generateByokProvidersNotification] has used BYOK supported provider ${provider}`
@@ -271,7 +346,7 @@ async function generateByokProvidersNotification(
       {
         id: 'byok-providers-jan-19',
         title: 'Try BYOK for Kilo Gateway',
-        message: `BYOK now supported for your ${names[provider]}, allowing faster model support, Kilo platform features, and more!`,
+        message: `BYOK now supported for your ${providerName}, allowing faster model support, Kilo platform features, and more!`,
         action: {
           actionText: 'Learn more',
           actionURL: 'https://kilo.ai/docs/basic-usage/byok',
@@ -283,6 +358,29 @@ async function generateByokProvidersNotification(
     console.error('[generateByokProvidersNotification]', e);
     return [];
   }
+}
+
+async function generateKiloPassPromoMay29Notification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  if (!(await hasUserEverPaid(user.id))) {
+    return [];
+  }
+
+  return [
+    {
+      id: 'kilo-pass-promo-may-29',
+      title: 'Get more from every dollar with Kilo Pass',
+      message: 'A monthly AI token subscription with up to 50% bonus credits included.',
+      action: {
+        actionText: 'Explore Kilo Pass',
+        actionURL: 'https://kilo.ai/pricing/kilo-pass',
+      },
+      showIn: ['cli', 'extension'],
+      expiresAt: '2026-06-30T08:00:00Z',
+    },
+  ];
 }
 
 async function generateKiloPassNotification(

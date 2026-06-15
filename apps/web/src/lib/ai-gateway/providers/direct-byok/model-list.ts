@@ -4,29 +4,26 @@ import {
 } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { createCachedFetch } from '@/lib/cached-fetch';
-import { redisGet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
 type CachedEnhancedModelListOptions = {
   providerId: DirectUserByokInferenceProviderId;
   recommendedModels: ReadonlyArray<DirectByokModel>;
-  variants?: Record<string, OpenCodeVariant>;
 };
 
 export function cachedEnhancedDirectByokModelList({
   providerId,
   recommendedModels,
-  variants,
 }: CachedEnhancedModelListOptions) {
   return createCachedFetch<ReadonlyArray<DirectByokModel>>(
     async () =>
       enhanceDirectByokModelList({
         recommendedModels,
         remainingModels: DirectByokModelArraySchema.parse(
-          JSON.parse((await redisGet(directByokModelsRedisKey(providerId))) ?? '[]')
+          JSON.parse((await redisClient.get<string>(directByokModelsRedisKey(providerId))) ?? '[]')
         ),
-        variants,
       }),
     600_000,
     recommendedModels
@@ -36,7 +33,6 @@ export function cachedEnhancedDirectByokModelList({
 function enhanceDirectByokModelList({
   recommendedModels,
   remainingModels,
-  variants,
 }: {
   recommendedModels: ReadonlyArray<DirectByokModel>;
   remainingModels: ReadonlyArray<DirectByokModel>;
@@ -51,7 +47,6 @@ function enhanceDirectByokModelList({
       return {
         ...model,
         flags: flags.size > 0 ? [...flags] : undefined,
-        variants: model.variants ?? variants,
       };
     });
 }

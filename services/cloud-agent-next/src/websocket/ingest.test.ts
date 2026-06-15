@@ -41,13 +41,14 @@ function createFakeDOContext(): IngestDOContext {
     updateKiloSessionId: vi.fn().mockResolvedValue(undefined),
     updateUpstreamBranch: vi.fn().mockResolvedValue(undefined),
     setAvailableCommands: vi.fn().mockResolvedValue(undefined),
+    terminalizeSessionMessageOnce: vi.fn().mockResolvedValue(undefined),
     wrapperSupervisor: {
       checkReconnect: vi.fn().mockResolvedValue({ accepted: true }),
       recordReconnectAccepted: vi.fn().mockResolvedValue(undefined),
       isCurrentConnection: vi.fn().mockResolvedValue(true),
       observePong: vi.fn().mockResolvedValue(undefined),
       observeMeaningfulOutput: vi.fn().mockResolvedValue(undefined),
-      observeRootIdle: vi.fn().mockResolvedValue(undefined),
+      observeFinalizing: vi.fn().mockResolvedValue(undefined),
       onTerminalEvent: vi.fn().mockResolvedValue(undefined),
     },
   };
@@ -183,12 +184,13 @@ describe('createIngestHandler', () => {
       const eventQueries = createFakeEventQueries();
       (eventQueries as unknown as Record<string, unknown>).upsert = vi.fn().mockReturnValue(42);
       const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
       const handler = createIngestHandler(
         createFakeState(),
         eventQueries,
         SESSION_ID,
         broadcastFn,
-        createFakeDOContext()
+        doContext
       );
       const ws = createFakeWebSocket(makeAttachment());
 
@@ -217,12 +219,13 @@ describe('createIngestHandler', () => {
     ])('kilocode %s is plain-inserted', async eventName => {
       const eventQueries = createFakeEventQueries();
       const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
       const handler = createIngestHandler(
         createFakeState(),
         eventQueries,
         SESSION_ID,
         broadcastFn,
-        createFakeDOContext()
+        doContext
       );
       const ws = createFakeWebSocket(makeAttachment());
 
@@ -245,12 +248,13 @@ describe('createIngestHandler', () => {
     ])('kilocode %s is broadcast-only', async eventName => {
       const eventQueries = createFakeEventQueries();
       const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
       const handler = createIngestHandler(
         createFakeState(),
         eventQueries,
         SESSION_ID,
         broadcastFn,
-        createFakeDOContext()
+        doContext
       );
       const ws = createFakeWebSocket(makeAttachment());
 
@@ -847,11 +851,12 @@ describe('createIngestHandler', () => {
     function createNewPathDOContext() {
       return {
         ...createFakeDOContext(),
+        observeCorrelatedAgentActivity: vi.fn().mockResolvedValue(undefined),
         terminalizeSessionMessageOnce: vi.fn().mockResolvedValue(undefined),
       };
     }
 
-    it('does NOT terminalize on partial assistant message.updated (no time.completed)', async () => {
+    it('observes activity without terminalizing on partial assistant message.updated', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
       const handler = createIngestHandler(
@@ -882,10 +887,11 @@ describe('createIngestHandler', () => {
 
       await handler.handleIngestMessage(ws, message);
 
+      expect(doContext.observeCorrelatedAgentActivity).toHaveBeenCalledWith('msg_user_111');
       expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
     });
 
-    it('terminalizes on terminal assistant message.updated (with time.completed)', async () => {
+    it('observes activity without terminalizing on completed assistant message.updated', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
       const handler = createIngestHandler(
@@ -916,30 +922,79 @@ describe('createIngestHandler', () => {
 
       await handler.handleIngestMessage(ws, message);
 
-      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
-        'msg_user_222',
-        expect.objectContaining({
-          kind: 'completed',
-          assistantMessageId: 'asst_222',
-          completionSource: 'assistant_message_event',
-        }),
-        WRAPPER_RUN_ID
-      );
+      expect(doContext.observeCorrelatedAgentActivity).toHaveBeenCalledWith('msg_user_222');
+      expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
     });
 
-    it('terminalizes as failed on assistant message.updated with error', async () => {
+    it('terminalizes on wrapper cloud.message.completed control event', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
-      const handler = createIngestHandler(
-        state,
-        createFakeEventQueries(),
-        SESSION_ID,
-        vi.fn(),
-        doContext
-      );
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(state, eventQueries, SESSION_ID, broadcast, doContext);
 
       const ws = createFakeWebSocket(makeNewPathAttachment());
 
+      const message = JSON.stringify({
+        streamEventType: 'cloud.message.completed',
+        data: {
+          messageId: 'msg_compact',
+          completionSource: 'manual_compact_summarize',
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      await handler.handleIngestMessage(ws, message);
+
+      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
+        'msg_compact',
+        {
+          kind: 'completed',
+          assistantMessageId: undefined,
+          completionSource: 'manual_compact_summarize',
+        },
+        WRAPPER_RUN_ID
+      );
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(eventQueries.upsert).not.toHaveBeenCalled();
+      expect(broadcast).not.toHaveBeenCalled();
+    });
+
+    it('rejects unsupported wrapper cloud.message.completed sources', async () => {
+      const state = createFakeState();
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const handler = createIngestHandler(state, eventQueries, SESSION_ID, broadcast, doContext);
+
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      const message = JSON.stringify({
+        streamEventType: 'cloud.message.completed',
+        data: {
+          messageId: 'msg_compact',
+          completionSource: 'unsupported_source',
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      await handler.handleIngestMessage(ws, message);
+
+      expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith('Invalid cloud.message.completed event payload');
+      warn.mockRestore();
+    });
+
+    it('publishes and persists a safe assistant message error while terminalizing with raw data', async () => {
+      const state = createFakeState();
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(state, eventQueries, SESSION_ID, broadcast, doContext);
+
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      const secretError = '429 rate limit exceeded provider-body=secret-token';
       const message = JSON.stringify({
         streamEventType: 'kilocode',
         data: {
@@ -947,9 +1002,10 @@ describe('createIngestHandler', () => {
           properties: {
             info: {
               id: 'asst_333',
+              sessionID: 'kilo_session_333',
               role: 'assistant',
               parentID: 'msg_user_333',
-              error: 'rate limit exceeded',
+              error: { data: { message: secretError, responseBody: 'secret-response' } },
             },
           },
         },
@@ -958,15 +1014,75 @@ describe('createIngestHandler', () => {
 
       await handler.handleIngestMessage(ws, message);
 
+      const safePayload = JSON.stringify({
+        event: 'message.updated',
+        properties: {
+          info: {
+            id: 'asst_333',
+            sessionID: 'kilo_session_333',
+            role: 'assistant',
+            parentID: 'msg_user_333',
+            error: 'Assistant request was rate limited',
+          },
+        },
+      });
+      expect(eventQueries.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ entityId: 'message/asst_333', payload: safePayload })
+      );
+      expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ payload: safePayload }));
+      expect(JSON.stringify(vi.mocked(broadcast).mock.calls)).not.toContain('secret-token');
+      expect(JSON.stringify(vi.mocked(eventQueries.upsert).mock.calls)).not.toContain(
+        'secret-response'
+      );
       expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
         'msg_user_333',
         expect.objectContaining({
           kind: 'failed',
           assistantMessageId: 'asst_333',
           completionSource: 'assistant_message_event',
-          error: 'rate limit exceeded',
+          error: secretError,
+          safeFailureMessage: 'Assistant request was rate limited',
         }),
         WRAPPER_RUN_ID
+      );
+    });
+
+    it('publishes and persists a safe session error with session correlation intact', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        createNewPathDOContext()
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('kilocode', {
+          event: 'session.error',
+          properties: {
+            sessionID: 'kilo_session_error',
+            error: { data: { message: 'Payment Required api-key=secret-session-key' } },
+          },
+        })
+      );
+
+      const safePayload = JSON.stringify({
+        event: 'session.error',
+        properties: {
+          sessionID: 'kilo_session_error',
+          error: 'Assistant request failed: insufficient credits',
+        },
+      });
+      expect(eventQueries.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: safePayload })
+      );
+      expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ payload: safePayload }));
+      expect(JSON.stringify(vi.mocked(eventQueries.insert).mock.calls)).not.toContain(
+        'secret-session-key'
       );
     });
 
@@ -1008,6 +1124,7 @@ describe('createIngestHandler', () => {
           assistantMessageId: 'asst_object_completed',
           completionSource: 'assistant_message_event',
           error: 'provider failed',
+          safeFailureMessage: 'Assistant request failed',
         }),
         WRAPPER_RUN_ID
       );
@@ -1050,12 +1167,13 @@ describe('createIngestHandler', () => {
           assistantMessageId: 'asst_object_pending',
           completionSource: 'assistant_message_event',
           error: 'provider failed early',
+          safeFailureMessage: 'Assistant request failed',
         }),
         WRAPPER_RUN_ID
       );
     });
 
-    it('ingests duplicate terminal updates without error (idempotency at DO level)', async () => {
+    it('ingests duplicate completed assistant updates as non-terminal activity', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
       doContext.terminalizeSessionMessageOnce = vi.fn().mockResolvedValue(undefined);
@@ -1089,13 +1207,51 @@ describe('createIngestHandler', () => {
       await handler.handleIngestMessage(ws, makeMessage());
       await handler.handleIngestMessage(ws, makeMessage());
 
-      // Both events trigger terminalizeSessionMessageOnce; the DO handles idempotency
-      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledTimes(2);
-      expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
-        'msg_user_444',
-        expect.objectContaining({ kind: 'completed' }),
-        WRAPPER_RUN_ID
+      expect(doContext.observeCorrelatedAgentActivity).toHaveBeenCalledTimes(2);
+      expect(doContext.observeCorrelatedAgentActivity).toHaveBeenCalledWith('msg_user_444');
+      expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
+    });
+
+    it('marks the current run finalizing from wrapper control event', async () => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
       );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('wrapper_finalizing'));
+
+      expect(doContext.wrapperSupervisor.observeFinalizing).toHaveBeenCalledWith(WRAPPER_RUN_ID);
+    });
+
+    it.each([
+      { failureCode: 'payment_required' as const, error: 'Insufficient credits' },
+      { failureCode: 'model_missing' as const, error: 'Model not found' },
+    ])('forwards $failureCode wrapper failures to the session coordinator', async failure => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', { fatal: true, ...failure })
+      );
+
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        ...failure,
+      });
     });
 
     it('does NOT terminalize on wrapper complete event (new path)', async () => {
@@ -1113,7 +1269,7 @@ describe('createIngestHandler', () => {
 
       const message = JSON.stringify({
         streamEventType: 'complete',
-        data: { exitCode: 0 },
+        data: { exitCode: 0, messageIds: ['msg_user_complete'] },
         timestamp: new Date().toISOString(),
       });
 
@@ -1123,6 +1279,268 @@ describe('createIngestHandler', () => {
       expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'completed', wrapperRunId: WRAPPER_RUN_ID })
       );
+    });
+
+    it('forwards legacy wrapper complete events without sealed membership', async () => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('complete', { exitCode: 0 }));
+
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        status: 'completed',
+        wrapperRunId: WRAPPER_RUN_ID,
+        gateResult: undefined,
+        messageIds: undefined,
+      });
+    });
+
+    it('publishes and persists a safe fatal assistant wrapper error while forwarding raw data', async () => {
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      const rawError = 'Payment Required provider-body=secret-wrapper-token';
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', {
+          fatal: true,
+          error: rawError,
+          message: 'another secret',
+          errorSource: 'assistant',
+          arbitrary: 'must be dropped',
+        })
+      );
+
+      const safeMessage = 'Assistant request failed: insufficient credits';
+      const safePayload = JSON.stringify({
+        fatal: true,
+        errorSource: 'assistant',
+        error: safeMessage,
+        message: safeMessage,
+      });
+      expect(eventQueries.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: safePayload })
+      );
+      expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ payload: safePayload }));
+      expect(broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stream_event_type: 'cloud.status',
+          payload: JSON.stringify({ cloudStatus: { type: 'error', message: safeMessage } }),
+        })
+      );
+      expect(JSON.stringify(vi.mocked(broadcast).mock.calls)).not.toContain('secret-wrapper-token');
+      expect(JSON.stringify(vi.mocked(eventQueries.insert).mock.calls)).not.toContain(
+        'must be dropped'
+      );
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        error: rawError,
+        errorSource: 'assistant',
+      });
+    });
+
+    it('keeps model diagnostics private while forwarding them to the supervisor', async () => {
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      const diagnostics = {
+        requestedModel: 'kilo/retired-model',
+        availableModelCount: 2,
+        availableModels: ['vendor/alpha-model', 'vendor/beta-model'],
+        suggestedModels: ['vendor/alpha-model'],
+        suggestionSource: 'fuzzy' as const,
+      };
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', {
+          fatal: true,
+          error: 'Model not found: kilo/retired-model',
+          errorSource: 'assistant',
+          modelNotFoundRuntimeDiagnostics: diagnostics,
+        })
+      );
+
+      const safeMessage = 'Assistant request failed: model not found';
+      const safePayload = JSON.stringify({
+        fatal: true,
+        errorSource: 'assistant',
+        error: safeMessage,
+        message: safeMessage,
+      });
+      expect(eventQueries.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: safePayload })
+      );
+      expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ payload: safePayload }));
+      expect(broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stream_event_type: 'cloud.status',
+          payload: JSON.stringify({ cloudStatus: { type: 'error', message: safeMessage } }),
+        })
+      );
+      const publicCalls = JSON.stringify({
+        persisted: vi.mocked(eventQueries.insert).mock.calls,
+        broadcast: vi.mocked(broadcast).mock.calls,
+      });
+      expect(publicCalls).not.toContain('retired-model');
+      expect(publicCalls).not.toContain('vendor/alpha-model');
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        error: 'Model not found: kilo/retired-model',
+        errorSource: 'assistant',
+        modelNotFoundRuntimeDiagnostics: diagnostics,
+      });
+    });
+
+    it('drops model diagnostics attached to non-model-not-found fatal events', async () => {
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      const diagnostics = {
+        requestedModel: 'kilo/retired-model',
+        availableModelCount: 2,
+        availableModels: ['vendor/alpha-model', 'vendor/beta-model'],
+        suggestedModels: ['vendor/alpha-model'],
+        suggestionSource: 'fuzzy' as const,
+      };
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', {
+          fatal: true,
+          error: 'Rate limit exceeded for provider request',
+          errorSource: 'assistant',
+          modelNotFoundRuntimeDiagnostics: diagnostics,
+        })
+      );
+
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        error: 'Rate limit exceeded for provider request',
+        errorSource: 'assistant',
+      });
+      const publicCalls = JSON.stringify({
+        persisted: vi.mocked(eventQueries.insert).mock.calls,
+        broadcast: vi.mocked(broadcast).mock.calls,
+      });
+      expect(publicCalls).not.toContain('retired-model');
+      expect(publicCalls).not.toContain('vendor/alpha-model');
+    });
+
+    it('keeps unclassified fatal events as wrapper failures', async () => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', {
+          fatal: true,
+          error: 'Wrapper process exited unexpectedly',
+        })
+      );
+
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        error: 'Wrapper process exited unexpectedly',
+        errorSource: undefined,
+      });
+    });
+
+    it.each([
+      {
+        name: 'structured container shutdown',
+        input: {
+          reason: 'Container shutdown: SIGTERM secret-container-reason',
+          exitCode: 143,
+          interruptionSource: 'container_shutdown' as const,
+          arbitrary: 'drop-me',
+        },
+        publicReason: 'Container shutdown',
+      },
+      {
+        name: 'untrusted wrapper interruption',
+        input: {
+          reason: 'user token=secret-interruption-reason',
+          exitCode: 1,
+          arbitrary: 'drop-me',
+        },
+        publicReason: 'Wrapper interrupted',
+      },
+    ])('publishes and persists a bounded $name reason', async ({ input, publicReason }) => {
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('interrupted', input));
+
+      const safePayload = JSON.stringify({
+        reason: publicReason,
+        exitCode: input.exitCode,
+        ...(input.interruptionSource ? { interruptionSource: input.interruptionSource } : {}),
+      });
+      expect(eventQueries.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: safePayload })
+      );
+      expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ payload: safePayload }));
+      expect(JSON.stringify(vi.mocked(broadcast).mock.calls)).not.toContain('secret-');
+      expect(JSON.stringify(vi.mocked(eventQueries.insert).mock.calls)).not.toContain('drop-me');
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'interrupted',
+        error: input.reason,
+        interruptionSource: input.interruptionSource,
+      });
     });
   });
 

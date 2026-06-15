@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import BigLoader from '@/components/BigLoader';
 import { PageContainer } from '@/components/layouts/PageContainer';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -37,6 +38,19 @@ function stepStatus(step: ActivationStep, current: ActivationStep): 'done' | 'ac
   return 'pending';
 }
 
+function WelcomePromoIneligibleNotice() {
+  return (
+    <Alert variant="warning">
+      <AlertTriangle />
+      <AlertTitle>Introductory bonus not available</AlertTitle>
+      <AlertDescription>
+        This payment method has already been used for the introductory Kilo Pass bonus. Your
+        subscription remains active and standard monthly bonus terms apply.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 export function KiloPassAwardingCreditsClient() {
   const trpc = useTRPC();
   const router = useRouter();
@@ -44,17 +58,23 @@ export function KiloPassAwardingCreditsClient() {
   const [didTimeout, setDidTimeout] = useState(false);
   const [redirectSecondsRemaining, setRedirectSecondsRemaining] = useState<number | null>(null);
 
-  const clawHostingPlan = searchParams.get('clawHostingPlan');
-  const clawInstanceId = searchParams.get('clawInstanceId');
-  const isClawAutoActivation = !!clawHostingPlan;
+  const checkoutSessionId = searchParams.get('session_id') ?? '';
 
   const [activationStep, setActivationStep] = useState<ActivationStep>('payment');
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
 
-  const enrollWithCredits = useMutation(
-    trpc.kiloclaw.enrollWithCredits.mutationOptions({
-      onSuccess: () => {
-        setActivationStep('done');
+  const activateCheckoutHosting = useMutation(
+    trpc.kiloPass.activateCheckoutHosting.mutationOptions({
+      onSuccess: result => {
+        if (result.activated) {
+          setActivationStep('done');
+          return;
+        }
+        setEnrollmentError(
+          result.hostingIntent === 'expired_commit'
+            ? 'Commit hosting is no longer available. Activate month-to-month Standard from KiloClaw.'
+            : 'Checkout did not include a hosting activation intent.'
+        );
       },
       onError: error => {
         setEnrollmentError(error.message);
@@ -76,7 +96,8 @@ export function KiloPassAwardingCreditsClient() {
   }, []);
 
   const query = useQuery({
-    ...trpc.kiloPass.getCheckoutReturnState.queryOptions(),
+    ...trpc.kiloPass.getCheckoutReturnState.queryOptions({ sessionId: checkoutSessionId }),
+    enabled: checkoutSessionId.length > 0,
     refetchInterval: query => {
       const data = query.state.data;
       if (didTimeout) return false;
@@ -88,38 +109,24 @@ export function KiloPassAwardingCreditsClient() {
   });
 
   const isReady = query.data?.creditsAwarded === true;
+  const isClawAutoActivation =
+    query.data?.hostingIntent !== 'none' && query.data?.hostingIntent != null;
   const hasSubscription = query.data?.subscription != null;
+  const showWelcomePromoIneligibleNotice =
+    query.data?.welcomePromoIneligibleDueToReusedFingerprint === true;
+  const visibleActivationStep =
+    activationStep === 'done'
+      ? activationStep
+      : isClawAutoActivation && isReady
+        ? 'hosting'
+        : activationStep;
 
-  // For KiloClaw auto-activation: advance step when credits are awarded, then enroll
   useEffect(() => {
-    if (!isClawAutoActivation || !isReady) return;
-    if (activationStep === 'payment') {
-      setActivationStep('credits');
-    }
-  }, [isClawAutoActivation, isReady, activationStep]);
+    if (!isClawAutoActivation || !isReady || enrollmentTriggered.current) return;
 
-  useEffect(() => {
-    if (!isClawAutoActivation || activationStep !== 'credits') return;
-
-    // Credits awarded — trigger enrollment
-    setActivationStep('hosting');
-    if (
-      !enrollmentTriggered.current &&
-      (clawHostingPlan === 'standard' || clawHostingPlan === 'commit')
-    ) {
-      enrollmentTriggered.current = true;
-      enrollWithCredits.mutate({
-        plan: clawHostingPlan,
-        ...(clawInstanceId ? { instanceId: clawInstanceId } : {}),
-      });
-    }
-  }, [
-    isClawAutoActivation,
-    activationStep,
-    clawHostingPlan,
-    clawInstanceId,
-    enrollWithCredits.mutate,
-  ]);
+    enrollmentTriggered.current = true;
+    activateCheckoutHosting.mutate({ sessionId: checkoutSessionId });
+  }, [isClawAutoActivation, isReady, activateCheckoutHosting.mutate, checkoutSessionId]);
 
   // Standard (non-KiloClaw) flow: redirect to /profile when ready
   useEffect(() => {
@@ -276,6 +283,7 @@ export function KiloPassAwardingCreditsClient() {
                 <div className="text-muted-foreground text-sm">
                   You can activate hosting manually from the KiloClaw dashboard.
                 </div>
+                {showWelcomePromoIneligibleNotice ? <WelcomePromoIneligibleNotice /> : null}
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" onClick={() => router.replace('/claw')}>
                     Go to KiloClaw
@@ -303,6 +311,7 @@ export function KiloPassAwardingCreditsClient() {
               </CardHeader>
               <CardContent className="grid gap-4">
                 <ActivationSteps current="done" />
+                {showWelcomePromoIneligibleNotice ? <WelcomePromoIneligibleNotice /> : null}
                 <div className="flex flex-wrap items-center gap-3">
                   <Button type="button" onClick={() => router.replace('/claw')}>
                     Continue to KiloClaw
@@ -327,7 +336,7 @@ export function KiloPassAwardingCreditsClient() {
               <CardTitle>Setting up your hosting</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4">
-              <ActivationSteps current={activationStep} />
+              <ActivationSteps current={visibleActivationStep} />
               <div className="text-muted-foreground text-sm">
                 This can take a few seconds while we finalize your setup.
               </div>
@@ -356,6 +365,8 @@ export function KiloPassAwardingCreditsClient() {
               <div className="text-muted-foreground text-sm">
                 Your Kilo Pass is active and your credits are ready.
               </div>
+
+              {showWelcomePromoIneligibleNotice ? <WelcomePromoIneligibleNotice /> : null}
 
               <div className="flex flex-wrap items-center gap-3">
                 <Button type="button" onClick={() => router.replace('/profile')}>

@@ -31,6 +31,7 @@ import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-rou
 import { adminKiloclawProvidersRouter } from '@/routers/admin-kiloclaw-providers-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
+import { adminCloudAgentNextRouter } from '@/routers/admin-cloud-agent-next-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
@@ -46,6 +47,8 @@ import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-r
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
 import { adminKiloclawReferralsRouter } from '@/routers/admin/kiloclaw-referrals-router';
+import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-router';
+import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
 import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
@@ -1674,6 +1677,8 @@ export const adminRouter = createTRPCRouter({
 
   codeReviews: adminCodeReviewsRouter,
 
+  cloudAgentNext: adminCloudAgentNextRouter,
+
   sessionTraces: createTRPCRouter({
     resolveCloudAgentSession: adminProcedure
       .input(z.object({ cloud_agent_session_id: z.string().startsWith('agent_') }))
@@ -1891,6 +1896,8 @@ export const adminRouter = createTRPCRouter({
   blacklistDomains: adminBlacklistDomainsRouter,
   bulkBlock: adminBulkBlockRouter,
   kiloPass: adminKiloPassRouter,
+  disputes: adminStripeDisputesRouter,
+  earlyFraudWarnings: adminStripeEarlyFraudWarningsRouter,
   // Key kept as `securityAdvisorContent` for tRPC client compatibility —
   // admin UI consumers reference `trpc.admin.securityAdvisorContent.*`.
   // Backing router renamed to `adminShellSecurityContentRouter` as part of

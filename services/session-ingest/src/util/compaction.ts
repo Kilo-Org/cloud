@@ -1,5 +1,10 @@
 import type { SessionDataItem } from '../types/session-sync';
 
+export function getPartItemIdentityRange(messageId: string): { start: string; end: string } {
+  // Under SQLite's default BINARY collation, '/' sorts immediately before '0'.
+  return { start: `${messageId}/`, end: `${messageId}0` };
+}
+
 export function getItemIdentity(item: SessionDataItem): {
   item_id: string;
   item_type: SessionDataItem['type'];

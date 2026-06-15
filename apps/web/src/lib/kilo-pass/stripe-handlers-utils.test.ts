@@ -5,6 +5,7 @@ import {
   getInvoiceSubscription,
   getPreviousIssueMonth,
   getStripeEndedAtIso,
+  resolveSettledInvoicePayment,
 } from './stripe-handlers-utils';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 
@@ -292,6 +293,158 @@ describe('getInvoiceSubscription', () => {
     const result = await getInvoiceSubscription({ invoice, stripe: mockStripe });
     expect(result).toBe(subscriptionObject);
     expect(mockStripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_123');
+  });
+});
+
+describe('resolveSettledInvoicePayment', () => {
+  function makeInvoicePayment(payment: Stripe.InvoicePayment.Payment): Stripe.InvoicePayment {
+    return {
+      id: `inpay_${Math.random()}`,
+      object: 'invoice_payment',
+      payment,
+      status: 'paid',
+    } as unknown as Stripe.InvoicePayment;
+  }
+
+  function makeInvoice(payments: Stripe.InvoicePayment[], hasMore = false): Stripe.Invoice {
+    return {
+      id: `in_${Math.random()}`,
+      payments: {
+        object: 'list',
+        data: payments,
+        has_more: hasMore,
+        url: '/v1/invoices/test/payments',
+      },
+    } as unknown as Stripe.Invoice;
+  }
+
+  it('resolves exactly one PaymentIntent settlement and exact refund target', async () => {
+    const invoice = makeInvoice([
+      makeInvoicePayment({
+        type: 'payment_intent',
+        payment_intent: {
+          id: 'pi_exact',
+          object: 'payment_intent',
+          payment_method: {
+            id: 'pm_exact',
+            object: 'payment_method',
+            type: 'card',
+            card: { fingerprint: 'fp_exact' },
+          },
+        } as unknown as Stripe.PaymentIntent,
+      }),
+    ]);
+
+    await expect(resolveSettledInvoicePayment({ invoice, stripe: {} as Stripe })).resolves.toEqual({
+      kind: 'settled',
+      paymentMethod: { kind: 'reusable', paymentMethodType: 'card', fingerprint: 'fp_exact' },
+      refundableTarget: { kind: 'payment_intent', id: 'pi_exact' },
+    });
+  });
+
+  it('resolves exactly one direct Charge settlement and exact refund target', async () => {
+    const invoice = makeInvoice([
+      makeInvoicePayment({
+        type: 'charge',
+        charge: {
+          id: 'ch_exact',
+          object: 'charge',
+          payment_method_details: { type: 'card', card: { fingerprint: 'fp_charge' } },
+        } as unknown as Stripe.Charge,
+      }),
+    ]);
+
+    await expect(resolveSettledInvoicePayment({ invoice, stripe: {} as Stripe })).resolves.toEqual({
+      kind: 'settled',
+      paymentMethod: { kind: 'reusable', paymentMethodType: 'card', fingerprint: 'fp_charge' },
+      refundableTarget: { kind: 'charge', id: 'ch_exact' },
+    });
+  });
+
+  it('rejects multiple paid settlements instead of choosing one', async () => {
+    const invoice = makeInvoice([
+      makeInvoicePayment({ type: 'payment_intent', payment_intent: 'pi_first' }),
+      makeInvoicePayment({ type: 'payment_intent', payment_intent: 'pi_second' }),
+    ]);
+
+    await expect(resolveSettledInvoicePayment({ invoice, stripe: {} as Stripe })).resolves.toEqual({
+      kind: 'multiple',
+    });
+  });
+
+  it('lists incomplete embedded payments with enough capacity to detect multiples', async () => {
+    const list = jest.fn(async () => ({
+      object: 'list',
+      data: [
+        makeInvoicePayment({ type: 'payment_intent', payment_intent: 'pi_first' }),
+        makeInvoicePayment({ type: 'payment_intent', payment_intent: 'pi_second' }),
+      ],
+      has_more: false,
+      url: '/v1/invoices/test/payments',
+    }));
+    const invoice = makeInvoice(
+      [makeInvoicePayment({ type: 'payment_intent', payment_intent: 'pi_first' })],
+      true
+    );
+
+    await expect(
+      resolveSettledInvoicePayment({
+        invoice,
+        stripe: { invoicePayments: { list } } as unknown as Stripe,
+      })
+    ).resolves.toEqual({ kind: 'multiple' });
+    expect(list).toHaveBeenCalledWith({ invoice: invoice.id, status: 'paid', limit: 2 });
+  });
+
+  it('returns unresolved instead of throwing when provider lookup fails', async () => {
+    const lookupError = new Error('provider unavailable');
+    const invoice = makeInvoice([
+      makeInvoicePayment({ type: 'payment_intent', payment_intent: 'pi_lookup_failure' }),
+    ]);
+
+    await expect(
+      resolveSettledInvoicePayment({
+        invoice,
+        stripe: {
+          paymentIntents: { retrieve: jest.fn(async () => Promise.reject(lookupError)) },
+        } as unknown as Stripe,
+      })
+    ).resolves.toEqual({ kind: 'unresolved', reason: 'provider_lookup_failed' });
+  });
+
+  it('distinguishes unsupported and missing-fingerprint payment methods', async () => {
+    const unsupported = makeInvoice([
+      makeInvoicePayment({
+        type: 'payment_intent',
+        payment_intent: {
+          id: 'pi_cashapp',
+          payment_method: { id: 'pm_cashapp', type: 'cashapp' },
+        } as unknown as Stripe.PaymentIntent,
+      }),
+    ]);
+    const missingFingerprint = makeInvoice([
+      makeInvoicePayment({
+        type: 'payment_intent',
+        payment_intent: {
+          id: 'pi_card',
+          payment_method: { id: 'pm_card', type: 'card', card: { fingerprint: null } },
+        } as unknown as Stripe.PaymentIntent,
+      }),
+    ]);
+
+    const stripe = {} as Stripe;
+    await expect(
+      resolveSettledInvoicePayment({ invoice: unsupported, stripe })
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      paymentMethod: { kind: 'without_supported_fingerprint' },
+    });
+    await expect(
+      resolveSettledInvoicePayment({ invoice: missingFingerprint, stripe })
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      paymentMethod: { kind: 'reusable', paymentMethodType: 'card', fingerprint: null },
+    });
   });
 });
 

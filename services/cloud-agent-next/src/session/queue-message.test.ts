@@ -107,7 +107,42 @@ describe('queueMessage', () => {
     expect(request?.turn.id).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
   });
 
-  it('forwards the composed user-message payload to the Durable Object', async () => {
+  it('forwards canonical document attachments to the Durable Object', async () => {
+    const { stub, admitSubmittedMessage } = makeDoStub({
+      success: true,
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+
+    await queueMessage(
+      {
+        cloudAgentSessionId: 'agent_document' as SessionId,
+        turn: {
+          type: 'prompt',
+          prompt: 'inspect the PDF',
+          attachments: {
+            path: '123e4567-e89b-12d3-a456-426614174000',
+            files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+          },
+        },
+      },
+      { env: makeEnv(stub) as Env, userId: 'user_document' }
+    );
+
+    expect(admitSubmittedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turn: expect.objectContaining({
+          attachments: {
+            path: '123e4567-e89b-12d3-a456-426614174000',
+            files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+          },
+        }),
+      })
+    );
+  });
+
+  it('forwards the composed canonical message payload to the Durable Object', async () => {
     const { stub, admitSubmittedMessage } = makeDoStub({
       success: true,
       outcome: 'queued',
@@ -121,7 +156,7 @@ describe('queueMessage', () => {
         turn: {
           type: 'prompt',
           prompt: 'inspect the screenshot',
-          images: {
+          attachments: {
             path: '123e4567-e89b-12d3-a456-426614174000',
             files: ['123e4567-e89b-12d3-a456-426614174001.png'],
           },
@@ -139,7 +174,7 @@ describe('queueMessage', () => {
         type: 'prompt',
         id: undefined,
         prompt: 'inspect the screenshot',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
           files: ['123e4567-e89b-12d3-a456-426614174001.png'],
         },
@@ -175,30 +210,57 @@ describe('queueMessage', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'nope' });
   });
 
-  it('maps PENDING_QUEUE_FULL to TOO_MANY_REQUESTS', async () => {
+  it('maps PENDING_QUEUE_FULL to a retryable TOO_MANY_REQUESTS error', async () => {
     const { stub } = makeDoStub({ success: false, code: 'PENDING_QUEUE_FULL', error: 'full' });
-    await expect(
-      queueMessage(
-        {
-          cloudAgentSessionId: 'agent_x' as SessionId,
-          turn: { type: 'prompt', prompt: 'x' },
-        },
-        { env: makeEnv(stub) as Env, userId: 'u' }
-      )
-    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS', message: 'full' });
+    const error = await queueMessage(
+      {
+        cloudAgentSessionId: 'agent_x' as SessionId,
+        turn: { type: 'prompt', prompt: 'x' },
+      },
+      { env: makeEnv(stub) as Env, userId: 'u' }
+    ).catch(error => error);
+
+    expect(error).toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+      message: 'full',
+      cause: { error: 'PENDING_QUEUE_FULL', retryable: true },
+    });
   });
 
-  it('maps INTERNAL to 500', async () => {
+  it('maps INTERNAL to an explicitly retryable 500 error', async () => {
     const { stub } = makeDoStub({ success: false, code: 'INTERNAL', error: 'boom' });
-    await expect(
-      queueMessage(
-        {
-          cloudAgentSessionId: 'agent_x' as SessionId,
-          turn: { type: 'prompt', prompt: 'x' },
-        },
-        { env: makeEnv(stub) as Env, userId: 'u' }
-      )
-    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'boom' });
+    const error = await queueMessage(
+      {
+        cloudAgentSessionId: 'agent_x' as SessionId,
+        turn: { type: 'prompt', prompt: 'x' },
+      },
+      { env: makeEnv(stub) as Env, userId: 'u' }
+    ).catch(error => error);
+
+    expect(error).toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'boom',
+      cause: { error: 'INTERNAL', retryable: true },
+    });
+  });
+
+  it.each([
+    ['NOT_FOUND', 'NOT_FOUND'],
+    ['BAD_REQUEST', 'BAD_REQUEST'],
+  ] as const)('marks permanent %s admission errors non-retryable', async (resultCode, trpcCode) => {
+    const { stub } = makeDoStub({ success: false, code: resultCode, error: 'permanent' });
+    const error = await queueMessage(
+      {
+        cloudAgentSessionId: 'agent_x' as SessionId,
+        turn: { type: 'prompt', prompt: 'x' },
+      },
+      { env: makeEnv(stub) as Env, userId: 'u' }
+    ).catch(error => error);
+
+    expect(error).toMatchObject({
+      code: trpcCode,
+      cause: { error: resultCode, retryable: false },
+    });
   });
 
   it('maps retryable SANDBOX_CONNECT_FAILED to SERVICE_UNAVAILABLE with retryable cause', async () => {

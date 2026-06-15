@@ -2,8 +2,8 @@
 
 import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar';
 import { useUser } from '@/hooks/useUser';
-import { useKiloClawStatus } from '@/hooks/useKiloClaw';
-import { useEffect, useMemo, useState } from 'react';
+import { useKiloClawNavState } from '@/hooks/useKiloClaw';
+import { useState } from 'react';
 import {
   Code,
   Coins,
@@ -37,16 +37,27 @@ import {
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import SidebarMenuList from './SidebarMenuList';
+import SidebarPromoBanner from './SidebarPromoBanner';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
+
+const SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS = 5 * 60_000;
 
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  const trpc = useTRPC();
   const { data: user, isLoading } = useUser();
-  const kiloClawStatusQuery = useKiloClawStatus();
+  const kiloClawNavStateQuery = useKiloClawNavState();
   const pathname = usePathname();
+  const { data: sidebarPromoEligibility } = useQuery(
+    trpc.kiloPass.getSidebarPromoEligibility.queryOptions(undefined, {
+      staleTime: SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS,
+    })
+  );
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -97,6 +108,16 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: CreditCard,
       url: '/claw/subscription',
     },
+    // Agent management is admin-only for now.
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'Agents',
+            icon: Bot,
+            url: '/claw/agents',
+          },
+        ]
+      : []),
     {
       title: 'Settings',
       icon: Settings,
@@ -190,6 +211,15 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           },
         ]
       : []),
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'MCP Gateway',
+            icon: Cable,
+            url: '/cloud/mcp-gateway',
+          },
+        ]
+      : []),
   ];
 
   // Account group
@@ -197,6 +227,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
+    badge?: string;
     className?: string;
   }> = [
     {
@@ -255,20 +286,23 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   ];
 
   const kiloClawBaseUrl = '/claw';
-  const kiloClawInstanceState = kiloClawStatusQuery.isSuccess
-    ? kiloClawStatusQuery.data.status === null
-      ? 'absent'
-      : 'present'
+  const kiloClawInstanceState = kiloClawNavStateQuery.isSuccess
+    ? kiloClawNavStateQuery.data.hasActiveInstance
+      ? 'present'
+      : 'absent'
     : 'unknown';
   const hasKiloClawInstance = kiloClawInstanceState === 'present';
   const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
-  const [sidebarMenu, setSidebarMenu] = useState<'main' | 'kiloClaw'>(
-    isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main'
-  );
-
-  useEffect(() => {
-    setSidebarMenu(isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main');
-  }, [hasKiloClawInstance, isKiloClawPath]);
+  const [sidebarMenuOverride, setSidebarMenuOverride] = useState<{
+    pathname: string;
+    menu: 'main' | 'kiloClaw';
+  } | null>(null);
+  const sidebarMenu =
+    hasKiloClawInstance && sidebarMenuOverride?.pathname === pathname
+      ? sidebarMenuOverride.menu
+      : isKiloClawPath && hasKiloClawInstance
+        ? 'kiloClaw'
+        : 'main';
 
   const kiloClawEntryItems: Array<{
     title: string;
@@ -282,7 +316,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
         {
           title: 'KiloClaw',
           icon: MessageSquare,
-          onClick: () => setSidebarMenu('kiloClaw'),
+          onClick: () => setSidebarMenuOverride({ pathname, menu: 'kiloClaw' }),
           isActive: isKiloClawPath,
           suffixIcon: ChevronRight,
         },
@@ -304,22 +338,18 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     {
       title: 'Back',
       icon: ChevronLeft,
-      onClick: () => setSidebarMenu('main'),
+      onClick: () => setSidebarMenuOverride({ pathname, menu: 'main' }),
     },
   ];
 
-  const allUrls = useMemo(
-    () =>
-      [
-        kiloClawBaseUrl,
-        ...dashboardItems,
-        ...kiloClawItems,
-        ...cloudItems,
-        ...accountItems,
-        ...startItems,
-      ].map(i => (typeof i === 'string' ? i : i.url)),
-    [kiloClawBaseUrl, dashboardItems, kiloClawItems, cloudItems, accountItems, startItems]
-  );
+  const allUrls = [
+    kiloClawBaseUrl,
+    ...dashboardItems,
+    ...kiloClawItems,
+    ...cloudItems,
+    ...accountItems,
+    ...startItems,
+  ].map(i => (typeof i === 'string' ? i : i.url));
 
   return (
     <Sidebar {...props}>
@@ -353,6 +383,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
         )}
       </SidebarContent>
 
+      {sidebarPromoEligibility?.showPromoBanner && <SidebarPromoBanner />}
       <SidebarUserFooter user={user} isLoading={isLoading} />
     </Sidebar>
   );

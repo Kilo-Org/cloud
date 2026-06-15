@@ -7,6 +7,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
+import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
@@ -40,14 +41,18 @@ import {
   webhook_events,
   agent_environment_profiles,
   security_findings,
+  security_finding_notifications,
+  security_remediation_attempts,
+  security_remediations,
   security_audit_log,
   auto_triage_tickets,
   auto_fix_tickets,
   slack_bot_requests,
   bot_requests,
   cloud_agent_code_reviews,
+  code_review_feedback_events,
+  code_review_memory_proposals,
   kiloclaw_instances,
-  kiloclaw_composio_identities,
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
@@ -59,6 +64,8 @@ import {
   security_advisor_scans,
   kilo_pass_scheduled_changes,
   security_analysis_owner_state,
+  security_agent_commands,
+  security_agent_repository_sync_state,
   kiloclaw_subscriptions,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
@@ -77,7 +84,14 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  user_github_app_tokens,
   model_eval_ingestions,
+  stripe_dispute_actions,
+  stripe_dispute_cases,
+  stripe_early_fraud_warning_cases,
+  coding_plan_availability_intents,
+  coding_plan_subscriptions,
+  deployments_ephemeral,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -111,6 +125,7 @@ import {
   type ParsedImpactReferralTouch,
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
+import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -693,7 +708,10 @@ export async function createOrUpdateUser(
   });
 
   // Set up user identification via user ID
-  posthogClient.alias({ distinctId: savedUser.google_user_email, alias: savedUser.id });
+  posthogClient.alias({
+    distinctId: savedUser.google_user_email,
+    alias: savedUser.id,
+  });
 
   await tryVerifyDiscordGuildMembership(args.provider, args.provider_account_id, savedUser.id);
 
@@ -780,15 +798,20 @@ export class SoftDeletePreconditionError extends Error {
  * - Stripe link (stripe_customer_id unchanged)
  * - credit_transactions, microdollar_usage (billing records)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
+ * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - cli_sessions, shared_cli_sessions, cli_sessions_v2 (session history)
  * - deployments, app_builder_projects (user assets)
  * - stytch_fingerprints (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
+ * - model_experiment_request (experiment attribution and prompt hashes retained
+ *   under the dedicated experiment retention policy)
  * - kiloclaw_scheduled_action_targets (retained operational records;
  * - transactional_email_log (retained outbox marker, financial record;
  *   user_id FK references the anonymized kilocode_users row and optional
- *   organization_id references the organization — no direct PII)
+ *   organization_id references the organization -- no direct PII)
+ * - stripe_early_fraud_warning_cases/actions (retained enforcement and
+ *   financial audit history; case user ownership link is nulled)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email replaced with a synthetic tombstone; name, avatar, urls cleared)
@@ -808,15 +831,22 @@ export class SoftDeletePreconditionError extends Error {
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
+ * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
+ * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
+ *   immediate cleanup scheduled)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
- *   security_findings, security_analysis_owner_state,
+ *   security_findings, security_analysis_owner_state, security_agent_commands,
+ *   security_agent_repository_sync_state, security_remediations,
+ *   security_remediation_attempts actor references,
+ *   security_finding_notifications addressed to the user,
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
- *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
- *   kiloclaw_instances/inbound_email_aliases/access_codes, user_period_cache,
- *   kilo_pass_scheduled_changes)
+ *   cloud_agent_code_reviews, review memory feedback/proposals,
+ *   device_auth_requests, auto_top_up_configs,
+ *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
+ *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -855,7 +885,10 @@ export async function softDeleteUser(userId: string) {
     // trialing — the user may have a running Fly instance, and deleting the
     // row without destroying the instance would orphan it.
     const liveClawSubscriptions = await tx
-      .select({ id: kiloclaw_subscriptions.id, status: kiloclaw_subscriptions.status })
+      .select({
+        id: kiloclaw_subscriptions.id,
+        status: kiloclaw_subscriptions.status,
+      })
       .from(kiloclaw_subscriptions)
       .where(
         and(
@@ -891,6 +924,15 @@ export async function softDeleteUser(userId: string) {
       normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
     });
 
+    // ── Gateway cleanup ───────────────────────────────────────────────────
+    await revokeGatewayStateForUser(tx, userId);
+
+    // Remove recipient-addressed Security Agent notifications before user
+    // anonymization and org membership removal. Org-owned findings can remain.
+    await tx
+      .delete(security_finding_notifications)
+      .where(eq(security_finding_notifications.recipient_user_id, userId));
+
     // ── 1. Anonymize the user row ────────────────────────────────────────
     const deletedEmail = getDeletedUserEmail(userId);
     await tx
@@ -909,7 +951,7 @@ export async function softDeleteUser(userId: string) {
         web_session_pepper: randomUUID(),
         app_store_account_token: randomUUID(),
         default_model: null,
-        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+        blocked_reason: createSoftDeletedBlockedReason(),
         blocked_at: null,
         blocked_by_kilo_user_id: null,
         auto_top_up_enabled: false,
@@ -1018,12 +1060,71 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));
+    await tx.execute(sql`
+       UPDATE coding_plan_key_inventory
+       SET status = 'revocation_pending',
+           encrypted_api_key = NULL,
+           assigned_to_user_id = NULL,
+           revocation_requested_at = now(),
+          last_revocation_error = NULL,
+          updated_at = now()
+      WHERE id IN (
+        SELECT key_inventory_id
+        FROM coding_plan_subscriptions
+        WHERE user_id = ${userId}
+          AND status IN ('active', 'past_due')
+          AND key_inventory_id IS NOT NULL
+      )
+    `);
+    await tx
+      .update(coding_plan_subscriptions)
+      .set({
+        status: 'canceled',
+        canceled_at: sql`now()`,
+        cancellation_reason: 'account_deleted',
+        installed_byok_key_id: null,
+        cancel_at_period_end: false,
+        past_due_started_at: null,
+        payment_grace_expires_at: null,
+        auto_top_up_attempted_for_due: null,
+      })
+      .where(
+        and(
+          eq(coding_plan_subscriptions.user_id, userId),
+          inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
+        )
+      );
+    await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
     await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
+    await tx
+      .delete(coding_plan_availability_intents)
+      .where(eq(coding_plan_availability_intents.user_id, userId));
     await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
     await tx.delete(webhook_events).where(eq(webhook_events.owned_by_user_id, userId));
     await tx
       .delete(security_analysis_owner_state)
       .where(eq(security_analysis_owner_state.owned_by_user_id, userId));
+    await tx
+      .delete(security_agent_commands)
+      .where(eq(security_agent_commands.owned_by_user_id, userId));
+    await tx
+      .delete(security_agent_repository_sync_state)
+      .where(eq(security_agent_repository_sync_state.owned_by_user_id, userId));
+    await tx
+      .update(security_remediation_attempts)
+      .set({
+        requested_by_user_id: null,
+        cancellation_requested_by_user_id: null,
+      })
+      .where(
+        or(
+          eq(security_remediation_attempts.requested_by_user_id, userId),
+          eq(security_remediation_attempts.cancellation_requested_by_user_id, userId)
+        )
+      );
+    await tx
+      .delete(security_remediations)
+      .where(eq(security_remediations.owned_by_user_id, userId));
     await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
     await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
     await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
@@ -1032,6 +1133,12 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_memory_proposals)
+      .where(eq(code_review_memory_proposals.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_feedback_events)
+      .where(eq(code_review_feedback_events.owned_by_user_id, userId));
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
@@ -1040,9 +1147,6 @@ export async function softDeleteUser(userId: string) {
       .set({ initiated_by_admin_id: null })
       .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
-    await tx
-      .delete(kiloclaw_composio_identities)
-      .where(eq(kiloclaw_composio_identities.user_id, userId));
     // Remove stored Google OAuth credentials for all instances owned by this user.
     await tx
       .delete(kiloclaw_google_oauth_connections)
@@ -1257,6 +1361,47 @@ export async function softDeleteUser(userId: string) {
       .set({ kilo_user_id: null })
       .where(eq(free_model_usage.kilo_user_id, userId));
     await tx
+      .update(stripe_early_fraud_warning_cases)
+      .set({ kilo_user_id: null })
+      .where(eq(stripe_early_fraud_warning_cases.kilo_user_id, userId));
+    await tx.execute(sql`
+      UPDATE ${stripe_dispute_actions}
+      SET target_key = replace(${stripe_dispute_actions.target_key}, ${userId}, 'deleted_user'),
+          result_reference_id = CASE
+            WHEN ${stripe_dispute_actions.result_reference_id} = ${userId} THEN NULL
+            ELSE ${stripe_dispute_actions.result_reference_id}
+          END,
+          updated_at = now()
+      WHERE case_id IN (
+        SELECT id FROM ${stripe_dispute_cases}
+        WHERE kilo_user_id = ${userId}
+          OR accepted_by_kilo_user_id = ${userId}
+      )
+      AND (
+        position(${userId} in ${stripe_dispute_actions.target_key}) > 0
+        OR ${stripe_dispute_actions.result_reference_id} = ${userId}
+      )
+    `);
+    await tx
+      .update(stripe_dispute_cases)
+      .set({ kilo_user_id: null })
+      .where(eq(stripe_dispute_cases.kilo_user_id, userId));
+    await tx
+      .update(stripe_dispute_cases)
+      .set({ accepted_by_kilo_user_id: null })
+      .where(eq(stripe_dispute_cases.accepted_by_kilo_user_id, userId));
+    await tx
+      .update(deployments_ephemeral)
+      .set({
+        owned_by_user_id: null,
+        status: 'cleanup_retry',
+        next_cleanup_at: sql`now()`,
+        cleanup_claim_token: null,
+        cleanup_claimed_until: null,
+        updated_at: sql`now()`,
+      })
+      .where(eq(deployments_ephemeral.owned_by_user_id, userId));
+    await tx
       .update(security_advisor_scans)
       .set({ kilo_user_id: 'deleted', public_ip: null })
       .where(eq(security_advisor_scans.kilo_user_id, userId));
@@ -1376,7 +1521,9 @@ export async function getAllUserProviders(email: string): Promise<{
  * @returns The WorkOS organization, or null if not found
  */
 export async function getWorkOSOrganization(domain: string) {
-  const orgResult = await workos.organizations.listOrganizations({ domains: [domain] });
+  const orgResult = await workos.organizations.listOrganizations({
+    domains: [domain],
+  });
 
   if (orgResult.data.length === 1) {
     return orgResult.data[0];
@@ -1443,7 +1590,9 @@ async function tryVerifyDiscordGuildMembership(
     if (isMember) {
       await db
         .update(kilocode_users)
-        .set({ discord_server_membership_verified_at: new Date().toISOString() })
+        .set({
+          discord_server_membership_verified_at: new Date().toISOString(),
+        })
         .where(eq(kilocode_users.id, kiloUserId));
     }
   } catch (error) {

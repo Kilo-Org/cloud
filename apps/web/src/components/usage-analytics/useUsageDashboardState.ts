@@ -1,12 +1,20 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { PeriodOption, Granularity, MetricKey, Dimension } from './types';
+import {
+  parseCostSource,
+  type CostSource,
+  type PeriodOption,
+  type Granularity,
+  type MetricKey,
+  type Dimension,
+} from './types';
 import type { UsageFilters } from './hooks';
 import { EMPTY_FILTERS } from './hooks';
 
 export type DashboardState = {
   period: PeriodOption;
   granularity: Granularity;
+  costSource: CostSource;
   chartMetric: MetricKey;
   filters: UsageFilters;
   groupBy: Dimension | 'none';
@@ -173,6 +181,8 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
       ? (params.get('granularity') as Granularity)
       : (defaultState?.granularity ?? ('hour' as Granularity));
 
+    const costSource = parseCostSource(params.get('costSource'), defaultState?.costSource);
+
     const chartMetric = isValidMetricKey(params.get('metric') ?? '')
       ? (params.get('metric') as MetricKey)
       : (defaultState?.chartMetric ?? ('cost' as MetricKey));
@@ -191,7 +201,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
 
     const filters = deserializeFiltersFromParams(params);
 
-    return { period, granularity, chartMetric, filters, groupBy, personalView, viewAs };
+    return { period, granularity, costSource, chartMetric, filters, groupBy, personalView, viewAs };
   });
 
   const isInitialized = useRef(false);
@@ -219,6 +229,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
       const granularity = VALID_GRANULARITIES.includes(params.get('granularity') as Granularity)
         ? (params.get('granularity') as Granularity)
         : state.granularity;
+      const costSource = parseCostSource(params.get('costSource'));
       const chartMetric = isValidMetricKey(params.get('metric') ?? '')
         ? (params.get('metric') as MetricKey)
         : state.chartMetric;
@@ -235,6 +246,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
       setStateInternal({
         period,
         granularity,
+        costSource,
         chartMetric,
         filters,
         groupBy,
@@ -254,6 +266,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
   }, [
     state.period,
     state.granularity,
+    state.costSource,
     state.chartMetric,
     state.groupBy,
     state.personalView,
@@ -279,6 +292,12 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     params.set('granularity', state.granularity);
     params.set('metric', state.chartMetric);
     params.set('group', state.groupBy);
+
+    if (state.costSource === 'market') {
+      params.set('costSource', state.costSource);
+    } else {
+      params.delete('costSource');
+    }
 
     if (state.personalView && state.personalView !== 'personal-only') {
       params.set('personalView', state.personalView);

@@ -41,13 +41,23 @@ import { getPgDb } from '../../db/pg.js';
 import type { Env } from '../../types.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
+import { assertKiloModelAvailable } from '../../model-validation.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
   updateSession: typeof updateSessionHandler;
 };
 
-const CLOUD_AGENT_WEB_PLATFORM = 'cloud-agent-web';
+const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
+  'cloud-agent-web',
+  'slack',
+  'github',
+  'linear',
+  'discord',
+  'app-builder',
+  'webhook',
+  'scheduled',
+]);
 
 export type ProfileResolutionPolicy = {
   defaultProfileResolution: 'explicit-profile-only' | 'include-web-defaults';
@@ -58,7 +68,7 @@ export function profileResolutionPolicyForSessionCreateOrigin(
 ): ProfileResolutionPolicy {
   return {
     defaultProfileResolution:
-      createdOnPlatform === CLOUD_AGENT_WEB_PLATFORM
+      createdOnPlatform !== undefined && IMPLICIT_PROFILE_RESOLUTION_ORIGINS.has(createdOnPlatform)
         ? 'include-web-defaults'
         : 'explicit-profile-only',
   };
@@ -69,7 +79,8 @@ type PrepareInput = z.infer<typeof PrepareSessionInput>;
 function repoFullNameForBindingLookup(input: SessionCreateRequest): string | undefined {
   if (input.repository.type === 'github') return input.repository.repo;
   if (input.repository.type === 'gitlab') {
-    return repoFullNameFromGitUrl(input.repository.url);
+    // The repository discriminator establishes this host as GitLab, including self-hosted instances.
+    return repoFullNameFromGitUrl(input.repository.url, input.repository.url);
   }
   return undefined;
 }
@@ -221,12 +232,12 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
           id: input.initialMessageId,
           command: input.initialPayload.command,
           arguments: input.initialPayload.arguments,
-          images: input.images,
+          attachments: input.attachments ?? input.images,
         }
       : {
           type: 'prompt',
           prompt: input.prompt,
-          images: input.images,
+          attachments: input.attachments ?? input.images,
           id: input.initialMessageId,
         };
 
@@ -296,11 +307,11 @@ const prepareSessionHandler = internalApiProtectedProcedure
 
       if (
         requestWithProfile.initialTurn.type === 'command' &&
-        requestWithProfile.initialTurn.images !== undefined
+        requestWithProfile.initialTurn.attachments !== undefined
       ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Images cannot be attached to slash commands',
+          message: 'Attachments cannot be attached to slash commands',
         });
       }
 
@@ -308,6 +319,17 @@ const prepareSessionHandler = internalApiProtectedProcedure
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'devcontainer sessions must use autoInitiate',
+        });
+      }
+
+      if (requestWithProfile.initialTurn.type === 'prompt') {
+        await assertKiloModelAvailable({
+          env: ctx.env,
+          submittedModel: requestWithProfile.agent.model,
+          originalToken: ctx.authToken,
+          originalOrganizationId: requestWithProfile.options?.kilocodeOrganizationId,
+          createdOnPlatform: requestWithProfile.options?.createdOnPlatform,
+          procedure: 'prepareSession',
         });
       }
 

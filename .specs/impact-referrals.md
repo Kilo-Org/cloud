@@ -17,6 +17,11 @@ Draft -- created 2026-04-21 as `.specs/kiloclaw-referrals.md` for KiloClaw refer
 Updated 2026-05-06 -- require Impact Advocate reward redemption after local KiloClaw reward application.
 Updated 2026-05-12 -- note price-versioned KiloClaw billing preserves referral semantics.
 Updated 2026-05-22 -- renamed to `.specs/impact-referrals.md` and expanded to Kilo Pass referrals.
+Updated 2026-05-28 -- classify enforced Stripe EFW refunds as adverse payments.
+Updated 2026-05-29 -- name the Impact-facing Kilo Pass reward unit `Kilo Pass Bonus Credits`.
+Updated 2026-06-05 -- final Commit term reward-extension behavior.
+Updated 2026-06-12 -- clarify subscription-independent Kilo Pass referral sharing and automatic pending reward
+application.
 
 ## Conventions
 
@@ -66,16 +71,15 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
 - **Brand-new Kilo account**: User identity with no current or historical Kilo user identity under the configured
   identity key before the referral touch. Adding an auth provider to an existing user is not brand-new.
 - **Reward beneficiary**: User who may receive a referral reward. Beneficiary roles are `referrer` and `referee`.
-- **Reward state**: Durable lifecycle state for a reward. Required states are `pending`, `earned`, `applied`,
-  `reversed`, `expired`, `canceled`, and `review_required`.
+- **Reward state**: Durable lifecycle state for a reward. Required states are `pending`, `earned`, `applied`, `reversed`, `expired`, and `canceled`.
 - **Impact-facing status field**: Local status retained only to compare Kilo state with Impact dashboard exports or API
   reads; it cannot drive eligibility, reward granting, or billing fulfillment.
 - **Chargeback**: Stripe dispute event for the qualifying Stripe payment.
 - **Fraud-marked payment**: Qualifying payment marked fraudulent by Stripe, an internal fraud process, or an authorized
   operator.
-- **Support review**: Durable `review_required` reward state with triggering reason, affected billing period, and source
-  payment or dispute recorded. Kilo team review is required before an already-applied reward can be canceled, clawed
-  back, or otherwise adjusted.
+- **Enforced EFW refund**: Refund of a qualifying personal Stripe payment performed under
+  `.specs/stripe-early-fraud-warnings.md` after a new Stripe Early Fraud Warning; it is an adverse payment even when no
+  later chargeback is created.
 
 ### KiloClaw Definitions
 
@@ -91,8 +95,9 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
   calendar month. It is not a general account credit.
 - **Calendar month**: Billing-period extension that preserves day-of-month semantics of the current KiloClaw billing
   calendar, clamping to the last valid day of the target month when necessary.
-- **Active eligible personal KiloClaw subscription**: Personal KiloClaw subscription that is active, not canceling at
-  period end, not suspended, and not past due.
+- **Active eligible personal KiloClaw subscription**: Personal KiloClaw subscription that is active, not ordinarily
+  user-canceling at period end, not suspended, and not past due. A final Commit term made non-renewing solely by the
+  Commit retirement guard remains eligible for free-month reward application.
 - **Personal KiloClaw subscription**: KiloClaw subscription owned by an individual user. Organization/team-scoped
   KiloClaw subscriptions are not eligible.
 
@@ -139,6 +144,8 @@ not stack with, the normal Kilo Pass monthly/promo bonus for that issuance.
 Existing Impact Performance conversion events drive Impact Advocate conversion state. The system uses `Sale (71659)` as
 the paid-conversion event for referral conversion and renewal reporting. When referral wins attribution for a paid
 conversion, local referral rewards are authoritative and affiliate SALE reporting for the same conversion is suppressed.
+Impact Advocate reward redemption is used only for reporting synchronization: KiloClaw redeems after local free-month
+application, and Kilo Pass redeems after local referral bonus allocation.
 
 ## Rules
 
@@ -153,21 +160,22 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
    - UTT UUID: `A7138521-9724-4b8f-95f4-1db2fbae81141`
    - Advocate widget ID: `p/51699/w/referrerWidget`
 
-3. Existing unscoped Impact Advocate configuration MAY remain as KiloClaw fallback configuration only. Kilo Pass MUST
-   require explicit Kilo Pass Advocate program/widget configuration and MUST NOT fall back to KiloClaw configuration.
+3. Impact Advocate account SID, auth token, and tenant alias MAY be shared across Advocate programs. KiloClaw and Kilo
+   Pass MUST each require explicit product-scoped Advocate program ID and widget ID configuration. Products MUST NOT
+   fall back to unscoped or other-product program/widget configuration.
 
 4. Kilo Pass MUST use a different Impact Advocate program ID and widget ID than KiloClaw.
 
 5. The system MUST use existing Impact Performance conversion action tracker IDs for lifecycle reporting where
    applicable:
 
-   | Event       | ActionTrackerId | Referral use                                      |
-   | ----------- | --------------- | ------------------------------------------------- |
-   | VISIT       | 71668           | Affiliate/visit reporting where applicable        |
-   | SIGNUP      | 71655           | New user creation with attribution                |
-   | TRIAL_START | 71656           | KiloClaw trial subscription becomes active        |
-   | TRIAL_END   | 71658           | KiloClaw trial subscription ends                  |
-   | SALE        | 71659           | KiloClaw monetized period or Kilo Pass conversion |
+   | Event | ActionTrackerId | Referral use |
+   |---|---|---|
+   | VISIT | 71668 | Affiliate/visit reporting where applicable |
+   | SIGNUP | 71655 | New user creation with attribution |
+   | TRIAL_START | 71656 | KiloClaw trial subscription becomes active |
+   | TRIAL_END | 71658 | KiloClaw trial subscription ends |
+   | SALE | 71659 | KiloClaw monetized period or Kilo Pass conversion |
 
 6. Impact Advocate API credentials MUST remain server-side and MUST NOT be exposed to the browser.
 
@@ -186,6 +194,14 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 10. Logged-in users MUST access referral sharing through the product's Impact Verified Access widget.
 
 11. Kilo Pass referral sharing MUST be available from `/subscriptions/kilo-pass/refer` when configured.
+
+11a. Any logged-in Kilo user MUST be able to access and share the Kilo Pass referral link regardless of current or
+     historical Kilo Pass subscription state. Active, paused, canceling, canceled, annual, former, and never-subscribed
+     Kilo users remain eligible to share.
+
+11b. Relevant Kilo Pass surfaces MUST expose a `Refer & earn` path to `/subscriptions/kilo-pass/refer` for active,
+     paused, canceling, canceled, annual, former, and never-subscribed users. Non-subscriber surfaces MUST show only the
+     referral call to action; reward details belong on the dedicated referral page.
 
 12. The Kilo Pass referral page MUST use Kilo Pass-specific widget configuration, token issuance, reward summary, and
     copy. It MUST NOT show KiloClaw referral wording, widgets, links, or rewards as Kilo Pass referral state.
@@ -296,14 +312,14 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 
 47. The system MUST implement at least these attribution outcomes:
 
-| Scenario                                                                  | Expected winner |
-| ------------------------------------------------------------------------- | --------------- |
-| Affiliate first, referral second, both valid, no prior affiliate SALE     | Referral        |
-| Affiliate first, referral second, both valid, affiliate SALE before touch | Affiliate       |
-| Referral first, affiliate second, both valid, no prior affiliate SALE     | Referral        |
-| Only affiliate valid                                                      | Affiliate       |
-| Only referral valid                                                       | Referral        |
-| All touches expired or invalid                                            | None            |
+| Scenario | Expected winner |
+|---|---|
+| Affiliate first, referral second, both valid, no prior affiliate SALE | Referral |
+| Affiliate first, referral second, both valid, affiliate SALE before touch | Affiliate |
+| Referral first, affiliate second, both valid, no prior affiliate SALE | Referral |
+| Only affiliate valid | Affiliate |
+| Only referral valid | Referral |
+| All touches expired or invalid | None |
 
 48. Attribution resolution for referral rewards MUST happen at conversion time, not only at signup time.
 
@@ -421,9 +437,9 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 
 91. For month-to-month KiloClaw subscriptions, one reward MUST delay the next monthly renewal by one calendar month.
 
-92. For six-month commitment KiloClaw subscriptions, one reward MUST delay the next six-month renewal by one calendar
-    month. The reward MUST NOT convert the subscription to month-to-month and MUST NOT reduce the next invoice by one
-    sixth.
+92. For a final six-month Commit term, one reward MUST extend the final Commit boundary by one calendar month. It MUST
+    NOT authorize another Commit renewal, convert the current term immediately to Standard, or reduce a future invoice by
+    one sixth. Cancellation or a scheduled Standard transition MUST move to the extended boundary.
 
 93. For pure-credit KiloClaw subscriptions, reward application MUST update local renewal state so the credit renewal
     sweep does not deduct KiloClaw hosting credits until the extended renewal time.
@@ -432,9 +448,12 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
     billing state consistent. The system MUST NOT create a local-only renewal delay for a Stripe-funded subscription
     while allowing Stripe to charge on the original schedule.
 
-95. KiloClaw reward application MUST respect cancellation state. If a subscription is canceled or canceling before
-    reward application, the reward MUST remain pending until the beneficiary has an active eligible personal KiloClaw
-    subscription.
+95. KiloClaw reward application MUST respect cancellation state. If a subscription is canceled or ordinarily
+    user-canceling before reward application, the reward MUST remain pending until the beneficiary has an active eligible
+    personal KiloClaw subscription. A final Commit term canceling solely because of the retirement guard remains eligible;
+    reward application MUST preserve non-renewal while atomically extending the current period, credit-renewal boundary,
+    canonical `commit_ends_at` final boundary, and any scheduled Standard transition. Ambiguous provider or schedule
+    outcomes MUST abort reward application, force provider non-renewal when possible, report the anomaly through logs and Sentry, and leave the reward retryable for canonical-state recomputation.
 
 96. Price-versioned KiloClaw billing does not change referral eligibility, attribution priority, first-paid-conversion
     timing, reward caps, or free-month fulfillment.
@@ -470,7 +489,8 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 
 107.  If a Kilo Pass beneficiary has no active eligible monthly Kilo Pass subscription when a reward would apply, the
       reward MUST remain pending until the beneficiary starts or reactivates an eligible monthly Kilo Pass subscription,
-      is canceled by adverse-payment handling, is manually resolved, or expires.
+      is canceled by adverse-payment handling, is manually resolved, or expires. Paused, canceling, canceled, annual,
+      and unsubscribed states MUST NOT qualify merely because a subscription record exists.
 
 108.  A pending Kilo Pass referral reward MUST expire and be canceled 12 months after it is earned if it has not been
       consumed.
@@ -512,6 +532,9 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 
 122.  When multiple pending unexpired Kilo Pass referral rewards are eligible for the same issuance, the oldest earned
       reward MUST be consumed first.
+
+122a. Kilo Pass referral reward application MUST be automatic. The system MUST NOT require or expose a user-triggered
+      manual claim action for pending Kilo Pass referral rewards.
 
 123.  A Kilo Pass referral reward MUST apply only to an eligible monthly base issuance after the reward is earned. It MUST
       NOT apply retroactively to the source conversion's base issuance or to any already-created issuance.
@@ -623,20 +646,33 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 158. Impact reward redemption state is for reporting and reconciliation only. It MUST NOT be the source of truth for
      local reward eligibility, application, cancellation, or reversal.
 
+158a. For Kilo Pass, when a local referral bonus reward is allocated/granted, the system MUST queue asynchronous Impact
+      Advocate reward lookup and single-reward redemption using the USD-denominated reward amount and the
+      `Kilo Pass Bonus Credits` unit so Impact reporting matches Kilo allocation state.
+
+158b. Kilo Pass Impact Advocate reward redemption MUST be idempotently queued per local reward and MUST NOT block paid
+      conversion processing, reward ledger creation, reward application, billing settlement, or user access.
+
+158c. Kilo Pass Impact reward lookup and redemption state is for reporting and reconciliation only. It MUST NOT be the
+      source of truth for local reward eligibility, application, cancellation, or reversal.
+
 ### Refunds, Reversals, and Fraud
 
-159. Rewards from a qualifying Stripe payment MUST be canceled if Stripe reports a chargeback for that payment.
+159. Rewards from a qualifying Stripe payment MUST be treated as adverse when Stripe reports a chargeback or when
+     Kilo enforces an EFW refund for that payment.
 
 160. Pending or earned-but-unapplied rewards MUST be canceled when the qualifying Stripe payment is charged back,
-     refunded, or fraud-marked.
+     refunded, fraud-marked, or refunded as part of enforced EFW handling. This rule applies to both KiloClaw and Kilo
+     Pass qualifying payments.
 
-161. Already-applied rewards from a charged-back, refunded, or fraud-marked payment MUST be marked for support review
-     and MUST NOT be automatically canceled or clawed back.
+161. Already-applied rewards from a charged-back, refunded, fraud-marked, or EFW-refunded payment MUST NOT be automatically canceled or clawed back. The anomaly MUST be logged and reported to Sentry using non-sensitive payment and reward identifiers.
 
-162. If a qualifying Impact action must be reversed, the system SHOULD use Impact's reverse-action mechanism instead of
-     creating an unrelated negative conversion.
+162. If a qualifying Impact action must be reversed, including after an enforced EFW refund that prevents a later
+     chargeback event, the system SHOULD use Impact's reverse-action mechanism instead of creating an unrelated negative
+     conversion.
 
-163. Reversal and reward-cancellation handling MUST be idempotent.
+163. Reversal and reward-cancellation handling MUST be idempotent across EFW refund, ordinary refund, fraud marking, and
+     later chargeback delivery for the same qualifying payment.
 
 ### GDPR and PII
 
@@ -666,9 +702,7 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 171. Reward fulfillment failures MUST leave rewards in a retryable state unless the failure is a permanent eligibility,
      expiry, adverse-payment, or configuration failure.
 
-172. The system MUST expose enough operational state to distinguish pending Impact registration, pending Impact
-     conversion reporting, pending local reward application, applied rewards, reversed rewards, canceled rewards,
-     expired rewards, review-required rewards, and disqualified referrals.
+172. The system MUST expose enough operational state to distinguish pending Impact registration, pending Impact conversion reporting, pending local reward application, applied rewards, reversed rewards, canceled rewards, expired rewards, and disqualified referrals.
 
 173. Admin-only subscription interventions, internal test conversions, and support adjustments MUST NOT emit referral
      rewards or Impact referral conversions unless explicitly marked as eligible by an authorized operator.
@@ -680,6 +714,46 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 
 175. Before launch, the existing internal referral system MUST be scoped away from KiloClaw and Kilo Pass, disabled for
      those products, or migrated into this program's rules to prevent double rewards.
+
+### Kilo Pass Reusable Payment-Fingerprint Welcome-Promo Guard
+
+176. The Kilo Pass introductory welcome promo MUST be available at most once per supported reusable Stripe payment
+     instrument. Initial supported instrument types are `card`, `sepa_debit`, `us_bank_account`, `bacs_debit`, and
+     `au_becs_debit`. Annual subscriptions MUST NOT receive the welcome promo. An instrument used for a first paid annual
+     purchase MUST count as previously used when later monthly welcome-promo or referral eligibility is evaluated.
+
+177. A reusable payment instrument MUST count as used only after it settles either a positive personal monthly Kilo Pass
+     Stripe payment or a first positive personal annual Kilo Pass Stripe payment. Merely attaching the instrument, issuing
+     a zero-value invoice, crossing the usage threshold, or later issuing welcome-promo credits MUST NOT count as use.
+
+178. A first-time account whose positively paid monthly Kilo Pass settlement uses a previously claimed reusable instrument
+     fingerprint MUST NOT receive the introductory `50%` welcome promo. It MAY receive the ordinary monthly-ramp bonus
+     using the same behavior as an existing or previously canceled Kilo Pass subscriber.
+
+179. A positively paid monthly Kilo Pass settlement using a previously claimed reusable instrument fingerprint MUST NOT be
+     an eligible Kilo Pass referral conversion and MUST NOT grant a Kilo Pass referral reward to either beneficiary role.
+
+180. A positively paid monthly settlement whose payment method is confirmed not to provide a supported reusable
+     fingerprint MUST NOT be disqualified solely because no cross-account instrument signal exists. A supported reusable
+     method with an absent fingerprint MAY follow that fallback. An unresolvable settlement MUST NOT be treated as a
+     confirmed eligible fallback.
+
+181. Shared household, business, or other jointly used payment instruments are governed by the same one-claim rule; the
+     system MUST NOT provide additional welcome-promo or Kilo Pass referral-conversion eligibility solely because a later
+     buyer is a different person.
+
+182. A claimed reusable instrument fingerprint MUST remain claimed after refund, dispute, fraud marking, cancellation,
+     failure to redeem welcome-promo credits, or account deletion. Credit or reward handling for adverse payments is
+     separate from instrument-claim retention.
+
+183. When a paid monthly purchase is welcome-promo ineligible because its reusable payment fingerprint was previously
+     claimed, the post-payment Kilo Pass confirmation flow MUST inform the customer that the introductory bonus does not
+     apply. The message MUST NOT expose the fingerprint or the existence or identity of another account.
+
+184. Durable instrument-claim records MAY retain the minimum Stripe fingerprint and payment identity data needed to
+     enforce these anti-abuse rules after account deletion. Customer-facing surfaces MUST NOT expose that retained
+     evidence, and any direct user identity references stored with such records MUST be deleted or anonymized under GDPR
+     deletion flows.
 
 ## Error Handling
 
@@ -704,8 +778,7 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
 7. If reward application fails after a reward is earned, the reward MUST remain retryable unless the failure is permanent
    and auditable.
 
-8. If required billing or credit state is ambiguous, the system MUST NOT apply a reward. It MUST leave the reward pending
-   or mark it for review, as appropriate, and log the ambiguity for investigation.
+8. If required billing or credit state is ambiguous, the system MUST NOT apply a reward. It MUST leave the reward pending, force provider non-renewal when relevant and possible, report non-sensitive context through logs and Sentry, and retry or recompute from canonical state.
 
 9. If Impact Advocate reward lookup or redemption fails with a server error or timeout, the system MUST leave redemption
    work in a retryable state.
@@ -714,6 +787,35 @@ conversion, local referral rewards are authoritative and affiliate SALE reportin
     retry unchanged payloads, except an already-redeemed response MAY be treated as idempotent success.
 
 ## Changelog
+
+### 2026-06-05 -- Extend guarded final Commit terms
+
+Allowed KiloClaw free-month rewards to extend final Commit terms guarded for retirement while preserving ordinary user-cancellation ineligibility, non-renewal, authorized final boundary, and scheduled Standard timing.
+
+### 2026-05-29 -- Name the Kilo Pass Impact reward unit
+
+Kilo Pass reward synchronization sends the `Kilo Pass Bonus Credits` unit to Impact Advocate while retaining the USD-denominated local reward amount.
+
+### 2026-05-28 -- Enforced EFW refunds are adverse payments
+
+Classified an enforced Stripe Early Fraud Warning refund as an adverse qualifying payment for both covered products. Pending or earned-but-unapplied rewards cancel, already-applied rewards are not automatically clawed back and are reported operationally, and later refund or chargeback delivery must remain idempotent.
+
+### 2026-05-27 -- Prevent repeated Kilo Pass welcome claims by payment fingerprint
+
+Added the Kilo Pass reusable Stripe payment-fingerprint guard for monthly introductory welcome promos and referral
+conversions. The first positively paid settlement using a supported fingerprintable instrument permanently claims that
+instrument opportunity; reused instruments retain ordinary monthly-ramp bonus behavior but do not receive the
+introductory promo or create Kilo Pass referral rewards. Annual behavior remains outside this restriction.
+
+### 2026-05-26 -- Redeem allocated Kilo Pass rewards in Impact Advocate
+
+Kilo Pass referral bonus allocation now queues Impact Advocate reward lookup and redemption using the USD reward amount,
+for reporting synchronization only. The local reward ledger remains authoritative.
+
+### 2026-05-25 -- Require product-scoped Advocate program/widget configuration
+
+Removed KiloClaw fallback to unscoped Impact Advocate program/widget configuration. KiloClaw and Kilo Pass now both
+require explicit product-scoped Advocate program ID and widget ID while sharing account SID, auth token, and tenant alias.
 
 ### 2026-05-22 -- Rename and expand to Kilo Pass
 
@@ -743,5 +845,4 @@ Advocate widget and participant registration requirements, referral-priority att
 exact 30-day UTC expiration semantics, brand-new and previously deleted user boundaries, first-paid monetized KiloClaw
 conversion, double-sided free-month rewards, referrer 12-month cap, atomic reward decisions, pending rewards for
 inactive referrers, next-unpaid-renewal reward application, app-owned billing fulfillment, Impact reconciliation
-behavior, no Advocate webhook reliance, retryable failure states, tracking-value limits, support-review state, GDPR
-handling, Impact identity mapping, and Stripe chargeback reward cancellation.
+behavior, no Advocate webhook reliance, retryable failure states, tracking-value limits, operational anomaly reporting, GDPR handling, Impact identity mapping, and Stripe chargeback reward cancellation.

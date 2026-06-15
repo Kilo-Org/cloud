@@ -259,7 +259,7 @@ describe('CloudAgentTransport unexpected disconnect', () => {
 
     const stoppedEvents = serviceEvents.filter(e => e.type === 'stopped');
     expect(stoppedEvents).toHaveLength(1);
-    expect(stoppedEvents[0]).toEqual({ type: 'stopped', reason: 'disconnected' });
+    expect(stoppedEvents[0]).toEqual({ type: 'stopped', reason: 'transport-disconnected' });
 
     transport.destroy();
   });
@@ -403,6 +403,28 @@ describe('CloudAgentTransport command delegation', () => {
     expect(api.send).toHaveBeenCalledWith({
       sessionId: 'ses-1',
       payload: { type: 'prompt', prompt: 'hello', mode: 'code', model: 'gpt-4' },
+    });
+
+    transport.destroy();
+  });
+
+  it('send() delegates canonical document attachments to api.send', () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.pdf'],
+    };
+
+    void transport.send!({
+      payload: { type: 'prompt', prompt: 'read it', mode: 'code', model: 'gpt-4' },
+      attachments,
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      payload: { type: 'prompt', prompt: 'read it', mode: 'code', model: 'gpt-4' },
+      attachments,
     });
 
     transport.destroy();

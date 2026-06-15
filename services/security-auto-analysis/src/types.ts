@@ -7,24 +7,69 @@ export const AUTO_ANALYSIS_MAX_ATTEMPTS = 5;
 export const SecurityAgentConfigSchema = z
   .object({
     model_slug: z.string().optional(),
+    triage_model_slug: z.string().optional(),
+    analysis_model_slug: z.string().optional(),
     analysis_mode: z.enum(['auto', 'shallow', 'deep']).default('auto'),
+    auto_dismiss_enabled: z.boolean().default(false),
+    auto_dismiss_confidence_threshold: z.enum(['high', 'medium', 'low']).default('high'),
     auto_analysis_enabled: z.boolean().default(false),
     auto_analysis_min_severity: z.enum(['critical', 'high', 'medium', 'all']).default('high'),
     auto_analysis_include_existing: z.boolean().default(false),
+    auto_remediation_enabled: z.boolean().default(false),
+    auto_remediation_min_severity: z.enum(['critical', 'high', 'medium', 'all']).default('high'),
+    auto_remediation_include_existing: z.boolean().default(false),
+    auto_remediation_enabled_at: z.string().nullable().default(null),
+    remediation_model_slug: z.string().optional(),
   })
   .passthrough();
 
 export type SecurityAgentConfig = z.infer<typeof SecurityAgentConfigSchema>;
 export type AnalysisMode = SecurityAgentConfig['analysis_mode'];
 export type AutoAnalysisMinSeverity = SecurityAgentConfig['auto_analysis_min_severity'];
+export type AutoRemediationMinSeverity = SecurityAgentConfig['auto_remediation_min_severity'];
 
 export const DEFAULT_SECURITY_AGENT_CONFIG: SecurityAgentConfig = {
   model_slug: 'anthropic/claude-opus-4.6',
+  triage_model_slug: 'anthropic/claude-opus-4.6',
+  analysis_model_slug: 'anthropic/claude-opus-4.6',
   analysis_mode: 'auto',
+  auto_dismiss_enabled: false,
+  auto_dismiss_confidence_threshold: 'high',
   auto_analysis_enabled: false,
   auto_analysis_min_severity: 'high',
   auto_analysis_include_existing: false,
+  auto_remediation_enabled: false,
+  auto_remediation_min_severity: 'high',
+  auto_remediation_include_existing: false,
+  auto_remediation_enabled_at: null,
+  remediation_model_slug: 'anthropic/claude-opus-4.6',
 };
+
+export function resolveSecurityAgentModels(
+  config: Pick<
+    SecurityAgentConfig,
+    'model_slug' | 'triage_model_slug' | 'analysis_model_slug' | 'remediation_model_slug'
+  >
+): { triageModel: string; analysisModel: string; remediationModel: string } {
+  const analysisModel =
+    config.analysis_model_slug ??
+    config.model_slug ??
+    DEFAULT_SECURITY_AGENT_CONFIG.analysis_model_slug ??
+    'anthropic/claude-opus-4.6';
+  return {
+    triageModel:
+      config.triage_model_slug ??
+      config.model_slug ??
+      DEFAULT_SECURITY_AGENT_CONFIG.triage_model_slug ??
+      'anthropic/claude-opus-4.6',
+    analysisModel,
+    remediationModel:
+      config.remediation_model_slug ??
+      analysisModel ??
+      DEFAULT_SECURITY_AGENT_CONFIG.remediation_model_slug ??
+      'anthropic/claude-opus-4.6',
+  };
+}
 
 export const AutoAnalysisFailureCodeSchema = z.enum([
   'NETWORK_TIMEOUT',
@@ -68,10 +113,26 @@ export type SecurityFindingTriage = {
   triageAt: string;
 };
 
+export type SecurityFindingSandboxAnalysis = {
+  isExploitable: boolean | 'unknown';
+  exploitabilityReasoning: string;
+  usageLocations: string[];
+  suggestedFix: string;
+  suggestedAction: 'dismiss' | 'open_pr' | 'manual_review' | 'monitor';
+  summary: string;
+  rawMarkdown: string;
+  analysisAt: string;
+  modelUsed?: string;
+};
+
 export type SecurityFindingAnalysis = {
   triage?: SecurityFindingTriage;
+  sandboxAnalysis?: SecurityFindingSandboxAnalysis;
+  rawMarkdown?: string;
   analyzedAt: string;
   modelUsed?: string;
+  triageModel?: string;
+  analysisModel?: string;
   triggeredByUserId?: string;
   correlationId?: string;
 };

@@ -34,6 +34,7 @@ type ListResponse = {
     title: string;
     updated_at: string;
     merged_at: string | null;
+    draft?: boolean;
     head: { sha: string };
   }>;
 };
@@ -97,6 +98,27 @@ describe('fetchPullRequestForBranch', () => {
       sort: 'updated',
       direction: 'desc',
     });
+  });
+
+  it('returns draft state for an open draft PR', async () => {
+    mockPullsList.mockResolvedValueOnce(
+      okResponse([
+        {
+          number: 8,
+          html_url: 'https://github.com/acme/widgets/pull/8',
+          state: 'open',
+          title: 'Work in progress',
+          updated_at: '2026-04-20T10:00:00Z',
+          merged_at: null,
+          draft: true,
+          head: { sha: 'draftsha' },
+        },
+      ])
+    );
+
+    const result = await fetchPullRequestForBranch(params);
+
+    expect(result?.state).toBe('draft');
   });
 
   it('prefers an open PR over a more-recently-updated closed one', async () => {

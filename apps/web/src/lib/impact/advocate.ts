@@ -4,15 +4,17 @@ import jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
 import type { User } from '@kilocode/db/schema';
 import {
-  IMPACT_ACCOUNT_SID,
   IMPACT_ADVOCATE_ACCOUNT_SID,
   IMPACT_ADVOCATE_API_BASE_URL,
   IMPACT_ADVOCATE_AUTH_TOKEN,
-  IMPACT_ADVOCATE_PROGRAM_ID,
+  IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID,
+  IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID,
+  IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID,
+  IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID,
   IMPACT_ADVOCATE_TENANT_ALIAS,
-  IMPACT_ADVOCATE_WIDGET_ID,
 } from '@/lib/config.server';
 import { logImpactReferralDebug, truncateForLog } from '@/lib/impact/debug';
+import { ImpactAdvocateProgramKey, ImpactReferralProduct } from '@kilocode/db/schema-types';
 
 /**
  * SaaSquatch / Impact Advocate expects locale tags formatted as `en_US`,
@@ -25,10 +27,38 @@ function normalizeAdvocateLocale(locale: string | null | undefined): string | nu
   return trimmed.replace(/-/g, '_');
 }
 
-export const IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID = '51699';
-export const IMPACT_ADVOCATE_DEFAULT_WIDGET_ID = 'p/51699/w/referrerWidget';
 const IMPACT_ADVOCATE_WIDGET_NAME = 'referrerWidget';
 const IMPACT_ADVOCATE_VERIFIED_ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
+
+type ImpactAdvocateConfigScope = {
+  product?: ImpactReferralProduct;
+  programKey?: ImpactAdvocateProgramKey;
+};
+
+type ImpactAdvocateConfig = {
+  accountSid: string;
+  authToken: string;
+  tenantAlias: string;
+  programId: string;
+  widgetId: string;
+  programKey: ImpactAdvocateProgramKey;
+};
+
+export function getImpactAdvocateProgramKeyForProduct(
+  product: ImpactReferralProduct
+): ImpactAdvocateProgramKey {
+  return product === ImpactReferralProduct.KiloPass
+    ? ImpactAdvocateProgramKey.KiloPass
+    : ImpactAdvocateProgramKey.KiloClaw;
+}
+
+function resolveImpactAdvocateProgramKey(
+  scope?: ImpactAdvocateConfigScope
+): ImpactAdvocateProgramKey {
+  if (scope?.programKey) return scope.programKey;
+  if (scope?.product) return getImpactAdvocateProgramKeyForProduct(scope.product);
+  return ImpactAdvocateProgramKey.KiloClaw;
+}
 
 export type ImpactAdvocateIdentityPayload = {
   id: string;
@@ -179,6 +209,11 @@ function getDebuggableVerifiedAccessTokenPayload(
   };
 }
 
+function configuredValue(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed && trimmed !== 'undefined' ? trimmed : '';
+}
+
 function getImpactAdvocateWidgetPath(widgetId: string, programId: string): string {
   const trimmedWidgetId = widgetId.trim();
   if (!trimmedWidgetId) return `p/${programId}/w/${IMPACT_ADVOCATE_WIDGET_NAME}`;
@@ -186,14 +221,70 @@ function getImpactAdvocateWidgetPath(widgetId: string, programId: string): strin
   return `p/${trimmedWidgetId}/w/${IMPACT_ADVOCATE_WIDGET_NAME}`;
 }
 
-function getImpactAdvocateConfig() {
-  const accountSid = IMPACT_ADVOCATE_ACCOUNT_SID || IMPACT_ACCOUNT_SID;
-  const authToken = IMPACT_ADVOCATE_AUTH_TOKEN;
-  const tenantAlias = IMPACT_ADVOCATE_TENANT_ALIAS;
-  const programId = IMPACT_ADVOCATE_PROGRAM_ID || IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID;
-  const widgetId = getImpactAdvocateWidgetPath(IMPACT_ADVOCATE_WIDGET_ID, programId);
+function getKiloClawAdvocateIdentifiersForComparison(): {
+  programIds: Set<string>;
+  widgetIds: Set<string>;
+} {
+  const programId = configuredValue(IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID);
+  const rawWidgetId = configuredValue(IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID);
+  const programIds = new Set<string>();
+  const widgetIds = new Set<string>();
 
-  if (!accountSid || !authToken || !tenantAlias) {
+  if (programId) {
+    programIds.add(programId);
+  }
+  if (programId && rawWidgetId) {
+    widgetIds.add(getImpactAdvocateWidgetPath(rawWidgetId, programId));
+  }
+
+  return { programIds, widgetIds };
+}
+
+function kiloPassAdvocateConfigReusesKiloClawIdentifiers(params: {
+  programId: string;
+  widgetId: string;
+}): boolean {
+  const kiloClawIdentifiers = getKiloClawAdvocateIdentifiersForComparison();
+  return (
+    kiloClawIdentifiers.programIds.has(params.programId) ||
+    kiloClawIdentifiers.widgetIds.has(params.widgetId)
+  );
+}
+
+function getImpactAdvocateConfig(scope?: ImpactAdvocateConfigScope): ImpactAdvocateConfig | null {
+  const programKey = resolveImpactAdvocateProgramKey(scope);
+
+  const scopedValues =
+    programKey === ImpactAdvocateProgramKey.KiloPass
+      ? {
+          programId: configuredValue(IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID),
+          widgetId: configuredValue(IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID),
+        }
+      : {
+          programId: configuredValue(IMPACT_ADVOCATE_KILOCLAW_PROGRAM_ID),
+          widgetId: configuredValue(IMPACT_ADVOCATE_KILOCLAW_WIDGET_ID),
+        };
+
+  const accountSid = configuredValue(IMPACT_ADVOCATE_ACCOUNT_SID);
+  const authToken = configuredValue(IMPACT_ADVOCATE_AUTH_TOKEN);
+  const tenantAlias = configuredValue(IMPACT_ADVOCATE_TENANT_ALIAS);
+  const programId = scopedValues.programId;
+  const rawWidgetId = scopedValues.widgetId;
+
+  if (!accountSid || !authToken || !tenantAlias || !programId || !rawWidgetId) {
+    return null;
+  }
+
+  const widgetId = getImpactAdvocateWidgetPath(rawWidgetId, programId);
+
+  if (!widgetId) {
+    return null;
+  }
+
+  if (
+    programKey === ImpactAdvocateProgramKey.KiloPass &&
+    kiloPassAdvocateConfigReusesKiloClawIdentifiers({ programId, widgetId })
+  ) {
     return null;
   }
 
@@ -203,19 +294,22 @@ function getImpactAdvocateConfig() {
     tenantAlias,
     programId,
     widgetId,
+    programKey,
   };
 }
 
-export function isImpactAdvocateConfigured(): boolean {
-  return getImpactAdvocateConfig() !== null;
+export function isImpactAdvocateConfigured(scope?: ImpactAdvocateConfigScope): boolean {
+  return getImpactAdvocateConfig(scope) !== null;
 }
 
-export function getImpactAdvocateWidgetId(): string {
-  return getImpactAdvocateConfig()?.widgetId ?? IMPACT_ADVOCATE_DEFAULT_WIDGET_ID;
+export function getImpactAdvocateWidgetId(scope?: ImpactAdvocateConfigScope): string | null {
+  const programKey = resolveImpactAdvocateProgramKey(scope);
+  return getImpactAdvocateConfig({ programKey })?.widgetId ?? null;
 }
 
-export function getImpactAdvocateProgramId(): string {
-  return getImpactAdvocateConfig()?.programId ?? IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID;
+export function getImpactAdvocateProgramId(scope?: ImpactAdvocateConfigScope): string | null {
+  const programKey = resolveImpactAdvocateProgramKey(scope);
+  return getImpactAdvocateConfig({ programKey })?.programId ?? null;
 }
 
 /**
@@ -282,9 +376,7 @@ export function buildImpactAdvocateRegisterParticipantPayload(params: {
   return payload;
 }
 
-function getImpactAdvocateAuthorizationHeader(
-  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>
-): string {
+function getImpactAdvocateAuthorizationHeader(config: ImpactAdvocateConfig): string {
   return `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString('base64')}`;
 }
 
@@ -346,7 +438,7 @@ export function extractImpactAdvocateRewards(responseBody: string | null | undef
  * integration spec; we URL-encode them because the path segment contains '@'.
  */
 function getImpactAdvocateRegisterParticipantUrl(
-  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>,
+  config: ImpactAdvocateConfig,
   payload: ImpactAdvocateRegisterParticipantPayload
 ): string {
   const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
@@ -356,16 +448,14 @@ function getImpactAdvocateRegisterParticipantUrl(
   return `${base}/api/v1/${tenant}/open/account/${accountId}/user/${userId}`;
 }
 
-function getDebuggableImpactAdvocateRegisterParticipantUrl(
-  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>
-): string {
+function getDebuggableImpactAdvocateRegisterParticipantUrl(config: ImpactAdvocateConfig): string {
   const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
   const tenant = encodeURIComponent(config.tenantAlias);
   return `${base}/api/v1/${tenant}/open/account/[redacted-account-id]/user/[redacted-user-id]`;
 }
 
 function getImpactAdvocateRewardsUrl(
-  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>,
+  config: ImpactAdvocateConfig,
   payload: ImpactAdvocateRewardLookupPayload
 ): string {
   const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
@@ -378,7 +468,7 @@ function getImpactAdvocateRewardsUrl(
 }
 
 function getDebuggableImpactAdvocateRewardsUrl(
-  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>,
+  config: ImpactAdvocateConfig,
   payload: ImpactAdvocateRewardLookupPayload
 ): string {
   const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
@@ -390,19 +480,17 @@ function getDebuggableImpactAdvocateRewardsUrl(
   return url.toString();
 }
 
-function getImpactAdvocateRedeemRewardUrl(
-  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>,
-  rewardId: string
-): string {
+function getImpactAdvocateRedeemRewardUrl(config: ImpactAdvocateConfig, rewardId: string): string {
   const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
   const tenant = encodeURIComponent(config.tenantAlias);
   return `${base}/api/v1/${tenant}/credit/${encodeURIComponent(rewardId)}/redeem`;
 }
 
 export async function sendImpactAdvocateRegisterParticipantPayload(
-  payload: ImpactAdvocateRegisterParticipantPayload
+  payload: ImpactAdvocateRegisterParticipantPayload,
+  scope?: ImpactAdvocateConfigScope
 ): Promise<ImpactAdvocateDispatchResult> {
-  const config = getImpactAdvocateConfig();
+  const config = getImpactAdvocateConfig(scope);
   if (!config) {
     return {
       ok: false,
@@ -474,9 +562,10 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
 }
 
 export async function sendImpactAdvocateRewardLookupPayload(
-  payload: ImpactAdvocateRewardLookupPayload
+  payload: ImpactAdvocateRewardLookupPayload,
+  scope?: ImpactAdvocateConfigScope
 ): Promise<ImpactAdvocateRewardListResult> {
-  const config = getImpactAdvocateConfig();
+  const config = getImpactAdvocateConfig(scope);
   if (!config) {
     return {
       ok: false,
@@ -539,9 +628,10 @@ export async function sendImpactAdvocateRewardLookupPayload(
 }
 
 export async function sendImpactAdvocateRewardRedemptionPayload(
-  payload: ImpactAdvocateRewardRedemptionPayload
+  payload: ImpactAdvocateRewardRedemptionPayload,
+  scope?: ImpactAdvocateConfigScope
 ): Promise<ImpactAdvocateDispatchResult> {
-  const config = getImpactAdvocateConfig();
+  const config = getImpactAdvocateConfig(scope);
   if (!config) {
     return {
       ok: false,
@@ -610,9 +700,10 @@ export async function sendImpactAdvocateRewardRedemptionPayload(
 
 export function issueImpactAdvocateVerifiedAccessToken(
   user: Pick<User, 'id' | 'google_user_email'>,
-  now: Date = new Date()
+  now: Date = new Date(),
+  scope?: ImpactAdvocateConfigScope
 ): string | null {
-  const config = getImpactAdvocateConfig();
+  const config = getImpactAdvocateConfig(scope);
   if (!config) return null;
 
   const header: ImpactAdvocateJwtHeaderInput = {

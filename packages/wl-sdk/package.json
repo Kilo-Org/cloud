@@ -22,9 +22,10 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "tsx": "^4.21.0",
     "typescript": "catalog:",
-    "vitest": "~3.2.4"
+    "vitest": "catalog:"
   }
 }

@@ -246,16 +246,12 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
       } satisfies Partial<AppState>);
     }
 
-    if (!this.envKeySet) {
-      this.envKeySet = true;
-      await this.ctx.storage.put({ envKeySet: true } satisfies Partial<AppState>);
-      console.log(
-        '[AppDO] Persisted env encryption key for:',
-        this.flyAppName ?? `owner ${ownerKey}`
-      );
-    }
-
     if (!this.flyAppName) {
+      if (!this.envKeySet) {
+        this.envKeySet = true;
+        await this.ctx.storage.put({ envKeySet: true } satisfies Partial<AppState>);
+        console.log('[AppDO] Persisted env encryption key for:', `owner ${ownerKey}`);
+      }
       return { key: this.envKey, secretsVersion: 0 };
     }
 
@@ -269,6 +265,12 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
       ENV_KEY_SECRET_NAME,
       this.envKey
     );
+
+    if (!this.envKeySet) {
+      this.envKeySet = true;
+      await this.ctx.storage.put({ envKeySet: true } satisfies Partial<AppState>);
+      console.log('[AppDO] Persisted env encryption key for:', this.flyAppName);
+    }
 
     return { key: this.envKey, secretsVersion };
   }

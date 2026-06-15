@@ -8,6 +8,7 @@ import {
   EncryptedSecretEnvelopeSchema,
   EncryptedSecretsSchema,
   CallbackTargetSchema,
+  AttachmentsSchema,
   ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
@@ -17,6 +18,8 @@ import {
 } from '../persistence/schemas.js';
 import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
+import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
+import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 
 // Re-export schemas from types.ts and persistence/schemas.ts for convenience
 export { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema };
@@ -26,6 +29,7 @@ export {
   EncryptedSecretEnvelopeSchema,
   EncryptedSecretsSchema,
   CallbackTargetSchema,
+  AttachmentsSchema,
   ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
@@ -59,7 +63,30 @@ export function isBuiltinMode(slug: string): boolean {
   return BUILTIN_AGENT_MODES.has(slug);
 }
 
+export type Attachments = z.infer<typeof AttachmentsSchema>;
 export type Images = z.infer<typeof ImagesSchema>;
+
+const AttachmentFieldsSchema = {
+  attachments: AttachmentsSchema.optional().describe(
+    'Optional file attachments to download from R2 to the sandbox'
+  ),
+  images: ImagesSchema.optional().describe(
+    'Legacy optional image attachments to download from R2 to the sandbox'
+  ),
+};
+
+function rejectAmbiguousAttachments(
+  data: { attachments?: unknown; images?: unknown },
+  ctx: z.RefinementCtx
+): void {
+  if (data.attachments !== undefined && data.images !== undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['attachments'],
+      message: 'Provide attachments or legacy images, not both',
+    });
+  }
+}
 
 /**
  * Base prompt payload schema used by all execution endpoints.
@@ -212,9 +239,7 @@ const SendMessageV2Options = z.object({
     .describe(
       'Deprecated compatibility field. Accepted for older clients but ignored; provider credentials are managed by the server.'
     ),
-  images: ImagesSchema.optional().describe(
-    'Optional image attachments to download from R2 to the sandbox'
-  ),
+  ...AttachmentFieldsSchema,
   messageId: MessageIdSchema.nullish().describe('Optional message ID for correlating the request'),
 });
 
@@ -232,6 +257,18 @@ export const SendMessageV2Input = z
     SendMessageV2PromptPayloadInput,
     SendMessageV2CommandPayloadInput,
   ])
+  .superRefine((input, ctx) => {
+    rejectAmbiguousAttachments(input, ctx);
+    if ('payload' in input && input.payload.type === 'command') {
+      if (input.attachments !== undefined || input.images !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['attachments'],
+          message: 'Attachments cannot be attached to slash commands',
+        });
+      }
+    }
+  })
   .transform(input => {
     if ('payload' in input && input.payload.type === 'prompt') {
       const { payload, ...options } = input;
@@ -422,10 +459,7 @@ export const PrepareSessionInput = z
       .optional()
       .describe('Profile ID to resolve (repo binding + default still apply on top)'),
 
-    // Image attachments
-    images: ImagesSchema.optional().describe(
-      'Optional image attachments to download from R2 to the sandbox'
-    ),
+    ...AttachmentFieldsSchema,
     createdOnPlatform: z
       .string()
       .max(100)
@@ -478,6 +512,7 @@ export const PrepareSessionInput = z
     message: 'Must provide either githubRepo or gitUrl, but not both',
     path: ['githubRepo'],
   })
+  .superRefine(rejectAmbiguousAttachments)
   .refine(requiresAppendSystemPrompt, {
     message: 'appendSystemPrompt is required when mode is custom',
     path: ['appendSystemPrompt'],
@@ -579,11 +614,13 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  */
 export const StartSessionInput = z
   .object({
-    message: z.object({
-      prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
-      images: ImagesSchema.optional(),
-      id: MessageIdSchema.optional(),
-    }),
+    message: z
+      .object({
+        prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
+        ...AttachmentFieldsSchema,
+        id: MessageIdSchema.optional(),
+      })
+      .superRefine(rejectAmbiguousAttachments),
     agent: z.object({
       mode: ModeSlugSchema,
       model: modelIdSchema,
@@ -635,11 +672,13 @@ export const StartSessionOutput = z.object({
 export const SendMessageInput = z
   .object({
     cloudAgentSessionId: sessionIdSchema,
-    message: z.object({
-      prompt: z.string().min(1, 'Prompt is required'),
-      images: ImagesSchema.optional(),
-      id: MessageIdSchema.nullish(),
-    }),
+    message: z
+      .object({
+        prompt: z.string().min(1, 'Prompt is required'),
+        ...AttachmentFieldsSchema,
+        id: MessageIdSchema.nullish(),
+      })
+      .superRefine(rejectAmbiguousAttachments),
     agent: z
       .object({
         mode: ModeSlugSchema,
@@ -813,6 +852,89 @@ export const GetSessionOutput = z.object({
 });
 
 export type GetSessionResponse = z.infer<typeof GetSessionOutput>;
+
+export const GetMessageResultInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
+    messageId: MessageIdSchema.describe('Exact submitted message ID to inspect'),
+  })
+  .strict();
+
+export const GetMessageResultOutput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema,
+    messageId: MessageIdSchema,
+    status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+    createdAt: z.number(),
+    queuedAt: z.number().optional(),
+    acceptedAt: z.number().optional(),
+    terminalAt: z.number().optional(),
+    completionSource: SessionMessageCompletionSourceSchema.optional(),
+    failure: SafeFailureProjectionSchema.extend({ retryable: z.boolean() }).optional(),
+    gateResult: z.enum(['pass', 'fail']).optional(),
+    assistant: z
+      .object({
+        messageId: z.string(),
+        text: z.string().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((result, ctx) => {
+    const isTerminal =
+      result.status === 'completed' ||
+      result.status === 'failed' ||
+      result.status === 'interrupted';
+    if (result.status === 'queued' && result.acceptedAt !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Queued results cannot include acceptedAt',
+        path: ['acceptedAt'],
+      });
+    }
+    if (!isTerminal && result.terminalAt !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Active results cannot include terminalAt',
+        path: ['terminalAt'],
+      });
+    }
+    if (!isTerminal && result.completionSource !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Active results cannot include completionSource',
+        path: ['completionSource'],
+      });
+    }
+    if (
+      result.status !== 'failed' &&
+      result.status !== 'interrupted' &&
+      result.failure !== undefined
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Only failed or interrupted results can include failure details',
+        path: ['failure'],
+      });
+    }
+    if (result.status !== 'completed' && result.gateResult !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Only completed results can include gateResult',
+        path: ['gateResult'],
+      });
+    }
+    if (result.status !== 'completed' && result.assistant !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Only completed results can include an assistant response',
+        path: ['assistant'],
+      });
+    }
+  });
+
+export type GetMessageResultResponse = z.infer<typeof GetMessageResultOutput>;
 
 export const GetLatestAssistantMessageInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),

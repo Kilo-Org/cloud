@@ -44,7 +44,7 @@ describe('selectImageVersionForInstance', () => {
     const result = await selectImageVersionForInstance({
       kv,
       variant: 'default',
-      instanceId: 'instance-1',
+      rolloutSubject: 'instance-1',
     });
     expect(result).toBeNull();
   });
@@ -56,7 +56,7 @@ describe('selectImageVersionForInstance', () => {
     const result = await selectImageVersionForInstance({
       kv,
       variant: 'default',
-      instanceId: 'instance-1',
+      rolloutSubject: 'instance-1',
       currentImageTag: 'img-old',
     });
     expect(result?.imageTag).toBe('img-stable');
@@ -69,7 +69,7 @@ describe('selectImageVersionForInstance', () => {
     const result = await selectImageVersionForInstance({
       kv,
       variant: 'default',
-      instanceId: 'instance-1',
+      rolloutSubject: 'instance-1',
       currentImageTag: 'img-stable',
     });
     expect(result).toBeNull();
@@ -86,7 +86,7 @@ describe('selectImageVersionForInstance', () => {
       const result = await selectImageVersionForInstance({
         kv,
         variant: 'default',
-        instanceId: `synthetic-${i}`,
+        rolloutSubject: `synthetic-${i}`,
         currentImageTag: 'img-old',
       });
       if (result?.imageTag === 'img-candidate') inCohort++;
@@ -108,7 +108,7 @@ describe('selectImageVersionForInstance', () => {
       const result = await selectImageVersionForInstance({
         kv,
         variant: 'default',
-        instanceId: `synthetic-${i}`,
+        rolloutSubject: `synthetic-${i}`,
         currentImageTag: 'img-old',
         autoEnroll: true,
       });
@@ -124,7 +124,7 @@ describe('selectImageVersionForInstance', () => {
     const result = await selectImageVersionForInstance({
       kv,
       variant: 'default',
-      instanceId: 'instance-1',
+      rolloutSubject: 'instance-1',
       currentImageTag: 'img-candidate',
     });
     // Critical: must NOT fall through to :latest — that would downgrade an
@@ -142,7 +142,7 @@ describe('selectImageVersionForInstance', () => {
     const result = await selectImageVersionForInstance({
       kv,
       variant: 'default',
-      instanceId: 'instance-1',
+      rolloutSubject: 'instance-1',
       currentImageTag: 'img-old',
     });
     expect(result?.imageTag).toBe('img-stable');
@@ -157,7 +157,7 @@ describe('selectImageVersionForInstance', () => {
       const result = await selectImageVersionForInstance({
         kv,
         variant: 'default',
-        instanceId: `synthetic-${i}`,
+        rolloutSubject: `synthetic-${i}`,
         currentImageTag: 'img-old',
       });
       // Always falls through to :latest, never picks the 0% candidate.
@@ -174,7 +174,7 @@ describe('selectImageVersionForInstance', () => {
       const result = await selectImageVersionForInstance({
         kv,
         variant: 'default',
-        instanceId: `synthetic-${i}`,
+        rolloutSubject: `synthetic-${i}`,
         currentImageTag: 'img-old',
       });
       expect(result?.imageTag).toBe('img-candidate');
@@ -189,13 +189,13 @@ describe('selectImageVersionForInstance', () => {
     const first = await selectImageVersionForInstance({
       kv,
       variant: 'default',
-      instanceId: 'instance-stable',
+      rolloutSubject: 'instance-stable',
       currentImageTag: 'img-old',
     });
     const second = await selectImageVersionForInstance({
       kv,
       variant: 'default',
-      instanceId: 'instance-stable',
+      rolloutSubject: 'instance-stable',
       currentImageTag: 'img-old',
     });
     expect(first?.imageTag).toBe(second?.imageTag);

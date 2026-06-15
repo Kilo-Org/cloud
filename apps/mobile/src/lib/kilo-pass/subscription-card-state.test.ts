@@ -24,6 +24,46 @@ describe('getKiloPassSubscriptionCardState', () => {
     });
   });
 
+  it('keeps Stripe-managed Kilo Pass inert on iOS', () => {
+    expect(
+      getKiloPassSubscriptionCardState(
+        {
+          cancelAtPeriodEnd: false,
+          currentPeriodBaseCreditsUsd: 49,
+          paymentProvider: 'stripe',
+          refillAt: '2026-06-08T15:21:05.000Z',
+          status: 'active',
+        },
+        { platformOS: 'ios' }
+      )
+    ).toEqual({
+      action: 'none',
+      actionLabel: null,
+      description: '$49 monthly credits · This Kilo Pass is managed on web',
+      title: 'Kilo Pass active',
+    });
+  });
+
+  it('keeps canceling Stripe-managed Kilo Pass inert on iOS', () => {
+    expect(
+      getKiloPassSubscriptionCardState(
+        {
+          cancelAtPeriodEnd: true,
+          currentPeriodBaseCreditsUsd: 49,
+          paymentProvider: 'stripe',
+          refillAt: '2026-06-08T15:21:05.000Z',
+          status: 'active',
+        },
+        { platformOS: 'ios' }
+      )
+    ).toEqual({
+      action: 'none',
+      actionLabel: null,
+      description: '$49 monthly credits · Ends June 8, 2026 · This Kilo Pass is managed on web',
+      title: 'Kilo Pass canceling',
+    });
+  });
+
   it('keeps unsubscribed users on the App Store purchase path', () => {
     expect(getKiloPassSubscriptionCardState(null)).toEqual({
       action: 'open-store-sheet',

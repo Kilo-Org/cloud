@@ -4,6 +4,7 @@ import type {
   AdmitAcceptedSessionMessageRequest,
   MessageDeliveryRequest,
   MessageDeliveryResult,
+  RetryableResultCode,
   SessionMessageAdmissionResult,
   SessionMessageIntent,
   SubmittedSessionMessageRequest,
@@ -11,9 +12,10 @@ import type {
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { isExecutionError } from '../execution/errors.js';
 import { logger } from '../logger.js';
-import { normalizeKilocodeModel } from '../persistence/model-utils.js';
+import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { isSandboxWorkspaceProbeTimeoutError } from '../sandbox-recovery.js';
+import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
 import {
   MESSAGE_ID_FORMAT_DESCRIPTION,
   createMessageId,
@@ -32,18 +34,22 @@ import {
   type PendingFlushFailureResult,
   type PendingFlushPolicy,
   type PendingSessionExecutionDefaults,
+  type PendingFlushFailureCode,
   type PendingSessionMessage,
   type SessionQueueStorage,
 } from './pending-messages.js';
 import {
   createQueuedSessionMessageState,
   getSessionMessageState,
-  listNeverAcceptedTerminalQueuedMessages,
+  listReconnectVisibleTerminalQueuedMessages,
   putSessionMessageState,
+  type SessionMessageFailureCode,
   type SessionMessageStorage,
   type TerminalizeParams,
+  type SessionMessageState,
 } from './session-message-state.js';
 import type { QueuedMessageSnapshot } from '../websocket/stream.js';
+import { buildCloudMessageFailedPayload } from './message-settlement-outbox.js';
 
 export const PENDING_FLUSH_DEBOUNCE_MS = 1_000;
 
@@ -76,7 +82,16 @@ export type PendingFlushDelivered = {
   remainingCount: number;
 };
 
-export type PendingFlushResult = PendingFlushFailure | PendingFlushSkipped | PendingFlushDelivered;
+export type PendingFlushHeld = {
+  type: 'held';
+  remainingCount: number;
+};
+
+export type PendingFlushResult =
+  | PendingFlushFailure
+  | PendingFlushSkipped
+  | PendingFlushDelivered
+  | PendingFlushHeld;
 
 type PersistedQueuedMessageEvent = {
   sessionId: string;
@@ -95,6 +110,7 @@ export type PendingMessageDrainResult = {
 };
 
 export type SessionMessageQueue = {
+  hasMessageAdmission(messageId: string): Promise<boolean>;
   admitSubmittedMessage(
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult>;
@@ -119,8 +135,11 @@ export type SessionMessageQueueDependencies = {
   requireSessionId: () => Promise<string>;
   validateModeAgainstRuntimeAgents: (metadata: SessionMetadata, mode: string) => string | null;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
+  getDeliveryBlock: () => Promise<{ retryAt: number } | null>;
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
+  isDeliveryHeld?: () => Promise<boolean>;
   ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
+  reportQueuedState?: (state: SessionMessageState) => void;
   ensureAcceptedMessageEffects: (messageId: string) => Promise<void>;
   persistTerminalTransition: (
     messageId: string,
@@ -154,6 +173,55 @@ function toFailureResult(
   };
 }
 
+function isSandboxConnectionRetry(message: PendingSessionMessage): boolean {
+  return (
+    message.lastFlushFailureCode === 'SANDBOX_CONNECT_FAILED' && (message.flushAttempts ?? 0) >= 1
+  );
+}
+
+function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
+  failureStage: 'pre_dispatch';
+  failureCode: SessionMessageFailureCode;
+} {
+  switch (code) {
+    case 'SANDBOX_CONNECT_FAILED':
+      return { failureStage: 'pre_dispatch', failureCode: 'sandbox_connect_failed' };
+    case 'WORKSPACE_SETUP_FAILED':
+      return { failureStage: 'pre_dispatch', failureCode: 'workspace_setup_failed' };
+    case 'KILO_SERVER_FAILED':
+      return { failureStage: 'pre_dispatch', failureCode: 'kilo_server_failed' };
+    case 'WRAPPER_START_FAILED':
+      return { failureStage: 'pre_dispatch', failureCode: 'wrapper_start_failed' };
+    case 'NOT_FOUND':
+      return { failureStage: 'pre_dispatch', failureCode: 'session_metadata_missing' };
+    case 'BAD_REQUEST':
+    case 'PENDING_QUEUE_FULL':
+      return { failureStage: 'pre_dispatch', failureCode: 'invalid_delivery_request' };
+    case 'MODEL_MISSING':
+      return { failureStage: 'pre_dispatch', failureCode: 'model_missing' };
+    case 'WRAPPER_FINALIZING':
+    case 'INTERNAL':
+    case 'UNKNOWN':
+    case undefined:
+      return { failureStage: 'pre_dispatch', failureCode: 'delivery_failure_unknown' };
+  }
+}
+
+function knownPreDispatchExecutionFailureCode(error: unknown): RetryableResultCode | undefined {
+  if (!isExecutionError(error)) return undefined;
+  switch (error.code) {
+    case 'SANDBOX_CONNECT_FAILED':
+    case 'WORKSPACE_SETUP_FAILED':
+    case 'KILO_SERVER_FAILED':
+      return error.code;
+    case 'WRAPPER_START_FAILED':
+      // Orchestration also uses this code when prompt dispatch fails after wrapper readiness.
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
 function getPendingFlushPolicy(
   totalCount: number,
   context: ExecutionDeliveryContext | null
@@ -180,7 +248,7 @@ function buildMessageDeliveryRequest(
     throw new MessageDeliveryRequestValidationError(modeCheck);
   }
 
-  const model = normalizeKilocodeModel(intent.agent.model);
+  const model = dispatchedKilocodeModelId(intent.agent.model);
   if (!model) {
     throw new Error('Session is missing a valid model');
   }
@@ -195,7 +263,7 @@ function buildMessageDeliveryRequest(
     agent: {
       ...intent.agent,
       mode: modeInput,
-      model: model.replace(/^kilo\//, ''),
+      model,
     },
     finalization: intent.finalization,
     workspace: {
@@ -221,9 +289,12 @@ export async function flushNextPendingSessionMessage(params: {
   storage: SessionMessageQueueStorage;
   now: number;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
+  getDeliveryBlock?: SessionMessageQueueDependencies['getDeliveryBlock'];
   validateModeAgainstRuntimeAgents: SessionMessageQueueDependencies['validateModeAgainstRuntimeAgents'];
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
+  isDeliveryHeld?: () => Promise<boolean>;
   repairQueuedMessageEffects?: (intent: SessionMessageIntent) => Promise<void>;
+  prepareQueuedMessageDelivery?: (intent: SessionMessageIntent) => Promise<void>;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
 }): Promise<PendingFlushResult> {
   const context = await params.getDeliveryContext();
@@ -244,6 +315,9 @@ export async function flushNextPendingSessionMessage(params: {
 
   if (!message) {
     return { type: 'skipped', remainingCount: 0 };
+  }
+  if (await params.isDeliveryHeld?.()) {
+    return { type: 'held', remainingCount: totalCount };
   }
 
   const existingState = await getSessionMessageState(params.storage, message.messageId);
@@ -305,7 +379,7 @@ export async function flushNextPendingSessionMessage(params: {
       message,
       'Session is missing a valid model',
       params.now,
-      { policy, code: 'BAD_REQUEST' }
+      { policy, code: 'MODEL_MISSING' }
     );
     return toFailureResult(failure, totalCount);
   }
@@ -321,7 +395,29 @@ export async function flushNextPendingSessionMessage(params: {
       createQueuedSessionMessageState(intent, callbackSnapshot, message.createdAt)
     );
   }
+
   await params.repairQueuedMessageEffects?.(intent);
+
+  const deliveryBlock = await params.getDeliveryBlock?.();
+  if (deliveryBlock) {
+    if (isSandboxConnectionRetry(message)) {
+      const failure = await recordPendingFlushFailure(
+        params.storage,
+        message,
+        message.lastFlushError ?? 'Sandbox connection failed',
+        params.now,
+        { policy, code: 'SANDBOX_CONNECT_FAILED' }
+      );
+      return toFailureResult(failure, totalCount);
+    }
+    return {
+      type: 'skipped',
+      nextFlushAttemptAt: deliveryBlock.retryAt,
+      remainingCount: totalCount,
+    };
+  }
+
+  await params.prepareQueuedMessageDelivery?.(intent);
 
   try {
     const plan = buildMessageDeliveryRequest(
@@ -330,12 +426,15 @@ export async function flushNextPendingSessionMessage(params: {
       params.validateModeAgainstRuntimeAgents
     );
     const startResult = await params.deliver(plan);
+    if (!startResult.success && startResult.code === 'WRAPPER_FINALIZING') {
+      return { type: 'held', remainingCount: totalCount };
+    }
     if (!startResult.success) {
       const failure = await recordPendingFlushFailure(
         params.storage,
         message,
         startResult.error,
-        params.now,
+        Date.now(),
         { policy, code: startResult.code }
       );
       throw new PendingFlushRecordedError(failure);
@@ -346,18 +445,41 @@ export async function flushNextPendingSessionMessage(params: {
     if (error instanceof PendingFlushRecordedError) {
       return toFailureResult(error.failure, totalCount);
     }
+    if (error instanceof WrapperCleanupBlockedError) {
+      if (isSandboxConnectionRetry(message)) {
+        const failure = await recordPendingFlushFailure(
+          params.storage,
+          message,
+          message.lastFlushError ?? 'Sandbox connection failed',
+          Date.now(),
+          { policy, code: 'SANDBOX_CONNECT_FAILED' }
+        );
+        return toFailureResult(failure, totalCount);
+      }
+      return {
+        type: 'skipped',
+        nextFlushAttemptAt: error.retryAt,
+        remainingCount: totalCount,
+      };
+    }
     const code =
       error instanceof MessageDeliveryRequestValidationError
         ? error.code
         : isSandboxWorkspaceProbeTimeoutError(error)
           ? 'INTERNAL'
-          : undefined;
+          : knownPreDispatchExecutionFailureCode(error);
     const failure = await recordPendingFlushFailure(
       params.storage,
       message,
       error instanceof Error ? error.message : String(error),
-      params.now,
-      code === undefined ? { policy } : { policy, code }
+      Date.now(),
+      {
+        policy,
+        code: code ?? 'UNKNOWN',
+        subtype: isExecutionError(error) ? error.workspaceFailureSubtype : undefined,
+        safeFailureMessage: isExecutionError(error) ? error.safeFailureMessage : undefined,
+        retryable: isExecutionError(error) ? error.retryable : undefined,
+      }
     );
     return toFailureResult(failure, totalCount);
   }
@@ -404,8 +526,11 @@ export function createSessionMessageQueue(
     requireSessionId,
     validateModeAgainstRuntimeAgents,
     getDeliveryContext,
+    getDeliveryBlock,
     deliver,
+    isDeliveryHeld,
     ensureQueuedMessageEvent,
+    reportQueuedState,
     ensureAcceptedMessageEffects,
     persistTerminalTransition,
     repairTerminalMessageEffects,
@@ -452,7 +577,7 @@ export function createSessionMessageQueue(
     return true;
   }
 
-  async function completeQueuedAdmissionEffects(intent: SessionMessageIntent): Promise<void> {
+  async function repairQueuedAdmissionEffects(intent: SessionMessageIntent): Promise<void> {
     const sessionId = await requireSessionId();
     ensureQueuedMessageEvent({
       entityId: `queued-message/${intent.turn.messageId}`,
@@ -465,10 +590,26 @@ export function createSessionMessageQueue(
       }),
       timestamp: Date.now(),
     });
+    const queuedState = await getSessionMessageState(storage, intent.turn.messageId);
+    if (queuedState?.status === 'queued') reportQueuedState?.(queuedState);
+  }
+
+  async function prepareQueuedMessageDelivery(intent: SessionMessageIntent): Promise<void> {
     await requestPendingDrain();
     logger
-      .withFields({ sessionId, messageId: intent.turn.messageId })
+      .withFields({ sessionId: getSessionIdForLogs(), messageId: intent.turn.messageId })
       .info('Queued message event persisted and pending flush scheduled');
+  }
+
+  async function completeQueuedAdmissionEffects(intent: SessionMessageIntent): Promise<void> {
+    await repairQueuedAdmissionEffects(intent);
+    await prepareQueuedMessageDelivery(intent);
+  }
+
+  async function hasMessageAdmission(messageId: string): Promise<boolean> {
+    const pendingMessage = await getQueuedMessageByMessageId(storage, messageId);
+    if (pendingMessage) return true;
+    return (await getSessionMessageState(storage, messageId)) !== undefined;
   }
 
   async function getExistingAdmissionAckForMessageId(
@@ -590,10 +731,12 @@ export function createSessionMessageQueue(
       (metadata?.callback?.target
         ? { required: true, target: metadata.callback.target }
         : undefined);
-    await putSessionMessageState(
-      storage,
-      createQueuedSessionMessageState(intent, callbackSnapshot, message.createdAt)
+    const repairedState = createQueuedSessionMessageState(
+      intent,
+      callbackSnapshot,
+      message.createdAt
     );
+    await putSessionMessageState(storage, repairedState);
   }
 
   async function admitIntent(intent: SessionMessageIntent): Promise<SessionMessageAdmissionResult> {
@@ -634,7 +777,7 @@ export function createSessionMessageQueue(
     if (modeCheck) {
       return buildAdmissionError('BAD_REQUEST', modeCheck);
     }
-    const model = normalizeKilocodeModel(request.agent.model);
+    const model = dispatchedKilocodeModelId(request.agent.model);
     if (!model) {
       return buildAdmissionError(
         'BAD_REQUEST',
@@ -646,7 +789,7 @@ export function createSessionMessageQueue(
       turn: request.turn,
       agent: {
         ...request.agent,
-        model: model.replace(/^kilo\//, ''),
+        model,
       },
       finalization: request.finalization,
     });
@@ -680,8 +823,11 @@ export function createSessionMessageQueue(
       if (explicitTurn.type === 'prompt' && !explicitTurn.prompt) {
         return buildAdmissionError('BAD_REQUEST', 'No prompt provided');
       }
-      if (explicitTurn.type === 'command' && explicitTurn.images !== undefined) {
-        return buildAdmissionError('BAD_REQUEST', 'Images cannot be attached to slash commands');
+      if (explicitTurn.type === 'command' && explicitTurn.attachments !== undefined) {
+        return buildAdmissionError(
+          'BAD_REQUEST',
+          'Attachments cannot be attached to slash commands'
+        );
       }
 
       const requestedAgent = request.agent;
@@ -691,7 +837,7 @@ export function createSessionMessageQueue(
       if (modeCheck) {
         return buildAdmissionError('BAD_REQUEST', modeCheck);
       }
-      const model = normalizeKilocodeModel(requestedAgent?.model ?? metadata.agent?.model);
+      const model = dispatchedKilocodeModelId(requestedAgent?.model ?? metadata.agent?.model);
       const variant = requestedAgent?.variant ?? metadata.agent?.variant;
       if (!model) {
         return buildAdmissionError(
@@ -707,7 +853,7 @@ export function createSessionMessageQueue(
                 type: 'prompt',
                 messageId,
                 prompt: explicitTurn.prompt,
-                images: explicitTurn.images,
+                attachments: explicitTurn.attachments,
               }
             : {
                 type: 'command',
@@ -717,7 +863,7 @@ export function createSessionMessageQueue(
               },
         agent: {
           mode: modeInput,
-          model: model.replace(/^kilo\//, ''),
+          model,
           variant,
         },
         finalization: {
@@ -757,9 +903,12 @@ export function createSessionMessageQueue(
       storage,
       now,
       getDeliveryContext,
+      getDeliveryBlock,
       validateModeAgainstRuntimeAgents,
       deliver,
-      repairQueuedMessageEffects: completeQueuedAdmissionEffects,
+      isDeliveryHeld,
+      repairQueuedMessageEffects: repairQueuedAdmissionEffects,
+      prepareQueuedMessageDelivery,
       ensureAcceptedMessageEffects,
     });
 
@@ -775,6 +924,10 @@ export function createSessionMessageQueue(
         retryAt: undefined,
         remainingPendingCount: flushResult.remainingCount,
       };
+    }
+
+    if (flushResult.type === 'held') {
+      return { remainingPendingCount: flushResult.remainingCount };
     }
 
     if (flushResult.type === 'delivered') {
@@ -799,6 +952,7 @@ export function createSessionMessageQueue(
       })
       .warn('Failed to flush pending session message');
     if (flushResult.exhausted) {
+      const failure = classifyDeliveryFailure(flushResult.message.lastFlushFailureCode);
       await persistTerminalTransition(
         flushResult.message.messageId,
         {
@@ -806,6 +960,9 @@ export function createSessionMessageQueue(
           reason: 'exhausted',
           error: flushResult.message.lastFlushError ?? 'Pending message delivery failed',
           completionSource: 'delivery_failure',
+          ...failure,
+          failureSubtype: flushResult.message.lastFlushFailureSubtype,
+          safeFailureMessage: flushResult.message.safeFailureMessage,
           attempts: flushResult.attempts,
         },
         { allowIdleBatchWithoutObservedIdle: true }
@@ -848,7 +1005,7 @@ export function createSessionMessageQueue(
   async function snapshotForStreamConnect(): Promise<QueuedMessageSnapshot[]> {
     const pending = await listPendingSessionMessages(storage);
     const pendingMessageIds = new Set(pending.map(message => message.messageId));
-    const terminalQueued = await listNeverAcceptedTerminalQueuedMessages(storage);
+    const terminalQueued = await listReconnectVisibleTerminalQueuedMessages(storage);
 
     return [
       ...pending.map(message => ({
@@ -863,11 +1020,7 @@ export function createSessionMessageQueue(
           content: state.prompt,
           timestamp: state.queuedAt ?? state.createdAt,
           terminalFailure: {
-            status: state.status,
-            completionSource: state.completionSource,
-            reason: state.failureReason,
-            error: state.error,
-            attempts: state.attempts,
+            ...buildCloudMessageFailedPayload(state),
             timestamp: state.terminalAt ?? state.createdAt,
           },
         })),
@@ -899,6 +1052,8 @@ export function createSessionMessageQueue(
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         { allowIdleBatchWithoutObservedIdle: true }
       );
@@ -953,6 +1108,7 @@ export function createSessionMessageQueue(
   }
 
   return {
+    hasMessageAdmission,
     admitSubmittedMessage,
     admitAcceptedMessage,
     drainNextPendingMessage,

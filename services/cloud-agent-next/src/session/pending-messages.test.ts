@@ -121,15 +121,15 @@ describe('createPendingSessionMessageFromIntent', () => {
     expect(stored).not.toHaveProperty('callbackUrl');
   });
 
-  it('creates a message from a session message intent', () => {
+  it('creates a canonical document message from a session message intent', () => {
     const intent: SessionMessageIntent = {
       turn: {
         type: 'prompt',
         messageId: 'msg_018f1e2d3c4bIntentAbCdEfGh',
         prompt: 'write tests',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
         },
       },
       agent: { mode: 'plan', model: 'claude', variant: 'thinking' },
@@ -145,6 +145,32 @@ describe('createPendingSessionMessageFromIntent', () => {
       createdAt: 42,
       intent,
     });
+  });
+
+  it('does not decode stored V2 intents containing legacy images', async () => {
+    const storage = createMemoryStorage([
+      [
+        `pending_message:0000000000000001:${BASE_MSG_ID}`,
+        {
+          version: 2,
+          intent: {
+            turn: {
+              type: 'prompt',
+              messageId: BASE_MSG_ID,
+              prompt: 'old image record',
+              images: {
+                path: '123e4567-e89b-12d3-a456-426614174000',
+                files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+              },
+            },
+            agent: { mode: 'code', model: 'claude' },
+          },
+          delivery: { queuedAt: 1 },
+        },
+      ],
+    ]);
+
+    expect(await listPendingSessionMessages(storage)).toEqual([]);
   });
 });
 
@@ -180,10 +206,6 @@ describe('resolvePendingSessionMessageExecutionOptions', () => {
 describe('resolvePendingSessionMessageIntent', () => {
   it('restores an accepted turn plus resolved delivery semantics from flat pending storage', () => {
     const message = makeMessage({
-      images: {
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-      },
       executionOptions: {
         mode: 'plan',
         model: 'queued-model',
@@ -205,10 +227,6 @@ describe('resolvePendingSessionMessageIntent', () => {
         type: 'prompt',
         messageId: BASE_MSG_ID,
         prompt: 'hello',
-        images: {
-          path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-        },
       },
       agent: { mode: 'plan', model: 'queued-model', variant: 'thinking' },
       finalization: { autoCommit: true, condenseOnComplete: false },
@@ -353,26 +371,44 @@ describe('recordPendingFlushFailure', () => {
     expect(delays).toEqual([2_000, undefined]);
   });
 
-  it('schedules only one cold-init retry', async () => {
+  it('retries a sandbox connection failure once after exactly five seconds', async () => {
     const storage = createMemoryStorage();
-    let message = makeMessage();
+    let message = makeMessage({ createdAt: 100_000 });
     await storePendingSessionMessage(storage, message);
 
-    const delays: (number | undefined)[] = [];
-    const now = 100_000;
+    const firstFailure = await recordPendingFlushFailure(storage, message, 'error', 100_000, {
+      policy: 'cold-init',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
+    message = firstFailure.message;
+    const secondFailure = await recordPendingFlushFailure(storage, message, 'error', 105_000, {
+      policy: 'cold-init',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
 
-    for (let i = 0; i < 2; i++) {
-      const result = await recordPendingFlushFailure(storage, message, 'error', now, {
-        policy: 'cold-init',
-        code: 'SANDBOX_CONNECT_FAILED',
-      });
-      delays.push(
-        result.nextFlushAttemptAt !== undefined ? result.nextFlushAttemptAt - now : undefined
-      );
-      message = result.message;
-    }
+    expect(firstFailure.nextFlushAttemptAt).toBe(105_000);
+    expect(firstFailure.exhausted).toBe(false);
+    expect(secondFailure.attempts).toBe(2);
+    expect(secondFailure.nextFlushAttemptAt).toBeUndefined();
+    expect(secondFailure.exhausted).toBe(true);
+  });
 
-    expect(delays).toEqual([2_000, undefined]);
+  it('starts sandbox retry attempts independently from earlier failure categories', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage({
+      createdAt: 1,
+      flushAttempts: 2,
+      lastFlushFailureCode: 'WORKSPACE_SETUP_FAILED',
+    });
+    await storePendingSessionMessage(storage, message);
+
+    const result = await recordPendingFlushFailure(storage, message, 'error', 100_000, {
+      policy: 'cold-init',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
+
+    expect(result.attempts).toBe(1);
+    expect(result.exhausted).toBe(false);
   });
 
   it('exhausts immediately for non-retryable codes', async () => {
@@ -405,6 +441,7 @@ describe('recordPendingFlushFailure', () => {
       messageId: message.messageId,
       flushAttempts: 1,
       lastFlushError: 'bad',
+      lastFlushFailureCode: 'BAD_REQUEST',
       nextFlushAttemptAt: undefined,
       deliveryDisposition: 'terminalization-pending',
     });
@@ -427,6 +464,79 @@ describe('recordPendingFlushFailure', () => {
       code: 'BAD_REQUEST',
     });
     expect(exhausted.message.deliveryDisposition).toBe('terminalization-pending');
+    expect(exhausted.message.lastFlushFailureCode).toBe('BAD_REQUEST');
+  });
+
+  it.each([
+    { label: 'missing', code: undefined },
+    { label: 'UNKNOWN', code: 'UNKNOWN' as const },
+    { label: 'INTERNAL', code: 'INTERNAL' as const },
+  ])(
+    'preserves a structured retryable delivery cause through $label-code exhaustion',
+    async ({ code }) => {
+      const storage = createMemoryStorage();
+      let message = makeMessage();
+      await storePendingSessionMessage(storage, message);
+
+      const retry = await recordPendingFlushFailure(
+        storage,
+        message,
+        'workspace temporarily failed',
+        100_000,
+        {
+          policy: 'warm-followup',
+          code: 'WORKSPACE_SETUP_FAILED',
+          subtype: 'git_clone_timeout',
+          safeFailureMessage: 'Repository clone timed out',
+        }
+      );
+      message = retry.message;
+      const exhausted = await recordPendingFlushFailure(
+        storage,
+        message,
+        'retry transport failed without a specific cause',
+        102_000,
+        { policy: 'warm-followup', code }
+      );
+
+      expect(exhausted.exhausted).toBe(true);
+      expect(exhausted.message).toMatchObject({
+        lastFlushFailureCode: 'WORKSPACE_SETUP_FAILED',
+        lastFlushError: 'workspace temporarily failed',
+        lastFlushFailureSubtype: 'git_clone_timeout',
+        safeFailureMessage: 'Repository clone timed out',
+      });
+    }
+  );
+
+  it('replaces the failure code and error together for a newer specific cause', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage({
+      flushAttempts: 1,
+      lastFlushFailureCode: 'WORKSPACE_SETUP_FAILED',
+      lastFlushError: 'workspace temporarily failed',
+      lastFlushFailureSubtype: 'git_clone_timeout',
+      safeFailureMessage: 'Repository clone timed out',
+    });
+    await storePendingSessionMessage(storage, message);
+
+    const result = await recordPendingFlushFailure(
+      storage,
+      message,
+      'wrapper failed to start',
+      102_000,
+      {
+        policy: 'warm-followup',
+        code: 'WRAPPER_START_FAILED',
+      }
+    );
+
+    expect(result.message).toMatchObject({
+      lastFlushFailureCode: 'WRAPPER_START_FAILED',
+      lastFlushError: 'wrapper failed to start',
+    });
+    expect(result.message.lastFlushFailureSubtype).toBeUndefined();
+    expect(result.message.safeFailureMessage).toBeUndefined();
   });
 
   it('keeps the message in storage when not exhausted', async () => {
@@ -445,13 +555,16 @@ describe('recordPendingFlushFailure', () => {
     expect(listed[0].lastFlushError).toBe('transient');
   });
 
-  it('retains images when re-storing a retryable pending message', async () => {
+  it('retains canonical attachments when re-storing a retryable current pending message', async () => {
     const storage = createMemoryStorage();
-    const images = {
+    const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      files: ['123e4567-e89b-12d3-a456-426614174001.md'],
     };
-    const message = makeMessage({ images });
+    const message = createPendingSessionMessageFromIntent({
+      turn: { type: 'prompt', messageId: BASE_MSG_ID, prompt: 'read markdown', attachments },
+      agent: { mode: 'code', model: 'test-model' },
+    });
     await storePendingSessionMessage(storage, message);
 
     await recordPendingFlushFailure(storage, message, 'transient', 100_000, {
@@ -460,8 +573,9 @@ describe('recordPendingFlushFailure', () => {
     });
 
     const listed = await listPendingSessionMessages(storage);
-    expect(listed).toHaveLength(1);
-    expect(listed[0]?.legacy?.images).toEqual(images);
+    expect(listed[0]?.intent?.turn).toMatchObject({ attachments });
+    const [stored] = storage.store.values();
+    expect(stored).not.toHaveProperty('images');
   });
 
   it('preserves the original pending intent when retry replacement write fails', async () => {

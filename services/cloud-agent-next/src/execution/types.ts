@@ -8,7 +8,7 @@
 
 import type { ExecutionId, SessionId, UserId } from '../types/ids.js';
 import type { AgentMode } from '../schema.js';
-import type { Images } from '../router/schemas.js';
+import type { Attachments } from '../router/schemas.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
 
@@ -34,10 +34,10 @@ export type SessionScope = {
   botId?: string;
 };
 
-/** Prompt text and optional images before message identity concerns are added. */
+/** Prompt text and optional canonical attachments before message identity is added. */
 export type PromptContent = {
   prompt: string;
-  images?: Images;
+  attachments?: Attachments;
 };
 
 /** Prompt input submitted before queue admission settles the message identity. */
@@ -54,7 +54,7 @@ export type CommandExecutionTurnSubmission = {
   id?: string | null;
   command: string;
   arguments: string;
-  images?: Images;
+  attachments?: Attachments;
 };
 
 export type ExecutionTurnSubmission =
@@ -138,7 +138,7 @@ export type SessionConfig = {
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   appendSystemPrompt?: string;
-  images?: Images;
+  attachments?: Attachments;
 };
 
 /** A single user message to deliver to the agent. */
@@ -225,12 +225,14 @@ export type RetryableResultCode =
   | 'SANDBOX_CONNECT_FAILED'
   | 'WORKSPACE_SETUP_FAILED'
   | 'KILO_SERVER_FAILED'
-  | 'WRAPPER_START_FAILED';
+  | 'WRAPPER_START_FAILED'
+  | 'WRAPPER_FINALIZING';
 
 export type AdmissionFailure = {
   success: false;
   code: 'NOT_FOUND' | 'BAD_REQUEST' | 'INTERNAL' | 'PENDING_QUEUE_FULL' | RetryableResultCode;
   error: string;
+  failureBoundary?: 'registration' | 'admission';
 };
 
 /** Durable acknowledgement that a message intent is stored for asynchronous delivery. */

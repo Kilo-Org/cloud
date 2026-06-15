@@ -16,6 +16,7 @@ import {
   type BillingWorkerEnv,
 } from './types.js';
 import {
+  processCommitRetirementGuardPage,
   processCreditRenewalDiscovery,
   processCreditRenewalItem,
   processOrganizationTrialExpiryPage,
@@ -84,6 +85,28 @@ const CreditRenewalDiscoveryContinuationQueueMessageSchema = z.object({
   cutoffTime: z.string().datetime(),
   cursorSubscriptionId: z.string().uuid(),
   cursorRenewalBoundary: z.string().datetime(),
+  pageBudget: z.number().int().min(1).max(1000).optional(),
+  wallClockBudgetMs: z.number().int().min(1).max(110_000).optional(),
+});
+
+const CommitRetirementGuardPageQueueMessageSchema = z.object({
+  kind: z.literal('commit_retirement_guard_page'),
+  runId: z.string().uuid(),
+  sweep: z.literal('commit_retirement_guard'),
+  cutoffTime: z.string().datetime().optional(),
+  cursorSubscriptionId: z.string().uuid().optional(),
+  cursorFinalBoundary: z.string().datetime().optional(),
+  pageBudget: z.number().int().min(1).max(1000).optional(),
+  wallClockBudgetMs: z.number().int().min(1).max(110_000).optional(),
+});
+
+const CommitRetirementGuardContinuationQueueMessageSchema = z.object({
+  kind: z.literal('commit_retirement_guard_continuation'),
+  runId: z.string().uuid(),
+  sweep: z.literal('commit_retirement_guard'),
+  cutoffTime: z.string().datetime(),
+  cursorSubscriptionId: z.string().uuid(),
+  cursorFinalBoundary: z.string().datetime(),
   pageBudget: z.number().int().min(1).max(1000).optional(),
   wallClockBudgetMs: z.number().int().min(1).max(110_000).optional(),
 });
@@ -167,6 +190,8 @@ const BillingQueueMessageSchema = z.discriminatedUnion('kind', [
   TrialInactivityStopCandidateQueueMessageSchema,
   CreditRenewalDiscoveryQueueMessageSchema,
   CreditRenewalDiscoveryContinuationQueueMessageSchema,
+  CommitRetirementGuardPageQueueMessageSchema,
+  CommitRetirementGuardContinuationQueueMessageSchema,
   TrialExpiryPageQueueMessageSchema,
   TrialExpiryContinuationQueueMessageSchema,
   OrganizationTrialExpiryPageQueueMessageSchema,
@@ -514,6 +539,31 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 outcome: 'completed',
               });
             } else if (
+              parsed.data.kind === 'commit_retirement_guard_page' ||
+              parsed.data.kind === 'commit_retirement_guard_continuation'
+            ) {
+              const result = await processCommitRetirementGuardPage(
+                env,
+                parsed.data,
+                message.attempts
+              );
+              if (!result.continuationEnqueued) {
+                const next = nextSweep('commit_retirement_guard');
+                if (next) {
+                  await env.LIFECYCLE_QUEUE.send({
+                    kind: 'lifecycle',
+                    runId: parsed.data.runId,
+                    sweep: next,
+                  });
+                }
+              }
+              log('info', 'Completed Commit retirement guard page message', {
+                event: 'run_completed',
+                outcome: 'completed',
+                continuationEnqueued: result.continuationEnqueued,
+                summary: result.summary,
+              });
+            } else if (
               parsed.data.kind === 'trial_expiry_page' ||
               parsed.data.kind === 'trial_expiry_continuation'
             ) {
@@ -595,6 +645,19 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 });
               }
               log('info', 'Started credit-renewal fanout discovery', {
+                event: 'run_started',
+                outcome: 'started',
+              });
+            } else if (
+              parsed.data.kind === 'lifecycle' &&
+              parsed.data.sweep === 'commit_retirement_guard'
+            ) {
+              await env.LIFECYCLE_QUEUE.send({
+                kind: 'commit_retirement_guard_page',
+                runId: parsed.data.runId,
+                sweep: 'commit_retirement_guard',
+              });
+              log('info', 'Started paginated Commit retirement guard processing', {
                 event: 'run_started',
                 outcome: 'started',
               });

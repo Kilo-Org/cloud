@@ -151,6 +151,30 @@ describe('browse', () => {
     expect(decodeURIComponent(calls[0].url)).toContain('LIMIT 10');
   });
 
+  it('applies search filter as a literal substring match', async () => {
+    const { fetch: f, calls } = makeFetch([
+      {
+        status: 200,
+        body: { query_execution_status: 'Success', rows: [] },
+      },
+      { status: 200, body: { branches: [] } },
+    ]);
+
+    const result = await browse({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      fork: { forkOwner: 'alice', forkDb: 'wl' },
+      rigHandle: 'alice',
+      filter: { search: "100%_\\bob's" },
+      fetch: f,
+    });
+
+    expect(result.ok).toBe(true);
+    const sql = decodeURIComponent(calls[0].url);
+    expect(sql).toContain("INSTR(title, '100%_\\\\bob''s') > 0");
+    expect(sql).not.toContain('LIKE');
+  });
+
   it('coerces numeric strings returned by DoltHub', async () => {
     const { fetch: f } = makeFetch([
       {

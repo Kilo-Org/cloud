@@ -49,16 +49,16 @@ Given a user prompt that invokes this skill:
 2. Identify the dominant concern from the prompt and load the matching
    reference(s):
 
-| Prompt signal                                                    | Load                              |
-| ---------------------------------------------------------------- | --------------------------------- |
-| typography, fonts, type scale, hierarchy, readability            | `reference/typography.md`         |
+| Prompt signal | Load |
+|---|---|
+| typography, fonts, type scale, hierarchy, readability | `reference/typography.md` |
 | color, palette, contrast, accent, theming, gradient, a11y colors | `reference/color-and-contrast.md` |
-| spacing, layout, grid, rhythm, padding, alignment, cards         | `reference/spatial-design.md`     |
-| motion, animation, transitions, easing, micro-interactions       | `reference/motion-design.md`      |
-| forms, focus, hover, states, dialog, dropdown, keyboard nav      | `reference/interaction-design.md` |
-| responsive, mobile, breakpoints, touch, tablet, adapt            | `reference/responsive-design.md`  |
-| copy, microcopy, error messages, labels, empty state copy        | `reference/ux-writing.md`         |
-| audit / critique / polish / general redesign                     | all references above              |
+| spacing, layout, grid, rhythm, padding, alignment, cards | `reference/spatial-design.md` |
+| motion, animation, transitions, easing, micro-interactions | `reference/motion-design.md` |
+| forms, focus, hover, states, dialog, dropdown, keyboard nav | `reference/interaction-design.md` |
+| responsive, mobile, breakpoints, touch, tablet, adapt | `reference/responsive-design.md` |
+| copy, microcopy, error messages, labels, empty state copy | `reference/ux-writing.md` |
+| audit / critique / polish / general redesign | all references above |
 
 3. If the prompt targets a specific file, component, or route, **read
    that file first** before proposing or making changes. Do not guess
@@ -155,15 +155,15 @@ This skill is intentionally scoped. It does **not**:
 
 ## Reference map
 
-| File                              | What it covers                                                  |
-| --------------------------------- | --------------------------------------------------------------- |
-| `reference/kilo-brand.md`         | Kilo-specific tokens, components, rules. Load first, always.    |
-| `reference/typography.md`         | Inter/mono usage, hierarchy, tabular nums, OpenType polish.     |
+| File | What it covers |
+|---|---|
+| `reference/kilo-brand.md` | Kilo-specific tokens, components, rules. Load first, always. |
+| `reference/typography.md` | Inter/mono usage, hierarchy, tabular nums, OpenType polish. |
 | `reference/color-and-contrast.md` | OKLCH tokens, brand vs action color, dark-first contrast rules. |
-| `reference/spatial-design.md`     | Spacing, radius scale, grid patterns, optical alignment.        |
-| `reference/motion-design.md`      | Durations, easings, reduced motion, Kilo brand flourishes.      |
-| `reference/interaction-design.md` | Focus, forms, overlays, destructive actions, keyboard nav.      |
-| `reference/responsive-design.md`  | Breakpoints, input-method queries, safe areas, images.          |
-| `reference/ux-writing.md`         | Kilo voice, labels, error copy, empty states, i18n.             |
+| `reference/spatial-design.md` | Spacing, radius scale, grid patterns, optical alignment. |
+| `reference/motion-design.md` | Durations, easings, reduced motion, Kilo brand flourishes. |
+| `reference/interaction-design.md` | Focus, forms, overlays, destructive actions, keyboard nav. |
+| `reference/responsive-design.md` | Breakpoints, input-method queries, safe areas, images. |
+| `reference/ux-writing.md` | Kilo voice, labels, error copy, empty states, i18n. |
 
 See `NOTICE.md` for Impeccable attribution and licensing.

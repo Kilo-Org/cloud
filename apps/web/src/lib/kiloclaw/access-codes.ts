@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@/lib/drizzle';
 import { kiloclaw_access_codes } from '@kilocode/db/schema';
 import { eq, and, lt, ne, or } from 'drizzle-orm';
-import { randomBytes } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 
 const CODE_LENGTH = 10;
 const CODE_EXPIRATION_MINUTES = 10;
@@ -11,10 +11,9 @@ const CODE_EXPIRATION_MINUTES = 10;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function generateCode(): string {
-  const buf = randomBytes(CODE_LENGTH);
   let code = '';
-  for (let i = 0; i < buf.length; i++) {
-    code += CODE_CHARS[buf[i] % CODE_CHARS.length];
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    code += CODE_CHARS.charAt(randomInt(CODE_CHARS.length));
   }
   return `${code.slice(0, 5)}-${code.slice(5)}`;
 }

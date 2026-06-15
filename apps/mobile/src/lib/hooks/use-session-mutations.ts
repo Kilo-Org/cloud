@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { useTRPC } from '@/lib/trpc';
 
 const onError = (error: { message: string }) => {
@@ -12,10 +13,7 @@ export function useSessionMutations() {
   const queryClient = useQueryClient();
 
   const invalidateSessions = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter()),
-      queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter()),
-    ]);
+    await invalidateAgentSessionQueries(queryClient, trpc);
   };
 
   const deleteSessionMutation = useMutation(

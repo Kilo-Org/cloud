@@ -51,13 +51,13 @@ reserved for inline links and historical references, not action fills.
 
 ### Palette structure (how Kilo's tokens map)
 
-| Role     | Purpose                           | Kilo tokens                                                                                                           |
-| -------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Brand    | Rare, load-bearing accent         | `brand-primary`                                                                                                       |
-| Action   | Primary CTAs in product/marketing | `primary` / `primary-foreground`                                                                                      |
-| Neutral  | Text, backgrounds, borders        | `background`, `foreground`, `muted`, `accent`, `secondary`, `card`, `popover`, `border`, `input`, `ring`, `kilo-gray` |
-| Semantic | Destructive, success pills        | `destructive`, badge variants `beta`/`new`                                                                            |
-| Surface  | Sidebar, charts, Kilo gray        | `sidebar-*`, `chart-1`..`chart-5`, `kilo-gray`                                                                        |
+| Role | Purpose | Kilo tokens |
+|---|---|---|
+| Brand | Rare, load-bearing accent | `brand-primary` |
+| Action | Primary CTAs in product/marketing | `primary` / `primary-foreground` |
+| Neutral | Text, backgrounds, borders | `background`, `foreground`, `muted`, `accent`, `secondary`, `card`, `popover`, `border`, `input`, `ring`, `kilo-gray` |
+| Semantic | Destructive, success pills | `destructive`, badge variants `beta`/`new` |
+| Surface | Sidebar, charts, Kilo gray | `sidebar-*`, `chart-1`..`chart-5`, `kilo-gray` |
 
 ### Theming discipline
 
@@ -104,13 +104,13 @@ create a new branded surface, lean on `kilo-gray` rather than a pure gray.
 
 A complete system needs:
 
-| Role         | Purpose                       | Example                   |
-| ------------ | ----------------------------- | ------------------------- |
-| **Brand**    | Rare, voice-carrying accent   | 1 color, 1–2 shades       |
-| **Action**   | Primary call-to-action        | 1 color, 3 states         |
-| **Neutral**  | Text, backgrounds, borders    | 9–11 shade scale          |
+| Role | Purpose | Example |
+|---|---|---|
+| **Brand** | Rare, voice-carrying accent | 1 color, 1–2 shades |
+| **Action** | Primary call-to-action | 1 color, 3 states |
+| **Neutral** | Text, backgrounds, borders | 9–11 shade scale |
 | **Semantic** | Success, error, warning, info | 4 colors, 2–3 shades each |
-| **Surface**  | Cards, modals, overlays       | 2–3 elevation levels      |
+| **Surface** | Cards, modals, overlays | 2–3 elevation levels |
 
 Skip secondary/tertiary unless you need them. Most apps work fine with
 one accent and one action color.
@@ -131,11 +131,11 @@ That shared role should still stay near 10% visual weight.
 
 ### WCAG Requirements
 
-| Content type                    | AA minimum | AAA target |
-| ------------------------------- | ---------- | ---------- |
-| Body text                       | 4.5:1      | 7:1        |
-| Large text (18px+ or 14px bold) | 3:1        | 4.5:1      |
-| UI components, icons            | 3:1        | 4.5:1      |
+| Content type | AA minimum | AAA target |
+|---|---|---|
+| Body text | 4.5:1 | 7:1 |
+| Large text (18px+ or 14px bold) | 3:1 | 4.5:1 |
+| UI components, icons | 3:1 | 4.5:1 |
 
 The gotcha: placeholder text still needs 4.5:1. Check Kilo's
 `placeholder:text-muted-foreground` against `bg-input/30` on real screens
@@ -170,12 +170,12 @@ first and "flip" it, you'll introduce bad shadows, under-contrast accents,
 and oversaturated hues. Design on the real `background` / `card` /
 `muted` surfaces, not on `#fff`.
 
-| Light mode principle | Dark mode behavior                          |
-| -------------------- | ------------------------------------------- |
-| Shadows for depth    | Lighter surfaces for depth (no shadows)     |
-| Dark text on light   | Light text on dark (reduce font weight)     |
-| Vibrant accents      | Desaturate accents slightly                 |
-| White backgrounds    | Never pure black — dark gray (OKLCH 12–18%) |
+| Light mode principle | Dark mode behavior |
+|---|---|
+| Shadows for depth | Lighter surfaces for depth (no shadows) |
+| Dark text on light | Light text on dark (reduce font weight) |
+| Vibrant accents | Desaturate accents slightly |
+| White backgrounds | Never pure black — dark gray (OKLCH 12–18%) |
 
 Depth in dark mode comes from surface lightness, not shadow. Kilo's scale
 is already: `background` → `card`/`popover` → `muted`/`secondary`/`accent`.

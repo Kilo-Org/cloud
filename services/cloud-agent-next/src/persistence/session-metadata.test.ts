@@ -24,7 +24,7 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
-  it('parses and serializes current grouped metadata', () => {
+  it('parses and serializes current grouped metadata with canonical attachments', () => {
     const current = {
       metadataSchemaVersion: 2 as const,
       identity: {
@@ -49,9 +49,9 @@ describe('session metadata boundary', () => {
       initialMessage: {
         id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
         prompt: 'Build the thing',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
         },
       },
       agent: {
@@ -156,10 +156,6 @@ describe('session metadata boundary', () => {
       upstreamBranch: 'main',
       prompt: 'Build the thing',
       initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-      images: {
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-      },
       mode: 'reviewer',
       model: 'kilo/gpt-5',
       variant: 'thinking',
@@ -202,10 +198,6 @@ describe('session metadata boundary', () => {
       initialMessage: {
         id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
         prompt: 'Build the thing',
-        images: {
-          path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-        },
       },
       agent: {
         mode: 'reviewer',
@@ -234,6 +226,44 @@ describe('session metadata boundary', () => {
         initiatedAt: 1236,
         kiloServerLastActivity: 1237,
       },
+    });
+  });
+
+  it('ignores unknown fields in current grouped metadata', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        unknownRootField: 'from-newer-writer',
+        identity: { sessionId: 'agent_grouped_legacy', userId: 'user_123' },
+        auth: {},
+        initialMessage: {
+          id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          prompt: 'old image turn',
+          images: {
+            path: '123e4567-e89b-12d3-a456-426614174000',
+            files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          },
+          turn: {
+            type: 'prompt',
+            prompt: 'old image turn',
+            images: {
+              path: '123e4567-e89b-12d3-a456-426614174000',
+              files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+            },
+          },
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toEqual({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_grouped_legacy', userId: 'user_123' },
+      auth: {},
+      initialMessage: {
+        id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        prompt: 'old image turn',
+        turn: { type: 'prompt', prompt: 'old image turn' },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
     });
   });
 
@@ -282,6 +312,27 @@ describe('session metadata boundary', () => {
       platform: 'gitlab',
       gitlabTokenManaged: true,
     });
+  });
+
+  it('parses review-origin GitLab metadata using generic repository context', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'agent_gitlab_review',
+        userId: 'user_123',
+        createdOnPlatform: 'code-review',
+      },
+      auth: {},
+      repository: {
+        type: 'gitlab' as const,
+        url: 'https://gitlab.com/acme/repo.git',
+        platform: 'gitlab' as const,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
   });
 
   it('preserves legacy generic git tokens in grouped repository metadata', () => {

@@ -4,19 +4,33 @@ on:
   workflow_dispatch:
   workflow_call:
 
+# Least-privilege default for the whole workflow. Each job opts into only the
+# scopes it needs via its own `permissions:` block below.
 permissions:
   contents: read
-  packages: write
 
 jobs:
   deploy:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     name: Deploy KiloClaw
+    # Builds/pushes the image and deploys the worker. Deliberately has NO
+    # id-token/attestations scopes — signing is isolated in the attest-sbom job
+    # so a compromised install step or action here cannot mint a trusted OIDC
+    # identity.
+    permissions:
+      contents: read
+      packages: write
     outputs:
       image-tag: ${{ steps.image-hash.outputs.tag }}
       image-hash: ${{ steps.image-hash.outputs.hash }}
       image-digest: ${{ steps.image-digest.outputs.digest }}
+      # True only when the build step actually ran and succeeded (it is skipped
+      # when the content-hash tag already exists). Keyed off the step outcome
+      # rather than the pre-build registry check so a failed build never reports
+      # as "built". `outcome` (not `conclusion`) stays correct if a future
+      # continue-on-error is added to the build step.
+      image-built: ${{ steps.docker-build.outcome == 'success' }}
       openclaw-version: ${{ steps.openclaw-version.outputs.version }}
 
     steps:
@@ -229,6 +243,48 @@ jobs:
             --var OPENCLAW_VERSION:${{ steps.openclaw-version.outputs.version }}
             --var FLY_IMAGE_DIGEST:${{ steps.image-digest.outputs.digest }}
 
+  # ── Generate + attest the image SBOM (isolated, minimal scopes) ──
+  # Separated from `deploy` so that ONLY this job can mint an OIDC identity or
+  # write attestations — no install steps or third-party build actions run here.
+  # Runs after `deploy` (image already pushed; digest comes from its output).
+  # Gated to the build path: an unchanged image keeps the attestation produced
+  # when its content was last built, so we don't pull a large unchanged image.
+  attest-sbom:
+    needs: deploy
+    if: needs.deploy.outputs.image-built == 'true' && needs.deploy.outputs.image-digest != ''
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    name: Attest image SBOM
+    permissions:
+      contents: read
+      packages: write # pull the GHCR image + push the attestation referrer
+      id-token: write # OIDC signing for actions/attest-sbom
+      attestations: write # write the attestation
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ghcr.io/kilo-org/kiloclaw@${{ needs.deploy.outputs.image-digest }}
+          format: cyclonedx-json
+          output-file: kiloclaw-sbom.cyclonedx.json
+          upload-artifact: true
+          artifact-name: kiloclaw-sbom-${{ needs.deploy.outputs.image-tag }}
+
+      - name: Attest image SBOM
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ghcr.io/kilo-org/kiloclaw
+          subject-digest: ${{ needs.deploy.outputs.image-digest }}
+          sbom-path: kiloclaw-sbom.cyclonedx.json
+          push-to-registry: true
+
   # ── Push prod image to dev registry ───────────────────────────
   # Runs after the production deploy completes. Copies the prod image
   # to the dev Fly registry so dev stays in sync automatically.
@@ -239,6 +295,9 @@ jobs:
     timeout-minutes: 10
     name: Push Dev Image
     continue-on-error: true
+    # Uses Fly registry tokens via docker login, not GITHUB_TOKEN — no
+    # GITHUB_TOKEN scopes are required.
+    permissions: {}
 
     steps:
       - name: Setup Docker Buildx

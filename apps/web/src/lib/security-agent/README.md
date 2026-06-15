@@ -122,16 +122,16 @@ src/lib/security-reviews/
 
 ### tRPC Router (`src/routers/security-reviews-router.ts`)
 
-| Procedure             | Type     | Description                                               |
-| --------------------- | -------- | --------------------------------------------------------- |
-| `getPermissionStatus` | Query    | Check if GitHub App has `vulnerability_alerts` permission |
-| `getConfig`           | Query    | Get SLA configuration                                     |
-| `saveConfig`          | Mutation | Save SLA configuration                                    |
-| `setEnabled`          | Mutation | Enable/disable security reviews                           |
-| `listFindings`        | Query    | List findings with filters                                |
-| `getFinding`          | Query    | Get single finding by ID                                  |
-| `getStats`            | Query    | Get summary statistics                                    |
-| `triggerSync`         | Mutation | **Manual trigger** to sync a specific repository          |
+| Procedure | Type | Description |
+|---|---|---|
+| `getPermissionStatus` | Query | Check if GitHub App has `vulnerability_alerts` permission |
+| `getConfig` | Query | Get SLA configuration |
+| `saveConfig` | Mutation | Save SLA configuration |
+| `setEnabled` | Mutation | Enable/disable security reviews |
+| `listFindings` | Query | List findings with filters |
+| `getFinding` | Query | Get single finding by ID |
+| `getStats` | Query | Get summary statistics |
+| `triggerSync` | Mutation | **Manual trigger** to sync a specific repository |
 
 ### Cron Job (`src/app/api/cron/sync-security-alerts/route.ts`)
 
@@ -145,33 +145,33 @@ src/lib/security-reviews/
 
 ### Table: `security_findings`
 
-| Column                     | Type      | Description                               |
-| -------------------------- | --------- | ----------------------------------------- |
-| `id`                       | UUID      | Primary key                               |
-| `owned_by_organization_id` | UUID      | Organization owner (nullable)             |
-| `owned_by_user_id`         | TEXT      | User owner (nullable)                     |
-| `platform_integration_id`  | UUID      | Reference to platform_integrations        |
-| `repo_full_name`           | TEXT      | Repository full name (e.g., "owner/repo") |
-| `source`                   | TEXT      | Source type: 'dependabot'                 |
-| `source_id`                | TEXT      | Alert number from source                  |
-| `severity`                 | TEXT      | 'critical', 'high', 'medium', 'low'       |
-| `ghsa_id`                  | TEXT      | GitHub Security Advisory ID               |
-| `cve_id`                   | TEXT      | CVE ID (nullable)                         |
-| `package_name`             | TEXT      | Vulnerable package name                   |
-| `package_ecosystem`        | TEXT      | Package ecosystem (npm, pip, etc.)        |
-| `vulnerable_version_range` | TEXT      | Affected versions                         |
-| `patched_version`          | TEXT      | Fixed version (nullable)                  |
-| `manifest_path`            | TEXT      | Path to manifest file                     |
-| `title`                    | TEXT      | Finding title                             |
-| `description`              | TEXT      | Full description                          |
-| `status`                   | TEXT      | 'open', 'fixed', 'ignored'                |
-| `ignored_reason`           | TEXT      | Reason for dismissal                      |
-| `fixed_at`                 | TIMESTAMP | When fixed                                |
-| `sla_due_at`               | TIMESTAMP | SLA deadline                              |
-| `dependabot_html_url`      | TEXT      | Link to Dependabot alert                  |
-| `raw_data`                 | JSONB     | Original API response                     |
-| `first_detected_at`        | TIMESTAMP | When first seen                           |
-| `last_synced_at`           | TIMESTAMP | Last sync time                            |
+| Column | Type | Description |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `owned_by_organization_id` | UUID | Organization owner (nullable) |
+| `owned_by_user_id` | TEXT | User owner (nullable) |
+| `platform_integration_id` | UUID | Reference to platform_integrations |
+| `repo_full_name` | TEXT | Repository full name (e.g., "owner/repo") |
+| `source` | TEXT | Source type: 'dependabot' |
+| `source_id` | TEXT | Alert number from source |
+| `severity` | TEXT | 'critical', 'high', 'medium', 'low' |
+| `ghsa_id` | TEXT | GitHub Security Advisory ID |
+| `cve_id` | TEXT | CVE ID (nullable) |
+| `package_name` | TEXT | Vulnerable package name |
+| `package_ecosystem` | TEXT | Package ecosystem (npm, pip, etc.) |
+| `vulnerable_version_range` | TEXT | Affected versions |
+| `patched_version` | TEXT | Fixed version (nullable) |
+| `manifest_path` | TEXT | Path to manifest file |
+| `title` | TEXT | Finding title |
+| `description` | TEXT | Full description |
+| `status` | TEXT | 'open', 'fixed', 'ignored' |
+| `ignored_reason` | TEXT | Reason for dismissal |
+| `fixed_at` | TIMESTAMP | When fixed |
+| `sla_due_at` | TIMESTAMP | SLA deadline |
+| `dependabot_html_url` | TEXT | Link to Dependabot alert |
+| `raw_data` | JSONB | Original API response |
+| `first_detected_at` | TIMESTAMP | When first seen |
+| `last_synced_at` | TIMESTAMP | Last sync time |
 
 **Constraints:**
 
@@ -185,11 +185,11 @@ src/lib/security-reviews/
 Default SLAs stored in `agent_configs` table with `agent_type: 'security_scan'`:
 
 | Severity | Default SLA (days) |
-| -------- | ------------------ |
-| Critical | 15                 |
-| High     | 30                 |
-| Medium   | 45                 |
-| Low      | 90                 |
+|---|---|
+| Critical | 15 |
+| High | 30 |
+| Medium | 45 |
+| Low | 90 |
 
 ---
 
@@ -228,11 +228,11 @@ The cron job at `/api/cron/sync-security-alerts` runs every 6 hours and:
 ## State Mapping
 
 | Dependabot State | Our Status |
-| ---------------- | ---------- |
-| `open`           | `open`     |
-| `fixed`          | `fixed`    |
-| `dismissed`      | `ignored`  |
-| `auto_dismissed` | `ignored`  |
+|---|---|
+| `open` | `open` |
+| `fixed` | `fixed` |
+| `dismissed` | `ignored` |
+| `auto_dismissed` | `ignored` |
 
 ---
 

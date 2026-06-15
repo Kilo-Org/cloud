@@ -10,6 +10,7 @@ import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import type { KiloPassTier } from '@/lib/kilo-pass/enums';
 import { recommendKiloPassTierFromAverageMonthlyUsageUsd } from '@/lib/kilo-pass/recommend-tier';
+import { KiloPassReferralButton } from '@/components/referrals/KiloPassReferralButton';
 import { KiloPassSubscribeCard } from '@/components/profile/kilo-pass/KiloPassSubscribeCard';
 import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
 import { SubscriptionGroup } from '@/components/subscriptions/SubscriptionGroup';
@@ -36,9 +37,11 @@ function getShowKiloPassTwoMonthPromo(showFirstMonthPromo: boolean): boolean {
 export function KiloPassGroup({
   showTerminal,
   accordionValue,
+  hideHeader = false,
 }: {
   showTerminal: boolean;
   accordionValue?: string;
+  hideHeader?: boolean;
 }) {
   const trpc = useTRPC();
   const query = useQuery(trpc.kiloPass.getState.queryOptions());
@@ -60,7 +63,7 @@ export function KiloPassGroup({
           toast.error('Failed to create Stripe checkout session');
           return;
         }
-        window.location.href = result.url;
+        window.location.assign(result.url);
       },
       onError: error => {
         toast.error(error.message || 'Failed to start checkout');
@@ -98,16 +101,18 @@ export function KiloPassGroup({
     <SubscriptionGroup
       title="Kilo Pass"
       description="Manage your Kilo Pass subscription and credit entitlements."
-      headerIcon={<Crown className="h-5 w-5" />}
+      headerIcon={<Crown className="size-5" />}
       isLoading={query.isLoading}
       isError={query.isError}
       error={query.error}
       onRetry={() => void query.refetch()}
       accordionValue={accordionValue}
+      hideHeader={hideHeader}
+      unframed={hideHeader}
     >
       {shouldShowSubscription && subscriptionDisplay && providerManagement ? (
         <SubscriptionCard
-          icon={<Crown className="h-5 w-5" />}
+          icon={<Crown className="size-5" />}
           title={`Kilo Pass ${formatKiloPassTierLabel(subscription.tier)}`}
           subtitle={`${formatKiloPassTierLabel(subscription.tier)} tier • ${formatKiloPassCadenceLabel(subscription.cadence)}`}
           status={subscriptionDisplay.status}
@@ -127,19 +132,26 @@ export function KiloPassGroup({
                 : undefined
           }
           statusNote={subscriptionDisplay.cardNotice}
+          action={<KiloPassReferralButton className="w-full sm:w-auto" />}
+          actionPlacement="top-right"
         />
       ) : (
-        <KiloPassSubscribeCard
-          cadence={cadence}
-          setCadence={setCadence}
-          pending={checkout.isPending}
-          showFirstMonthPromo={showFirstMonthPromo}
-          showSecondMonthPromo={showSecondMonthPromo}
-          recommendedTier={recommendedTier}
-          onSelectTier={tier => void startCheckout(tier)}
-          showHeader={false}
-          contentClassName="p-6"
-        />
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <KiloPassReferralButton className="w-full sm:w-auto" />
+          </div>
+          <KiloPassSubscribeCard
+            cadence={cadence}
+            setCadence={setCadence}
+            pending={checkout.isPending}
+            showFirstMonthPromo={showFirstMonthPromo}
+            showSecondMonthPromo={showSecondMonthPromo}
+            recommendedTier={recommendedTier}
+            onSelectTier={tier => void startCheckout(tier)}
+            showHeader={false}
+            unframed
+          />
+        </div>
       )}
     </SubscriptionGroup>
   );

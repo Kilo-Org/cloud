@@ -1,4 +1,4 @@
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
@@ -106,28 +106,29 @@ export function buildStartCommand(serviceName: string): string {
 // Tmux service lifecycle
 // ---------------------------------------------------------------------------
 
-export function startServiceInTmux(sessionName: string, serviceName: string): void {
+export function startServiceInTmux(
+  sessionName: string,
+  serviceName: string,
+  env?: Record<string, string>
+): void {
   const svc = getService(serviceName);
-  const winIndex = createWindow(sessionName, serviceName);
-  if (svc.type === 'infra') {
-    // Profile-gated services need --profile on every compose subcommand,
-    // including `logs`. Without it, Compose v2 filters the service out of
-    // the graph and the tmux pane is silent or errors. Shell-quote the
-    // profile and service names — they are safe identifiers today but the
-    // quoting keeps the command robust if a future maintainer adds a name
-    // containing whitespace or metacharacters.
-    const profile = getInfraProfile(serviceName);
-    const profileArg = profile ? `--profile ${shellQuote(profile)} ` : '';
-    sendKeys(
-      sessionName,
-      serviceName,
-      `docker compose ${profileArg}-f dev/docker-compose.yml logs -f ${shellQuote(serviceName)}`
-    );
-  } else {
-    sendKeys(sessionName, serviceName, buildStartCommand(serviceName));
-  }
+  const startupCommand =
+    svc.type === 'infra' ? buildInfraLogCommand(serviceName) : buildStartCommand(serviceName);
+  const winIndex = createWindow(sessionName, serviceName, env, startupCommand);
   const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
   pipePane(sessionName, winIndex, 0, buildLogPipeCommand(logPath));
+}
+
+function buildInfraLogCommand(serviceName: string): string {
+  // Profile-gated services need --profile on every compose subcommand,
+  // including `logs`. Without it, Compose v2 filters the service out of
+  // the graph and the tmux pane is silent or errors. Shell-quote the
+  // profile and service names — they are safe identifiers today but the
+  // quoting keeps the command robust if a future maintainer adds a name
+  // containing whitespace or metacharacters.
+  const profile = getInfraProfile(serviceName);
+  const profileArg = profile ? `--profile ${shellQuote(profile)} ` : '';
+  return `docker compose ${profileArg}-f dev/docker-compose.yml logs -f ${shellQuote(serviceName)}`;
 }
 
 function buildLogPipeCommand(logPath: string): string {
@@ -260,8 +261,7 @@ export function showServiceInTmux(
 export function showGroupInTmux(
   sessionName: string,
   serviceNames: string[],
-  currentPaneNames: string,
-  currentViewedIsGroup: boolean
+  currentPaneNames: string
 ): string {
   if (serviceNames.length === 0) return currentPaneNames;
   try {

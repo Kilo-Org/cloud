@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ExecutionError } from '../execution/errors.js';
 import type {
   ExecutionDeliveryContext,
   MessageDeliveryRequest,
@@ -7,6 +8,7 @@ import type {
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE } from '../sandbox-recovery.js';
 import type { SessionId, UserId } from '../types/ids.js';
+import { buildCloudMessageFailedPayload } from './message-settlement-outbox.js';
 import {
   createSessionMessageQueue,
   flushNextPendingSessionMessage,
@@ -16,6 +18,7 @@ import {
   createPendingSessionMessage,
   createPendingSessionMessageFromIntent,
   listPendingSessionMessages,
+  PENDING_FLUSH_RETRY_BASE_DELAY_MS,
   PENDING_SESSION_MESSAGE_LIMIT,
   recordPendingFlushFailure,
   storePendingSessionMessage,
@@ -27,6 +30,7 @@ import {
   putSessionMessageState,
   type TerminalizeParams,
 } from './session-message-state.js';
+import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
 
 type QueueEvent = {
   sessionId: string;
@@ -120,6 +124,7 @@ function createQueueHarness(options?: {
   failAlarmOnce?: boolean;
   failTerminalizationOnce?: boolean;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
+  getDeliveryBlock?: () => Promise<{ retryAt: number } | null>;
 }) {
   const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
@@ -154,6 +159,7 @@ function createQueueHarness(options?: {
       requireSessionId: async () => metadata?.identity.sessionId ?? 'agent_test',
       validateModeAgainstRuntimeAgents: () => null,
       getDeliveryContext: async () => (metadata ? createContext(metadata) : null),
+      getDeliveryBlock: options?.getDeliveryBlock ?? (async () => null),
       deliver,
       ensureQueuedMessageEvent: event => {
         if (failQueuedEvent) {
@@ -250,6 +256,37 @@ describe('recordPendingFlushFailure backoff progression', () => {
     expect(delays).toEqual([2_000, undefined]);
   });
 
+  it('honors an explicit non-retryable override while preserving workspace failure details', async () => {
+    const storage = createMemoryStorage();
+    const message = createPendingSessionMessage({
+      messageId: 'msg_018f1e2d3c4bBranchMissingA',
+      role: 'user',
+      content: 'test',
+      createdAt: 1,
+    });
+    await storePendingSessionMessage(storage, message);
+
+    const result = await recordPendingFlushFailure(storage, message, 'branch missing', 100_000, {
+      policy: 'cold-init',
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_branch_missing',
+      safeFailureMessage: 'Requested repository branch was not found',
+      retryable: false,
+    });
+
+    expect(result).toMatchObject({
+      attempts: 1,
+      exhausted: true,
+      nextFlushAttemptAt: undefined,
+      message: {
+        lastFlushError: 'branch missing',
+        lastFlushFailureCode: 'WORKSPACE_SETUP_FAILED',
+        lastFlushFailureSubtype: 'git_branch_missing',
+        safeFailureMessage: 'Requested repository branch was not found',
+      },
+    });
+  });
+
   it('does not retry non-retryable failure codes', async () => {
     const storage = createMemoryStorage();
     const message = createPendingSessionMessage({
@@ -333,6 +370,115 @@ describe('flushNextPendingSessionMessage', () => {
     });
     expect(secondPlan?.workspace).not.toHaveProperty('repositoryAuthOverrides');
     expect((await storage.list({ prefix: 'pending_message:' })).size).toBe(0);
+  });
+
+  it('schedules a retry from the time a delivery failure is observed', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'slow failed delivery',
+        createdAt: 1,
+      })
+    );
+    const attemptStartedAt = 100_000;
+    const failedAt = 160_000;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(attemptStartedAt);
+    const deliver = vi.fn(async () => {
+      clock.mockReturnValue(failedAt);
+      throw ExecutionError.workspaceSetupFailed('workspace failed late');
+    });
+
+    const result = await (async () => {
+      try {
+        return await flushNextPendingSessionMessage({
+          storage,
+          now: attemptStartedAt,
+          getDeliveryContext: async () => createContext(),
+          validateModeAgainstRuntimeAgents: () => null,
+          deliver,
+        });
+      } finally {
+        clock.mockRestore();
+      }
+    })();
+
+    expect(result).toMatchObject({
+      type: 'failure',
+      nextFlushAttemptAt: failedAt + PENDING_FLUSH_RETRY_BASE_DELAY_MS,
+    });
+  });
+
+  it('schedules an unsuccessful delivery result retry from the time it is observed', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'slow unsuccessful delivery',
+        createdAt: 1,
+      })
+    );
+    const attemptStartedAt = 100_000;
+    const failedAt = 160_000;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(attemptStartedAt);
+    const deliver = vi.fn(async (): Promise<MessageDeliveryResult> => {
+      clock.mockReturnValue(failedAt);
+      return { success: false, code: 'WORKSPACE_SETUP_FAILED', error: 'workspace failed late' };
+    });
+
+    const result = await (async () => {
+      try {
+        return await flushNextPendingSessionMessage({
+          storage,
+          now: attemptStartedAt,
+          getDeliveryContext: async () => createContext(),
+          validateModeAgainstRuntimeAgents: () => null,
+          deliver,
+        });
+      } finally {
+        clock.mockRestore();
+      }
+    })();
+
+    expect(result).toMatchObject({
+      type: 'failure',
+      nextFlushAttemptAt: failedAt + PENDING_FLUSH_RETRY_BASE_DELAY_MS,
+    });
+  });
+
+  it('holds typed wrapper finalizing without consuming a flush attempt', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'hold during finalization',
+        createdAt: 1,
+      })
+    );
+    const deliver = vi.fn().mockResolvedValue({
+      success: false,
+      code: 'WRAPPER_FINALIZING',
+      error: 'Wrapper batch is finalizing',
+    });
+
+    const result = await flushNextPendingSessionMessage({
+      storage,
+      now: 10,
+      getDeliveryContext: async () => createContext(),
+      validateModeAgainstRuntimeAgents: () => null,
+      deliver,
+    });
+
+    expect(result).toEqual({ type: 'held', remainingCount: 1 });
+    const [pending] = await listPendingSessionMessages(storage);
+    expect(pending?.flushAttempts).toBeUndefined();
+    expect(pending?.lastFlushError).toBeUndefined();
   });
 
   it('delivers the next current message without execution-runtime blocking', async () => {
@@ -431,6 +577,173 @@ describe('flushNextPendingSessionMessage', () => {
 });
 
 describe('SessionMessageQueue', () => {
+  it('reports whether a message identity already has durable admission state', async () => {
+    const harness = createQueueHarness();
+
+    await expect(harness.queue.hasMessageAdmission(FIRST_MESSAGE_ID)).resolves.toBe(false);
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'queue this prompt' },
+    });
+
+    await expect(harness.queue.hasMessageAdmission(FIRST_MESSAGE_ID)).resolves.toBe(true);
+  });
+
+  it('repairs queued effects without consuming delivery attempts while delivery is blocked', async () => {
+    const retryAt = 50_000;
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ retryAt }),
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'repair before blocked delivery',
+        createdAt: 1,
+      })
+    );
+
+    const drain = await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+
+    expect(drain).toEqual({ retryAt, remainingPendingCount: 1 });
+    expect(harness.events).toHaveLength(1);
+    expect(harness.deliver).not.toHaveBeenCalled();
+    expect(pending?.flushAttempts).toBeUndefined();
+    expect(pending?.lastFlushError).toBeUndefined();
+  });
+
+  it('fails the second sandbox attempt when wrapper cleanup remains blocked', async () => {
+    const now = 200_000;
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'fail blocked sandbox retry',
+        createdAt: 100_000,
+        flushAttempts: 1,
+        nextFlushAttemptAt: now,
+        lastFlushError: 'Sandbox connection failed during wrapper discovery',
+        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
+      })
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    let drain;
+    try {
+      drain = await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    expect(harness.deliver).not.toHaveBeenCalled();
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'sandbox_connect_failed',
+    });
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
+  });
+
+  it('keeps the fixed five-second sandbox retry deadline ahead of cleanup backoff', async () => {
+    const now = 200_000;
+    const retryAt = now + 5_000;
+    const harness = createQueueHarness({
+      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'wake for fixed sandbox retry',
+        createdAt: 100_000,
+        flushAttempts: 1,
+        nextFlushAttemptAt: retryAt,
+        lastFlushError: 'Sandbox connection failed during wrapper discovery',
+        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
+      })
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    let drain;
+    try {
+      drain = await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(drain).toEqual({ retryAt, remainingPendingCount: 1 });
+    expect(harness.deliver).not.toHaveBeenCalled();
+  });
+
+  it('retains a queued message without consuming an attempt while wrapper cleanup blocks delivery', async () => {
+    const retryAt = 50_000;
+    const harness = createQueueHarness({
+      deliver: async () => {
+        throw new WrapperCleanupBlockedError(retryAt);
+      },
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'wait for wrapper cleanup' },
+    });
+
+    const drain = await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+
+    expect(drain).toEqual({ retryAt, remainingPendingCount: 1 });
+    expect(pending?.messageId).toBe(FIRST_MESSAGE_ID);
+    expect(pending?.flushAttempts).toBeUndefined();
+    expect(pending?.lastFlushError).toBeUndefined();
+  });
+
+  it('fails the second sandbox attempt when delivery discovers blocked cleanup', async () => {
+    const now = 200_000;
+    const harness = createQueueHarness({
+      deliver: async () => {
+        throw new WrapperCleanupBlockedError(now + 300_000);
+      },
+    });
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'fail sandbox retry blocked during delivery',
+        createdAt: 100_000,
+        flushAttempts: 1,
+        nextFlushAttemptAt: now,
+        lastFlushError: 'Sandbox connection failed during wrapper discovery',
+        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
+      })
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    let drain;
+    try {
+      drain = await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'sandbox_connect_failed',
+    });
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
+  });
+
   it('admits a durable queued message once and replays the original acknowledgement', async () => {
     const harness = createQueueHarness();
     const request = {
@@ -577,6 +890,38 @@ describe('SessionMessageQueue', () => {
     expect(result).toMatchObject({ success: false, code: 'BAD_REQUEST' });
   });
 
+  it('accepts canonical replay against predecessor constraints with attachments', async () => {
+    const harness = createQueueHarness();
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+    await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
+      messageId: FIRST_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'saved constraint',
+      legacyAdmissionConstraints: {
+        turn: {
+          type: 'prompt',
+          messageId: FIRST_MESSAGE_ID,
+          prompt: 'saved constraint',
+          attachments,
+        },
+        agent: { mode: 'code', model: 'default-model' },
+      },
+      createdAt: 1,
+      acceptedAt: 2,
+    });
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'saved constraint', attachments },
+      agent: { mode: 'code', model: 'default-model' },
+    });
+
+    expect(result).toMatchObject({ success: true, compatibilityDelivery: 'sent' });
+  });
+
   it('rejects replay changing a known legacy stored turn payload', async () => {
     const harness = createQueueHarness();
     await harness.storage.put(`session_message:${FIRST_MESSAGE_ID}`, {
@@ -706,7 +1051,7 @@ describe('SessionMessageQueue', () => {
     expect(harness.queue).not.toHaveProperty('admitRegisteredInitial');
   });
 
-  it('rejects command turns with images instead of dropping attachments', async () => {
+  it('rejects command turns with generic attachments instead of dropping them', async () => {
     const harness = createQueueHarness();
 
     const result = await harness.queue.admitSubmittedMessage({
@@ -716,9 +1061,9 @@ describe('SessionMessageQueue', () => {
         id: FIRST_MESSAGE_ID,
         command: 'compact',
         arguments: '--aggressive',
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
         },
       },
     });
@@ -726,10 +1071,27 @@ describe('SessionMessageQueue', () => {
     expect(result).toEqual({
       success: false,
       code: 'BAD_REQUEST',
-      error: 'Images cannot be attached to slash commands',
+      error: 'Attachments cannot be attached to slash commands',
     });
     expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
     expect(harness.events).toHaveLength(0);
+  });
+
+  it('admits prompt documents as canonical attachments in durable pending state', async () => {
+    const harness = createQueueHarness();
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+
+    const result = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'read this PDF', attachments },
+    });
+    const [pending] = await listPendingSessionMessages(harness.storage);
+
+    expect(result).toMatchObject({ success: true, messageId: FIRST_MESSAGE_ID });
+    expect(pending?.intent?.turn).toMatchObject({ attachments });
   });
 
   it('rejects queue admission once durable pending capacity is exhausted', async () => {
@@ -1023,6 +1385,8 @@ describe('SessionMessageQueue', () => {
           reason: 'exhausted',
           error: 'invalid queued turn',
           completionSource: 'delivery_failure',
+          failureStage: 'pre_dispatch',
+          failureCode: 'invalid_delivery_request',
           attempts: 1,
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
@@ -1030,6 +1394,169 @@ describe('SessionMessageQueue', () => {
     ]);
     expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
     expect(harness.finalizedTerminalCallbacks).toEqual([{ allowWithoutObservedIdle: true }]);
+  });
+
+  it.each([
+    ['SANDBOX_CONNECT_FAILED', 'sandbox_connect_failed'],
+    ['WORKSPACE_SETUP_FAILED', 'workspace_setup_failed'],
+    ['KILO_SERVER_FAILED', 'kilo_server_failed'],
+    ['WRAPPER_START_FAILED', 'wrapper_start_failed'],
+  ] as const)('classifies exhausted %s delivery failures as %s', async (code, failureCode) => {
+    const harness = createQueueHarness({
+      deliver: async () => ({ success: false, code, error: 'transient exhausted' }),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'terminalize after retry' },
+    });
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.nextFlushAttemptAt).toBeDefined();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(pending?.nextFlushAttemptAt ?? 0);
+    try {
+      await harness.queue.drainNextPendingMessage();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode,
+    });
+  });
+
+  it('terminalizes a non-retryable branch-missing failure on its first attempt', async () => {
+    const error = 'Requested repository branch was not found';
+    const harness = createQueueHarness({
+      deliver: async () =>
+        Promise.reject(
+          ExecutionError.workspaceSetupFailed(error, undefined, {
+            subtype: 'git_branch_missing',
+            safeFailureMessage: error,
+            retryable: false,
+          })
+        ),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'checkout strict branch' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending).toBeUndefined();
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      error,
+      failureStage: 'pre_dispatch',
+      failureCode: 'workspace_setup_failed',
+      failureSubtype: 'git_branch_missing',
+      safeFailureMessage: error,
+    });
+  });
+
+  it('preserves a thrown workspace setup failure through retry exhaustion', async () => {
+    const error = 'Git clone failed: No space left on device';
+    const harness = createQueueHarness({
+      deliver: async () =>
+        Promise.reject(
+          ExecutionError.workspaceSetupFailed(error, undefined, {
+            subtype: 'sandbox_storage_full',
+            safeFailureMessage: 'Sandbox storage is full',
+          })
+        ),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'clone a workspace' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
+    expect(pending?.lastFlushError).toBe(error);
+    expect(pending?.lastFlushFailureSubtype).toBe('sandbox_storage_full');
+    expect(pending?.safeFailureMessage).toBe('Sandbox storage is full');
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected workspace setup failure to be retried before terminalization');
+    }
+
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      error,
+      failureStage: 'pre_dispatch',
+      failureCode: 'workspace_setup_failed',
+      failureSubtype: 'sandbox_storage_full',
+      safeFailureMessage: 'Sandbox storage is full',
+    });
+  });
+
+  it('does not classify an ambiguous thrown wrapper execution failure as startup', async () => {
+    const harness = createQueueHarness({
+      deliver: async () =>
+        Promise.reject(
+          ExecutionError.wrapperStartFailed('Failed to execute wrapper bootstrap: dispatch unknown')
+        ),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'deliver ambiguously' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected ambiguous delivery failure to be retried before terminalization');
+    }
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'delivery_failure_unknown',
+    });
+  });
+
+  it('preserves an earlier workspace setup cause when exhaustion becomes ambiguous', async () => {
+    const deliver = vi
+      .fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>()
+      .mockRejectedValueOnce(
+        ExecutionError.workspaceSetupFailed('workspace temporarily unavailable')
+      )
+      .mockRejectedValueOnce(
+        ExecutionError.wrapperStartFailed('Failed to execute wrapper bootstrap: dispatch unknown')
+      );
+    const harness = createQueueHarness({ deliver });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'retry then dispatch ambiguously' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
+    if (pending?.nextFlushAttemptAt === undefined) {
+      throw new Error('Expected workspace setup failure to be retried before terminalization');
+    }
+    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+    await harness.queue.drainNextPendingMessage();
+    vi.restoreAllMocks();
+
+    expect(harness.terminalizations.at(-1)?.params).toMatchObject({
+      kind: 'failed',
+      error: 'workspace temporarily unavailable',
+      failureStage: 'pre_dispatch',
+      failureCode: 'workspace_setup_failed',
+    });
   });
 
   it('builds reconnect snapshots for pending and never-accepted terminal queued messages', async () => {
@@ -1060,11 +1587,21 @@ describe('SessionMessageQueue', () => {
       terminalAt: 30,
       completionSource: 'delivery_failure',
       failureReason: 'exhausted',
-      error: 'delivery exhausted',
+      error: 'delivery exhausted with token=raw-secret',
+      failureStage: 'pre_dispatch',
+      failureCode: 'workspace_setup_failed',
+      failureSubtype: 'git_clone_timeout',
+      safeFailureMessage: 'Clone exceeded the safe deadline',
       attempts: 2,
     });
 
     const snapshots = await harness.queue.snapshotForStreamConnect();
+    const persisted = await getSessionMessageState(harness.storage, FIRST_MESSAGE_ID);
+    expect(persisted).toBeDefined();
+    if (!persisted) return;
+    const livePayload = buildCloudMessageFailedPayload(persisted);
+    expect(snapshots[0]?.terminalFailure).toMatchObject(livePayload);
+    expect(JSON.stringify({ snapshots, livePayload })).not.toContain('raw-secret');
 
     expect(snapshots).toEqual([
       {
@@ -1072,11 +1609,22 @@ describe('SessionMessageQueue', () => {
         content: 'failed before acceptance',
         timestamp: 10,
         terminalFailure: {
+          messageId: FIRST_MESSAGE_ID,
           status: 'failed',
+          delivery: 'queued',
+          accepted: false,
           completionSource: 'delivery_failure',
           reason: 'exhausted',
-          error: 'delivery exhausted',
+          error: 'Repository clone timed out: Clone exceeded the safe deadline',
           attempts: 2,
+
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'workspace_setup_failed',
+            subtype: 'git_clone_timeout',
+            attempts: 2,
+            message: 'Repository clone timed out: Clone exceeded the safe deadline',
+          },
           timestamp: 30,
         },
       },
@@ -1086,6 +1634,92 @@ describe('SessionMessageQueue', () => {
         timestamp: 20,
       },
     ]);
+  });
+
+  it('omits a reconnect delivery failure after a later turn completed', async () => {
+    const harness = createQueueHarness();
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState(
+        {
+          turn: {
+            type: 'prompt',
+            messageId: FIRST_MESSAGE_ID,
+            prompt: 'failed before acceptance',
+          },
+          agent: { mode: 'code', model: 'default-model' },
+        },
+        undefined,
+        10
+      ),
+      status: 'failed',
+      terminalAt: 30,
+      completionSource: 'delivery_failure',
+      failureReason: 'exhausted',
+      error: 'delivery exhausted',
+      attempts: 1,
+    });
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState(
+        {
+          turn: {
+            type: 'prompt',
+            messageId: SECOND_MESSAGE_ID,
+            prompt: 'delivered later',
+          },
+          agent: { mode: 'code', model: 'default-model' },
+        },
+        undefined,
+        40
+      ),
+      status: 'completed',
+      acceptedAt: 50,
+      terminalAt: 60,
+      completionSource: 'assistant_message_event',
+    });
+
+    await expect(harness.queue.snapshotForStreamConnect()).resolves.toEqual([]);
+  });
+
+  it('omits a reconnect delivery failure while a later turn is accepted', async () => {
+    const harness = createQueueHarness();
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState(
+        {
+          turn: {
+            type: 'prompt',
+            messageId: FIRST_MESSAGE_ID,
+            prompt: 'failed before acceptance',
+          },
+          agent: { mode: 'code', model: 'default-model' },
+        },
+        undefined,
+        10
+      ),
+      status: 'failed',
+      terminalAt: 30,
+      completionSource: 'delivery_failure',
+      failureReason: 'exhausted',
+      error: 'delivery exhausted',
+      attempts: 1,
+    });
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState(
+        {
+          turn: {
+            type: 'prompt',
+            messageId: SECOND_MESSAGE_ID,
+            prompt: 'currently running',
+          },
+          agent: { mode: 'code', model: 'default-model' },
+        },
+        undefined,
+        40
+      ),
+      status: 'accepted',
+      acceptedAt: 50,
+    });
+
+    await expect(harness.queue.snapshotForStreamConnect()).resolves.toEqual([]);
   });
 
   it('terminalizes pending queued work before deleting it during interrupt handoff', async () => {
@@ -1126,6 +1760,8 @@ describe('SessionMessageQueue', () => {
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
       },
@@ -1135,6 +1771,8 @@ describe('SessionMessageQueue', () => {
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
       },
@@ -1190,6 +1828,8 @@ describe('SessionMessageQueue', () => {
           kind: 'interrupted',
           error: 'Pending queued message interrupted by user',
           completionSource: 'interrupt',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
         },
         options: { allowIdleBatchWithoutObservedIdle: true },
       },

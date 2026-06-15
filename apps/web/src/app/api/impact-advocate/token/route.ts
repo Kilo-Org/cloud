@@ -1,10 +1,11 @@
 import { headers } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 
 import { referral_codes } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { getUserFromAuth } from '@/lib/user/server';
 import {
+  getImpactAdvocateProgramKeyForProduct,
   getImpactAdvocateWidgetId,
   issueImpactAdvocateVerifiedAccessToken,
 } from '@/lib/impact/advocate';
@@ -13,6 +14,7 @@ import {
   localeFromHeaders,
   queueImpactAdvocateSelfRegistration,
 } from '@/lib/impact/referral';
+import { ImpactReferralProduct } from '@kilocode/db/schema-types';
 
 /**
  * Internal Kilo referral code (kept for legacy/internal attribution flows in
@@ -28,7 +30,15 @@ async function ensureInternalReferralCode(userId: string): Promise<void> {
     .onConflictDoNothing({ target: [referral_codes.kilo_user_id] });
 }
 
-export async function GET() {
+function parseRequestedProduct(request: NextRequest): ImpactReferralProduct | null {
+  const product = request.nextUrl.searchParams.get('product')?.trim();
+  if (!product) return ImpactReferralProduct.KiloClaw;
+  if (product === ImpactReferralProduct.KiloClaw) return ImpactReferralProduct.KiloClaw;
+  if (product === ImpactReferralProduct.KiloPass) return ImpactReferralProduct.KiloPass;
+  return null;
+}
+
+export async function GET(request: NextRequest) {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) {
     return authFailedResponse;
@@ -38,7 +48,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const token = issueImpactAdvocateVerifiedAccessToken(user);
+  const product = parseRequestedProduct(request);
+  if (!product) {
+    return NextResponse.json({ error: 'Unsupported Impact Advocate product' }, { status: 400 });
+  }
+  const programKey = getImpactAdvocateProgramKeyForProduct(product);
+
+  const token = issueImpactAdvocateVerifiedAccessToken(user, new Date(), { programKey });
   if (!token) {
     return NextResponse.json({ error: 'Impact Advocate is not configured' }, { status: 503 });
   }
@@ -53,6 +69,7 @@ export async function GET() {
     // page loads via dedupe key.
     const requestHeaders = await headers();
     await queueImpactAdvocateSelfRegistration({
+      programKey,
       user,
       locale: localeFromHeaders(requestHeaders),
       countryCode: countryCodeFromHeaders(requestHeaders),
@@ -70,6 +87,6 @@ export async function GET() {
 
   return NextResponse.json({
     token,
-    widgetId: getImpactAdvocateWidgetId(),
+    widgetId: getImpactAdvocateWidgetId({ programKey }),
   });
 }

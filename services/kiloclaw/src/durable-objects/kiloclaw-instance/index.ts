@@ -10,6 +10,8 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { KiloClawEnv } from '../../types';
+import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../../db';
+import type { OpenclawFileWriteValidation } from '../gateway-controller-types';
 import type {
   InstanceConfig,
   PersistedState,
@@ -36,6 +38,7 @@ import type {
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
 import {
+  imageRolloutSubjectFromSandboxId,
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
 } from '@kilocode/worker-utils/instance-id';
@@ -77,6 +80,15 @@ import {
   parseMachineSizeFromFlyGuest,
 } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
+import type {
+  AgentConfigListResponse,
+  AgentReadResponse,
+  AgentMutationResponse,
+  AgentDefaultsMutationResponse,
+  AgentCreateResponse,
+  AgentDeleteResponse,
+  AgentConfigErrorEnvelope,
+} from '../gateway-controller-types';
 
 // Domain modules
 import type { InstanceMutableState, InstanceStatus, DestroyResult } from './types';
@@ -110,6 +122,7 @@ import {
   markRestartSuccessful,
   emitDestroyPendingTelemetry,
   maybeEmitDestroyStuckTelemetry,
+  type FinalizeDestroyRetention,
 } from './reconcile';
 import {
   restoreFromPostgres,
@@ -194,6 +207,41 @@ function resolveInstanceTypeFromState(
   return state.instanceType ?? tryInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
 }
 
+type PendingRegistryCleanup = {
+  userId: string;
+  orgId: string | null;
+  sandboxId: string;
+  releaseProvisionReservation: boolean;
+};
+
+const PENDING_REGISTRY_CLEANUP_KEY = 'pendingRegistryCleanup';
+const SKIP_PROVISION_RESERVATION_RELEASE_KEY = 'skipProvisionReservationRelease';
+const REGISTRY_CLEANUP_RETRY_MS = 60_000;
+
+const JSON_LOG_STRING_ESCAPES: Record<string, string> = {
+  '\b': '\\b',
+  '\f': '\\f',
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+  '"': '\\"',
+  '\\': '\\\\',
+};
+
+function formatJsonLogString(value: string): string {
+  let result = '"';
+  for (const char of value) {
+    const escaped = JSON_LOG_STRING_ESCAPES[char];
+    if (escaped) {
+      result += escaped;
+      continue;
+    }
+    const code = char.charCodeAt(0);
+    result += code < 0x20 ? `\\u${code.toString(16).padStart(4, '0')}` : char;
+  }
+  return `${result}"`;
+}
+
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
   private startInProgress = false;
@@ -244,7 +292,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private async resolveImageStateForPin(
     pinnedImageTag: string | null,
     userId: string,
-    instanceId: string,
+    rolloutSubject: string,
     opts: { isNew: boolean; ignoreCurrentImageTag?: boolean }
   ): Promise<void> {
     if (pinnedImageTag) {
@@ -331,7 +379,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const selected = await selectImageVersionForInstance({
       kv: this.env.KV_CLAW_CACHE,
       variant,
-      instanceId,
+      rolloutSubject,
       currentImageTag: selectorCurrentImageTag,
       autoEnroll,
     });
@@ -801,7 +849,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async provision(
     userId: string,
     config: InstanceConfig,
-    opts?: { orgId?: string | null; instanceId?: string; provider?: ProviderId }
+    opts?: {
+      orgId?: string | null;
+      instanceId?: string;
+      provider?: ProviderId;
+      freshProvision?: boolean;
+    }
   ): Promise<{ sandboxId: string }> {
     const provisionStart = performance.now();
     await this.loadState();
@@ -822,6 +875,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       ? sandboxIdFromInstanceId(opts.instanceId)
       : sandboxIdFromUserId(userId);
     const isNew = !this.s.status;
+    if (opts?.instanceId && !opts.freshProvision && isNew) {
+      throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
+    }
     if (!isNew && opts?.provider && opts.provider !== this.s.provider) {
       throw Object.assign(
         new Error(`Cannot change provider from ${this.s.provider} to ${opts.provider}`),
@@ -1909,10 +1965,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Returns the resolved image metadata so the caller can surface what
    * was actually applied.
    */
-  async applyPinnedVersion(
-    imageTag: string | null,
-    instanceId?: string
-  ): Promise<{
+  async applyPinnedVersion(imageTag: string | null): Promise<{
     openclawVersion: string | null;
     imageTag: string | null;
     imageDigest: string | null;
@@ -1931,9 +1984,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.s.userId) {
       throw Object.assign(new Error('Cannot apply pin: instance has no userId'), { status: 404 });
     }
+    if (!this.s.sandboxId) {
+      throw Object.assign(new Error('Cannot apply pin: instance has no sandboxId'), {
+        status: 404,
+      });
+    }
 
-    const resolvedInstanceId = instanceId ?? this.s.userId;
-    await this.resolveImageStateForPin(imageTag, this.s.userId, resolvedInstanceId, {
+    const rolloutSubject = imageRolloutSubjectFromSandboxId(this.s.sandboxId, this.s.userId);
+    await this.resolveImageStateForPin(imageTag, this.s.userId, rolloutSubject, {
       isNew: false,
       // When clearing a pin (imageTag === null), force a fresh rollout
       // decision instead of preserving the currently-tracked tag. Without
@@ -2510,6 +2568,131 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
+  private registryCleanupRetention(
+    userId: string,
+    orgId: string | null,
+    sandboxId: string,
+    releaseProvisionReservation: boolean
+  ): FinalizeDestroyRetention {
+    const pendingCleanup = {
+      userId,
+      orgId,
+      sandboxId,
+      releaseProvisionReservation,
+    } satisfies PendingRegistryCleanup;
+    return {
+      entries: { [PENDING_REGISTRY_CLEANUP_KEY]: pendingCleanup },
+      retryAlarmAt: Date.now() + REGISTRY_CLEANUP_RETRY_MS,
+    };
+  }
+
+  private async cleanupRegistryAfterFinalizedDestroy(
+    userId: string,
+    orgId: string | null,
+    sandboxId: string,
+    releaseProvisionReservation: boolean
+  ): Promise<void> {
+    try {
+      const registryInstanceId = isInstanceKeyedSandboxId(sandboxId)
+        ? instanceIdFromSandboxId(sandboxId)
+        : null;
+      let releaseAllowed = releaseProvisionReservation;
+      if (!releaseAllowed && registryInstanceId) {
+        const connectionString = this.env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new Error('HYPERDRIVE is not configured');
+        const db = getWorkerDb(connectionString);
+        const active = await getInstanceById(db, registryInstanceId);
+        if (!active) {
+          const destroyed = await getInstanceByIdIncludingDestroyed(db, registryInstanceId, {
+            includeDestroyed: true,
+          });
+          releaseAllowed = destroyed !== null;
+        }
+      }
+      const registryKeys = registryInstanceId
+        ? orgId
+          ? [`org:${orgId}`]
+          : [`user:${userId}`]
+        : orgId
+          ? [`user:${userId}`, `org:${orgId}`]
+          : [`user:${userId}`];
+
+      for (const registryKey of registryKeys) {
+        const registryStub = this.env.KILOCLAW_REGISTRY.get(
+          this.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+        );
+        if (registryInstanceId) {
+          if (releaseAllowed) {
+            await registryStub.finalizeDestroyedInstance(
+              registryKey,
+              userId,
+              registryInstanceId,
+              registryInstanceId,
+              'instance_destroyed'
+            );
+          } else {
+            await registryStub.destroyInstance(registryKey, registryInstanceId);
+          }
+          console.log('[DO] Registry entry destroyed on finalization:', {
+            registryKey,
+            instanceId: registryInstanceId,
+          });
+        } else {
+          const legacyDoKeys = legacyDoKeysForIdentity(userId, sandboxId);
+          const entries = await registryStub.listInstances(registryKey);
+          const legacyEntry = entries.find(e => legacyDoKeys.includes(e.doKey));
+          if (legacyEntry) {
+            await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
+            console.log('[DO] Registry entry destroyed on finalization (legacy):', {
+              registryKey,
+              instanceId: legacyEntry.instanceId,
+              doKeysTried: legacyDoKeys,
+              matchedDoKey: legacyEntry.doKey,
+            });
+          } else {
+            console.log(
+              '[DO] Registry cleanup: no active entry found (already cleaned or never existed):',
+              {
+                registryKey,
+                doKeysTried: legacyDoKeys,
+                activeEntryCount: entries.length,
+              }
+            );
+          }
+        }
+      }
+      if (!releaseAllowed) {
+        await this.ctx.storage.setAlarm(Date.now() + REGISTRY_CLEANUP_RETRY_MS);
+        return;
+      }
+      await this.ctx.storage.delete(PENDING_REGISTRY_CLEANUP_KEY);
+      await this.ctx.storage.deleteAlarm();
+    } catch (registryErr) {
+      console.error('[DO] Registry cleanup on finalization failed; will retry:', registryErr);
+      await this.ctx.storage.setAlarm(Date.now() + REGISTRY_CLEANUP_RETRY_MS);
+    }
+  }
+
+  async allowProvisionReservationReleaseOnFinalize(): Promise<void> {
+    await this.ctx.storage.delete(SKIP_PROVISION_RESERVATION_RELEASE_KEY);
+    const pendingCleanup = await this.ctx.storage.get<PendingRegistryCleanup>(
+      PENDING_REGISTRY_CLEANUP_KEY
+    );
+    if (pendingCleanup) {
+      const permittedCleanup = {
+        ...pendingCleanup,
+        releaseProvisionReservation: true,
+      } satisfies PendingRegistryCleanup;
+      await this.ctx.storage.put({ [PENDING_REGISTRY_CLEANUP_KEY]: permittedCleanup });
+      await this.cleanupRegistryAfterFinalizedDestroy(
+        permittedCleanup.userId,
+        permittedCleanup.orgId,
+        permittedCleanup.sandboxId,
+        true
+      );
+    }
+  }
+
   async destroy(options?: { reason?: KiloclawDestroyReason }): Promise<DestroyResult> {
     await this.loadState();
 
@@ -2524,6 +2707,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
+    const releaseProvisionReservation = options?.reason !== 'bootstrap_cleanup_failure';
+    if (releaseProvisionReservation) {
+      await this.ctx.storage.delete(SKIP_PROVISION_RESERVATION_RELEASE_KEY);
+    } else {
+      await this.ctx.storage.put(SKIP_PROVISION_RESERVATION_RELEASE_KEY, true);
+    }
     const runtimeId = getRuntimeId(this.s);
     const storageId = getStorageId(this.s);
     const destroyStartedAt = this.s.destroyStartedAt ?? Date.now();
@@ -2590,58 +2779,22 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s,
       destroyRctx,
       (userId, sandboxId) =>
-        markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
+        markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId),
+      this.registryCleanupRetention(
+        preDestroyUserId,
+        preDestroyOrgId,
+        preDestroySandboxId,
+        releaseProvisionReservation
+      )
     );
 
-    // Clean up registry entry on finalization. This covers both platform-initiated
-    // and alarm-initiated destroys. The platform route's registry cleanup is
-    // redundant but harmless (destroyInstance is idempotent on already-destroyed entries).
     if (finalized.finalized && preDestroyUserId && preDestroySandboxId) {
-      try {
-        const registryInstanceId = isInstanceKeyedSandboxId(preDestroySandboxId)
-          ? instanceIdFromSandboxId(preDestroySandboxId)
-          : null;
-
-        const registryKeys = [`user:${preDestroyUserId}`];
-        if (preDestroyOrgId) registryKeys.push(`org:${preDestroyOrgId}`);
-
-        for (const registryKey of registryKeys) {
-          const registryStub = this.env.KILOCLAW_REGISTRY.get(
-            this.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-          );
-          if (registryInstanceId) {
-            await registryStub.destroyInstance(registryKey, registryInstanceId);
-            console.log('[DO] Registry entry destroyed on finalization:', {
-              registryKey,
-              instanceId: registryInstanceId,
-            });
-          } else {
-            const legacyDoKeys = legacyDoKeysForIdentity(preDestroyUserId, preDestroySandboxId);
-            const entries = await registryStub.listInstances(registryKey);
-            const legacyEntry = entries.find(e => legacyDoKeys.includes(e.doKey));
-            if (legacyEntry) {
-              await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
-              console.log('[DO] Registry entry destroyed on finalization (legacy):', {
-                registryKey,
-                instanceId: legacyEntry.instanceId,
-                doKeysTried: legacyDoKeys,
-                matchedDoKey: legacyEntry.doKey,
-              });
-            } else {
-              console.log(
-                '[DO] Registry cleanup: no active entry found (already cleaned or never existed):',
-                {
-                  registryKey,
-                  doKeysTried: legacyDoKeys,
-                  activeEntryCount: entries.length,
-                }
-              );
-            }
-          }
-        }
-      } catch (registryErr) {
-        console.error('[DO] Registry cleanup on finalization failed (non-fatal):', registryErr);
-      }
+      await this.cleanupRegistryAfterFinalizedDestroy(
+        preDestroyUserId,
+        preDestroyOrgId,
+        preDestroySandboxId,
+        releaseProvisionReservation
+      );
     }
 
     if (!finalized.finalized) {
@@ -3358,7 +3511,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           previousOverride ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB` : 'none'
         } ` +
         `new=${input.size.cpus}/${input.size.memory_mb}MB cpu_kind=${input.size.cpu_kind ?? 'shared'} ` +
-        `reason="${input.reason.replace(/"/g, '\\"')}"`
+        `reason=${formatJsonLogString(input.reason)}`
     );
 
     return { previousOverride, newOverride: input.size };
@@ -3398,7 +3551,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
       console.log(
         `[admin-size-override] clear (no-op) userId=${this.s.userId} actor=${input.actorEmail} ` +
-          `reason="${input.reason.replace(/"/g, '\\"')}"`
+          `reason=${JSON.stringify(input.reason)}`
       );
       return { previousOverride: null };
     }
@@ -3429,10 +3582,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const previousLabel = previousOverride
       ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB`
       : 'metadata-only (skewed state)';
-    console.log(
-      `[admin-size-override] clear userId=${this.s.userId} actor=${input.actorEmail} ` +
-        `previous=${previousLabel} reason="${input.reason.replace(/"/g, '\\"')}"`
-    );
+    console.log('[admin-size-override] clear', {
+      userId: this.s.userId,
+      actor: input.actorEmail,
+      previous: previousLabel,
+      reason: input.reason,
+    });
 
     return { previousOverride };
   }
@@ -3750,9 +3905,91 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.replaceConfigOnMachine(this.s, this.env, config, etag);
   }
 
-  async getFileTree() {
+  /**
+   * List the agent fleet (+ inherited defaults). Fails closed with a typed
+   * `capability_unavailable` error when the controller lacks `config.agents.read`.
+   */
+  async listAgents(): Promise<AgentConfigListResponse | AgentConfigErrorEnvelope> {
     await this.loadState();
-    return gateway.getFileTree(this.s, this.env);
+    return gateway.listAgents(this.s, this.env);
+  }
+
+  /**
+   * Read one agent's normalized config. Returns an error envelope for an unknown
+   * id (`agent_not_found`) or a missing capability (`capability_unavailable`) —
+   * typed errors are returned, not thrown, so they survive the DO RPC boundary.
+   */
+  async getAgent(agentId: string): Promise<AgentReadResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.getAgent(this.s, this.env, agentId);
+  }
+
+  /**
+   * Edit one agent's model & behavioral settings ({ etag?, set, unset }).
+   * Throws typed errors for stale etag (`config_etag_conflict`), unknown agent
+   * (`agent_not_found`), or missing capability (`capability_unavailable`).
+   */
+  async updateAgent(
+    agentId: string,
+    patch: Record<string, unknown>
+  ): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.updateAgent(this.s, this.env, agentId, patch);
+  }
+
+  /**
+   * Edit the fleet-wide inherited agent defaults ({ etag?, set, unset }).
+   * Returns an error envelope for stale etag (`config_etag_conflict`) or missing
+   * capability (`capability_unavailable`).
+   */
+  async updateAgentDefaults(
+    patch: Record<string, unknown>
+  ): Promise<AgentDefaultsMutationResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.updateAgentDefaults(this.s, this.env, patch);
+  }
+
+  /**
+   * Create an agent (config + workspace + session dirs) via the OpenClaw CLI.
+   * Returns an error envelope for typed failures: `agent_exists`,
+   * `reserved_agent_id`, `openclaw_cli_failed`, `openclaw_cli_timeout`,
+   * `capability_unavailable`.
+   */
+  async createAgent(
+    body: Record<string, unknown>
+  ): Promise<AgentCreateResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.createAgent(this.s, this.env, body);
+  }
+
+  /**
+   * Delete an agent + clean up its references via the OpenClaw CLI. On-disk files
+   * are not confirmed removed (`filesystemDisposition: 'unverified'`). Rejects
+   * `main` (`reserved_agent_id`). Returns an error envelope for
+   * `openclaw_cli_failed`/`_timeout` or `capability_unavailable`.
+   */
+  async deleteAgent(agentId: string): Promise<AgentDeleteResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.deleteAgent(this.s, this.env, agentId);
+  }
+
+  /**
+   * Declaratively set an agent's channel-level routes ({ etag?, channels[] }).
+   * Returns an error envelope for stale etag (`config_etag_conflict`), unknown
+   * agent (`agent_not_found`), channel conflict (`agent_binding_conflict`), or
+   * missing capability (`capability_unavailable`).
+   */
+  async updateAgentBindings(
+    agentId: string,
+    body: Record<string, unknown>
+  ): Promise<AgentMutationResponse | AgentConfigErrorEnvelope> {
+    await this.loadState();
+    return gateway.updateAgentBindings(this.s, this.env, agentId, body);
+  }
+
+  async getFileTree(filePath?: string) {
+    await this.loadState();
+    return gateway.getFileTree(this.s, this.env, filePath);
   }
 
   async readFile(filePath: string) {
@@ -3763,6 +4000,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async writeFile(filePath: string, content: string, etag?: string) {
     await this.loadState();
     return gateway.writeFile(this.s, this.env, filePath, content, etag);
+  }
+
+  async writeOpenclawConfigFile(
+    content: string,
+    etag: string | undefined,
+    mode: OpenclawFileWriteValidation
+  ) {
+    await this.loadState();
+    return gateway.writeOpenclawConfigFile(this.s, this.env, content, etag, mode);
   }
 
   async importOpenclawWorkspace(files: Array<{ path: string; content: string }>) {
@@ -4056,10 +4302,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (options?.imageTag) {
         if (options.imageTag === 'latest') {
           const variant: ImageVariant = 'default';
-          const instanceIdForBucket =
-            this.s.sandboxId && isInstanceKeyedSandboxId(this.s.sandboxId)
-              ? instanceIdFromSandboxId(this.s.sandboxId)
-              : (this.s.userId ?? '');
+          const rolloutSubject = imageRolloutSubjectFromSandboxId(
+            this.s.sandboxId,
+            this.s.userId ?? ''
+          );
           let autoEnroll = false;
           if (this.s.userId && this.env.HYPERDRIVE?.connectionString) {
             try {
@@ -4076,7 +4322,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           const latest = await selectImageVersionForInstance({
             kv: this.env.KV_CLAW_CACHE,
             variant,
-            instanceId: instanceIdForBucket,
+            rolloutSubject,
             currentImageTag: this.s.trackedImageTag,
             autoEnroll,
           });
@@ -4307,6 +4553,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // ========================================================================
 
   override async alarm(): Promise<void> {
+    const pendingRegistryCleanup = await this.ctx.storage.get<PendingRegistryCleanup>(
+      PENDING_REGISTRY_CLEANUP_KEY
+    );
+    if (pendingRegistryCleanup) {
+      await this.cleanupRegistryAfterFinalizedDestroy(
+        pendingRegistryCleanup.userId,
+        pendingRegistryCleanup.orgId,
+        pendingRegistryCleanup.sandboxId,
+        pendingRegistryCleanup.releaseProvisionReservation
+      );
+      return;
+    }
+
     await this.loadState();
 
     if (!this.s.userId || !this.s.status) return;
@@ -4409,6 +4668,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       'alarm_retained_recovery_cleanup'
     );
 
+    const skipProvisionReservationRelease =
+      (await this.ctx.storage.get<boolean>(SKIP_PROVISION_RESERVATION_RELEASE_KEY)) === true;
+    const pendingDestroyIdentity =
+      this.s.status === 'destroying' && this.s.userId && this.s.sandboxId
+        ? {
+            userId: this.s.userId,
+            orgId: this.s.orgId,
+            sandboxId: this.s.sandboxId,
+            releaseProvisionReservation: !skipProvisionReservationRelease,
+          }
+        : null;
+
     try {
       if (this.s.provider !== 'fly') {
         if (this.s.status === 'destroying') {
@@ -4419,9 +4690,24 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             this.s,
             destroyRctx,
             (userId, sandboxId) =>
-              markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
+              markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId),
+            pendingDestroyIdentity
+              ? this.registryCleanupRetention(
+                  pendingDestroyIdentity.userId,
+                  pendingDestroyIdentity.orgId,
+                  pendingDestroyIdentity.sandboxId,
+                  pendingDestroyIdentity.releaseProvisionReservation
+                )
+              : undefined
           );
-          if (!result.finalized) {
+          if (result.finalized && pendingDestroyIdentity) {
+            await this.cleanupRegistryAfterFinalizedDestroy(
+              pendingDestroyIdentity.userId,
+              pendingDestroyIdentity.orgId,
+              pendingDestroyIdentity.sandboxId,
+              pendingDestroyIdentity.releaseProvisionReservation
+            );
+          } else if (!result.finalized) {
             await maybeEmitDestroyStuckTelemetry(this.ctx, this.s, destroyRctx);
           }
         } else {
@@ -4442,8 +4728,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         'alarm',
         () => this.destroy({ reason: 'stale_provision_cleanup' }).then(() => undefined),
         (userId, sandboxId) =>
-          markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
+          markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId),
+        pendingDestroyIdentity
+          ? this.registryCleanupRetention(
+              pendingDestroyIdentity.userId,
+              pendingDestroyIdentity.orgId,
+              pendingDestroyIdentity.sandboxId,
+              pendingDestroyIdentity.releaseProvisionReservation
+            )
+          : undefined
       );
+
+      if (pendingDestroyIdentity && this.s.status === null) {
+        await this.cleanupRegistryAfterFinalizedDestroy(
+          pendingDestroyIdentity.userId,
+          pendingDestroyIdentity.orgId,
+          pendingDestroyIdentity.sandboxId,
+          pendingDestroyIdentity.releaseProvisionReservation
+        );
+      }
 
       if (reconcileResult.beginUnexpectedStopRecovery && this.s.status === 'running') {
         await beginUnexpectedStopRecovery(

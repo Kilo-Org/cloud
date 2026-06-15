@@ -1,5 +1,8 @@
 import {
   credit_transactions,
+  impact_referral_conversions,
+  impact_referral_reward_applications,
+  impact_referral_rewards,
   kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
@@ -7,6 +10,11 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
+import {
+  ImpactReferralProduct,
+  ImpactReferralRewardKind,
+  ImpactReferralRewardStatus,
+} from '@kilocode/db/schema-types';
 import { KiloPassAuditLogResult } from './enums';
 import { KiloPassAuditLogAction } from './enums';
 import { KiloPassCadence } from './enums';
@@ -17,14 +25,21 @@ import type { db as defaultDb } from '@/lib/drizzle';
 import { processTopUp } from '@/lib/credits';
 import { grantCreditForCategory, type GrantCreditOptions } from '@/lib/promotionalCredits';
 import { toMicrodollars } from '@/lib/utils';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 
 import type { DrizzleTransaction } from '@/lib/drizzle';
+import { computeKiloPassBonusUsd } from '@/lib/kilo-pass/bonus-decision';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import type { Dayjs } from 'dayjs';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;
+
+export const KILO_PASS_BONUS_LIKE_ITEM_KINDS = [
+  KiloPassIssuanceItemKind.Bonus,
+  KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+  KiloPassIssuanceItemKind.ReferralBonus,
+];
 
 export function computeIssueMonth(date: Dayjs): string {
   return date.utc().format('YYYY-MM-01');
@@ -442,6 +457,273 @@ export async function issueBaseCreditsForIssuance(
   };
 }
 
+async function getExistingBonusLikeIssuanceItem(
+  tx: DrizzleTransaction,
+  params: { issuanceId: string }
+): Promise<{
+  issuanceItemId: string;
+  creditTransactionId: string;
+  kind: KiloPassIssuanceItemKind;
+} | null> {
+  const rows = await tx
+    .select({
+      issuanceItemId: kilo_pass_issuance_items.id,
+      creditTransactionId: kilo_pass_issuance_items.credit_transaction_id,
+      kind: kilo_pass_issuance_items.kind,
+    })
+    .from(kilo_pass_issuance_items)
+    .where(
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, params.issuanceId),
+        inArray(kilo_pass_issuance_items.kind, [
+          KiloPassIssuanceItemKind.Bonus,
+          KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+          KiloPassIssuanceItemKind.ReferralBonus,
+        ])
+      )
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export type KiloPassReferralBonusApplicationResult = IssueCreditResult & {
+  rewardId: string | null;
+  expiredRewardIds: string[];
+};
+
+export async function applyPendingKiloPassReferralBonusForIssuance(
+  tx: DrizzleTransaction,
+  params: {
+    issuanceId: string;
+    subscriptionId: string;
+    kiloUserId: string;
+    stripeInvoiceId?: string | null;
+  }
+): Promise<KiloPassReferralBonusApplicationResult> {
+  const { issuanceId, subscriptionId, kiloUserId, stripeInvoiceId } = params;
+
+  await lockIssuanceRow(tx, issuanceId);
+
+  const issuanceRows = await tx
+    .select({
+      issueMonth: kilo_pass_issuances.issue_month,
+      stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
+      createdAt: kilo_pass_issuances.created_at,
+    })
+    .from(kilo_pass_issuances)
+    .where(eq(kilo_pass_issuances.id, issuanceId))
+    .limit(1);
+
+  const issuance = issuanceRows[0];
+  if (!issuance) {
+    throw new Error(`Issuance not found: ${issuanceId}`);
+  }
+
+  const applicationCutoff = issuance.createdAt;
+  const sourcePaymentId = stripeInvoiceId ?? issuance.stripeInvoiceId;
+
+  const expiredRewards = await tx
+    .update(impact_referral_rewards)
+    .set({
+      status: ImpactReferralRewardStatus.Expired,
+      reversed_at: applicationCutoff,
+      review_reason: 'expired_before_kilo_pass_referral_bonus_application',
+    })
+    .where(
+      and(
+        eq(impact_referral_rewards.product, ImpactReferralProduct.KiloPass),
+        eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloPassBonus),
+        eq(impact_referral_rewards.beneficiary_user_id, kiloUserId),
+        inArray(impact_referral_rewards.status, [
+          ImpactReferralRewardStatus.Pending,
+          ImpactReferralRewardStatus.Earned,
+        ]),
+        sql`${impact_referral_rewards.expires_at} IS NOT NULL`,
+        lte(impact_referral_rewards.expires_at, applicationCutoff),
+        isNull(impact_referral_rewards.applied_at),
+        isNull(impact_referral_rewards.consumed_kilo_pass_issuance_id)
+      )
+    )
+    .returning({ id: impact_referral_rewards.id });
+
+  const existingBonusLikeItem = await getExistingBonusLikeIssuanceItem(tx, { issuanceId });
+  if (existingBonusLikeItem) {
+    return {
+      wasIssued: false,
+      rewardId: null,
+      expiredRewardIds: expiredRewards.map(reward => reward.id),
+      issuanceItemId: existingBonusLikeItem.issuanceItemId,
+      creditTransactionId: existingBonusLikeItem.creditTransactionId,
+      amountUsd: 0,
+      amountMicrodollars: 0,
+    };
+  }
+
+  const rewardRows = await tx
+    .select({
+      id: impact_referral_rewards.id,
+      rewardAmountUsd: impact_referral_rewards.reward_amount_usd,
+      rewardPercent: impact_referral_rewards.reward_percent,
+      sourcePaymentId: impact_referral_conversions.source_payment_id,
+    })
+    .from(impact_referral_rewards)
+    .innerJoin(
+      impact_referral_conversions,
+      eq(impact_referral_conversions.id, impact_referral_rewards.conversion_id)
+    )
+    .where(
+      and(
+        eq(impact_referral_rewards.product, ImpactReferralProduct.KiloPass),
+        eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloPassBonus),
+        eq(impact_referral_rewards.beneficiary_user_id, kiloUserId),
+        inArray(impact_referral_rewards.status, [
+          ImpactReferralRewardStatus.Pending,
+          ImpactReferralRewardStatus.Earned,
+        ]),
+        isNull(impact_referral_rewards.applied_at),
+        isNull(impact_referral_rewards.consumed_kilo_pass_issuance_id),
+        lt(impact_referral_rewards.earned_at, applicationCutoff),
+        gt(impact_referral_rewards.expires_at, applicationCutoff),
+        sourcePaymentId
+          ? ne(impact_referral_conversions.source_payment_id, sourcePaymentId)
+          : undefined
+      )
+    )
+    .orderBy(asc(impact_referral_rewards.earned_at), asc(impact_referral_rewards.created_at))
+    .for('update')
+    .limit(1);
+
+  const reward = rewardRows[0];
+  if (!reward || reward.rewardAmountUsd == null) {
+    return {
+      wasIssued: false,
+      rewardId: null,
+      expiredRewardIds: expiredRewards.map(expiredReward => expiredReward.id),
+      issuanceItemId: null,
+      creditTransactionId: null,
+      amountUsd: 0,
+      amountMicrodollars: 0,
+    };
+  }
+
+  const user = await getUserForCreditMutations(tx, kiloUserId);
+  const rewardCents = roundUsdToCents(reward.rewardAmountUsd);
+  const rewardAmountUsd = centsToUsd(rewardCents);
+  const rewardAmountMicrodollars = toMicrodollars(rewardAmountUsd);
+  const bonusPercentApplied = reward.rewardPercent ?? 0.5;
+
+  const creditExpiryDate = await computeKiloPassBonusExpiryDate(tx, {
+    issuanceId,
+    subscriptionId,
+  });
+
+  const creditCategory = 'kilo-pass-bonus';
+  const grantResult = await grantCreditForCategory(user, {
+    credit_category: creditCategory,
+    counts_as_selfservice: false,
+    amount_usd: rewardAmountUsd,
+    description: `Kilo Pass referral bonus (${issuance.issueMonth})`,
+    credit_expiry_date: creditExpiryDate ?? undefined,
+    dbOrTx: tx,
+  });
+  if (!grantResult.success) {
+    throw new Error(`Failed to grant Kilo Pass referral bonus credits: ${grantResult.message}`);
+  }
+
+  const creditTransactionId = grantResult.credit_transaction_id;
+  const issuanceItemInsert = await tx
+    .insert(kilo_pass_issuance_items)
+    .values({
+      kilo_pass_issuance_id: issuanceId,
+      kind: KiloPassIssuanceItemKind.ReferralBonus,
+      credit_transaction_id: creditTransactionId,
+      amount_usd: rewardAmountUsd,
+      bonus_percent_applied: bonusPercentApplied,
+    })
+    .returning({ issuanceItemId: kilo_pass_issuance_items.id });
+
+  const issuanceItemId = issuanceItemInsert[0]?.issuanceItemId;
+  if (!issuanceItemId) {
+    throw new Error('Failed to insert issuance item for referral bonus credits');
+  }
+
+  const appliedAt = new Date().toISOString();
+  const appliedRows = await tx
+    .update(impact_referral_rewards)
+    .set({
+      status: ImpactReferralRewardStatus.Applied,
+      applies_to_kilo_pass_subscription_id: subscriptionId,
+      consumed_kilo_pass_issuance_id: issuanceId,
+      consumed_kilo_pass_issuance_item_id: issuanceItemId,
+      applied_at: appliedAt,
+      review_reason: null,
+    })
+    .where(
+      and(
+        eq(impact_referral_rewards.id, reward.id),
+        inArray(impact_referral_rewards.status, [
+          ImpactReferralRewardStatus.Pending,
+          ImpactReferralRewardStatus.Earned,
+        ]),
+        isNull(impact_referral_rewards.applied_at),
+        isNull(impact_referral_rewards.consumed_kilo_pass_issuance_id)
+      )
+    )
+    .returning({ id: impact_referral_rewards.id });
+
+  if (!appliedRows[0]) {
+    throw new Error(`Failed to mark Kilo Pass referral reward applied: ${reward.id}`);
+  }
+
+  const existingApplication = await tx.query.impact_referral_reward_applications.findFirst({
+    columns: { id: true },
+    where: eq(impact_referral_reward_applications.reward_id, reward.id),
+  });
+
+  if (!existingApplication) {
+    const issueMonthStart = `${issuance.issueMonth}T00:00:00.000Z`;
+    await tx.insert(impact_referral_reward_applications).values({
+      product: ImpactReferralProduct.KiloPass,
+      reward_id: reward.id,
+      beneficiary_user_id: kiloUserId,
+      subscription_id: subscriptionId,
+      previous_renewal_boundary: issueMonthStart,
+      new_renewal_boundary: creditExpiryDate?.toISOString() ?? issueMonthStart,
+      local_operation_id: creditTransactionId,
+      stripe_operation_id: sourcePaymentId ?? null,
+      applied_at: appliedAt,
+    });
+  }
+
+  await appendKiloPassAuditLog(tx, {
+    action: KiloPassAuditLogAction.BonusCreditsIssued,
+    result: KiloPassAuditLogResult.Success,
+    kiloUserId,
+    kiloPassSubscriptionId: subscriptionId,
+    stripeInvoiceId: sourcePaymentId ?? null,
+    relatedCreditTransactionId: creditTransactionId,
+    relatedMonthlyIssuanceId: issuanceId,
+    payload: {
+      kind: KiloPassIssuanceItemKind.ReferralBonus,
+      rewardId: reward.id,
+      bonusPercentApplied,
+      bonusAmountUsd: rewardAmountUsd,
+      creditCategory,
+    },
+  });
+
+  return {
+    wasIssued: true,
+    rewardId: reward.id,
+    expiredRewardIds: expiredRewards.map(expiredReward => expiredReward.id),
+    issuanceItemId,
+    creditTransactionId,
+    amountUsd: rewardAmountUsd,
+    amountMicrodollars: rewardAmountMicrodollars,
+  };
+}
+
 export async function issueBonusCreditsForIssuance(
   tx: DrizzleTransaction,
   params: {
@@ -564,9 +846,8 @@ export async function issueBonusCreditsForIssuance(
 
   const user = await getUserForCreditMutations(tx, kiloUserId);
   const baseCents = roundUsdToCents(baseAmountUsd);
-  const bonusCents = Math.round(baseCents * bonusPercentApplied);
-  const bonusUsd = centsToUsd(bonusCents);
-  const bonusMicrodollars = toMicrodollars(centsToUsd(bonusCents));
+  const bonusUsd = computeKiloPassBonusUsd({ baseAmountUsd, bonusPercentApplied });
+  const bonusMicrodollars = toMicrodollars(bonusUsd);
 
   const creditExpiryDate = await computeKiloPassBonusExpiryDate(tx, {
     issuanceId,

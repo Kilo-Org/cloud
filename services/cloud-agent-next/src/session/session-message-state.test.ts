@@ -4,11 +4,13 @@ import {
   getSessionMessageState,
   putSessionMessageState,
   markMessageAccepted,
+  markAgentActivityObserved,
   markMessageCompleted,
   markMessageFailed,
   markMessageInterrupted,
   terminalizeMessageOnce,
   listNonTerminalAcceptedMessages,
+  listMessagesForWrapperRun,
   listMessagesWithPendingCallbacks,
   isTerminalMessageState,
   type SessionMessageState,
@@ -18,10 +20,13 @@ import type { SessionMessageIntent } from '../execution/types.js';
 
 function createFakeStorage(): SessionMessageStorage & {
   store: Map<string, unknown>;
+  listPrefixes: string[];
 } {
   const store = new Map<string, unknown>();
+  const listPrefixes: string[] = [];
   return {
     store,
+    listPrefixes,
     async get<T = unknown>(key: string): Promise<T | undefined> {
       return store.get(key) as T | undefined;
     },
@@ -29,6 +34,7 @@ function createFakeStorage(): SessionMessageStorage & {
       store.set(key, value);
     },
     async list<T = unknown>(options: { prefix: string }): Promise<Map<string, T>> {
+      listPrefixes.push(options.prefix);
       const result = new Map<string, T>();
       for (const [key, value] of store.entries()) {
         if (key.startsWith(options.prefix)) {
@@ -136,13 +142,64 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     expect(loaded).not.toHaveProperty('finalization');
   });
 
-  it('normalizes a legacy stored turn as an additional partial replay constraint', async () => {
+  it('round-trips canonical attachments in an admission snapshot', async () => {
+    const storage = createFakeStorage();
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+    const state = createQueuedSessionMessageState({
+      turn: { type: 'prompt', messageId: VALID_MESSAGE_ID, prompt: 'document', attachments },
+      agent: { mode: 'code', model: 'default-model' },
+    });
+    await putSessionMessageState(storage, state);
+
+    const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+
+    expect(loaded?.admissionSnapshot?.turn).toMatchObject({ attachments });
+  });
+
+  it('rejects stored admission snapshots containing legacy images', async () => {
     const storage = createFakeStorage();
     await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
       messageId: VALID_MESSAGE_ID,
       status: 'accepted',
-      prompt: 'legacy prompt',
-      turn: { type: 'prompt', messageId: VALID_MESSAGE_ID, prompt: 'legacy prompt' },
+      prompt: 'old image snapshot',
+      admissionSnapshot: {
+        turn: {
+          type: 'prompt',
+          messageId: VALID_MESSAGE_ID,
+          prompt: 'old image snapshot',
+          images: {
+            path: '123e4567-e89b-12d3-a456-426614174000',
+            files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          },
+        },
+        agent: { mode: 'code', model: 'default-model' },
+      },
+      createdAt: 1000,
+      acceptedAt: 2000,
+    });
+
+    expect(await getSessionMessageState(storage, VALID_MESSAGE_ID)).toBeUndefined();
+  });
+
+  it('normalizes canonical predecessor turn attachments into replay constraints', async () => {
+    const storage = createFakeStorage();
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+    await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
+      messageId: VALID_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'stored document',
+      turn: {
+        type: 'prompt',
+        messageId: VALID_MESSAGE_ID,
+        prompt: 'stored document',
+        attachments,
+      },
       createdAt: 1000,
       acceptedAt: 2000,
       agent: { mode: 'plan', model: 'legacy-model' },
@@ -153,7 +210,8 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     expect(loaded?.legacyAdmissionConstraints?.turn).toEqual({
       type: 'prompt',
       messageId: VALID_MESSAGE_ID,
-      prompt: 'legacy prompt',
+      prompt: 'stored document',
+      attachments,
     });
   });
 
@@ -177,6 +235,26 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     expect(loaded).not.toHaveProperty('agent');
   });
 
+  it('reads predecessor rows without new report classification fields', async () => {
+    const storage = createFakeStorage();
+    await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
+      messageId: VALID_MESSAGE_ID,
+      status: 'failed',
+      prompt: 'legacy failed prompt',
+      createdAt: 1000,
+      terminalAt: 2000,
+      completionSource: 'delivery_failure',
+      failureReason: 'exhausted',
+    });
+
+    const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+    expect(loaded).toMatchObject({ status: 'failed', completionSource: 'delivery_failure' });
+    expect(loaded?.failureStage).toBeUndefined();
+    expect(loaded?.failureCode).toBeUndefined();
+    expect(loaded?.dispatchAcceptanceKind).toBeUndefined();
+    expect(loaded?.agentActivityObservedAt).toBeUndefined();
+  });
+
   it('returns undefined for unknown messageId', async () => {
     const storage = createFakeStorage();
     const loaded = await getSessionMessageState(storage, 'msg_unknown00000000ABCDEFGHIJKLMN');
@@ -198,7 +276,26 @@ describe('markMessageAccepted', () => {
     expect(updated).not.toBeNull();
     expect(updated!.status).toBe('accepted');
     expect(updated!.acceptedAt).toBe(2000);
+    expect(updated!.dispatchAcceptanceKind).toBe('observed');
     expect(updated!.wrapperRunId).toBe('wr_abc123');
+  });
+
+  it('records inferred acceptance when terminal ingest reconstructs dispatch', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000)
+    );
+
+    const updated = await markMessageAccepted(
+      storage,
+      VALID_MESSAGE_ID,
+      'wr_abc123',
+      2000,
+      'inferred_from_terminal'
+    );
+
+    expect(updated?.dispatchAcceptanceKind).toBe('inferred_from_terminal');
   });
 
   it('returns null if message not found', async () => {
@@ -219,6 +316,27 @@ describe('markMessageAccepted', () => {
 
     const secondAccept = await markMessageAccepted(storage, VALID_MESSAGE_ID, 'wr_def456', 3000);
     expect(secondAccept).toBeNull();
+  });
+});
+
+describe('markAgentActivityObserved', () => {
+  it('records first attributable activity only after acceptance', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000)
+    );
+    expect(await markAgentActivityObserved(storage, VALID_MESSAGE_ID, 1500)).toBeNull();
+
+    await markMessageAccepted(storage, VALID_MESSAGE_ID, 'wr_abc123', 2000);
+    const observed = await markAgentActivityObserved(storage, VALID_MESSAGE_ID, 3000);
+    const duplicate = await markAgentActivityObserved(storage, VALID_MESSAGE_ID, 4000);
+
+    expect(observed?.agentActivityObservedAt).toBe(3000);
+    expect(duplicate).toBeNull();
+    expect((await getSessionMessageState(storage, VALID_MESSAGE_ID))?.agentActivityObservedAt).toBe(
+      3000
+    );
   });
 });
 
@@ -290,6 +408,8 @@ describe('markMessageFailed', () => {
         reason: 'missing_assistant_reply',
         error: 'No reply found',
         completionSource: 'idle_reconciliation',
+        failureStage: 'post_dispatch_no_activity',
+        failureCode: 'missing_assistant_reply',
       },
       3000
     );
@@ -298,6 +418,8 @@ describe('markMessageFailed', () => {
     expect(failed!.failureReason).toBe('missing_assistant_reply');
     expect(failed!.error).toBe('No reply found');
     expect(failed!.completionSource).toBe('idle_reconciliation');
+    expect(failed!.failureStage).toBe('post_dispatch_no_activity');
+    expect(failed!.failureCode).toBe('missing_assistant_reply');
     expect(failed!.terminalAt).toBe(3000);
   });
 
@@ -339,7 +461,11 @@ describe('markMessageInterrupted', () => {
     const interrupted = await markMessageInterrupted(
       storage,
       VALID_MESSAGE_ID,
-      { error: 'User interrupted' },
+      {
+        error: 'User interrupted',
+        failureStage: 'interruption',
+        failureCode: 'user_interrupt',
+      },
       2000
     );
     expect(interrupted).not.toBeNull();
@@ -347,6 +473,8 @@ describe('markMessageInterrupted', () => {
     expect(interrupted!.failureReason).toBe('interrupted');
     expect(interrupted!.error).toBe('User interrupted');
     expect(interrupted!.completionSource).toBe('interrupt');
+    expect(interrupted!.failureStage).toBe('interruption');
+    expect(interrupted!.failureCode).toBe('user_interrupt');
   });
 });
 
@@ -372,7 +500,28 @@ describe('terminalizeMessageOnce', () => {
     expect(result.state!.terminalEffects).toEqual({
       event: 'pending',
       callback: { disposition: 'not-required' },
+      push: { disposition: 'pending' },
     });
+  });
+
+  it('marks predecessor accepted terminalization as inferred acceptance for reporting', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(storage, {
+      ...createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000),
+      status: 'accepted',
+      acceptedAt: 2000,
+      wrapperRunId: 'wr_legacy',
+    });
+
+    const result = await terminalizeMessageOnce(
+      storage,
+      VALID_MESSAGE_ID,
+      { kind: 'completed', completionSource: 'assistant_message_event' },
+      {},
+      3000
+    );
+
+    expect(result.state?.dispatchAcceptanceKind).toBe('inferred_from_terminal');
   });
 
   it('does not double-terminalize and reports changed=false', async () => {
@@ -418,6 +567,48 @@ describe('terminalizeMessageOnce', () => {
     expect(result.changed).toBe(true);
     expect(result.state?.status).toBe('interrupted');
     expect(result.state?.failureReason).toBe('interrupted');
+  });
+
+  it('stores validated workspace failure diagnostics without changing the raw error', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000)
+    );
+
+    const result = await terminalizeMessageOnce(storage, VALID_MESSAGE_ID, {
+      kind: 'failed',
+      reason: 'exhausted',
+      error: 'raw compatibility error',
+      completionSource: 'delivery_failure',
+      failureCode: 'workspace_setup_failed',
+      failureSubtype: 'git_clone_timeout',
+      safeFailureMessage: 'Repository clone timed out',
+    });
+
+    expect(result.state).toMatchObject({
+      error: 'raw compatibility error',
+      failureSubtype: 'git_clone_timeout',
+      safeFailureMessage: 'Repository clone timed out',
+    });
+  });
+
+  it('rejects workspace failure subtypes on non-workspace failures', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000)
+    );
+
+    await expect(
+      terminalizeMessageOnce(storage, VALID_MESSAGE_ID, {
+        kind: 'failed',
+        reason: 'exhausted',
+        completionSource: 'delivery_failure',
+        failureCode: 'wrapper_start_failed',
+        failureSubtype: 'git_clone_timeout',
+      })
+    ).rejects.toThrow('Workspace failure subtype requires workspace_setup_failed failure code');
   });
 
   it('returns changed=false for unknown messageId', async () => {
@@ -466,6 +657,134 @@ describe('listNonTerminalAcceptedMessages', () => {
 
     const accepted = await listNonTerminalAcceptedMessages(storage);
     expect(accepted).toHaveLength(0);
+  });
+});
+
+describe('listMessagesForWrapperRun', () => {
+  it('lists accepted and terminal messages fenced to the wrapper run', async () => {
+    const storage = createFakeStorage();
+    const acceptedId = 'msg_0123456789abAAAAAAAAAAAAAA';
+    const completedId = 'msg_0123456789abBBBBBBBBBBBBBB';
+    const failedId = 'msg_0123456789abCCCCCCCCCCCCCC';
+    const queuedId = 'msg_0123456789abDDDDDDDDDDDDDD';
+    const otherRunId = 'msg_0123456789abEEEEEEEEEEEEEE';
+
+    for (const [messageId, status, wrapperRunId] of [
+      [acceptedId, 'accepted', 'wr_run1'],
+      [completedId, 'completed', 'wr_run1'],
+      [failedId, 'failed', 'wr_run1'],
+      [queuedId, 'queued', undefined],
+      [otherRunId, 'completed', 'wr_run2'],
+    ] as const) {
+      await putSessionMessageState(storage, {
+        ...createQueuedSessionMessageState(createIntent(messageId, messageId), undefined, 1000),
+        status,
+        acceptedAt: status === 'queued' ? undefined : 2000,
+        terminalAt: status === 'accepted' || status === 'queued' ? undefined : 3000,
+        wrapperRunId,
+      });
+    }
+
+    const messages = await listMessagesForWrapperRun(storage, 'wr_run1');
+
+    expect(messages.map(message => message.messageId)).toEqual([acceptedId, completedId, failedId]);
+    expect(storage.listPrefixes).toContain('session_message:');
+  });
+
+  it('falls back to history after an older writer drops the live run index version', async () => {
+    const storage = createFakeStorage();
+    const legacyId = 'msg_0123456789abAAAAAAAAAAAAAA';
+    const indexedId = 'msg_0123456789abBBBBBBBBBBBBBB';
+
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_live',
+      wrapperRunId: 'wr_live',
+      messageIndexVersion: 1,
+    });
+    await putSessionMessageState(storage, {
+      ...createQueuedSessionMessageState(createIntent(indexedId, 'indexed'), undefined, 1000),
+      status: 'accepted',
+      acceptedAt: 2000,
+      wrapperRunId: 'wr_live',
+    });
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_live',
+      wrapperRunId: 'wr_live',
+    });
+    await storage.put(`session_message:${legacyId}`, {
+      ...createQueuedSessionMessageState(createIntent(legacyId, 'legacy'), undefined, 1000),
+      status: 'accepted',
+      acceptedAt: 2000,
+      wrapperRunId: 'wr_live',
+    });
+
+    const messages = await listMessagesForWrapperRun(storage, 'wr_live');
+
+    expect(messages.map(message => message.messageId).sort()).toEqual([legacyId, indexedId]);
+    expect(storage.listPrefixes).toContain('session_message:');
+  });
+
+  it('reads only an initialized wrapper run index and preserves accepted filtering', async () => {
+    const storage = createFakeStorage();
+    const acceptedId = 'msg_0123456789abAAAAAAAAAAAAAA';
+    const completedId = 'msg_0123456789abBBBBBBBBBBBBBB';
+    const historicalId = 'msg_0123456789abCCCCCCCCCCCCCC';
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_current',
+      wrapperRunId: 'wr_current',
+      messageIndexVersion: 1,
+    });
+
+    for (const [messageId, status, wrapperRunId] of [
+      [acceptedId, 'accepted', 'wr_current'],
+      [completedId, 'completed', 'wr_current'],
+      [historicalId, 'completed', 'wr_historical'],
+    ] as const) {
+      await putSessionMessageState(storage, {
+        ...createQueuedSessionMessageState(createIntent(messageId, messageId), undefined, 1000),
+        status,
+        acceptedAt: 2000,
+        terminalAt: status === 'completed' ? 3000 : undefined,
+        wrapperRunId,
+      });
+    }
+    storage.listPrefixes.length = 0;
+
+    await expect(listNonTerminalAcceptedMessages(storage, 'wr_current')).resolves.toMatchObject([
+      { messageId: acceptedId, status: 'accepted' },
+    ]);
+    expect(storage.listPrefixes).toEqual(['session_message_wrapper_run:wr_current:']);
+  });
+
+  it('does not expose an indexed member whose primary state write failed', async () => {
+    const storage = createFakeStorage();
+    const messageId = 'msg_0123456789abAAAAAAAAAAAAAA';
+    await storage.put('wrapper_runtime_state', {
+      wrapperGeneration: 1,
+      wrapperConnectionId: 'conn_current',
+      wrapperRunId: 'wr_current',
+      messageIndexVersion: 1,
+    });
+    const put = storage.put.bind(storage);
+    storage.put = async (key, value) => {
+      if (key === `session_message:${messageId}`) throw new Error('primary write failed');
+      await put(key, value);
+    };
+
+    await expect(
+      putSessionMessageState(storage, {
+        ...createQueuedSessionMessageState(createIntent(messageId, 'message'), undefined, 1000),
+        status: 'accepted',
+        acceptedAt: 2000,
+        wrapperRunId: 'wr_current',
+      })
+    ).rejects.toThrow('primary write failed');
+    storage.put = put;
+
+    await expect(listMessagesForWrapperRun(storage, 'wr_current')).resolves.toEqual([]);
   });
 });
 

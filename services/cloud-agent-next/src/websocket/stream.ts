@@ -25,6 +25,7 @@ import type {
 } from '../shared/protocol.js';
 import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
+import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 
 /**
  * Approximate byte budget per replay round.
@@ -88,14 +89,7 @@ export type QueuedMessageSnapshot = {
   messageId: string;
   content: string;
   timestamp: number;
-  terminalFailure?: {
-    status: 'failed' | 'interrupted';
-    completionSource?: string;
-    reason?: string;
-    error?: string;
-    attempts?: number;
-    timestamp: number;
-  };
+  terminalFailure?: CloudMessageFailedPayload & { timestamp: number };
 };
 
 /** Options for deriving current session state in the `connected` event. */
@@ -123,6 +117,16 @@ export type StreamHandlerOptions = {
  * @param options - Optional derivation functions for the `connected` event
  * @returns Stream handler object with methods for WebSocket operations
  */
+/**
+ * Number of active /stream WebSocket connections.
+ *
+ * Stateless so callers can check the count without instantiating a
+ * StreamHandler (and without knowing the internal 'stream' tag).
+ */
+export function getConnectedStreamClientCount(state: DurableObjectState): number {
+  return state.getWebSockets('stream').length;
+}
+
 export function createStreamHandler(
   state: DurableObjectState,
   eventQueries: EventQueries,
@@ -273,14 +277,8 @@ export function createStreamHandler(
               streamEventType: 'cloud.message.failed' as const,
               timestamp: new Date(msg.terminalFailure.timestamp).toISOString(),
               data: {
-                messageId: msg.messageId,
-                status: msg.terminalFailure.status,
-                delivery: 'queued',
-                accepted: false,
-                completionSource: msg.terminalFailure.completionSource,
-                reason: msg.terminalFailure.reason,
-                attempts: msg.terminalFailure.attempts,
-                error: msg.terminalFailure.error,
+                ...msg.terminalFailure,
+                timestamp: undefined,
               },
             })
           );
@@ -409,15 +407,6 @@ export function createStreamHandler(
           // Don't close the WebSocket on broadcast error - let the client handle reconnection
         }
       }
-    },
-
-    /**
-     * Get count of connected stream clients.
-     *
-     * @returns Number of active WebSocket connections with 'stream' tag
-     */
-    getConnectedClientCount(): number {
-      return state.getWebSockets('stream').length;
     },
   };
 }

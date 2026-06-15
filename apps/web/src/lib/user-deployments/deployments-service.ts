@@ -35,13 +35,16 @@ import { isHTTPsUrl, extractRepoNameFromUrl } from './git-url-utils';
 import { encryptAuthToken, decryptAuthToken } from './auth-token-encryption';
 import { hasUserEverPaid, hasOrganizationEverPaid } from '@/lib/creditTransactions';
 import { slugSchema } from './validation';
-import { dispatcherClient } from './dispatcher-client';
+import { DispatcherSlugTakenError, dispatcherClient } from './dispatcher-client';
 
 type PaymentCheckResult = { hasPaid: true } | { hasPaid: false };
 
-/** Thrown when the dispatcher KV slug mapping update fails during a rename. */
+/** Thrown when the dispatcher slug mapping update fails during a rename. */
 class SlugMappingError extends Error {
-  constructor(cause: unknown) {
+  constructor(
+    readonly slugTaken: boolean,
+    cause: unknown
+  ) {
     super('Dispatcher slug mapping failed', { cause });
     this.name = 'SlugMappingError';
   }
@@ -784,14 +787,17 @@ export async function createDeployment(params: {
       return deployment.id;
     });
   } catch (error) {
-    // The slug mapping (line 727) and worker already exist at this point.
-    // Clean up both on failure to avoid orphaned resources.
+    // Stop the queued build before removing routing or any worker it may already have created.
+    await deployApiClient.cancelBuild(builderResponse.buildId).catch(() => {});
     await dispatcherClient.deleteSlugMapping(internalWorkerName).catch(() => {});
     await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
 
-    // Handle unique constraint violation on deployment_slug (rare race condition).
+    // Handle conflicts found in the database or dispatcher reservation layer.
     // Everything has been torn down at this point, so ask the user to retry.
-    if (isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')) {
+    if (
+      error instanceof DispatcherSlugTakenError ||
+      isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')
+    ) {
       return { success: false, error: 'slug_taken', message: 'Please try again' };
     }
     throw error;
@@ -856,11 +862,11 @@ export async function renameDeployment(
   const internalWorkerName = deployment.internal_worker_name;
   const newUrl = `https://${newSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
 
-  // Run DB update + dispatcher KV mapping inside a transaction so the DB change
-  // is automatically rolled back if the dispatcher call fails.
+  let slugMappingUpdated = false;
+
   try {
     const slugWasConcurrentlyTaken = await db.transaction(async tx => {
-      // The unique constraint is the authoritative guard against races.
+      // The database guards stored deployment conflicts; the dispatcher also reserves quick URLs.
       // Optimistic locking: only update if the slug hasn't changed since we read it.
       const [row] = await tx
         .update(deployments)
@@ -875,13 +881,13 @@ export async function renameDeployment(
         return true;
       }
 
-      // KV mapping: newSlug <-> internalWorkerName (bidirectional).
-      // The dispatcher's set endpoint cleans up any previous slug mapping for this worker.
-      // If this throws, the transaction rolls back and the old slug + KV mapping stay consistent.
+      // The dispatcher reserves the new public slug and removes the prior mapping.
+      // If the database transaction later aborts, the catch path restores the old mapping.
       try {
         await dispatcherClient.setSlugMapping(internalWorkerName, newSlug);
+        slugMappingUpdated = true;
       } catch (cause) {
-        throw new SlugMappingError(cause);
+        throw new SlugMappingError(cause instanceof DispatcherSlugTakenError, cause);
       }
 
       return false;
@@ -895,12 +901,30 @@ export async function renameDeployment(
       };
     }
   } catch (err) {
+    if (slugMappingUpdated) {
+      try {
+        await dispatcherClient.setSlugMapping(internalWorkerName, oldSlug);
+      } catch {
+        return {
+          success: false,
+          error: 'internal_error',
+          message: 'Failed to restore subdomain routing. Please try again.',
+        };
+      }
+    }
+
     if (err instanceof SlugMappingError) {
-      return {
-        success: false,
-        error: 'internal_error',
-        message: 'Failed to update subdomain routing. Please try again.',
-      };
+      return err.slugTaken
+        ? {
+            success: false,
+            error: 'slug_taken',
+            message: 'This subdomain is already taken',
+          }
+        : {
+            success: false,
+            error: 'internal_error',
+            message: 'Failed to update subdomain routing. Please try again.',
+          };
     }
     if (isUniqueConstraintError(err, 'UQ_deployments_deployment_slug')) {
       return {

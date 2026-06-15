@@ -13,14 +13,32 @@ export const CallbackTargetSchema = z.object({
 });
 
 /**
- * Schema for image attachments that will be downloaded from R2 to the sandbox.
- * Defined here to avoid circular dependency with router/schemas.ts.
- * Images are stored in R2 at path: {bucket}/{userId}/{path}/{filename}
+ * R2 attachment descriptors carry only server-issued names. The worker derives
+ * service/user prefixes and never accepts caller-provided object key prefixes.
  */
-const imageMessageUuidSchema = z
+const attachmentMessageUuidSchema = z
   .string()
   .uuid()
   .describe('Bare message upload UUID; service prefix is derived by the worker');
+
+const attachmentFilenameSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/,
+    'Attachment filename must be a UUID with extension png, jpg, jpeg, webp, gif, pdf, txt, md, or csv'
+  );
+
+export const AttachmentsSchema = z.object({
+  path: attachmentMessageUuidSchema,
+  files: z
+    .array(attachmentFilenameSchema)
+    .min(1)
+    .max(5)
+    .describe('Ordered array of specific UUID attachment filenames to download'),
+});
+export type Attachments = z.infer<typeof AttachmentsSchema>;
 
 const imageFilenameSchema = z
   .string()
@@ -31,8 +49,9 @@ const imageFilenameSchema = z
     'Image filename must be a UUID with extension png, jpg, jpeg, webp, or gif'
   );
 
+/** Legacy public image decoder retained only for API request compatibility. */
 export const ImagesSchema = z.object({
-  path: imageMessageUuidSchema,
+  path: attachmentMessageUuidSchema,
   files: z
     .array(imageFilenameSchema)
     .min(1)
@@ -407,9 +426,6 @@ export const MetadataSchema = z.object({
 
   // Callback configuration
   callbackTarget: CallbackTargetSchema.optional(),
-
-  // Image attachments
-  images: ImagesSchema.optional(),
 
   // Kilo server lifecycle tracking
   kiloServerLastActivity: z.number().optional(),

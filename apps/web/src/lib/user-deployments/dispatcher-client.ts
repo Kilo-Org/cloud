@@ -22,6 +22,13 @@ const setPasswordResponseSchema = z.object({
 export type GetPasswordStatusResponse = z.infer<typeof getPasswordStatusResponseSchema>;
 export type SetPasswordResponse = z.infer<typeof setPasswordResponseSchema>;
 
+export class DispatcherSlugTakenError extends Error {
+  constructor() {
+    super('This subdomain is already taken');
+    this.name = 'DispatcherSlugTakenError';
+  }
+}
+
 /**
  * Client for the deploy dispatcher worker API.
  * Handles password protection, slug-to-worker mappings, and banner management.
@@ -109,6 +116,9 @@ class DispatcherClient {
       { maxRetries: 0 }
     );
 
+    if (response.status === 409) {
+      throw new DispatcherSlugTakenError();
+    }
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Failed to set slug mapping: ${errorText}`);

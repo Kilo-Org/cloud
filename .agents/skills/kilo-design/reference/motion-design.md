@@ -45,12 +45,12 @@ Kilo motion is **purposeful and subtle** in product UI, with occasional
 
 ### Durations
 
-| Duration  | Use                                  | Examples                               |
-| --------- | ------------------------------------ | -------------------------------------- |
-| 100–150ms | Instant feedback                     | Button press, toggle, color shift      |
-| 200–300ms | State changes                        | Menu open, tooltip, hover, focus bloom |
-| 300–500ms | Layout changes                       | Accordion, drawer open, sheet open     |
-| 500–800ms | Entrance animations (brand surfaces) | Hero reveal, first-paint choreography  |
+| Duration | Use | Examples |
+|---|---|---|
+| 100–150ms | Instant feedback | Button press, toggle, color shift |
+| 200–300ms | State changes | Menu open, tooltip, hover, focus bloom |
+| 300–500ms | Layout changes | Accordion, drawer open, sheet open |
+| 500–800ms | Entrance animations (brand surfaces) | Hero reveal, first-paint choreography |
 
 Exit animations are faster than entrances (≈75% of enter duration).
 
@@ -70,12 +70,12 @@ Exit animations are faster than entrances (≈75% of enter duration).
 
 Timing matters more than easing. These durations feel right for most UI:
 
-| Duration  | Use                 | Examples                           |
-| --------- | ------------------- | ---------------------------------- |
-| 100–150ms | Instant feedback    | Button press, toggle, color change |
-| 200–300ms | State changes       | Menu open, tooltip, hover states   |
-| 300–500ms | Layout changes      | Accordion, modal, drawer           |
-| 500–800ms | Entrance animations | Page load, hero reveals            |
+| Duration | Use | Examples |
+|---|---|---|
+| 100–150ms | Instant feedback | Button press, toggle, color change |
+| 200–300ms | State changes | Menu open, tooltip, hover states |
+| 300–500ms | Layout changes | Accordion, modal, drawer |
+| 500–800ms | Entrance animations | Page load, hero reveals |
 
 Exit animations are faster than entrances — use ~75% of enter duration.
 
@@ -83,10 +83,10 @@ Exit animations are faster than entrances — use ~75% of enter duration.
 
 Don't use `ease` — it's a compromise that's rarely optimal. Instead:
 
-| Curve           | Use for                      | CSS                              |
-| --------------- | ---------------------------- | -------------------------------- |
-| **ease-out**    | Elements entering            | `cubic-bezier(0.16, 1, 0.3, 1)`  |
-| **ease-in**     | Elements leaving             | `cubic-bezier(0.7, 0, 0.84, 0)`  |
+| Curve | Use for | CSS |
+|---|---|---|
+| **ease-out** | Elements entering | `cubic-bezier(0.16, 1, 0.3, 1)` |
+| **ease-in** | Elements leaving | `cubic-bezier(0.7, 0, 0.84, 0)` |
 | **ease-in-out** | State toggles (there → back) | `cubic-bezier(0.65, 0, 0.35, 1)` |
 
 For micro-interactions, exponential curves feel natural (friction,

@@ -1,13 +1,29 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useTRPC } from '@/lib/trpc/utils';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueries,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
-import type { SlaConfig } from './SecurityConfigForm';
+import type { SlaConfig } from './security-config-types';
+import {
+  getSecurityAgentCommandFailureTitle,
+  getSecurityAgentDismissalTerminalTitle,
+  securityAgentCommandAdmissionCopy,
+} from './security-agent-command-copy';
+import {
+  deletedSecurityAgentFindingsScopes,
+  getSecurityAgentInvalidationScopesForCommand,
+  type SecurityAgentInvalidationScope,
+} from './security-agent-command-invalidation';
 
 type SecurityAgentContextValue = {
   organizationId: string | undefined;
@@ -27,6 +43,7 @@ type SecurityAgentContextValue = {
         slaHighDays: number;
         slaMediumDays: number;
         slaLowDays: number;
+        slaEnabled: boolean;
         repositorySelectionMode: 'all' | 'selected';
         selectedRepositoryIds: number[];
         modelSlug?: string;
@@ -38,6 +55,16 @@ type SecurityAgentContextValue = {
         autoAnalysisEnabled: boolean;
         autoAnalysisMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoAnalysisIncludeExisting: boolean;
+        autoRemediationEnabled: boolean;
+        autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
+        autoRemediationIncludeExisting: boolean;
+        autoRemediationEnabledAt: string | null;
+        remediationModelSlug?: string;
+        slaNotificationsEnabled: boolean;
+        slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+        slaNotificationWarningDays: number;
+        newFindingNotificationsEnabled: boolean;
+        newFindingNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
       }
     | undefined;
   refetchConfig: () => Promise<unknown>;
@@ -48,9 +75,15 @@ type SecurityAgentContextValue = {
 
   // Mutation handlers
   handleSync: (repoFullName?: string) => void;
-  handleDismiss: (finding: SecurityFinding, reason: DismissReason, comment?: string) => void;
+  handleDismiss: (
+    finding: SecurityFinding,
+    reason: DismissReason,
+    comment?: string,
+    onSuccess?: () => void
+  ) => void;
   handleSaveConfig: (
     config: SlaConfig & {
+      slaEnabled: boolean;
       repositorySelectionMode: 'all' | 'selected';
       selectedRepositoryIds: number[];
       triageModelSlug: string;
@@ -62,7 +95,17 @@ type SecurityAgentContextValue = {
       autoAnalysisEnabled: boolean;
       autoAnalysisMinSeverity: 'critical' | 'high' | 'medium' | 'all';
       autoAnalysisIncludeExisting: boolean;
-    }
+      autoRemediationEnabled: boolean;
+      autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
+      autoRemediationIncludeExisting: boolean;
+      remediationModelSlug: string;
+      slaNotificationsEnabled: boolean;
+      slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+      slaNotificationWarningDays: number;
+      newFindingNotificationsEnabled: boolean;
+      newFindingNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+    },
+    options?: { onSuccess?: () => void; onError?: () => void }
   ) => void;
   handleToggleEnabled: (
     enabled: boolean,
@@ -71,8 +114,14 @@ type SecurityAgentContextValue = {
       selectedRepositoryIds: number[];
     }
   ) => void;
-  handleStartAnalysis: (findingId: string, options?: { retrySandboxOnly?: boolean }) => void;
-  handleDeleteFindings: (repoFullName: string) => void;
+  handleStartAnalysis: (
+    findingId: string,
+    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean }
+  ) => void;
+  handleStartRemediation: (findingId: string) => void;
+  handleRetryRemediation: (findingId: string) => void;
+  handleCancelRemediation: (attemptId: string, findingId?: string) => void;
+  handleDeleteFindings: (repoFullName: string, onSuccess?: () => void) => void;
 
   // Mutation states
   isSyncing: boolean;
@@ -83,6 +132,8 @@ type SecurityAgentContextValue = {
 
   // Analysis tracking
   startingAnalysisIds: Set<string>;
+  startingRemediationIds: Set<string>;
+  cancellingRemediationAttemptIds: Set<string>;
 
   // GitHub error
   gitHubError: string | null;
@@ -94,7 +145,7 @@ type SecurityAgentContextValue = {
 const SecurityAgentContext = createContext<SecurityAgentContextValue | null>(null);
 
 export function useSecurityAgent() {
-  const ctx = useContext(SecurityAgentContext);
+  const ctx = use(SecurityAgentContext);
   if (!ctx) {
     throw new Error('useSecurityAgent must be used within a SecurityAgentProvider');
   }
@@ -109,19 +160,422 @@ function getOptionalStringField(source: unknown, key: string): string | undefine
   return typeof value === 'string' ? value : undefined;
 }
 
+const COMMAND_POLL_INTERVAL_MS = 3000;
+const EMPTY_REPOSITORIES: SecurityAgentContextValue['allRepositories'] = [];
+const EMPTY_REPOSITORY_IDS: number[] = [];
+const EMPTY_ORPHANED_REPOSITORIES: SecurityAgentContextValue['orphanedRepositories'] = [];
+
+export type SecurityAgentCommand = {
+  id: string;
+  commandType: 'sync' | 'dismiss_finding' | 'start_analysis' | 'apply_auto_remediation';
+  findingId: string | null;
+  status: 'accepted' | 'running' | 'succeeded' | 'failed' | 'no_op';
+  resultCode: string | null;
+  lastErrorRedacted: string | null;
+};
+
+export function isActiveSecurityAgentCommand(command: SecurityAgentCommand): boolean {
+  return command.status === 'accepted' || command.status === 'running';
+}
+
+export function mergeSecurityAgentActiveCommands(
+  recoveredCommands: readonly SecurityAgentCommand[],
+  polledCommands: readonly (SecurityAgentCommand | undefined)[]
+): SecurityAgentCommand[] {
+  const activeCommands = new Map<string, SecurityAgentCommand>();
+  for (const command of recoveredCommands) {
+    if (isActiveSecurityAgentCommand(command)) activeCommands.set(command.id, command);
+  }
+  for (const command of polledCommands) {
+    if (command && isActiveSecurityAgentCommand(command)) activeCommands.set(command.id, command);
+  }
+  return [...activeCommands.values()];
+}
+
+export function getSecurityAgentActiveCommandState(
+  activeCommands: readonly SecurityAgentCommand[],
+  optimisticStartingAnalysisIds: ReadonlySet<string>
+): {
+  hasActiveSyncCommand: boolean;
+  hasActiveDismissCommand: boolean;
+  startingAnalysisIds: Set<string>;
+} {
+  const startingAnalysisIds = new Set(optimisticStartingAnalysisIds);
+  let hasActiveSyncCommand = false;
+  let hasActiveDismissCommand = false;
+
+  for (const command of activeCommands) {
+    if (command.commandType === 'sync') hasActiveSyncCommand = true;
+    if (command.commandType === 'dismiss_finding') hasActiveDismissCommand = true;
+    if (command.commandType === 'start_analysis' && command.findingId) {
+      startingAnalysisIds.add(command.findingId);
+    }
+  }
+
+  return { hasActiveSyncCommand, hasActiveDismissCommand, startingAnalysisIds };
+}
+
+export function getUnprocessedTerminalSecurityAgentCommands(
+  commands: readonly (SecurityAgentCommand | undefined)[],
+  processedTerminalCommandIds: ReadonlySet<string>
+): SecurityAgentCommand[] {
+  return commands.filter((command): command is SecurityAgentCommand => {
+    if (!command) return false;
+    return !isActiveSecurityAgentCommand(command) && !processedTerminalCommandIds.has(command.id);
+  });
+}
+
+export function shouldRunSecurityAgentCommandSuccessCallback(
+  command: SecurityAgentCommand
+): boolean {
+  return command.status === 'succeeded' || command.status === 'no_op';
+}
+
+type SecurityAgentProviderState = {
+  optimisticStartingAnalysisIds: Set<string>;
+  optimisticStartingRemediationIds: Set<string>;
+  optimisticCancellingRemediationAttemptIds: Set<string>;
+  trackedCommandIds: Set<string>;
+  processedTerminalCommandIds: Set<string>;
+  gitHubError: string | null;
+};
+
+type SecurityAgentProviderAction =
+  | { type: 'track-command'; commandId: string }
+  | { type: 'add-optimistic-analysis'; findingId: string }
+  | { type: 'remove-optimistic-analysis'; findingId: string }
+  | { type: 'add-optimistic-remediation'; findingId: string }
+  | { type: 'remove-optimistic-remediation'; findingId: string }
+  | { type: 'add-cancelling-remediation'; attemptId: string }
+  | { type: 'remove-cancelling-remediation'; attemptId: string }
+  | { type: 'settle-commands'; commands: SecurityAgentCommand[]; gitHubError?: string }
+  | { type: 'prune-processed-commands'; polledCommandIds: Set<string> }
+  | { type: 'set-github-error'; error: string | null };
+
+function createSecurityAgentProviderState(): SecurityAgentProviderState {
+  return {
+    optimisticStartingAnalysisIds: new Set(),
+    optimisticStartingRemediationIds: new Set(),
+    optimisticCancellingRemediationAttemptIds: new Set(),
+    trackedCommandIds: new Set(),
+    processedTerminalCommandIds: new Set(),
+    gitHubError: null,
+  };
+}
+
+function securityAgentProviderReducer(
+  state: SecurityAgentProviderState,
+  action: SecurityAgentProviderAction
+): SecurityAgentProviderState {
+  switch (action.type) {
+    case 'track-command':
+      return {
+        ...state,
+        trackedCommandIds: new Set(state.trackedCommandIds).add(action.commandId),
+      };
+    case 'add-optimistic-analysis':
+      return {
+        ...state,
+        optimisticStartingAnalysisIds: new Set(state.optimisticStartingAnalysisIds).add(
+          action.findingId
+        ),
+      };
+    case 'remove-optimistic-analysis': {
+      const optimisticStartingAnalysisIds = new Set(state.optimisticStartingAnalysisIds);
+      optimisticStartingAnalysisIds.delete(action.findingId);
+      return { ...state, optimisticStartingAnalysisIds };
+    }
+    case 'add-optimistic-remediation':
+      return {
+        ...state,
+        optimisticStartingRemediationIds: new Set(state.optimisticStartingRemediationIds).add(
+          action.findingId
+        ),
+      };
+    case 'remove-optimistic-remediation': {
+      const optimisticStartingRemediationIds = new Set(state.optimisticStartingRemediationIds);
+      optimisticStartingRemediationIds.delete(action.findingId);
+      return { ...state, optimisticStartingRemediationIds };
+    }
+    case 'add-cancelling-remediation':
+      return {
+        ...state,
+        optimisticCancellingRemediationAttemptIds: new Set(
+          state.optimisticCancellingRemediationAttemptIds
+        ).add(action.attemptId),
+      };
+    case 'remove-cancelling-remediation': {
+      const optimisticCancellingRemediationAttemptIds = new Set(
+        state.optimisticCancellingRemediationAttemptIds
+      );
+      optimisticCancellingRemediationAttemptIds.delete(action.attemptId);
+      return { ...state, optimisticCancellingRemediationAttemptIds };
+    }
+    case 'settle-commands': {
+      const optimisticStartingAnalysisIds = new Set(state.optimisticStartingAnalysisIds);
+      const optimisticStartingRemediationIds = new Set(state.optimisticStartingRemediationIds);
+      const trackedCommandIds = new Set(state.trackedCommandIds);
+      const processedTerminalCommandIds = new Set(state.processedTerminalCommandIds);
+      for (const command of action.commands) {
+        if (command.findingId) {
+          optimisticStartingAnalysisIds.delete(command.findingId);
+          optimisticStartingRemediationIds.delete(command.findingId);
+        }
+        trackedCommandIds.delete(command.id);
+        processedTerminalCommandIds.add(command.id);
+      }
+      return {
+        optimisticStartingAnalysisIds,
+        optimisticStartingRemediationIds,
+        optimisticCancellingRemediationAttemptIds: state.optimisticCancellingRemediationAttemptIds,
+        trackedCommandIds,
+        processedTerminalCommandIds,
+        gitHubError: action.gitHubError ?? state.gitHubError,
+      };
+    }
+    case 'prune-processed-commands': {
+      const processedTerminalCommandIds = new Set(
+        [...state.processedTerminalCommandIds].filter(commandId =>
+          action.polledCommandIds.has(commandId)
+        )
+      );
+      return processedTerminalCommandIds.size === state.processedTerminalCommandIds.size
+        ? state
+        : { ...state, processedTerminalCommandIds };
+    }
+    case 'set-github-error':
+      return { ...state, gitHubError: action.error };
+  }
+}
+
+function commandFailureDescription(command: SecurityAgentCommand): string {
+  switch (command.resultCode) {
+    case 'OWNER_CAP_REACHED':
+      return 'Analysis capacity is full. Wait for an active analysis to finish, then retry.';
+    case 'GITHUB_TOKEN_UNAVAILABLE':
+    case 'GITHUB_AUTH_INVALID':
+      return 'GitHub authorization needs attention. Re-authorize GitHub App, then retry.';
+    case 'FINDING_UNAVAILABLE':
+      return 'Finding is no longer available. Refresh findings and retry if it remains open.';
+    case 'REPOSITORY_UNAVAILABLE':
+      return 'Repository is no longer available to GitHub App. Refresh repository access, then retry.';
+    case 'INVALID_DISMISS_TARGET':
+      return 'Finding cannot be dismissed because its Dependabot target is invalid.';
+    case 'COMMAND_STALLED':
+      return 'Queued action did not finish in time. Retry action.';
+    case 'QUEUE_ADMISSION_FAILED':
+      return command.lastErrorRedacted ?? 'Queued action could not be admitted. Retry action.';
+    default:
+      return command.lastErrorRedacted ?? 'Queued action failed. Retry action.';
+  }
+}
+
 type SecurityAgentProviderProps = {
   organizationId?: string;
   children: React.ReactNode;
 };
 
-export function SecurityAgentProvider({ organizationId, children }: SecurityAgentProviderProps) {
+type SecurityAgentTrpcUtils = ReturnType<typeof useTRPC>;
+
+function invalidateSecurityAgentQueryScopesForOwner(
+  input: {
+    isOrg: boolean;
+    organizationId?: string;
+    queryClient: QueryClient;
+    trpc: SecurityAgentTrpcUtils;
+  },
+  scopes: Iterable<SecurityAgentInvalidationScope>
+) {
+  const { isOrg, organizationId, queryClient, trpc } = input;
+  const scopeSet = new Set(scopes);
+  const invalidations: Promise<unknown>[] = [];
+
+  if (isOrg && organizationId) {
+    const ownerInput = { organizationId };
+    if (scopeSet.has('findings')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.listFindings.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('findingDetails')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getFinding.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('analysis')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getAnalysis.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('stats')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getStats.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('dashboardStats')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('lastSyncTime')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getLastSyncTime.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('repositories')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getRepositories.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('orphanedRepositories')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getOrphanedRepositories.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('autoDismissEligible')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getAutoDismissEligible.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('permissionStatus')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getPermissionStatus.queryKey(ownerInput),
+        })
+      );
+    }
+    if (scopeSet.has('config')) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getConfig.queryKey(ownerInput),
+        })
+      );
+    }
+    void Promise.all(invalidations);
+    return;
+  }
+
+  if (scopeSet.has('findings')) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() })
+    );
+  }
+  if (scopeSet.has('findingDetails')) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getFinding.queryKey() })
+    );
+  }
+  if (scopeSet.has('analysis')) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getAnalysis.queryKey() })
+    );
+  }
+  if (scopeSet.has('stats')) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getStats.queryKey() })
+    );
+  }
+  if (scopeSet.has('dashboardStats')) {
+    invalidations.push(
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getDashboardStats.queryKey(),
+      })
+    );
+  }
+  if (scopeSet.has('lastSyncTime')) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getLastSyncTime.queryKey() })
+    );
+  }
+  if (scopeSet.has('repositories')) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getRepositories.queryKey() })
+    );
+  }
+  if (scopeSet.has('orphanedRepositories')) {
+    invalidations.push(
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getOrphanedRepositories.queryKey(),
+      })
+    );
+  }
+  if (scopeSet.has('autoDismissEligible')) {
+    invalidations.push(
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getAutoDismissEligible.queryKey(),
+      })
+    );
+  }
+  if (scopeSet.has('permissionStatus')) {
+    invalidations.push(
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getPermissionStatus.queryKey(),
+      })
+    );
+  }
+  if (scopeSet.has('config')) {
+    invalidations.push(
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getConfig.queryKey() })
+    );
+  }
+  void Promise.all(invalidations);
+}
+
+function useSecurityAgentProviderValue(
+  organizationId: string | undefined
+): SecurityAgentContextValue {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isOrg = !!organizationId;
 
-  const [startingAnalysisIds, setStartingAnalysisIds] = useState<Set<string>>(new Set());
-  const [gitHubError, setGitHubError] = useState<string | null>(null);
+  const [providerState, dispatchProviderState] = useReducer(
+    securityAgentProviderReducer,
+    undefined,
+    createSecurityAgentProviderState
+  );
   const toggleEnabledInFlightRef = useRef(false);
+  const commandSuccessCallbacksRef = useRef<Map<string, () => void> | null>(null);
+
+  const trackCommand = useCallback((commandId: string, onSuccess?: () => void) => {
+    if (onSuccess) {
+      if (commandSuccessCallbacksRef.current === null) {
+        commandSuccessCallbacksRef.current = new Map();
+      }
+      commandSuccessCallbacksRef.current.set(commandId, onSuccess);
+    }
+    dispatchProviderState({ type: 'track-command', commandId });
+  }, []);
+
+  function invalidateSecurityAgentQueryScopes(scopes: Iterable<SecurityAgentInvalidationScope>) {
+    invalidateSecurityAgentQueryScopesForOwner(
+      { isOrg, organizationId, queryClient, trpc },
+      scopes
+    );
+  }
+
+  function invalidateRemediationQueries() {
+    invalidateSecurityAgentQueryScopes(
+      getSecurityAgentInvalidationScopesForCommand('apply_auto_remediation')
+    );
+  }
 
   // Permission status query
   const { data: permissionData, isLoading: isLoadingPermission } = useQuery(
@@ -155,24 +609,126 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       : trpc.securityAgent.getOrphanedRepositories.queryOptions()
   );
 
+  const { data: activeCommandsData } = useQuery({
+    ...(isOrg
+      ? trpc.organizations.securityAgent.listActiveCommands.queryOptions({ organizationId })
+      : trpc.securityAgent.listActiveCommands.queryOptions()),
+    refetchInterval: query =>
+      query.state.data && query.state.data.length > 0 ? COMMAND_POLL_INTERVAL_MS : false,
+  });
+
+  const commandIdsToPoll = useMemo(() => {
+    const commandIds = new Set(providerState.trackedCommandIds);
+    for (const command of activeCommandsData ?? []) commandIds.add(command.id);
+    return commandIds;
+  }, [activeCommandsData, providerState.trackedCommandIds]);
+
+  useEffect(() => {
+    if (
+      [...providerState.processedTerminalCommandIds].some(
+        commandId => !commandIdsToPoll.has(commandId)
+      )
+    ) {
+      dispatchProviderState({
+        type: 'prune-processed-commands',
+        polledCommandIds: commandIdsToPoll,
+      });
+    }
+  }, [commandIdsToPoll, providerState.processedTerminalCommandIds]);
+
+  const commandStatusQueries = useQueries({
+    queries: [...commandIdsToPoll].map(commandId => ({
+      ...(isOrg
+        ? trpc.organizations.securityAgent.getCommandStatus.queryOptions({
+            organizationId,
+            commandId,
+          })
+        : trpc.securityAgent.getCommandStatus.queryOptions({ commandId })),
+      refetchInterval: (query: { state: { data?: SecurityAgentCommand } }) =>
+        query.state.data?.status === 'accepted' || query.state.data?.status === 'running'
+          ? COMMAND_POLL_INTERVAL_MS
+          : false,
+    })),
+  });
+  const activeCommands = useMemo(
+    () =>
+      mergeSecurityAgentActiveCommands(
+        activeCommandsData ?? [],
+        commandStatusQueries.map(query => query.data)
+      ),
+    [activeCommandsData, commandStatusQueries]
+  );
+  const { hasActiveSyncCommand, hasActiveDismissCommand, startingAnalysisIds } =
+    getSecurityAgentActiveCommandState(activeCommands, providerState.optimisticStartingAnalysisIds);
+
+  useEffect(() => {
+    const unprocessedTerminalCommands = getUnprocessedTerminalSecurityAgentCommands(
+      commandStatusQueries.map(query => query.data),
+      providerState.processedTerminalCommandIds
+    );
+    if (unprocessedTerminalCommands.length === 0) return;
+
+    let terminalGitHubError: string | undefined;
+    for (const command of unprocessedTerminalCommands) {
+      invalidateSecurityAgentQueryScopesForOwner(
+        { isOrg, organizationId, queryClient, trpc },
+        getSecurityAgentInvalidationScopesForCommand(command.commandType)
+      );
+      const successCallback = commandSuccessCallbacksRef.current?.get(command.id);
+      commandSuccessCallbacksRef.current?.delete(command.id);
+      if (command.status === 'failed') {
+        const title = getSecurityAgentCommandFailureTitle(command.commandType);
+        if (command.resultCode === 'GITHUB_AUTH_INVALID') {
+          terminalGitHubError = commandFailureDescription(command);
+        }
+        toast.error(title, { description: commandFailureDescription(command), duration: 8000 });
+      } else if (shouldRunSecurityAgentCommandSuccessCallback(command)) {
+        successCallback?.();
+        if (command.commandType === 'dismiss_finding') {
+          toast.success(getSecurityAgentDismissalTerminalTitle(command.status));
+        } else if (command.commandType === 'apply_auto_remediation') {
+          toast.success(
+            command.status === 'no_op'
+              ? 'No existing findings queued'
+              : 'Existing remediations queued'
+          );
+        }
+      }
+    }
+
+    dispatchProviderState({
+      type: 'settle-commands',
+      commands: unprocessedTerminalCommands,
+      gitHubError: terminalGitHubError,
+    });
+  }, [
+    commandStatusQueries,
+    providerState.processedTerminalCommandIds,
+    isOrg,
+    organizationId,
+    queryClient,
+    trpc,
+  ]);
+
   // ---- Mutations (org) ----
   const { mutate: orgSyncMutate, isPending: isOrgSyncPending } = useMutation(
     trpc.organizations.securityAgent.triggerSync.mutationOptions({
-      onSuccess: () => {
-        setGitHubError(null);
-        toast.success('Sync completed successfully');
-        void queryClient.invalidateQueries();
+      onSuccess: data => {
+        dispatchProviderState({ type: 'set-github-error', error: null });
+        toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
-          setGitHubError(message);
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
+          dispatchProviderState({ type: 'set-github-error', error: message });
+          toast.error('GitHub integration error', {
+            description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
-          toast.error('Sync failed', { description: message });
+          toast.error(securityAgentCommandAdmissionCopy.sync.failureTitle, {
+            description: message,
+          });
         }
       },
     })
@@ -180,9 +736,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: orgDismissMutate, isPending: isOrgDismissPending } = useMutation(
     trpc.organizations.securityAgent.dismissFinding.mutationOptions({
-      onSuccess: () => {
-        toast.success('Finding dismissed');
-        void queryClient.invalidateQueries();
+      onSuccess: data => {
+        toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        trackCommand(data.commandId);
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -192,9 +748,29 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: orgSaveConfigMutate, isPending: isOrgSaveConfigPending } = useMutation(
     trpc.organizations.securityAgent.saveConfig.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async data => {
         toast.success('Configuration saved');
+        if (data.backlogAdmissionWarning) {
+          toast.warning(securityAgentCommandAdmissionCopy.existing_findings_backlog.failureTitle, {
+            description: data.backlogAdmissionWarning,
+          });
+        }
+        if (data.remediationBacklogAdmissionWarning) {
+          toast.warning('Existing remediations not queued', {
+            description: data.remediationBacklogAdmissionWarning,
+          });
+        }
+        if (data.existingRemediationCommandId) {
+          trackCommand(data.existingRemediationCommandId);
+        }
         await refetchConfig();
+        invalidateSecurityAgentQueryScopes([
+          'config',
+          'findings',
+          'analysis',
+          'stats',
+          'dashboardStats',
+        ]);
       },
       onError: error => {
         toast.error('Failed to save configuration', { description: error.message });
@@ -205,15 +781,20 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const { mutate: orgSetEnabledMutate, isPending: isOrgSetEnabledPending } = useMutation(
     trpc.organizations.securityAgent.setEnabled.mutationOptions({
       onSuccess: async data => {
-        if ('syncResult' in data && data.syncResult) {
-          toast.success('Security Agent enabled', {
-            description: `Initial sync completed: ${data.syncResult.synced} alerts synced${data.syncResult.errors > 0 ? `, ${data.syncResult.errors} errors` : ''}`,
+        if ('initialSyncAdmissionFailed' in data && data.initialSyncAdmissionFailed) {
+          toast.warning(securityAgentCommandAdmissionCopy.enable_initial_sync.successTitle, {
+            description: securityAgentCommandAdmissionCopy.enable_initial_sync.failureDescription,
           });
+        } else if ('initialSync' in data && data.initialSync) {
+          toast.success(securityAgentCommandAdmissionCopy.enable_initial_sync.successTitle, {
+            description: securityAgentCommandAdmissionCopy.enable_initial_sync.successDescription,
+          });
+          trackCommand(data.initialSync.commandId);
         } else {
           toast.success('Security Agent setting updated');
         }
         await refetchConfig();
-        void queryClient.invalidateQueries();
+        invalidateSecurityAgentQueryScopes(['config', 'repositories', 'permissionStatus']);
       },
       onError: error => {
         toast.error('Failed to toggle Security Agent', { description: error.message });
@@ -226,32 +807,90 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: orgStartAnalysisMutate } = useMutation(
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        setGitHubError(null);
-        toast.success('Analysis started');
-        void queryClient.invalidateQueries();
-        setStartingAnalysisIds(prev => {
-          const next = new Set(prev);
-          next.delete(variables.findingId);
-          return next;
-        });
+      onSuccess: async data => {
+        dispatchProviderState({ type: 'set-github-error', error: null });
+        toast.success(securityAgentCommandAdmissionCopy.start_analysis.successTitle);
+        trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
-          setGitHubError(message);
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
+          dispatchProviderState({ type: 'set-github-error', error: message });
+          toast.error('GitHub integration error', {
+            description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
-          toast.error('Failed to start analysis', { description: message, duration: 8000 });
+          toast.error(securityAgentCommandAdmissionCopy.start_analysis.failureTitle, {
+            description: message,
+            duration: 8000,
+          });
         }
-        void queryClient.invalidateQueries();
-        setStartingAnalysisIds(prev => {
-          const next = new Set(prev);
-          next.delete(variables.findingId);
-          return next;
+        invalidateSecurityAgentQueryScopes(
+          getSecurityAgentInvalidationScopesForCommand('start_analysis')
+        );
+        dispatchProviderState({
+          type: 'remove-optimistic-analysis',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: orgStartRemediationMutate } = useMutation(
+    trpc.organizations.securityAgent.startRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation queued');
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to queue remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: orgRetryRemediationMutate } = useMutation(
+    trpc.organizations.securityAgent.retryRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation retry queued');
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to retry remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: orgCancelRemediationMutate } = useMutation(
+    trpc.organizations.securityAgent.cancelRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation cancellation requested');
+        dispatchProviderState({
+          type: 'remove-cancelling-remediation',
+          attemptId: variables.attemptId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to cancel remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-cancelling-remediation',
+          attemptId: variables.attemptId,
         });
       },
     })
@@ -263,7 +902,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
         toast.success('Findings deleted', {
           description: `${data.deletedCount} findings were permanently deleted`,
         });
-        void queryClient.invalidateQueries();
+        invalidateSecurityAgentQueryScopes(deletedSecurityAgentFindingsScopes);
       },
       onError: error => {
         toast.error('Failed to delete findings', { description: error.message });
@@ -274,21 +913,22 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   // ---- Mutations (personal) ----
   const { mutate: personalSyncMutate, isPending: isPersonalSyncPending } = useMutation(
     trpc.securityAgent.triggerSync.mutationOptions({
-      onSuccess: () => {
-        setGitHubError(null);
-        toast.success('Sync completed successfully');
-        void queryClient.invalidateQueries();
+      onSuccess: data => {
+        dispatchProviderState({ type: 'set-github-error', error: null });
+        toast.success(securityAgentCommandAdmissionCopy.sync.successTitle);
+        trackCommand(data.commandId);
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
-          setGitHubError(message);
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
+          dispatchProviderState({ type: 'set-github-error', error: message });
+          toast.error('GitHub integration error', {
+            description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
-          toast.error('Sync failed', { description: message });
+          toast.error(securityAgentCommandAdmissionCopy.sync.failureTitle, {
+            description: message,
+          });
         }
       },
     })
@@ -296,9 +936,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: personalDismissMutate, isPending: isPersonalDismissPending } = useMutation(
     trpc.securityAgent.dismissFinding.mutationOptions({
-      onSuccess: () => {
-        toast.success('Finding dismissed');
-        void queryClient.invalidateQueries();
+      onSuccess: data => {
+        toast.success(securityAgentCommandAdmissionCopy.dismiss_finding.successTitle);
+        trackCommand(data.commandId);
       },
       onError: error => {
         toast.error('Failed to dismiss finding', { description: error.message });
@@ -308,9 +948,29 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: personalSaveConfigMutate, isPending: isPersonalSaveConfigPending } = useMutation(
     trpc.securityAgent.saveConfig.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async data => {
         toast.success('Configuration saved');
+        if (data.backlogAdmissionWarning) {
+          toast.warning(securityAgentCommandAdmissionCopy.existing_findings_backlog.failureTitle, {
+            description: data.backlogAdmissionWarning,
+          });
+        }
+        if (data.remediationBacklogAdmissionWarning) {
+          toast.warning('Existing remediations not queued', {
+            description: data.remediationBacklogAdmissionWarning,
+          });
+        }
+        if (data.existingRemediationCommandId) {
+          trackCommand(data.existingRemediationCommandId);
+        }
         await refetchConfig();
+        invalidateSecurityAgentQueryScopes([
+          'config',
+          'findings',
+          'analysis',
+          'stats',
+          'dashboardStats',
+        ]);
       },
       onError: error => {
         toast.error('Failed to save configuration', { description: error.message });
@@ -321,15 +981,20 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const { mutate: personalSetEnabledMutate, isPending: isPersonalSetEnabledPending } = useMutation(
     trpc.securityAgent.setEnabled.mutationOptions({
       onSuccess: async data => {
-        if ('syncResult' in data && data.syncResult) {
-          toast.success('Security Agent enabled', {
-            description: `Initial sync completed: ${data.syncResult.synced} alerts synced${data.syncResult.errors > 0 ? `, ${data.syncResult.errors} errors` : ''}`,
+        if ('initialSyncAdmissionFailed' in data && data.initialSyncAdmissionFailed) {
+          toast.warning(securityAgentCommandAdmissionCopy.enable_initial_sync.successTitle, {
+            description: securityAgentCommandAdmissionCopy.enable_initial_sync.failureDescription,
           });
+        } else if ('initialSync' in data && data.initialSync) {
+          toast.success(securityAgentCommandAdmissionCopy.enable_initial_sync.successTitle, {
+            description: securityAgentCommandAdmissionCopy.enable_initial_sync.successDescription,
+          });
+          trackCommand(data.initialSync.commandId);
         } else {
           toast.success('Security Agent setting updated');
         }
         await refetchConfig();
-        void queryClient.invalidateQueries();
+        invalidateSecurityAgentQueryScopes(['config', 'repositories', 'permissionStatus']);
       },
       onError: error => {
         toast.error('Failed to toggle Security Agent', { description: error.message });
@@ -342,32 +1007,90 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const { mutate: personalStartAnalysisMutate } = useMutation(
     trpc.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        setGitHubError(null);
-        toast.success('Analysis started');
-        void queryClient.invalidateQueries();
-        setStartingAnalysisIds(prev => {
-          const next = new Set(prev);
-          next.delete(variables.findingId);
-          return next;
-        });
+      onSuccess: async data => {
+        dispatchProviderState({ type: 'set-github-error', error: null });
+        toast.success(securityAgentCommandAdmissionCopy.start_analysis.successTitle);
+        trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
         if (isGitHubIntegrationError(error)) {
-          setGitHubError(message);
-          toast.error('GitHub Integration Error', {
-            description:
-              'The GitHub App may have been uninstalled. Please check your integrations.',
+          dispatchProviderState({ type: 'set-github-error', error: message });
+          toast.error('GitHub integration error', {
+            description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
-          toast.error('Failed to start analysis', { description: message, duration: 8000 });
+          toast.error(securityAgentCommandAdmissionCopy.start_analysis.failureTitle, {
+            description: message,
+            duration: 8000,
+          });
         }
-        void queryClient.invalidateQueries();
-        setStartingAnalysisIds(prev => {
-          const next = new Set(prev);
-          next.delete(variables.findingId);
-          return next;
+        invalidateSecurityAgentQueryScopes(
+          getSecurityAgentInvalidationScopesForCommand('start_analysis')
+        );
+        dispatchProviderState({
+          type: 'remove-optimistic-analysis',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: personalStartRemediationMutate } = useMutation(
+    trpc.securityAgent.startRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation queued');
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to queue remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: personalRetryRemediationMutate } = useMutation(
+    trpc.securityAgent.retryRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation retry queued');
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to retry remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId: variables.findingId,
+        });
+      },
+    })
+  );
+
+  const { mutate: personalCancelRemediationMutate } = useMutation(
+    trpc.securityAgent.cancelRemediation.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        toast.success('Remediation cancellation requested');
+        dispatchProviderState({
+          type: 'remove-cancelling-remediation',
+          attemptId: variables.attemptId,
+        });
+        invalidateRemediationQueries();
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to cancel remediation', { description: error.message, duration: 8000 });
+        dispatchProviderState({
+          type: 'remove-cancelling-remediation',
+          attemptId: variables.attemptId,
         });
       },
     })
@@ -380,7 +1103,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
           toast.success('Findings deleted', {
             description: `${data.deletedCount} findings were permanently deleted`,
           });
-          void queryClient.invalidateQueries();
+          invalidateSecurityAgentQueryScopes(deletedSecurityAgentFindingsScopes);
         },
         onError: error => {
           toast.error('Failed to delete findings', { description: error.message });
@@ -401,19 +1124,26 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   );
 
   const handleDismiss = useCallback(
-    (finding: SecurityFinding, reason: DismissReason, comment?: string) => {
+    (finding: SecurityFinding, reason: DismissReason, comment?: string, onSuccess?: () => void) => {
       if (isOrg && organizationId) {
-        orgDismissMutate({ organizationId, findingId: finding.id, reason, comment });
+        orgDismissMutate(
+          { organizationId, findingId: finding.id, reason, comment },
+          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
+        );
       } else {
-        personalDismissMutate({ findingId: finding.id, reason, comment });
+        personalDismissMutate(
+          { findingId: finding.id, reason, comment },
+          { onSuccess: data => trackCommand(data.commandId, onSuccess) }
+        );
       }
     },
-    [isOrg, organizationId, orgDismissMutate, personalDismissMutate]
+    [isOrg, organizationId, orgDismissMutate, personalDismissMutate, trackCommand]
   );
 
   const handleSaveConfig = useCallback(
     (
       config: SlaConfig & {
+        slaEnabled: boolean;
         repositorySelectionMode: 'all' | 'selected';
         selectedRepositoryIds: number[];
         triageModelSlug: string;
@@ -425,47 +1155,82 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
         autoAnalysisEnabled: boolean;
         autoAnalysisMinSeverity: 'critical' | 'high' | 'medium' | 'all';
         autoAnalysisIncludeExisting: boolean;
-      }
+        autoRemediationEnabled: boolean;
+        autoRemediationMinSeverity: 'critical' | 'high' | 'medium' | 'all';
+        autoRemediationIncludeExisting: boolean;
+        remediationModelSlug: string;
+        slaNotificationsEnabled: boolean;
+        slaNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+        slaNotificationWarningDays: number;
+        newFindingNotificationsEnabled: boolean;
+        newFindingNotificationMinSeverity: 'critical' | 'high' | 'medium' | 'low';
+      },
+      options?: { onSuccess?: () => void; onError?: () => void }
     ) => {
       const modelConfigPayload = {
         triageModelSlug: config.triageModelSlug,
         analysisModelSlug: config.analysisModelSlug,
+        remediationModelSlug: config.remediationModelSlug,
         modelSlug: config.modelSlug,
       };
 
       if (isOrg && organizationId) {
-        orgSaveConfigMutate({
-          organizationId,
-          slaCriticalDays: config.critical,
-          slaHighDays: config.high,
-          slaMediumDays: config.medium,
-          slaLowDays: config.low,
-          repositorySelectionMode: config.repositorySelectionMode,
-          selectedRepositoryIds: config.selectedRepositoryIds,
-          analysisMode: config.analysisMode,
-          autoDismissEnabled: config.autoDismissEnabled,
-          autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
-          autoAnalysisEnabled: config.autoAnalysisEnabled,
-          autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
-          autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
-          ...modelConfigPayload,
-        });
+        orgSaveConfigMutate(
+          {
+            organizationId,
+            slaCriticalDays: config.critical,
+            slaHighDays: config.high,
+            slaMediumDays: config.medium,
+            slaLowDays: config.low,
+            slaEnabled: config.slaEnabled,
+            repositorySelectionMode: config.repositorySelectionMode,
+            selectedRepositoryIds: config.selectedRepositoryIds,
+            analysisMode: config.analysisMode,
+            autoDismissEnabled: config.autoDismissEnabled,
+            autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
+            autoAnalysisEnabled: config.autoAnalysisEnabled,
+            autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
+            autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
+            autoRemediationEnabled: config.autoRemediationEnabled,
+            autoRemediationMinSeverity: config.autoRemediationMinSeverity,
+            autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            slaNotificationsEnabled: config.slaNotificationsEnabled,
+            slaNotificationMinSeverity: config.slaNotificationMinSeverity,
+            slaNotificationWarningDays: config.slaNotificationWarningDays,
+            newFindingNotificationsEnabled: config.newFindingNotificationsEnabled,
+            newFindingNotificationMinSeverity: config.newFindingNotificationMinSeverity,
+            ...modelConfigPayload,
+          },
+          options
+        );
       } else {
-        personalSaveConfigMutate({
-          slaCriticalDays: config.critical,
-          slaHighDays: config.high,
-          slaMediumDays: config.medium,
-          slaLowDays: config.low,
-          repositorySelectionMode: config.repositorySelectionMode,
-          selectedRepositoryIds: config.selectedRepositoryIds,
-          analysisMode: config.analysisMode,
-          autoDismissEnabled: config.autoDismissEnabled,
-          autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
-          autoAnalysisEnabled: config.autoAnalysisEnabled,
-          autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
-          autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
-          ...modelConfigPayload,
-        });
+        personalSaveConfigMutate(
+          {
+            slaCriticalDays: config.critical,
+            slaHighDays: config.high,
+            slaMediumDays: config.medium,
+            slaLowDays: config.low,
+            slaEnabled: config.slaEnabled,
+            repositorySelectionMode: config.repositorySelectionMode,
+            selectedRepositoryIds: config.selectedRepositoryIds,
+            analysisMode: config.analysisMode,
+            autoDismissEnabled: config.autoDismissEnabled,
+            autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
+            autoAnalysisEnabled: config.autoAnalysisEnabled,
+            autoAnalysisMinSeverity: config.autoAnalysisMinSeverity,
+            autoAnalysisIncludeExisting: config.autoAnalysisIncludeExisting,
+            autoRemediationEnabled: config.autoRemediationEnabled,
+            autoRemediationMinSeverity: config.autoRemediationMinSeverity,
+            autoRemediationIncludeExisting: config.autoRemediationIncludeExisting,
+            slaNotificationsEnabled: config.slaNotificationsEnabled,
+            slaNotificationMinSeverity: config.slaNotificationMinSeverity,
+            slaNotificationWarningDays: config.slaNotificationWarningDays,
+            newFindingNotificationsEnabled: config.newFindingNotificationsEnabled,
+            newFindingNotificationMinSeverity: config.newFindingNotificationMinSeverity,
+            ...modelConfigPayload,
+          },
+          options
+        );
       }
     },
     [isOrg, organizationId, orgSaveConfigMutate, personalSaveConfigMutate]
@@ -494,23 +1259,71 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   );
 
   const handleStartAnalysis = useCallback(
-    (findingId: string, { retrySandboxOnly }: { retrySandboxOnly?: boolean } = {}) => {
-      setStartingAnalysisIds(prev => new Set(prev).add(findingId));
+    (
+      findingId: string,
+      {
+        forceSandbox,
+        retrySandboxOnly,
+      }: { forceSandbox?: boolean; retrySandboxOnly?: boolean } = {}
+    ) => {
+      dispatchProviderState({ type: 'add-optimistic-analysis', findingId });
       if (isOrg && organizationId) {
-        orgStartAnalysisMutate({ organizationId, findingId, retrySandboxOnly });
+        orgStartAnalysisMutate({ organizationId, findingId, forceSandbox, retrySandboxOnly });
       } else {
-        personalStartAnalysisMutate({ findingId, retrySandboxOnly });
+        personalStartAnalysisMutate({ findingId, forceSandbox, retrySandboxOnly });
       }
     },
     [isOrg, organizationId, orgStartAnalysisMutate, personalStartAnalysisMutate]
   );
 
-  const handleDeleteFindings = useCallback(
-    (repoFullName: string) => {
+  const handleStartRemediation = useCallback(
+    (findingId: string) => {
+      dispatchProviderState({ type: 'add-optimistic-remediation', findingId });
       if (isOrg && organizationId) {
-        orgDeleteFindingsMutate({ organizationId, repoFullName });
+        orgStartRemediationMutate({ organizationId, findingId });
       } else {
-        personalDeleteFindingsMutate({ repoFullName });
+        personalStartRemediationMutate({ findingId });
+      }
+    },
+    [isOrg, organizationId, orgStartRemediationMutate, personalStartRemediationMutate]
+  );
+
+  const handleRetryRemediation = useCallback(
+    (findingId: string) => {
+      dispatchProviderState({ type: 'add-optimistic-remediation', findingId });
+      if (isOrg && organizationId) {
+        orgRetryRemediationMutate({ organizationId, findingId });
+      } else {
+        personalRetryRemediationMutate({ findingId });
+      }
+    },
+    [isOrg, organizationId, orgRetryRemediationMutate, personalRetryRemediationMutate]
+  );
+
+  const handleCancelRemediation = useCallback(
+    (attemptId: string, findingId?: string) => {
+      if (findingId) {
+        dispatchProviderState({
+          type: 'remove-optimistic-remediation',
+          findingId,
+        });
+      }
+      dispatchProviderState({ type: 'add-cancelling-remediation', attemptId });
+      if (isOrg && organizationId) {
+        orgCancelRemediationMutate({ organizationId, attemptId });
+      } else {
+        personalCancelRemediationMutate({ attemptId });
+      }
+    },
+    [isOrg, organizationId, orgCancelRemediationMutate, personalCancelRemediationMutate]
+  );
+
+  const handleDeleteFindings = useCallback(
+    (repoFullName: string, onSuccess?: () => void) => {
+      if (isOrg && organizationId) {
+        orgDeleteFindingsMutate({ organizationId, repoFullName }, { onSuccess });
+      } else {
+        personalDeleteFindingsMutate({ repoFullName }, { onSuccess });
       }
     },
     [isOrg, organizationId, orgDeleteFindingsMutate, personalDeleteFindingsMutate]
@@ -520,9 +1333,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
   const hasPermission = permissionData?.hasPermissions ?? false;
   const reauthorizeUrl = permissionData?.reauthorizeUrl ?? undefined;
   const isEnabled = configData ? configData.isEnabled : undefined;
-  const allRepositories = reposData ?? [];
+  const allRepositories = reposData ?? EMPTY_REPOSITORIES;
   const repositorySelectionMode = configData?.repositorySelectionMode ?? 'selected';
-  const selectedRepositoryIds = configData?.selectedRepositoryIds ?? [];
+  const selectedRepositoryIds = configData?.selectedRepositoryIds ?? EMPTY_REPOSITORY_IDS;
 
   const filteredRepositories = useMemo(
     () =>
@@ -534,6 +1347,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const triageModelSlug = getOptionalStringField(configData, 'triageModelSlug');
   const analysisModelSlug = getOptionalStringField(configData, 'analysisModelSlug');
+  const remediationModelSlug = getOptionalStringField(configData, 'remediationModelSlug');
 
   const value = useMemo<SecurityAgentContextValue>(
     () => ({
@@ -548,6 +1362,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       configData: configData
         ? {
             ...configData,
+            slaEnabled: configData.slaEnabled ?? true,
             repositorySelectionMode: configData.repositorySelectionMode ?? 'selected',
             selectedRepositoryIds: configData.selectedRepositoryIds ?? [],
             triageModelSlug,
@@ -558,6 +1373,11 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
             autoAnalysisEnabled: configData.autoAnalysisEnabled ?? false,
             autoAnalysisMinSeverity: configData.autoAnalysisMinSeverity ?? 'high',
             autoAnalysisIncludeExisting: configData.autoAnalysisIncludeExisting ?? false,
+            autoRemediationEnabled: configData.autoRemediationEnabled ?? false,
+            autoRemediationMinSeverity: configData.autoRemediationMinSeverity ?? 'high',
+            autoRemediationIncludeExisting: configData.autoRemediationIncludeExisting ?? false,
+            autoRemediationEnabledAt: configData.autoRemediationEnabledAt ?? null,
+            remediationModelSlug,
           }
         : undefined,
       refetchConfig,
@@ -568,15 +1388,21 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       handleSaveConfig,
       handleToggleEnabled,
       handleStartAnalysis,
+      handleStartRemediation,
+      handleRetryRemediation,
+      handleCancelRemediation,
       handleDeleteFindings,
-      isSyncing: isOrg ? isOrgSyncPending : isPersonalSyncPending,
-      isDismissing: isOrg ? isOrgDismissPending : isPersonalDismissPending,
+      isSyncing: hasActiveSyncCommand || (isOrg ? isOrgSyncPending : isPersonalSyncPending),
+      isDismissing:
+        hasActiveDismissCommand || (isOrg ? isOrgDismissPending : isPersonalDismissPending),
       isSavingConfig: isOrg ? isOrgSaveConfigPending : isPersonalSaveConfigPending,
       isTogglingEnabled: isOrg ? isOrgSetEnabledPending : isPersonalSetEnabledPending,
       isDeletingFindings: isOrg ? isOrgDeleteFindingsPending : isPersonalDeleteFindingsPending,
       startingAnalysisIds,
-      gitHubError,
-      orphanedRepositories: orphanedReposData ?? [],
+      startingRemediationIds: providerState.optimisticStartingRemediationIds,
+      cancellingRemediationAttemptIds: providerState.optimisticCancellingRemediationAttemptIds,
+      gitHubError: providerState.gitHubError,
+      orphanedRepositories: orphanedReposData ?? EMPTY_ORPHANED_REPOSITORIES,
     }),
     [
       organizationId,
@@ -596,9 +1422,14 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       handleSaveConfig,
       handleToggleEnabled,
       handleStartAnalysis,
+      handleStartRemediation,
+      handleRetryRemediation,
+      handleCancelRemediation,
       handleDeleteFindings,
       isOrgSyncPending,
       isPersonalSyncPending,
+      hasActiveSyncCommand,
+      hasActiveDismissCommand,
       isOrgDismissPending,
       isPersonalDismissPending,
       isOrgSaveConfigPending,
@@ -608,12 +1439,20 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       isOrgDeleteFindingsPending,
       isPersonalDeleteFindingsPending,
       startingAnalysisIds,
-      gitHubError,
+      providerState.optimisticStartingRemediationIds,
+      providerState.optimisticCancellingRemediationAttemptIds,
+      providerState.gitHubError,
       orphanedReposData,
       triageModelSlug,
       analysisModelSlug,
+      remediationModelSlug,
     ]
   );
 
+  return value;
+}
+
+export function SecurityAgentProvider({ organizationId, children }: SecurityAgentProviderProps) {
+  const value = useSecurityAgentProviderValue(organizationId);
   return <SecurityAgentContext.Provider value={value}>{children}</SecurityAgentContext.Provider>;
 }

@@ -1,17 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from '@kilocode/db';
 
-const { mockGetWorkerDb, mockGetMissingSnowflakeConfig, mockQueryKiloclawActiveUserIds } =
-  vi.hoisted(() => ({
-    mockGetWorkerDb: vi.fn(),
-    mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
-    mockQueryKiloclawActiveUserIds: vi.fn(),
-  }));
+const {
+  mockFindLatestPreCutoffUserCommitSwitchQualification,
+  mockGetWorkerDb,
+  mockGetMissingSnowflakeConfig,
+  mockQueryKiloclawActiveUserIds,
+} = vi.hoisted(() => ({
+  mockFindLatestPreCutoffUserCommitSwitchQualification: vi.fn<
+    () => Promise<DbModule.KiloClawCommitSwitchQualification | null>
+  >(async () => null),
+  mockGetWorkerDb: vi.fn(),
+  mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
+  mockQueryKiloclawActiveUserIds: vi.fn(),
+}));
 
 vi.mock('@kilocode/db', async importOriginal => {
   const actual: Record<string, unknown> = await importOriginal();
   return {
     ...actual,
+    findLatestPreCutoffUserCommitSwitchQualification:
+      mockFindLatestPreCutoffUserCommitSwitchQualification,
     getWorkerDb: mockGetWorkerDb,
   };
 });
@@ -23,12 +32,14 @@ vi.mock('./snowflake.js', () => ({
 
 import {
   buildOrganizationKiloClawLifecycleNotification,
+  decideCommitRetirementCreditRenewal,
   processCreditRenewalDiscovery,
   processCreditRenewalItem,
   processOrganizationTrialExpiryPage,
   processTrialExpiryPage,
   processTrialInactivityStopCandidate,
   recordCreditRenewalTerminalFailure,
+  runCommitRetirementGuardSweep,
   runCreditRenewalSweep,
   runSweep,
   selectOrganizationKiloClawLifecycleRecipients,
@@ -248,6 +259,8 @@ function createTestBillingSummary() {
     credit_renewals_past_due: 0,
     credit_renewals_auto_top_up: 0,
     credit_renewals_skipped_duplicate: 0,
+    commit_retirement_guard_candidates: 0,
+    commit_retirement_guard_requests: 0,
     interrupted_auto_resume_requests: 0,
     trial_inactivity_candidates: 0,
     trial_inactivity_batches: 0,
@@ -307,9 +320,11 @@ function creditRenewalRow(overrides: Partial<Record<string, unknown>> = {}) {
     status: 'active',
     kiloclaw_price_version: '2026-03-19',
     credit_renewal_at: '2026-06-01T00:00:00.000Z',
+    current_period_start: '2026-05-01T00:00:00.000Z',
     current_period_end: '2026-06-01T00:00:00.000Z',
     cancel_at_period_end: false,
     scheduled_plan: null,
+    scheduled_by: null,
     commit_ends_at: null,
     past_due_since: null,
     suspended_at: null,
@@ -450,6 +465,285 @@ function createEnvWithQueueMocks(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch'
     trialInactivitySendBatch,
   };
 }
+
+describe('Commit retirement credit renewal decisions', () => {
+  it('cancels final Commit boundary without requiring cancel-at-period-end', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-06T00:00:00.000Z',
+          current_period_end: '2026-06-06T00:00:00.000Z',
+          commit_ends_at: '2026-06-06T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'cancel_final_commit' });
+  });
+
+  it('continues explicitly opted-in final Commit as Standard', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          scheduled_plan: 'standard',
+          scheduled_by: 'user',
+          credit_renewal_at: '2026-06-01T00:00:00.000Z',
+          commit_ends_at: '2026-06-01T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'continue_standard' });
+  });
+
+  it('fails closed when Standard continuation renewal boundary mismatches final boundary', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          scheduled_plan: 'standard',
+          scheduled_by: 'user',
+          credit_renewal_at: '2026-06-01T00:00:00.001Z',
+          commit_ends_at: '2026-06-01T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'ambiguous' });
+  });
+
+  it('honors canonical pending Standard-to-Commit switch qualification once', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'standard',
+          scheduled_plan: 'commit',
+          credit_renewal_at: '2026-07-01T00:00:00.000Z',
+        }) as never,
+        true
+      )
+    ).toEqual({
+      kind: 'allow_final_commit',
+      qualificationSource: 'switch_requested_before_cutoff',
+    });
+  });
+
+  it('fails closed for every unqualified scheduled Commit switch', () => {
+    for (const creditRenewalAt of ['2026-06-05T23:59:59.999Z', '2026-07-01T00:00:00.000Z']) {
+      expect(
+        decideCommitRetirementCreditRenewal(
+          creditRenewalRow({
+            plan: 'standard',
+            scheduled_plan: 'commit',
+            credit_renewal_at: creditRenewalAt,
+          }) as never
+        )
+      ).toEqual({ kind: 'ambiguous' });
+    }
+  });
+
+  it('does not authorize pre-cutoff recovery after a final term is already proven', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-05T23:59:59.999Z',
+          commit_ends_at: '2026-12-05T23:59:59.999Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'ambiguous' });
+  });
+
+  it('authorizes pre-cutoff recovery only when no exhaustion state exists', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-05T23:59:59.999Z',
+        }) as never
+      )
+    ).toEqual({
+      kind: 'allow_final_commit',
+      qualificationSource: 'renewal_due_before_cutoff',
+    });
+  });
+
+  it('fails closed instead of canceling before a proven final boundary', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'commit',
+          credit_renewal_at: '2026-06-06T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'ambiguous' });
+  });
+
+  it('does not authorize a qualified pending switch after final-term exhaustion', () => {
+    expect(
+      decideCommitRetirementCreditRenewal(
+        creditRenewalRow({
+          plan: 'standard',
+          scheduled_plan: 'commit',
+          credit_renewal_at: '2026-07-01T00:00:00.000Z',
+        }) as never
+      )
+    ).toEqual({ kind: 'ambiguous' });
+  });
+});
+
+describe('Commit retirement guard discovery', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-06T00:00:00.000Z'));
+  });
+
+  it('delegates active Stripe-backed Commit rows with lazy final boundary to web verification', async () => {
+    const candidate = {
+      id: '11111111-1111-4111-8111-111111111111',
+      user_id: 'user-1',
+      instance_id: '22222222-2222-4222-8222-222222222222',
+      final_boundary: '2026-07-01 00:00:00+00',
+    };
+    const { db } = createMockDb([[candidate]]);
+    const { env } = createEnvWithQueueMocks(vi.fn());
+    const timeoutSignal = new AbortController().signal;
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutSignal);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ guarded: true }));
+    const summary = createTestBillingSummary();
+
+    await runCommitRetirementGuardSweep(
+      db as never,
+      env,
+      {
+        billingFlow: 'kiloclaw_billing',
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'commit_retirement_guard',
+        billingAttempt: 1,
+      } as never,
+      summary
+    );
+
+    expect(summary.commit_retirement_guard_candidates).toBe(1);
+    expect(summary.commit_retirement_guard_requests).toBe(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://app.kilo.ai/api/internal/kiloclaw/billing-side-effects',
+      expect.objectContaining({
+        body: JSON.stringify({
+          action: 'commit_retirement_guard',
+          input: {
+            subscriptionId: candidate.id,
+            expectedFinalBoundary: '2026-07-01T00:00:00.000Z',
+          },
+        }),
+        signal: timeoutSignal,
+      })
+    );
+    expect(timeoutSpy).toHaveBeenCalledWith(30_000);
+  });
+
+  it('processes one bounded guard page and emits stable continuation', async () => {
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
+    const candidates = Array.from({ length: 4 }, (_, index) => ({
+      id: `${String(index).padStart(8, '0')}-1111-4111-8111-111111111111`,
+      user_id: `user-${index}`,
+      instance_id: null,
+      final_boundary: '2026-07-01T00:00:00.000Z',
+    }));
+    const { db, selectBuilders } = createMockDb([[...candidates]]);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ guarded: true }));
+    const summary = createTestBillingSummary();
+
+    const result = await runCommitRetirementGuardSweep(
+      db as never,
+      env,
+      {
+        billingFlow: 'kiloclaw_billing',
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'commit_retirement_guard',
+        billingAttempt: 1,
+      } as never,
+      summary,
+      {
+        kind: 'commit_retirement_guard_page',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'commit_retirement_guard',
+        cutoffTime: '2026-06-06T00:00:00.000Z',
+        pageBudget: 3,
+      }
+    );
+
+    expect(selectBuilders[0]?.orderBy).toHaveBeenCalled();
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(4);
+    expect(summary.commit_retirement_guard_candidates).toBe(3);
+    expect(summary.commit_retirement_guard_requests).toBe(3);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(lifecycleSend).toHaveBeenCalledWith({
+      kind: 'commit_retirement_guard_continuation',
+      runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      sweep: 'commit_retirement_guard',
+      cutoffTime: '2026-06-06T00:00:00.000Z',
+      cursorSubscriptionId: candidates[2]?.id,
+      cursorFinalBoundary: '2026-07-01T00:00:00.000Z',
+      pageBudget: 3,
+      wallClockBudgetMs: undefined,
+    });
+    expect(findLogRecord('Processed bounded Commit retirement guard batch')).toMatchObject({
+      batchSize: 3,
+      fetchedCount: 4,
+      guardBacklogLikely: true,
+      batchLimit: 3,
+      concurrency: 3,
+      continuationEnqueued: true,
+    });
+  });
+
+  it('advances cursor past failed guard candidates so later rows are not starved', async () => {
+    const candidates = Array.from({ length: 3 }, (_, index) => ({
+      id: `${String(index).padStart(8, '0')}-1111-4111-8111-111111111111`,
+      user_id: `user-${index}`,
+      instance_id: null,
+      final_boundary: '2026-07-01T00:00:00.000Z',
+    }));
+    const { db } = createMockDb([[...candidates]]);
+    const { env, lifecycleSend } = createEnvWithQueueMocks(vi.fn());
+    vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('persistent provider failure'))
+      .mockResolvedValue(Response.json({ guarded: true }));
+    const summary = createTestBillingSummary();
+
+    const result = await runCommitRetirementGuardSweep(
+      db as never,
+      env,
+      {
+        billingFlow: 'kiloclaw_billing',
+        billingRunId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        billingSweep: 'commit_retirement_guard',
+        billingAttempt: 1,
+      } as never,
+      summary,
+      {
+        kind: 'commit_retirement_guard_page',
+        runId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sweep: 'commit_retirement_guard',
+        cutoffTime: '2026-06-06T00:00:00.000Z',
+        pageBudget: 2,
+      }
+    );
+
+    expect(summary.errors).toBe(1);
+    expect(summary.commit_retirement_guard_requests).toBe(1);
+    expect(result.continuationEnqueued).toBe(true);
+    expect(lifecycleSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'commit_retirement_guard_continuation',
+        cursorSubscriptionId: candidates[1]?.id,
+      })
+    );
+  });
+});
 
 describe('credit renewal fanout queue processing', () => {
   beforeEach(() => {
@@ -870,6 +1164,38 @@ describe('credit renewal fanout queue processing', () => {
         kind: 'credit_renewal_item',
         subscriptionId: '11111111-1111-4111-8111-111111111111',
         renewalBoundary: '2026-06-01T00:00:00.000Z',
+      })
+    );
+  });
+
+  it('arms pure-credit final-term cancellation with retirement guard marker', async () => {
+    const row = creditRenewalRow({
+      plan: 'commit',
+      credit_renewal_at: '2026-06-06T00:00:00.000Z',
+      current_period_end: '2026-06-06T00:00:00.000Z',
+      commit_ends_at: '2026-06-06T00:00:00.000Z',
+    });
+    const { db, txUpdates } = createMockDb([[row], [row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await processCreditRenewalItem(
+      createEnvWithQueueMocks(vi.fn()).env,
+      {
+        kind: 'credit_renewal_item',
+        runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        sweep: 'credit_renewal_item',
+        subscriptionId: row.id,
+        userId: row.user_id,
+        renewalBoundary: '2026-06-06T00:00:00.000Z',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals_canceled).toBe(1);
+    expect(txUpdates).toContainEqual(
+      expect.objectContaining({
+        status: 'canceled',
+        cancel_at_period_end: false,
       })
     );
   });
@@ -3020,6 +3346,177 @@ describe('instance destruction sweep', () => {
     );
   });
 
+  it('clears destruction_deadline on a detached subscription row instead of starving the queue', async () => {
+    // Regression: a subscription with `destruction_deadline < now()` but
+    // `instance_id IS NULL` (its instance was already destroyed via some
+    // other path) has nothing left for this sweep to destroy. Before this
+    // fix the loop logged "missing_instance_id" and `continue`d without
+    // clearing the deadline, so the same detached row stayed at the head
+    // of the FIFO candidate query forever — production saw 25k+ real
+    // overdue rows starve for 40 days behind ~50 detached rows.
+    //
+    // The fix collects all detached IDs during the loop, then after the
+    // loop issues a single bulk SELECT + guarded bulk UPDATE + bulk
+    // changelog INSERT inside one database transaction. The transaction
+    // is what keeps the audit record at-least-once: if the INSERT fails
+    // the UPDATE rolls back so the rows stay detached and the next sweep
+    // retries the whole pair atomically — otherwise a transient INSERT
+    // failure would erase the only signal (`destruction_deadline IS NOT
+    // NULL`) that the cleanup ever ran.
+    const subscriptionId = 'sub-detached-1';
+    const detachedBefore = {
+      id: subscriptionId,
+      user_id: 'user-detached',
+      instance_id: null,
+      destruction_deadline: '2026-04-17T18:41:17.736Z',
+    };
+    const detachedAfter = { ...detachedBefore, destruction_deadline: null };
+    const { db, updates, txUpdates, inserts, txInserts, deletes } = createMockDb(
+      [
+        // 1. Destruction candidates (db.select): a single detached row.
+        [
+          {
+            id: subscriptionId,
+            user_id: 'user-detached',
+            instance_id: null,
+            sandbox_id: null,
+            organization_id: null,
+            status: 'canceled',
+            email: 'detached@example.com',
+          },
+        ],
+        // 2. Bulk SELECT for before-snapshots inside the cleanup transaction.
+        [detachedBefore],
+      ],
+      { txUpdateReturningRows: [[detachedAfter]] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // The guarded UPDATE happens inside a transaction so it lives on
+    // `txUpdates`, not `updates`. The top-level handles see nothing.
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(txUpdates).toEqual([{ destruction_deadline: null }]);
+    // The bulk INSERT writes the changelog entries as an array in one
+    // call inside the same transaction. txInserts[0] is the values array
+    // passed to tx.insert().values([...]).
+    expect(txInserts).toHaveLength(1);
+    expect(txInserts[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: subscriptionId,
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'detached_subscription_no_instance',
+        }),
+      ])
+    );
+    // The pre-existing skip log is still emitted for operator visibility.
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for detached subscription row',
+          reason: 'missing_instance_id',
+          subscriptionId,
+        }),
+      ])
+    );
+  });
+
+  it('clears a soft-deleted detached subscription instead of leaving it to pin the queue', async () => {
+    // Regression for the review of this PR. The detached check fires
+    // BEFORE the soft-deleted check inside the loop, so a row that is
+    // BOTH soft-deleted AND detached (`instance_id IS NULL`) still gets
+    // its destruction_deadline cleared. Without that ordering, the
+    // soft-deleted `continue` would short-circuit the loop and the row
+    // would stay at the head of the bounded FIFO queue forever — the
+    // same starvation the PR fixes for the common case, just gated on
+    // a different attribute.
+    const subscriptionId = 'sub-detached-softdeleted';
+    const detachedBefore = {
+      id: subscriptionId,
+      user_id: 'user-softdeleted',
+      instance_id: null,
+      destruction_deadline: '2026-04-17T18:41:17.736Z',
+    };
+    const detachedAfter = { ...detachedBefore, destruction_deadline: null };
+    const { db, updates, txUpdates, inserts, txInserts, deletes } = createMockDb(
+      [
+        [
+          {
+            id: subscriptionId,
+            user_id: 'user-softdeleted',
+            instance_id: null,
+            sandbox_id: null,
+            organization_id: null,
+            status: 'canceled',
+            // Trailing @deleted.invalid identifies a soft-deleted account
+            // (see SOFT_DELETED_EMAIL_SUFFIX in lifecycle.ts).
+            email: 'user-softdeleted@deleted.invalid',
+          },
+        ],
+        [detachedBefore],
+      ],
+      { txUpdateReturningRows: [[detachedAfter]] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'cdcdcdcd-cdcd-4cdc-8cdc-cdcdcdcdcdcd',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // Cleared inside a transaction even though the user is soft-deleted.
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(txUpdates).toEqual([{ destruction_deadline: null }]);
+    expect(txInserts).toHaveLength(1);
+    expect(txInserts[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: subscriptionId,
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'detached_subscription_no_instance',
+        }),
+      ])
+    );
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for detached subscription row',
+          reason: 'missing_instance_id',
+          subscriptionId,
+        }),
+      ])
+    );
+  });
+
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, txUpdates, inserts, deletes, selectBuilders } = createMockDb([
@@ -3072,7 +3569,7 @@ describe('instance destruction sweep', () => {
 
     expect(summary.errors).toBe(0);
     expect(summary.sweep3_instance_destruction).toBe(1);
-    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(50);
+    expect(selectBuilders[0]?.limit).toHaveBeenCalledWith(75);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     expect(inserts).toEqual(
@@ -4135,7 +4632,7 @@ describe('credit renewal sweep affiliate tracking', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('charges pure-credit renewals from the subscription price version catalog', async () => {
+  it('charges Standard renewals from catalog and cancels final Commit without another charge', async () => {
     const renewalAt = '2026-04-09T10:00:00.000Z';
     const { db, txInserts } = createMockDb(
       [
@@ -4206,9 +4703,11 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 'active',
             kiloclaw_price_version: '2026-05-10',
             credit_renewal_at: renewalAt,
+            current_period_start: '2026-04-01T10:00:00.000Z',
             current_period_end: renewalAt,
             cancel_at_period_end: false,
             scheduled_plan: null,
+            scheduled_by: null,
             commit_ends_at: renewalAt,
             past_due_since: null,
             suspended_at: null,
@@ -4268,7 +4767,8 @@ describe('credit renewal sweep affiliate tracking', () => {
       'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
     );
 
-    expect(summary.credit_renewals).toBe(3);
+    expect(summary.credit_renewals).toBe(2);
+    expect(summary.credit_renewals_canceled).toBe(1);
     expect(summary.errors).toBe(0);
     expect(txInserts).toEqual(
       expect.arrayContaining([
@@ -4281,11 +4781,6 @@ describe('credit renewal sweep affiliate tracking', () => {
           kilo_user_id: 'current-user',
           amount_microdollars: -55_000_000,
           credit_category: 'kiloclaw-subscription:current-instance:2026-04',
-        }),
-        expect.objectContaining({
-          kilo_user_id: 'current-commit-user',
-          amount_microdollars: -306_000_000,
-          credit_category: 'kiloclaw-subscription-commit:current-commit-instance:2026-04',
         }),
       ])
     );
@@ -4315,13 +4810,6 @@ describe('credit renewal sweep affiliate tracking', () => {
           itemCategory: 'kiloclaw-standard-2026-05-10',
           itemName: 'KiloClaw Standard Plan',
           itemSku: 'kiloclaw-standard-2026-05-10',
-        }),
-        expect.objectContaining({
-          userId: 'current-commit-user',
-          amount: 306,
-          itemCategory: 'kiloclaw-commit-2026-05-10',
-          itemName: 'KiloClaw Commit Plan',
-          itemSku: 'kiloclaw-commit-2026-05-10',
         }),
       ])
     );
@@ -4381,7 +4869,11 @@ describe('credit renewal sweep affiliate tracking', () => {
     expect(txUpdates).toHaveLength(0);
   });
 
-  it('applies scheduled pure-credit plan switches atomically at the versioned renewal cost', async () => {
+  it('applies canonically qualified pure-credit plan switches atomically at the versioned renewal cost', async () => {
+    mockFindLatestPreCutoffUserCommitSwitchQualification.mockResolvedValueOnce({
+      qualifiedAt: '2026-04-08T10:00:00.000Z',
+      qualificationSource: 'switch_requested_before_cutoff',
+    });
     const renewalAt = '2026-04-09T10:00:00.000Z';
     const { db, updates, txInserts, txUpdates } = createMockDb(
       [
@@ -4401,6 +4893,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             current_period_end: renewalAt,
             cancel_at_period_end: false,
             scheduled_plan: 'commit',
+            scheduled_by: 'user',
             commit_ends_at: null,
             past_due_since: null,
             suspended_at: null,
@@ -4428,6 +4921,7 @@ describe('credit renewal sweep affiliate tracking', () => {
             current_period_end: renewalAt,
             cancel_at_period_end: false,
             scheduled_plan: 'standard',
+            scheduled_by: 'user',
             commit_ends_at: renewalAt,
             past_due_since: null,
             suspended_at: null,

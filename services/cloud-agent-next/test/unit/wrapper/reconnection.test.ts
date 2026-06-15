@@ -141,7 +141,6 @@ const createCallbacks = (): ConnectionCallbacks & {
   onRootSessionActivity: ReturnType<typeof vi.fn>;
   onSseEvent: ReturnType<typeof vi.fn>;
 } => ({
-  onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
@@ -157,6 +156,7 @@ const createMockKiloClient = (overrides: Partial<WrapperKiloClient> = {}): Wrapp
   getSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
   sendPromptAsync: vi.fn().mockResolvedValue(undefined),
   abortSession: vi.fn().mockResolvedValue(true),
+  summarizeSession: vi.fn().mockResolvedValue(true),
   sendCommand: vi.fn().mockResolvedValue(undefined),
   answerPermission: vi.fn().mockResolvedValue(true),
   answerQuestion: vi.fn().mockResolvedValue(true),
@@ -167,6 +167,7 @@ const createMockKiloClient = (overrides: Partial<WrapperKiloClient> = {}): Wrapp
   getPermissions: vi.fn().mockResolvedValue([]),
   getNetworkWaits: vi.fn().mockResolvedValue([]),
   resumeNetworkWait: vi.fn().mockResolvedValue(true),
+  listEffectiveModels: vi.fn().mockResolvedValue([]),
   // Return a stream that never yields — keeps event subscription alive
   subscribeEvents: vi.fn().mockResolvedValue({
     stream: (async function* () {
@@ -650,8 +651,14 @@ describe('ingest WS reconnection', () => {
       timestamp: new Date().toISOString(),
       data: { text: 'some output' },
     };
+    const event3: IngestEvent = {
+      streamEventType: 'cloud.message.completed',
+      timestamp: new Date().toISOString(),
+      data: { messageId: 'msg_compact', completionSource: 'manual_compact_summarize' },
+    };
     state.sendToIngest(event1);
     state.sendToIngest(event2);
+    state.sendToIngest(event3);
 
     // Events should NOT have been sent to the old WS
     // (old WS is closed, so nothing is sent — events are buffered internally).
@@ -664,6 +671,12 @@ describe('ingest WS reconnection', () => {
         return true;
       }
       if (parsed.streamEventType === 'kilocode' && parsed.data?.event === 'test_event_1') {
+        return true;
+      }
+      if (
+        parsed.streamEventType === 'cloud.message.completed' &&
+        parsed.data?.messageId === 'msg_compact'
+      ) {
         return true;
       }
       return false;
@@ -684,7 +697,7 @@ describe('ingest WS reconnection', () => {
     });
     expect(resumeMsg).toBeDefined();
     const parsedResume = JSON.parse(resumeMsg!);
-    expect(parsedResume.data.bufferedEvents).toBe(2);
+    expect(parsedResume.data.bufferedEvents).toBe(3);
     expect(parsedResume.data.eventsLost).toBe(false);
 
     // Verify buffered events were flushed to new WS. Filter to the specific
@@ -692,14 +705,29 @@ describe('ingest WS reconnection', () => {
     // session.status kilocode event, which we ignore.
     const flushedEvents = newWs.sent
       .map(msg => JSON.parse(msg))
-      .filter((e: { streamEventType: string; data?: { event?: string; text?: string } }) => {
-        if (e.streamEventType === 'kilocode' && e.data?.event === 'test_event_1') return true;
-        if (e.streamEventType === 'output' && e.data?.text === 'some output') return true;
-        return false;
-      });
-    expect(flushedEvents).toHaveLength(2);
+      .filter(
+        (e: {
+          streamEventType: string;
+          data?: { event?: string; text?: string; messageId?: string };
+        }) => {
+          if (e.streamEventType === 'kilocode' && e.data?.event === 'test_event_1') return true;
+          if (e.streamEventType === 'output' && e.data?.text === 'some output') return true;
+          if (
+            e.streamEventType === 'cloud.message.completed' &&
+            e.data?.messageId === 'msg_compact'
+          ) {
+            return true;
+          }
+          return false;
+        }
+      );
+    expect(flushedEvents).toHaveLength(3);
     expect(flushedEvents[0].data.event).toBe('test_event_1');
     expect(flushedEvents[1].data.text).toBe('some output');
+    expect(flushedEvents[2]).toMatchObject({
+      streamEventType: 'cloud.message.completed',
+      data: { messageId: 'msg_compact', completionSource: 'manual_compact_summarize' },
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1064,8 +1092,26 @@ describe('ingest WS reconnection', () => {
     expect(callbacks2.onReconnecting).toHaveBeenCalledWith(1);
   });
 
-  it('surfaces model-not-found session errors as terminal wrapper errors', async () => {
+  it('surfaces code-review model-not-found session errors with runtime diagnostics', async () => {
+    state = new WrapperState();
+    state.bindSession(createCodeReviewSessionContext());
+    state.acceptMessage('msg_0123456789abMODELNOTFOUND', {
+      autoCommit: false,
+      condenseOnComplete: false,
+      model: 'kilo/zzzzzzzz',
+    });
+    const listEffectiveModels = vi
+      .fn()
+      .mockResolvedValue([
+        'vendor/theta',
+        'vendor/beta',
+        'vendor/epsilon',
+        'vendor/delta',
+        'vendor/alpha',
+        'vendor/gamma',
+      ]);
     const kiloClient = createMockKiloClient({
+      listEffectiveModels,
       subscribeEvents: vi.fn().mockResolvedValue({
         stream: createEventStream([
           {
@@ -1074,7 +1120,7 @@ describe('ingest WS reconnection', () => {
               sessionID: 'kilo_sess_456',
               error: {
                 name: 'UnknownError',
-                data: { message: 'Model not found: kilo/does-not-exist.' },
+                data: { message: 'Model not found: kilo/zzzzzzzz.' },
               },
             },
           },
@@ -1090,7 +1136,274 @@ describe('ingest WS reconnection', () => {
       event => event.streamEventType === 'kilocode' && event.data.event === 'session.error'
     );
     expect(sessionErrors).toHaveLength(1);
-    expect(callbacks.onTerminalError).toHaveBeenCalledWith('Model not found: kilo/does-not-exist.');
+    expect(listEffectiveModels).toHaveBeenCalledWith('kilo');
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'model_missing',
+      message: 'Model not found: kilo/zzzzzzzz.',
+      errorSource: 'assistant',
+      modelNotFoundRuntimeDiagnostics: {
+        requestedModel: 'kilo/zzzzzzzz',
+        availableModelCount: 6,
+        availableModels: [
+          'vendor/alpha',
+          'vendor/beta',
+          'vendor/delta',
+          'vendor/epsilon',
+          'vendor/gamma',
+          'vendor/theta',
+        ],
+        suggestedModels: [
+          'vendor/alpha',
+          'vendor/beta',
+          'vendor/delta',
+          'vendor/epsilon',
+          'vendor/gamma',
+        ],
+        suggestionSource: 'first-five',
+      },
+    });
+  });
+
+  it('preserves the terminal model-not-found error when runtime diagnostics lookup fails', async () => {
+    state = new WrapperState();
+    state.bindSession(createCodeReviewSessionContext());
+    state.acceptMessage('msg_0123456789abLOOKUPFAILS', {
+      autoCommit: false,
+      condenseOnComplete: false,
+      model: 'kilo/retired-model',
+    });
+    const listEffectiveModels = vi.fn().mockRejectedValue(new Error('config unavailable'));
+    const kiloClient = createMockKiloClient({
+      listEffectiveModels,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: { data: { message: 'Model not found: kilo/retired-model.' } },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(listEffectiveModels).toHaveBeenCalledWith('kilo');
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'model_missing',
+      message: 'Model not found: kilo/retired-model.',
+      errorSource: 'assistant',
+    });
+  });
+
+  it('preserves the terminal model-not-found error when runtime diagnostics lookup hangs', async () => {
+    state = new WrapperState();
+    state.bindSession(createCodeReviewSessionContext());
+    state.acceptMessage('msg_0123456789abLOOKUPHANGS', {
+      autoCommit: false,
+      condenseOnComplete: false,
+      model: 'kilo/retired-model',
+    });
+    const listEffectiveModels = vi.fn().mockReturnValue(new Promise<string[]>(() => {}));
+    const kiloClient = createMockKiloClient({
+      listEffectiveModels,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: { data: { message: 'Model not found: kilo/retired-model.' } },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(listEffectiveModels).toHaveBeenCalledWith('kilo');
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'model_missing',
+      message: 'Model not found: kilo/retired-model.',
+      errorSource: 'assistant',
+    });
+  });
+
+  it('does not fetch model diagnostics for non-code-review model-not-found errors', async () => {
+    const listEffectiveModels = vi.fn().mockResolvedValue(['vendor/model']);
+    const kiloClient = createMockKiloClient({
+      listEffectiveModels,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: { data: { message: 'Model not found: kilo/retired-model.' } },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(listEffectiveModels).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'model_missing',
+      message: 'Model not found: kilo/retired-model.',
+      errorSource: 'assistant',
+    });
+  });
+
+  it('does not fetch model diagnostics for child-session model-not-found errors', async () => {
+    state = new WrapperState();
+    state.bindSession(createCodeReviewSessionContext());
+    const listEffectiveModels = vi.fn().mockResolvedValue(['vendor/model']);
+    const kiloClient = createMockKiloClient({
+      listEffectiveModels,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_child_789',
+              error: { data: { message: 'Model not found: kilo/retired-model.' } },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(listEffectiveModels).not.toHaveBeenCalled();
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+  });
+
+  it('detects billing markers in full session error objects', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: {
+                name: 'PaymentRequiredError',
+                data: { message: 'Request failed' },
+              },
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+      code: 'payment_required',
+      message: 'Request failed',
+      errorSource: 'assistant',
+    });
+  });
+
+  it.each(['usage_limit_exceeded', 'Too Many Requests'])(
+    'surfaces explicit assistant request failures as terminal errors: %s',
+    async errorMessage => {
+      const kiloClient = createMockKiloClient({
+        subscribeEvents: vi.fn().mockResolvedValue({
+          stream: createEventStream([
+            {
+              type: 'session.error',
+              properties: {
+                sessionID: 'kilo_sess_456',
+                error: {
+                  name: 'ProviderError',
+                  data: { message: errorMessage },
+                },
+              },
+            },
+          ]),
+        }),
+      });
+
+      const manager = createManagerWithClient(kiloClient);
+      await openConnection(manager);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+        message: errorMessage,
+        errorSource: 'assistant',
+      });
+    }
+  );
+
+  it.each(['usage_limit_exceeded', 'Too Many Requests'])(
+    'does not terminate the root session for a child session rate-limit error: %s',
+    async errorMessage => {
+      const kiloClient = createMockKiloClient({
+        subscribeEvents: vi.fn().mockResolvedValue({
+          stream: createEventStream([
+            {
+              type: 'session.error',
+              properties: {
+                sessionID: 'kilo_child_789',
+                error: {
+                  name: 'ProviderError',
+                  data: { message: errorMessage },
+                },
+              },
+            },
+          ]),
+        }),
+      });
+
+      const manager = createManagerWithClient(kiloClient);
+      await openConnection(manager);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not treat incidental rate-limit text on non-error events as terminal', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'session.updated',
+            properties: {
+              sessionID: 'kilo_sess_456',
+              error: 'Too Many Requests',
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
   it('records explicit Kilo gate results from event properties', async () => {
@@ -1115,7 +1428,26 @@ describe('ingest WS reconnection', () => {
     expect(state.observedGateResult).toBe('fail');
   });
 
-  it('reports root activity before a terminal root message completion after idle', async () => {
+  it('does not treat trailing root session.turn.close as resumed execution', async () => {
+    callbacks.onSessionIdle = vi.fn();
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          { type: 'session.idle', properties: { sessionID: 'kilo_sess_456' } },
+          { type: 'session.turn.close', properties: { sessionID: 'kilo_sess_456' } },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onSessionIdle).toHaveBeenCalledOnce();
+    expect(callbacks.onRootSessionActivity).not.toHaveBeenCalled();
+  });
+
+  it('does not treat the post-idle root session epilogue as resumed execution', async () => {
     const callbackOrder: string[] = [];
     callbacks.onSessionIdle = vi.fn(() => {
       callbackOrder.push('idle');
@@ -1123,17 +1455,14 @@ describe('ingest WS reconnection', () => {
     callbacks.onRootSessionActivity.mockImplementation(() => {
       callbackOrder.push('activity');
     });
-    callbacks.onMessageComplete = vi.fn((messageId: string) => {
-      callbackOrder.push(`complete:${messageId}`);
-    });
 
     const kiloClient = createMockKiloClient({
       subscribeEvents: vi.fn().mockResolvedValue({
         stream: createEventStream([
-          {
-            type: 'session.idle',
-            properties: { sessionID: 'kilo_sess_456' },
-          },
+          { type: 'session.idle', properties: { sessionID: 'kilo_sess_456' } },
+          { type: 'session.turn.close', properties: { sessionID: 'kilo_sess_456' } },
+          { type: 'session.updated', properties: { sessionID: 'kilo_sess_456' } },
+          { type: 'session.diff', properties: { sessionID: 'kilo_sess_456' } },
           {
             type: 'message.updated',
             properties: {
@@ -1155,10 +1484,30 @@ describe('ingest WS reconnection', () => {
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(callbacks.onSessionIdle).toHaveBeenCalledTimes(1);
-    expect(callbacks.onRootSessionActivity).toHaveBeenCalledTimes(1);
-    expect(callbacks.onMessageComplete).toHaveBeenCalledWith('msg_root_user_123');
-    expect(callbackOrder).toEqual(['idle', 'activity', 'complete:msg_root_user_123']);
+    expect(callbacks.onSessionIdle).toHaveBeenCalledOnce();
+    expect(callbacks.onRootSessionActivity).not.toHaveBeenCalled();
+    expect(callbacks.onCompletionSignal).toHaveBeenCalledTimes(2);
+    expect(callbackOrder).toEqual(['idle']);
+  });
+
+  it('treats root turn-open and busy-status events as resumed execution', async () => {
+    const kiloClient = createMockKiloClient({
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          { type: 'session.turn.open', properties: { sessionID: 'kilo_sess_456' } },
+          {
+            type: 'session.status',
+            properties: { sessionID: 'kilo_sess_456', status: { type: 'busy' } },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onRootSessionActivity).toHaveBeenCalledTimes(2);
   });
 
   it('rejects real-time code-review questions without disconnecting', async () => {
@@ -1184,7 +1533,6 @@ describe('ingest WS reconnection', () => {
     expect(questionEvents).toHaveLength(0);
     expect(rejectQuestion).toHaveBeenCalledWith('q_123');
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
-    expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
   });
 
   it('rejects real-time code-review permissions without disconnecting', async () => {
@@ -1217,7 +1565,6 @@ describe('ingest WS reconnection', () => {
       CODE_REVIEW_PERMISSION_REJECTION_MESSAGE
     );
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
-    expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
   });
 
   it.each(['question', 'permission'])(
@@ -1253,7 +1600,6 @@ describe('ingest WS reconnection', () => {
       });
       expect(statusEvents).toHaveLength(0);
       expect(callbacks.onDisconnect).not.toHaveBeenCalled();
-      expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
     }
   );
 
@@ -1277,34 +1623,52 @@ describe('ingest WS reconnection', () => {
     expect(kiloClient.rejectQuestion).not.toHaveBeenCalled();
   });
 
-  it('forwards payment-style events and reports terminal errors', async () => {
-    const kiloClient = createMockKiloClient({
-      subscribeEvents: vi.fn().mockResolvedValue({
-        stream: createEventStream([
-          {
-            type: 'payment_required',
-            properties: { error: 'Insufficient credits', sessionID: 'kilo_sess_456' },
-          },
-        ]),
-      }),
-    });
+  it.each([
+    { eventType: 'payment_required', sessionID: 'kilo_child_789', terminal: false },
+    { eventType: 'insufficient_funds', sessionID: 'kilo_child_789', terminal: false },
+    { eventType: 'usage_limit_exceeded', sessionID: 'kilo_child_789', terminal: false },
+    { eventType: 'payment_required', sessionID: 'kilo_sess_456', terminal: true },
+    { eventType: 'insufficient_funds', sessionID: 'kilo_sess_456', terminal: true },
+    { eventType: 'usage_limit_exceeded', sessionID: 'kilo_sess_456', terminal: true },
+    { eventType: 'payment_required', sessionID: undefined, terminal: true },
+    { eventType: 'insufficient_funds', sessionID: undefined, terminal: true },
+    { eventType: 'usage_limit_exceeded', sessionID: undefined, terminal: true },
+  ])(
+    'scopes named terminal event $eventType with session $sessionID',
+    async ({ eventType, sessionID, terminal }) => {
+      const kiloClient = createMockKiloClient({
+        subscribeEvents: vi.fn().mockResolvedValue({
+          stream: createEventStream([
+            {
+              type: eventType,
+              properties: {
+                error: 'Insufficient credits',
+                ...(sessionID ? { sessionID } : {}),
+              },
+            },
+          ]),
+        }),
+      });
 
-    const manager = createManagerWithClient(kiloClient);
-    const ws = await openConnection(manager);
-    await vi.advanceTimersByTimeAsync(0);
+      const manager = createManagerWithClient(kiloClient);
+      const ws = await openConnection(manager);
+      await vi.advanceTimersByTimeAsync(0);
 
-    const paymentEvents = parseSentMessages(ws).filter(
-      event => event.streamEventType === 'kilocode' && event.data.event === 'payment_required'
-    );
-    expect(paymentEvents).toHaveLength(1);
-    expect(paymentEvents[0].data).toMatchObject({
-      event: 'payment_required',
-      error: 'Insufficient credits',
-    });
-    expect(callbacks.onTerminalError).toHaveBeenCalledWith('Insufficient credits');
-    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
-    expect(callbacks.onMessageComplete).not.toHaveBeenCalled();
-  });
+      const terminalEvents = parseSentMessages(ws).filter(
+        event => event.streamEventType === 'kilocode' && event.data.event === eventType
+      );
+      expect(terminalEvents).toHaveLength(1);
+      expect(callbacks.onTerminalError).toHaveBeenCalledTimes(terminal ? 1 : 0);
+      if (terminal) {
+        expect(callbacks.onTerminalError).toHaveBeenCalledWith({
+          ...(eventType === 'usage_limit_exceeded' ? {} : { code: 'payment_required' }),
+          message: 'Insufficient credits',
+          errorSource: 'assistant',
+        });
+      }
+      expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+    }
+  );
 
   // -------------------------------------------------------------------------
   // Test: close() clears event buffer to prevent stale events leaking

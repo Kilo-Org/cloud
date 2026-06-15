@@ -61,12 +61,12 @@ Monitor this endpoint for availability and to detect configuration drift
 Per-user rate limits are enforced at the tRPC middleware layer
 (`src/util/rate-limit.util.ts`):
 
-| Operation                      | Limit  |
-| ------------------------------ | ------ |
-| `wasteland.claimWantedItem`    | 10/min |
+| Operation | Limit |
+|---|---|
+| `wasteland.claimWantedItem` | 10/min |
 | `wasteland.markWantedItemDone` | 10/min |
-| `wasteland.postWantedItem`     | 5/min  |
-| `wasteland.browseWantedBoard`  | 60/min |
+| `wasteland.postWantedItem` | 5/min |
+| `wasteland.browseWantedBoard` | 60/min |
 
 Other procedures — including `joinWasteland`, `listMyForkBranches`,
 `discardBranch`, `publishBranch`, `listMyPulls`, and `resolveOwnerRepo` —

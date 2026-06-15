@@ -1092,9 +1092,10 @@ describe('runOnboardOrDoctor', () => {
 
   it('migrates legacy plaintext kilocode key in auth-profiles.json to a keyRef', () => {
     // Integration check: runOnboardOrDoctor must drive the auth-profiles
-    // migration. On a legacy doctor boot, a plaintext key in
-    // /root/.openclaw/agents/main/agent/auth-profiles.json should be
-    // rewritten to an env-backed keyRef on the same path.
+    // migration BEFORE `openclaw doctor --fix`. On a legacy doctor boot, a
+    // plaintext key in /root/.openclaw/agents/main/agent/auth-profiles.json is
+    // rewritten to an env-backed keyRef on the same path so doctor's SQLite
+    // import snapshots a keyRef, never the plaintext.
     const AGENTS_DIR = '/root/.openclaw/agents';
     const AGENT_ROOT = '/root/.openclaw/agents/main';
     const PROFILE_PATH = '/root/.openclaw/agents/main/agent/auth-profiles.json';
@@ -1162,6 +1163,108 @@ describe('runOnboardOrDoctor', () => {
     });
     expect(rewritten.profiles['kilocode:default']).not.toHaveProperty('key');
     expect(tempWrite.data).not.toContain('legacy-plaintext-key');
+
+    // Security-critical ordering: the keyRef rewrite must land BEFORE
+    // `openclaw doctor --fix` imports the profile into SQLite. OpenClaw imports a
+    // plaintext key verbatim when no keyRef is present, so a rewrite that ran
+    // after doctor would leave the plaintext in the SQLite store.
+    const doctorCallIndex = (
+      harness.deps.execFileSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([_cmd, args]) => Array.isArray(args) && args.includes('doctor'));
+    expect(doctorCallIndex).not.toBe(-1);
+    const doctorCallOrder = (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[doctorCallIndex];
+    const renameToProfileIndex = (
+      harness.deps.renameSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([, to]) => to === PROFILE_PATH);
+    expect(renameToProfileIndex).not.toBe(-1);
+    const renameOrder = (harness.deps.renameSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[renameToProfileIndex];
+    expect(renameOrder).toBeLessThan(doctorCallOrder);
+  });
+
+  it('hardens credential backups even when doctor exits nonzero', () => {
+    const AGENT_DIR = '/root/.openclaw/agents/main/agent';
+    const BAK = `${AGENT_DIR}/auth-profiles.json.sqlite-import.9.bak`;
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (cmd: string, args: string[]) => {
+        if (cmd === 'openclaw' && Array.isArray(args) && args.includes('doctor')) {
+          throw new Error('doctor exited 1');
+        }
+        return '';
+      }
+    );
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) =>
+        p.endsWith('openclaw.json') || p === '/root/.openclaw/agents' || p === AGENT_DIR
+    );
+    (harness.deps.readdirSync as ReturnType<typeof vi.fn>).mockImplementation((dir: string) => {
+      if (dir === '/root/.openclaw/agents') return ['main'];
+      if (dir === AGENT_DIR) return ['auth-profiles.json.sqlite-import.9.bak'];
+      return [];
+    });
+    (harness.deps.statSync as ReturnType<typeof vi.fn>).mockReturnValue({
+      isDirectory: () => true,
+    });
+
+    expect(() =>
+      runOnboardOrDoctor(
+        { KILOCODE_API_KEY: 'k', OPENCLAW_GATEWAY_TOKEN: 't', AUTO_APPROVE_DEVICES: 'true' },
+        harness.deps
+      )
+    ).toThrow('doctor exited 1');
+
+    // The finally hardened the backup despite the doctor failure.
+    expect(harness.chmodCalls).toContainEqual({ path: BAK, mode: 0o600 });
+  });
+
+  it('aborts before doctor when a detected plaintext profile cannot be rewritten', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const MAIN_AUTH = '/root/.openclaw/agents/main/agent/auth-profiles.json';
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) =>
+        p.endsWith('openclaw.json') || p === '/root/.openclaw/agents' || p === MAIN_AUTH
+    );
+    (harness.deps.readdirSync as ReturnType<typeof vi.fn>).mockImplementation((dir: string) =>
+      dir === '/root/.openclaw/agents' ? ['main'] : []
+    );
+    (harness.deps.statSync as ReturnType<typeof vi.fn>).mockReturnValue({
+      isDirectory: () => true,
+    });
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === MAIN_AUTH) {
+        return JSON.stringify({
+          version: 1,
+          profiles: {
+            'kilocode:default': { type: 'api_key', provider: 'kilocode', key: 'plaintext' },
+          },
+        });
+      }
+      if (p.endsWith('openclaw.json')) return JSON.stringify({ gateway: { port: 3001 } });
+      return '{}';
+    });
+    // The pre-doctor rewrite fails (e.g. read-only fs) when writing the auth file.
+    (harness.deps.writeFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.includes('auth-profiles.json')) throw new Error('EROFS');
+    });
+
+    expect(() =>
+      runOnboardOrDoctor(
+        { KILOCODE_API_KEY: 'k', OPENCLAW_GATEWAY_TOKEN: 't', AUTO_APPROVE_DEVICES: 'true' },
+        harness.deps
+      )
+    ).toThrow(/aborting before doctor/);
+
+    // doctor must NOT have run — the plaintext would otherwise be imported.
+    const doctorRan = harness.execCalls.some(
+      c => c.cmd === 'openclaw' && c.args.includes('doctor')
+    );
+    expect(doctorRan).toBe(false);
+    warnSpy.mockRestore();
   });
 
   it('does not auto-assign kilo-exa on doctor path when BRAVE_API_KEY is configured', () => {

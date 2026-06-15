@@ -5,6 +5,7 @@ import {
   REVIEW_INSTRUCTIONS_FILE,
   normalizeRepositoryReviewInstructions,
 } from './repository-review-instructions';
+import { REVIEW_SUMMARY_HISTORY_START } from '../summary/history';
 
 // --- Fixtures ---
 
@@ -15,6 +16,7 @@ const localTemplate = {
   workflow: 'local workflow',
   whatToReview: 'local what',
   commentFormat: 'local comment format',
+  inlineCommentFooter: 'local inline footer',
   summaryFormatIssuesFound: 'local issues',
   summaryFormatNoIssues: 'local no issues',
   summaryMarkerNote: 'local marker',
@@ -87,6 +89,12 @@ describe('resolveTemplate', () => {
     });
   });
 
+  it('falls back to local inline comment footer when remote omits it', () => {
+    const result = resolveTemplate(remoteTemplateWithoutStyleOverrides, localTemplate);
+
+    expect(result.template.inlineCommentFooter).toBe('local inline footer');
+  });
+
   it('remote wins for keys that both local and remote define', () => {
     const result = resolveTemplate(remoteTemplateOverridingRoast, localTemplate);
 
@@ -135,7 +143,6 @@ const baseConfig = {
   focus_areas: [],
   custom_instructions: '',
   model_slug: 'test-model',
-  max_review_time_minutes: 30,
 } satisfies CodeReviewAgentConfig;
 
 describe('generateReviewPrompt', () => {
@@ -183,6 +190,25 @@ describe('generateReviewPrompt', () => {
     );
     expect(prompt.indexOf(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`)).toBeLessThan(
       prompt.indexOf('# FOCUS AREAS')
+    );
+  });
+
+  it('includes GitHub inline comment footer guidance after the comment format', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain('## Inline Comment Footer');
+    expect(prompt).toContain(
+      'Reply with `@kilocode-bot fix it` to have Kilo Code address this issue.'
+    );
+    expect(prompt).toContain('after any fenced `suggestion` block');
+    expect(prompt).toContain(
+      'Do not add this footer to the review summary, top-level review body, or any non-inline comment.'
+    );
+    expect(prompt.indexOf('# COMMENT FORMAT')).toBeLessThan(
+      prompt.indexOf('## Inline Comment Footer')
+    );
+    expect(prompt.indexOf('## Inline Comment Footer')).toBeLessThan(
+      prompt.indexOf('# CONTEXT FOR THIS PR')
     );
   });
 
@@ -324,6 +350,48 @@ const existingReviewStateNoSummary: ExistingReviewState = {
   headCommitSha: 'currentsha123',
 };
 
+const existingReviewStateWithHistory: ExistingReviewState = {
+  summaryComment: {
+    commentId: 456,
+    body: [
+      '<!-- kilo-review -->',
+      '## Code Review Summary',
+      '',
+      '**Status:** No Issues Found | **Recommendation:** Merge',
+      '',
+      '<details>',
+      '<summary><b>Files Reviewed (1 file)</b></summary>',
+      '',
+      '- `src/current.ts`',
+      '',
+      '</details>',
+      '',
+      '<!-- kilo-review-history -->',
+      '<details>',
+      '<summary><b>Previous Review Summary</b> (commit oldwarn)</summary>',
+      '',
+      '_Current summary above is authoritative. Previous snapshots are kept for context only._',
+      '',
+      '<!-- kilo-review-history-entry -->',
+      '### Previous review (commit oldwarn)',
+      '',
+      '**Status:** 1 Issue Found | **Recommendation:** Address before merge',
+      '',
+      'Archived WARNING that should not be active context.',
+      '',
+      '</details>',
+      '<!-- /kilo-review-history -->',
+      '',
+      '---',
+      '<!-- kilo-usage -->',
+      '<sub>Reviewed by stale-model - 123 tokens</sub>',
+    ].join('\n'),
+  },
+  inlineComments: [],
+  previousStatus: 'no-issues',
+  headCommitSha: 'currentsha123',
+};
+
 describe('generateReviewPrompt (incremental review)', () => {
   it('uses incremental workflow when previousHeadSha and summary comment are provided', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
@@ -353,6 +421,20 @@ describe('generateReviewPrompt (incremental review)', () => {
 
     expect(prompt).not.toContain('INCREMENTAL REVIEW MODE');
     expect(prompt).toContain('gh pr diff 42');
+  });
+
+  it('allows GitHub agents to pull latest changes in standard mode', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateNoSummary,
+      previousHeadSha: null,
+    });
+
+    expect(prompt).toContain('Before reading files, always fetch from remote');
+    expect(prompt).toContain('git pull origin $(git branch --show-current)');
+    expect(prompt).toContain('gh pr diff 42');
+    expect(prompt).not.toContain('DO NOT fetch or pull');
+    expect(prompt).not.toContain('Do not run `git fetch`');
   });
 
   it('uses standard workflow when previousHeadSha is provided but no summary comment', async () => {
@@ -401,6 +483,61 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('123'); // commentId
   });
 
+  it('does not send archived summary history through the model', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain('2 Issues Found');
+    expect(prompt).toContain('UPDATE existing comment');
+    expect(prompt).not.toContain('## Previous Summary Preservation');
+    expect(prompt).not.toContain(REVIEW_SUMMARY_HISTORY_START);
+    expect(prompt).not.toContain('old-model');
+  });
+
+  it('does not add summary preservation instructions outside incremental mode', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: null,
+    });
+
+    expect(prompt).not.toContain('INCREMENTAL REVIEW MODE');
+    expect(prompt).not.toContain('## Previous Summary Preservation');
+    expect(prompt).not.toContain(REVIEW_SUMMARY_HISTORY_START);
+  });
+
+  it('does not add previous summary preservation for create prompts', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateNoSummary,
+      previousHeadSha: null,
+    });
+
+    expect(prompt).not.toContain('## Previous Summary Preservation');
+    expect(prompt).toContain('CREATE new comment');
+  });
+
+  it('excludes archived history from incremental previous-summary context', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithHistory,
+      previousHeadSha: 'abc123prev',
+    });
+    const previousSummaryStart = prompt.indexOf('## Previous Review Summary');
+    const previousSummaryEnd = prompt.indexOf('## Previous Inline Comments');
+    const previousSummaryContext = prompt.slice(previousSummaryStart, previousSummaryEnd);
+
+    expect(previousSummaryContext).toContain('No Issues Found');
+    expect(previousSummaryContext).toContain('src/current.ts');
+    expect(previousSummaryContext).not.toContain('Archived WARNING');
+    expect(previousSummaryContext).not.toContain(REVIEW_SUMMARY_HISTORY_START);
+    expect(previousSummaryContext).not.toContain('stale-model');
+    expect(prompt).not.toContain('Archived WARNING');
+  });
+
   it('works with GitLab platform in incremental mode', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
       reviewId: 'review-456',
@@ -413,5 +550,56 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('INCREMENTAL REVIEW MODE');
     expect(prompt).toContain('prevsha456');
     expect(prompt).toContain('glab mr diff');
+    expect(prompt).toContain('git pull');
+    expect(prompt).toContain('git diff prevsha456..HEAD');
+    expect(prompt).not.toContain('DO NOT fetch or pull');
+    expect(prompt).not.toContain('Do not run `git fetch`');
+  });
+
+  it('does not send summary history through GitLab update prompts', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      reviewId: 'review-456',
+      existingReviewState: existingReviewStateWithSummary,
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+      previousHeadSha: 'prevsha456',
+    });
+
+    expect(prompt).toContain('UPDATE existing note');
+    expect(prompt).not.toContain('## Previous Summary Preservation');
+    expect(prompt).not.toContain(REVIEW_SUMMARY_HISTORY_START);
+  });
+
+  it('allows GitLab agents to fetch and pull latest changes in standard mode', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      reviewId: 'review-456',
+      existingReviewState: existingReviewStateNoSummary,
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+      previousHeadSha: null,
+    });
+
+    expect(prompt).toContain('Before reading files, always fetch from remote');
+    expect(prompt).toContain('git fetch origin');
+    expect(prompt).toContain('git pull origin $(git branch --show-current)');
+    expect(prompt).toContain('glab mr diff 10');
+    expect(prompt).toContain(
+      'glab api --method POST "projects/group%2Fproject/merge_requests/10/notes"'
+    );
+    expect(prompt).toContain(
+      'glab api --method POST "projects/group%2Fproject/merge_requests/10/discussions"'
+    );
+    expect(prompt).not.toContain('DO NOT fetch or pull');
+    expect(prompt).not.toContain('Do not run `git fetch`');
+  });
+
+  it('does not include GitHub inline comment footer guidance for GitLab prompts', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+    });
+
+    expect(prompt).not.toContain('## Inline Comment Footer');
+    expect(prompt).not.toContain('@kilocode-bot fix it');
   });
 });

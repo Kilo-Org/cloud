@@ -11,6 +11,39 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-06-10',
+    description:
+      'OpenClaw 2026.6.5 is available now as an Early Access upgrade. This release includes a new OpenClaw feature that migrates some credentials stored in JSON files into a SQLite database. The migration runs automatically the first time you upgrade — and once your instance has migrated, there is no automatic way to revert to the previous format.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-06-03',
+    description:
+      "Google Calendar now connects through KiloCode's official Google approved OAuth client. Connect it from Settings → Productivity → Google Calendar for read-only calendar access. We encourage everyone to use this instead of the legacy Google (Gog) connection. If you already have the legacy connection set up, it keeps working and nothing is removed. New legacy setups are no longer offered, so switch over when convenient.",
+    category: 'feature',
+    deployHint: null,
+  },
+  {
+    date: '2026-06-01',
+    description: 'Updated OpenClaw to 2026.5.26.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-05-28',
+    description: 'Updated OpenClaw to 2026.5.22.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-05-27',
+    description:
+      'Saving openclaw.json from the file explorer in Settings now runs OpenClaw config validation first. If validation fails, your edits are preserved so you can review the warning before choosing Save anyway.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
     date: '2026-05-20',
     description:
       'Morning Briefing is now generally available to all KiloClaw users. Enable it in Settings → Morning Briefing for a daily briefing covering your calendar, open GitHub and Linear issues, news on the topics you choose, local news, and a summary of your recent KiloClaw chat activity. It is delivered each morning, or on demand with Run Now.',

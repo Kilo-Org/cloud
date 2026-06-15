@@ -23,6 +23,7 @@ import type { Owner } from '@/lib/code-reviews/core';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
 import { sentryLogger } from '@/lib/utils.server';
 import { logSecurityAudit, SecurityAuditLogAction } from './audit-log-service';
+import { parseDependabotDismissalTarget } from '@kilocode/worker-utils/dependabot-dismissal-target';
 
 const log = sentryLogger('security-agent:auto-dismiss', 'info');
 const logError = sentryLogger('security-agent:auto-dismiss', 'error');
@@ -73,17 +74,11 @@ export async function writebackDependabotDismissal(
     return;
   }
 
-  const alertNumber = parseInt(finding.source_id, 10);
-  if (isNaN(alertNumber)) {
-    return;
-  }
-
-  const [repoOwner, repoName] = finding.repo_full_name.split('/');
-  if (!repoOwner || !repoName) {
-    logError('Invalid repo_full_name for Dependabot writeback', {
-      findingId,
-      repoFullName: finding.repo_full_name,
-    });
+  const target = parseDependabotDismissalTarget({
+    sourceId: finding.source_id,
+    repoFullName: finding.repo_full_name,
+  });
+  if (!target) {
     return;
   }
 
@@ -96,14 +91,14 @@ export async function writebackDependabotDismissal(
 
   await dismissDependabotAlert(
     installationId,
-    repoOwner,
-    repoName,
-    alertNumber,
+    target.repoOwner,
+    target.repoName,
+    target.alertNumber,
     'not_used',
     `[Kilo Code auto-dismiss] ${dismissedComment}`
   );
 
-  log('Wrote back Dependabot dismissal', { findingId, alertNumber });
+  log('Wrote back Dependabot dismissal', { findingId, alertNumber: target.alertNumber });
 }
 
 /**

@@ -5,12 +5,13 @@ import type {
   SandboxId,
   SessionContext,
   SessionId,
-  InterruptResult,
+  GitAuthorConfig,
+  ManagedGitHubFallbackReason,
 } from './types.js';
 import { generateSandboxId } from './sandbox-id.js';
 import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
-  resolveGitHubTokenForRepo,
+  resolveCloudAgentGitHubAuthForRepo,
   resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
 import { ExecutionError } from './execution/errors.js';
@@ -24,6 +25,7 @@ import {
   GIT_COMMAND_TIMEOUT_MS,
   manageBranch,
   setupWorkspace,
+  updateGitAuthor,
   updateGitRemoteToken,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
@@ -56,7 +58,7 @@ import {
   resolveDockerSocketPath,
 } from './kilo/sandbox-runtime.js';
 import { shellQuote, validShellEnvEntries } from './kilo/utils.js';
-import { buildSignedImagePromptAttachments } from './execution/image-prompt-parts.js';
+import { buildSignedPromptAttachments } from './execution/attachment-prompt-parts.js';
 import {
   type WrapperBootstrapRepoSource,
   type WrapperCommandRequest,
@@ -64,16 +66,50 @@ import {
   type WrapperSessionReadyRequest,
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
+import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
 import type {
   FencedLegacyExecutionRequest,
   FencedWrapperDispatchRequest,
 } from './execution/types.js';
 import { normalizeAgentMode } from './schema.js';
+import {
+  isSandboxFilesystemUnusableError,
+  SandboxCapacityInspectionError,
+} from './workspace-errors.js';
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
 
-// Keep in sync with: cloud-agent/src/workspace.ts, cloudflare-code-review-infra/src/code-review-orchestrator.ts
+function gitLabTokenLookupFailureMessage(reason: string): string {
+  switch (reason) {
+    case 'no_integration_found':
+    case 'invalid_org_id':
+      return `No GitLab integration found (${reason}). Please connect your GitLab account first.`;
+    case 'no_token':
+    case 'token_refresh_failed':
+    case 'token_expired_no_refresh':
+      return `GitLab token lookup failed (${reason}). Please reconnect your GitLab account.`;
+    case 'repository_url_required':
+    case 'invalid_repository_url':
+      return `GitLab token lookup failed (${reason}). Repository metadata is missing or invalid for this GitLab code-review session.`;
+    case 'no_matching_integration':
+      return `GitLab token lookup failed (${reason}). No authorized GitLab integration matches this repository. Connect the GitLab account or organization that has access to the repository.`;
+    case 'ambiguous_integration':
+      return `GitLab token lookup failed (${reason}). Multiple GitLab integrations or project tokens match this repository. Remove duplicate GitLab integrations or reconfigure the GitLab code-review integration.`;
+    case 'project_lookup_failed':
+      return `GitLab token lookup failed (${reason}). The connected GitLab integration cannot read this project. Grant repository access, then reconnect GitLab if required.`;
+    case 'no_project_token':
+      return `GitLab token lookup failed (${reason}). No GitLab project access token is configured for this repository. Reconfigure or reinstall the GitLab code-review bot for the project.`;
+    case 'database_not_configured':
+    case 'service_not_configured':
+    case 'rpc_error':
+      return `GitLab token lookup failed (${reason}). Git token service is unavailable; contact support.`;
+    default:
+      return `GitLab token lookup failed (${reason}). Please reconnect your GitLab account.`;
+  }
+}
+
+// Keep in sync with: cloudflare-code-review-infra/src/code-review-orchestrator.ts
 // mkdir and touch are intentionally allowed for agent scratch space during analysis
 const CODE_REVIEW_ALLOWED_COMMANDS = [
   'ls',
@@ -82,6 +118,8 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'pwd',
   'find',
   'grep',
+  'rg',
+  'awk',
   'wc',
   'sort',
   'uniq',
@@ -90,7 +128,21 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'nl',
   'jq',
   'git',
-  'gh',
+  'git fetch',
+  'git pull',
+  'gh pr diff',
+  'gh pr view',
+  'gh api repos/*/pulls/*/reviews',
+  'gh api repos/*/pulls/*/comments',
+  'gh api repos/*/issues/*/comments',
+  'gh api repos/*/issues/*/comments --input*',
+  'gh api repos/*/issues/comments/* -X PATCH*',
+  'gh api repos/*/pulls/*/reviews --input*',
+  'glab mr diff',
+  'glab mr view',
+  'glab api --method POST *merge_requests/*/notes*',
+  'glab api --method PUT *merge_requests/*/notes/*',
+  'glab api --method POST *merge_requests/*/discussions*',
   'whoami',
   'date',
   'stat',
@@ -116,6 +168,9 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'sed * -*i',
   'sed * --in-place',
   'sed * --in-place*',
+  'awk * -i*',
+  'awk * --in-place*',
+  'awk *system(*',
   'sort -o',
   'sort -o*',
   'sort -*o',
@@ -148,8 +203,14 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'tmux',
   'screen',
   'git add',
+  'git branch',
+  'git clean',
   'git commit',
+  'git config',
+  'git mv',
   'git push',
+  'git restore',
+  'git rm',
   'git merge',
   'git rebase',
   'git cherry-pick',
@@ -158,6 +219,7 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'git switch',
   'git stash',
   'git tag',
+  'git worktree',
   'git am',
   'git apply',
   'git remote set-url',
@@ -172,6 +234,38 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'gh issue',
   'gh repo create',
   'gh repo fork',
+  'gh api repos/*/pulls/*/reviews --method*',
+  'gh api repos/*/pulls/*/reviews -X*',
+  'gh api repos/*/pulls/*/reviews -f*',
+  'gh api repos/*/pulls/*/reviews -F*',
+  'gh api repos/*/pulls/*/reviews --field*',
+  'gh api repos/*/pulls/*/reviews --raw-field*',
+  'gh api repos/*/pulls/*/comments --method*',
+  'gh api repos/*/pulls/*/comments -X*',
+  'gh api repos/*/pulls/*/comments -f*',
+  'gh api repos/*/pulls/*/comments -F*',
+  'gh api repos/*/pulls/*/comments --field*',
+  'gh api repos/*/pulls/*/comments --raw-field*',
+  'gh api repos/*/pulls/*/comments --input*',
+  'gh api repos/*/issues/*/comments --method*',
+  'gh api repos/*/issues/*/comments -X*',
+  'gh api repos/*/issues/*/comments -f*',
+  'gh api repos/*/issues/*/comments -F*',
+  'gh api repos/*/issues/*/comments --field*',
+  'gh api repos/*/issues/*/comments --raw-field*',
+  'glab auth',
+  'glab mr approve',
+  'glab mr close',
+  'glab mr create',
+  'glab mr delete',
+  'glab mr merge',
+  'glab mr reopen',
+  'glab mr update',
+  'glab repo',
+  'glab issue',
+  'glab pipeline',
+  'glab release',
+  'glab variable',
   'npm test',
   'pnpm test',
   'bun test',
@@ -180,22 +274,142 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'vitest',
 ];
 
-type CommandGuardPolicy = {
+const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
+  'ls',
+  'cat',
+  'echo',
+  'pwd',
+  'find',
+  'grep',
+  'rg',
+  'wc',
+  'sort',
+  'uniq',
+  'cut',
+  'tr',
+  'nl',
+  'jq',
+  'git',
+  'git status',
+  'git diff',
+  'git branch',
+  'git checkout',
+  'git switch',
+  'git add',
+  'git commit',
+  'git push',
+  'gh pr create',
+  'gh pr view',
+  'gh pr diff',
+  'npm',
+  'npm install',
+  'npm run',
+  'npm test',
+  'pnpm',
+  'pnpm install',
+  'pnpm run',
+  'pnpm test',
+  'bun',
+  'bun install',
+  'bun run',
+  'bun test',
+  'yarn',
+  'yarn install',
+  'yarn run',
+  'yarn test',
+  'python',
+  'python3',
+  'python -m',
+  'python3 -m',
+  'pip',
+  'pip3',
+  'pytest',
+  'go',
+  'go test',
+  'mvn',
+  'gradle',
+  'bundle',
+  'vitest',
+  'sed',
+  'cd',
+  'mkdir',
+  'touch',
+  'cp',
+  'mv',
+  'rm',
+];
+
+const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
+  'git reset --hard',
+  'git clean',
+  'git push --force',
+  'git push -f',
+  'git push * --force',
+  'git push * -f',
+  'git push --mirror',
+  'git remote set-url',
+  'git tag',
+  'git worktree',
+  'git stash',
+  'gh pr merge',
+  'gh pr close',
+  'gh pr edit',
+  'gh pr checkout',
+  'gh auth',
+  'gh repo',
+  'gh secret',
+  'curl',
+  'wget',
+  'ssh',
+  'scp',
+  'rsync',
+  'docker',
+  'kubectl',
+  'wrangler',
+  'vercel',
+];
+
+export type CommandGuardPolicy = {
   policyName: string;
   allowed: string[];
   denied: string[];
 };
 
-function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy | null {
-  if (createdOnPlatform !== 'code-review') {
-    return null;
+export function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy | null {
+  if (createdOnPlatform === 'security-remediation') {
+    return {
+      policyName: 'security-remediation-pr',
+      allowed: SECURITY_REMEDIATION_ALLOWED_COMMANDS,
+      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS],
+    };
   }
 
-  return {
-    policyName: 'code-review-read-only',
-    allowed: CODE_REVIEW_ALLOWED_COMMANDS,
-    denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
-  };
+  if (createdOnPlatform === 'code-review') {
+    return {
+      policyName: 'code-review-read-only',
+      allowed: CODE_REVIEW_ALLOWED_COMMANDS,
+      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
+    };
+  }
+
+  return null;
+}
+
+export function buildCommandGuardBashPermissions(
+  commandGuardPolicy: CommandGuardPolicy
+): Record<string, string> {
+  // Denies are inserted after allows so exact duplicates still fail closed;
+  // more-specific denied sub-commands also override broader allowed commands in the CLI matcher.
+  const bashPermissions: Record<string, string> = {};
+  for (const cmd of commandGuardPolicy.allowed) {
+    bashPermissions[cmd] = 'allow';
+    bashPermissions[`${cmd} *`] = 'allow';
+  }
+  for (const cmd of commandGuardPolicy.denied) {
+    bashPermissions[cmd] = 'deny';
+    bashPermissions[`${cmd} *`] = 'deny';
+  }
+  return bashPermissions;
 }
 
 class SessionSnapshotRestoreError extends Error {
@@ -252,9 +466,33 @@ export type ResolvedWorkspaceTokens = {
   githubToken?: string;
   githubInstallationId?: string;
   githubAppType?: 'standard' | 'lite';
+  githubSource?: 'user' | 'installation';
+  githubGitAuthor?: GitAuthorConfig;
+  githubCommitCoAuthor?: GitAuthorConfig;
+  githubFallbackReason?: ManagedGitHubFallbackReason;
   gitToken?: string;
   gitlabTokenManaged?: boolean;
+  glabIsOAuth2?: boolean;
 };
+
+function installationGitAuthorFromEnv(
+  env: PersistenceEnv,
+  githubAppType: 'standard' | 'lite'
+): GitAuthorConfig | undefined {
+  const slug =
+    githubAppType === 'lite'
+      ? env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG
+      : env.GITHUB_APP_SLUG;
+  const userId =
+    githubAppType === 'lite'
+      ? env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID
+      : env.GITHUB_APP_BOT_USER_ID;
+  if (!slug || !userId) return undefined;
+  return {
+    name: `${slug}[bot]`,
+    email: `${userId}+${slug}[bot]@users.noreply.github.com`,
+  };
+}
 
 function parseRestoreScriptOutput(stdout: string | undefined): {
   code?: number;
@@ -408,11 +646,9 @@ export async function runSetupCommands(
   logger.info('Setup commands completed');
 }
 
-// Write Kilo auth file so the CLI's KiloSessions can call session ingest.
-// The CLI reads ~/.local/share/kilo/auth.json via Auth.get("kilo") but we
-// never run `kilo auth login` — credentials are injected purely via env vars
-// for config (KILO_CONFIG_CONTENT). The session ingest code path ignores the
-// provider config and only reads the auth file.
+// Persist Kilo auth for workspace preparation paths that do not receive the
+// wrapper process environment; wrapper-launched Kilo receives the same auth
+// shape through KILO_AUTH_CONTENT.
 export async function writeAuthFile(
   sandbox: SandboxInstance,
   sessionHome: string,
@@ -479,21 +715,7 @@ export async function writeGlobalRules(
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  const content = [
-    '# Cloud Agent Environment',
-    '',
-    "You are running inside a sandboxed cloud container, not on the user's local machine.",
-    'The filesystem is ephemeral and will not persist after the session ends.',
-    "Do not assume access to the user's local files, browsers, or desktop environment.",
-    '',
-    '## Temporary Files',
-    '',
-    `When you need to create temporary or scratch files, use \`/tmp/${sessionId}/\` as your scratch directory.`,
-    'This path is pre-approved for file access and will not trigger permission prompts.',
-    '',
-  ].join('\n');
-
-  await sandbox.writeFile(rulesPath, content);
+  await sandbox.writeFile(rulesPath, buildCloudAgentRules(sessionId));
 }
 
 /**
@@ -799,6 +1021,8 @@ export class SessionService {
     githubToken?: string;
     gitUrl?: string;
     gitToken?: string;
+    gitlabTokenManaged?: boolean;
+    glabIsOAuth2?: boolean;
     upstreamBranch?: string;
     branchName?: string;
     envVars?: Record<string, string>;
@@ -827,6 +1051,8 @@ export class SessionService {
       githubToken: options.githubToken,
       gitUrl: options.gitUrl,
       gitToken: options.gitToken,
+      gitlabTokenManaged: options.gitlabTokenManaged,
+      glabIsOAuth2: options.glabIsOAuth2,
       platform: options.platform,
       envVars: options.envVars,
     };
@@ -855,6 +1081,7 @@ export class SessionService {
       appendSystemPrompt: opts.appendSystemPrompt,
       gitUrl: context.gitUrl,
       gitToken: context.gitToken,
+      glabIsOAuth2: context.glabIsOAuth2,
       platform: context.platform,
       profile: effectiveProfile,
     });
@@ -875,6 +1102,7 @@ export class SessionService {
       appendSystemPrompt,
       gitUrl,
       gitToken,
+      glabIsOAuth2,
       platform,
       profile,
     } = opts;
@@ -914,6 +1142,7 @@ export class SessionService {
       SESSION_HOME: sessionHome,
       // Inject Kilocode credentials (with override support)
       KILOCODE_TOKEN: kilocodeToken,
+      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: originalToken } }),
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',
@@ -949,6 +1178,7 @@ export class SessionService {
       external_directory: {
         '*': 'deny',
         [`/tmp/${sessionId}/**`]: 'allow',
+        [`/tmp/attachments/${sessionId}/**`]: 'allow',
         [`${workspacePath}/**`]: 'allow',
         [`${sessionHome}/.kilocode/skills/**`]: 'allow',
       },
@@ -971,18 +1201,7 @@ export class SessionService {
     };
 
     if (commandGuardPolicy) {
-      // Build bash permission rules from guard policy. Denies are inserted after
-      // allows so exact duplicates still fail closed; more-specific denied
-      // sub-commands also override broader allowed commands in the CLI matcher.
-      const bashPermissions: Record<string, string> = {};
-      for (const cmd of commandGuardPolicy.allowed) {
-        bashPermissions[cmd] = 'allow';
-        bashPermissions[`${cmd} *`] = 'allow';
-      }
-      for (const cmd of commandGuardPolicy.denied) {
-        bashPermissions[cmd] = 'deny';
-        bashPermissions[`${cmd} *`] = 'deny';
-      }
+      const bashPermissions = buildCommandGuardBashPermissions(commandGuardPolicy);
 
       // Parity with old autoApproval config:
       //   read: allow  (was read.enabled: true)
@@ -992,7 +1211,7 @@ export class SessionService {
       //   question: handled above (line 564) for non-interactive sessions
       Object.assign(permission, {
         read: 'allow',
-        edit: 'deny',
+        edit: commandGuardPolicy.policyName === 'security-remediation-pr' ? 'allow' : 'deny',
         bash: bashPermissions,
         webfetch: 'deny',
         websearch: 'deny',
@@ -1018,7 +1237,7 @@ export class SessionService {
         },
       },
       autoupdate: false,
-      snapshot: false,
+      snapshot: createdOnPlatform === 'cloud-agent-web',
     };
     if (mcpServers && Object.keys(mcpServers).length > 0) {
       const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);
@@ -1076,10 +1295,21 @@ export class SessionService {
     // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
     const effectivePlatform = platform ?? (gitUrl?.includes('gitlab') ? 'gitlab' : undefined);
 
-    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides
-    if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
+    const requiresResolvedGitLabTokenMode = glabIsOAuth2 === false;
+    // A token-mode credential must be materialized consistently with its resolver instruction.
+    if (
+      gitToken &&
+      effectivePlatform === 'gitlab' &&
+      (!baseEnvVars.GITLAB_TOKEN || requiresResolvedGitLabTokenMode)
+    ) {
       envVars.GITLAB_TOKEN = gitToken;
-      if (!baseEnvVars.GITLAB_HOST) {
+      if (
+        glabIsOAuth2 !== undefined &&
+        (baseEnvVars.GLAB_IS_OAUTH2 === undefined || requiresResolvedGitLabTokenMode)
+      ) {
+        envVars.GLAB_IS_OAUTH2 = glabIsOAuth2 ? 'true' : 'false';
+      }
+      if (!baseEnvVars.GITLAB_HOST || requiresResolvedGitLabTokenMode) {
         if (gitUrl) {
           try {
             const url = new URL(gitUrl);
@@ -1095,9 +1325,9 @@ export class SessionService {
         .withFields({
           gitUrl,
           gitlabHost: envVars.GITLAB_HOST,
-          gitTokenLength: gitToken.length,
+          glabOAuthMode: envVars.GLAB_IS_OAUTH2 === 'true',
         })
-        .info('[GITLAB] Setting GITLAB_TOKEN and GITLAB_HOST for GitLab session');
+        .info('[GITLAB] Configured GitLab CLI environment for GitLab session');
     }
 
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)
@@ -1178,29 +1408,33 @@ export class SessionService {
     let githubToken: string | undefined;
     let githubInstallationId = github?.githubInstallationId;
     let githubAppType = github?.githubAppType;
+    let githubSource: 'user' | 'installation' | undefined;
+    let githubGitAuthor: GitAuthorConfig | undefined;
+    let githubCommitCoAuthor: GitAuthorConfig | undefined;
+    let githubFallbackReason: ManagedGitHubFallbackReason | undefined;
 
     if (github) {
-      if (githubInstallationId) {
-        if (!env.GIT_TOKEN_SERVICE) {
-          throw ExecutionError.invalidRequest('Git token service is not configured');
-        }
-        githubAppType = githubAppType ?? 'standard';
-        githubToken = await env.GIT_TOKEN_SERVICE.getToken(githubInstallationId, githubAppType);
+      const result = await resolveCloudAgentGitHubAuthForRepo(env, {
+        githubRepo: github.repo,
+        userId: metadata.identity.userId,
+        orgId: metadata.identity.orgId,
+        allowUserAuthorization:
+          metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
+          metadata.identity.createdOnPlatform === 'slack',
+      });
+      if (result.success) {
+        githubToken = result.value.githubToken;
+        githubInstallationId = result.value.installationId;
+        githubAppType = result.value.appType;
+        githubSource = result.value.source;
+        githubGitAuthor =
+          result.value.gitAuthor ?? installationGitAuthorFromEnv(env, result.value.appType);
+        githubCommitCoAuthor = result.value.commitCoAuthor;
+        githubFallbackReason = result.value.fallbackReason;
       } else {
-        const result = await resolveGitHubTokenForRepo(env, {
-          githubRepo: github.repo,
-          userId: metadata.identity.userId,
-          orgId: metadata.identity.orgId,
-        });
-        if (result.success) {
-          githubToken = result.value.token;
-          githubInstallationId = result.value.installationId;
-          githubAppType = result.value.appType;
-        } else {
-          throw ExecutionError.invalidRequest(
-            `GitHub token or active app installation required for this repository (${result.error.reason})`
-          );
-        }
+        throw ExecutionError.invalidRequest(
+          `GitHub token or active app installation required for this repository (${result.error.reason})`
+        );
       }
     }
 
@@ -1210,25 +1444,24 @@ export class SessionService {
 
     let gitToken = repositoryPlatform(metadata) === 'gitlab' ? undefined : git?.token;
     let gitlabTokenManaged = git?.type === 'gitlab' ? git.gitlabTokenManaged : undefined;
+    let glabIsOAuth2: boolean | undefined;
     if (git?.url && repositoryPlatform(metadata) === 'gitlab') {
       if (!env.GIT_TOKEN_SERVICE) {
         throw ExecutionError.invalidRequest('Git token service is not configured');
       }
+
       const result = await resolveManagedGitLabToken(env, {
         userId: metadata.identity.userId,
         orgId: metadata.identity.orgId,
+        repositoryUrl: git.url,
+        createdOnPlatform: metadata.identity.createdOnPlatform,
       });
       if (result.success) {
         gitToken = result.token;
         gitlabTokenManaged = true;
-      } else if (result.reason === 'no_integration_found' || result.reason === 'invalid_org_id') {
-        throw ExecutionError.invalidRequest(
-          'No GitLab integration found. Please connect your GitLab account first.'
-        );
+        glabIsOAuth2 = result.glabIsOAuth2;
       } else {
-        throw ExecutionError.invalidRequest(
-          `GitLab token lookup failed (${result.reason}). Please reconnect your GitLab account.`
-        );
+        throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
       }
     }
 
@@ -1238,7 +1471,18 @@ export class SessionService {
       );
     }
 
-    return { githubToken, githubInstallationId, githubAppType, gitToken, gitlabTokenManaged };
+    return {
+      githubToken,
+      githubInstallationId,
+      githubAppType,
+      githubSource,
+      githubGitAuthor,
+      githubCommitCoAuthor,
+      githubFallbackReason,
+      gitToken,
+      gitlabTokenManaged,
+      glabIsOAuth2,
+    };
   }
 
   async buildWrapperSessionReadyAndPromptRequests(
@@ -1288,6 +1532,8 @@ export class SessionService {
       githubToken: resolvedTokens.githubToken,
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
+      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       upstreamBranch: metadata.repository?.upstreamBranch,
       branchName,
       envVars: profile.envVars,
@@ -1309,6 +1555,7 @@ export class SessionService {
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
+      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       platform,
       profile,
     });
@@ -1326,7 +1573,7 @@ export class SessionService {
       ...(metadata.devcontainer ? { devcontainer: metadata.devcontainer } : {}),
     } satisfies WrapperWorkspaceReady;
 
-    const repo = this.buildWrapperRepoSource(env, metadata, resolvedTokens);
+    const repo = this.buildWrapperRepoSource(metadata, resolvedTokens);
     const session = buildWrapperSessionBinding({
       workerUrl: env.WORKER_URL,
       kilocodeToken: metadata.auth.kilocodeToken,
@@ -1338,11 +1585,11 @@ export class SessionService {
 
     const attachments =
       turn.type === 'prompt'
-        ? await buildSignedImagePromptAttachments({
+        ? await buildSignedPromptAttachments({
             env,
             userId,
             sessionId,
-            images: turn.images,
+            attachments: turn.attachments,
             createdOnPlatform: metadata.identity.createdOnPlatform,
           })
         : [];
@@ -1388,9 +1635,17 @@ export class SessionService {
         command: turn.command,
         ...(turn.arguments.length > 0 ? { args: turn.arguments } : {}),
         messageId: turn.messageId,
+        agent: {
+          mode: promptAgent,
+          model: { modelID: agent.model },
+          ...(agent.variant ? { variant: agent.variant } : {}),
+        },
         ...(finalization?.autoCommit !== undefined ? { autoCommit: finalization.autoCommit } : {}),
         ...(finalization?.condenseOnComplete !== undefined
           ? { condenseOnComplete: finalization.condenseOnComplete }
+          : {}),
+        ...(resolvedTokens.githubCommitCoAuthor
+          ? { commitCoAuthor: resolvedTokens.githubCommitCoAuthor }
           : {}),
         session,
       };
@@ -1408,14 +1663,19 @@ export class SessionService {
         model: { modelID: agent.model },
         ...(agent.variant ? { variant: agent.variant } : {}),
       },
-      ...(finalization?.autoCommit !== undefined || finalization?.condenseOnComplete !== undefined
+      ...(finalization?.autoCommit !== undefined ||
+      finalization?.condenseOnComplete !== undefined ||
+      resolvedTokens.githubCommitCoAuthor
         ? {
             finalization: {
-              ...(finalization.autoCommit !== undefined
+              ...(finalization?.autoCommit !== undefined
                 ? { autoCommit: finalization.autoCommit }
                 : {}),
-              ...(finalization.condenseOnComplete !== undefined
+              ...(finalization?.condenseOnComplete !== undefined
                 ? { condenseOnComplete: finalization.condenseOnComplete }
+                : {}),
+              ...(resolvedTokens.githubCommitCoAuthor
+                ? { commitCoAuthor: resolvedTokens.githubCommitCoAuthor }
                 : {}),
             },
           }
@@ -1427,7 +1687,6 @@ export class SessionService {
   }
 
   private buildWrapperRepoSource(
-    env: PersistenceEnv,
     metadata: CloudAgentSessionState,
     tokens: ResolvedWorkspaceTokens
   ): WrapperBootstrapRepoSource | undefined {
@@ -1447,14 +1706,6 @@ export class SessionService {
 
     const github = githubRepository(metadata);
     if (github) {
-      const authorEnv = getGitAuthorEnv(env, tokens.githubAppType ?? github.githubAppType);
-      const gitAuthor =
-        authorEnv.GITHUB_APP_SLUG && authorEnv.GITHUB_APP_BOT_USER_ID
-          ? {
-              name: `${authorEnv.GITHUB_APP_SLUG}[bot]`,
-              email: `${authorEnv.GITHUB_APP_BOT_USER_ID}+${authorEnv.GITHUB_APP_SLUG}[bot]@users.noreply.github.com`,
-            }
-          : undefined;
       return {
         kind: 'github',
         repo: github.repo,
@@ -1462,7 +1713,7 @@ export class SessionService {
         ...(repositoryShallow(metadata) !== undefined
           ? { shallow: repositoryShallow(metadata) }
           : {}),
-        ...(gitAuthor ? { gitAuthor } : {}),
+        ...(tokens.githubGitAuthor ? { gitAuthor: tokens.githubGitAuthor } : {}),
         refreshRemote: tokens.githubInstallationId !== undefined,
       };
     }
@@ -1506,6 +1757,8 @@ export class SessionService {
       githubToken: resolvedTokens.githubToken,
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
+      gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       upstreamBranch: metadata.repository?.upstreamBranch,
       branchName,
       envVars: readProfileBundle(metadata).envVars,
@@ -1599,7 +1852,12 @@ export class SessionService {
     }
 
     onProgress?.('disk_check', 'Checking disk space…');
-    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId);
+    await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId, {
+      inspectContainers:
+        sandboxId.startsWith('dind-') ||
+        metadata.workspace?.devcontainerRequested === true ||
+        metadata.devcontainer !== undefined,
+    });
 
     onProgress?.('workspace_setup', 'Setting up workspace…');
     await setupWorkspace(sandbox, userId, orgId, sessionId);
@@ -1617,7 +1875,7 @@ export class SessionService {
     let dockerEnv: Record<string, string> | undefined;
     try {
       onProgress?.('cloning', 'Cloning repository…');
-      await this.cloneRepository(env, session, workspacePath, metadata, resolvedTokens);
+      await this.cloneRepository(session, workspacePath, metadata, resolvedTokens);
 
       onProgress?.('branch', 'Setting up branch…');
       await this.prepareBranch(session, workspacePath, branchName, metadata);
@@ -1742,16 +2000,31 @@ export class SessionService {
     executor: SandboxInstance | ExecutionSession,
     workspacePath: string
   ): Promise<boolean> {
-    const result = await timedExec(
-      executor,
-      `test -d '${workspacePath}/.git' && echo exists`,
-      'session.prepareWorkspace.repoExists'
-    );
-    return result.stdout?.includes('exists') ?? false;
+    try {
+      const result = await timedExec(
+        executor,
+        `test -d '${workspacePath}/.git' && echo exists`,
+        'session.prepareWorkspace.repoExists'
+      );
+      if (result.exitCode !== 0 && isSandboxFilesystemUnusableError(result.stderr)) {
+        throw new SandboxCapacityInspectionError(
+          'Workspace admission probe cannot run because the sandbox filesystem is unusable',
+          new Error(result.stderr)
+        );
+      }
+      return result.stdout?.includes('exists') ?? false;
+    } catch (error) {
+      if (isSandboxFilesystemUnusableError(error)) {
+        throw new SandboxCapacityInspectionError(
+          'Workspace admission probe cannot run because the sandbox filesystem is unusable',
+          error
+        );
+      }
+      throw error;
+    }
   }
 
   private async cloneRepository(
-    env: PersistenceEnv,
     session: ExecutionSession,
     workspacePath: string,
     metadata: CloudAgentSessionState,
@@ -1773,7 +2046,7 @@ export class SessionService {
         workspacePath,
         github.repo,
         tokens.githubToken,
-        getGitAuthorEnv(env, tokens.githubAppType ?? github.githubAppType),
+        tokens.githubGitAuthor,
         cloneOptions
       );
       return;
@@ -1823,12 +2096,12 @@ export class SessionService {
    * Refresh the embedded credentials in the workspace's git remote URL on the
    * warm fast path.
    *
-   * GitHub App installation tokens expire after ~1h, and managed GitLab tokens
-   * rotate on a similar cadence; the URL-embedded credentials from the original
-   * clone go stale quickly. `GH_TOKEN` / `GITLAB_TOKEN` env vars don't rescue
-   * `git` itself (they only affect the `gh` CLI / GitLab HTTP integrations), so
-   * we rewrite `origin` with the freshly-resolved token whenever the token is
-   * managed by us.
+   * GitHub App installation tokens expire after ~1h, and server-resolved GitLab
+   * credentials can rotate independently of a warm workspace. The URL-embedded
+   * credentials from the original clone go stale quickly. `GH_TOKEN` /
+   * `GITLAB_TOKEN` env vars don't rescue `git` itself (they only affect the
+   * provider CLIs / GitLab HTTP integrations), so we rewrite `origin` whenever
+   * the token is resolved by us.
    */
   private async refreshGitRemoteToken(
     session: ExecutionSession,
@@ -1845,6 +2118,9 @@ export class SessionService {
           `https://github.com/${github.repo}.git`,
           tokens.githubToken
         );
+        if (tokens.githubGitAuthor) {
+          await updateGitAuthor(session, context.workspacePath, tokens.githubGitAuthor);
+        }
       }
     }
 
@@ -2026,221 +2302,6 @@ export class SessionService {
   }
 
   /**
-   * Identifies and kills all kilocode processes running in a specific session's workspace.
-   * This allows clients to stop running executions in a session without deleting the session itself.
-   *
-   * @param usePkill - If true, uses `pkill -f` with sessionId pattern instead of sandbox.listProcesses/killProcess.
-   *                   This is a temporary workaround for environments where sandbox process APIs are unreliable.
-   */
-  static async interrupt(
-    sandbox: SandboxInstance,
-    session: ExecutionSession,
-    sessionContext: SessionContext,
-    usePkill: boolean = false,
-    executionId?: string
-  ): Promise<InterruptResult> {
-    if (usePkill) {
-      return SessionService.interruptWithPkill(session, sessionContext, executionId);
-    }
-    return SessionService.interruptWithSandboxApi(sandbox, session, sessionContext);
-  }
-
-  /**
-   * Interrupt using pkill -f with the sessionId as the pattern.
-   * This kills any process whose command line contains the sessionId.
-   */
-  private static async interruptWithPkill(
-    session: ExecutionSession,
-    sessionContext: SessionContext,
-    executionId?: string
-  ): Promise<InterruptResult> {
-    const startTime = Date.now();
-    const { sessionId } = sessionContext;
-
-    try {
-      const attemptPkill = async (pattern: string, label: string) => {
-        logger.info('Interrupting session using pkill', {
-          sessionId,
-          label,
-          pattern,
-        });
-        return session.exec(`pkill -f -- '${pattern}'`);
-      };
-
-      let execIdError: string | null = null;
-
-      if (executionId) {
-        // Prefer the wrapper execution ID for v2 sessions.
-        // pkill -f matches against the full command line.
-        const execResult = await attemptPkill(`--execution-id=${executionId}`, 'executionId');
-        if (execResult.exitCode === 0) {
-          return {
-            success: true,
-            message: 'Interrupted execution using pkill (executionId)',
-            processesFound: true,
-          };
-        }
-        if (execResult.exitCode !== 1) {
-          execIdError = `pkill failed with exit code ${execResult.exitCode}: ${execResult.stderr}`;
-          logger.error('pkill command failed for executionId', {
-            sessionId,
-            executionId,
-            exitCode: execResult.exitCode,
-            stderr: execResult.stderr,
-          });
-        }
-      }
-
-      // Fall back to sessionId for legacy sessions.
-      const sessionResult = await attemptPkill(sessionId, 'sessionId');
-      const elapsed = Date.now() - startTime;
-
-      if (sessionResult.exitCode === 0) {
-        logger.info('pkill successfully killed processes', {
-          sessionId,
-          elapsedMs: elapsed,
-        });
-
-        return {
-          success: true,
-          message: execIdError
-            ? `Interrupted execution using pkill (sessionId fallback). ${execIdError}`
-            : 'Interrupted execution using pkill',
-          processesFound: true,
-        };
-      }
-      if (sessionResult.exitCode === 1) {
-        logger.info('No matching processes found for pkill', {
-          sessionId,
-          elapsedMs: elapsed,
-        });
-
-        return {
-          success: true,
-          message: execIdError
-            ? `No running processes found for this session. ${execIdError}`
-            : 'No running processes found for this session',
-          processesFound: false,
-        };
-      }
-
-      logger.error('pkill command failed for sessionId', {
-        sessionId,
-        exitCode: sessionResult.exitCode,
-        stderr: sessionResult.stderr,
-        elapsedMs: elapsed,
-      });
-
-      return {
-        success: false,
-        message: execIdError
-          ? `${execIdError}; sessionId pkill failed with exit code ${sessionResult.exitCode}: ${sessionResult.stderr}`
-          : `pkill failed with exit code ${sessionResult.exitCode}: ${sessionResult.stderr}`,
-        processesFound: false,
-      };
-    } catch (error) {
-      logger.error('Interrupt with pkill failed', {
-        sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Interrupt using sandbox.listProcesses and session.killProcess APIs.
-   * This is the original implementation that enumerates and kills processes individually.
-   */
-  private static async interruptWithSandboxApi(
-    sandbox: SandboxInstance,
-    session: ExecutionSession,
-    sessionContext: SessionContext
-  ): Promise<InterruptResult> {
-    type ProcessInfo = {
-      id: string;
-      status: string;
-      command: string;
-    };
-
-    const startTime = Date.now();
-
-    try {
-      // List all processes in the sandbox
-      const processes = await sandbox.listProcesses();
-
-      // Filter for kilocode processes in this session's workspace
-      const targetProcesses = processes.filter((proc: ProcessInfo) => {
-        const isRunning = proc.status === 'running';
-        const isKilocode = proc.command.includes('kilocode');
-        const isInWorkspace = proc.command.includes(`--workspace=${sessionContext.workspacePath}`);
-
-        return isRunning && isKilocode && isInWorkspace;
-      });
-
-      if (targetProcesses.length === 0) {
-        logger.info('No matching kilocode processes found to interrupt', {
-          sessionId: sessionContext.sessionId,
-          workspacePath: sessionContext.workspacePath,
-        });
-
-        return {
-          success: true,
-          message: 'No running kilocode processes found for this session',
-          processesFound: false,
-        };
-      }
-
-      // Kill each target process
-      const killed: string[] = [];
-      const failed: string[] = [];
-
-      for (const proc of targetProcesses) {
-        try {
-          // Send SIGTERM for graceful termination (exit code 143)
-          // This allows the SSE stream to properly close with an expected exit code
-          await session.killProcess(proc.id, 'SIGTERM');
-          killed.push(proc.id);
-          logger.info('Successfully killed process', {
-            processId: proc.id,
-            command: proc.command,
-          });
-        } catch (error) {
-          failed.push(proc.id);
-          logger.error('Failed to kill process', {
-            processId: proc.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-
-      const elapsed = Date.now() - startTime;
-      logger.info('Interrupt operation completed', {
-        sessionId: sessionContext.sessionId,
-        killedCount: killed.length,
-        failedCount: failed.length,
-        elapsedMs: elapsed,
-      });
-
-      return {
-        success: killed.length > 0,
-        message:
-          killed.length > 0
-            ? `Interrupted execution: killed ${killed.length} process(es)${failed.length > 0 ? `, ${failed.length} failed` : ''}`
-            : `Failed to kill any processes (${failed.length} attempts failed)`,
-        processesFound: true,
-      };
-    } catch (error) {
-      logger.error('Interrupt operation failed', {
-        sessionId: sessionContext.sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      throw error;
-    }
-  }
-
-  /**
    * Create a cli_sessions_v2 record via session-ingest RPC.
    * Called during session preparation so the DB record exists before execution.
    */
@@ -2304,26 +2365,6 @@ export class SessionService {
   }
 }
 
-/**
- * Returns the correct GitHub App slug and bot user ID for git author attribution,
- * based on whether this is a standard or lite app session.
- */
-function getGitAuthorEnv(
-  env: PersistenceEnv,
-  githubAppType?: 'standard' | 'lite'
-): { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string } {
-  if (githubAppType === 'lite') {
-    return {
-      GITHUB_APP_SLUG: env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG,
-      GITHUB_APP_BOT_USER_ID: env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID,
-    };
-  }
-  return {
-    GITHUB_APP_SLUG: env.GITHUB_APP_SLUG,
-    GITHUB_APP_BOT_USER_ID: env.GITHUB_APP_BOT_USER_ID,
-  };
-}
-
 export type PreparedSession = {
   context: SessionContext;
   session: Awaited<ReturnType<SessionService['getOrCreateSession']>>;
@@ -2368,6 +2409,7 @@ type GetSaferEnvVarsOptions = {
   appendSystemPrompt?: string;
   gitUrl?: string;
   gitToken?: string;
+  glabIsOAuth2?: boolean;
   platform?: 'github' | 'gitlab';
   profile?: SessionProfileBundle;
 };

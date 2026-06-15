@@ -263,6 +263,17 @@ export type RegistryResult = {
     createdAt: string;
     destroyedAt: string | null;
   }>;
+  reservations: Array<{
+    instanceId: string;
+    doKey: string;
+    assignedUserId: string;
+    status: 'in_progress' | 'completed' | 'failed_requires_reconciliation' | 'released';
+    startedAt: string;
+    updatedAt: string;
+    completedAt: string | null;
+    failureCode: string | null;
+    resolutionReason: string | null;
+  }>;
   migrated: boolean;
 };
 
@@ -523,6 +534,102 @@ export type ControllerVersionResponse =
 export type OpenclawConfigResponse = {
   config: Record<string, unknown>;
   etag: string;
+};
+
+// ──────────────────────────────────────────────────────────────────────
+// Agent config CRUD responses.
+// apps/web cannot import from services/kiloclaw, so these mirror the worker-side
+// Zod schemas in services/kiloclaw/src/durable-objects/gateway-controller-types.ts
+// (AgentSummary, AgentConfigListResponse, etc.). Keep in sync with that file.
+// ──────────────────────────────────────────────────────────────────────
+export type AgentModelSummary = {
+  primary: string | null;
+  fallbacks: string[];
+};
+
+export type AgentSettingsSummary = {
+  thinkingDefault: string | null;
+  verboseDefault: string | null;
+  reasoningDefault: string | null;
+  fastModeDefault: boolean | null;
+};
+
+export type AgentBindingSummary = {
+  channel: string;
+  accountId: string | null;
+  advanced: boolean;
+};
+
+export type AgentSummary = {
+  id: string;
+  name: string | null;
+  configured: boolean;
+  workspace: string | null;
+  agentDir: string | null;
+  model: AgentModelSummary & { source: 'agent' | 'defaults' | null };
+  rawModel: string | { primary?: string; fallbacks?: string[] } | null;
+  settings: AgentSettingsSummary;
+  bindings: AgentBindingSummary[];
+};
+
+export type AgentDefaultsSummary = {
+  model: AgentModelSummary | null;
+  settings: AgentSettingsSummary;
+};
+
+export type AgentConfigListResponse = {
+  etag: string;
+  defaults: AgentDefaultsSummary;
+  agents: AgentSummary[];
+};
+
+export type AgentReadResponse = {
+  etag: string;
+  agent: AgentSummary;
+};
+
+export type AgentMutationResponse = {
+  ok: boolean;
+  etag: string;
+  agent: AgentSummary;
+};
+
+export type AgentDefaultsMutationResponse = {
+  ok: boolean;
+  etag: string;
+  defaults: AgentDefaultsSummary;
+};
+
+export type AgentCreateResult = {
+  agentId: string;
+  name: string;
+  workspace: string;
+  agentDir: string;
+  model?: string;
+  bindings?: {
+    added: string[];
+    updated: string[];
+    skipped: string[];
+    conflicts: string[];
+  };
+};
+
+export type AgentCreateResponse = {
+  ok: boolean;
+  etag: string;
+  agent: AgentSummary;
+  created: AgentCreateResult;
+};
+
+export type AgentDeleteResponse = {
+  ok: boolean;
+  filesystemDisposition: 'unverified';
+  agentId: string;
+  workspace: string;
+  agentDir: string;
+  sessionsDir: string;
+  removedBindings: number;
+  removedAllow: number;
 };
 
 export type MorningBriefingSourceReadiness = {

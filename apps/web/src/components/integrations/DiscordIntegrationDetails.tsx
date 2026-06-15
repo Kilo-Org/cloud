@@ -40,7 +40,14 @@ export function DiscordIntegrationDetails({
     useModelSelectorList(organizationId);
 
   const modelOptions = useMemo<ModelOption[]>(() => {
-    return openRouterModels?.data.map(model => ({ id: model.id, name: model.name })) ?? [];
+    return (
+      openRouterModels?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+        mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+      })) ?? []
+    );
   }, [openRouterModels]);
 
   // Track selected model

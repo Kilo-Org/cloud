@@ -25,8 +25,42 @@ export type Pricing = {
   completion_per_million: number;
   input_cache_read_per_million: number | null;
   input_cache_write_per_million: number | null;
-  calculate_mUsd(usage: Usage, basePricing: Pricing): number;
 };
+
+export type PricingTier = {
+  start_context_length: number;
+  pricing: Pricing;
+};
+
+export type PricingTiers = readonly [PricingTier, ...PricingTier[]];
+
+export function calculateCost_mUsd(usage: Usage, pricingTiers: PricingTiers): number {
+  if (pricingTiers[0].start_context_length !== 0) {
+    throw new Error('The first pricing tier must start at context length 0');
+  }
+
+  const totalInputTokens =
+    usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
+  let selectedTier = pricingTiers[0];
+  let previousTier = pricingTiers[0];
+  for (const tier of pricingTiers.slice(1)) {
+    if (tier.start_context_length <= previousTier.start_context_length) {
+      throw new Error('Pricing tiers must be ordered by ascending start context length');
+    }
+    if (tier.start_context_length <= totalInputTokens) {
+      selectedTier = tier;
+    }
+    previousTier = tier;
+  }
+
+  const pricing = selectedTier.pricing;
+  return (
+    usage.uncachedInputTokens * pricing.prompt_per_million +
+    usage.cacheWriteTokens * (pricing.input_cache_write_per_million ?? pricing.prompt_per_million) +
+    usage.cacheHitTokens * (pricing.input_cache_read_per_million ?? pricing.prompt_per_million) +
+    usage.totalOutputTokens * pricing.completion_per_million
+  );
+}
 
 export type KiloExclusiveModel = {
   public_id: string;
@@ -38,7 +72,7 @@ export type KiloExclusiveModel = {
   flags: KiloExclusiveModelFlag[];
   gateway: ProviderId;
   internal_id: string;
-  pricing: Pricing | null;
+  pricing: PricingTiers | null;
   /** Features allowed to use this model. Empty array means no restriction. */
   exclusive_to: ReadonlyArray<FeatureValue>;
   /**
@@ -48,12 +82,86 @@ export type KiloExclusiveModel = {
   inference_provider_restriction: ReadonlyArray<OpenRouterInferenceProviderId>;
 };
 
+type TokenLimitMutation = 'removed' | 'clamped';
+
+function logMaxTokenMutation(
+  requestToMutate: GatewayRequest,
+  kiloExclusiveModel: KiloExclusiveModel,
+  field: 'max_completion_tokens' | 'max_tokens' | 'max_output_tokens',
+  requestedValue: number,
+  mutation: TokenLimitMutation
+) {
+  console.warn('[removeNonSensicalMaxTokens] mutated request with token limit above model cap', {
+    model: kiloExclusiveModel.public_id,
+    requestKind: requestToMutate.kind,
+    field,
+    requestedValue,
+    modelMaxCompletionTokens: kiloExclusiveModel.max_completion_tokens,
+    mutation,
+  });
+}
+
+function removeNonSensicalMaxTokens(
+  requestToMutate: GatewayRequest,
+  kiloExclusiveModel: KiloExclusiveModel
+) {
+  // OpenClaw sometimes puts numbers in that are too large and some providers will reject the request.
+  if (requestToMutate.kind === 'chat_completions') {
+    const maxCompletionTokens = requestToMutate.body.max_completion_tokens;
+    if (
+      maxCompletionTokens !== undefined &&
+      maxCompletionTokens !== null &&
+      maxCompletionTokens > kiloExclusiveModel.max_completion_tokens
+    ) {
+      logMaxTokenMutation(
+        requestToMutate,
+        kiloExclusiveModel,
+        'max_completion_tokens',
+        maxCompletionTokens,
+        'removed'
+      );
+      delete requestToMutate.body.max_completion_tokens;
+    }
+
+    const maxTokens = requestToMutate.body.max_tokens;
+    if (maxTokens !== undefined && maxTokens > kiloExclusiveModel.max_completion_tokens) {
+      logMaxTokenMutation(requestToMutate, kiloExclusiveModel, 'max_tokens', maxTokens, 'removed');
+      delete requestToMutate.body.max_tokens;
+    }
+  }
+  if (requestToMutate.kind === 'responses') {
+    const maxOutputTokens = requestToMutate.body.max_output_tokens;
+    if (
+      maxOutputTokens !== undefined &&
+      maxOutputTokens !== null &&
+      maxOutputTokens > kiloExclusiveModel.max_completion_tokens
+    ) {
+      logMaxTokenMutation(
+        requestToMutate,
+        kiloExclusiveModel,
+        'max_output_tokens',
+        maxOutputTokens,
+        'removed'
+      );
+      delete requestToMutate.body.max_output_tokens;
+    }
+  }
+  if (requestToMutate.kind === 'messages') {
+    const maxTokens = requestToMutate.body.max_tokens;
+    if (maxTokens !== undefined && maxTokens > kiloExclusiveModel.max_completion_tokens) {
+      logMaxTokenMutation(requestToMutate, kiloExclusiveModel, 'max_tokens', maxTokens, 'clamped');
+      requestToMutate.body.max_tokens = kiloExclusiveModel.max_completion_tokens;
+    }
+  }
+}
+
 /** Rewrites a gateway request to target a Kilo-exclusive model. */
 export function applyKiloExclusiveModelSettings(
   requestToMutate: GatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel
 ) {
   requestToMutate.body.model = kiloExclusiveModel.internal_id;
+  removeNonSensicalMaxTokens(requestToMutate, kiloExclusiveModel);
   const restriction = kiloExclusiveModel.inference_provider_restriction;
   if (restriction.length === 0) {
     return;
@@ -83,6 +191,8 @@ function formatPricePerMillionAsPerToken(price: number | null | undefined): stri
 }
 
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
+  const cheapestPricing = model.pricing?.[0].pricing;
+  const isFree = !model.pricing;
   return {
     id: model.public_id,
     canonical_slug: model.public_id,
@@ -99,17 +209,17 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       instruct_type: null,
     },
     pricing: {
-      prompt: formatPricePerMillionAsPerToken(model.pricing?.prompt_per_million ?? 0),
-      completion: formatPricePerMillionAsPerToken(model.pricing?.completion_per_million ?? 0),
+      prompt: formatPricePerMillionAsPerToken(cheapestPricing?.prompt_per_million ?? 0),
+      completion: formatPricePerMillionAsPerToken(cheapestPricing?.completion_per_million ?? 0),
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
       input_cache_read: formatPricePerMillionAsPerToken(
-        model.pricing?.input_cache_read_per_million ?? model.pricing?.prompt_per_million ?? 0
+        cheapestPricing?.input_cache_read_per_million ?? cheapestPricing?.prompt_per_million ?? 0
       ),
       input_cache_write: formatPricePerMillionAsPerToken(
-        model.pricing?.input_cache_write_per_million
+        cheapestPricing?.input_cache_write_per_million
       ),
     },
     top_provider: {
@@ -122,5 +232,7 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       model.flags.includes('reasoning') ? ['reasoning', 'include_reasoning'] : []
     ),
     default_parameters: {},
+    isFree,
+    mayTrainOnYourPrompts: isFree || model.flags.includes('requires-data-collection'),
   };
 }

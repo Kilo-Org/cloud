@@ -10,10 +10,16 @@
  */
 
 import type { WrapperState } from './state.js';
-import type { IngestEvent, WrapperCommand } from '../../src/shared/protocol.js';
+import type {
+  IngestEvent,
+  WrapperCommand,
+  WrapperTerminalFailureCode,
+} from '../../src/shared/protocol.js';
 import { trimPayload } from '../../src/shared/trim-payload.js';
 import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
+import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-model-diagnostics.js';
+import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -39,6 +45,26 @@ function isInteractiveStatusType(statusType: string | undefined): boolean {
   return statusType === 'question' || statusType === 'permission';
 }
 
+function permissionCategoryFromProperties(properties: Record<string, unknown>): string {
+  const permission = properties.permission;
+  if (isRecord(permission)) {
+    const type = permission.type;
+    if (typeof type === 'string') return type;
+    const tool = permission.tool;
+    if (typeof tool === 'string') return tool;
+  }
+
+  if (typeof permission !== 'string') return 'unknown';
+  const normalized = permission.toLowerCase();
+  if (normalized.includes('glab')) return 'bash:glab';
+  if (normalized === 'gh' || normalized.includes('gh ')) return 'bash:gh';
+  if (normalized.includes('git ')) return 'bash:git';
+  if (normalized.includes('bash')) return 'bash';
+  if (normalized.includes('edit')) return 'edit';
+  if (normalized.includes('web')) return 'web';
+  return 'unknown';
+}
+
 function getActivitySessionID(
   eventType: string,
   properties: Record<string, unknown>
@@ -61,12 +87,9 @@ function isRootSessionActivity(
   properties: Record<string, unknown>,
   rootSessionID: string | undefined
 ): boolean {
-  if (!rootSessionID || eventType === 'session.idle') return false;
-  if (eventType === 'session.status' && statusTypeFromProperties(properties) === 'idle') {
-    return false;
-  }
-
-  return getActivitySessionID(eventType, properties) === rootSessionID;
+  if (!rootSessionID || getActivitySessionID(eventType, properties) !== rootSessionID) return false;
+  if (eventType === 'session.turn.open') return true;
+  return eventType === 'session.status' && statusTypeFromProperties(properties) === 'busy';
 }
 
 export const CODE_REVIEW_PERMISSION_REJECTION_MESSAGE =
@@ -86,9 +109,21 @@ function rejectCodeReviewQuestion(
 
 function rejectCodeReviewPermission(
   permissionId: string | undefined,
+  properties: Record<string, unknown>,
+  state: WrapperState,
   kiloClient: WrapperKiloClient
 ): void {
   if (!permissionId) return;
+  logToFile(
+    JSON.stringify({
+      message: 'code_review_permission_rejected',
+      agentSessionId: state.currentSession?.agentSessionId,
+      kiloSessionId: state.currentSession?.kiloSessionId,
+      permissionCategory: permissionCategoryFromProperties(properties),
+      policy: 'code-review-read-only',
+      reason: 'non-interactive-unapproved',
+    })
+  );
   kiloClient
     .answerPermission(permissionId, 'reject', CODE_REVIEW_PERMISSION_REJECTION_MESSAGE)
     .catch(err => {
@@ -119,36 +154,10 @@ export function isSessionIdleEvent(
   return isRecord(props) && typeof props.sessionID === 'string';
 }
 
-/**
- * Type guard for message.updated events where the assistant message is
- * terminal (has time.completed or an error) and has a resolvable parentID.
- * Used by the wrapper to detect per-message completion in the new-path
- * keep-warm model.
- */
-export function isAssistantMessageCompleted(data: unknown): data is {
-  event: 'message.updated';
-  properties: { info: { role: string; parentID: string; time?: { completed?: number } } };
-} {
-  if (!isRecord(data)) return false;
-  if (data.event !== 'message.updated') return false;
-  const info = isRecord(data.properties) ? data.properties.info : undefined;
-  if (!isRecord(info)) return false;
-  if (info.role !== 'assistant') return false;
-  if (typeof info.parentID !== 'string') return false;
+function isAssistantCompletionSignal(info: unknown): boolean {
+  if (!isRecord(info) || info.role !== 'assistant') return false;
   const time = isRecord(info.time) ? info.time : undefined;
-  const isCompleted = time !== undefined && typeof time.completed === 'number';
-  const hasError = info.error !== undefined && info.error !== null;
-  return isCompleted || hasError;
-}
-
-/**
- * Extracts the parentID of a completed assistant message from a
- * message.updated event. Returns undefined if the event is not a
- * terminal assistant message update.
- */
-export function getCompletedAssistantParentID(data: unknown): string | undefined {
-  if (!isAssistantMessageCompleted(data)) return undefined;
-  return (data.properties.info as { parentID: string }).parentID;
+  return typeof time?.completed === 'number' || (info.error !== undefined && info.error !== null);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,11 +168,16 @@ export type ConnectionConfig = {
   kiloClient: WrapperKiloClient;
 };
 
+export type WrapperTerminalFailure = {
+  code?: WrapperTerminalFailureCode;
+  message: string;
+  errorSource: 'assistant';
+  modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
+};
+
 export type ConnectionCallbacks = {
-  /** Called when a completion event is detected for a message */
-  onMessageComplete: (messageId: string) => void;
-  /** Called when a terminal error is detected */
-  onTerminalError: (reason: string) => void;
+  /** Called when a terminal assistant request error is detected */
+  onTerminalError: (failure: WrapperTerminalFailure) => void;
   /** Called when a command is received from DO */
   onCommand: (cmd: WrapperCommand) => void;
   /** Called when the connection unexpectedly closes */
@@ -226,6 +240,7 @@ const RECONNECT_BASE_DELAY_MS = 1_000;
  *  a silently stuck HTTP stream. */
 const SUBSCRIBE_HANDSHAKE_TIMEOUT_MS = 5_000;
 const INGEST_INITIAL_CONNECT_TIMEOUT_MS = 10_000;
+const MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS = 1_000;
 
 function buildIngestWebSocketUrl(session: NonNullable<WrapperState['currentSession']>): string {
   const url = new URL(session.ingestUrl);
@@ -733,27 +748,62 @@ export function createConnectionManager(
   }
 
   /**
-   * Check if an event represents a terminal error (payment/billing/quota/model resolution).
+   * Classify terminal errors that require changed model or account state.
    */
-  function isTerminalError(eventType: string, properties: Record<string, unknown>): boolean {
-    if (eventType === 'payment_required' || eventType === 'insufficient_funds') {
-      return true;
+  function getTerminalFailure(
+    eventType: string,
+    properties: Record<string, unknown>
+  ): WrapperTerminalFailure | undefined {
+    const eventSessionID =
+      typeof properties.sessionID === 'string' ? properties.sessionID : undefined;
+    if (eventSessionID && eventSessionID !== state.currentSession?.kiloSessionId) {
+      return undefined;
     }
-    const error = properties.error;
-    if (error) {
-      const errorStr = typeof error === 'string' ? error : JSON.stringify(error);
-      const normalizedError = errorStr.toLowerCase();
-      if (
-        normalizedError.includes('payment') ||
-        normalizedError.includes('credit') ||
-        normalizedError.includes('balance') ||
-        normalizedError.includes('quota') ||
-        (eventType === 'session.error' && normalizedError.includes('model not found'))
-      ) {
-        return true;
+    if (
+      eventType === 'session.error' &&
+      properties.sessionID !== state.currentSession?.kiloSessionId
+    ) {
+      return undefined;
+    }
+
+    const terminalErrorText = getTerminalErrorText(eventType, properties);
+    let code: WrapperTerminalFailureCode | undefined;
+    if (eventType === 'payment_required' || eventType === 'insufficient_funds') {
+      code = 'payment_required';
+    } else if (eventType !== 'usage_limit_exceeded') {
+      const error = properties.error;
+      if (error) {
+        const normalizedError = JSON.stringify(error).toLowerCase();
+        if (eventType === 'session.error' && isModelNotFoundMessage(terminalErrorText)) {
+          code = 'model_missing';
+        } else if (
+          normalizedError.includes('payment') ||
+          normalizedError.includes('credit') ||
+          normalizedError.includes('balance') ||
+          normalizedError.includes('quota')
+        ) {
+          code = 'payment_required';
+        }
       }
     }
-    return false;
+
+    const isExplicitAssistantFailure =
+      eventType === 'usage_limit_exceeded' ||
+      (eventType === 'session.error' &&
+        (() => {
+          const normalizedError = JSON.stringify(properties.error ?? '').toLowerCase();
+          return (
+            normalizedError.includes('usage_limit_exceeded') ||
+            normalizedError.includes('too many requests')
+          );
+        })());
+    if (!code && !isExplicitAssistantFailure) return undefined;
+
+    return {
+      ...(code ? { code } : {}),
+      message: terminalErrorText,
+      errorSource: 'assistant',
+    };
   }
 
   function getTerminalErrorText(eventType: string, properties: Record<string, unknown>): string {
@@ -776,6 +826,82 @@ export function createConnectionManager(
     }
 
     return `Insufficient credits: ${eventType}`;
+  }
+
+  function isModelNotFoundMessage(message: string): boolean {
+    return /\b(model\s+(?:was\s+)?not\s+found|unknown\s+model|invalid\s+model)\b/i.test(message);
+  }
+
+  function shouldFetchModelNotFoundDiagnostics(
+    eventType: string,
+    properties: Record<string, unknown>,
+    terminalErrorText: string
+  ): boolean {
+    if (eventType !== 'session.error') return false;
+    if (!isCodeReviewJob(state)) return false;
+    if (properties.sessionID !== state.currentSession?.kiloSessionId) return false;
+    return isModelNotFoundMessage(terminalErrorText);
+  }
+
+  function logModelDiagnosticUnavailable(reason: string, requestedModel?: string): void {
+    logToFile(
+      JSON.stringify({
+        message: 'model_not_found_runtime_diagnostics_unavailable',
+        reason,
+        agentSessionId: state.currentSession?.agentSessionId,
+        kiloSessionId: state.currentSession?.kiloSessionId,
+        requestedModel,
+      })
+    );
+  }
+
+  async function listEffectiveModelsForDiagnostics(
+    requestedModel: string
+  ): Promise<string[] | undefined> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<undefined>(resolve => {
+      timeoutId = setTimeout(() => {
+        logModelDiagnosticUnavailable(
+          `timed out after ${MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS}ms`,
+          requestedModel
+        );
+        resolve(undefined);
+      }, MODEL_NOT_FOUND_DIAGNOSTICS_TIMEOUT_MS);
+    });
+
+    try {
+      return await Promise.race([config.kiloClient.listEffectiveModels('kilo'), timeout]);
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
+  }
+
+  async function maybeBuildModelNotFoundDiagnostics(
+    eventType: string,
+    properties: Record<string, unknown>,
+    terminalErrorText: string
+  ): Promise<ModelNotFoundRuntimeDiagnostics | undefined> {
+    if (!shouldFetchModelNotFoundDiagnostics(eventType, properties, terminalErrorText)) {
+      return undefined;
+    }
+
+    const requestedModel = state.batchFinalizationConfig?.model?.trim();
+    if (!requestedModel) {
+      logModelDiagnosticUnavailable('missing_requested_model');
+      return undefined;
+    }
+
+    try {
+      const availableModels = await listEffectiveModelsForDiagnostics(requestedModel);
+      if (!availableModels) return undefined;
+      return buildModelNotFoundRuntimeDiagnostics(requestedModel, availableModels);
+    } catch (error) {
+      logModelDiagnosticUnavailable(
+        error instanceof Error ? error.message : String(error),
+        requestedModel
+      );
+      return undefined;
+    }
   }
 
   function maybeResumeNetworkWait(eventType: string, properties: Record<string, unknown>): void {
@@ -931,7 +1057,7 @@ export function createConnectionManager(
           if (eventType === 'permission.asked') {
             const permId = typeof properties.id === 'string' ? properties.id : undefined;
             if (isCodeReviewJob(state)) {
-              rejectCodeReviewPermission(permId, config.kiloClient);
+              rejectCodeReviewPermission(permId, properties, state, config.kiloClient);
               callbacks.onSseEvent?.();
               continue;
             }
@@ -993,20 +1119,23 @@ export function createConnectionManager(
                 state.setLastAssistantMessageId(messageInfo.id);
               }
             }
-
-            // Detect terminal assistant messages for per-message completion in
-            // the new-path keep-warm model.
-            const data = { event: eventType as 'message.updated', properties };
-            const parentID = getCompletedAssistantParentID(data);
-            if (parentID) {
-              callbacks.onMessageComplete(parentID);
+            if (isAssistantCompletionSignal(messageInfo)) {
               callbacks.onCompletionSignal();
             }
           }
 
           // Terminal error detection
-          if (isTerminalError(eventType, properties)) {
-            callbacks.onTerminalError(getTerminalErrorText(eventType, properties));
+          const terminalFailure = getTerminalFailure(eventType, properties);
+          if (terminalFailure) {
+            const modelNotFoundRuntimeDiagnostics = await maybeBuildModelNotFoundDiagnostics(
+              eventType,
+              properties,
+              terminalFailure.message
+            );
+            callbacks.onTerminalError({
+              ...terminalFailure,
+              ...(modelNotFoundRuntimeDiagnostics ? { modelNotFoundRuntimeDiagnostics } : {}),
+            });
             return;
           }
 

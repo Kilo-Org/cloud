@@ -9,13 +9,26 @@
   "observability": {
     "enabled": true,
   },
+  "routes": [
+    {
+      "pattern": "security-sync.kilosessions.ai",
+      "custom_domain": true,
+    },
+  ],
   "dev": {
-    "port": 8796,
+    "port": 8812,
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },
+  "vars": {
+    "MANUAL_SYNC_COMMAND_ROUTING_ENABLED": "true",
+    "DISMISS_FINDING_COMMAND_ROUTING_ENABLED": "true",
+    "BACKEND_API_URL": "https://app.kilo.ai",
+    "SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED": "true",
+    "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
+  },
   "triggers": {
-    "crons": ["0 */6 * * *"],
+    "crons": ["0 */6 * * *", "15 * * * *"],
   },
   "queues": {
     "producers": [
@@ -48,11 +61,25 @@
       "entrypoint": "GitTokenRPCEntrypoint",
     },
   ],
+  "secrets_store_secrets": [
+    {
+      "binding": "INTERNAL_API_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+  ],
   "env": {
     "dev": {
       "name": "cloudflare-security-sync-dev",
+      "vars": {
+        "MANUAL_SYNC_COMMAND_ROUTING_ENABLED": "true",
+        "DISMISS_FINDING_COMMAND_ROUTING_ENABLED": "true",
+        "BACKEND_API_URL": "http://localhost:3000",
+        "SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED": "true",
+        "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
+      },
       "triggers": {
-        "crons": ["0 */6 * * *"],
+        "crons": ["0 */6 * * *", "15 * * * *"],
       },
       "queues": {
         "producers": [
@@ -83,6 +110,13 @@
           "binding": "GIT_TOKEN_SERVICE",
           "service": "git-token-service-dev",
           "entrypoint": "GitTokenRPCEntrypoint",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "INTERNAL_API_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "INTERNAL_API_SECRET_DEV",
         },
       ],
     },

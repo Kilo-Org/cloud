@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { KiloClawEnv } from '../types';
+import * as DbModule from '../db';
 import type { InstanceMutableState } from '../durable-objects/kiloclaw-instance/types';
 import {
   cancelDoctorViaController,
@@ -35,6 +36,11 @@ function envWithDOError(error: Error, writeDataPoint = vi.fn()) {
         ),
     },
     KILOCLAW_AE: { writeDataPoint },
+    HYPERDRIVE: { connectionString: 'postgresql://fake' },
+    KILOCLAW_REGISTRY: {
+      idFromName: (id: string) => id,
+      get: () => ({ repairCompletedProvision: vi.fn().mockResolvedValue(false) }),
+    },
     KILOCLAW_BILLING: {
       resolveProvisionEntitlement: vi.fn().mockResolvedValue({
         priceVersion: '2026-05-10',
@@ -162,6 +168,25 @@ describe('sanitizeError: Instance-not-* status correction', () => {
     const err = new Error('Fly API allocateIP failed (500): <!DOCTYPE html><html>upstream</html>');
     const writeDataPoint = vi.fn();
     const env = envWithDOError(err, writeDataPoint);
+    vi.spyOn(DbModule, 'getWorkerDb').mockReturnValue({
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            orderBy: () => ({
+              limit: () =>
+                Promise.resolve([
+                  {
+                    id: '11111111-1111-4111-8111-111111111111',
+                    sandbox_id: 'ki_11111111111141118111111111111111',
+                    organization_id: null,
+                  },
+                ]),
+            }),
+            limit: () => Promise.resolve([{ id: 'subscription-1' }]),
+          }),
+        }),
+      }),
+    } as never);
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const resp = await platform.request(
@@ -169,7 +194,10 @@ describe('sanitizeError: Instance-not-* status correction', () => {
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: 'user-1' }),
+        body: JSON.stringify({
+          userId: 'user-1',
+          instanceId: '11111111-1111-4111-8111-111111111111',
+        }),
       },
       env
     );
@@ -190,6 +218,26 @@ describe('sanitizeError: Instance-not-* status correction', () => {
     expect(serializedDataPoint).toContain('provision failed');
     expect(serializedDataPoint).not.toContain('<!DOCTYPE html>');
     expect(serializedDataPoint).not.toContain('upstream</html>');
+  });
+});
+
+describe('sanitizeOpenclawConfigError: file tree RPC limit', () => {
+  it('returns a stable code and bounded message for oversized file trees', async () => {
+    const err = new Error(
+      'Serialized RPC arguments or return values are limited to 32MiB, but the size of this value was: 37110765 bytes.'
+    );
+    const env = envWithDOError(err);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const resp = await platform.request('/files/tree?userId=user-1', {}, env);
+
+    expect(resp.status).toBe(413);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      code: 'file_tree_too_large',
+      error:
+        'File tree is too large to load through the Cloudflare RPC limit (32 MiB; returned 37110765 bytes).',
+    });
+    expect(consoleSpy).toHaveBeenCalledWith('[platform] files/tree failed:', err.message);
   });
 });
 
@@ -754,6 +802,87 @@ describe('sanitizeError: explicit provider support errors', () => {
       error: 'Provider docker-local is only available in development',
     });
     expect(provision).not.toHaveBeenCalled();
+  });
+});
+
+describe('validation-aware config write platform route', () => {
+  function envWithWriteOpenclawConfigFile(
+    writeOpenclawConfigFile: (...args: unknown[]) => Promise<unknown>
+  ) {
+    return {
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: () => ({ writeOpenclawConfigFile }),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+  }
+
+  it('forwards opt-in validation mode and warning responses', async () => {
+    const writeOpenclawConfigFile = vi.fn().mockResolvedValue({
+      outcome: 'openclaw-validation-warning',
+      valid: false,
+      reason: 'invalid',
+      issues: [{ path: 'gateway.mode', message: 'Expected local' }],
+    });
+    const env = envWithWriteOpenclawConfigFile(writeOpenclawConfigFile);
+
+    const resp = await platform.request(
+      '/files/write-openclaw-config?instanceId=11111111-1111-4111-8111-111111111111',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          content: '{"gateway":{"mode":"remote"}}',
+          etag: 'etag-1',
+          mode: 'warn-before-write',
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(200);
+    await expect(jsonBody(resp)).resolves.toMatchObject({
+      outcome: 'openclaw-validation-warning',
+      reason: 'invalid',
+    });
+    expect(writeOpenclawConfigFile).toHaveBeenCalledWith(
+      '{"gateway":{"mode":"remote"}}',
+      'etag-1',
+      'warn-before-write'
+    );
+  });
+
+  it('fails closed when the running controller lacks the dedicated route', async () => {
+    const env = envWithWriteOpenclawConfigFile(async () => null);
+    const resp = await platform.request(
+      '/files/write-openclaw-config',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          content: '{"gateway":{"mode":"remote"}}',
+          etag: 'etag-1',
+          mode: 'warn-before-write',
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(404);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      error: 'OpenClaw validation-aware writing not available (controller too old)',
+      code: 'controller_route_unavailable',
+    });
   });
 });
 

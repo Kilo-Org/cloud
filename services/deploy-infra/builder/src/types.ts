@@ -170,6 +170,7 @@ export type Env = {
   CF_VERSION_METADATA: { id: string; tag: string; timestamp: string };
 
   BACKEND_AUTH_TOKEN: string;
+  DISPATCHER_AUTH_TOKEN: string;
 
   /** URL endpoint where build events will be sent (REQUIRED) */
   BACKEND_EVENTS_URL: string;
@@ -189,7 +190,17 @@ export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   DeploymentOrchestrator: DurableObjectNamespace<DeploymentOrchestrator>;
   EventsManager: DurableObjectNamespace<EventsManager>;
+
+  NEXTAUTH_SECRET: SecretsStoreSecret;
+  HYPERDRIVE: Hyperdrive;
+  WORKER_ENV: string;
+  DEPLOY_HOSTNAME_BASE: string;
+  DeployDispatcher: Fetcher;
+  HtmlDeployRateLimiter: RateLimit;
 };
+
+/** Hono app environment with Worker bindings. */
+export type HonoEnv = { Bindings: Env };
 
 /**
  * Request body for POST /deploy
@@ -234,4 +245,10 @@ export type CloudflareApiResponse<T = unknown> = {
   success: boolean;
   result?: T;
   errors?: Array<{ code: number; message: string }>;
+};
+
+export type HtmlDeployResponse = {
+  slug: string;
+  url: string;
+  expires_at: string;
 };

@@ -36,6 +36,10 @@ const agentConfig = {
 
 export const kiloExtras = {
   top: {
+    auto_expand_history: {
+      description: 'Automatically expand command history when searching',
+      type: 'boolean',
+    },
     model: {
       description: 'Model to use in the format of provider/model, eg anthropic/claude-2',
       ...nullableModel,
@@ -48,6 +52,20 @@ export const kiloExtras = {
     remote_control: {
       description:
         'Enable remote control of sessions via Kilo Cloud. Equivalent to running /remote on startup.',
+      type: 'boolean',
+    },
+    auto_collapse_reasoning: {
+      description: 'Automatically collapse reasoning blocks after the agent finishes writing them',
+      type: 'boolean',
+    },
+    terminal_command_display: {
+      description:
+        'Controls whether terminal command blocks are expanded or collapsed by default in the VS Code chat UI',
+      type: 'string',
+      enum: ['expanded', 'collapsed'],
+    },
+    hide_prompt_training_models: {
+      description: 'Hide Kilo Gateway models that may train on your prompts from model listings',
       type: 'boolean',
     },
     commit_message: {

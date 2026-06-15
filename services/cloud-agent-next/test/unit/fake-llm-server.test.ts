@@ -168,6 +168,21 @@ async function postChat(url: string, prompt: string): Promise<Response> {
   });
 }
 
+async function postModelValidation(
+  url: string,
+  modelId: string,
+  organizationId?: string
+): Promise<Response> {
+  const route = organizationId
+    ? `/api/organizations/${organizationId}/models/validate`
+    : '/api/openrouter/models/validate';
+  return fetch(`${url}${route}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modelId }),
+  });
+}
+
 describe('fake-llm-server HTTP', () => {
   it('serves the models catalogue with a tools-capable entry', async () => {
     const h = await start();
@@ -180,6 +195,34 @@ describe('fake-llm-server HTTP', () => {
     const fake = body.data.find(m => m.id === 'fake-deterministic');
     expect(fake).toBeDefined();
     expect(fake?.supported_parameters).toContain('tools');
+  });
+
+  it('validates a model without requiring the full catalogue response', async () => {
+    const h = await start();
+
+    const personalAvailable = await postModelValidation(h.url, 'fake-deterministic');
+    await expect(personalAvailable.json()).resolves.toEqual({ valid: true });
+
+    const personalMissing = await postModelValidation(h.url, 'does-not-exist');
+    await expect(personalMissing.json()).resolves.toEqual({
+      valid: false,
+      reason: 'unavailable',
+    });
+
+    const organizationAvailable = await postModelValidation(h.url, 'fake-deterministic', 'org-1');
+    await expect(organizationAvailable.json()).resolves.toEqual({ valid: true });
+  });
+
+  it('reports chat completion request counts for fail-fast assertions', async () => {
+    const h = await start();
+    const before = await fetch(`${h.url}/test/requests`);
+    await expect(before.json()).resolves.toEqual({ chatCompletions: 0 });
+
+    const response = await postChat(h.url, '__fake__:echo:hello');
+    expect(response.status).toBe(200);
+
+    const after = await fetch(`${h.url}/test/requests`);
+    await expect(after.json()).resolves.toEqual({ chatCompletions: 1 });
   });
 
   it('returns HTTP 404 for routes outside the fake gateway contract', async () => {

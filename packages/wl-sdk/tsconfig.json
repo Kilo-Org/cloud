@@ -11,6 +11,7 @@
     "noEmit": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
+    "types": ["node"],
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },

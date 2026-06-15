@@ -1,10 +1,15 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
+  CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION,
+  CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS,
   CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION,
   CLOUD_AGENT_IMAGE_PRESIGNED_URL_EXPIRY_SECONDS,
 } from '@/lib/cloud-agent/constants';
-import type { CloudAgentImageAllowedType } from '@/lib/cloud-agent/constants';
+import type {
+  CloudAgentAttachmentAllowedType,
+  CloudAgentImageAllowedType,
+} from '@/lib/cloud-agent/constants';
 import { r2Client, r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
 
 type Service = 'app-builder' | 'cloud-agent';
@@ -74,5 +79,54 @@ export async function generateImageUploadUrl({
     signedUrl,
     key,
     expiresAt,
+  };
+}
+
+export type GenerateCloudAgentAttachmentUploadUrlParams = {
+  userId: string;
+  messageUuid: string;
+  attachmentId: string;
+  contentType: CloudAgentAttachmentAllowedType;
+  contentLength: number;
+};
+
+export type GenerateCloudAgentAttachmentUploadUrlResult = {
+  signedUrl: string;
+  key: string;
+  expiresAt: string;
+};
+
+export async function generateCloudAgentAttachmentUploadUrl({
+  userId,
+  messageUuid,
+  attachmentId,
+  contentType,
+  contentLength,
+}: GenerateCloudAgentAttachmentUploadUrlParams): Promise<GenerateCloudAgentAttachmentUploadUrlResult> {
+  const extension = CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION[contentType];
+  const key = `${userId}/cloud-agent/${messageUuid}/${attachmentId}.${extension}`;
+  const command = new PutObjectCommand({
+    Bucket: r2CloudAgentAttachmentsBucketName,
+    Key: key,
+    ContentType: contentType,
+    ContentLength: contentLength,
+    Metadata: {
+      userId,
+      messageUuid,
+      attachmentId,
+    },
+  });
+
+  const signedUrl = await getSignedUrl(r2Client, command, {
+    expiresIn: CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS,
+    signableHeaders: new Set(['content-length', 'content-type']),
+  });
+
+  return {
+    signedUrl,
+    key,
+    expiresAt: new Date(
+      Date.now() + CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS * 1000
+    ).toISOString(),
   };
 }

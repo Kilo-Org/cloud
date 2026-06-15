@@ -21,12 +21,13 @@ const groups: ServiceGroup[] = [
     alwaysOn: false,
     sectionBreakBefore: true,
   },
-  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false },
+  { id: 'notifications', label: 'Notifications', alwaysOn: false },
+  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, groupDependsOn: ['notifications'] },
   {
     id: 'cloud-agent',
     label: 'Cloud Agent',
     alwaysOn: false,
-    groupDependsOn: ['git-token-service'],
+    groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
@@ -39,6 +40,12 @@ const groups: ServiceGroup[] = [
     sectionBreakBefore: true,
   },
   { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
+  {
+    id: 'security-agent',
+    label: 'Security Agent',
+    alwaysOn: false,
+    groupDependsOn: ['cloud-agent'],
+  },
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
@@ -65,14 +72,29 @@ type ServiceMeta = {
 
 const serviceMeta: Record<string, ServiceMeta> = {
   // core
-  nextjs: { group: 'core', dependsOn: ['postgres', 'redis', 'stripe'] },
+  nextjs: {
+    group: 'core',
+    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe', 'auto-routing'],
+  },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
+  'redis-http': { group: 'core', dependsOn: ['redis'] },
   stripe: { group: 'core', dependsOn: [] },
+  'auto-routing': {
+    group: 'core',
+    dependsOn: [],
+    dir: 'services/auto-routing',
+  },
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
-    dependsOn: ['postgres', 'nextjs', 'cloudflare-session-ingest', 'cloudflare-git-token-service'],
+    dependsOn: [
+      'postgres',
+      'nextjs',
+      'cloudflare-session-ingest',
+      'cloudflare-git-token-service',
+      'notifications',
+    ],
     dir: 'services/cloud-agent-next',
     useLanIp: true,
   },
@@ -128,6 +150,23 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/auto-fix-infra',
   },
+  // security-agent
+  'cloudflare-security-sync': {
+    group: 'security-agent',
+    dependsOn: ['postgres', 'cloudflare-git-token-service'],
+    dir: 'services/security-sync',
+  },
+  'cloudflare-security-auto-analysis': {
+    group: 'security-agent',
+    dependsOn: [
+      'postgres',
+      'nextjs',
+      'cloud-agent-next',
+      'cloudflare-git-token-service',
+      'cloudflare-session-ingest',
+    ],
+    dir: 'services/security-auto-analysis',
+  },
   // deploy
   'cloudflare-deploy-builder': {
     group: 'deploy',
@@ -143,7 +182,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   notifications: {
-    group: 'kiloclaw',
+    group: 'notifications',
     dependsOn: ['postgres'],
     dir: 'services/notifications',
   },
@@ -198,6 +237,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'gastown',
     dependsOn: ['postgres', 'cloudflare-git-token-service', 'nextjs'],
     dir: 'services/gastown',
+  },
+  'cloudflare-wasteland': {
+    group: 'gastown',
+    dependsOn: ['postgres', 'nextjs'],
+    dir: 'services/wasteland',
   },
 };
 
@@ -304,7 +348,12 @@ function readWranglerPort(dir: string): number {
 // Build service definitions from serviceMeta + wrangler.jsonc
 // ---------------------------------------------------------------------------
 
-const INFRA_PORTS: Record<string, number> = { postgres: 5432, redis: 6379, grafana: 4000 };
+const INFRA_PORTS: Record<string, number> = {
+  postgres: 5432,
+  redis: 6379,
+  'redis-http': 8079,
+  grafana: 4000,
+};
 
 // Docker Compose profile that gates each infra service, if any. Services not
 // listed here are part of the default profile and start with a plain `up -d`.
@@ -514,7 +563,10 @@ export function resolveTransitiveDeps(targets: string[]): string[] {
   const stack = [...targets];
 
   while (stack.length > 0) {
-    const name = stack.pop()!;
+    const name = stack.pop();
+    if (name === undefined) {
+      break;
+    }
     if (result.has(name)) continue;
     const svc = services.get(name);
     if (!svc) throw new Error(`Unknown service: ${name}`);
@@ -545,7 +597,11 @@ export function topologicalSort(serviceNames: string[]): string[] {
     if (!svc) throw new Error(`Unknown service: ${name}`);
     for (const dep of svc.dependsOn) {
       if (!nameSet.has(dep)) continue;
-      adjacency.get(dep)!.push(name);
+      const neighbors = adjacency.get(dep);
+      if (!neighbors) {
+        throw new Error(`Unknown dependency in service graph: ${dep}`);
+      }
+      neighbors.push(name);
       inDegree.set(name, (inDegree.get(name) ?? 0) + 1);
     }
   }
@@ -557,7 +613,10 @@ export function topologicalSort(serviceNames: string[]): string[] {
 
   const sorted: string[] = [];
   while (queue.length > 0) {
-    const current = queue.shift()!;
+    const current = queue.shift();
+    if (current === undefined) {
+      break;
+    }
     sorted.push(current);
     for (const neighbor of adjacency.get(current) ?? []) {
       const newDegree = (inDegree.get(neighbor) ?? 1) - 1;
@@ -579,11 +638,11 @@ export function resolveTargets(targets: string[]): string[] {
   const groupIdsToExpand: string[] = [];
   for (const target of targets) {
     if (target in shortcuts) {
-      groupIdsToExpand.push(...shortcuts[target].map(name => services.get(name)!.group));
+      groupIdsToExpand.push(...shortcuts[target].map(name => getService(name).group));
     } else if (groupIds.has(target)) {
       groupIdsToExpand.push(target);
     } else if (services.has(target)) {
-      groupIdsToExpand.push(services.get(target)!.group);
+      groupIdsToExpand.push(getService(target).group);
     } else {
       const validTargets = [...services.keys(), ...groupIds, ...Object.keys(shortcuts)].join(', ');
       throw new Error(`Unknown target: ${target}. Valid targets: ${validTargets}`);
@@ -632,7 +691,10 @@ export function resolveGroupTransitiveDeps(groupIds: string[]): string[] {
   const result = new Set<string>();
   const stack = [...groupIds];
   while (stack.length > 0) {
-    const id = stack.pop()!;
+    const id = stack.pop();
+    if (id === undefined) {
+      break;
+    }
     if (result.has(id)) continue;
     const group = groups.find(g => g.id === id);
     if (!group) throw new Error(`Unknown group: ${id}`);

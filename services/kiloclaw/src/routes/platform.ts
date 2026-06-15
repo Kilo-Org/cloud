@@ -9,6 +9,8 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import * as fly from '../fly/client';
 import type { InstanceStatus } from '../durable-objects/kiloclaw-instance/types';
+import type { FileWriteResponse } from '../durable-objects/gateway-controller-types';
+import { isAgentConfigErrorEnvelope } from '../durable-objects/gateway-controller-types';
 import type { AppEnv } from '../types';
 import {
   ProvisionRequestSchema,
@@ -36,7 +38,10 @@ import {
   markImageAsLatest,
   disableImageAndClearRollout,
 } from '../lib/version-rollout';
-import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
+import {
+  setKiloclawEarlyAccess,
+  lookupKiloclawRolloutContextByInstanceId,
+} from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
@@ -44,6 +49,7 @@ import {
   KiloclawStartReasonSchema,
   KiloclawStopReasonSchema,
   withDORetry,
+  type DORetryConfig,
 } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
@@ -76,8 +82,16 @@ import {
 } from '../providers/rollout';
 import type { ProviderId } from '../schemas/instance-config';
 import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
-import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
+import {
+  getActiveOrganizationInstance,
+  getActivePersonalInstance,
+  getInstanceById,
+  getInstanceByIdIncludingDestroyed,
+  getWorkerDb,
+  hasSubscriptionForInstance,
+} from '../db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { volumeNameFromSandboxId } from '../durable-objects/machine-config';
 import { fallbackAppNameForRestore } from '../durable-objects/kiloclaw-instance/postgres';
 import { getAppKey } from '../durable-objects/kiloclaw-instance/types';
@@ -113,6 +127,22 @@ const KiloCodeConfigPatchSchema = z.object({
 const WebSearchConfigPatchSchema = z.object({
   userId: z.string().min(1),
   exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
+});
+
+const ProvisionReservationRepairSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.uuid(),
+  orgId: z.uuid().nullable().optional(),
+});
+
+const ProvisionReservationReleaseSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.uuid(),
+  orgId: z.uuid().nullable().optional(),
+  // Break-glass: the operator must explicitly assert they have confirmed the
+  // attempt is dead and any provider resources are cleaned up. `z.literal(true)`
+  // makes the request fail validation unless the flag is present and true.
+  acknowledgeCleanupVerified: z.literal(true),
 });
 
 const KILOCLAW_WORKER_DESTROY_ACTOR = {
@@ -399,10 +429,28 @@ async function withResolvedDORetry<TResult>(
   userId: string,
   instanceId: string | undefined,
   operation: (stub: KiloClawInstanceStub) => Promise<TResult>,
-  operationName: string
+  operationName: string,
+  config?: DORetryConfig
 ): Promise<TResult> {
-  return withDORetry(await instanceStubFactory(env, userId, instanceId), operation, operationName);
+  return withDORetry(
+    await instanceStubFactory(env, userId, instanceId),
+    operation,
+    operationName,
+    config
+  );
 }
+
+/**
+ * Opt non-idempotent operations out of automatic DO retries. Cloudflare's
+ * `.retryable` retries are only safe for idempotent operations: agent
+ * create/delete are non-idempotent, and etag-guarded updates are not
+ * response-idempotent, so an auto-replay after a lost-but-committed success
+ * would surface a misleading agent_exists / agent_not_found / config_etag_conflict
+ * for an action that already succeeded. With retries disabled, a transient DO
+ * failure surfaces to the caller, who retries explicitly once state has settled
+ * and the typed outcome is accurate. Reads keep the default retry.
+ */
+const NO_DO_RETRY: DORetryConfig = { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 };
 
 type ProvisionedInstanceRecord = {
   id: string;
@@ -411,6 +459,44 @@ type ProvisionedInstanceRecord = {
 
 function buildDefaultInboundEmailAlias(instanceId: string): string {
   return `claw-${instanceId.replaceAll('-', '')}`;
+}
+
+function provisionRegistryKey(userId: string, orgId: string | null | undefined): string {
+  return orgId ? `org:${orgId}` : `user:${userId}`;
+}
+
+function getProvisionRegistryStub(
+  env: AppEnv['Bindings'],
+  userId: string,
+  orgId: string | null | undefined
+) {
+  const registryKey = provisionRegistryKey(userId, orgId);
+  return {
+    registryKey,
+    stub: env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(registryKey)),
+  };
+}
+
+async function getActiveProvisionContextInstance(
+  env: AppEnv['Bindings'],
+  userId: string,
+  orgId: string | null | undefined
+) {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) throw new Error('HYPERDRIVE is not configured');
+  const db = getWorkerDb(connectionString);
+  return orgId
+    ? await getActiveOrganizationInstance(db, userId, orgId)
+    : await getActivePersonalInstance(db, userId);
+}
+
+async function hasCanonicalProvisionSubscription(
+  env: AppEnv['Bindings'],
+  instanceId: string
+): Promise<boolean> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) throw new Error('HYPERDRIVE is not configured');
+  return await hasSubscriptionForInstance(getWorkerDb(connectionString), instanceId);
 }
 
 function isWithinSelfServiceEntitlement(
@@ -1010,6 +1096,27 @@ const OPENCLAW_CONFIG_ERROR_CODES = new Set([
   'invalid_request_body',
 ]);
 
+const FILE_TREE_RPC_LIMIT_ERROR_PREFIX =
+  'Serialized RPC arguments or return values are limited to 32MiB';
+
+function sanitizeFileTreeRpcLimitError(message: string): {
+  message: string;
+  status: number;
+  code: string;
+} | null {
+  if (!message.startsWith(FILE_TREE_RPC_LIMIT_ERROR_PREFIX)) return null;
+
+  const sizeMatch = message.match(/size of this value was: (\d+) bytes/);
+  const returnedSize = sizeMatch?.[1];
+  const returnedSizeSegment = returnedSize ? `; returned ${returnedSize} bytes` : '';
+
+  return {
+    message: `File tree is too large to load through the Cloudflare RPC limit (32 MiB${returnedSizeSegment}).`,
+    status: 413,
+    code: 'file_tree_too_large',
+  };
+}
+
 function isSafeOpenclawConfigCode(code: string): boolean {
   return OPENCLAW_CONFIG_ERROR_CODES.has(code) || code.startsWith('openclaw_import_');
 }
@@ -1025,6 +1132,11 @@ function sanitizeOpenclawConfigError(
 
   console.error(`[platform] ${operation} failed:`, raw);
 
+  if (operation === 'files/tree') {
+    const fileTreeRpcLimitError = sanitizeFileTreeRpcLimitError(normalized);
+    if (fileTreeRpcLimitError) return fileTreeRpcLimitError;
+  }
+
   if (code && isSafeOpenclawConfigCode(code)) {
     return { message: normalized, status, code };
   }
@@ -1037,6 +1149,61 @@ function sanitizeOpenclawConfigError(
     };
   }
 
+  return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
+}
+
+// Agent config CRUD error codes that are safe to forward verbatim to the caller.
+// Mirrors OPENCLAW_CONFIG_ERROR_CODES; the controller's messages for these are
+// generic (no internal paths/PII), so the message + status + code pass through.
+const AGENT_CONFIG_ERROR_CODES = new Set([
+  'controller_route_unavailable', // old controller missing the route entirely
+  'capability_unavailable', // gateway capability gate (501) — old controller image
+  'config_etag_conflict', // stale config-wide etag
+  'agent_not_found',
+  'agent_exists',
+  'reserved_agent_id',
+  'invalid_agent_id',
+  'invalid_agent_request',
+  'invalid_agent_config',
+  'invalid_config_after_patch',
+  'agent_binding_rollback_failed', // 500 — binding change rejected but routing left uncertain
+  'openclaw_cli_failed', // 502 — controller CLI message is generic
+  'openclaw_cli_timeout', // 504
+]);
+
+function sanitizeAgentConfigError(
+  err: unknown,
+  operation: string
+): { message: string; status: number; code?: string } {
+  const raw = err instanceof Error ? err.message : 'Unknown error';
+  const status = statusCodeFromError(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  const code = getErrorCode(err);
+
+  console.error(`[platform] ${operation} failed:`, raw);
+
+  if (code && AGENT_CONFIG_ERROR_CODES.has(code)) {
+    return { message: normalized, status, code };
+  }
+
+  return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
+}
+
+/**
+ * Reconstruct an HTTP error from the serializable envelope a DO agent method
+ * RETURNS (typed errors can't be thrown across the DO RPC boundary; see
+ * gateway.ts). Forwards the message only for known-safe codes; otherwise redacts
+ * the message but preserves the status.
+ */
+function reconstructAgentError(
+  operation: string,
+  agentError: { status: number; code: string | null; message: string }
+): { message: string; status: number; code?: string } {
+  const { status, code, message } = agentError;
+  if (code && AGENT_CONFIG_ERROR_CODES.has(code)) {
+    return { message, status, code };
+  }
+  console.error(`[platform] ${operation} returned error envelope:`, { status, code, message });
   return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
 }
 
@@ -1110,6 +1277,10 @@ platform.post('/provision', async c => {
   const provisionRoute = '/api/platform/provision';
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionStartedAt = performance.now();
+  let provisionRegistry: ReturnType<typeof getProvisionRegistryStub> | null = null;
+  let freshReservationAdmitted = false;
+  let freshProviderWorkStarted = false;
+  let explicitInstanceRequiresSubscriptionBootstrap = false;
 
   let selectedProvider = provider;
   if (!selectedProvider && shouldInsertInstanceRecord) {
@@ -1129,6 +1300,41 @@ platform.post('/provision', async c => {
   let instanceType: InstanceTierKey | undefined;
   let provision: Awaited<ReturnType<KiloClawInstanceStub['provision']>>;
   try {
+    if (instanceId) {
+      const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+      if (activeInstance?.id !== instanceId) {
+        return jsonError('Active instance not found', 404, 'instance_not_found');
+      }
+      if (await hasCanonicalProvisionSubscription(c.env, instanceId)) {
+        const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+        try {
+          await stub.repairCompletedProvision(
+            registryKey,
+            userId,
+            instanceId,
+            doKeyFromActiveInstance(activeInstance)
+          );
+        } catch (repairError) {
+          console.error(
+            '[platform] Failed to repair existing provision before update:',
+            repairError
+          );
+          return jsonError(
+            'Provisioning completed but finalization is pending',
+            503,
+            'provision_completion_pending'
+          );
+        }
+      } else if (bootstrapSubscription === true) {
+        explicitInstanceRequiresSubscriptionBootstrap = true;
+      } else {
+        return jsonError(
+          'Provisioning completed but subscription finalization is pending',
+          503,
+          'provision_completion_pending'
+        );
+      }
+    }
     if (selectedProvider) {
       assertAvailableProvider(c.env, selectedProvider);
     }
@@ -1162,6 +1368,99 @@ platform.post('/provision', async c => {
       ) {
         return c.json({ error: 'instanceType exceeds self-service entitlement' }, 400);
       }
+
+      provisionRegistry = getProvisionRegistryStub(c.env, userId, orgId);
+      const admission = await provisionRegistry.stub.beginFreshProvision(
+        provisionRegistry.registryKey,
+        userId,
+        provisionedInstanceId,
+        provisionDoKey
+      );
+      if (admission.outcome === 'conflict') {
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_conflict',
+          delivery: 'http',
+          route: provisionRoute,
+          userId,
+          instanceId: admission.reservation.instanceId,
+          orgId: orgId ?? undefined,
+          label: admission.reservation.status,
+        });
+        const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+        if (
+          activeInstance?.id === admission.reservation.instanceId &&
+          (await hasCanonicalProvisionSubscription(c.env, activeInstance.id))
+        ) {
+          try {
+            await provisionRegistry.stub.repairCompletedProvision(
+              provisionRegistry.registryKey,
+              userId,
+              activeInstance.id,
+              doKeyFromActiveInstance(activeInstance)
+            );
+            writeEvent(c.env, {
+              event: 'instance.provision_reservation_repaired',
+              delivery: 'http',
+              route: provisionRoute,
+              userId,
+              instanceId: activeInstance.id,
+              orgId: orgId ?? undefined,
+            });
+            return jsonError('User already has an active instance', 409, 'instance_already_active');
+          } catch (repairError) {
+            console.error(
+              '[platform] Failed to repair completed provision reservation:',
+              repairError
+            );
+            return jsonError(
+              'Provisioning completed but finalization is pending',
+              503,
+              'provision_completion_pending'
+            );
+          }
+        }
+        return jsonError(
+          'An instance is already being created. Wait for setup to finish, then try again.',
+          409,
+          'provision_in_progress'
+        );
+      }
+      freshReservationAdmitted = true;
+      writeEvent(c.env, {
+        event: 'instance.provision_reservation_started',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? undefined,
+      });
+
+      const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+      if (activeInstance) {
+        if (await hasCanonicalProvisionSubscription(c.env, activeInstance.id)) {
+          const repaired = await provisionRegistry.stub.repairCompletedProvision(
+            provisionRegistry.registryKey,
+            userId,
+            activeInstance.id,
+            doKeyFromActiveInstance(activeInstance)
+          );
+          if (!repaired) {
+            await provisionRegistry.stub.createInstance(
+              provisionRegistry.registryKey,
+              userId,
+              activeInstance.id,
+              doKeyFromActiveInstance(activeInstance)
+            );
+          }
+        }
+        await provisionRegistry.stub.releaseFreshProvision(
+          provisionRegistry.registryKey,
+          userId,
+          provisionedInstanceId,
+          'active_instance_exists'
+        );
+        return jsonError('User already has an active instance', 409, 'instance_already_active');
+      }
     }
     // Only default to the billing entitlement tier on FRESH inserts. On
     // re-provision (config updates with an existing instanceId), pass
@@ -1173,6 +1472,7 @@ platform.post('/provision', async c => {
     instanceType =
       requestedInstanceType ??
       (shouldInsertInstanceRecord ? provisionEntitlement?.selfServiceInstanceType : undefined);
+    freshProviderWorkStarted = shouldInsertInstanceRecord;
     provision = await withResolvedDORetry(
       c.env,
       userId,
@@ -1193,11 +1493,47 @@ platform.post('/provision', async c => {
             region,
             pinnedImageTag,
           },
-          { instanceId: provisionedInstanceId, orgId, provider: selectedProvider }
+          {
+            instanceId: provisionedInstanceId,
+            orgId,
+            provider: selectedProvider,
+            freshProvision: shouldInsertInstanceRecord,
+          }
         ),
       'provision'
     );
+    if (instanceId) {
+      const activeAfterProvision = await getActiveProvisionContextInstance(c.env, userId, orgId);
+      if (activeAfterProvision?.id !== instanceId) {
+        return jsonError('Instance was destroyed during update', 409, 'instance_destroyed');
+      }
+    }
   } catch (err) {
+    if (freshReservationAdmitted && provisionRegistry) {
+      try {
+        if (freshProviderWorkStarted) {
+          await provisionRegistry.stub.failFreshProvision(
+            provisionRegistry.registryKey,
+            userId,
+            provisionedInstanceId,
+            'provider_provision_failed'
+          );
+        } else {
+          await provisionRegistry.stub.releaseFreshProvision(
+            provisionRegistry.registryKey,
+            userId,
+            provisionedInstanceId,
+            'failed_before_provider_work'
+          );
+        }
+      } catch (reservationError) {
+        console.error('[platform] Failed to update fresh provision reservation after error:', {
+          instanceId: provisionedInstanceId,
+          error:
+            reservationError instanceof Error ? reservationError.message : String(reservationError),
+        });
+      }
+    }
     const raw = err instanceof Error ? err.message : 'Unknown error';
     if (raw.includes('duplicate key') || raw.includes('unique constraint')) {
       console.error('[platform] provision failed: duplicate instance');
@@ -1273,16 +1609,48 @@ platform.post('/provision', async c => {
           '[platform] Failed to destroy provisioned instance after bootstrap error:',
           destroyErr
         );
+        return null;
       });
+      let instanceMarkedDestroyed = true;
       await markProvisionedInstanceDestroyed({
         env: c.env,
         instanceId: provisionedInstanceId,
       }).catch(markErr => {
+        instanceMarkedDestroyed = false;
         console.error(
           '[platform] Failed to mark instance destroyed after bootstrap error:',
           markErr
         );
       });
+      if (instanceMarkedDestroyed) {
+        await withResolvedDORetry(
+          c.env,
+          userId,
+          provisionedInstanceId,
+          stub => stub.allowProvisionReservationReleaseOnFinalize(),
+          'allowProvisionReservationReleaseOnFinalize'
+        ).catch(releaseSignalError => {
+          console.error(
+            '[platform] Failed to confirm reservation cleanup release; DO will retry after Postgres confirmation:',
+            releaseSignalError
+          );
+        });
+      }
+      if (provisionRegistry && !instanceMarkedDestroyed) {
+        await provisionRegistry.stub
+          .failFreshProvision(
+            provisionRegistry.registryKey,
+            userId,
+            provisionedInstanceId,
+            'instance_record_insert_failed'
+          )
+          .catch(reservationError => {
+            console.error(
+              '[platform] Failed to finalize failed provision reservation:',
+              reservationError
+            );
+          });
+      }
       return jsonError(message, status);
     }
   }
@@ -1383,16 +1751,48 @@ platform.post('/provision', async c => {
             '[platform] Failed to destroy provisioned instance after subscription bootstrap error:',
             destroyErr
           );
+          return null;
         });
+        let instanceMarkedDestroyed = true;
         await markProvisionedInstanceDestroyed({
           env: c.env,
           instanceId: provisionedInstanceId,
         }).catch(markErr => {
+          instanceMarkedDestroyed = false;
           console.error(
             '[platform] Failed to mark bootstrap-quarantined instance destroyed for retry:',
             markErr
           );
         });
+        if (instanceMarkedDestroyed) {
+          await withResolvedDORetry(
+            c.env,
+            userId,
+            provisionedInstanceId,
+            stub => stub.allowProvisionReservationReleaseOnFinalize(),
+            'allowProvisionReservationReleaseOnFinalize'
+          ).catch(releaseSignalError => {
+            console.error(
+              '[platform] Failed to confirm reservation cleanup release; DO will retry after Postgres confirmation:',
+              releaseSignalError
+            );
+          });
+        }
+        if (provisionRegistry && !instanceMarkedDestroyed) {
+          await provisionRegistry.stub
+            .failFreshProvision(
+              provisionRegistry.registryKey,
+              userId,
+              provisionedInstanceId,
+              'subscription_bootstrap_failed'
+            )
+            .catch(reservationError => {
+              console.error(
+                '[platform] Failed to finalize failed provision reservation:',
+                reservationError
+              );
+            });
+        }
       }
       console.error(
         '[platform] Subscription bootstrap failed after local fallback; instance quarantined for remediation',
@@ -1409,19 +1809,91 @@ platform.post('/provision', async c => {
     }
   }
 
-  try {
-    const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
-    const registryStub = c.env.KILOCLAW_REGISTRY.get(
-      c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-    );
-    await registryStub.createInstance(registryKey, userId, provisionedInstanceId, provisionDoKey);
-    console.log('[platform] Registry entry created:', {
-      registryKey,
-      instanceId: provisionedInstanceId,
-      doKey: provisionDoKey,
-    });
-  } catch (registryErr) {
-    console.error('[platform] Registry create failed (non-fatal):', registryErr);
+  if (shouldInsertInstanceRecord && provisionRegistry) {
+    try {
+      await provisionRegistry.stub.completeFreshProvision(
+        provisionRegistry.registryKey,
+        userId,
+        provisionedInstanceId,
+        provisionDoKey
+      );
+      writeEvent(c.env, {
+        event: 'instance.provision_reservation_completed',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? undefined,
+      });
+    } catch (registryErr) {
+      console.error('[platform] Registry completion failed; attempting repair:', registryErr);
+      writeEvent(c.env, {
+        event: 'instance.provision_reservation_repair_required',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? undefined,
+      });
+      try {
+        const repaired = await provisionRegistry.stub.repairCompletedProvision(
+          provisionRegistry.registryKey,
+          userId,
+          provisionedInstanceId,
+          provisionDoKey
+        );
+        if (!repaired) throw new Error('Provision reservation missing during completion repair');
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_repaired',
+          delivery: 'http',
+          route: provisionRoute,
+          userId,
+          instanceId: provisionedInstanceId,
+          orgId: orgId ?? undefined,
+        });
+      } catch (repairError) {
+        console.error('[platform] Registry completion repair failed:', repairError);
+        return jsonError(
+          'Provisioning completed but finalization is pending',
+          503,
+          'provision_completion_pending'
+        );
+      }
+    }
+  } else if (explicitInstanceRequiresSubscriptionBootstrap) {
+    try {
+      const registryKey = provisionRegistryKey(userId, orgId);
+      const registryStub = c.env.KILOCLAW_REGISTRY.get(
+        c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+      );
+      const repaired = await registryStub.repairCompletedProvision(
+        registryKey,
+        userId,
+        provisionedInstanceId,
+        provisionDoKey
+      );
+      if (!repaired) {
+        const published = await registryStub.publishRecoveredInstance(
+          registryKey,
+          userId,
+          provisionedInstanceId,
+          provisionDoKey
+        );
+        if (!published) {
+          return jsonError('Instance was destroyed during update', 409, 'instance_destroyed');
+        }
+      }
+    } catch (registryErr) {
+      console.error(
+        '[platform] Registry completion failed after subscription recovery:',
+        registryErr
+      );
+      return jsonError(
+        'Provisioning completed but finalization is pending',
+        503,
+        'provision_completion_pending'
+      );
+    }
   }
 
   return c.json(
@@ -1433,7 +1905,143 @@ platform.post('/provision', async c => {
   );
 });
 
+platform.post('/provision/repair-reservation', async c => {
+  const result = await parseBody(c, ProvisionReservationRepairSchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, orgId } = result.data;
+
+  try {
+    const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+    if (
+      activeInstance?.id !== instanceId ||
+      !(await hasCanonicalProvisionSubscription(c.env, instanceId))
+    ) {
+      return jsonError(
+        'No completed active provision exists for repair',
+        409,
+        'provision_repair_unavailable'
+      );
+    }
+    const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+    const repaired = await stub.repairCompletedProvision(
+      registryKey,
+      userId,
+      instanceId,
+      doKeyFromActiveInstance(activeInstance)
+    );
+    if (!repaired) {
+      return jsonError(
+        'No provision reservation exists for repair',
+        409,
+        'provision_repair_unavailable'
+      );
+    }
+    writeEvent(c.env, {
+      event: 'instance.provision_reservation_repaired',
+      delivery: 'http',
+      route: '/api/platform/provision/repair-reservation',
+      userId,
+      instanceId,
+      orgId: orgId ?? undefined,
+    });
+    return c.json({ ok: true });
+  } catch (error) {
+    const { message, status } = sanitizeError(error, 'provision reservation repair');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/provision/release-reservation
+// Admin break-glass: release a stuck provision reservation (`in_progress` or
+// `failed_requires_reconciliation`) so the user can provision again. A failed
+// fresh provision can leave such a row behind (e.g. `provider_provision_failed`
+// during a provider outage); the partial unique index then rejects every new
+// provision with `provision_in_progress` ("An instance is already being
+// created"), and nothing auto-heals it because no instance/DO exists to finalize
+// a destroy.
+//
+// This is an OPERATOR action, not an autonomous safety decision. The admin must
+// have already confirmed the attempt is dead and any provider resources are
+// cleaned up; `acknowledgeCleanupVerified: true` records that assertion (and the
+// admin identity is captured in the tRPC audit log upstream). It mutates only
+// the registry bookkeeping row — no provider (Fly/Northflank) or Postgres
+// changes. Guards: refuses a reservation backing a live active instance, refuses
+// non-releasable statuses, and releases atomically via a compare-and-set on the
+// validated status so a concurrent completion is reported, not clobbered.
+platform.post('/provision/release-reservation', async c => {
+  const result = await parseBody(c, ProvisionReservationReleaseSchema);
+  if ('error' in result) return result.error;
+  const { userId, instanceId, orgId } = result.data;
+
+  try {
+    // Never release a reservation that belongs to a currently-active instance.
+    const activeInstance = await getActiveProvisionContextInstance(c.env, userId, orgId);
+    if (activeInstance?.id === instanceId) {
+      return jsonError(
+        'Reservation belongs to an active instance; refusing to release',
+        409,
+        'reservation_active'
+      );
+    }
+
+    const { registryKey, stub } = getProvisionRegistryStub(c.env, userId, orgId);
+    const { reservations } = await stub.listAllInstances(registryKey);
+    const reservation = reservations.find(r => r.instanceId === instanceId);
+    if (!reservation) {
+      return jsonError('No provision reservation found for instance', 404, 'reservation_not_found');
+    }
+    if (
+      reservation.status !== 'in_progress' &&
+      reservation.status !== 'failed_requires_reconciliation'
+    ) {
+      return jsonError(
+        `Reservation is not in a releasable state (status=${reservation.status})`,
+        409,
+        'reservation_not_releasable'
+      );
+    }
+
+    // Atomic compare-and-set on the exact status we validated.
+    const release = await stub.adminReleaseStuckReservation(
+      registryKey,
+      userId,
+      instanceId,
+      reservation.status,
+      'manual_admin_release'
+    );
+    switch (release.outcome) {
+      case 'not_found':
+        return jsonError(
+          'No provision reservation found for instance',
+          404,
+          'reservation_not_found'
+        );
+      case 'status_changed':
+        return jsonError(
+          `Reservation status changed to ${release.status} during release; re-check and retry`,
+          409,
+          'reservation_status_changed'
+        );
+      case 'released':
+        writeEvent(c.env, {
+          event: 'instance.provision_reservation_released',
+          delivery: 'http',
+          route: '/api/platform/provision/release-reservation',
+          userId,
+          instanceId,
+          orgId: orgId ?? undefined,
+          label: release.previousStatus,
+        });
+        return c.json({ ok: true, previousStatus: release.previousStatus });
+    }
+  } catch (error) {
+    const { message, status } = sanitizeError(error, 'provision reservation release');
+    return jsonError(message, status);
+  }
+});
+
 // PATCH /api/platform/kilocode-config
+
 platform.patch('/kilocode-config', async c => {
   const result = await parseBody(c, KiloCodeConfigPatchSchema);
   if ('error' in result) return result.error;
@@ -2226,6 +2834,255 @@ platform.patch('/openclaw-config', async c => {
   }
 });
 
+// ──────────────────────────────────────────────────────────────────────
+// Agent config CRUD (controller: /_kilo/config/agents*)
+// Mirrors the openclaw-config proxy: x-internal-api-key auth (mount-level),
+// userId + optional instanceId resolution, opaque payload forwarding (deep
+// validation lives at the tRPC layer and the controller), and typed
+// error-code passthrough via sanitizeAgentConfigError. Each DO method fails
+// closed (501 capability_unavailable) on controllers that lack the capability.
+// ──────────────────────────────────────────────────────────────────────
+
+// GET /api/platform/agents?userId=...&instanceId=...
+platform.get('/agents', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.listAgents().then(r => r),
+      'listAgents'
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agents list', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agents list');
+    return jsonError(message, status, code);
+  }
+});
+
+// GET /api/platform/agents/:agentId?userId=...&instanceId=...
+platform.get('/agents/:agentId', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getAgent(agentId).then(r => r),
+      'getAgent'
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent read', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent read');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/agents — create an agent (payload forwarded opaquely).
+const CreateAgentSchema = z.object({
+  userId: z.string().min(1),
+  agent: z.record(z.string(), z.unknown()),
+});
+
+platform.post('/agents', async c => {
+  const result = await parseBody(c, CreateAgentSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, agent } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.createAgent(agent).then(r => r),
+      'createAgent',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent create', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent create');
+    return jsonError(message, status, code);
+  }
+});
+
+// PATCH /api/platform/agents/:agentId — edit one agent (payload forwarded opaquely).
+const UpdateAgentSchema = z.object({
+  userId: z.string().min(1),
+  patch: z.record(z.string(), z.unknown()),
+});
+
+platform.patch('/agents/:agentId', async c => {
+  const result = await parseBody(c, UpdateAgentSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+  const { userId, patch } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgent(agentId, patch).then(r => r),
+      'updateAgent',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent update', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent update');
+    return jsonError(message, status, code);
+  }
+});
+
+// PATCH /api/platform/agent-defaults — edit the fleet-wide defaults.
+const UpdateAgentDefaultsSchema = z.object({
+  userId: z.string().min(1),
+  patch: z.record(z.string(), z.unknown()),
+});
+
+platform.patch('/agent-defaults', async c => {
+  const result = await parseBody(c, UpdateAgentDefaultsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, patch } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgentDefaults(patch).then(r => r),
+      'updateAgentDefaults',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError(
+        'agent-defaults update',
+        response.agentError
+      );
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent-defaults update');
+    return jsonError(message, status, code);
+  }
+});
+
+// DELETE /api/platform/agents/:agentId?userId=...&instanceId=...
+platform.delete('/agents/:agentId', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.deleteAgent(agentId).then(r => r),
+      'deleteAgent',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError('agent delete', response.agentError);
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent delete');
+    return jsonError(message, status, code);
+  }
+});
+
+// PUT /api/platform/agents/:agentId/bindings — declaratively set channel routes.
+const UpdateAgentBindingsSchema = z.object({
+  userId: z.string().min(1),
+  bindings: z.record(z.string(), z.unknown()),
+});
+
+platform.put('/agents/:agentId/bindings', async c => {
+  const result = await parseBody(c, UpdateAgentBindingsSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const agentId = c.req.param('agentId');
+  const { userId, bindings } = result.data;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateAgentBindings(agentId, bindings).then(r => r),
+      'updateAgentBindings',
+      NO_DO_RETRY
+    );
+    if (isAgentConfigErrorEnvelope(response)) {
+      const { message, status, code } = reconstructAgentError(
+        'agent bindings update',
+        response.agentError
+      );
+      return jsonError(message, status, code);
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeAgentConfigError(err, 'agent bindings update');
+    return jsonError(message, status, code);
+  }
+});
+
 const MorningBriefingSetupSchema = z.object({
   userId: z.string().min(1),
   cron: z.string().min(1).optional(),
@@ -2641,9 +3498,10 @@ platform.get('/morning-briefing/read/:day', async c => {
   }
 });
 
-// GET /api/platform/files/tree?userId=...
+// GET /api/platform/files/tree?userId=...[&path=...]
 platform.get('/files/tree', async c => {
   const userId = setValidatedQueryUserId(c);
+  const filePath = c.req.query('path');
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -2656,7 +3514,7 @@ platform.get('/files/tree', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.getFileTree(),
+      stub => stub.getFileTree(filePath),
       'getFileTree'
     );
     if (!result) {
@@ -2716,6 +3574,13 @@ const WriteFileSchema = z.object({
   etag: z.string().optional(),
 });
 
+const WriteOpenclawConfigFileSchema = z.object({
+  userId: z.string().min(1),
+  content: z.string(),
+  etag: z.string().optional(),
+  mode: z.enum(['warn-before-write', 'allow-invalid']),
+});
+
 const OpenclawWorkspaceImportSchema = z.object({
   userId: z.string().min(1),
   files: z
@@ -2756,6 +3621,40 @@ platform.post('/files/write', async c => {
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'files/write');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/files/write-openclaw-config
+platform.post('/files/write-openclaw-config', async c => {
+  const result = await parseBody(c, WriteOpenclawConfigFileSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, content, etag, mode } = result.data;
+  try {
+    const response = await withResolvedDORetry<FileWriteResponse | null>(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.writeOpenclawConfigFile(content, etag, mode),
+      'writeOpenclawConfigFile'
+    );
+    if (!response) {
+      return jsonError(
+        'OpenClaw validation-aware writing not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'files/write-openclaw-config'
+    );
     return jsonError(message, status, code);
   }
 });
@@ -3665,6 +4564,17 @@ platform.get('/registry-entries', async c => {
       createdAt: string;
       destroyedAt: string | null;
     }>;
+    reservations: Array<{
+      instanceId: string;
+      doKey: string;
+      assignedUserId: string;
+      status: string;
+      startedAt: string;
+      updatedAt: string;
+      completedAt: string | null;
+      failureCode: string | null;
+      resolutionReason: string | null;
+    }>;
     migrated: boolean;
   }> = [];
 
@@ -4036,27 +4946,44 @@ platform.post('/admin/orphan-volume-destroy', async c => {
     return c.json({ error: 'Database connection is not configured' }, 503);
   }
   const workerDb = getWorkerDb(connectionString);
+  // Aliased outer table so the correlated subquery below can refer to it as
+  // `target_inst.*`. Drizzle interpolates `${kiloclaw_instances.X}` inside a
+  // raw `sql` template as a BARE `"X"` column reference (no table qualifier).
+  // Postgres then resolves that bare reference to the most-local scope — the
+  // inner `sandbox_destroys` alias — which collapses the correlation to a
+  // trivially-true `sandbox_destroys.user_id = sandbox_destroys.user_id` and
+  // turns the subquery into a table-wide `max(destroyed_at)`. With many
+  // users in production that max is always recent, so the grace gate would
+  // fail closed for every destroy regardless of the target. Aliasing the
+  // outer table and writing the correlation columns as literal SQL keeps
+  // every reference explicitly qualified.
+  const targetInstance = alias(kiloclaw_instances, 'target_inst');
   const [instance] = await workerDb
     .select({
-      id: kiloclaw_instances.id,
-      userId: kiloclaw_instances.user_id,
-      sandboxId: kiloclaw_instances.sandbox_id,
-      organizationId: kiloclaw_instances.organization_id,
-      destroyedAt: kiloclaw_instances.destroyed_at,
-      // The latest `destroyed_at` across every destroyed row of this
-      // (user, sandbox). A reprovisioned sandbox has several destroyed rows
-      // sharing one Fly volume; the grace period must run from the most
-      // recent destruction, not whichever row the caller happened to submit.
-      latestSandboxDestroyedAt: sql<string | null>`(
-        select max(latest.destroyed_at)
-        from ${kiloclaw_instances} as latest
-        where latest.user_id = ${kiloclaw_instances.user_id}
-          and latest.sandbox_id = ${kiloclaw_instances.sandbox_id}
-          and latest.destroyed_at is not null
-      )`,
+      id: targetInstance.id,
+      userId: targetInstance.user_id,
+      sandboxId: targetInstance.sandbox_id,
+      organizationId: targetInstance.organization_id,
+      destroyedAt: targetInstance.destroyed_at,
+      // Whether the orphan-volume grace period has elapsed, evaluated entirely
+      // in Postgres. Grace runs from the LATEST destruction of this
+      // (user, sandbox): a reprovisioned sandbox has several destroyed rows
+      // sharing one Fly volume, so the clock follows the most recent
+      // destruction, not whichever row the caller happened to submit.
+      // Computing this in SQL avoids parsing a database timestamp with the JS
+      // `Date` constructor, whose handling of Postgres timestamp text differs
+      // across the Vercel and Cloudflare runtimes.
+      gracePeriodElapsed: sql<boolean>`
+        extract(epoch from (now() - (
+          select max(sandbox_destroys.destroyed_at)
+          from ${kiloclaw_instances} as sandbox_destroys
+          where sandbox_destroys.user_id = target_inst.user_id
+            and sandbox_destroys.sandbox_id = target_inst.sandbox_id
+            and sandbox_destroys.destroyed_at is not null
+        ))) * 1000 > ${ORPHAN_VOLUME_GRACE_PERIOD_MS}`,
     })
-    .from(kiloclaw_instances)
-    .where(eq(kiloclaw_instances.id, instanceId))
+    .from(targetInstance)
+    .where(eq(targetInstance.id, instanceId))
     .limit(1);
 
   if (!instance) {
@@ -4079,8 +5006,9 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   // sandbox. A reprovisioned sandbox has several destroyed rows sharing one
   // Fly volume; the volume's cleanup clock runs from the most recent
   // destruction, so an older submitted row must not shorten the grace.
-  const latestDestroyedAt = instance.latestSandboxDestroyedAt ?? instance.destroyedAt;
-  if (Date.now() - new Date(latestDestroyedAt).getTime() <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
+  // `gracePeriodElapsed` is computed by Postgres in the query above; `false`
+  // or `null` (no destroyed row, already ruled out by gate A) both fail closed.
+  if (instance.gracePeriodElapsed !== true) {
     return c.json({ error: 'Instance is still within the orphan-volume grace period' }, 409);
   }
   // Gate C — never destroy data while this ownership context still has
@@ -4377,51 +5305,50 @@ platform.get('/versions', async c => {
 // GET /api/platform/versions/latest
 // Resolves the image version this caller should be on next.
 //
-// Query params (all optional):
-//   instanceId       — bucket subject for rollout candidate selection
-//   currentImageTag  — caller's current image; used to suppress self-upgrades
-//
-// Without instanceId, returns the current :latest pointer (back-compat for
-// anonymous callers — public version banner, CI, etc.). With instanceId, runs
-// the rollout-aware selector and returns the candidate when the instance falls
-// in cohort, the :latest baseline when not, or 404 when the caller is already
-// on the newest applicable image (banner: "no upgrade").
-//
-// The Early Access flag is looked up server-side from the instance's owning
-// user — callers cannot pass it as a query param. This keeps the service as
-// the single authoritative source: even an internal-key-holding caller can't
-// claim Early Access for an arbitrary instance.
+// Without rolloutSubject or instanceId, returns the current :latest pointer for
+// anonymous callers. With a rollout subject, runs the same rollout selector used
+// by restartMachine({ imageTag: 'latest' }). instanceId is the authoritative DB
+// row used to resolve Early Access and the rollout subject server-side.
 platform.get('/versions/latest', async c => {
   try {
+    const requestedRolloutSubject = c.req.query('rolloutSubject');
     const instanceId = c.req.query('instanceId');
     const currentImageTag = c.req.query('currentImageTag') ?? null;
 
-    if (!instanceId) {
+    let rolloutSubject = instanceId ?? requestedRolloutSubject;
+    if (!rolloutSubject) {
       const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
       if (!latest) return c.json({ error: 'No latest version registered' }, 404);
       return c.json(latest);
     }
 
-    // Resolve Early Access from the instance's owner. This requires Hyperdrive;
-    // without it we degrade gracefully to autoEnroll=false (the bucket math
-    // still works correctly — only the staff/beta-tester override is missing).
     let autoEnroll = false;
     const connectionString = c.env.HYPERDRIVE?.connectionString;
-    if (connectionString) {
+    if (instanceId && connectionString) {
       try {
-        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
+        const rolloutContext = await lookupKiloclawRolloutContextByInstanceId(
+          connectionString,
+          instanceId
+        );
+        if (rolloutContext) {
+          rolloutSubject = rolloutContext.rolloutSubject;
+          autoEnroll = rolloutContext.earlyAccess;
+        } else {
+          rolloutSubject = instanceId;
+        }
       } catch (err) {
         console.warn(
-          '[platform] Early Access lookup failed; treating as false:',
+          '[platform] Instance rollout context lookup failed; treating as false:',
           err instanceof Error ? err.message : err
         );
+        rolloutSubject = instanceId;
       }
     }
 
     const selected = await selectImageVersionForInstance({
       kv: c.env.KV_CLAW_CACHE,
       variant: 'default',
-      instanceId,
+      rolloutSubject,
       currentImageTag,
       autoEnroll,
     });
@@ -4558,7 +5485,7 @@ platform.post('/versions/apply-pin', async c => {
       c.env,
       userId,
       instanceId,
-      stub => stub.applyPinnedVersion(imageTag, instanceId),
+      stub => stub.applyPinnedVersion(imageTag),
       'applyPinnedVersion'
     );
     return c.json({ ok: true, ...applied });

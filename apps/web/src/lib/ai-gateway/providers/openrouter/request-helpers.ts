@@ -97,6 +97,24 @@ function containsCacheControl(value: unknown): boolean {
   return Object.values(value).some(containsCacheControl);
 }
 
+function deleteCacheControl(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      deleteCacheControl(item);
+    }
+    return;
+  }
+  if (!isObjectRecord(value)) {
+    return;
+  }
+  if (Object.hasOwn(value, 'cache_control')) {
+    delete value.cache_control;
+  }
+  for (const item of Object.values(value)) {
+    deleteCacheControl(item);
+  }
+}
+
 export function addCacheBreakpoints(request: GatewayRequest) {
   if (
     request.kind === 'chat_completions' &&
@@ -153,6 +171,20 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   }
 }
 
+export function removeCacheBreakpoints(request: GatewayRequest) {
+  if (request.kind === 'chat_completions' && Array.isArray(request.body.messages)) {
+    console.debug('[removeCacheBreakpoints] removing cache breakpoints from chat completions');
+    deleteCacheControl(request.body.messages);
+  } else if (request.kind === 'responses' && Array.isArray(request.body.input)) {
+    console.debug('[removeCacheBreakpoints] removing cache breakpoints from responses request');
+    deleteCacheControl(request.body.input);
+  } else if (request.kind === 'messages') {
+    console.debug('[removeCacheBreakpoints] removing cache breakpoints from messages request');
+    delete request.body.cache_control;
+    deleteCacheControl(request.body.messages);
+  }
+}
+
 export function fixResponsesRequest(request: GatewayResponsesRequest) {
   if (!Array.isArray(request.input)) {
     return;
@@ -163,11 +195,9 @@ export function fixResponsesRequest(request: GatewayResponsesRequest) {
       continue;
     }
     if (!outputMsg.type) {
-      console.warn('[fixResponsesRequest] assistant message missing type, fixing');
       outputMsg.type = 'message';
     }
     if (!outputMsg.status) {
-      console.warn('[fixResponsesRequest] assistant message missing status, fixing');
       outputMsg.status = 'completed';
     }
   }

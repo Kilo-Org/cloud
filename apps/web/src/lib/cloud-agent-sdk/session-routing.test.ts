@@ -113,7 +113,7 @@ describe('session transport routing', () => {
   });
 
   describe('resolveSession returning remote session', () => {
-    it('creates CLI live transport and sends subscribe message', async () => {
+    it('creates CLI live transport using its required injected user web connection', async () => {
       const resolveSession = jest.fn(
         (): Promise<ResolvedSession> =>
           Promise.resolve({
@@ -121,31 +121,33 @@ describe('session transport routing', () => {
             kiloSessionId: kiloId('ses-1'),
           })
       );
+      const release = jest.fn();
+      const userWebConnection = {
+        connect: jest.fn(),
+        disconnect: jest.fn(),
+        destroy: jest.fn(),
+        subscribeToCliSession: jest.fn(() => release),
+        sendCommand: jest.fn(() => Promise.resolve()),
+        onCliEvent: jest.fn(() => jest.fn()),
+        onSystemEvent: jest.fn(() => jest.fn()),
+        onReconnect: jest.fn(() => jest.fn()),
+        onSessionEvent: jest.fn(() => jest.fn()),
+      };
 
       const session = createCloudAgentSession({
         kiloSessionId: kiloId('ses-1'),
         resolveSession,
-        transport: {
-          getAuthToken: () => 'auth-token',
-          cliWebsocketUrl: 'wss://localhost:8888/api/user/web',
-        },
+        transport: { userWebConnection },
       });
 
       session.connect();
       await Promise.resolve();
 
-      // CLI live transport connects to the cliWebsocketUrl with auth token
-      expect(webSocketConstructor).toHaveBeenCalledTimes(1);
-      const url = webSocketConstructor.mock.calls[0][0] as string;
-      expect(url).toContain('localhost:8888');
-
-      // Opening the connection sends a subscribe message
-      mockWs.onopen?.({} as Event);
-      expect(mockWs.send).toHaveBeenCalledWith(
-        JSON.stringify({ type: 'subscribe', sessionId: 'ses-1' })
-      );
+      expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith('ses-1');
+      expect(webSocketConstructor).not.toHaveBeenCalled();
 
       session.destroy();
+      expect(release).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -382,7 +384,7 @@ describe('session transport routing', () => {
       await Promise.resolve();
 
       expect(onError).toHaveBeenCalledWith(
-        'CloudAgentSession transport.cliWebsocketUrl and getAuthToken are required for remote CLI sessions'
+        'CloudAgentSession transport.userWebConnection is required for remote CLI sessions'
       );
       expect(session.state.getActivity()).toEqual({ type: 'idle' });
       expect(session.state.getStatus().type).toBe('error');

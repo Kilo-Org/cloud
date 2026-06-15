@@ -14,32 +14,42 @@ import {
   listSecurityFindings,
   getSecurityFindingById,
   getSecurityFindingsSummary,
-  updateSecurityFindingStatus,
   getLastSyncTime as getLastSyncTimeDb,
   getOrphanedRepositoriesWithFindingCounts,
   deleteFindingsByRepository as deleteFindingsByRepositoryDb,
 } from '@/lib/security-agent/db/security-findings';
 import { getDashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import {
+  getSecurityAgentCommandStatus,
+  listActiveSecurityAgentCommands,
+  createApplyAutoRemediationCommand,
+  markApplyAutoRemediationCommandAdmissionFailed,
+} from '@/lib/security-agent/db/security-commands';
+import {
   canStartAnalysis,
   enqueueBacklogFindings,
 } from '@/lib/security-agent/db/security-analysis';
 import {
+  decorateFindingWithRemediation,
+  decorateFindingsWithRemediation,
+  getRemediationAttemptHistory,
+} from '@/lib/security-agent/db/security-remediation';
+import {
   hasSecurityReviewPermissions,
   getReauthorizeUrl,
 } from '@/lib/security-agent/github/permissions';
+import { submitManualSecuritySync } from '@/lib/security-agent/services/manual-sync-client';
+import { submitManualFindingDismissal } from '@/lib/security-agent/services/manual-dismiss-client';
+import { submitManualAnalysisStart } from '@/lib/security-agent/services/manual-analysis-client';
 import {
-  syncDependabotAlertsForRepo,
-  syncAllReposForOwner,
-} from '@/lib/security-agent/services/sync-service';
-import { startSecurityAnalysis } from '@/lib/security-agent/services/analysis-service';
-import { trpcCodeForAnalysisError } from '@/lib/security-agent/core/error-classification';
+  submitApplyAutoRemediation,
+  submitManualRemediationStart,
+  submitRemediationCancellation,
+} from '@/lib/security-agent/services/manual-remediation-client';
 import {
   autoDismissEligibleFindings,
   countEligibleForAutoDismiss,
 } from '@/lib/security-agent/services/auto-dismiss-service';
-import { dismissDependabotAlert } from '@/lib/security-agent/github/dependabot-api';
-import { rethrowAsPaymentRequired } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import {
@@ -50,7 +60,11 @@ import {
   GetFindingInputSchema,
   SetEnabledInputSchema,
   StartAnalysisInputSchema,
+  StartRemediationInputSchema,
+  RetryRemediationInputSchema,
+  CancelRemediationInputSchema,
   GetAnalysisInputSchema,
+  GetCommandStatusInputSchema,
   DeleteFindingsByRepoInputSchema,
   GetDashboardStatsInputSchema,
   type SaveSecurityConfigInput,
@@ -60,13 +74,19 @@ import {
   type GetFindingInput,
   type SetEnabledInput,
   type StartAnalysisInput,
+  type StartRemediationInput,
+  type RetryRemediationInput,
+  type CancelRemediationInput,
   type GetAnalysisInput,
+  type GetCommandStatusInput,
   type DeleteFindingsByRepoInput,
   type GetDashboardStatsInput,
 } from '@/lib/security-agent/core/schemas';
 import {
   DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
   DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
+  DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
+  DEFAULT_SECURITY_AGENT_CONFIG,
 } from '@/lib/security-agent/core/constants';
 import {
   trackSecurityAgentEnabled,
@@ -98,9 +118,23 @@ type SecurityAgentDeps<TExtra = {}> = {
   resolveResourceId: (ctx: TRPCContext, input: TExtra) => string;
   verifyFindingOwnership: (finding: SecurityFinding, ctx: TRPCContext, input: TExtra) => boolean;
   getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
-  getGitHubToken: (ctx: TRPCContext, input: TExtra) => Promise<string | null>;
   trackingExtras: (ctx: TRPCContext, input: TExtra) => Record<string, string>;
 };
+
+function getRepoFullNamesInScope(
+  integration: Integration,
+  config: { repository_selection_mode?: 'all' | 'selected'; selected_repository_ids?: number[] }
+): string[] {
+  const repositories = integration?.repositories ?? [];
+  if (config.repository_selection_mode === 'all') {
+    return repositories.map(repo => repo.full_name).filter((name): name is string => !!name);
+  }
+  const selectedIds = new Set(config.selected_repository_ids ?? []);
+  return repositories
+    .filter(repo => selectedIds.has(repo.id))
+    .map(repo => repo.full_name)
+    .filter((name): name is string => !!name);
+}
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -128,19 +162,26 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           hasIntegration: false,
           hasPermissions: false,
           reauthorizeUrl: null,
+          authInvalidAt: integration?.auth_invalid_at ?? null,
+          authInvalidReason: integration?.auth_invalid_reason ?? null,
         };
       }
 
       const hasPermissions = hasSecurityReviewPermissions(integration);
+      // UI reauthorization state is intentionally time-invariant: once GitHub returns
+      // auth-invalid, keep prompting until a sync or install-refresh path clears the flag.
+      const hasEffectivePermissions = hasPermissions && !integration.auth_invalid_at;
 
       return {
         hasIntegration: true,
-        hasPermissions,
-        reauthorizeUrl: hasPermissions
+        hasPermissions: hasEffectivePermissions,
+        reauthorizeUrl: hasEffectivePermissions
           ? null
           : integration.platform_installation_id
             ? getReauthorizeUrl(integration.platform_installation_id)
             : null,
+        authInvalidAt: integration.auth_invalid_at,
+        authInvalidReason: integration.auth_invalid_reason,
       };
     },
 
@@ -159,6 +200,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           slaHighDays: 30,
           slaMediumDays: 45,
           slaLowDays: 90,
+          slaEnabled: DEFAULT_SECURITY_AGENT_CONFIG.sla_enabled,
           autoSyncEnabled: true,
           repositorySelectionMode: 'selected' as const,
           selectedRepositoryIds: [] as number[],
@@ -171,6 +213,18 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           autoAnalysisEnabled: false,
           autoAnalysisMinSeverity: 'high' as const,
           autoAnalysisIncludeExisting: false,
+          autoRemediationEnabled: false,
+          autoRemediationMinSeverity: 'high' as const,
+          autoRemediationIncludeExisting: false,
+          autoRemediationEnabledAt: null,
+          remediationModelSlug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
+          slaNotificationsEnabled: DEFAULT_SECURITY_AGENT_CONFIG.sla_notifications_enabled,
+          slaNotificationMinSeverity: DEFAULT_SECURITY_AGENT_CONFIG.sla_notification_min_severity,
+          slaNotificationWarningDays: DEFAULT_SECURITY_AGENT_CONFIG.sla_notification_warning_days,
+          newFindingNotificationsEnabled:
+            DEFAULT_SECURITY_AGENT_CONFIG.new_finding_notifications_enabled,
+          newFindingNotificationMinSeverity:
+            DEFAULT_SECURITY_AGENT_CONFIG.new_finding_notification_min_severity,
         };
       }
 
@@ -184,6 +238,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         result.storedConfig.model_slug ??
         result.config.analysis_model_slug ??
         DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL;
+      const remediationModelSlug =
+        result.storedConfig.remediation_model_slug ??
+        result.config.remediation_model_slug ??
+        analysisModelSlug ??
+        DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
       return {
         isEnabled: result.isEnabled,
@@ -191,6 +250,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         slaHighDays: result.config.sla_high_days,
         slaMediumDays: result.config.sla_medium_days,
         slaLowDays: result.config.sla_low_days,
+        slaEnabled: result.config.sla_enabled,
         autoSyncEnabled: result.config.auto_sync_enabled,
         repositorySelectionMode: result.config.repository_selection_mode || 'selected',
         selectedRepositoryIds: result.config.selected_repository_ids || [],
@@ -203,6 +263,16 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         autoAnalysisEnabled: result.config.auto_analysis_enabled ?? false,
         autoAnalysisMinSeverity: result.config.auto_analysis_min_severity ?? 'high',
         autoAnalysisIncludeExisting: result.config.auto_analysis_include_existing ?? false,
+        autoRemediationEnabled: result.config.auto_remediation_enabled ?? false,
+        autoRemediationMinSeverity: result.config.auto_remediation_min_severity ?? 'high',
+        autoRemediationIncludeExisting: result.config.auto_remediation_include_existing ?? false,
+        autoRemediationEnabledAt: result.config.auto_remediation_enabled_at ?? null,
+        remediationModelSlug,
+        slaNotificationsEnabled: result.config.sla_notifications_enabled,
+        slaNotificationMinSeverity: result.config.sla_notification_min_severity,
+        slaNotificationWarningDays: result.config.sla_notification_warning_days,
+        newFindingNotificationsEnabled: result.config.new_finding_notifications_enabled,
+        newFindingNotificationMinSeverity: result.config.new_finding_notification_min_severity,
       };
     },
 
@@ -244,6 +314,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
               autoAnalysisEnabled: existingConfig.config.auto_analysis_enabled,
               autoAnalysisMinSeverity: existingConfig.config.auto_analysis_min_severity,
               autoAnalysisIncludeExisting: existingConfig.config.auto_analysis_include_existing,
+              autoRemediationEnabled: existingConfig.config.auto_remediation_enabled,
+              autoRemediationMinSeverity: existingConfig.config.auto_remediation_min_severity,
+              autoRemediationIncludeExisting:
+                existingConfig.config.auto_remediation_include_existing,
+              autoRemediationEnabledAt: existingConfig.config.auto_remediation_enabled_at,
+              remediationModelSlug:
+                existingConfig.config.remediation_model_slug ?? existingAnalysisModelSlug,
               modelSlug: existingConfig.config.model_slug,
               triageModelSlug: existingTriageModelSlug,
               analysisModelSlug: existingAnalysisModelSlug,
@@ -253,6 +330,14 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
               slaHighDays: existingConfig.config.sla_high_days,
               slaMediumDays: existingConfig.config.sla_medium_days,
               slaLowDays: existingConfig.config.sla_low_days,
+              slaEnabled: existingConfig.config.sla_enabled,
+              slaNotificationsEnabled: existingConfig.config.sla_notifications_enabled,
+              slaNotificationMinSeverity: existingConfig.config.sla_notification_min_severity,
+              slaNotificationWarningDays: existingConfig.config.sla_notification_warning_days,
+              newFindingNotificationsEnabled:
+                existingConfig.config.new_finding_notifications_enabled,
+              newFindingNotificationMinSeverity:
+                existingConfig.config.new_finding_notification_min_severity,
             }
           : undefined;
 
@@ -269,6 +354,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           existingConfig?.storedConfig.model_slug ??
           analysisModelSlug ??
           triageModelSlug;
+        const remediationModelSlug =
+          input.remediationModelSlug ??
+          existingConfig?.storedConfig.remediation_model_slug ??
+          existingConfig?.config.remediation_model_slug ??
+          analysisModelSlug;
 
         await upsertSecurityAgentConfig(
           owner,
@@ -277,6 +367,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             sla_high_days: input.slaHighDays,
             sla_medium_days: input.slaMediumDays,
             sla_low_days: input.slaLowDays,
+            sla_enabled: input.slaEnabled,
             auto_sync_enabled: input.autoSyncEnabled,
             repository_selection_mode: input.repositorySelectionMode,
             selected_repository_ids: input.selectedRepositoryIds,
@@ -289,6 +380,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             auto_analysis_enabled: input.autoAnalysisEnabled,
             auto_analysis_min_severity: input.autoAnalysisMinSeverity,
             auto_analysis_include_existing: input.autoAnalysisIncludeExisting,
+            auto_remediation_enabled: input.autoRemediationEnabled,
+            auto_remediation_min_severity: input.autoRemediationMinSeverity,
+            auto_remediation_include_existing: input.autoRemediationIncludeExisting,
+            remediation_model_slug: remediationModelSlug,
+            sla_notifications_enabled: input.slaNotificationsEnabled,
+            sla_notification_min_severity: input.slaNotificationMinSeverity,
+            sla_notification_warning_days: input.slaNotificationWarningDays,
+            new_finding_notifications_enabled: input.newFindingNotificationsEnabled,
+            new_finding_notification_min_severity: input.newFindingNotificationMinSeverity,
           },
           ctx.user.id
         );
@@ -306,18 +406,66 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const autoAnalysisReEnabled =
           isAutoAnalysisOn && !wasAutoAnalysisOn && isNowIncludeExisting;
 
+        let existingFindingsQueuedCount: number | undefined;
+        let backlogAdmissionWarning: string | undefined;
         if (isAutoAnalysisOn && (includeExistingJustTurnedOn || autoAnalysisReEnabled)) {
-          enqueueBacklogFindings({
-            owner: securityOwner,
-            autoAnalysisMinSeverity:
-              input.autoAnalysisMinSeverity ??
-              existingConfig?.config.auto_analysis_min_severity ??
-              'high',
-          }).catch(error => {
-            // Fire-and-forget: don't fail the config save if backlog enqueue errors.
-            // The next sync cron will pick up any missed findings.
+          try {
+            existingFindingsQueuedCount = await enqueueBacklogFindings({
+              owner: securityOwner,
+              autoAnalysisMinSeverity:
+                input.autoAnalysisMinSeverity ??
+                existingConfig?.config.auto_analysis_min_severity ??
+                'high',
+            });
+          } catch (error) {
             console.error('Failed to enqueue backlog findings', error);
-          });
+            backlogAdmissionWarning =
+              'Settings saved, but existing findings could not be queued. Retry saving settings.';
+          }
+        }
+
+        const wasAutoRemediationOn = existingConfig?.config.auto_remediation_enabled ?? false;
+        const isAutoRemediationOn =
+          input.autoRemediationEnabled ?? existingConfig?.config.auto_remediation_enabled ?? false;
+        const wasRemediationIncludeExisting =
+          existingConfig?.config.auto_remediation_include_existing ?? false;
+        const isNowRemediationIncludeExisting =
+          input.autoRemediationIncludeExisting ?? wasRemediationIncludeExisting;
+        const remediationIncludeExistingJustTurnedOn =
+          isNowRemediationIncludeExisting && !wasRemediationIncludeExisting;
+        const autoRemediationReEnabled =
+          isAutoRemediationOn && !wasAutoRemediationOn && isNowRemediationIncludeExisting;
+        const remediationThresholdChanged =
+          isAutoRemediationOn &&
+          isNowRemediationIncludeExisting &&
+          !!input.autoRemediationMinSeverity &&
+          input.autoRemediationMinSeverity !== existingConfig?.config.auto_remediation_min_severity;
+
+        let existingRemediationCommandId: string | undefined;
+        let remediationBacklogAdmissionWarning: string | undefined;
+        if (
+          isAutoRemediationOn &&
+          (remediationIncludeExistingJustTurnedOn ||
+            autoRemediationReEnabled ||
+            remediationThresholdChanged)
+        ) {
+          const command = await createApplyAutoRemediationCommand(securityOwner);
+          existingRemediationCommandId = command.id;
+          try {
+            await submitApplyAutoRemediation({
+              commandId: command.id,
+              owner: securityOwner,
+              actorUserId: ctx.user.id,
+            });
+          } catch (error) {
+            console.error('Failed to enqueue existing findings for remediation', error);
+            remediationBacklogAdmissionWarning =
+              'Settings saved, but existing exploitable findings could not be queued. Retry saving settings.';
+            await markApplyAutoRemediationCommandAdmissionFailed(
+              command.id,
+              remediationBacklogAdmissionWarning
+            );
+          }
         }
 
         trackSecurityAgentConfigSaved({
@@ -331,6 +479,16 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           modelSlug,
           triageModelSlug,
           analysisModelSlug,
+          remediationModelSlug,
+          autoRemediationEnabled: input.autoRemediationEnabled,
+          autoRemediationMinSeverity: input.autoRemediationMinSeverity,
+          autoRemediationIncludeExisting: input.autoRemediationIncludeExisting,
+          slaEnabled: input.slaEnabled,
+          slaNotificationsEnabled: input.slaNotificationsEnabled,
+          slaNotificationMinSeverity: input.slaNotificationMinSeverity,
+          slaNotificationWarningDays: input.slaNotificationWarningDays,
+          newFindingNotificationsEnabled: input.newFindingNotificationsEnabled,
+          newFindingNotificationMinSeverity: input.newFindingNotificationMinSeverity,
           repositorySelectionMode: input.repositorySelectionMode,
           selectedRepoCount: input.selectedRepositoryIds?.length,
         });
@@ -352,19 +510,35 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             autoAnalysisEnabled: input.autoAnalysisEnabled,
             autoAnalysisMinSeverity: input.autoAnalysisMinSeverity,
             autoAnalysisIncludeExisting: input.autoAnalysisIncludeExisting,
+            autoRemediationEnabled: input.autoRemediationEnabled,
+            autoRemediationMinSeverity: input.autoRemediationMinSeverity,
+            autoRemediationIncludeExisting: input.autoRemediationIncludeExisting,
             modelSlug,
             triageModelSlug,
             analysisModelSlug,
+            remediationModelSlug,
             repositorySelectionMode: input.repositorySelectionMode,
             selectedRepositoryIds: input.selectedRepositoryIds,
             slaCriticalDays: input.slaCriticalDays,
             slaHighDays: input.slaHighDays,
             slaMediumDays: input.slaMediumDays,
             slaLowDays: input.slaLowDays,
+            slaEnabled: input.slaEnabled,
+            slaNotificationsEnabled: input.slaNotificationsEnabled,
+            slaNotificationMinSeverity: input.slaNotificationMinSeverity,
+            slaNotificationWarningDays: input.slaNotificationWarningDays,
+            newFindingNotificationsEnabled: input.newFindingNotificationsEnabled,
+            newFindingNotificationMinSeverity: input.newFindingNotificationMinSeverity,
           },
         });
 
-        return { success: true };
+        return {
+          success: true,
+          existingFindingsQueuedCount,
+          backlogAdmissionWarning,
+          existingRemediationCommandId,
+          remediationBacklogAdmissionWarning,
+        };
       },
     },
 
@@ -441,12 +615,22 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             }
 
             if (repositoriesToSync.length > 0) {
-              const syncResult = await syncAllReposForOwner({
-                owner: securityOwner,
-                platformIntegrationId: integration.id,
-                installationId,
-                repositories: repositoriesToSync,
-              });
+              let initialSync: Awaited<ReturnType<typeof submitManualSecuritySync>> | undefined;
+              let initialSyncAdmissionFailed = false;
+              try {
+                initialSync = await submitManualSecuritySync({
+                  owner: securityOwner,
+                  actor: {
+                    id: ctx.user.id,
+                    email: ctx.user.google_user_email,
+                    name: ctx.user.google_user_name,
+                  },
+                  origin: 'enable_initial_sync',
+                });
+              } catch (error) {
+                initialSyncAdmissionFailed = true;
+                console.error('Security Agent enabled but initial sync admission failed', error);
+              }
 
               trackSecurityAgentEnabled({
                 distinctId: ctx.user.id,
@@ -455,8 +639,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                 isEnabled: input.isEnabled,
                 repositorySelectionMode: selectionMode,
                 selectedRepoCount: repositoriesToSync.length,
-                syncedCount: syncResult.synced,
-                syncErrors: syncResult.errors,
               });
 
               logSecurityAudit({
@@ -472,10 +654,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
               return {
                 success: true,
-                syncResult: {
-                  synced: syncResult.synced,
-                  errors: syncResult.errors,
-                },
+                initialSync,
+                initialSyncAdmissionFailed,
               };
             }
           }
@@ -556,6 +736,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         input: ListFindingsInput & TExtra;
       }) => {
         const input = rawInput;
+        const owner = deps.resolveOwner(ctx, input);
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
 
         const { findings, totalCount } = await listSecurityFindings({
@@ -571,9 +752,20 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
 
         const concurrencyCheck = await canStartAnalysis(securityOwner);
+        const [configWithStatus, integration] = await Promise.all([
+          getSecurityAgentConfigWithStatus(owner),
+          deps.getIntegration(ctx, input),
+        ]);
+        const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
+        const decoratedFindings = await decorateFindingsWithRemediation({
+          findings,
+          config,
+          isAgentEnabled: configWithStatus?.isEnabled ?? false,
+          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+        });
 
         return {
-          findings,
+          findings: decoratedFindings,
           totalCount,
           runningCount: concurrencyCheck.currentCount,
           concurrencyLimit: concurrencyCheck.limit,
@@ -594,6 +786,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         input: GetFindingInput & TExtra;
       }) => {
         const input = rawInput;
+        const owner = deps.resolveOwner(ctx, input);
         const finding = await getSecurityFindingById(input.id);
 
         if (!finding) {
@@ -610,7 +803,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        return finding;
+        const [configWithStatus, integration] = await Promise.all([
+          getSecurityAgentConfigWithStatus(owner),
+          deps.getIntegration(ctx, input),
+        ]);
+        const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
+        return decorateFindingWithRemediation({
+          finding,
+          config,
+          isAgentEnabled: configWithStatus?.isEnabled ?? false,
+          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+        });
       },
     },
 
@@ -699,10 +902,14 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             });
           }
 
-          const result = await syncDependabotAlertsForRepo({
+          const accepted = await submitManualSecuritySync({
             owner: securityOwner,
-            platformIntegrationId: integration.id,
-            installationId,
+            actor: {
+              id: ctx.user.id,
+              email: ctx.user.google_user_email,
+              name: ctx.user.google_user_name,
+            },
+            origin: 'dashboard_refresh',
             repoFullName: input.repoFullName,
           });
 
@@ -712,8 +919,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             ...deps.trackingExtras(ctx, input),
             syncType: 'single_repo',
             repoCount: 1,
-            synced: result.synced,
-            errors: result.errors,
+            synced: 0,
+            errors: 0,
           });
 
           logSecurityAudit({
@@ -727,15 +934,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             metadata: {
               syncType: 'single_repo',
               repoFullName: input.repoFullName,
-              synced: result.synced,
-              errors: result.errors,
+              runId: accepted.runId,
+              messageId: accepted.messageId,
+              status: 'accepted',
             },
           });
 
           return {
             success: true,
-            synced: result.synced,
-            errors: result.errors,
+            ...accepted,
           };
         }
 
@@ -763,11 +970,14 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        const result = await syncAllReposForOwner({
+        const accepted = await submitManualSecuritySync({
           owner: securityOwner,
-          platformIntegrationId: integration.id,
-          installationId,
-          repositories: repositoriesToSync,
+          actor: {
+            id: ctx.user.id,
+            email: ctx.user.google_user_email,
+            name: ctx.user.google_user_name,
+          },
+          origin: 'dashboard_refresh',
         });
 
         trackSecurityAgentSync({
@@ -776,8 +986,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           ...deps.trackingExtras(ctx, input),
           syncType: 'all_repos',
           repoCount: repositoriesToSync.length,
-          synced: result.synced,
-          errors: result.errors,
+          synced: 0,
+          errors: 0,
         });
 
         logSecurityAudit({
@@ -791,15 +1001,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           metadata: {
             syncType: 'all_repos',
             repoCount: repositoriesToSync.length,
-            synced: result.synced,
-            errors: result.errors,
+            runId: accepted.runId,
+            messageId: accepted.messageId,
+            status: 'accepted',
           },
         });
 
         return {
           success: true,
-          synced: result.synced,
-          errors: result.errors,
+          ...accepted,
         };
       },
     },
@@ -853,38 +1063,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Parse repo owner and name from full name
-        const [repoOwner, repoName] = finding.repo_full_name.split('/');
-        if (!repoOwner || !repoName) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Invalid repository name format',
-          });
-        }
-
-        // Dismiss on GitHub if it's a Dependabot alert
-        if (finding.source === 'dependabot') {
-          const alertNumber = parseInt(finding.source_id, 10);
-          if (!isNaN(alertNumber)) {
-            await dismissDependabotAlert(
-              installationId,
-              repoOwner,
-              repoName,
-              alertNumber,
-              input.reason,
-              input.comment
-            );
-          } else {
-            console.warn(
-              `Dependabot finding ${input.findingId} has non-numeric source_id "${finding.source_id}", skipping GitHub dismissal`
-            );
-          }
-        }
-
-        // Update local database
-        await updateSecurityFindingStatus(input.findingId, 'ignored', {
-          ignoredReason: input.reason,
-          ignoredBy: ctx.user.google_user_email,
+        const accepted = await submitManualFindingDismissal({
+          owner: securityOwner,
+          actor: {
+            id: ctx.user.id,
+            email: ctx.user.google_user_email,
+            name: ctx.user.google_user_name,
+          },
+          findingId: input.findingId,
+          installationId,
+          reason: input.reason,
+          comment: input.comment,
         });
 
         trackSecurityAgentFindingDismissed({
@@ -897,20 +1086,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           severity: finding.severity,
         });
 
-        logSecurityAudit({
-          owner: securityOwner,
-          actor_id: ctx.user.id,
-          actor_email: ctx.user.google_user_email,
-          actor_name: ctx.user.google_user_name,
-          action: SecurityAuditLogAction.FindingDismissed,
-          resource_type: 'security_finding',
-          resource_id: input.findingId,
-          before_state: { status: finding.status },
-          after_state: { status: 'ignored', ignoredReason: input.reason },
-          metadata: { source: finding.source, severity: finding.severity },
-        });
-
-        return { success: true };
+        return { success: true, ...accepted };
       },
     },
 
@@ -927,7 +1103,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         input: StartAnalysisInput & TExtra;
       }) => {
         const input = rawInput;
-        const owner = deps.resolveOwner(ctx, input);
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
 
         const finding = await getSecurityFindingById(input.findingId);
@@ -957,80 +1132,130 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Get GitHub token
-        const githubToken = await deps.getGitHubToken(ctx, input);
+        const queued = await submitManualAnalysisStart({
+          findingId: input.findingId,
+          owner: securityOwner,
+          actorUserId: ctx.user.id,
+          requestedModels: {
+            model: input.model,
+            triageModel: input.triageModel,
+            analysisModel: input.analysisModel,
+          },
+          forceSandbox: input.forceSandbox,
+          retrySandboxOnly: input.retrySandboxOnly,
+        });
 
-        if (!githubToken) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub integration required for analysis',
-          });
-        }
-
-        // Resolve triage/analysis models with legacy fallbacks
-        const config = await getSecurityAgentConfigWithStatus(owner);
-        const triageModel =
-          input.triageModel ||
-          input.model ||
-          config?.storedConfig.triage_model_slug ||
-          config?.storedConfig.model_slug ||
-          config?.config.triage_model_slug ||
-          DEFAULT_SECURITY_AGENT_TRIAGE_MODEL;
-        const analysisModel =
-          input.analysisModel ||
-          input.model ||
-          config?.storedConfig.analysis_model_slug ||
-          config?.storedConfig.model_slug ||
-          config?.config.analysis_model_slug ||
-          DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL;
-        const analysisMode = config?.config.analysis_mode ?? 'auto';
-
-        try {
-          const result = await startSecurityAnalysis({
-            findingId: input.findingId,
-            user: ctx.user,
-            githubRepo: finding.repo_full_name,
-            githubToken,
-            triageModel,
-            analysisModel,
-            analysisMode,
-            retrySandboxOnly: input.retrySandboxOnly,
-            organizationId: owner.type === 'org' ? owner.id : undefined,
-          });
-
-          if (!result.started) {
-            throw new TRPCError({
-              code: trpcCodeForAnalysisError(result.errorCode),
-              message: result.error || 'Failed to start analysis',
-            });
-          }
-
-          logSecurityAudit({
-            owner: securityOwner,
-            actor_id: ctx.user.id,
-            actor_email: ctx.user.google_user_email,
-            actor_name: ctx.user.google_user_name,
-            action: SecurityAuditLogAction.FindingAnalysisStarted,
-            resource_type: 'security_finding',
-            resource_id: input.findingId,
-            metadata: {
-              model: analysisModel,
-              triageModel,
-              analysisModel,
-              analysisMode,
-              triageOnly: result.triageOnly,
-            },
-          });
-
-          return { success: true, triageOnly: result.triageOnly };
-        } catch (error) {
-          rethrowAsPaymentRequired(error);
-        }
+        return { success: true, ...queued };
       },
     },
 
     // -----------------------------------------------------------------------
-    // 13. getAnalysis
+    // 13. startRemediation
+    // -----------------------------------------------------------------------
+    startRemediation: {
+      inputSchema: StartRemediationInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: StartRemediationInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const finding = await getSecurityFindingById(input.findingId);
+
+        if (!finding) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Security finding not found',
+          });
+        }
+
+        if (!deps.verifyFindingOwnership(finding, ctx, input)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this finding',
+          });
+        }
+
+        const queued = await submitManualRemediationStart({
+          findingId: input.findingId,
+          owner: securityOwner,
+          actorUserId: ctx.user.id,
+        });
+
+        return { success: true, ...queued };
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 14. retryRemediation
+    // -----------------------------------------------------------------------
+    retryRemediation: {
+      inputSchema: RetryRemediationInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: RetryRemediationInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const finding = await getSecurityFindingById(input.findingId);
+
+        if (!finding) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Security finding not found',
+          });
+        }
+
+        if (!deps.verifyFindingOwnership(finding, ctx, input)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this finding',
+          });
+        }
+
+        const queued = await submitManualRemediationStart({
+          findingId: input.findingId,
+          owner: securityOwner,
+          actorUserId: ctx.user.id,
+          retry: true,
+        });
+
+        return { success: true, ...queued };
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 15. cancelRemediation
+    // -----------------------------------------------------------------------
+    cancelRemediation: {
+      inputSchema: CancelRemediationInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: CancelRemediationInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const result = await submitRemediationCancellation({
+          attemptId: input.attemptId,
+          owner: securityOwner,
+          actorUserId: ctx.user.id,
+        });
+
+        return result;
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 16. getAnalysis
     // -----------------------------------------------------------------------
     getAnalysis: {
       inputSchema: GetAnalysisInputSchema,
@@ -1059,6 +1284,20 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
+        const owner = deps.resolveOwner(ctx, input);
+        const [configWithStatus, integration, remediationAttempts] = await Promise.all([
+          getSecurityAgentConfigWithStatus(owner),
+          deps.getIntegration(ctx, input),
+          getRemediationAttemptHistory(input.findingId),
+        ]);
+        const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
+        const decoratedFinding = await decorateFindingWithRemediation({
+          finding,
+          config,
+          isAgentEnabled: configWithStatus?.isEnabled ?? false,
+          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+        });
+
         return {
           status: finding.analysis_status,
           startedAt: finding.analysis_started_at,
@@ -1067,12 +1306,45 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           analysis: finding.analysis,
           sessionId: finding.session_id,
           cliSessionId: finding.cli_session_id,
+          remediationSummary: decoratedFinding.remediationSummary ?? null,
+          remediationCapability: decoratedFinding.remediationCapability,
+          remediationAttempts,
         };
       },
     },
 
     // -----------------------------------------------------------------------
-    // 14. getOrphanedRepositories
+    // 17. getCommandStatus
+    // -----------------------------------------------------------------------
+    getCommandStatus: {
+      inputSchema: GetCommandStatusInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: GetCommandStatusInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const command = await getSecurityAgentCommandStatus(securityOwner, input.commandId);
+        if (!command) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Security Agent command not found' });
+        }
+        return command;
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 18. listActiveCommands
+    // -----------------------------------------------------------------------
+    listActiveCommands: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+      const extra = toExtra(input);
+      return listActiveSecurityAgentCommands(deps.resolveSecurityOwner(ctx, extra));
+    },
+
+    // -----------------------------------------------------------------------
+    // 19. getOrphanedRepositories
     // -----------------------------------------------------------------------
     getOrphanedRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);

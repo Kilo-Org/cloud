@@ -1,21 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
-import { useAtomValue } from 'jotai';
 import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
-import { toast } from 'sonner-native';
+import { useAtomValue } from 'jotai';
+import { useCallback, useEffect, useMemo } from 'react';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
-import { normalizeAgentMode } from '@/components/agents/mode-options';
-import { type AgentMode } from '@/components/agents/mode-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
+import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
+import {
+  shouldShowAgentWorkingIndicator,
+  shouldShowFooterWorkingIndicator,
+} from '@/components/agents/session-working-state';
+import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
+import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
@@ -55,6 +60,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
+  const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -71,51 +77,14 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
 
   const { models: modelOptions } = useAvailableModels(organizationId);
 
-  const [currentMode, setCurrentMode] = useState<AgentMode>(() =>
-    normalizeAgentMode(fetchedData?.mode)
-  );
-
-  const [currentModel, setCurrentModel] = useState<string>(fetchedData?.model ?? '');
-  const [currentVariant, setCurrentVariant] = useState<string>(fetchedData?.variant ?? '');
-
-  // Sync mode/model/variant from session data and SDK session config.
-  // The SDK's sessionConfig is updated from assistant messages during snapshot
-  // replay, so it captures the model actually used in the conversation.
-  useEffect(() => {
-    const mode = sessionConfig?.mode ?? fetchedData?.mode;
-    if (mode) {
-      setCurrentMode(normalizeAgentMode(mode));
-    }
-
-    const model = sessionConfig?.model ?? fetchedData?.model;
-    if (model) {
-      setCurrentModel(model);
-    }
-
-    const variant = sessionConfig?.variant ?? fetchedData?.variant;
-    if (variant) {
-      setCurrentVariant(variant);
-    }
-  }, [
-    sessionConfig?.mode,
-    sessionConfig?.model,
-    sessionConfig?.variant,
-    fetchedData?.mode,
-    fetchedData?.model,
-    fetchedData?.variant,
-  ]);
-
-  // Auto-select first available model when session has no model (e.g. remote CLI sessions)
-  useEffect(() => {
-    if (currentModel || modelOptions.length === 0 || fetchedData === null) {
-      return;
-    }
-    const firstModel = modelOptions[0];
-    if (firstModel) {
-      setCurrentModel(firstModel.id);
-      setCurrentVariant(firstModel.variants[0] ?? '');
-    }
-  }, [currentModel, modelOptions, fetchedData]);
+  const {
+    currentMode,
+    currentModel,
+    currentVariant,
+    setCurrentMode,
+    setCurrentModel,
+    setCurrentVariant,
+  } = useSessionConfigSync({ fetchedData, sessionConfig, modelOptions });
 
   const {
     flatListRef,
@@ -166,6 +135,15 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     (fetchedData === null && !statusIndicator && !error) ||
     (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
   const shouldBlockMessages = shouldShowLoading;
+  const shouldShowWorkingIndicator = shouldShowAgentWorkingIndicator({
+    isStreaming,
+    pendingMessageCount: pendingMessages.size,
+  });
+  const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
+    isAgentWorking: shouldShowWorkingIndicator,
+    hasStatusIndicator:
+      statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready'),
+  });
 
   const emptyStateText = error ?? (statusIndicator ? null : 'No messages yet');
 
@@ -181,6 +159,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     (requiresModel && !currentModel);
   const showInteractionCards = activeQuestion ?? activePermission;
   const composerPlaceholder = getComposerPlaceholder(cloudStatus?.type);
+  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -218,10 +197,23 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
 
       {!isConnected && <ConnectivityBanner />}
 
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {keyboardContainerKind === 'app-aware-padding' ? (
+        <AppAwareKeyboardPaddingView className="flex-1">
+          {renderKeyboardBody()}
+        </AppAwareKeyboardPaddingView>
+      ) : (
+        <KeyboardAvoidingView className="flex-1" behavior="padding">
+          {renderKeyboardBody()}
+        </KeyboardAvoidingView>
+      )}
+
+      <View style={{ height: bottom }} className="bg-background" />
+    </View>
+  );
+
+  function renderKeyboardBody() {
+    return (
+      <>
         <View className="flex-1">{renderContent()}</View>
 
         {activeQuestion ? (
@@ -274,11 +266,9 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
               }}
             />
           ))}
-      </KeyboardAvoidingView>
-
-      <View style={{ height: bottom }} className="bg-background" />
-    </View>
-  );
+      </>
+    );
+  }
 
   function renderContent() {
     if (shouldBlockMessages) {
@@ -319,7 +309,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
         scrollEventThrottle={16}
         ListFooterComponent={
           <>
-            <WorkingIndicator messages={messages} isStreaming={isStreaming} />
+            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           </>
         }

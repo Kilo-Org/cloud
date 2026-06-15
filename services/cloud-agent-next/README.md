@@ -36,7 +36,7 @@ By default, the script looks for kilo-cli at `$HOME/projects/kilo-cli`. Override
 
 **What's in Dockerfile.dev:**
 
-- Base image: `cloudflare/sandbox:0.10.1`
+- Base image: `cloudflare/sandbox:0.11.0`
 - Pre-built `kilo` binary (from `cloud-agent-build.sh`)
 - GitHub CLI (`gh`) and GitLab CLI (`glab`)
 - Wrapper bundle built inside the container
@@ -56,6 +56,7 @@ The recommended V2 flow is:
 - `prepareSession` - Create a fully prepared session with workspace, git clone, and configuration
 - `updateSession` - Update a prepared (not yet initiated) session
 - `getSession` - Query session metadata (no secrets)
+- `getMessageResult` - Poll lifecycle state and terminal assistant text for one submitted turn
 - `initiateFromKilocodeSessionV2` - Start execution on a prepared session
 - `sendMessageV2` - Send follow-up messages (output via `/stream` WebSocket)
 - `deleteSession` - Delete a session and clean up resources
@@ -66,6 +67,28 @@ The recommended V2 flow is:
 ### Authentication
 
 All endpoints require a kilocode api token except `/stream` which uses short lived ws tickets.
+
+### Message Result Retrieval
+
+Use the bearer-protected `GET /trpc/getMessageResult` query to poll one durably submitted Cloud Agent turn. Supply `cloudAgentSessionId` and the submitted `messageId`.
+
+```text
+GET /trpc/getMessageResult?input={"cloudAgentSessionId":"agent_<uuid>","messageId":"msg_<id>"}
+Authorization: Bearer <kilocode-api-token>
+```
+
+The response includes only safe fields: `cloudAgentSessionId`, `messageId`, lifecycle status and timestamps, optional structured `completionSource`, `failure`, `gateResult`, and assistant text correlated to the selected submitted turn. It never returns prompts, tokens, callback details, or raw diagnostics.
+
+| Stored lifecycle state | Public status |
+|---|---|
+| `queued` | `queued` |
+| `accepted` | `running` |
+| `completed` | `completed` |
+| `failed` | `failed` |
+| `interrupted` | `interrupted` |
+| Pending-only compatibility row | `queued` |
+
+The query returns `NOT_FOUND` for missing sessions, cross-user session lookups, and unknown message IDs.
 
 ## Usage Examples
 
@@ -702,6 +725,8 @@ This project also ships with an on-demand GitHub Action (`Deploy Cloud Agent`) l
 Required secrets:
 
 - `CLOUDFLARE_API_TOKEN` — must have permission to deploy the worker for the selected environment.
+
+Cloud Agent Next owns its operational reporting projection. Deploy the reporting database migration before this worker release and provision `cloud-agent-next-report-queue` plus `cloud-agent-next-report-queue-dlq` with four-day message retention. A deployed `dev` environment requires isolated `cloud-agent-next-report-queue-dev` and `cloud-agent-next-report-queue-dlq-dev` resources with the same retention. New sessions synchronously create their reporting anchor before setup; queued run reports do not synthesize parents when an anchor is absent.
 
 ### Testing
 

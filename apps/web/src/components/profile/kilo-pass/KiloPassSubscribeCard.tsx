@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Check, Crown, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +24,8 @@ export function KiloPassSubscribeCard(props: {
   showFirstMonthPromo?: boolean;
   showSecondMonthPromo: boolean;
   showHeader?: boolean;
+  headerAction?: ReactNode;
+  unframed?: boolean;
   className?: string;
   contentClassName?: string;
   recommendedTier: KiloPassTier | null;
@@ -35,6 +38,8 @@ export function KiloPassSubscribeCard(props: {
     showFirstMonthPromo = false,
     showSecondMonthPromo,
     showHeader = true,
+    headerAction,
+    unframed = false,
     className,
     contentClassName,
     recommendedTier,
@@ -57,14 +62,81 @@ export function KiloPassSubscribeCard(props: {
     { value: KiloPassCadence.Yearly, label: 'Yearly' },
   ] as const;
 
+  const content = (
+    <div className={cn('grid gap-5', contentClassName)}>
+      <div className="bg-muted/20 border-border/60 flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-lg border px-3 py-2">
+        <div className="text-muted-foreground text-sm">Billing cadence</div>
+        <div className="bg-white/[0.04] flex w-full items-center gap-1 rounded-lg p-1 sm:w-56">
+          {cadenceOptions.map(option => (
+            <Button
+              key={option.value}
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={() => setCadence(option.value)}
+              className={cn(
+                'h-8 flex-1 rounded-md px-3 text-xs font-semibold transition',
+                cadence === option.value
+                  ? 'bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+              )}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3 lg:gap-5">
+        {tiers.map(tier => (
+          <KiloPassTierCard
+            key={tier}
+            tier={tier}
+            cadence={cadence}
+            pending={pending}
+            showFirstMonthPromo={showFirstMonthPromo}
+            showSecondMonthPromo={showSecondMonthPromo}
+            isRecommended={recommendedTier != null && tier === recommendedTier}
+            onSelect={onSelectTier}
+          />
+        ))}
+      </div>
+
+      <div className="space-y-2 text-xs">
+        <div className="text-muted-foreground flex items-start gap-2">
+          <Check className="mt-0.5 size-4 flex-none text-emerald-400" />
+          <span>Your payment converts 1:1 into credits that are added to your balance</span>
+        </div>
+        <div className="text-muted-foreground flex items-start gap-2">
+          <Check className="mt-0.5 size-4 flex-none text-emerald-400" />
+          <span>
+            Earn free bonus credits after using your paid credits each month. Unused free bonus
+            credits expire every month.
+          </span>
+        </div>
+        {monthlyPromoDescription && (
+          <div className="text-muted-foreground flex items-start gap-2">
+            <Check className="mt-0.5 size-4 flex-none text-emerald-400" />
+            <span>{monthlyPromoDescription}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (unframed) {
+    return content;
+  }
+
   return (
     <Card className={cn('border-border/60 w-full overflow-hidden rounded-xl shadow-sm', className)}>
       {showHeader ? (
         <CardHeader>
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <CardTitle className="flex items-center gap-2">
-              <span className="bg-muted/40 ring-border/60 grid h-9 w-9 place-items-center rounded-lg ring-1">
-                <Crown className="h-5 w-5" />
+              <span className="bg-muted/40 ring-border/60 grid size-9 place-items-center rounded-lg ring-1">
+                <Crown className="size-5" />
               </span>
 
               <span className="leading-none">
@@ -76,79 +148,21 @@ export function KiloPassSubscribeCard(props: {
               </span>
             </CardTitle>
 
-            {pending ? (
-              <Badge variant="secondary" className="gap-1.5">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Processing
-              </Badge>
-            ) : (
-              <Badge variant="secondary">Subscribe</Badge>
-            )}
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+              {headerAction}
+              {pending ? (
+                <Badge variant="secondary" className="gap-1.5">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Processing
+                </Badge>
+              ) : (
+                <Badge variant="secondary">Subscribe</Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
       ) : null}
-      <CardContent className={cn('grid gap-5', showHeader ? 'pt-4' : 'p-0 pt-0', contentClassName)}>
-        <div className="bg-muted/20 border-border/60 flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-lg border px-3 py-2">
-          <div className="text-muted-foreground text-sm">Billing cadence</div>
-          <div className="bg-white/[0.04] flex w-full items-center gap-1 rounded-lg p-1 sm:w-56">
-            {cadenceOptions.map(option => (
-              <Button
-                key={option.value}
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                onClick={() => setCadence(option.value)}
-                className={cn(
-                  'h-8 flex-1 rounded-md px-3 text-xs font-semibold transition',
-                  cadence === option.value
-                    ? 'bg-blue-500 text-white hover:bg-blue-500'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                )}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-3 lg:gap-5">
-          {tiers.map(tier => {
-            return (
-              <KiloPassTierCard
-                key={tier}
-                tier={tier}
-                cadence={cadence}
-                pending={pending}
-                showFirstMonthPromo={showFirstMonthPromo}
-                showSecondMonthPromo={showSecondMonthPromo}
-                isRecommended={recommendedTier != null && tier === recommendedTier}
-                onSelect={onSelectTier}
-              />
-            );
-          })}
-        </div>
-
-        <div className="space-y-2 text-xs">
-          <div className="text-muted-foreground flex items-start gap-2">
-            <Check className="mt-0.5 h-4 w-4 flex-none text-emerald-400" />
-            <span>Your payment converts 1:1 into credits that are added to your balance</span>
-          </div>
-          <div className="text-muted-foreground flex items-start gap-2">
-            <Check className="mt-0.5 h-4 w-4 flex-none text-emerald-400" />
-            <span>
-              Earn free bonus credits after using your paid credits each month. Unused free bonus
-              credits expire every month.
-            </span>
-          </div>
-          {monthlyPromoDescription && (
-            <div className="text-muted-foreground flex items-start gap-2">
-              <Check className="mt-0.5 h-4 w-4 flex-none text-emerald-400" />
-              <span>{monthlyPromoDescription}</span>
-            </div>
-          )}
-        </div>
-      </CardContent>
+      <CardContent className={cn('pt-4', !showHeader && 'p-0 pt-0')}>{content}</CardContent>
     </Card>
   );
 }

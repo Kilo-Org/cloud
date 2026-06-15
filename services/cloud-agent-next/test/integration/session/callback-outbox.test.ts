@@ -45,7 +45,13 @@ function removeCallbackQueue(instance: CloudAgentSession): void {
 describe('callback outbox — missing target or queue', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
-    await Promise.all(ids.map(id => env.CLOUD_AGENT_SESSION.get(id).deleteSession()));
+    await Promise.all(
+      ids.map(id =>
+        runInDurableObject(env.CLOUD_AGENT_SESSION.get(id), instance =>
+          instance.ctx.storage.deleteAll()
+        )
+      )
+    );
   });
 
   it('records callbackLastError when callbackTarget is missing on a callback-required message', async () => {
@@ -310,6 +316,9 @@ describe('callback outbox — missing target or queue', () => {
         reason: 'assistant_error',
         error: 'provider failed',
         completionSource: 'assistant_message_event',
+        failureStage: 'agent_activity',
+        failureCode: 'assistant_error',
+        safeFailureMessage: 'Assistant request failed',
       });
       await (instance as any).finalizeIdleBatchCallbackIfReady({
         allowWithoutObservedIdle: true,
@@ -328,7 +337,12 @@ describe('callback outbox — missing target or queue', () => {
     expect(queue.captured[0].payload.executionId).toBe(result.secondMessageId);
     expect(queue.captured[0].payload.idempotencyKey).toBe(result.secondMessageId);
     expect(queue.captured[0].payload.status).toBe('failed');
-    expect(queue.captured[0].payload.errorMessage).toBe('provider failed');
+    expect(queue.captured[0].payload.errorMessage).toBe('Assistant request failed');
+    expect(queue.captured[0].payload.failure).toEqual({
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      message: 'Assistant request failed',
+    });
   });
 
   it('includes idempotencyKey set to messageId in callback payload', async () => {

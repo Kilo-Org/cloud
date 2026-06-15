@@ -36,6 +36,7 @@ describe('processMessagesApiUsage', () => {
       cache_read_input_tokens: 10,
       cache_creation_input_tokens: 5,
       server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      output_tokens_details: null,
       cost: 0.001,
       is_byok: false,
       cost_details: { upstream_inference_cost: 0.7 },
@@ -58,6 +59,7 @@ describe('processMessagesApiUsage', () => {
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
       server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      output_tokens_details: null,
       cost: 0.001,
       is_byok: true,
       cost_details: { upstream_inference_cost: 0.02 },
@@ -76,6 +78,7 @@ describe('processMessagesApiUsage', () => {
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
       server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      output_tokens_details: null,
     };
     const providerMetadata = {
       gateway: { routing: { finalProvider: 'anthropic' }, cost: '0', marketCost: '0.000375' },
@@ -98,6 +101,7 @@ describe('processMessagesApiUsage', () => {
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
       server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      output_tokens_details: null,
     };
     const providerMetadata = {
       gateway: {
@@ -128,6 +132,7 @@ describe('processMessagesApiUsage', () => {
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
       server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      output_tokens_details: null,
     };
     const providerMetadata = {
       gateway: {
@@ -157,6 +162,7 @@ describe('processMessagesApiUsage', () => {
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
       server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      output_tokens_details: null,
     };
     const providerMetadata = {
       gateway: {

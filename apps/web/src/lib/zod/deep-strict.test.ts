@@ -113,10 +113,38 @@ describe('deepStrict', () => {
     }
   });
 
+  test('rejects unknown keys inside object intersections', () => {
+    const schema = deepStrict(
+      z.intersection(z.object({ a: z.object({ value: z.string() }) }), z.object({ b: z.number() }))
+    );
+
+    expect(schema.safeParse({ a: { value: 'x' }, b: 1 }).success).toBe(true);
+    expect(schema.safeParse({ a: { value: 'x' }, b: 1, typo: true }).success).toBe(false);
+    expect(schema.safeParse({ a: { value: 'x', typo: true }, b: 1 }).success).toBe(false);
+  });
+
+  test('supports chained object intersections', () => {
+    const schema = deepStrict(
+      z
+        .object({ a: z.string() })
+        .and(z.object({ b: z.number() }))
+        .and(z.object({ c: z.boolean() }))
+    );
+
+    expect(schema.safeParse({ a: 'x', b: 1, c: true }).success).toBe(true);
+    expect(schema.safeParse({ a: 'x', b: 1, c: true, typo: 1 }).success).toBe(false);
+  });
+
+  test('preserves validation for overlapping intersection keys', () => {
+    const schema = deepStrict(
+      z.intersection(z.object({ value: z.string() }), z.object({ value: z.string().min(2) }))
+    );
+
+    expect(schema.safeParse({ value: 'ok' }).success).toBe(true);
+    expect(schema.safeParse({ value: 'x' }).success).toBe(false);
+  });
+
   test('throws on unsupported wrappers so new Zod types surface loudly', () => {
-    expect(() =>
-      deepStrict(z.intersection(z.object({ a: z.string() }), z.object({ b: z.number() })))
-    ).toThrow(/deepStrict: unsupported Zod type 'intersection'/);
     expect(() => deepStrict(z.tuple([z.string(), z.number()]))).toThrow(
       /deepStrict: unsupported Zod type 'tuple'/
     );

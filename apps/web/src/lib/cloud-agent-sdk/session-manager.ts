@@ -1,3 +1,4 @@
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import { errorShapeSchema } from './schemas';
 import type { TransportSendPayload } from './transport';
@@ -30,7 +31,10 @@ import type {
 } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from './array-utils';
+import type { UserWebConnection } from './user-web-connection';
 import { generateMessageId } from './message-id';
+import { findLatestContextUsage } from './context-usage';
+import type { ContextUsage } from './context-usage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,7 +55,7 @@ type SessionConfig = {
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
 };
-type ActiveSessionType = 'cloud-agent' | 'remote';
+type ActiveSessionType = ResolvedSession['type'];
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
 type StandalonePermission = {
   requestId: string;
@@ -131,9 +135,8 @@ type SessionManagerConfig = {
     sessionId: CloudAgentSessionId
   ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
-  getAuthToken: () => string | Promise<string>;
-  cliWebsocketUrl?: string;
   websocketBaseUrl?: string;
+  userWebConnection: UserWebConnection;
   api: CloudAgentApi;
   lifecycleHooks?: ConnectionLifecycleHooks;
   websocketHeaders?: WebSocketHeaders;
@@ -158,6 +161,8 @@ type SessionManagerAtoms = {
   isLoading: W<boolean>;
   /** Session structurally cannot accept input (no transport send). */
   isReadOnly: W<boolean>;
+  /** Active resolved transport can deliver canonical Cloud Agent attachments. */
+  supportsAttachments: W<boolean>;
   canSend: W<boolean>;
   canInterrupt: W<boolean>;
   statusIndicator: W<SessionStatusIndicator | null>;
@@ -184,6 +189,7 @@ type SessionManagerAtoms = {
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
   totalCost: Atom<number>;
+  contextUsage: Atom<ContextUsage | undefined>;
   childMessages: Atom<(childSessionId: string) => StoredMessage[]>;
   childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
 };
@@ -191,7 +197,11 @@ type SessionManagerAtoms = {
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
-  send(input: { payload: TransportSendPayload; images?: Images }): Promise<boolean>;
+  send(input: {
+    payload: TransportSendPayload;
+    attachments?: CloudAgentAttachments;
+    images?: Images;
+  }): Promise<boolean>;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
@@ -209,10 +219,19 @@ type SessionManager = {
 // ---------------------------------------------------------------------------
 
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
+const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
+  'selected model is not available for this cloud agent session';
+const SELECTED_MODEL_UNAVAILABLE_ERROR =
+  'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.';
+
+function isSelectedModelUnavailable(message: string | undefined): boolean {
+  return message?.toLowerCase().includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ?? false;
+}
 
 function formatError(err: unknown): string {
   const r = errorShapeSchema.safeParse(err);
   if (r.success) {
+    if (isSelectedModelUnavailable(r.data.message)) return SELECTED_MODEL_UNAVAILABLE_ERROR;
     const code = r.data.data?.code ?? r.data.shape?.code;
     const http = r.data.data?.httpStatus ?? r.data.shape?.data?.httpStatus;
     if (code === 'PAYMENT_REQUIRED' || http === 402)
@@ -302,6 +321,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const isStreamingAtom = atom(false);
   const isLoadingAtom = atom(false);
   const isReadOnlyAtom = atom(false);
+  const supportsAttachmentsAtom = atom(false);
   const canSendAtom = atom(false);
   const canInterruptAtom = atom(false);
   const statusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
@@ -360,6 +380,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     for (const m of get(messagesListAtom)) if (m.info.role === 'assistant') t += m.info.cost;
     return t;
   });
+  const contextUsageAtom = atom(get => findLatestContextUsage(get(messagesListAtom)));
   const childMessagesAtom = atom(get => {
     const storage = get(sessionStorageAtom);
     if (!storage) return (): StoredMessage[] => [];
@@ -410,6 +431,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
     store.set(isReadOnlyAtom, false);
+    store.set(supportsAttachmentsAtom, false);
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
@@ -526,6 +548,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       const act = session.state.getActivity();
       const st = session.state.getStatus();
       const cs = session.state.getCloudStatus();
+      const previousStatus = store.get(agentStatusAtom);
       store.set(activityAtom, act);
       if (!firstActivityFired && act.type !== 'connecting') {
         firstActivityFired = true;
@@ -550,6 +573,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       store.set(canSendAtom, session.canSend && cloudReady);
       store.set(canInterruptAtom, session.canInterrupt);
+
+      if (previousStatus.type === 'disconnected' && st.type !== 'disconnected') {
+        store.set(errorAtom, null);
+        setIndicator(null);
+      }
 
       if (act.type !== prevAct) {
         if (act.type === 'busy') {
@@ -648,8 +676,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         getTicket: config.getTicket,
         api: config.api,
         fetchSnapshot: config.fetchSnapshot,
-        getAuthToken: config.getAuthToken,
-        cliWebsocketUrl: config.cliWebsocketUrl,
+        userWebConnection: config.userWebConnection,
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
       },
@@ -696,8 +723,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (as?.requestId === requestId) store.set(activeSuggestionAtom, null);
       },
       onResolved: resolved => {
-        if (resolved.type === 'cloud-agent') activeSessionType = 'cloud-agent';
-        else if (resolved.type === 'remote') activeSessionType = 'remote';
+        activeSessionType = resolved.type;
+        store.set(supportsAttachmentsAtom, resolved.type === 'cloud-agent');
       },
       onBranchChanged: branch => {
         const currentFetched = store.get(fetchedSessionDataAtom);
@@ -765,7 +792,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     session.connect();
   }
 
-  async function send(input: { payload: TransportSendPayload; images?: Images }): Promise<boolean> {
+  async function send(input: {
+    payload: TransportSendPayload;
+    attachments?: CloudAgentAttachments;
+    images?: Images;
+  }): Promise<boolean> {
     store.set(errorAtom, null);
     if (store.get(agentStatusAtom).type !== 'disconnected') {
       setIndicator(null);
@@ -784,9 +815,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     try {
       if (!currentSession) throw new Error('No active session');
+      if (input.attachments && sessionType !== 'cloud-agent') {
+        throw new Error('Only Cloud Agent sessions support attachments');
+      }
       await currentSession.send({
         payload: input.payload,
         messageId,
+        ...(input.attachments ? { attachments: input.attachments } : {}),
         images: input.images,
       });
       if (sessionType === 'remote' && kiloSessionId) {
@@ -907,6 +942,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       isStreaming: isStreamingAtom,
       isLoading: isLoadingAtom,
       isReadOnly: isReadOnlyAtom,
+      supportsAttachments: supportsAttachmentsAtom,
       canSend: canSendAtom,
       canInterrupt: canInterruptAtom,
       statusIndicator: statusIndicatorAtom,
@@ -932,6 +968,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,
       totalCost: totalCostAtom,
+      contextUsage: contextUsageAtom,
       childMessages: childMessagesAtom,
       childSessionHydrationState: childSessionHydrationStateAtom,
     },

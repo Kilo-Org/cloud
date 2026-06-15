@@ -51,3 +51,18 @@ export function instanceIdFromSandboxId(sandboxId: string): string {
   const hex = sandboxId.slice(3); // strip "ki_"
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
+
+/**
+ * Return the subject used to bucket image-version rollouts.
+ *
+ * Legacy rows are user-keyed, so they bucket by userId. Instance-keyed rows
+ * bucket by the UUID encoded in the `ki_` sandboxId. This mirrors
+ * KiloClawInstance.restartMachine({ imageTag: 'latest' }).
+ */
+export function imageRolloutSubjectFromSandboxId(
+  sandboxId: string | null | undefined,
+  userId: string
+): string {
+  if (!sandboxId) return userId;
+  return isInstanceKeyedSandboxId(sandboxId) ? instanceIdFromSandboxId(sandboxId) : userId;
+}

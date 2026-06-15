@@ -52,31 +52,31 @@ That's it. The UI, validation, encryption, env var mapping, and sensitivity clas
 
 ### SecretCatalogEntry
 
-| Field               | Type                      | Required | Description                                                      |
-| ------------------- | ------------------------- | -------- | ---------------------------------------------------------------- |
-| `id`                | `string`                  | yes      | Unique identifier (e.g. `'telegram'`, `'brave-search'`)          |
-| `label`             | `string`                  | yes      | Display name in UI headings                                      |
-| `category`          | `SecretCategory`          | yes      | Grouping: `'channel'` \| `'tool'` \| `'provider'` \| `'custom'`  |
-| `icon`              | `SecretIconKey`           | yes      | Icon key: `'send'` \| `'discord'` \| `'slack'` \| `'key'`        |
-| `fields`            | `SecretFieldDefinition[]` | yes      | One or more secret fields                                        |
-| `order`             | `number`                  | no       | Sort position within category (undefined sorts last)             |
-| `allFieldsRequired` | `boolean`                 | no       | If true, all fields must be set or cleared together (e.g. Slack) |
-| `helpText`          | `string`                  | no       | Inline guidance shown below the input                            |
-| `helpUrl`           | `string`                  | no       | Link to external setup docs                                      |
-| `injectionMethod`   | `InjectionMethod`         | no       | `'env'` (default) or `'openclaw-secrets'` (future)               |
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` | yes | Unique identifier (e.g. `'telegram'`, `'brave-search'`) |
+| `label` | `string` | yes | Display name in UI headings |
+| `category` | `SecretCategory` | yes | Grouping: `'channel'` \| `'tool'` \| `'provider'` \| `'custom'` |
+| `icon` | `SecretIconKey` | yes | Icon key: `'send'` \| `'discord'` \| `'slack'` \| `'key'` |
+| `fields` | `SecretFieldDefinition[]` | yes | One or more secret fields |
+| `order` | `number` | no | Sort position within category (undefined sorts last) |
+| `allFieldsRequired` | `boolean` | no | If true, all fields must be set or cleared together (e.g. Slack) |
+| `helpText` | `string` | no | Inline guidance shown below the input |
+| `helpUrl` | `string` | no | Link to external setup docs |
+| `injectionMethod` | `InjectionMethod` | no | `'env'` (default) or `'openclaw-secrets'` (future) |
 
 ### SecretFieldDefinition
 
-| Field                   | Type     | Required | Description                                                                  |
-| ----------------------- | -------- | -------- | ---------------------------------------------------------------------------- |
-| `key`                   | `string` | yes      | Storage key in DO state and `patchSecrets` input (e.g. `'telegramBotToken'`) |
-| `label`                 | `string` | yes      | UI label rendered above the input                                            |
-| `placeholder`           | `string` | yes      | Input hint when empty                                                        |
-| `placeholderConfigured` | `string` | yes      | Input hint when a value is already saved                                     |
-| `envVar`                | `string` | yes      | Container env var name (e.g. `'TELEGRAM_BOT_TOKEN'`)                         |
-| `validationPattern`     | `string` | no       | Regex string for client + server validation                                  |
-| `validationMessage`     | `string` | no       | Error text when validation fails                                             |
-| `maxLength`             | `number` | yes      | Max input length (enforced server + client)                                  |
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `key` | `string` | yes | Storage key in DO state and `patchSecrets` input (e.g. `'telegramBotToken'`) |
+| `label` | `string` | yes | UI label rendered above the input |
+| `placeholder` | `string` | yes | Input hint when empty |
+| `placeholderConfigured` | `string` | yes | Input hint when a value is already saved |
+| `envVar` | `string` | yes | Container env var name (e.g. `'TELEGRAM_BOT_TOKEN'`) |
+| `validationPattern` | `string` | no | Regex string for client + server validation |
+| `validationMessage` | `string` | no | Error text when validation fails |
+| `maxLength` | `number` | yes | Max input length (enforced server + client) |
 
 ## Lookup helpers
 

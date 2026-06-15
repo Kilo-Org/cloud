@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getSlackOAuthUrl } from '@/lib/integrations/slack-service';
-import { createOAuthState } from '@/lib/integrations/oauth-state';
 import { getUserFromAuth } from '@/lib/user/server';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 
 export async function GET(request: NextRequest) {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -12,6 +12,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  const state = createOAuthState(`user_${user.id}`, user.id);
-  return NextResponse.redirect(getSlackOAuthUrl(state));
+  return NextResponse.redirect(new URL(getPlatformOAuthConnectPath(PLATFORM.SLACK), request.url));
 }

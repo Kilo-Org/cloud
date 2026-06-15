@@ -16,6 +16,27 @@ describe('getControllerEndpointCapabilities', () => {
     expect(capabilities).toEqual([...new Set(CONTROLLER_ENDPOINT_CAPABILITIES)].sort());
   });
 
+  it('advertises operation-specific agent CRUD capabilities', () => {
+    expect(getControllerEndpointCapabilities()).toEqual(
+      expect.arrayContaining([
+        'config.agents.read',
+        'config.agents.create.basic.cli',
+        'config.agents.update',
+        'config.agents.delete.cli',
+        'config.agents.bindings.update',
+        'config.agent-defaults.update',
+      ])
+    );
+  });
+
+  it('advertises validation-aware OpenClaw file writes', () => {
+    expect(getControllerEndpointCapabilities()).toContain('files.write-openclaw-config');
+  });
+
+  it('advertises path-scoped file tree listing', () => {
+    expect(getControllerEndpointCapabilities()).toContain('files.tree.path');
+  });
+
   it('includes conditional Kilo Chat capabilities only when requested', () => {
     const defaultCapabilities = getControllerEndpointCapabilities();
     const kiloChatCapabilities = getControllerEndpointCapabilities({

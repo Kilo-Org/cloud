@@ -41,18 +41,18 @@ export type DriverConfig = {
   /** HTTPS git URL to bootstrap the workspace. Public tiny repos work fine. */
   gitUrl: string;
   /**
-   * Model ID sent to tRPC `start`. Must match a model served by the fake LLM
-   * gateway's `/api/openrouter/models` response — the default `kilo/fake-deterministic`
-   * is the only model the fake currently advertises.
+   * Model ID sent to tRPC `start`. Must be accepted by the fake LLM gateway's
+   * `/api/openrouter/models/validate` response - the default
+   * `kilo/fake-deterministic` is the only accepted model.
    */
   model: string;
   /** Kilo organization ID — null for personal sessions. */
   kilocodeOrganizationId?: string;
   /**
    * Base URL of the fake LLM gateway, as seen **from the driver** (the host).
-   * Kilo inside the sandbox reaches it via `host.docker.internal`; the driver
-   * uses `localhost`. Used for the `POST /test/release` and
-   * `GET /test/gate-status` side channels. Override with `FAKE_LLM_URL`.
+   * Runtime setup translates the separately configured provider URL for kilo
+   * inside the sandbox. Used for fake-server side channels such as
+   * `/test/release`, `/test/gate-status`, and `/test/requests`.
    */
   fakeLlmUrl: string;
 };
@@ -346,6 +346,19 @@ export async function fetchFakeWaiters(fakeLlmUrl: string): Promise<FakeWaitersS
     throw new Error(`fetchFakeWaiters failed: ${res.status} ${res.statusText}`);
   }
   return (await res.json()) as FakeWaitersSnapshot;
+}
+
+export type FakeRequestSnapshot = {
+  chatCompletions: number;
+};
+
+export async function fetchFakeRequests(fakeLlmUrl: string): Promise<FakeRequestSnapshot> {
+  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`fetchFakeRequests failed: ${res.status} ${res.statusText}`);
+  }
+  return (await res.json()) as FakeRequestSnapshot;
 }
 
 /**

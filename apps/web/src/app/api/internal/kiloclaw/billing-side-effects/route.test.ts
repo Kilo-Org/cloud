@@ -3,6 +3,7 @@ import { send as sendEmail } from '@/lib/email';
 import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
 import { enqueueAffiliateEventForUser } from '@/lib/impact/affiliate-events';
 import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
+import { enforceKiloClawCommitRetirementGuard } from '@/lib/kiloclaw/commit-retirement';
 
 jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
@@ -48,6 +49,10 @@ jest.mock('@/lib/kilo-pass/usage-triggered-bonus', () => ({
   maybeIssueKiloPassBonusFromUsageThreshold: jest.fn(),
 }));
 
+jest.mock('@/lib/kiloclaw/commit-retirement', () => ({
+  enforceKiloClawCommitRetirementGuard: jest.fn(),
+}));
+
 import { POST } from './route';
 
 const mockSendEmail = jest.mocked(sendEmail);
@@ -56,6 +61,7 @@ const mockEnqueueAffiliateEventForUser = jest.mocked(enqueueAffiliateEventForUse
 const mockProcessPersonalKiloClawPaidConversion = jest.mocked(
   processPersonalKiloClawPaidConversion
 );
+const mockEnforceKiloClawCommitRetirementGuard = jest.mocked(enforceKiloClawCommitRetirementGuard);
 
 type ConsoleSpy = jest.SpiedFunction<typeof console.log> | jest.SpiedFunction<typeof console.error>;
 
@@ -90,6 +96,7 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
 
     mockSendEmail.mockResolvedValue({ sent: true });
     mockMaybePerformAutoTopUp.mockResolvedValue(undefined);
+    mockEnforceKiloClawCommitRetirementGuard.mockResolvedValue({ guarded: true });
     mockProcessPersonalKiloClawPaidConversion.mockResolvedValue({
       shouldEnqueueAffiliateSale: true,
       winningTouchType: 'affiliate',
@@ -288,6 +295,40 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
         error: 'auto top-up unavailable',
       })
     );
+  });
+
+  it('runs authenticated Commit retirement guard side effects', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'commit_retirement_guard',
+        input: {
+          subscriptionId: '11111111-1111-4111-8111-111111111111',
+          expectedFinalBoundary: '2026-07-06T00:00:00.000Z',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEnforceKiloClawCommitRetirementGuard).toHaveBeenCalledWith({
+      subscriptionId: '11111111-1111-4111-8111-111111111111',
+      expectedFinalBoundary: '2026-07-06T00:00:00.000Z',
+    });
+    await expect(response.json()).resolves.toEqual({ guarded: true });
+  });
+
+  it('rejects malformed Commit retirement guard boundaries', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'commit_retirement_guard',
+        input: {
+          subscriptionId: '11111111-1111-4111-8111-111111111111',
+          expectedFinalBoundary: '2026-07-06 00:00:00+00',
+        },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockEnforceKiloClawCommitRetirementGuard).not.toHaveBeenCalled();
   });
 
   it('rejects Postgres timestamp text in paid conversion event dates', async () => {

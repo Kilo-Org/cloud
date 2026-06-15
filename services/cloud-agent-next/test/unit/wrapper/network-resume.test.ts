@@ -102,7 +102,6 @@ const createCallbacks = (): ConnectionCallbacks & {
   onDisconnect: ReturnType<typeof vi.fn>;
   onTerminalError: ReturnType<typeof vi.fn>;
 } => ({
-  onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
@@ -147,6 +146,7 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
     sendPromptAsync: vi.fn().mockResolvedValue(undefined),
     abortSession: vi.fn().mockResolvedValue(true),
+    summarizeSession: vi.fn().mockResolvedValue(true),
     sendCommand: vi.fn().mockResolvedValue(undefined),
     answerPermission: vi.fn().mockResolvedValue(true),
     answerQuestion: vi.fn().mockResolvedValue(true),

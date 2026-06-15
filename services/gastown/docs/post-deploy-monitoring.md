@@ -251,16 +251,16 @@ done
 
 ## 5. Key Metrics to Watch
 
-| Metric                | Healthy                                 | Unhealthy                             |
-| --------------------- | --------------------------------------- | ------------------------------------- |
-| Working agents        | >0 when beads exist                     | 0 for >5 min with open beads          |
-| Failed bead count     | Stable                                  | Increasing rapidly                    |
-| Invariant violations  | 0                                       | >0 (check reconciler logs)            |
-| Refinery status       | `working` during review, `idle` between | `idle` with in_progress MR for >5 min |
-| Review outcomes       | `merged`                                | `Refinery container failed to start`  |
-| Alarm interval        | `active (5s)` with work                 | Stuck at same `nextFireAt`            |
-| Reconciler wall clock | <100ms                                  | >500ms consistently                   |
-| Pending event count   | 0 between ticks                         | Growing (events not draining)         |
+| Metric | Healthy | Unhealthy |
+|---|---|---|
+| Working agents | >0 when beads exist | 0 for >5 min with open beads |
+| Failed bead count | Stable | Increasing rapidly |
+| Invariant violations | 0 | >0 (check reconciler logs) |
+| Refinery status | `working` during review, `idle` between | `idle` with in_progress MR for >5 min |
+| Review outcomes | `merged` | `Refinery container failed to start` |
+| Alarm interval | `active (5s)` with work | Stuck at same `nextFireAt` |
+| Reconciler wall clock | <100ms | >500ms consistently |
+| Pending event count | 0 between ticks | Growing (events not draining) |
 
 ## 6. Querying Cloudflare Logs (Workers Observability)
 
@@ -351,26 +351,26 @@ The `gastown_events` Analytics Engine dataset stores all lifecycle events (bead 
 
 The `gastown_events` dataset maps fields as follows:
 
-| Column  | Field               | Description                                       |
-| ------- | ------------------- | ------------------------------------------------- |
-| blob1   | event               | Event name (e.g. `bead.created`, `agent.spawned`) |
-| blob2   | userId              | User who triggered the event                      |
-| blob3   | delivery            | `http`, `trpc`, or `internal`                     |
-| blob4   | route               | HTTP route pattern (for HTTP events)              |
-| blob5   | error               | Error message (if any)                            |
-| blob6   | townId              | Town ID                                           |
-| blob7   | rigId               | Rig ID                                            |
-| blob8   | agentId             | Agent ID                                          |
-| blob9   | beadId              | Bead ID                                           |
-| blob10  | label               | Free-form label (e.g. actionsByType JSON)         |
-| blob11  | convoyId            | Convoy ID                                         |
-| blob12  | role                | Agent role (`polecat`, `refinery`, `mayor`)       |
-| blob13  | beadType            | Bead type                                         |
-| double1 | durationMs          | Duration in milliseconds                          |
-| double2 | value               | Generic numeric value                             |
-| double3 | actionsEmitted      | (reconciler_tick) actions count                   |
-| double7 | invariantViolations | (reconciler_tick) violation count                 |
-| double8 | pendingEventCount   | (reconciler_tick) pending event count             |
+| Column | Field | Description |
+|---|---|---|
+| blob1 | event | Event name (e.g. `bead.created`, `agent.spawned`) |
+| blob2 | userId | User who triggered the event |
+| blob3 | delivery | `http`, `trpc`, or `internal` |
+| blob4 | route | HTTP route pattern (for HTTP events) |
+| blob5 | error | Error message (if any) |
+| blob6 | townId | Town ID |
+| blob7 | rigId | Rig ID |
+| blob8 | agentId | Agent ID |
+| blob9 | beadId | Bead ID |
+| blob10 | label | Free-form label (e.g. actionsByType JSON) |
+| blob11 | convoyId | Convoy ID |
+| blob12 | role | Agent role (`polecat`, `refinery`, `mayor`) |
+| blob13 | beadType | Bead type |
+| double1 | durationMs | Duration in milliseconds |
+| double2 | value | Generic numeric value |
+| double3 | actionsEmitted | (reconciler_tick) actions count |
+| double7 | invariantViolations | (reconciler_tick) violation count |
+| double8 | pendingEventCount | (reconciler_tick) pending event count |
 
 ### Example AE queries
 
@@ -426,14 +426,14 @@ curl -s "$AE_API" \
 
 Worker logs now emit JSON-structured entries. Key fields available for filtering in Workers Observability:
 
-| JSON field | Description                 | Example filter                  |
-| ---------- | --------------------------- | ------------------------------- |
-| `source`   | Module that emitted the log | `"Town.do"`, `"gastown-worker"` |
-| `townId`   | Town UUID                   | `message : "townId":"<uuid>"`   |
-| `rigId`    | Rig UUID                    | `message : "rigId":"<uuid>"`    |
-| `userId`   | User UUID                   | `message : "userId":"<uuid>"`   |
-| `orgId`    | Organization UUID           | `message : "orgId":"<uuid>"`    |
-| `agentId`  | Agent UUID                  | `message : "agentId":"<uuid>"`  |
-| `level`    | `info`, `warn`, or `error`  | `message : "level":"error"`     |
+| JSON field | Description | Example filter |
+|---|---|---|
+| `source` | Module that emitted the log | `"Town.do"`, `"gastown-worker"` |
+| `townId` | Town UUID | `message : "townId":"<uuid>"` |
+| `rigId` | Rig UUID | `message : "rigId":"<uuid>"` |
+| `userId` | User UUID | `message : "userId":"<uuid>"` |
+| `orgId` | Organization UUID | `message : "orgId":"<uuid>"` |
+| `agentId` | Agent UUID | `message : "agentId":"<uuid>"` |
+| `level` | `info`, `warn`, or `error` | `message : "level":"error"` |
 
 These fields are embedded in the `message` text as JSON, so use the `contains` operator or `:` in the dashboard query language to filter by them.

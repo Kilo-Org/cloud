@@ -5,6 +5,14 @@ import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import {
+  AgentIdSchema,
+  AgentCreateInputSchema,
+  AgentUpdateInputSchema,
+  AgentDefaultsUpdateInputSchema,
+  AgentBindingsInputSchema,
+} from '@/lib/kiloclaw/agent-schemas';
+import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
@@ -29,8 +37,11 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   kiloclaw_cli_runs,
+  kiloclaw_instances,
+  kiloclaw_subscriptions,
+  kilocode_users,
 } from '@kilocode/db/schema';
-import { and, eq, desc, sql } from 'drizzle-orm';
+import { and, eq, desc, sql, isNull } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
@@ -46,23 +57,12 @@ import {
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
 import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
-import {
-  getOrganizationProvisionLockKey,
-  withKiloclawProvisionContextLock,
-} from '@/lib/kiloclaw/provision-lock';
 import { encryptProvisionSecretsForWorker } from '@/lib/kiloclaw/provision-secrets';
-import {
-  buildComposioProvisionSecrets,
-  composioSecretsPatchSource,
-  createManagedComposioGoogleCalendarLink,
-  clearComposioInstanceConfig,
-  getComposioInstanceConfigSource,
-  getManagedComposioGoogleCalendarStatus,
-  markComposioInstanceConfig,
-} from '@/lib/kiloclaw/composio-onboarding';
+import { handleProvisionError } from '@/lib/kiloclaw/provision-error-handler';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
+  organizationBillingProcedure,
 } from '@/routers/organizations/utils';
 import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
 
@@ -124,6 +124,25 @@ function handleFileOperationError(err: unknown, operation: string): never {
     throw new TRPCError({
       code: 'CONFLICT',
       message: message ?? 'File was modified externally',
+      cause: code ? new UpstreamApiError(code) : undefined,
+    });
+  }
+  // 422: controller rejected the resulting config (e.g. invalid_agent_config).
+  // tRPC has no 422, so BAD_REQUEST is the closest mapping.
+  if (err instanceof KiloClawApiError && err.statusCode === 422) {
+    const { message } = getKiloClawApiErrorPayload(err);
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: message ?? `Failed to ${operation}`,
+    });
+  }
+  // 501: the controller image does not advertise the required capability
+  // (capability_unavailable) — treat like a missing route: needs redeploy.
+  if (err instanceof KiloClawApiError && err.statusCode === 501) {
+    const { code, message } = getKiloClawApiErrorPayload(err);
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: message ?? `Instance needs redeploy to support ${operation}`,
       cause: code ? new UpstreamApiError(code) : undefined,
     });
   }
@@ -194,7 +213,6 @@ const updateConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
   userLocation: userLocationSchema.nullable().optional(),
-  skipIncompleteManagedComposioConnection: z.boolean().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -224,19 +242,6 @@ const patchBotIdentitySchema = z.object({
   botNature: z.string().trim().min(1).max(120).nullable().optional(),
   botVibe: z.string().trim().min(1).max(120).nullable().optional(),
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
-});
-
-const composioConnectLinkSchema = z.object({
-  organizationId: z.uuid(),
-  returnTo: z
-    .string()
-    .min(1)
-    .max(500)
-    .refine(value => value.startsWith('/'), {
-      message: 'returnTo must be a relative path',
-    }),
-  popup: z.boolean().optional(),
-  attemptId: z.string().min(1).max(100).optional(),
 });
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -327,9 +332,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const client = new KiloClawInternalClient();
       const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
       if (!instance) return client.getLatestVersion();
-      // Early Access is resolved server-side via the platform endpoint
-      // (instance → owner → kiloclaw_early_access lookup), not passed by us.
-      return client.getLatestVersion({
+      return client.getLatestVersionForInstance({
         instanceId: instance.id,
         currentImageTag: input.currentImageTag ?? null,
       });
@@ -423,6 +426,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
     } satisfies KiloClawDashboardStatus;
   }),
 
+  getNavState: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    return {
+      hasActiveInstance: instance !== null,
+    };
+  }),
+
   getDiskUsage: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     try {
@@ -467,75 +477,65 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .input(updateConfigSchema)
     .mutation(async ({ ctx, input }) => {
       await requireOrganizationKiloClawComputeEntitlement(input.organizationId);
-      return await withKiloclawProvisionContextLock(
-        getOrganizationProvisionLockKey(ctx.user.id, input.organizationId),
-        async () => {
-          const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-          if (existing) {
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message: 'You already have an active KiloClaw instance in this organization',
-            });
+      const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+      if (existing) {
+        const client = new KiloClawInternalClient();
+        try {
+          await client.repairProvisionReservation(ctx.user.id, existing.id, input.organizationId);
+        } catch (error) {
+          if (error instanceof KiloClawApiError) {
+            const { code } = getKiloClawApiErrorPayload(error);
+            if (code !== 'provision_repair_unavailable')
+              handleProvisionError(error, getKiloClawApiErrorPayload);
+          } else {
+            throw error;
           }
-
-          const composioProvision = await buildComposioProvisionSecrets({
-            scope: {
-              ownerType: 'organization_user',
-              userId: ctx.user.id,
-              organizationId: input.organizationId,
-            },
-            secrets: input.secrets,
-            skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
-          });
-
-          const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
-
-          const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-          const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-            expiresIn: expiresInSeconds,
-          });
-          const kilocodeApiKeyExpiresAt = new Date(
-            Date.now() + expiresInSeconds * 1000
-          ).toISOString();
-
-          const client = new KiloClawInternalClient();
-          const result = await client.provision(
-            ctx.user.id,
-            {
-              envVars: input.envVars,
-              encryptedSecrets,
-              channels: buildWorkerChannels(input.channels),
-              kilocodeApiKey,
-              kilocodeApiKeyExpiresAt,
-              kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-              userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
-              userLocation: input.userLocation === undefined ? undefined : input.userLocation,
-            },
-            { orgId: input.organizationId }
-          );
-
-          if (composioProvision.configToMark?.source === 'manual') {
-            await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
-          } else if (composioProvision.configToMark?.source === 'managed') {
-            await markComposioInstanceConfig({
-              instanceId: result.instanceId,
-              source: 'managed',
-            });
-          }
-
-          PostHogClient().capture({
-            distinctId: ctx.user.google_user_email,
-            event: 'claw_org_instance_provisioned',
-            properties: {
-              user_id: ctx.user.id,
-              organization_id: input.organizationId,
-              instance_id: result.instanceId,
-            },
-          });
-
-          return result;
         }
-      );
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'You already have an active KiloClaw instance in this organization',
+        });
+      }
+
+      const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
+      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
+        expiresIn: expiresInSeconds,
+      });
+      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+      const client = new KiloClawInternalClient();
+      let result: Awaited<ReturnType<typeof client.provision>>;
+      try {
+        result = await client.provision(
+          ctx.user.id,
+          {
+            envVars: input.envVars,
+            encryptedSecrets,
+            channels: buildWorkerChannels(input.channels),
+            kilocodeApiKey,
+            kilocodeApiKeyExpiresAt,
+            kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+            userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+            userLocation: input.userLocation === undefined ? undefined : input.userLocation,
+          },
+          { orgId: input.organizationId }
+        );
+      } catch (error) {
+        handleProvisionError(error, getKiloClawApiErrorPayload);
+      }
+
+      PostHogClient().capture({
+        distinctId: ctx.user.google_user_email,
+        event: 'claw_org_instance_provisioned',
+        properties: {
+          user_id: ctx.user.id,
+          organization_id: input.organizationId,
+          instance_id: result.instanceId,
+        },
+      });
+
+      return result;
     }),
 
   updateConfig: organizationMemberProcedure
@@ -545,18 +545,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       // Re-provision: same as provision but expects existing instance
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
 
-      const composioProvision = await buildComposioProvisionSecrets({
-        scope: {
-          ownerType: 'organization_user',
-          userId: ctx.user.id,
-          organizationId: input.organizationId,
-        },
-        instanceId: instance.id,
-        secrets: input.secrets,
-        skipIncompleteManagedConnection: input.skipIncompleteManagedComposioConnection,
-      });
-
-      const encryptedSecrets = encryptProvisionSecretsForWorker(composioProvision.secrets);
+      const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
 
       const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
       const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
@@ -571,32 +560,25 @@ export const organizationKiloclawRouter = createTRPCRouter({
         .limit(1);
 
       const client = new KiloClawInternalClient();
-      const result = await client.provision(
-        ctx.user.id,
-        {
-          envVars: input.envVars,
-          encryptedSecrets,
-          channels: buildWorkerChannels(input.channels),
-          kilocodeApiKey,
-          kilocodeApiKeyExpiresAt,
-          kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-          userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
-          userLocation: input.userLocation === undefined ? undefined : input.userLocation,
-          pinnedImageTag: pin?.image_tag,
-        },
-        { instanceId: instance.id, orgId: input.organizationId }
-      );
-
-      if (composioProvision.configToMark?.source === 'manual') {
-        await markComposioInstanceConfig({ instanceId: result.instanceId, source: 'manual' });
-      } else if (composioProvision.configToMark?.source === 'managed') {
-        await markComposioInstanceConfig({
-          instanceId: result.instanceId,
-          source: 'managed',
-        });
+      try {
+        return await client.provision(
+          ctx.user.id,
+          {
+            envVars: input.envVars,
+            encryptedSecrets,
+            channels: buildWorkerChannels(input.channels),
+            kilocodeApiKey,
+            kilocodeApiKeyExpiresAt,
+            kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+            userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+            userLocation: input.userLocation === undefined ? undefined : input.userLocation,
+            pinnedImageTag: pin?.image_tag,
+          },
+          { instanceId: instance.id, orgId: input.organizationId }
+        );
+      } catch (error) {
+        handleProvisionError(error, getKiloClawApiErrorPayload);
       }
-
-      return result;
     }),
 
   start: organizationMemberProcedure.mutation(async ({ ctx, input }) => {
@@ -799,18 +781,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       try {
-        const result = await client.patchSecrets(
+        return await client.patchSecrets(
           ctx.user.id,
           { secrets: encryptedPatch, meta: input.meta },
           workerInstanceId(instance)
         );
-        const sourceAction = composioSecretsPatchSource(input.secrets);
-        if (sourceAction === 'upsert_manual') {
-          await markComposioInstanceConfig({ instanceId: instance.id, source: 'manual' });
-        } else if (sourceAction === 'clear') {
-          await clearComposioInstanceConfig(instance.id);
-        }
-        return result;
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           let message = `Secret patch failed (${err.statusCode})`;
@@ -833,62 +808,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const client = new KiloClawUserClient(token);
     return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
-
-  getComposioOnboardingStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    let sandboxHasComposioSecrets = false;
-    if (instance) {
-      const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
-      const client = new KiloClawUserClient(token);
-      const config = await client.getConfig({
-        userId: ctx.user.id,
-        instanceId: workerInstanceId(instance),
-      });
-      sandboxHasComposioSecrets = config.configuredSecrets.composio === true;
-    }
-    return await getManagedComposioGoogleCalendarStatus({
-      scope: {
-        ownerType: 'organization_user',
-        userId: ctx.user.id,
-        organizationId: input.organizationId,
-      },
-      instance,
-      sandboxHasComposioSecrets,
-    });
-  }),
-
-  createComposioGoogleCalendarLink: organizationMemberMutationProcedure
-    .input(composioConnectLinkSchema)
-    .mutation(async ({ ctx, input }) => {
-      return await withKiloclawProvisionContextLock(
-        getOrganizationProvisionLockKey(ctx.user.id, input.organizationId),
-        async () => {
-          const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-          const sandboxConfigSource = instance
-            ? await getComposioInstanceConfigSource(instance.id)
-            : null;
-          if (sandboxConfigSource === 'manual') {
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message: 'This sandbox already uses your own Composio credentials.',
-            });
-          }
-
-          return await createManagedComposioGoogleCalendarLink({
-            userId: ctx.user.id,
-            scope: {
-              ownerType: 'organization_user',
-              userId: ctx.user.id,
-              organizationId: input.organizationId,
-            },
-            organizationId: input.organizationId,
-            returnTo: input.returnTo,
-            popup: input.popup,
-            attemptId: input.attemptId,
-          });
-        }
-      );
-    }),
 
   getChannelCatalog: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
@@ -1569,19 +1488,24 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   // ── File operations ───────────────────────────────────────────
 
-  fileTree: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    try {
-      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-      const client = new KiloClawInternalClient();
-      const result = await client.getFileTree(ctx.user.id, workerInstanceId(instance));
-      return result.tree;
-    } catch (err) {
-      handleFileOperationError(err, 'fetch file tree');
-    }
-  }),
+  fileTree: organizationMemberProcedure
+    .input(z.object({ organizationId: z.uuid(), path: kiloclawFilePathSchema.optional() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        const result = await client.getFileTree(ctx.user.id, {
+          instanceId: workerInstanceId(instance),
+          path: input.path,
+        });
+        return result.tree;
+      } catch (err) {
+        handleFileOperationError(err, 'fetch file tree');
+      }
+    }),
 
   readFile: organizationMemberProcedure
-    .input(z.object({ organizationId: z.uuid(), path: z.string().min(1) }))
+    .input(z.object({ organizationId: z.uuid(), path: kiloclawFilePathSchema }))
     .query(async ({ ctx, input }) => {
       try {
         const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
@@ -1596,9 +1520,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.uuid(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
         content: z.string(),
         etag: z.string().min(1),
+        openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1626,6 +1551,21 @@ export const organizationKiloclawRouter = createTRPCRouter({
           content = JSON.stringify(userConfig, null, 2);
         }
 
+        if (input.openclawValidation) {
+          if (input.path !== 'openclaw.json') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'OpenClaw validation is only available for openclaw.json',
+            });
+          }
+          return await client.writeOpenclawConfigFile(
+            ctx.user.id,
+            content,
+            input.etag,
+            workerInstanceId(instance),
+            input.openclawValidation
+          );
+        }
         return await client.writeFile(
           ctx.user.id,
           input.path,
@@ -1645,7 +1585,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         files: z
           .array(
             z.object({
-              path: z.string().min(1),
+              path: kiloclawFilePathSchema,
               content: z.string(),
             })
           )
@@ -1682,4 +1622,145 @@ export const organizationKiloclawRouter = createTRPCRouter({
         handleFileOperationError(err, 'patch openclaw config');
       }
     }),
+
+  // ── Agent config CRUD ─────────────────────────────────────────────────
+  listAgents: organizationMemberProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.listAgents(ctx.user.id, workerInstanceId(instance));
+      } catch (err) {
+        handleFileOperationError(err, 'list agents');
+      }
+    }),
+
+  getAgent: organizationMemberProcedure
+    .input(z.object({ organizationId: z.uuid(), agentId: AgentIdSchema }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.getAgent(ctx.user.id, input.agentId, workerInstanceId(instance));
+      } catch (err) {
+        handleFileOperationError(err, 'read agent');
+      }
+    }),
+
+  createAgent: organizationMemberMutationProcedure
+    .input(z.object({ organizationId: z.uuid(), agent: AgentCreateInputSchema }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.createAgent(ctx.user.id, input.agent, workerInstanceId(instance));
+      } catch (err) {
+        handleFileOperationError(err, 'create agent');
+      }
+    }),
+
+  updateAgent: organizationMemberMutationProcedure
+    .input(
+      z.object({ organizationId: z.uuid(), agentId: AgentIdSchema, patch: AgentUpdateInputSchema })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.updateAgent(
+          ctx.user.id,
+          input.agentId,
+          input.patch,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'update agent');
+      }
+    }),
+
+  updateAgentDefaults: organizationMemberMutationProcedure
+    .input(z.object({ organizationId: z.uuid(), patch: AgentDefaultsUpdateInputSchema }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.updateAgentDefaults(
+          ctx.user.id,
+          input.patch,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'update agent defaults');
+      }
+    }),
+
+  deleteAgent: organizationMemberMutationProcedure
+    .input(z.object({ organizationId: z.uuid(), agentId: AgentIdSchema }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.deleteAgent(ctx.user.id, input.agentId, workerInstanceId(instance));
+      } catch (err) {
+        handleFileOperationError(err, 'delete agent');
+      }
+    }),
+
+  updateAgentBindings: organizationMemberMutationProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid(),
+        agentId: AgentIdSchema,
+        bindings: AgentBindingsInputSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.updateAgentBindings(
+          ctx.user.id,
+          input.agentId,
+          input.bindings,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'update agent bindings');
+      }
+    }),
+
+  // ── Org-wide instance list (owner / billing_manager only) ─────
+
+  listActiveInstances: organizationBillingProcedure.query(async ({ input }) => {
+    const rows = await db
+      .select({
+        id: kiloclaw_instances.id,
+        name: kiloclaw_instances.name,
+        createdAt: kiloclaw_instances.created_at,
+        userEmail: kilocode_users.google_user_email,
+        suspendedAt: kiloclaw_subscriptions.suspended_at,
+      })
+      .from(kiloclaw_instances)
+      .innerJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .innerJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id)
+      )
+      .where(
+        and(
+          eq(kiloclaw_instances.organization_id, input.organizationId),
+          isNull(kiloclaw_instances.destroyed_at)
+        )
+      )
+      .orderBy(kiloclaw_instances.created_at);
+
+    return rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      createdAt: new Date(row.createdAt).toISOString(),
+      userEmail: row.userEmail,
+      isSuspended: row.suspendedAt !== null,
+    }));
+  }),
 });

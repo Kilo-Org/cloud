@@ -1478,6 +1478,63 @@ describe('Organizations', () => {
         }
       });
 
+      test('should reject invitation when accepting user email does not match invite email', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const differentUser = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(differentUser.id, invitation.token);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe('Invitation is for a different email address');
+        }
+
+        const storedInvitation = await db.query.organization_invitations.findFirst({
+          where: eq(organization_invitations.token, invitation.token),
+        });
+        expect(storedInvitation?.accepted_at).toBeNull();
+
+        const unexpectedMembership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, differentUser.id)
+          ),
+        });
+        expect(unexpectedMembership).toBeUndefined();
+      });
+
+      test('should accept invitation when normalized user email matches invite email', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({
+          google_user_email: 'johndoe@gmail.com',
+          normalized_email: 'johndoe@gmail.com',
+        });
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          'John.Doe+team@googlemail.com',
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+
+        expect(result.success).toBe(true);
+        const userOrgs = await getUserOrganizationsWithSeats(invitee.id);
+        expect(userOrgs).toHaveLength(1);
+        expect(userOrgs[0].organizationId).toBe(organization.id);
+      });
+
       test('should reject invitation for existing members', async () => {
         const owner = await insertTestUser();
         const invitee = await insertTestUser();

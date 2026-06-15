@@ -1,6 +1,7 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { isKiloExclusiveModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel, isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
@@ -15,10 +16,7 @@ import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { CustomLlmDefinitionSchema } from '@kilocode/db';
-import {
-  buildDirectProvider,
-  inferSupportedChatApis,
-} from '@/lib/ai-gateway/experiments/build-direct-provider';
+import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import {
   pickModelExperimentVariant,
@@ -45,14 +43,6 @@ export type GetProviderProviderResult = {
    *  by direct-byok and custom_llm2 because both already require explicit
    *  admin opt-in. */
   bypassAccessCheck: boolean;
-  /** Skip pinning `body.provider` from the organization-determined config.
-   *  Set for direct experiment upstreams where the partner endpoint is
-   *  selected by the variant, not by gateway routing. */
-  skipProviderPin?: boolean;
-  /** Skip the kilo-exclusive `internal_id` rewrite + provider pin in
-   *  `applyProviderSpecificLogic`. Generic provider-specific request fixes
-   *  and `provider.transformRequest` still run. */
-  skipKiloExclusiveModelSettings?: boolean;
   /** Present when this provider was resolved through a model experiment. */
   experiment?: ExperimentRouting;
 };
@@ -88,7 +78,7 @@ async function checkDirectBYOK(
       id: 'direct-byok',
       apiUrl: directByok.base_url,
       apiKey: userByok[0].decryptedAPIKey,
-      supportedChatApis: inferSupportedChatApis(directByok.ai_sdk_provider, undefined),
+      supportedChatApis: directByok.supported_chat_apis,
       transformRequest(context) {
         context.request.body.model = directByokModel.id;
         directByok.transformRequest(context);
@@ -117,22 +107,17 @@ async function checkCustomLlm(
   }
   return {
     kind: 'provider',
-    provider: buildDirectProvider({
-      internal_id: customLlm.internal_id,
-      base_url: customLlm.base_url,
-      api_key: customLlm.api_key,
-      opencode_settings: customLlm.opencode_settings
-        ? { ai_sdk_provider: customLlm.opencode_settings.ai_sdk_provider }
-        : undefined,
-      openclaw_settings: customLlm.openclaw_settings
-        ? { api_adapter: customLlm.openclaw_settings.api_adapter }
-        : undefined,
-      extra_body: customLlm.extra_body,
-      extra_headers: customLlm.extra_headers,
-      remove_from_body: customLlm.remove_from_body,
-      add_cache_breakpoints: customLlm.add_cache_breakpoints,
-      inject_reasoning_into_content: customLlm.inject_reasoning_into_content,
-    }),
+    provider: buildDirectProvider(
+      'custom',
+      [
+        customLlm.opencode_settings?.ai_sdk_provider === 'anthropic'
+          ? 'messages'
+          : customLlm.opencode_settings?.ai_sdk_provider === 'openai'
+            ? 'responses'
+            : 'chat_completions',
+      ],
+      customLlm
+    ),
     userByok: null,
     bypassAccessCheck: true,
   };
@@ -191,11 +176,18 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     };
   }
 
+  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
+
   // Model experiment routing for dedicated preview public ids. Runs before
-  // `kilo-internal/...` and the `kiloExclusiveModels` lookup so an
-  // experimented public id never falls through to OpenRouter/Vercel.
+  // the custom-LLM (`kilo-internal/...`) and the `kiloExclusiveModels` lookup
+  // so an experimented public id never falls through to OpenRouter/Vercel.
   const experimented = await isPublicIdExperimented(requestedModel);
   if (experimented === true) {
+    if (kiloExclusiveModel) {
+      throw new Error(
+        `Configuration error: ${requestedModel} cannot be both an experiment and a Kilo-exclusive model`
+      );
+    }
     const userId = isAnonymousContext(user) ? null : user.id;
     const selection = await pickModelExperimentVariant({
       publicModelId: requestedModel,
@@ -212,11 +204,9 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     if (selection?.status === 'active') {
       return {
         kind: 'provider',
-        provider: buildDirectProvider(selection.upstream),
+        provider: buildDirectProvider('experiment', ['chat_completions'], selection.upstream),
         userByok: null,
         bypassAccessCheck: false,
-        skipProviderPin: true,
-        skipKiloExclusiveModelSettings: true,
         experiment: {
           experimentId: selection.experimentId,
           variantId: selection.variantId,
@@ -229,14 +219,13 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     // this id. Fall through to non-experiment routing.
   }
 
-  if (requestedModel.startsWith('kilo-internal/') && organizationId) {
+  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId) {
     const customLlmResult = await checkCustomLlm(requestedModel, organizationId);
     if (customLlmResult) {
       return customLlmResult;
     }
   }
 
-  const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
 

@@ -127,7 +127,7 @@ export function useDeviceAuth(): DeviceAuthResult {
       });
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/device-auth/codes`, {
+        const response = await fetch(`${API_BASE_URL}/api/device-auth/codes?app=1`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
@@ -156,7 +156,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         const browserUrl =
           mode === 'signup'
             ? `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
-                callbackPath: `/device-auth?code=${data.code}`,
+                callbackPath: `/device-auth?code=${data.code}&app=1`,
                 signup: 'true',
               }).toString()}`
             : data.verificationUrl;

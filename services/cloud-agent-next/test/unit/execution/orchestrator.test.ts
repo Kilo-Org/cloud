@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
+
 import {
   ExecutionError,
   isExecutionError,
@@ -6,6 +9,7 @@ import {
   type RetryableErrorCode,
 } from '../../../src/execution/errors.js';
 import { ExecutionOrchestrator } from '../../../src/execution/orchestrator.js';
+import { CloudflareAgentSandbox } from '../../../src/agent-sandbox/cloudflare/cloudflare-agent-sandbox.js';
 import { WrapperClient } from '../../../src/kilo/wrapper-client.js';
 import { SessionService } from '../../../src/session-service.js';
 import type {
@@ -188,7 +192,10 @@ function createOrchestrator(
   const recordKiloServerActivity =
     options.recordKiloServerActivity ?? vi.fn().mockResolvedValue(undefined);
   return new ExecutionOrchestrator({
-    getSandbox: vi.fn().mockResolvedValue(sandbox),
+    getAgentSandbox: plan =>
+      new CloudflareAgentSandbox(env as Env, plan.workspace.metadata, {
+        resolveSandbox: () => sandbox,
+      }),
     getSessionStub: vi.fn(
       () =>
         ({
@@ -416,7 +423,27 @@ describe('ExecutionOrchestrator bootstrap execution', () => {
     ]);
   });
 
-  it('does not emit preparation progress when delivering to a warm workspace', async () => {
+  it('allows wrapper readiness eight minutes but enforces the ten-minute startup budget', async () => {
+    vi.useFakeTimers();
+    const { sandbox } = createMockSandbox({ workspaceWarm: true });
+    const { ensureSessionReady, prompt } = stubWrapperBootstrap();
+    ensureSessionReady.mockImplementation(() => new Promise(() => {}));
+    const orchestrator = createOrchestrator(sandbox);
+
+    const execution = orchestrator.execute(createExecutionPlan());
+    const rejection = expect(execution).rejects.toThrow(
+      'Workspace preparation timed out during wrapper readiness after 600s'
+    );
+    await vi.advanceTimersByTimeAsync(8 * 60 * 1000);
+
+    expect(ensureSessionReady).toHaveBeenCalledOnce();
+    expect(prompt).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
+    await rejection;
+  });
+
+  it('reports Kilo startup progress when delivering to a warm workspace', async () => {
     const { sandbox } = createMockSandbox({ workspaceWarm: true });
     const { ensureSessionReady, prompt } = stubWrapperBootstrap();
     const orchestrator = createOrchestrator(sandbox);
@@ -424,7 +451,7 @@ describe('ExecutionOrchestrator bootstrap execution', () => {
 
     await orchestrator.execute(createExecutionPlan(), { onProgress });
 
-    expect(onProgress).not.toHaveBeenCalled();
+    expect(onProgress).toHaveBeenCalledExactlyOnceWith('kilo_server', 'Starting Kilo...');
     expect(ensureSessionReady).toHaveBeenCalledOnce();
     expect(prompt).toHaveBeenCalledOnce();
   });

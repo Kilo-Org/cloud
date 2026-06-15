@@ -22,7 +22,8 @@ function throwTerminalError(result: OperationResult<unknown>): never {
       ? 'NOT_FOUND'
       : message.includes('interactive Cloud Agent')
         ? 'FORBIDDEN'
-        : message.includes('workspace is prepared')
+        : message.includes('workspace is prepared') ||
+            message.includes('session wrapper is not running')
           ? 'PRECONDITION_FAILED'
           : 'SERVICE_UNAVAILABLE';
 

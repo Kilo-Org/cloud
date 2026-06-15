@@ -12,12 +12,9 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  isReasoningExplicitlyDisabled,
-  isReasoningExplicitlyEnabled,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { redisGet } from '@/lib/redis';
+import { redisClient } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import {
   GatewayPercentageSchema,
@@ -27,10 +24,11 @@ import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
-    const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
+    const raw = await redisClient.get<string>(VERCEL_ROUTING_REDIS_KEY);
     if (!raw) return DEFAULT_VERCEL_PERCENTAGE;
     const { vercel_routing_percentage } = GatewayPercentageSchema.parse(JSON.parse(raw));
     return vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE;
@@ -54,6 +52,13 @@ export async function shouldRouteToVercel(
   if ((request.body.provider?.ignore?.length ?? 0) > 0) {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because provider.ignore is not supported`
+    );
+    return false;
+  }
+
+  if (isFableModel(requestedModel)) {
+    console.debug(
+      "[shouldRouteToVercel] not routing to Vercel because the Fable->Opus fallback doesn't seem to work"
     );
     return false;
   }
@@ -101,17 +106,9 @@ function parseAwsCredentials(input: string) {
 }
 
 export function getAnthropicProviderOptionsForVercel(
-  requestedModel: string,
   request: GatewayRequest
 ): AnthropicProviderOptions | undefined {
   const anthropicOptions: AnthropicProviderOptions = {};
-
-  // Workaround for Vercel not displaying thinking by default, unlike OpenRouter.
-  const isOpus47Thinking =
-    requestedModel.includes('opus-4.7') && isReasoningExplicitlyEnabled(request);
-  if (isOpus47Thinking) {
-    anthropicOptions.thinking = { type: 'adaptive', display: 'summarized' };
-  }
 
   if (request.kind === 'chat_completions' && request.body.verbosity) {
     anthropicOptions.effort = request.body.verbosity;
@@ -188,7 +185,7 @@ export function applyVercelSettings(
   }
 
   if (requestToMutate.body.providerOptions) {
-    const anthropicOptions = getAnthropicProviderOptionsForVercel(requestedModel, requestToMutate);
+    const anthropicOptions = getAnthropicProviderOptionsForVercel(requestToMutate);
     if (anthropicOptions) {
       requestToMutate.body.providerOptions.anthropic = anthropicOptions;
     }

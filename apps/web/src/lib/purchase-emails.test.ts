@@ -130,6 +130,40 @@ describe('subjects map', () => {
   test('includes transactional purchase templates', () => {
     expect(subjects.creditsTopUp).toBeTruthy();
     expect(subjects.kiloClawSubscriptionStarted).toBeTruthy();
+    expect(subjects.codeReviewDisabled).toBe('Action Required: Code Reviewer Disabled');
+  });
+});
+
+describe('kiloPassDuplicateCardCanceled template', () => {
+  test('explains payment-method limits without disclosing enforcement details', () => {
+    const html = renderTemplate('kiloPassDuplicateCardCanceled', {
+      support_url: 'https://kilo.ai/support',
+      year: '2026',
+    });
+
+    expect(html).toContain('payment method used');
+    expect(html).toContain('limits across Kilo Pass accounts');
+    expect(html).toMatch(/will be\s+refunded/);
+    expect(html).toMatch(/shared\s+payment method for legitimate reasons/);
+    expect(html).toContain('https://kilo.ai/support');
+    expect(html).not.toContain('active Kilo Pass subscription');
+    expect(html).not.toContain('24-hour');
+  });
+});
+
+describe('codeReviewDisabled template', () => {
+  test('renders reason and recovery link', () => {
+    const html = renderTemplate('codeReviewDisabled', {
+      reason: 'The selected BYOK API key is invalid or has been revoked.',
+      recovery_url: 'https://app.kilocode.ai/byok',
+      recovery_label: 'Update BYOK settings',
+      year: '2026',
+    });
+
+    expect(html).toContain('Code Reviewer Disabled');
+    expect(html).toContain('The selected BYOK API key is invalid or has been revoked.');
+    expect(html).toContain('https://app.kilocode.ai/byok');
+    expect(html).toContain('Update BYOK settings');
   });
 });
 

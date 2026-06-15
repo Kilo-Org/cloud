@@ -26,6 +26,7 @@ import {
   resolveEffectiveSessionConfiguration,
 } from './session-prepare.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
+import { assertKiloModelAvailable } from '../../model-validation.js';
 
 type SessionStartHandlers = {
   start: typeof startSessionHandler;
@@ -44,7 +45,9 @@ function startInputToSessionCreateRequest(
   return {
     initialTurn: {
       type: 'prompt',
-      ...input.message,
+      id: input.message.id,
+      prompt: input.message.prompt,
+      attachments: input.message.attachments ?? input.message.images,
     },
     agent: input.agent,
     repository:
@@ -119,6 +122,14 @@ const startSessionHandler = protectedProcedure
         requestWithProfile.agent.mode,
         requestWithProfile.profile?.resolved ?? {}
       );
+      await assertKiloModelAvailable({
+        env: ctx.env,
+        submittedModel: requestWithProfile.agent.model,
+        originalToken: ctx.authToken,
+        originalOrganizationId: requestWithProfile.options?.kilocodeOrganizationId,
+        createdOnPlatform: requestWithProfile.options?.createdOnPlatform,
+        procedure: 'start',
+      });
 
       const registration = await startNewSession(requestWithProfile, {
         env: ctx.env,

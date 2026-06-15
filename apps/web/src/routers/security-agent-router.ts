@@ -1,6 +1,5 @@
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
-import { getGitHubTokenForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { createSecurityAgentHandlers } from '@/lib/security-agent/router/shared-handlers';
 
 const handlers = createSecurityAgentHandlers({
@@ -17,9 +16,6 @@ const handlers = createSecurityAgentHandlers({
   getIntegration: async ctx => {
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
     return await getIntegrationForOwner(owner, 'github');
-  },
-  getGitHubToken: async ctx => {
-    return (await getGitHubTokenForUser(ctx.user.id)) ?? null;
   },
   trackingExtras: () => ({}),
 });
@@ -56,9 +52,22 @@ export const securityAgentRouter = createTRPCRouter({
   startAnalysis: baseProcedure
     .input(handlers.startAnalysis.inputSchema)
     .mutation(handlers.startAnalysis.handler),
+  startRemediation: baseProcedure
+    .input(handlers.startRemediation.inputSchema)
+    .mutation(handlers.startRemediation.handler),
+  retryRemediation: baseProcedure
+    .input(handlers.retryRemediation.inputSchema)
+    .mutation(handlers.retryRemediation.handler),
+  cancelRemediation: baseProcedure
+    .input(handlers.cancelRemediation.inputSchema)
+    .mutation(handlers.cancelRemediation.handler),
   getAnalysis: baseProcedure
     .input(handlers.getAnalysis.inputSchema)
     .query(handlers.getAnalysis.handler),
+  getCommandStatus: baseProcedure
+    .input(handlers.getCommandStatus.inputSchema)
+    .query(handlers.getCommandStatus.handler),
+  listActiveCommands: baseProcedure.query(handlers.listActiveCommands),
   getOrphanedRepositories: baseProcedure.query(handlers.getOrphanedRepositories),
   deleteFindingsByRepository: baseProcedure
     .input(handlers.deleteFindingsByRepository.inputSchema)

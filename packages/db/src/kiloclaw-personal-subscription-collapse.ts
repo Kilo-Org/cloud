@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, isNull, ne, or } from 'drizzle-orm';
 
 import type { WorkerDb } from './client';
 import {
@@ -14,7 +14,7 @@ type PersonalSubscriptionRow = {
   instance: {
     id: string;
     destroyedAt: string | null;
-  };
+  } | null;
 };
 
 type TransferUpdate = {
@@ -91,6 +91,29 @@ export class FundedRowDemotionRefusedError extends Error {
   }
 }
 
+export class PersonalSubscriptionCollapseUQConflictError extends Error {
+  readonly userId: string;
+  readonly selfSubscriptionId: string;
+  readonly targetSubscriptionId: string;
+  readonly conflictingOccupantId: string;
+
+  constructor(params: {
+    userId: string;
+    selfSubscriptionId: string;
+    targetSubscriptionId: string;
+    conflictingOccupantId: string;
+  }) {
+    super(
+      `Refusing to update personal subscription ${params.selfSubscriptionId} for user ${params.userId}: target ${params.targetSubscriptionId} is already occupied by ${params.conflictingOccupantId} under UQ_kiloclaw_subscriptions_transferred_to`
+    );
+    this.name = 'PersonalSubscriptionCollapseUQConflictError';
+    this.userId = params.userId;
+    this.selfSubscriptionId = params.selfSubscriptionId;
+    this.targetSubscriptionId = params.targetSubscriptionId;
+    this.conflictingOccupantId = params.conflictingOccupantId;
+  }
+}
+
 function compareRowsByCreatedAtAndIdAscending(
   left: PersonalSubscriptionRow,
   right: PersonalSubscriptionRow
@@ -112,7 +135,7 @@ async function listPersonalSubscriptionRows(
   executor: PersonalSubscriptionCollapseWriter,
   userId: string
 ): Promise<PersonalSubscriptionRow[]> {
-  return await executor
+  const rows = await executor
     .select({
       subscription: kiloclaw_subscriptions,
       instance: {
@@ -121,16 +144,31 @@ async function listPersonalSubscriptionRows(
       },
     })
     .from(kiloclaw_subscriptions)
-    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, userId),
-        isNotNull(kiloclaw_subscriptions.instance_id),
-        eq(kiloclaw_instances.user_id, userId),
-        isNull(kiloclaw_instances.organization_id)
+        or(
+          isNull(kiloclaw_subscriptions.instance_id),
+          and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.organization_id))
+        )
       )
     )
     .orderBy(kiloclaw_subscriptions.created_at, kiloclaw_subscriptions.id);
+
+  return rows.map(row => ({
+    subscription: row.subscription,
+    instance: row.instance?.id
+      ? {
+          id: row.instance.id,
+          destroyedAt: row.instance.destroyedAt,
+        }
+      : null,
+  }));
+}
+
+function getAttachedPersonalRows(rows: PersonalSubscriptionRow[]): PersonalSubscriptionRow[] {
+  return rows.filter(row => row.instance !== null);
 }
 
 function getCurrentRows(rows: PersonalSubscriptionRow[]): PersonalSubscriptionRow[] {
@@ -138,7 +176,7 @@ function getCurrentRows(rows: PersonalSubscriptionRow[]): PersonalSubscriptionRo
 }
 
 function getAliveCurrentRows(rows: PersonalSubscriptionRow[]): PersonalSubscriptionRow[] {
-  return getCurrentRows(rows).filter(row => row.instance.destroyedAt === null);
+  return getCurrentRows(rows).filter(row => row.instance?.destroyedAt === null);
 }
 
 /**
@@ -213,8 +251,13 @@ function selectTransferHeadRow(
   return headRow;
 }
 
-function buildDesiredTransferUpdates(rows: PersonalSubscriptionRow[], now: Date): TransferPlan {
-  const headRow = selectTransferHeadRow(rows, now);
+function buildDesiredTransferUpdates(params: {
+  rows: PersonalSubscriptionRow[];
+  headCandidateRows: PersonalSubscriptionRow[];
+  now: Date;
+}): TransferPlan {
+  const { rows, headCandidateRows, now } = params;
+  const headRow = selectTransferHeadRow(headCandidateRows, now);
   const nonHeadRowsDescending = rows
     .filter(row => row.subscription.id !== headRow.subscription.id)
     .sort(compareRowsByCreatedAtAndIdDescending);
@@ -309,12 +352,49 @@ function orderTransferUpdatesForUniqueIndex(
   return orderedUpdates;
 }
 
-function buildTransferPlan(rows: PersonalSubscriptionRow[], now: Date): TransferPlan {
-  const desiredPlan = buildDesiredTransferUpdates(rows, now);
+function buildTransferPlan(params: {
+  rows: PersonalSubscriptionRow[];
+  headCandidateRows: PersonalSubscriptionRow[];
+  now: Date;
+}): TransferPlan {
+  const desiredPlan = buildDesiredTransferUpdates(params);
   return {
     headRow: desiredPlan.headRow,
-    updates: orderTransferUpdatesForUniqueIndex(rows, desiredPlan.updates),
+    updates: orderTransferUpdatesForUniqueIndex(params.rows, desiredPlan.updates),
   };
+}
+
+async function assertTransferTargetSlotAvailable(params: {
+  executor: PersonalSubscriptionCollapseWriter;
+  update: TransferUpdate;
+  userId: string;
+}): Promise<void> {
+  const targetSubscriptionId = params.update.transferredToSubscriptionId;
+  if (targetSubscriptionId === null) {
+    return;
+  }
+
+  const [conflictingOccupant] = await params.executor
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.transferred_to_subscription_id, targetSubscriptionId),
+        ne(kiloclaw_subscriptions.id, params.update.before.id)
+      )
+    )
+    .limit(1);
+
+  if (!conflictingOccupant) {
+    return;
+  }
+
+  throw new PersonalSubscriptionCollapseUQConflictError({
+    userId: params.userId,
+    selfSubscriptionId: params.update.before.id,
+    targetSubscriptionId,
+    conflictingOccupantId: conflictingOccupant.id,
+  });
 }
 
 async function applyTransferUpdates(
@@ -322,11 +402,14 @@ async function applyTransferUpdates(
   updates: TransferUpdate[],
   actor: KiloClawSubscriptionChangeActor,
   reason: string,
-  options: CollapseOptions
+  options: CollapseOptions,
+  userId: string
 ): Promise<string[]> {
   const updatedSubscriptionIds: string[] = [];
 
   for (const update of updates) {
+    await assertTransferTargetSlotAvailable({ executor, update, userId });
+
     const [after] = await executor
       .update(kiloclaw_subscriptions)
       .set({
@@ -393,8 +476,9 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
   userId: string;
 }): Promise<{ updatedSubscriptionIds: string[] }> {
   const personalRows = await listPersonalSubscriptionRows(params.executor, params.userId);
-  const currentRows = getCurrentRows(personalRows);
-  const aliveCurrentRows = getAliveCurrentRows(personalRows);
+  const attachedPersonalRows = getAttachedPersonalRows(personalRows);
+  const currentRows = getCurrentRows(attachedPersonalRows);
+  const aliveCurrentRows = getAliveCurrentRows(attachedPersonalRows);
 
   if (aliveCurrentRows.length > 1) {
     throw new PersonalSubscriptionDestroyConflictError({
@@ -405,7 +489,7 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
   }
 
   const aliveRowsAfterDestroy = aliveCurrentRows.filter(
-    row => row.instance.id !== params.destroyedInstanceId
+    row => row.instance?.id !== params.destroyedInstanceId
   );
 
   if (aliveRowsAfterDestroy.length > 0) {
@@ -417,12 +501,20 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
   }
 
   const now = new Date();
-  const transferPlan = buildTransferPlan(personalRows, now);
+  const transferPlan = buildTransferPlan({
+    rows: personalRows,
+    headCandidateRows: attachedPersonalRows,
+    now,
+  });
   const updates =
     params.buildTransferUpdatesOverride?.({ rows: personalRows, now }) ?? transferPlan.updates;
 
+  const attachedPersonalSubscriptionIds = new Set(
+    attachedPersonalRows.map(row => row.subscription.id)
+  );
   const demotionCandidate = updates.find(
     update =>
+      attachedPersonalSubscriptionIds.has(update.before.id) &&
       update.transferredToSubscriptionId !== null &&
       getHeadSelectionPriority(update.before, now) > 0
   );
@@ -447,14 +539,15 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
     {
       changeLogFailurePolicy: params.changeLogFailurePolicy,
       onChangeLogFailure: params.onChangeLogFailure,
-    }
+    },
+    params.userId
   );
 
   console.log('personal_subscription_destroy_collapse_applied', {
     userId: params.userId,
     destroyedInstanceId: params.destroyedInstanceId,
     rowCountTotal: personalRows.length,
-    rowCountAlive: personalRows.filter(row => row.instance.destroyedAt === null).length,
+    rowCountAlive: personalRows.filter(row => row.instance?.destroyedAt === null).length,
     headSubscriptionId: transferPlan.headRow.subscription.id,
     headPlan: transferPlan.headRow.subscription.plan,
     headStatus: transferPlan.headRow.subscription.status,

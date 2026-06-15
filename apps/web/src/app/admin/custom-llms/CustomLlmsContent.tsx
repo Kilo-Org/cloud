@@ -28,6 +28,7 @@ import {
 import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
+import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import { toast } from 'sonner';
 import { Plus, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
@@ -226,7 +227,7 @@ export function CustomLlmsContent() {
                   }))
                 }
                 disabled={editor.mode === 'edit'}
-                placeholder="e.g. kilo-internal/my-custom-model"
+                placeholder={`e.g. ${CUSTOM_LLM_PREFIX}my-custom-model`}
                 className="font-mono"
               />
             </div>

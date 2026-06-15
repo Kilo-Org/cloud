@@ -1,0 +1,87 @@
+<table width="100%" cellpadding="0" cellspacing="0" style="background: #ffffff">
+  <tr>
+    <td align="center" style="padding: 40px 20px">
+      <table width="520" cellpadding="0" cellspacing="0">
+        <tr>
+          <td
+            style="
+              font-family:
+                -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              color: #333;
+            "
+          >
+            <h1 style="margin: 0 0 16px; color: #1a1a1a; font-size: 24px; line-height: 1.3">
+              SLA Warning
+            </h1>
+            <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6">
+              A {{ severity }} severity Security Finding is approaching its SLA deadline.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 24px">
+              <tr>
+                <td
+                  style="
+                    background: #f6f6f4;
+                    border: 1px solid #ebebea;
+                    border-radius: 10px;
+                    padding: 16px;
+                  "
+                >
+                  <p style="margin: 0; color: #1a1a1a; font-size: 14px; font-weight: 700">
+                    {{ finding_title }}
+                  </p>
+                  <p style="margin: 8px 0 0; color: #555; font-size: 13px; line-height: 1.5">
+                    {{ finding_description }}
+                  </p>
+                  <div style="margin: 10px 0 0">{{ finding_details }}</div>
+                </td>
+              </tr>
+            </table>
+            <p style="margin: 0 0 24px">
+              <a
+                href="{{ action_url }}"
+                style="
+                  display: inline-block;
+                  background: #1a1a1a;
+                  color: #ffffff;
+                  text-decoration: none;
+                  font-size: 13px;
+                  font-weight: 600;
+                  border-radius: 7px;
+                  padding: 10px 20px;
+                "
+                >Resolve with Security Agent</a
+              >
+            </p>
+            <p style="margin: 0 0 24px; color: #555; font-size: 13px; line-height: 1.5">
+              <a
+                href="{{ manage_notifications_url }}"
+                style="color: #1a1a1a; text-decoration: underline"
+                >Manage your security agent notifications</a
+              >
+            </p>
+          </td>
+        </tr>
+      </table>
+      <!-- Branding Footer -->
+      <table width="520" cellpadding="0" cellspacing="0">
+        <tr>
+          <td align="center" style="padding: 30px 20px; border-top: 1px solid #eee">
+            <p
+              style="
+                margin: 0;
+                font-size: 11px;
+                color: #ccc;
+                font-family:
+                  -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+                  sans-serif;
+              "
+            >
+              © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San
+              Francisco, CA 94105, USA
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

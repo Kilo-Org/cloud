@@ -6,19 +6,17 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN } from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
 } from '@/lib/model-allow.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-
-// Default model for Discord integrations - mirrors the Slack default
-const DISCORD_DEFAULT_MODEL = KILO_AUTO_FREE_MODEL.id;
+import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
 // Discord OAuth2 scopes for the bot integration
 // 'bot' scope is needed for the bot to join servers
@@ -29,7 +27,7 @@ const DISCORD_SCOPES = ['bot', 'guilds', 'applications.commands'];
 // Includes: Send Messages, Read Message History, Add Reactions, Use Slash Commands, Embed Links, Attach Files
 const DISCORD_BOT_PERMISSIONS = '277025770560';
 
-const DISCORD_REDIRECT_URI = `${APP_URL}/api/integrations/discord/callback`;
+const DISCORD_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.DISCORD);
 
 /**
  * Discord OAuth2 token response shape
@@ -179,7 +177,7 @@ export async function upsertDiscordInstallation(
 
   const existing = await getInstallation(owner);
 
-  const guildId = oauthResponse.guild.id;
+  const guildId = parseDiscordSnowflake(oauthResponse.guild.id, 'guild ID');
   const guildName = oauthResponse.guild.name || 'Unknown Server';
   const scopes = oauthResponse.scope?.split(' ') || null;
 
@@ -212,11 +210,11 @@ export async function upsertDiscordInstallation(
   }
 
   // For org integrations, get a model that respects org access policy.
-  // For user integrations, use the Discord-specific default model
+  // For user integrations, use the shared bot default model.
   const defaultModel =
     owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, DISCORD_DEFAULT_MODEL)
-      : DISCORD_DEFAULT_MODEL;
+      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+      : DEFAULT_BOT_MODEL;
 
   const metadata = {
     guild_icon: oauthResponse.guild.icon,
@@ -302,9 +300,16 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
     return { success: false, error: 'No guild ID found for this installation' };
   }
 
+  let validatedGuildId: string;
+  try {
+    validatedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
+  } catch {
+    return { success: false, error: 'Invalid guild ID found for this installation' };
+  }
+
   try {
     // Verify the bot can access this guild
-    const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, {
+    const response = await fetch(buildDiscordApiUrl(['guilds', validatedGuildId]), {
       headers: {
         Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
       },
@@ -346,8 +351,8 @@ export async function getModel(owner: Owner): Promise<string | null> {
 
   // Pre-existing installation without a stored model — resolve a default
   return owner.type === 'org'
-    ? getDefaultAllowedModel(owner.id, DISCORD_DEFAULT_MODEL)
-    : DISCORD_DEFAULT_MODEL;
+    ? getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+    : DEFAULT_BOT_MODEL;
 }
 
 /**
@@ -406,13 +411,32 @@ export async function postDiscordMessage(
     return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
   }
 
+  let validatedChannelId: string;
+  try {
+    validatedChannelId = parseDiscordSnowflake(channelId, 'channel ID');
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Invalid channel ID' };
+  }
+
   try {
     const body: Record<string, unknown> = { content };
     if (options?.messageReference) {
-      body.message_reference = options.messageReference;
+      try {
+        body.message_reference = {
+          message_id: parseDiscordSnowflake(
+            options.messageReference.message_id,
+            'message reference ID'
+          ),
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Invalid message reference ID',
+        };
+      }
     }
 
-    const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+    const response = await fetch(buildDiscordApiUrl(['channels', validatedChannelId, 'messages']), {
       method: 'POST',
       headers: {
         Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
@@ -447,10 +471,26 @@ export async function addDiscordReaction(
     return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
   }
 
+  let validatedChannelId: string;
+  let validatedMessageId: string;
   try {
-    const encodedEmoji = encodeURIComponent(emoji);
+    validatedChannelId = parseDiscordSnowflake(channelId, 'channel ID');
+    validatedMessageId = parseDiscordSnowflake(messageId, 'message ID');
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Invalid Discord ID' };
+  }
+
+  try {
     const response = await fetch(
-      `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`,
+      buildDiscordApiUrl([
+        'channels',
+        validatedChannelId,
+        'messages',
+        validatedMessageId,
+        'reactions',
+        emoji,
+        '@me',
+      ]),
       {
         method: 'PUT',
         headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
@@ -482,10 +522,26 @@ export async function removeDiscordReaction(
     return { ok: false, error: 'DISCORD_BOT_TOKEN is not configured' };
   }
 
+  let validatedChannelId: string;
+  let validatedMessageId: string;
   try {
-    const encodedEmoji = encodeURIComponent(emoji);
+    validatedChannelId = parseDiscordSnowflake(channelId, 'channel ID');
+    validatedMessageId = parseDiscordSnowflake(messageId, 'message ID');
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Invalid Discord ID' };
+  }
+
+  try {
     const response = await fetch(
-      `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`,
+      buildDiscordApiUrl([
+        'channels',
+        validatedChannelId,
+        'messages',
+        validatedMessageId,
+        'reactions',
+        emoji,
+        '@me',
+      ]),
       {
         method: 'DELETE',
         headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },

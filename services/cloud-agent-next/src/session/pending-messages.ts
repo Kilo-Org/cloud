@@ -6,13 +6,19 @@ import type {
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { logger } from '../logger.js';
-import { CallbackTargetSchema, ImagesSchema, type Images } from '../persistence/schemas.js';
+import { AttachmentsSchema, CallbackTargetSchema } from '../persistence/schemas.js';
 import { Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
+import { isWorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH,
+  type WorkspaceFailureSubtype,
+} from '../shared/wrapper-bootstrap.js';
 
 export const PENDING_SESSION_MESSAGE_LIMIT = 10;
 export const PENDING_FLUSH_RETRY_BASE_DELAY_MS = 2_000;
-// Pending delivery currently gets one redelivery after its initial failed attempt.
+const SANDBOX_CONNECT_RETRY_DELAYS_MS = [5_000] as const;
+// Other pending delivery failures currently get one redelivery after the initial failed attempt.
 const WARM_FOLLOWUP_RETRY_DELAYS_MS = [PENDING_FLUSH_RETRY_BASE_DELAY_MS] as const;
 const COLD_INIT_RETRY_DELAYS_MS = [PENDING_FLUSH_RETRY_BASE_DELAY_MS] as const;
 
@@ -28,21 +34,12 @@ const AgentSelectionSchema = z.object({
   model: z.string(),
   variant: z.string().optional(),
 });
-const SessionMessageIntentSchema = z.object({
-  turn: z.discriminatedUnion('type', [
-    z.object({
-      type: z.literal('prompt'),
-      messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
-      prompt: z.string(),
-      images: ImagesSchema.optional(),
-    }),
-    z.object({
-      type: z.literal('command'),
-      messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
-      command: z.string().min(1),
-      arguments: z.string(),
-    }),
-  ]),
+const PromptIntentTurnFields = {
+  type: z.literal('prompt'),
+  messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
+  prompt: z.string(),
+};
+const IntentEnvelopeFields = {
   agent: AgentSelectionSchema,
   finalization: z
     .object({
@@ -50,6 +47,20 @@ const SessionMessageIntentSchema = z.object({
       condenseOnComplete: z.boolean().optional(),
     })
     .optional(),
+};
+const SessionMessageIntentSchema = z.object({
+  turn: z.discriminatedUnion('type', [
+    z.object({ ...PromptIntentTurnFields, attachments: AttachmentsSchema.optional() }).strict(),
+    z
+      .object({
+        type: z.literal('command'),
+        messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
+        command: z.string().min(1),
+        arguments: z.string(),
+      })
+      .strict(),
+  ]),
+  ...IntentEnvelopeFields,
 });
 const PendingSessionMessageCallbackSnapshotSchema = z
   .object({
@@ -58,11 +69,30 @@ const PendingSessionMessageCallbackSnapshotSchema = z
   })
   .strict();
 const PendingDeliveryDispositionSchema = z.enum(['terminalization-pending']);
+const PendingFlushFailureCodeSchema = z.enum([
+  'SANDBOX_CONNECT_FAILED',
+  'WORKSPACE_SETUP_FAILED',
+  'KILO_SERVER_FAILED',
+  'WRAPPER_START_FAILED',
+  'WRAPPER_FINALIZING',
+  'NOT_FOUND',
+  'BAD_REQUEST',
+  'INTERNAL',
+  'PENDING_QUEUE_FULL',
+  'MODEL_MISSING',
+  'UNKNOWN',
+]);
+export type PendingFlushFailureCode = z.infer<typeof PendingFlushFailureCodeSchema>;
+const WorkspaceFailureSubtypeSchema = z.custom<WorkspaceFailureSubtype>(isWorkspaceFailureSubtype);
+const SafeFailureMessageSchema = z.string().max(WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH);
 const PendingDeliverySchema = z.object({
   queuedAt: z.number(),
   flushAttempts: z.number().int().min(0).optional(),
   nextFlushAttemptAt: z.number().optional(),
   lastFlushError: z.string().optional(),
+  lastFlushFailureCode: PendingFlushFailureCodeSchema.optional(),
+  lastFlushFailureSubtype: WorkspaceFailureSubtypeSchema.optional(),
+  safeFailureMessage: SafeFailureMessageSchema.optional(),
   disposition: PendingDeliveryDispositionSchema.optional(),
 });
 export const PendingSessionMessageV2Schema = z.object({
@@ -100,7 +130,6 @@ const LegacyPendingSessionMessageSchema = z
     role: z.literal('user'),
     content: z.string(),
     turn: LegacyPendingSessionMessageTurnSchema.optional(),
-    images: ImagesSchema.optional(),
     createdAt: z.number(),
     callbackUrl: z.string().optional(),
     callbackMetadata: z.unknown().optional(),
@@ -109,6 +138,9 @@ const LegacyPendingSessionMessageSchema = z
     flushAttempts: z.number().int().min(0).optional(),
     nextFlushAttemptAt: z.number().optional(),
     lastFlushError: z.string().optional(),
+    lastFlushFailureCode: PendingFlushFailureCodeSchema.optional(),
+    lastFlushFailureSubtype: WorkspaceFailureSubtypeSchema.optional(),
+    safeFailureMessage: SafeFailureMessageSchema.optional(),
     deliveryDisposition: PendingDeliveryDispositionSchema.optional(),
   })
   .passthrough();
@@ -127,6 +159,9 @@ export type PendingSessionMessage = {
   flushAttempts?: number;
   nextFlushAttemptAt?: number;
   lastFlushError?: string;
+  lastFlushFailureCode?: PendingFlushFailureCode;
+  lastFlushFailureSubtype?: WorkspaceFailureSubtype;
+  safeFailureMessage?: string;
   deliveryDisposition?: 'terminalization-pending';
   clientRequestId?: string;
   legacyExecutionId?: string;
@@ -206,7 +241,6 @@ function decodeLegacyPendingMessage(
                 type: 'prompt',
                 messageId: message.messageId,
                 prompt: message.content,
-                images: message.images,
               },
         agent: { mode, model, variant },
         finalization:
@@ -224,6 +258,9 @@ function decodeLegacyPendingMessage(
     flushAttempts: message.flushAttempts,
     nextFlushAttemptAt: message.nextFlushAttemptAt,
     lastFlushError: message.lastFlushError,
+    lastFlushFailureCode: message.lastFlushFailureCode,
+    lastFlushFailureSubtype: message.lastFlushFailureSubtype,
+    safeFailureMessage: message.safeFailureMessage,
     deliveryDisposition: message.deliveryDisposition,
     clientRequestId: message.clientRequestId,
     legacyExecutionId: typeof message.executionId === 'string' ? message.executionId : undefined,
@@ -252,6 +289,9 @@ function decodePendingMessage(
       flushAttempts: message.delivery.flushAttempts,
       nextFlushAttemptAt: message.delivery.nextFlushAttemptAt,
       lastFlushError: message.delivery.lastFlushError,
+      lastFlushFailureCode: message.delivery.lastFlushFailureCode,
+      lastFlushFailureSubtype: message.delivery.lastFlushFailureSubtype,
+      safeFailureMessage: message.delivery.safeFailureMessage,
       deliveryDisposition: message.delivery.disposition,
     };
   }
@@ -280,7 +320,6 @@ export function createPendingSessionMessage(params: {
   role: 'user';
   content: string;
   turn?: z.infer<typeof LegacyPendingSessionMessageTurnSchema>;
-  images?: Images;
   createdAt: number;
   callbackUrl?: string;
   callbackMetadata?: unknown;
@@ -289,6 +328,9 @@ export function createPendingSessionMessage(params: {
   flushAttempts?: number;
   nextFlushAttemptAt?: number;
   lastFlushError?: string;
+  lastFlushFailureCode?: PendingFlushFailureCode;
+  lastFlushFailureSubtype?: WorkspaceFailureSubtype;
+  safeFailureMessage?: string;
   deliveryDisposition?: 'terminalization-pending';
 }): PendingSessionMessage {
   const legacy = LegacyPendingSessionMessageSchema.parse(params);
@@ -350,6 +392,9 @@ function serializePendingSessionMessage(
           flushAttempts: normalized.flushAttempts,
           nextFlushAttemptAt: normalized.nextFlushAttemptAt,
           lastFlushError: normalized.lastFlushError,
+          lastFlushFailureCode: normalized.lastFlushFailureCode,
+          lastFlushFailureSubtype: normalized.lastFlushFailureSubtype,
+          safeFailureMessage: normalized.safeFailureMessage,
           disposition: normalized.deliveryDisposition,
         },
         callbackSnapshot: normalized.callbackSnapshot,
@@ -365,6 +410,9 @@ function serializePendingSessionMessage(
         flushAttempts: normalized.flushAttempts,
         nextFlushAttemptAt: normalized.nextFlushAttemptAt,
         lastFlushError: normalized.lastFlushError,
+        lastFlushFailureCode: normalized.lastFlushFailureCode,
+        lastFlushFailureSubtype: normalized.lastFlushFailureSubtype,
+        safeFailureMessage: normalized.safeFailureMessage,
         deliveryDisposition: normalized.deliveryDisposition,
       });
 }
@@ -409,9 +457,32 @@ export async function checkPendingSessionMessageCapacity(
       : `Pending message queue is full (${PENDING_SESSION_MESSAGE_LIMIT})`,
   };
 }
+async function replaceStoredPendingSessionMessage(
+  storage: SessionQueueStorage,
+  previous: PendingSessionMessage,
+  updated: PendingSessionMessage
+): Promise<void> {
+  const entries = (await listPendingMessageEntries(storage)).filter(
+    candidate => candidate.message.messageId === previous.messageId
+  );
+  const matchingEntry = entries.find(candidate => candidate.key === pendingMessageKey(previous));
+  const targetKey = matchingEntry?.key ?? entries[0]?.key ?? pendingMessageKey(previous);
+  await storage.put(targetKey, serializePendingSessionMessage(updated));
+  const duplicateKeys = entries.map(candidate => candidate.key).filter(key => key !== targetKey);
+  if (duplicateKeys.length === 0) return;
+  try {
+    await storage.delete(duplicateKeys);
+  } catch {
+    logger
+      .withFields({ messageId: previous.messageId, duplicateCount: duplicateKeys.length })
+      .warn('Failed to clean duplicate pending-message rows after retry update');
+  }
+}
+
 export function shouldSkipPendingFlush(message: PendingSessionMessage, now: number): boolean {
   return message.nextFlushAttemptAt !== undefined && message.nextFlushAttemptAt > now;
 }
+
 export async function recordPendingFlushFailure(
   storage: SessionQueueStorage,
   message: PendingSessionMessage,
@@ -419,10 +490,20 @@ export async function recordPendingFlushFailure(
   now: number,
   options: {
     policy: PendingFlushPolicy;
-    code?: RetryableResultCode | 'NOT_FOUND' | 'BAD_REQUEST' | 'INTERNAL' | 'PENDING_QUEUE_FULL';
+    code?:
+      | RetryableResultCode
+      | 'NOT_FOUND'
+      | 'BAD_REQUEST'
+      | 'INTERNAL'
+      | 'PENDING_QUEUE_FULL'
+      | 'MODEL_MISSING'
+      | 'UNKNOWN';
+    subtype?: WorkspaceFailureSubtype;
+    safeFailureMessage?: string;
+    retryable?: boolean;
   }
 ): Promise<PendingFlushFailureResult> {
-  if (options.code === undefined) {
+  if (options.code === undefined || options.code === 'UNKNOWN') {
     logger
       .withFields({
         messageId: message.messageId,
@@ -431,34 +512,57 @@ export async function recordPendingFlushFailure(
       })
       .warn('Pending flush failure with unknown error code; treating as retryable');
   }
-  const attempts = (message.flushAttempts ?? 0) + 1;
+  const preservesExistingFailure =
+    message.lastFlushFailureCode !== undefined &&
+    (options.code === undefined ||
+      options.code === 'INTERNAL' ||
+      (options.code === 'UNKNOWN' && message.lastFlushFailureCode !== 'INTERNAL'));
+  const flushFailureCode = preservesExistingFailure
+    ? message.lastFlushFailureCode
+    : (options.code ?? 'UNKNOWN');
+  const flushError = preservesExistingFailure ? (message.lastFlushError ?? error) : error;
+  const failureSubtype = preservesExistingFailure
+    ? message.lastFlushFailureSubtype
+    : options.code === 'WORKSPACE_SETUP_FAILED'
+      ? options.subtype
+      : undefined;
+  const safeFailureMessage = preservesExistingFailure
+    ? message.safeFailureMessage
+    : options.code === 'WORKSPACE_SETUP_FAILED'
+      ? options.safeFailureMessage
+      : undefined;
+  const attempts =
+    flushFailureCode === 'SANDBOX_CONNECT_FAILED' &&
+    message.lastFlushFailureCode !== 'SANDBOX_CONNECT_FAILED'
+      ? 1
+      : (message.flushAttempts ?? 0) + 1;
   const retryDelays =
-    options.policy === 'cold-init' ? COLD_INIT_RETRY_DELAYS_MS : WARM_FOLLOWUP_RETRY_DELAYS_MS;
-  const retryable = isRetryableFlushCode(options.code);
+    flushFailureCode === 'SANDBOX_CONNECT_FAILED'
+      ? SANDBOX_CONNECT_RETRY_DELAYS_MS
+      : options.policy === 'cold-init'
+        ? COLD_INIT_RETRY_DELAYS_MS
+        : WARM_FOLLOWUP_RETRY_DELAYS_MS;
+  const retryable = options.retryable ?? isRetryableFlushCode(flushFailureCode);
   const exhausted = !retryable || attempts > retryDelays.length;
-  const nextFlushAttemptAt = exhausted ? undefined : now + retryDelays[attempts - 1];
+  const retryDelay = retryDelays[attempts - 1];
+  const nextFlushAttemptAt = exhausted || retryDelay === undefined ? undefined : now + retryDelay;
   const updated: PendingSessionMessage = {
     ...message,
     flushAttempts: attempts,
     nextFlushAttemptAt,
-    lastFlushError: error,
+    lastFlushError: flushError,
+    lastFlushFailureCode: flushFailureCode,
+    lastFlushFailureSubtype: failureSubtype,
+    safeFailureMessage,
     deliveryDisposition: exhausted ? 'terminalization-pending' : undefined,
   };
-  const entries = (await listPendingMessageEntries(storage)).filter(
-    candidate => candidate.message.messageId === message.messageId
-  );
-  const matchingEntry = entries.find(candidate => candidate.key === pendingMessageKey(message));
-  const targetKey = matchingEntry?.key ?? entries[0]?.key ?? pendingMessageKey(message);
-  await storage.put(targetKey, serializePendingSessionMessage(updated));
-  const duplicateKeys = entries.map(candidate => candidate.key).filter(key => key !== targetKey);
-  if (duplicateKeys.length > 0) {
-    try {
-      await storage.delete(duplicateKeys);
-    } catch {
-      logger
-        .withFields({ messageId: message.messageId, duplicateCount: duplicateKeys.length })
-        .warn('Failed to clean duplicate pending-message rows after retry update');
-    }
+  await replaceStoredPendingSessionMessage(storage, message, updated);
+  if (flushFailureCode === 'SANDBOX_CONNECT_FAILED') {
+    logger
+      .withFields({ messageId: message.messageId, attempts, nextFlushAttemptAt })
+      .warn(
+        exhausted ? 'Sandbox connection retry exhausted' : 'Sandbox connection retry scheduled'
+      );
   }
   return { message: updated, attempts, exhausted, nextFlushAttemptAt };
 }
@@ -469,10 +573,13 @@ function isRetryableFlushCode(
     | 'BAD_REQUEST'
     | 'INTERNAL'
     | 'PENDING_QUEUE_FULL'
+    | 'MODEL_MISSING'
+    | 'UNKNOWN'
     | undefined
-): code is RetryableResultCode {
+): boolean {
   return (
     code === undefined ||
+    code === 'UNKNOWN' ||
     code === 'SANDBOX_CONNECT_FAILED' ||
     code === 'WORKSPACE_SETUP_FAILED' ||
     code === 'KILO_SERVER_FAILED' ||

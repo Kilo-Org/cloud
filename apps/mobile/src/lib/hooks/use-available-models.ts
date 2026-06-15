@@ -12,12 +12,16 @@ export type ModelOption = {
   name: string;
   variants: string[];
   isPreferred: boolean;
+  isFree?: boolean;
+  mayTrainOnYourPrompts?: boolean;
 };
 
 type ModelResponse = {
   data: {
     id: string;
     name: string;
+    isFree?: boolean;
+    mayTrainOnYourPrompts?: boolean;
     preferredIndex?: number;
     opencode?: {
       variants?: Record<string, unknown>;
@@ -98,6 +102,8 @@ export function useAvailableModels(organizationId: string | undefined) {
     const items = data.data.map(model => ({
       id: model.id,
       name: formatShortModelName(model.name),
+      isFree: model.isFree,
+      mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
       variants: Object.keys(model.opencode?.variants ?? {}),
       preferredIndex: model.preferredIndex,
     }));
@@ -123,6 +129,8 @@ export function useAvailableModels(organizationId: string | undefined) {
       name: item.name,
       variants: item.variants,
       isPreferred: item.preferredIndex !== undefined,
+      isFree: item.isFree,
+      mayTrainOnYourPrompts: item.mayTrainOnYourPrompts,
     }));
   }, [data]);
 

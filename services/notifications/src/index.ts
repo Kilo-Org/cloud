@@ -1,7 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { user_push_tokens } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { cli_sessions_v2, organization_memberships, user_push_tokens } from '@kilocode/db/schema';
+import { and, eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
@@ -15,6 +15,8 @@ import {
   type ClearBadgeBucketForUserOutput,
   type DispatchPushInput,
   type DispatchPushOutcome,
+  type SendCloudAgentSessionNotificationParams,
+  type SendCloudAgentSessionNotificationResult,
   type SendInstanceLifecycleNotificationParams,
   type SendInstanceLifecycleNotificationResult,
   type ListBadgesResponse,
@@ -25,6 +27,7 @@ import {
 } from '@kilocode/notifications';
 
 import { authMiddleware, type AuthContext } from './auth';
+import { dispatchCloudAgentSessionPush } from './lib/cloud-agent-session-push';
 import type { TicketTokenPair } from './lib/expo-push';
 import { sendPushNotifications } from './lib/expo-push';
 import { dispatchInstanceLifecyclePush } from './lib/instance-lifecycle-push';
@@ -212,6 +215,51 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
       enqueueReceipts: async ticketTokenPairs => {
         const receiptMsg = { ticketTokenPairs } satisfies ReceiptCheckMessage;
         await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
+      },
+    });
+  }
+
+  async sendCloudAgentSessionNotification(
+    params: SendCloudAgentSessionNotificationParams
+  ): Promise<SendCloudAgentSessionNotificationResult> {
+    let db: ReturnType<typeof getWorkerDb> | undefined;
+    const getDbForCall = () => (db ??= getWorkerDb(this.env.HYPERDRIVE.connectionString));
+
+    return dispatchCloudAgentSessionPush(params, {
+      getSession: async (userId, cliSessionId) => {
+        const [session] = await getDbForCall()
+          .select({
+            title: cli_sessions_v2.title,
+            organizationId: cli_sessions_v2.organization_id,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, cliSessionId),
+              eq(cli_sessions_v2.kilo_user_id, userId)
+            )
+          )
+          .limit(1);
+        return session ?? null;
+      },
+      hasOrganizationAccess: async (userId, organizationId) => {
+        const [membership] = await getDbForCall()
+          .select({ id: organization_memberships.id })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, organizationId),
+              eq(organization_memberships.kilo_user_id, userId)
+            )
+          )
+          .limit(1);
+        return membership !== undefined;
+      },
+      dispatchPush: async input => {
+        const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
+          this.env.NOTIFICATION_CHANNEL_DO.idFromName(input.userId)
+        ) as unknown as RecipientDOStub;
+        return stub.dispatchPush(input);
       },
     });
   }

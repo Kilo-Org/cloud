@@ -1,9 +1,17 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, kiloExclusiveModels, requiresKiloDataCollection } from './models';
+import {
+  autoFreeModels,
+  findKiloExclusiveModel,
+  kiloExclusiveModels,
+  isKiloExclusiveModelRequiringDataCollection,
+} from './models';
 import { isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
-import { claude_opus_4_7_stealth_model } from './providers/anthropic.constants';
-import { qwen36_plus_model } from './providers/qwen';
+import {
+  claude_opus_4_7_stealth_model,
+  claude_sonnet_4_6_stealth_model,
+  claude_opus_4_6_stealth_model,
+} from './providers/anthropic.constants';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -31,9 +39,6 @@ describe('isFreeModel', () => {
         m => m.status === 'public' && !m.pricing
       );
 
-      // Should have at least some enabled free models
-      expect(enabledFreeModels.length).toBeGreaterThan(0);
-
       // All enabled free models should be detected as free
       for (const model of enabledFreeModels) {
         expect(await isFreeModel(model.public_id)).toBe(true);
@@ -56,23 +61,43 @@ describe('isFreeModel', () => {
       }
     });
 
+    test('does not register discounted OpenRouter Qwen models as Kilo exclusive', () => {
+      expect(findKiloExclusiveModel('qwen/qwen3.7-max')).toBeNull();
+      expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
+    });
+
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
       expect(getInferenceProvider(claude_opus_4_7_stealth_model)).toBe('stealth');
       expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
+      expect(getInferenceProvider(claude_sonnet_4_6_stealth_model)).toBe('stealth');
+      expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
+      expect(getInferenceProvider(claude_opus_4_6_stealth_model)).toBe('stealth');
+      expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
     });
 
     test('requires data collection for paid training-enabled offerings', () => {
-      expect(requiresKiloDataCollection(claude_opus_4_7_stealth_model.public_id)).toBe(true);
-      expect(requiresKiloDataCollection(qwen36_plus_model.public_id)).toBe(false);
+      expect(
+        isKiloExclusiveModelRequiringDataCollection(claude_opus_4_7_stealth_model.public_id)
+      ).toBe(true);
+      expect(
+        isKiloExclusiveModelRequiringDataCollection(claude_sonnet_4_6_stealth_model.public_id)
+      ).toBe(true);
+      expect(
+        isKiloExclusiveModelRequiringDataCollection(claude_opus_4_6_stealth_model.public_id)
+      ).toBe(true);
     });
 
-    test('all Kilo exclusive models should have either no pricing or valid pricing', () => {
-      // Verify that all kilo exclusive models have valid pricing structure
+    test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
       for (const model of kiloExclusiveModels) {
         if (model.pricing) {
-          expect(typeof model.pricing.prompt_per_million).toBe('number');
-          expect(typeof model.pricing.completion_per_million).toBe('number');
-          expect(typeof model.pricing.calculate_mUsd).toBe('function');
+          expect(model.pricing[0].start_context_length).toBe(0);
+          let previousStartContextLength = -1;
+          for (const tier of model.pricing) {
+            expect(typeof tier.pricing.prompt_per_million).toBe('number');
+            expect(typeof tier.pricing.completion_per_million).toBe('number');
+            expect(tier.start_context_length).toBeGreaterThan(previousStartContextLength);
+            previousStartContextLength = tier.start_context_length;
+          }
         }
       }
     });

@@ -328,7 +328,7 @@ describe('referrals', () => {
       expect(creditTransactions).toHaveLength(0);
     });
 
-    it('grants legacy referral-code credits when only a Kilo Pass referral conversion exists', async () => {
+    it('does not grant legacy referral-code credits when a Kilo Pass Impact referral conversion exists', async () => {
       const redeemingUser = await insertTestUser({
         google_user_email: 'kilo-pass-referee@example.com',
         google_user_name: 'Kilo Pass Referee',
@@ -364,14 +364,13 @@ describe('referrals', () => {
         .select()
         .from(credit_transactions)
         .where(eq(credit_transactions.kilo_user_id, redeemingUser.id));
-      expect(legacyCredits).toHaveLength(1);
-      expect(legacyCredits[0].credit_category).toBe(referralRedeemingBonus.credit_category);
+      expect(legacyCredits).toHaveLength(0);
 
       const [usage] = await db
         .select()
         .from(referral_code_usages)
         .where(eq(referral_code_usages.redeeming_kilo_user_id, redeemingUser.id));
-      expect(usage?.paid_at).not.toBeNull();
+      expect(usage?.paid_at).toBeNull();
     });
 
     it('does not grant legacy referral-code credits when a kiloclaw referral conversion exists', async () => {

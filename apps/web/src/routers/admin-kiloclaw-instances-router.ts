@@ -26,6 +26,7 @@ import {
   getInboundEmailAddressForInstance,
 } from '@/lib/kiloclaw/inbound-email-alias';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import {
@@ -929,6 +930,51 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return client.getRegistryEntries(input.userId, input.orgId ?? undefined);
     }),
 
+  // Admin break-glass: release a STUCK provision reservation (status
+  // in_progress / failed_requires_reconciliation) so the user can provision
+  // again. This is an operator action — the admin asserts (via the UI confirm
+  // dialog) that they have verified the attempt is dead and any provider
+  // resources are cleaned up. The worker mutates only the registry bookkeeping
+  // row (no provider/Postgres changes) and refuses reservations backing an
+  // active instance or in a non-releasable state.
+  releaseReservation: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid(),
+        orgId: z.string().uuid().optional(),
+        // Caller (the break-glass confirmation dialog) must supply this; enforced
+        // at the API boundary, not auto-inserted by the client.
+        acknowledgeCleanupVerified: z.literal(true),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.releaseProvisionReservation(
+        input.userId,
+        input.instanceId,
+        input.orgId,
+        input.acknowledgeCleanupVerified
+      );
+      await createKiloClawAdminAuditLog({
+        action: 'kiloclaw.provision_reservation.release',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        target_user_id: input.userId,
+        message:
+          `Break-glass released stuck provision reservation ${input.instanceId} ` +
+          `(was ${result.previousStatus}); operator asserted provider cleanup verified`,
+        metadata: {
+          instanceId: input.instanceId,
+          orgId: input.orgId ?? null,
+          previousStatus: result.previousStatus,
+          acknowledgeCleanupVerified: true,
+        },
+      });
+      return result;
+    }),
+
   list: adminProcedure.input(ListInstancesSchema).query(async ({ input }) => {
     const { offset, limit, sortBy, sortOrder, search, status, imageTag, hasSizeOverride } = input;
     const searchTerm = search?.trim() || '';
@@ -1594,12 +1640,21 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   }),
 
   fileTree: adminProcedure
-    .input(z.object({ userId: z.string().min(1), instanceId: z.string().uuid().optional() }))
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        path: kiloclawFilePathSchema.optional(),
+      })
+    )
     .query(async ({ input }) => {
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
         const client = new KiloClawInternalClient();
-        const result = await client.getFileTree(input.userId, workerInstanceId(instance));
+        const result = await client.getFileTree(input.userId, {
+          instanceId: workerInstanceId(instance),
+          path: input.path,
+        });
         return result.tree;
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to fetch file tree');
@@ -1611,7 +1666,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
       })
     )
     .query(async ({ input }) => {
@@ -1629,15 +1684,31 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        path: z.string().min(1),
+        path: kiloclawFilePathSchema,
         content: z.string(),
         etag: z.string().optional(),
+        openclawValidation: z.enum(['warn-before-write', 'allow-invalid']).optional(),
       })
     )
     .mutation(async ({ input }) => {
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
         const client = new KiloClawInternalClient();
+        if (input.openclawValidation) {
+          if (input.path !== 'openclaw.json') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'OpenClaw validation is only available for openclaw.json',
+            });
+          }
+          return await client.writeOpenclawConfigFile(
+            input.userId,
+            input.content,
+            input.etag,
+            workerInstanceId(instance),
+            input.openclawValidation
+          );
+        }
         return await client.writeFile(
           input.userId,
           input.path,
@@ -3851,6 +3922,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       latest_sandbox_destroyed_at: string | null;
       user_email: string | null;
       subscription_status: string | null;
+      subscription_ended_at: string | null;
     };
 
     // 1. The latest destroyed row per (user, sandbox) inside the requested
@@ -3892,7 +3964,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         to_char(ranked.destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as destroyed_at,
         to_char(ranked.latest_sandbox_destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as latest_sandbox_destroyed_at,
         ranked.user_email,
-        ranked.subscription_status
+        ranked.subscription_status,
+        to_char(ranked.subscription_ended_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as subscription_ended_at
       from (
         select distinct on (i.user_id, i.sandbox_id)
           i.id,
@@ -3908,7 +3981,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               and latest.destroyed_at is not null
           ) as latest_sandbox_destroyed_at,
           u.google_user_email as user_email,
-          s.status as subscription_status
+          s.status as subscription_status,
+          -- Billing/trial period boundary for the subscription tied to this
+          -- destroyed instance — shown in the admin volume table as a proxy for
+          -- when the user's access ended (there is no canonical canceled_at
+          -- column). Prefer the paid period end, fall back to the trial end so
+          -- never-converted trials aren't blank. This is NOT an authoritative
+          -- end event: transfers and immediate cancellations can leave a
+          -- boundary that differs from the lineage's true end, so the UI labels
+          -- this column "Period End" rather than "Ended".
+          coalesce(s.current_period_end, s.trial_ends_at) as subscription_ended_at
         from kiloclaw_instances i
         left join kilocode_users u on i.user_id = u.id
         left join kiloclaw_subscriptions s on i.id = s.instance_id
@@ -3943,6 +4025,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       organization_id: string | null;
       destroyed_at: string;
       subscription_status: string | null;
+      subscription_ended_at: string | null;
       fly_app: string;
       volume_id: string;
       volume_name: string;
@@ -4083,6 +4166,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             organization_id: instance.organization_id,
             destroyed_at: destroyedAt,
             subscription_status: instance.subscription_status,
+            subscription_ended_at: instance.subscription_ended_at,
             fly_app: scan.flyApp,
             volume_id: v.id,
             volume_name: v.name,
@@ -4114,27 +4198,45 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       // 1. Re-fetch the instance. Every DB-side guard is re-evaluated here —
       //    the scan result the admin saw may be stale.
+      // Aliased outer table so the correlated subquery below can refer to
+      // it as `target_inst.*`. Drizzle interpolates `${kiloclaw_instances.X}`
+      // inside a raw `sql` template as a BARE `"X"` column reference (no
+      // table qualifier). Postgres then resolves that bare reference to the
+      // most-local scope — the inner `sandbox_destroys` alias — which
+      // collapses the correlation to a trivially-true
+      // `sandbox_destroys.user_id = sandbox_destroys.user_id` and turns the
+      // subquery into a table-wide `max(destroyed_at)`. With many users in
+      // production that max is always recent, so the grace gate would fail
+      // closed for every destroy regardless of the target. Aliasing the
+      // outer table and writing the correlation columns as literal SQL
+      // keeps every reference explicitly qualified.
+      const targetInstance = alias(kiloclaw_instances, 'target_inst');
       const [row] = await db
         .select({
-          id: kiloclaw_instances.id,
-          user_id: kiloclaw_instances.user_id,
-          sandbox_id: kiloclaw_instances.sandbox_id,
-          organization_id: kiloclaw_instances.organization_id,
-          destroyed_at: kiloclaw_instances.destroyed_at,
-          // The latest `destroyed_at` across every destroyed row of this
-          // (user, sandbox). A reprovisioned sandbox has several destroyed
-          // rows sharing one Fly volume; the grace period runs from the most
-          // recent destruction, not whichever row the admin selected.
-          latest_sandbox_destroyed_at: sql<string | null>`(
-            select max(latest.destroyed_at)
-            from ${kiloclaw_instances} as latest
-            where latest.user_id = ${kiloclaw_instances.user_id}
-              and latest.sandbox_id = ${kiloclaw_instances.sandbox_id}
-              and latest.destroyed_at is not null
-          )`,
+          id: targetInstance.id,
+          user_id: targetInstance.user_id,
+          sandbox_id: targetInstance.sandbox_id,
+          organization_id: targetInstance.organization_id,
+          destroyed_at: targetInstance.destroyed_at,
+          // Whether the orphan-volume grace period has elapsed, evaluated
+          // entirely in Postgres. Grace runs from the LATEST destruction of
+          // this (user, sandbox): a reprovisioned sandbox has several
+          // destroyed rows sharing one Fly volume, so the clock follows the
+          // most recent destruction, not whichever row the admin selected.
+          // Computing this in SQL avoids parsing a database timestamp with
+          // the JS `Date` constructor, whose handling of Postgres timestamp
+          // text differs across the Vercel and Cloudflare runtimes.
+          grace_period_elapsed: sql<boolean>`
+            extract(epoch from (now() - (
+              select max(sandbox_destroys.destroyed_at)
+              from ${kiloclaw_instances} as sandbox_destroys
+              where sandbox_destroys.user_id = target_inst.user_id
+                and sandbox_destroys.sandbox_id = target_inst.sandbox_id
+                and sandbox_destroys.destroyed_at is not null
+            ))) * 1000 > ${ORPHAN_VOLUME_GRACE_PERIOD_MS}`,
         })
-        .from(kiloclaw_instances)
-        .where(eq(kiloclaw_instances.id, input.instanceId))
+        .from(targetInstance)
+        .where(eq(targetInstance.id, input.instanceId))
         .limit(1);
 
       if (!row) {
@@ -4152,10 +4254,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
       // 3. Grace period, measured from the latest destruction of this
       //    sandbox — give Fly + the DO sweep time to self-heal first.
-      const now = new Date();
-      const latestDestroyedAt = row.latest_sandbox_destroyed_at ?? row.destroyed_at;
-      const destroyedMsAgo = now.getTime() - new Date(latestDestroyedAt).getTime();
-      if (destroyedMsAgo <= ORPHAN_VOLUME_GRACE_PERIOD_MS) {
+      //    `grace_period_elapsed` is computed by Postgres in the query above;
+      //    `false` or `null` (no destroyed row, already ruled out by gate 2)
+      //    both fail closed.
+      if (row.grace_period_elapsed !== true) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'Instance was destroyed too recently — wait out the 7-day grace period',
@@ -4173,7 +4275,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         organization_id: row.organization_id,
       };
       const { accessGrantingContextKeys, pendingDestructionContextKeys } =
-        await getOrphanVolumeContextProtections(db, [context], now);
+        await getOrphanVolumeContextProtections(db, [context], new Date());
       const contextKey = orphanVolumeSubscriptionContextKey(context);
       if (accessGrantingContextKeys.has(contextKey)) {
         throw new TRPCError({

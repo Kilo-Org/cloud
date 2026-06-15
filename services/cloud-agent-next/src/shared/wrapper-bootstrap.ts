@@ -1,3 +1,12 @@
+import type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
+
+export type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
+
+export type WrapperCommitCoAuthor = {
+  name: string;
+  email: string;
+};
+
 export type WrapperBootstrapRepoSource =
   | {
       kind: 'github';
@@ -92,6 +101,7 @@ export type WrapperPromptRequest = {
   finalization?: {
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
+    commitCoAuthor?: WrapperCommitCoAuthor;
   };
   session: WrapperSessionBinding;
 };
@@ -100,8 +110,10 @@ export type WrapperCommandRequest = {
   command: string;
   args?: string;
   messageId: string;
+  agent?: WrapperPromptAgent;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  commitCoAuthor?: WrapperCommitCoAuthor;
   session: WrapperSessionBinding;
 };
 
@@ -137,12 +149,22 @@ export type WrapperSessionReadySuccessResponse = {
   workspaceReady: WrapperWorkspaceReady;
 };
 
+export const WRAPPER_READY_ERROR_MESSAGE_MAX_LENGTH = 4_096;
+export const WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH = 8_192;
+
 export type WrapperSessionReadyErrorResponse = {
   status: 'error';
   error: {
-    code: 'INVALID_REQUEST' | 'WORKSPACE_SETUP_FAILED' | 'KILO_SERVER_FAILED';
+    code:
+      | 'INVALID_REQUEST'
+      | 'WRAPPER_FINALIZING'
+      | 'WORKSPACE_SETUP_FAILED'
+      | 'KILO_SERVER_FAILED';
+    subtype?: WorkspaceFailureSubtype;
     message: string;
+    detail?: string;
     retryable?: boolean;
+    wrapperRunId?: string;
   };
 };
 

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import type Stripe from 'stripe';
 import { addMonths } from 'date-fns';
 import { and, asc, count, eq, inArray, like, lt, lte, or, sql } from 'drizzle-orm';
 
@@ -22,7 +23,9 @@ import {
 } from '@/lib/impact/advocate';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import { IMPACT_REFERRAL_TOUCH_VALIDITY_MS } from '@/lib/impact/referral-utils';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
+import { getClawPlanForStripePriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { client as stripe } from '@/lib/stripe-client';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
@@ -51,6 +54,7 @@ import {
   ImpactReferralPaymentProvider,
   ImpactReferralProduct,
   ImpactReferralRewardKind,
+  ImpactReferralRewardStatus,
   ImpactAttributionTouchType,
   KiloClawReferralBeneficiaryRole,
   KiloClawReferralDecisionOutcome,
@@ -126,7 +130,8 @@ const REFERRAL_REWARD_ACTOR = {
 } as const;
 
 const SIGNUP_REFERRAL_TOUCH_CAPTURE_GRACE_MS = 10 * 60 * 1000;
-const IMPACT_ADVOCATE_REWARD_UNIT = 'free-months';
+const IMPACT_ADVOCATE_KILOCLAW_REWARD_UNIT = 'MONTH';
+const IMPACT_ADVOCATE_KILO_PASS_REWARD_UNIT = 'Kilo Pass Bonus Credits';
 
 function getDatabaseClient(database?: DatabaseClient): DatabaseClient {
   return database ?? db;
@@ -155,25 +160,32 @@ function hasAcceptedTrackingValue(touch: ImpactAttributionTouch): boolean {
 }
 
 function isTouchValidAtConversion(touch: ImpactAttributionTouch, convertedAt: Date): boolean {
+  const touchedAt = new Date(touch.touched_at).getTime();
+  const convertedAtMs = convertedAt.getTime();
+  // Qualification intentionally ignores the denormalized expires_at column: the referral
+  // spec defines validity as touched_at + 30 * 24h using server UTC timestamps.
+  const exactExpiration = touchedAt + IMPACT_REFERRAL_TOUCH_VALIDITY_MS;
   return (
-    hasAcceptedTrackingValue(touch) &&
-    new Date(touch.touched_at).getTime() <= convertedAt.getTime() &&
-    convertedAt.getTime() < new Date(touch.expires_at).getTime()
+    hasAcceptedTrackingValue(touch) && touchedAt <= convertedAtMs && convertedAtMs < exactExpiration
   );
 }
 
 export function resolveWinningAttributionTouch(params: {
+  product?: ImpactReferralProduct | null;
   touches: ImpactAttributionTouch[];
   convertedAt: Date;
 }): WinningAttributionResolution {
-  const validReferralTouches = params.touches
+  const scopedTouches = params.product
+    ? params.touches.filter(touch => touch.product === params.product)
+    : params.touches;
+  const validReferralTouches = scopedTouches
     .filter(
       touch =>
         touch.touch_type === ImpactAttributionTouchType.Referral &&
         isTouchValidAtConversion(touch, params.convertedAt)
     )
     .sort((a, b) => new Date(a.touched_at).getTime() - new Date(b.touched_at).getTime());
-  const validAffiliateTouches = params.touches
+  const validAffiliateTouches = scopedTouches
     .filter(
       touch =>
         touch.touch_type === ImpactAttributionTouchType.Affiliate &&
@@ -361,20 +373,74 @@ async function hasDeletedUserEmailTombstone(params: {
   return Boolean(row);
 }
 
+function hasUserScheduledStandardContinuation(subscription: KiloClawSubscription): boolean {
+  return subscription.scheduled_plan === 'standard' && subscription.scheduled_by === 'user';
+}
+
+async function isEligibleFinalCommitCancellation(
+  subscription: KiloClawSubscription,
+  database: DatabaseClient
+): Promise<boolean> {
+  if (
+    subscription.plan !== 'commit' ||
+    subscription.commit_ends_at === null ||
+    subscription.current_period_end !== subscription.commit_ends_at ||
+    !subscription.cancel_at_period_end ||
+    (!hasUserScheduledStandardContinuation(subscription) && subscription.scheduled_plan !== null)
+  ) {
+    return false;
+  }
+
+  if (hasUserScheduledStandardContinuation(subscription)) {
+    return true;
+  }
+
+  const [latestCancellationChange] = await database
+    .select({ reason: kiloclaw_subscription_change_log.reason })
+    .from(kiloclaw_subscription_change_log)
+    .where(
+      and(
+        eq(kiloclaw_subscription_change_log.subscription_id, subscription.id),
+        inArray(kiloclaw_subscription_change_log.reason, [
+          'commit_retirement_guarded',
+          'user_requested_cancellation',
+        ])
+      )
+    )
+    .orderBy(
+      sql`${kiloclaw_subscription_change_log.created_at} DESC`,
+      sql`${kiloclaw_subscription_change_log.id} DESC`
+    )
+    .limit(1);
+
+  return latestCancellationChange?.reason === 'commit_retirement_guarded';
+}
+
+async function hasActiveEligibleSubscriptionRow(
+  subscription: KiloClawSubscription,
+  database: DatabaseClient
+): Promise<boolean> {
+  if (
+    subscription.plan === 'trial' ||
+    subscription.status !== 'active' ||
+    subscription.suspended_at !== null ||
+    subscription.past_due_since !== null
+  ) {
+    return false;
+  }
+
+  return (
+    !subscription.cancel_at_period_end ||
+    (await isEligibleFinalCommitCancellation(subscription, database))
+  );
+}
+
 async function hasActiveEligiblePersonalSubscription(
   userId: string,
   database: DatabaseClient
 ): Promise<boolean> {
   const row = await resolveCurrentPersonalSubscriptionRow({ userId, dbOrTx: database });
-  if (!row) return false;
-
-  return (
-    row.subscription.plan !== 'trial' &&
-    row.subscription.status === 'active' &&
-    !row.subscription.cancel_at_period_end &&
-    row.subscription.suspended_at === null &&
-    row.subscription.past_due_since === null
-  );
+  return row ? hasActiveEligibleSubscriptionRow(row.subscription, database) : false;
 }
 
 async function markAffiliateTouchSaleAttributed(params: {
@@ -677,21 +743,131 @@ function logRewardBearingReferralConfigurationFailure(params: {
 }
 
 function getNextRenewalBoundary(subscription: KiloClawSubscription): string | null {
+  if (subscription.plan === 'commit') {
+    return subscription.commit_ends_at;
+  }
   return subscription.credit_renewal_at ?? subscription.current_period_end;
 }
 
-function hasActiveEligibleSubscriptionRow(subscription: KiloClawSubscription): boolean {
+function hasScheduledStandardTransition(subscription: KiloClawSubscription): boolean {
   return (
-    subscription.plan !== 'trial' &&
-    subscription.status === 'active' &&
-    !subscription.cancel_at_period_end &&
-    subscription.suspended_at === null &&
-    subscription.past_due_since === null
+    subscription.plan === 'commit' &&
+    hasUserScheduledStandardContinuation(subscription) &&
+    subscription.stripe_schedule_id !== null
   );
 }
 
 function requiresDeferredStripeRewardApplication(subscription: KiloClawSubscription): boolean {
+  if (hasUserScheduledStandardContinuation(subscription)) {
+    return false;
+  }
   return Boolean(subscription.stripe_schedule_id || subscription.scheduled_plan);
+}
+
+function toStripeTimestamp(value: string): number {
+  return Math.floor(new Date(value).getTime() / 1000);
+}
+
+function resolveSchedulePhasePrice(phase: Stripe.SubscriptionSchedule.Phase): string | null {
+  const price = phase.items[0]?.price;
+  if (!price) return null;
+  return typeof price === 'string' ? price : (price.id ?? null);
+}
+
+function isExtendedRetirementScheduleAlreadyApplied(params: {
+  schedule: Stripe.SubscriptionSchedule;
+  newBoundary: string;
+}): boolean {
+  const newBoundary = toStripeTimestamp(params.newBoundary);
+  if (!Number.isFinite(newBoundary)) return false;
+
+  const commitPhaseIndex = params.schedule.phases.findIndex(
+    phase =>
+      phase.end_date === newBoundary && phase.start_date < newBoundary && phase.items.length === 1
+  );
+  const commitPhase = params.schedule.phases[commitPhaseIndex];
+  const standardPhase = params.schedule.phases[commitPhaseIndex + 1];
+  const commitPrice = commitPhase ? resolveSchedulePhasePrice(commitPhase) : null;
+  const standardPrice = standardPhase ? resolveSchedulePhasePrice(standardPhase) : null;
+
+  return (
+    (params.schedule.status === 'active' || params.schedule.status === 'not_started') &&
+    commitPhaseIndex >= 0 &&
+    Boolean(commitPhase) &&
+    Boolean(standardPhase) &&
+    params.schedule.phases.length === commitPhaseIndex + 2 &&
+    standardPhase?.start_date === newBoundary &&
+    standardPhase.items.length === 1 &&
+    commitPrice !== null &&
+    standardPrice !== null &&
+    getClawPlanForStripePriceId(commitPrice) === 'commit' &&
+    getClawPlanForStripePriceId(standardPrice) === 'standard'
+  );
+}
+
+function buildExtendedRetirementSchedulePhases(params: {
+  schedule: Stripe.SubscriptionSchedule;
+  previousBoundary: string;
+  newBoundary: string;
+}): Stripe.SubscriptionScheduleUpdateParams.Phase[] | null {
+  if (params.schedule.status !== 'active' && params.schedule.status !== 'not_started') {
+    return null;
+  }
+
+  const previousBoundary = toStripeTimestamp(params.previousBoundary);
+  const newBoundary = toStripeTimestamp(params.newBoundary);
+  if (!Number.isFinite(previousBoundary) || !Number.isFinite(newBoundary)) {
+    return null;
+  }
+
+  const currentPhaseIndex = params.schedule.phases.findIndex(
+    phase =>
+      phase.end_date === previousBoundary &&
+      phase.start_date < previousBoundary &&
+      phase.items.length === 1
+  );
+  const currentPhase = params.schedule.phases[currentPhaseIndex];
+  const standardPhase = params.schedule.phases[currentPhaseIndex + 1];
+  const currentPrice = currentPhase ? resolveSchedulePhasePrice(currentPhase) : null;
+  const standardPrice = standardPhase ? resolveSchedulePhasePrice(standardPhase) : null;
+  if (
+    currentPhaseIndex < 0 ||
+    !currentPhase ||
+    !standardPhase ||
+    params.schedule.phases.length !== currentPhaseIndex + 2 ||
+    standardPhase.items.length !== 1 ||
+    standardPhase.start_date !== previousBoundary ||
+    !currentPrice ||
+    !standardPrice ||
+    getClawPlanForStripePriceId(currentPrice) !== 'commit' ||
+    getClawPlanForStripePriceId(standardPrice) !== 'standard'
+  ) {
+    return null;
+  }
+
+  if (newBoundary <= previousBoundary) {
+    return null;
+  }
+
+  const standardEndDate = standardPhase.end_date
+    ? standardPhase.end_date + (newBoundary - previousBoundary)
+    : null;
+  if (standardEndDate !== null && standardEndDate <= newBoundary) {
+    return null;
+  }
+
+  return [
+    {
+      items: [{ price: currentPrice }],
+      start_date: currentPhase.start_date,
+      end_date: newBoundary,
+    },
+    {
+      items: [{ price: standardPrice }],
+      start_date: newBoundary,
+      ...(standardEndDate !== null ? { end_date: standardEndDate } : {}),
+    },
+  ];
 }
 
 async function applyReferralRewardById(
@@ -757,7 +933,7 @@ async function applyReferralRewardById(
     });
     const subscription = currentSubscription?.subscription ?? null;
 
-    if (!subscription || !hasActiveEligibleSubscriptionRow(subscription)) {
+    if (!subscription || !(await hasActiveEligibleSubscriptionRow(subscription, tx))) {
       if (reward.status === KiloClawReferralRewardStatus.Earned) {
         // Mirror the conversion-time invariant: a Referrer reward that lands
         // in Pending because the referrer is no longer on an eligible paid
@@ -831,13 +1007,26 @@ async function applyReferralRewardById(
     const stripeIdempotencyKey = `kiloclaw-referral-reward:${reward.id}:stripe-apply`;
 
     if (subscription.stripe_subscription_id && !options?.stripeAlreadyApplied) {
+      if (hasScheduledStandardTransition(subscription)) {
+        const scheduleId = subscription.stripe_schedule_id;
+        if (!scheduleId) {
+          return 'pending';
+        }
+        return {
+          outcome: 'retirement_schedule_pending' as const,
+          subscriptionId: subscription.id,
+          stripeSubscriptionId: subscription.stripe_subscription_id,
+          scheduleId,
+          previousBoundary,
+          newBoundary,
+        };
+      }
+
       return {
         outcome: 'stripe_pending' as const,
-        stripeUpdate: {
-          stripeSubscriptionId: subscription.stripe_subscription_id,
-          trialEnd: Math.floor(new Date(newBoundary).getTime() / 1000),
-          idempotencyKey: stripeIdempotencyKey,
-        },
+        stripeSubscriptionId: subscription.stripe_subscription_id,
+        trialEnd: toStripeTimestamp(newBoundary),
+        idempotencyKey: stripeIdempotencyKey,
       };
     }
 
@@ -852,10 +1041,7 @@ async function applyReferralRewardById(
         current_period_end: newBoundary,
         credit_renewal_at:
           subscription.payment_source === 'credits' ? newBoundary : subscription.credit_renewal_at,
-        commit_ends_at:
-          subscription.plan === 'commit' && subscription.commit_ends_at
-            ? addMonths(new Date(subscription.commit_ends_at), reward.months_granted).toISOString()
-            : subscription.commit_ends_at,
+        commit_ends_at: subscription.plan === 'commit' ? newBoundary : subscription.commit_ends_at,
       })
       .where(eq(kiloclaw_subscriptions.id, subscription.id))
       .returning();
@@ -926,16 +1112,63 @@ async function applyReferralRewardById(
     return result;
   }
 
-  await stripe.subscriptions.update(
-    result.stripeUpdate.stripeSubscriptionId,
-    {
-      trial_end: result.stripeUpdate.trialEnd,
-      proration_behavior: 'none',
-    },
-    {
-      idempotencyKey: result.stripeUpdate.idempotencyKey,
+  if (result.outcome === 'stripe_pending') {
+    await stripe.subscriptions.update(
+      result.stripeSubscriptionId,
+      {
+        trial_end: result.trialEnd,
+        proration_behavior: 'none',
+      },
+      { idempotencyKey: result.idempotencyKey }
+    );
+    return applyReferralRewardById(rewardId, { stripeAlreadyApplied: true });
+  }
+
+  try {
+    const schedule = await stripe.subscriptionSchedules.retrieve(result.scheduleId);
+    const phases = buildExtendedRetirementSchedulePhases({
+      schedule,
+      previousBoundary: result.previousBoundary,
+      newBoundary: result.newBoundary,
+    });
+    if (phases) {
+      await stripe.subscriptionSchedules.update(result.scheduleId, { phases });
+    } else if (
+      !isExtendedRetirementScheduleAlreadyApplied({
+        schedule,
+        newBoundary: result.newBoundary,
+      })
+    ) {
+      throw new Error('Ambiguous retirement schedule phases');
     }
-  );
+  } catch (error) {
+    console.error(
+      '[kiloclaw-referrals] reward application requires review due to ambiguous retirement schedule',
+      {
+        rewardId,
+        subscriptionId: result.subscriptionId,
+        stripeSubscriptionId: result.stripeSubscriptionId,
+        scheduleId: result.scheduleId,
+        error,
+      }
+    );
+    await db
+      .update(impact_referral_rewards)
+      .set({
+        status: KiloClawReferralRewardStatus.ReviewRequired,
+        review_reason: getRewardApplicationReason('ambiguous_standard_schedule'),
+      })
+      .where(
+        and(
+          eq(impact_referral_rewards.id, rewardId),
+          or(
+            eq(impact_referral_rewards.status, KiloClawReferralRewardStatus.Earned),
+            eq(impact_referral_rewards.status, KiloClawReferralRewardStatus.Pending)
+          )
+        )
+      );
+    return 'pending';
+  }
 
   return applyReferralRewardById(rewardId, { stripeAlreadyApplied: true });
 }
@@ -990,7 +1223,7 @@ export async function processQueuedKiloClawReferralRewards(params?: {
   return summary;
 }
 
-async function queueImpactAdvocateRewardRedemption(params: {
+export async function queueImpactAdvocateRewardRedemption(params: {
   rewardId: string;
   database: DatabaseClient;
 }): Promise<void> {
@@ -999,6 +1232,7 @@ async function queueImpactAdvocateRewardRedemption(params: {
       id: impact_referral_rewards.id,
       beneficiaryUserId: impact_referral_rewards.beneficiary_user_id,
       monthsGranted: impact_referral_rewards.months_granted,
+      rewardAmountUsd: impact_referral_rewards.reward_amount_usd,
       status: impact_referral_rewards.status,
       product: impact_referral_rewards.product,
       rewardKind: impact_referral_rewards.reward_kind,
@@ -1009,18 +1243,40 @@ async function queueImpactAdvocateRewardRedemption(params: {
     .where(eq(impact_referral_rewards.id, params.rewardId))
     .limit(1);
 
+  if (!reward) {
+    return;
+  }
+
+  let programKey: ImpactAdvocateProgramKey | null = null;
+  let amount: number | null = null;
+  let unit: string | null = null;
+
   if (
-    !reward ||
-    reward.status !== KiloClawReferralRewardStatus.Applied ||
-    reward.product !== ImpactReferralProduct.KiloClaw ||
-    reward.rewardKind !== ImpactReferralRewardKind.KiloClawFreeMonth
+    reward.status === KiloClawReferralRewardStatus.Applied &&
+    reward.product === ImpactReferralProduct.KiloClaw &&
+    reward.rewardKind === ImpactReferralRewardKind.KiloClawFreeMonth
   ) {
+    amount = reward.monthsGranted;
+    unit = IMPACT_ADVOCATE_KILOCLAW_REWARD_UNIT;
+  } else if (
+    reward.product === ImpactReferralProduct.KiloPass &&
+    reward.rewardKind === ImpactReferralRewardKind.KiloPassBonus &&
+    (reward.status === ImpactReferralRewardStatus.Pending ||
+      reward.status === ImpactReferralRewardStatus.Earned ||
+      reward.status === ImpactReferralRewardStatus.Applied) &&
+    reward.rewardAmountUsd !== null &&
+    reward.rewardAmountUsd > 0
+  ) {
+    programKey = ImpactAdvocateProgramKey.KiloPass;
+    amount = reward.rewardAmountUsd;
+    unit = IMPACT_ADVOCATE_KILO_PASS_REWARD_UNIT;
+  } else {
     return;
   }
 
   const accountId = reward.email.trim();
   if (!accountId) {
-    console.error('[kiloclaw-referrals] missing beneficiary email for Impact reward redemption', {
+    console.error('[impact-referrals] missing beneficiary email for Impact reward redemption', {
       rewardId: params.rewardId,
       beneficiaryUserId: reward.beneficiaryUserId,
     });
@@ -1035,14 +1291,15 @@ async function queueImpactAdvocateRewardRedemption(params: {
       beneficiary_user_id: reward.beneficiaryUserId,
       state: ImpactAdvocateRewardRedemptionState.Queued,
       request_payload: {
+        ...(programKey ? { programKey } : {}),
         lookup: {
           accountId,
           userId: accountId,
           rewardTypeFilter: 'CREDIT',
         },
         redemption: {
-          amount: reward.monthsGranted,
-          unit: IMPACT_ADVOCATE_REWARD_UNIT,
+          amount,
+          unit,
         },
       } satisfies Record<string, unknown>,
     })
@@ -1050,6 +1307,7 @@ async function queueImpactAdvocateRewardRedemption(params: {
 }
 
 type ImpactAdvocateRewardRedemptionRequestPayload = {
+  programKey?: ImpactAdvocateProgramKey;
   lookup: {
     accountId: string;
     userId: string;
@@ -1077,17 +1335,27 @@ function isRewardRedemptionRequestPayload(
 ): payload is ImpactAdvocateRewardRedemptionRequestPayload {
   const lookup = getObjectProperty(payload, 'lookup');
   const redemption = getObjectProperty(payload, 'redemption');
+  const programKey = getObjectProperty(payload, 'programKey');
   return (
     typeof lookup === 'object' &&
     lookup !== null &&
     typeof redemption === 'object' &&
     redemption !== null &&
+    (programKey === undefined ||
+      programKey === ImpactAdvocateProgramKey.KiloClaw ||
+      programKey === ImpactAdvocateProgramKey.KiloPass) &&
     typeof getObjectProperty(lookup, 'accountId') === 'string' &&
     typeof getObjectProperty(lookup, 'userId') === 'string' &&
     getObjectProperty(lookup, 'rewardTypeFilter') === 'CREDIT' &&
     typeof getObjectProperty(redemption, 'amount') === 'number' &&
     typeof getObjectProperty(redemption, 'unit') === 'string'
   );
+}
+
+function getRewardRedemptionProgramKey(
+  payload: ImpactAdvocateRewardRedemptionRequestPayload
+): ImpactAdvocateProgramKey {
+  return payload.programKey ?? ImpactAdvocateProgramKey.KiloClaw;
 }
 
 function buildFailurePayload(result: ImpactAdvocateDispatchResult): Record<string, unknown> {
@@ -1162,9 +1430,13 @@ async function dispatchImpactAdvocateRewardRedemptionById(
     return 'failed';
   }
 
-  const lookupResult = await sendImpactAdvocateRewardLookupPayload(
-    redemption.request_payload.lookup
-  );
+  const programKey = getRewardRedemptionProgramKey(redemption.request_payload);
+  const advocateScope =
+    programKey === ImpactAdvocateProgramKey.KiloClaw ? undefined : { programKey };
+
+  const lookupResult = advocateScope
+    ? await sendImpactAdvocateRewardLookupPayload(redemption.request_payload.lookup, advocateScope)
+    : await sendImpactAdvocateRewardLookupPayload(redemption.request_payload.lookup);
   if (!lookupResult.ok) {
     return await persistRewardRedemptionFailure({
       redemptionId: redemption.id,
@@ -1212,10 +1484,13 @@ async function dispatchImpactAdvocateRewardRedemptionById(
       .where(eq(impact_advocate_reward_redemptions.id, redemption.id));
   }
 
-  const redeemResult = await sendImpactAdvocateRewardRedemptionPayload({
+  const redemptionPayload = {
     rewardId: impactRewardId,
     ...redemption.request_payload.redemption,
-  });
+  };
+  const redeemResult = advocateScope
+    ? await sendImpactAdvocateRewardRedemptionPayload(redemptionPayload, advocateScope)
+    : await sendImpactAdvocateRewardRedemptionPayload(redemptionPayload);
   const isIdempotentAlreadyRedeemed =
     !redeemResult.ok &&
     persistedImpactRewardId === impactRewardId &&
@@ -1254,10 +1529,49 @@ async function dispatchImpactAdvocateRewardRedemptionById(
   return 'redeemed';
 }
 
+async function queueMissingImpactAdvocateRewardRedemptions(limit: number): Promise<void> {
+  const rows = await db
+    .select({ id: impact_referral_rewards.id })
+    .from(impact_referral_rewards)
+    .where(
+      and(
+        or(
+          and(
+            eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
+            eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
+            eq(impact_referral_rewards.status, ImpactReferralRewardStatus.Applied)
+          ),
+          and(
+            eq(impact_referral_rewards.product, ImpactReferralProduct.KiloPass),
+            eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloPassBonus),
+            inArray(impact_referral_rewards.status, [
+              ImpactReferralRewardStatus.Pending,
+              ImpactReferralRewardStatus.Earned,
+              ImpactReferralRewardStatus.Applied,
+            ]),
+            sql`${impact_referral_rewards.reward_amount_usd} > 0`
+          )
+        ),
+        sql`NOT EXISTS (
+          SELECT 1
+          FROM ${impact_advocate_reward_redemptions}
+          WHERE ${impact_advocate_reward_redemptions.reward_id} = ${impact_referral_rewards.id}
+        )`
+      )
+    )
+    .orderBy(asc(impact_referral_rewards.earned_at), asc(impact_referral_rewards.created_at))
+    .limit(limit);
+
+  for (const row of rows) {
+    await queueImpactAdvocateRewardRedemption({ rewardId: row.id, database: db });
+  }
+}
+
 export async function dispatchQueuedImpactAdvocateRewardRedemptions(params?: {
   limit?: number;
 }): Promise<ImpactAdvocateRewardRedemptionDispatchSummary> {
   const limit = params?.limit ?? 100;
+  await queueMissingImpactAdvocateRewardRedemptions(limit);
   const nowIso = new Date().toISOString();
   const rows = await db
     .update(impact_advocate_reward_redemptions)
@@ -1584,7 +1898,7 @@ async function persistImpactConversionReportResult(params: {
     .where(eq(impact_conversion_reports.id, params.reportId));
 }
 
-async function dispatchImpactConversionReportById(
+export async function dispatchImpactConversionReportById(
   reportId: string
 ): Promise<'delivered' | 'retried' | 'failed'> {
   logImpactReferralDebug('Dispatching Impact referral conversion report', {
@@ -1847,6 +2161,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
       database: tx,
     });
     const resolution = resolveWinningAttributionTouch({
+      product: ImpactReferralProduct.KiloClaw,
       touches,
       convertedAt: params.convertedAt,
     });

@@ -19,6 +19,7 @@ import { linearRouter } from '@/routers/linear-router';
 import { dolthubRouter } from '@/routers/dolthub-router';
 import { discordRouter } from '@/routers/discord-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
+import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
 import { appBuilderRouter } from '@/routers/app-builder-router';
@@ -38,9 +39,11 @@ import { cloudAgentNextFeedbackRouter } from '@/routers/cloud-agent-next-feedbac
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { modelsRouter } from '@/routers/models-router';
+import { codingPlansRouter } from '@/routers/coding-plans-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
+import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -61,6 +64,7 @@ export const rootRouter = createTRPCRouter({
   cloudAgent: cloudAgentRouter,
   cloudAgentNext: cloudAgentNextRouter,
   codeReviews: codeReviewRouter,
+  reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,
   byok: byokRouter,
   appBuilder: appBuilderRouter,
@@ -80,9 +84,11 @@ export const rootRouter = createTRPCRouter({
   kiloChat: kiloChatRouter,
   kiloclaw: kiloclawRouter,
   models: modelsRouter,
+  codingPlans: codingPlansRouter,
   unifiedSessions: unifiedSessionsRouter,
   activeSessions: activeSessionsRouter,
   usageAnalytics: usageAnalyticsRouter,
+  mcpGateway: mcpGatewayRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

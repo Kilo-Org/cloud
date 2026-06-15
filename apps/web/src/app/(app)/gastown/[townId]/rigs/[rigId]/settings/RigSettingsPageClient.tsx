@@ -96,7 +96,13 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
   } = useModelSelectorList(organizationId);
 
   const modelOptions = useMemo<ModelOption[]>(
-    () => modelsData?.data.map(model => ({ id: model.id, name: model.name })) ?? [],
+    () =>
+      modelsData?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+        mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+      })) ?? [],
     [modelsData]
   );
 

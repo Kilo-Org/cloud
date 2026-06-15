@@ -84,38 +84,38 @@ still show the pre-merge values for 5–30 seconds. Every flow below uses a
 
 ### Inspection (read-only)
 
-| Endpoint                                                                | Purpose                                                       |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `GET $WL/debug/wastelands/:id/status`                                   | Wasteland config, members, connected towns                    |
-| `GET $WL/debug/wastelands/:id/browse-direct?-H Authorization:token ...` | Query upstream wanted via DoltHub SQL API directly            |
-| `GET $WL/debug/wastelands/:id/browse?userId=...`                        | Browse through the production wanted-board-ops path           |
-| `GET $WL/debug/wastelands/:id/auth-probe?userId=...`                    | Diagnose token auth issues against DoltHub (anon/local/fresh) |
-| `GET $WL/debug/registry`                                                | All wastelands in the global registry                         |
-| `GET $GT/debug/towns/:id/wasteland`                                     | Town DO's connected wasteland row                             |
+| Endpoint | Purpose |
+|---|---|
+| `GET $WL/debug/wastelands/:id/status` | Wasteland config, members, connected towns |
+| `GET $WL/debug/wastelands/:id/browse-direct?-H Authorization:token ...` | Query upstream wanted via DoltHub SQL API directly |
+| `GET $WL/debug/wastelands/:id/browse?userId=...` | Browse through the production wanted-board-ops path |
+| `GET $WL/debug/wastelands/:id/auth-probe?userId=...` | Diagnose token auth issues against DoltHub (anon/local/fresh) |
+| `GET $WL/debug/registry` | All wastelands in the global registry |
+| `GET $GT/debug/towns/:id/wasteland` | Town DO's connected wasteland row |
 
 ### Lifecycle mutations (uses stored credential)
 
-| Endpoint                                | Body                                             |
-| --------------------------------------- | ------------------------------------------------ |
-| `POST $WL/debug/wastelands/:id/post`    | `{userId, title, description, priority?, type?}` |
-| `POST $WL/debug/wastelands/:id/claim`   | `{userId, itemId}`                               |
-| `POST $WL/debug/wastelands/:id/unclaim` | `{userId, itemId}`                               |
-| `POST $WL/debug/wastelands/:id/done`    | `{userId, itemId, evidence}`                     |
-| `POST $WL/debug/wastelands/:id/accept`  | `{userId, itemId, quality, comment?}`            |
-| `POST $WL/debug/wastelands/:id/reject`  | `{userId, itemId, comment}`                      |
-| `POST $WL/debug/wastelands/:id/close`   | `{userId, itemId}`                               |
+| Endpoint | Body |
+|---|---|
+| `POST $WL/debug/wastelands/:id/post` | `{userId, title, description, priority?, type?}` |
+| `POST $WL/debug/wastelands/:id/claim` | `{userId, itemId}` |
+| `POST $WL/debug/wastelands/:id/unclaim` | `{userId, itemId}` |
+| `POST $WL/debug/wastelands/:id/done` | `{userId, itemId, evidence}` |
+| `POST $WL/debug/wastelands/:id/accept` | `{userId, itemId, quality, comment?}` |
+| `POST $WL/debug/wastelands/:id/reject` | `{userId, itemId, comment}` |
+| `POST $WL/debug/wastelands/:id/close` | `{userId, itemId}` |
 
 ### Maintainer ops + worker-direct simulation
 
-| Endpoint                                                    | Purpose                                                          |
-| ----------------------------------------------------------- | ---------------------------------------------------------------- |
-| `GET $WL/debug/dolthub/:owner/:db/pulls?state=open`         | List PRs (client-side filtered by state)                         |
-| `GET $WL/debug/dolthub/:owner/:db/pulls/:pullId`            | PR detail                                                        |
-| `POST $WL/debug/dolthub/:owner/:db/pulls/:pullId/merge`     | Merge PR (returns immediately; async)                            |
-| `PATCH $WL/debug/dolthub/:owner/:db/pulls/:pullId`          | Close `{state:"closed"}` (no merge)                              |
-| `GET $WL/debug/dolthub/:owner/:db/sql?q=...`                | Arbitrary SQL read                                               |
-| `POST $WL/debug/dolthub/:owner/:db/write/:from/:to?q=<SQL>` | Create branch `:to` from `:from` and run DML                     |
-| `POST $WL/debug/dolthub/:owner/:db/pulls`                   | Create PR (body: `{title, description, fromBranch*, toBranch*}`) |
+| Endpoint | Purpose |
+|---|---|
+| `GET $WL/debug/dolthub/:owner/:db/pulls?state=open` | List PRs (client-side filtered by state) |
+| `GET $WL/debug/dolthub/:owner/:db/pulls/:pullId` | PR detail |
+| `POST $WL/debug/dolthub/:owner/:db/pulls/:pullId/merge` | Merge PR (returns immediately; async) |
+| `PATCH $WL/debug/dolthub/:owner/:db/pulls/:pullId` | Close `{state:"closed"}` (no merge) |
+| `GET $WL/debug/dolthub/:owner/:db/sql?q=...` | Arbitrary SQL read |
+| `POST $WL/debug/dolthub/:owner/:db/write/:from/:to?q=<SQL>` | Create branch `:to` from `:from` and run DML |
+| `POST $WL/debug/dolthub/:owner/:db/pulls` | Create PR (body: `{title, description, fromBranch*, toBranch*}`) |
 
 All `dolthub` endpoints require `Authorization: token $TOKEN`.
 
@@ -748,67 +748,67 @@ interfering with each other's runs, each flow should:
 
 Most failures fall into these buckets:
 
-| Symptom                                                     | Likely cause                                                                                          | Fix                                                                                                |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `claim` / `post` returns `rig not found`                    | Registration PR not merged yet                                                                        | Merge flow 1's PR first                                                                            |
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `claim` / `post` returns `rig not found` | Registration PR not merged yet | Merge flow 1's PR first |
 | DoltHub write returns `Success` but nothing lands on branch | Multi-statement SQL silently skipped, OR check constraint violation (e.g. `stamps.author != subject`) | Split into separate writes per statement; verify against `SHOW CREATE TABLE <t>` check constraints |
-| PR state stuck on `Open` after merge call                   | DoltHub async processing                                                                              | Wait 5–30s; use `wait_for_pr_merged`                                                               |
-| `cannot merge pull that is not open`                        | PR already merged or closed                                                                           | Check current state; pick a different PR                                                           |
-| `stamps` INSERT succeeds but doesn't commit                 | Violating `CHECK (author != subject)` constraint                                                      | Ensure `author` and `subject` are different rig handles                                            |
-| Browse / claim returns `no such repository`                 | Token lacks access to upstream repo                                                                   | Use `/auth-probe` to compare anon / local / fresh-token paths and identify which credential fails  |
+| PR state stuck on `Open` after merge call | DoltHub async processing | Wait 5–30s; use `wait_for_pr_merged` |
+| `cannot merge pull that is not open` | PR already merged or closed | Check current state; pick a different PR |
+| `stamps` INSERT succeeds but doesn't commit | Violating `CHECK (author != subject)` constraint | Ensure `author` and `subject` are different rig handles |
+| Browse / claim returns `no such repository` | Token lacks access to upstream repo | Use `/auth-probe` to compare anon / local / fresh-token paths and identify which credential fails |
 
 ## Schema constraints
 
 Discovered during E2E verification. Check `SHOW CREATE TABLE <t>` on upstream main for the authoritative list.
 
-| Table         | Constraint                  | Implication for tests                                                   |
-| ------------- | --------------------------- | ----------------------------------------------------------------------- |
-| `stamps`      | `CHECK (author != subject)` | Contributor and maintainer must be different rigs                       |
-| `stamps`      | `valence` is NOT NULL JSON  | Must provide valid JSON object (can use MySQL `JSON_OBJECT(...)`)       |
-| `wanted`      | (PK: id)                    | Use unique `w-<hex>` IDs per item                                       |
-| `completions` | (PK: id)                    | Use unique `c-<hex>` IDs                                                |
-| `rigs`        | (PK: handle)                | Register each rig before it can appear as `author`/`subject` on a stamp |
+| Table | Constraint | Implication for tests |
+|---|---|---|
+| `stamps` | `CHECK (author != subject)` | Contributor and maintainer must be different rigs |
+| `stamps` | `valence` is NOT NULL JSON | Must provide valid JSON object (can use MySQL `JSON_OBJECT(...)`) |
+| `wanted` | (PK: id) | Use unique `w-<hex>` IDs per item |
+| `completions` | (PK: id) | Use unique `c-<hex>` IDs |
+| `rigs` | (PK: handle) | Register each rig before it can appear as `author`/`subject` on a stamp |
 
 ## Verification Results
 
 Status of each flow after the E2E verification run on 2026-04-20.
 
-| Flow                | Status                             | Notes                                                                                                                                                                                                                                                                  |
-| ------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — Join & register | ✅ Verified (manual)               | Registration PR #1 was manually merged; `jfawcett` appears in `jrf0110/wl-commons.rigs` on main. Maintainer rig `jrf0110` also registered via PR #7 during E2E setup.                                                                                                  |
-| 2 — Browse          | ✅ Verified via sub-agent          | `/debug/wastelands/:id/browse` fails in local dev due to container TLS egress issue; `/debug/wastelands/:id/browse-direct` returned 54 items matching `SELECT COUNT(*) FROM wanted`.                                                                                   |
-| 3 — Post            | ✅ Verified via sub-agent (PR #8)  | Item `w-870be07fbc` landed on upstream main with `posted_by=jfawcett, status=open`. Path A (container-driven) fails in local dev due to `wl post` getting `EOF` from DoltHub write API; Path B (worker-direct) succeeded.                                              |
-| 4 — Claim           | ✅ Verified via sub-agent (PR #9)  | Item `w-870be07fbc` → `claimed, claimed_by=jfawcett`. Also separately via PR #5 earlier.                                                                                                                                                                               |
-| 5 — Unclaim         | ✅ Verified via sub-agent (PR #14) | Fresh item `w-68aa4ab1dd`: open → claimed → open with `claimed_by=null`.                                                                                                                                                                                               |
-| 6 — Done            | ✅ Verified via sub-agent (PR #10) | Item `w-870be07fbc` → `in_review` with `evidence_url` set; completion `c-58cd6cc527b5bf3b` inserted. Required split writes (multi-statement SQL silently drops rows).                                                                                                  |
-| 7 — Accept + stamp  | ✅ Verified via sub-agent (PR #11) | Item `w-870be07fbc` → `completed`. Stamp `s-35e8a923fe63c8cd` created with `author=jrf0110, subject=jfawcett` (CHECK `author != subject` satisfied); completion linked via `validated_by=jrf0110, stamp_id=s-35e8a923...`. Required 3 split writes on a single branch. |
-| 8 — Reject          | ✅ Verified via sub-agent (PR #18) | Fresh item `w-d2cf6acf6a`: open → claimed → in_review → claimed (reject). Final state: `status=claimed, evidence_url=null`, no completion, no stamp.                                                                                                                   |
-| 9 — Close           | ✅ Verified via sub-agent (PR #22) | Fresh item `w-89e6720ca4`: open → claimed → in_review → completed (close with no stamp). Final state: `status=completed`, no stamp.                                                                                                                                    |
-| 10 — Disconnect     | Not yet executed                   | Requires manually invoking the `disconnectTownFromWasteland` tRPC. Lower priority since town disconnect is strictly a gastown operation and doesn't touch upstream data.                                                                                               |
+| Flow | Status | Notes |
+|---|---|---|
+| 1 — Join & register | ✅ Verified (manual) | Registration PR #1 was manually merged; `jfawcett` appears in `jrf0110/wl-commons.rigs` on main. Maintainer rig `jrf0110` also registered via PR #7 during E2E setup. |
+| 2 — Browse | ✅ Verified via sub-agent | `/debug/wastelands/:id/browse` fails in local dev due to container TLS egress issue; `/debug/wastelands/:id/browse-direct` returned 54 items matching `SELECT COUNT(*) FROM wanted`. |
+| 3 — Post | ✅ Verified via sub-agent (PR #8) | Item `w-870be07fbc` landed on upstream main with `posted_by=jfawcett, status=open`. Path A (container-driven) fails in local dev due to `wl post` getting `EOF` from DoltHub write API; Path B (worker-direct) succeeded. |
+| 4 — Claim | ✅ Verified via sub-agent (PR #9) | Item `w-870be07fbc` → `claimed, claimed_by=jfawcett`. Also separately via PR #5 earlier. |
+| 5 — Unclaim | ✅ Verified via sub-agent (PR #14) | Fresh item `w-68aa4ab1dd`: open → claimed → open with `claimed_by=null`. |
+| 6 — Done | ✅ Verified via sub-agent (PR #10) | Item `w-870be07fbc` → `in_review` with `evidence_url` set; completion `c-58cd6cc527b5bf3b` inserted. Required split writes (multi-statement SQL silently drops rows). |
+| 7 — Accept + stamp | ✅ Verified via sub-agent (PR #11) | Item `w-870be07fbc` → `completed`. Stamp `s-35e8a923fe63c8cd` created with `author=jrf0110, subject=jfawcett` (CHECK `author != subject` satisfied); completion linked via `validated_by=jrf0110, stamp_id=s-35e8a923...`. Required 3 split writes on a single branch. |
+| 8 — Reject | ✅ Verified via sub-agent (PR #18) | Fresh item `w-d2cf6acf6a`: open → claimed → in_review → claimed (reject). Final state: `status=claimed, evidence_url=null`, no completion, no stamp. |
+| 9 — Close | ✅ Verified via sub-agent (PR #22) | Fresh item `w-89e6720ca4`: open → claimed → in_review → completed (close with no stamp). Final state: `status=completed`, no stamp. |
+| 10 — Disconnect | Not yet executed | Requires manually invoking the `disconnectTownFromWasteland` tRPC. Lower priority since town disconnect is strictly a gastown operation and doesn't touch upstream data. |
 
 ### PR history (all merged on jrf0110/wl-commons)
 
-| PR  | Flow                      | Item ID        |
-| --- | ------------------------- | -------------- |
-| 4   | post (smoke; jrf0110)     | `w-0e5abc1976` |
-| 5   | claim                     | `w-0e5abc1976` |
-| 6   | done                      | `w-0e5abc1976` |
-| 7   | register rig: jrf0110     | —              |
-| 8   | post (jfawcett lifecycle) | `w-870be07fbc` |
-| 9   | claim                     | `w-870be07fbc` |
-| 10  | done                      | `w-870be07fbc` |
-| 11  | accept                    | `w-870be07fbc` |
-| 12  | post (flow 5)             | `w-68aa4ab1dd` |
-| 13  | claim                     | `w-68aa4ab1dd` |
-| 14  | unclaim                   | `w-68aa4ab1dd` |
-| 15  | post (flow 8)             | `w-d2cf6acf6a` |
-| 16  | claim                     | `w-d2cf6acf6a` |
-| 17  | done                      | `w-d2cf6acf6a` |
-| 18  | reject                    | `w-d2cf6acf6a` |
-| 19  | post (flow 9)             | `w-89e6720ca4` |
-| 20  | claim                     | `w-89e6720ca4` |
-| 21  | done                      | `w-89e6720ca4` |
-| 22  | close                     | `w-89e6720ca4` |
+| PR | Flow | Item ID |
+|---|---|---|
+| 4 | post (smoke; jrf0110) | `w-0e5abc1976` |
+| 5 | claim | `w-0e5abc1976` |
+| 6 | done | `w-0e5abc1976` |
+| 7 | register rig: jrf0110 | — |
+| 8 | post (jfawcett lifecycle) | `w-870be07fbc` |
+| 9 | claim | `w-870be07fbc` |
+| 10 | done | `w-870be07fbc` |
+| 11 | accept | `w-870be07fbc` |
+| 12 | post (flow 5) | `w-68aa4ab1dd` |
+| 13 | claim | `w-68aa4ab1dd` |
+| 14 | unclaim | `w-68aa4ab1dd` |
+| 15 | post (flow 8) | `w-d2cf6acf6a` |
+| 16 | claim | `w-d2cf6acf6a` |
+| 17 | done | `w-d2cf6acf6a` |
+| 18 | reject | `w-d2cf6acf6a` |
+| 19 | post (flow 9) | `w-89e6720ca4` |
+| 20 | claim | `w-89e6720ca4` |
+| 21 | done | `w-89e6720ca4` |
+| 22 | close | `w-89e6720ca4` |
 
 ### Findings that drove doc updates
 

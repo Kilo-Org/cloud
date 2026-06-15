@@ -115,7 +115,6 @@ const createCodeReviewSessionContext = (): SessionContext =>
   createSessionContext({ platform: 'code-review' });
 
 const createCallbacks = (): ConnectionCallbacks => ({
-  onMessageComplete: vi.fn(),
   onTerminalError: vi.fn(),
   onCommand: vi.fn(),
   onDisconnect: vi.fn(),
@@ -130,6 +129,7 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
     sendPromptAsync: vi.fn().mockResolvedValue(undefined),
     abortSession: vi.fn().mockResolvedValue(true),
+    summarizeSession: vi.fn().mockResolvedValue(true),
     sendCommand: vi.fn().mockResolvedValue(undefined),
     answerPermission: vi.fn().mockResolvedValue(true),
     answerQuestion: vi.fn().mockResolvedValue(true),
@@ -140,6 +140,7 @@ function createMockKiloClient(overrides?: Partial<WrapperKiloClient>): WrapperKi
     getPermissions: vi.fn().mockResolvedValue([]),
     getNetworkWaits: vi.fn().mockResolvedValue([]),
     resumeNetworkWait: vi.fn().mockResolvedValue(true),
+    listEffectiveModels: vi.fn().mockResolvedValue([]),
     subscribeEvents: vi.fn().mockResolvedValue({
       stream: (async function* () {
         await new Promise(() => {});

@@ -12,7 +12,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "isolatedModules": true,
-    "types": ["@cloudflare/workers-types"]
+    "types": ["@types/node", "@cloudflare/workers-types"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules"]

@@ -1,4 +1,5 @@
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
+import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
 
@@ -7,15 +8,31 @@ const {
   generateSandboxIdMock,
   createCliSessionMock,
   deleteCliSessionMock,
+  createSessionReportMock,
+  recordSandboxIdentityMock,
+  recordSessionFailureMock,
+  recordVisibleSessionOutcomeMock,
+  recordMetadataRegisteredMock,
+  recordInitialAdmissionMock,
+  recordInternalCompensationMock,
   mergeProfileConfigurationMock,
   organizationMembershipLimitMock,
+  assertKiloModelAvailableMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   generateSandboxIdMock: vi.fn().mockResolvedValue('sb-test-123'),
-  createCliSessionMock: vi.fn().mockResolvedValue(undefined),
-  deleteCliSessionMock: vi.fn().mockResolvedValue(undefined),
+  createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
+  deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
+  createSessionReportMock: vi.fn().mockResolvedValue(undefined),
+  recordSandboxIdentityMock: vi.fn().mockResolvedValue(undefined),
+  recordSessionFailureMock: vi.fn().mockResolvedValue(undefined),
+  recordVisibleSessionOutcomeMock: vi.fn().mockResolvedValue(undefined),
+  recordMetadataRegisteredMock: vi.fn().mockResolvedValue(undefined),
+  recordInitialAdmissionMock: vi.fn().mockResolvedValue(undefined),
+  recordInternalCompensationMock: vi.fn().mockResolvedValue(undefined),
   mergeProfileConfigurationMock: vi.fn(),
   organizationMembershipLimitMock: vi.fn(),
+  assertKiloModelAvailableMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {
@@ -46,9 +63,19 @@ vi.mock('./sandbox-id.js', () => ({
   getSandboxNamespace: vi.fn(),
 }));
 
+vi.mock('./telemetry/session-reports.js', () => ({
+  createCloudAgentSessionReport: createSessionReportMock,
+  recordCloudAgentSandboxIdentity: recordSandboxIdentityMock,
+  recordCloudAgentSessionFailure: recordSessionFailureMock,
+}));
+
 vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
   Sandbox: class Sandbox {},
+}));
+
+vi.mock('./model-validation.js', () => ({
+  assertKiloModelAvailable: assertKiloModelAvailableMock,
 }));
 
 vi.mock('./session-service.js', () => ({
@@ -72,6 +99,10 @@ vi.mock('./session-service.js', () => ({
   SessionService: class SessionService {
     createCliSessionViaSessionIngest = createCliSessionMock;
     deleteCliSessionViaSessionIngest = deleteCliSessionMock;
+    recordCloudAgentVisibleSessionOutcome = recordVisibleSessionOutcomeMock;
+    recordCloudAgentMetadataRegistered = recordMetadataRegisteredMock;
+    recordCloudAgentInitialAdmission = recordInitialAdmissionMock;
+    recordCloudAgentInternalCompensation = recordInternalCompensationMock;
   },
 }));
 
@@ -168,12 +199,13 @@ function createInternalApiContext(options: {
       } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
       SESSION_INGEST: {
         fetch: vi.fn(),
-        createSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
-        deleteSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
+        createSessionForCloudAgent: vi.fn().mockResolvedValue({ created: true }),
+        deleteSessionForCloudAgent: vi.fn().mockResolvedValue({ deleted: true }),
       } as unknown as TRPCContext['env']['SESSION_INGEST'],
       INTERNAL_API_SECRET: effectiveInternalApiSecret,
       NEXTAUTH_SECRET: 'test-secret',
       R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+      CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
       GIT_TOKEN_SERVICE: {} as TRPCContext['env']['GIT_TOKEN_SERVICE'],
       HYPERDRIVE: {
         connectionString: 'postgres://profile-test',
@@ -183,12 +215,26 @@ function createInternalApiContext(options: {
 }
 
 describe('effective session profile policy', () => {
-  it('selects web-default resolution explicitly at the platform adaptation boundary', () => {
-    expect(profileResolutionPolicyForSessionCreateOrigin('cloud-agent-web')).toEqual({
-      defaultProfileResolution: 'include-web-defaults',
-    });
-    expect(profileResolutionPolicyForSessionCreateOrigin('code-review')).toEqual({
-      defaultProfileResolution: 'explicit-profile-only',
+  it.each([
+    { origin: 'cloud-agent-web', expected: 'include-web-defaults' },
+    { origin: 'slack', expected: 'include-web-defaults' },
+    { origin: 'github', expected: 'include-web-defaults' },
+    { origin: 'linear', expected: 'include-web-defaults' },
+    { origin: 'discord', expected: 'include-web-defaults' },
+    { origin: 'app-builder', expected: 'include-web-defaults' },
+    { origin: 'webhook', expected: 'include-web-defaults' },
+    { origin: 'scheduled', expected: 'include-web-defaults' },
+    { origin: undefined, expected: 'explicit-profile-only' },
+    { origin: '', expected: 'explicit-profile-only' },
+    { origin: 'unknown', expected: 'explicit-profile-only' },
+    { origin: 'Slack', expected: 'explicit-profile-only' },
+    { origin: 'code-review', expected: 'explicit-profile-only' },
+    { origin: 'security-agent', expected: 'explicit-profile-only' },
+    { origin: 'autofix', expected: 'explicit-profile-only' },
+    { origin: 'auto-triage', expected: 'explicit-profile-only' },
+  ])('selects $expected for origin $origin', ({ origin, expected }) => {
+    expect(profileResolutionPolicyForSessionCreateOrigin(origin)).toEqual({
+      defaultProfileResolution: expected,
     });
   });
 });
@@ -198,14 +244,37 @@ describe('prepareSession endpoint', () => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxIdMock.mockResolvedValue('sb-test-123');
-    createCliSessionMock.mockResolvedValue(undefined);
-    deleteCliSessionMock.mockResolvedValue(undefined);
+    createCliSessionMock.mockResolvedValue({ created: true });
+    deleteCliSessionMock.mockResolvedValue({ deleted: true });
+    createSessionReportMock.mockResolvedValue(undefined);
+    recordSandboxIdentityMock.mockResolvedValue(undefined);
+    recordSessionFailureMock.mockResolvedValue(undefined);
+    recordVisibleSessionOutcomeMock.mockResolvedValue(undefined);
+    recordMetadataRegisteredMock.mockResolvedValue(undefined);
+    recordInitialAdmissionMock.mockResolvedValue(undefined);
+    recordInternalCompensationMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
+    assertKiloModelAvailableMock.mockResolvedValue(undefined);
   });
 
   it('rejects request without internal API key header', async () => {
     const caller = appRouter.createCaller(
       createInternalApiContext({ requestInternalApiKey: null })
+    );
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Test prompt',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('Invalid or missing internal API key');
+  });
+
+  it('rejects an incorrect internal API key of a different length', async () => {
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ requestInternalApiKey: 'wrong' })
     );
 
     await expect(
@@ -231,40 +300,100 @@ describe('prepareSession endpoint', () => {
     ).rejects.toThrow('Invalid customer token');
   });
 
-  it('resolves web defaults when no explicit profile is selected', async () => {
-    const caller = appRouter.createCaller(createInternalApiContext({}));
-
-    await caller.prepareSession({
-      prompt: 'Web default profile',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      createdOnPlatform: 'cloud-agent-web',
-    });
-
-    expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        profileId: undefined,
-        repoFullName: 'acme/repo',
-        platform: 'github',
-      })
+  it('rejects an unavailable model before registration or auto-initiation', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+    assertKiloModelAvailableMock.mockRejectedValue(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Selected model is not available' })
     );
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Test prompt',
+        mode: 'code',
+        model: 'missing/model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
-  it('does not resolve web defaults for non-web creation without an explicit profile', async () => {
-    const caller = appRouter.createCaller(createInternalApiContext({}));
+  it.each([
+    {
+      origin: 'cloud-agent-web',
+      repository: { githubRepo: 'acme/github-repo' },
+      expectedRepoFullName: 'acme/github-repo',
+      expectedPlatform: 'github',
+    },
+    {
+      origin: 'slack',
+      repository: { githubRepo: 'acme/slack-repo' },
+      expectedRepoFullName: 'acme/slack-repo',
+      expectedPlatform: 'github',
+    },
+    {
+      origin: 'linear',
+      repository: {
+        gitUrl: 'https://gitlab.com/acme/linear-repo.git',
+        platform: 'gitlab' as const,
+      },
+      expectedRepoFullName: 'acme/linear-repo',
+      expectedPlatform: 'gitlab',
+    },
+    {
+      origin: 'slack',
+      repository: {
+        gitUrl: 'https://gitlab.example.com/acme/subgroup/slack-repo.git',
+        platform: 'gitlab' as const,
+      },
+      expectedRepoFullName: 'acme/subgroup/slack-repo',
+      expectedPlatform: 'gitlab',
+    },
+  ])(
+    'resolves implicit profiles for approved $origin creation',
+    async ({ origin, repository, expectedRepoFullName, expectedPlatform }) => {
+      const caller = appRouter.createCaller(createInternalApiContext({}));
 
-    await caller.prepareSession({
-      prompt: 'Other platform',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      createdOnPlatform: 'code-review',
-    });
+      await caller.prepareSession({
+        prompt: 'Implicit profile',
+        mode: 'code',
+        model: 'claude-3',
+        ...repository,
+        createdOnPlatform: origin,
+      });
 
-    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
-  });
+      expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          profileId: undefined,
+          owner: { type: 'user', id: 'test-user-123' },
+          repoFullName: expectedRepoFullName,
+          platform: expectedPlatform,
+        })
+      );
+    }
+  );
+
+  it.each([{ origin: undefined }, { origin: 'unknown' }])(
+    'does not resolve implicit profiles for non-approved origin $origin',
+    async ({ origin }) => {
+      const caller = appRouter.createCaller(createInternalApiContext({}));
+
+      await caller.prepareSession({
+        prompt: 'Other platform',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        createdOnPlatform: origin,
+      });
+
+      expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('resolves an explicit profile for non-web creation and passes inline overrides', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
@@ -347,7 +476,7 @@ describe('prepareSession endpoint', () => {
             type: 'prompt',
             id: expect.stringMatching(/^msg_/) as unknown,
             prompt: 'Test prompt',
-            images: undefined,
+            attachments: undefined,
           },
         },
         agent: {
@@ -428,6 +557,34 @@ describe('prepareSession endpoint', () => {
     );
   });
 
+  it('persists generic GitLab review origin and repository context without a caller token', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test GitLab review prompt',
+      mode: 'code',
+      model: 'claude-3',
+      gitUrl: 'https://gitlab.com/acme/repo.git',
+      gitToken: 'caller-gitlab-token',
+      platform: 'gitlab',
+      createdOnPlatform: 'code-review',
+      upstreamBranch: 'feature/gitlab',
+    });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ createdOnPlatform: 'code-review' }),
+        repository: {
+          type: 'gitlab',
+          url: 'https://gitlab.com/acme/repo.git',
+          branch: 'feature/gitlab',
+        },
+      })
+    );
+    expect(doStub.registerSession.mock.calls[0]?.[0].repository).not.toHaveProperty('token');
+  });
+
   it('preserves caller gitToken for generic git repositories', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
@@ -453,7 +610,7 @@ describe('prepareSession endpoint', () => {
     );
   });
 
-  it('auto-initiates through grouped creation with the canonical initial message', async () => {
+  it('auto-initiates through grouped creation with canonicalized legacy initial attachments', async () => {
     const initialMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
     const images = {
       path: '123e4567-e89b-12d3-a456-426614174000',
@@ -485,7 +642,7 @@ describe('prepareSession endpoint', () => {
             type: 'prompt',
             messageId: initialMessageId,
             prompt: 'Inspect the screenshot',
-            images,
+            attachments: images,
           },
         },
       })
@@ -585,9 +742,10 @@ describe('prepareSession endpoint', () => {
     );
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
-  it('rejects command-valued initialPayload images before registration', async () => {
+  it('rejects command-valued initialPayload attachments before registration', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
@@ -598,9 +756,9 @@ describe('prepareSession endpoint', () => {
         model: 'claude-3',
         githubRepo: 'acme/repo',
         autoInitiate: true,
-        images: {
+        attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+          files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
         },
         initialPayload: {
           type: 'command',
@@ -608,10 +766,64 @@ describe('prepareSession endpoint', () => {
           arguments: '--aggressive',
         },
       })
-    ).rejects.toThrow('Images cannot be attached to slash commands');
+    ).rejects.toThrow('Attachments cannot be attached to slash commands');
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+  });
+
+  it('returns a prepared session when post-registration fact persistence fails', async () => {
+    recordMetadataRegisteredMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    recordInitialAdmissionMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    const result = await caller.prepareSession({
+      prompt: 'Prepare even if reporting is unavailable',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(result).toMatchObject({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'cli-session-abc123',
+    });
+  });
+
+  it('preserves a legacy registration rejection when fact persistence fails', async () => {
+    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const doStub = createMockDOStub({
+      registerSession: vi
+        .fn()
+        .mockResolvedValue({ success: false, error: 'Registration rejected' }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Reject even if reporting is unavailable',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('Registration rejected');
+  });
+
+  it('preserves a legacy registration unknown outcome when fact persistence fails', async () => {
+    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const doStub = createMockDOStub({
+      registerSession: vi.fn().mockRejectedValue(new Error('unknown registration outcome')),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Unknown even if reporting is unavailable',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('unknown registration outcome');
   });
 
   it('attempts best-effort ownership-row compensation on explicit registration rejection', async () => {
@@ -638,6 +850,41 @@ describe('prepareSession endpoint', () => {
       { onlyIfEmpty: true }
     );
     expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'registration', code: 'do_registration_rejected' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+  });
+
+  it('does not record compensation when empty-only ownership deletion declines deletion', async () => {
+    deleteCliSessionMock.mockResolvedValueOnce({ deleted: false });
+    const doStub = createMockDOStub({
+      registerSession: vi
+        .fn()
+        .mockResolvedValue({ success: false, error: 'Registration rejected' }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Do not erase non-empty ownership',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+      })
+    ).rejects.toThrow('Registration rejected');
+
+    expect(deleteCliSessionMock).toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'registration', code: 'do_registration_rejected' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('does not replay or compensate a committed registration with lost retryable response', async () => {
@@ -679,6 +926,12 @@ describe('prepareSession endpoint', () => {
 
     expect(registerSession).toHaveBeenCalledTimes(1);
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+      }),
+      expect.any(Object)
+    );
   });
 });
 
@@ -687,10 +940,18 @@ describe('start endpoint', () => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxIdMock.mockResolvedValue('sb-test-123');
-    createCliSessionMock.mockResolvedValue(undefined);
-    deleteCliSessionMock.mockResolvedValue(undefined);
+    createCliSessionMock.mockResolvedValue({ created: true });
+    deleteCliSessionMock.mockResolvedValue({ deleted: true });
+    createSessionReportMock.mockResolvedValue(undefined);
+    recordSandboxIdentityMock.mockResolvedValue(undefined);
+    recordSessionFailureMock.mockResolvedValue(undefined);
+    recordVisibleSessionOutcomeMock.mockResolvedValue(undefined);
+    recordMetadataRegisteredMock.mockResolvedValue(undefined);
+    recordInitialAdmissionMock.mockResolvedValue(undefined);
+    recordInternalCompensationMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership-123' }]);
+    assertKiloModelAvailableMock.mockResolvedValue(undefined);
   });
 
   it('rejects non-member organization profile resolution when balance validation is skipped', async () => {
@@ -718,24 +979,94 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
-  it('resolves web defaults for grouped start without an explicit profile', async () => {
+  it('rejects an unavailable model before ownership or initial admission', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+    assertKiloModelAvailableMock.mockRejectedValue(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Selected model is not available' })
+    );
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Do not admit' },
+        agent: { mode: 'code', model: 'missing/model' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it.each(['cloud-agent-web', 'slack'])(
+    'resolves implicit profiles for approved grouped %s start',
+    async origin => {
+      const caller = appRouter.createCaller(createInternalApiContext({}));
+
+      await caller.start({
+        message: { prompt: 'Approved start' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+        options: { createdOnPlatform: origin },
+      });
+
+      expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          profileId: undefined,
+          owner: { type: 'user', id: 'test-user-123' },
+          repoFullName: 'acme/repo',
+          platform: 'github',
+        })
+      );
+    }
+  );
+
+  it('returns an admitted session without persisting setup success milestones', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
 
-    await caller.start({
-      message: { prompt: 'Web start' },
+    const result = await caller.start({
+      message: { prompt: 'Run even if reporting is unavailable' },
       agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
       repository: { type: 'github', repo: 'acme/repo' },
-      options: { createdOnPlatform: 'cloud-agent-web' },
     });
 
-    expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        profileId: undefined,
-        repoFullName: 'acme/repo',
-        platform: 'github',
+    expect(result.delivery).toBe('queued');
+    expect(recordSessionFailureMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves a rejected Durable Object outcome when failure fact persistence fails', async () => {
+    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const doStub = createMockDOStub({
+      createSessionWithInitialAdmission: vi
+        .fn()
+        .mockResolvedValue({ success: false, code: 'INTERNAL', error: 'admission failed' }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Reject with reporting unavailable' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
       })
-    );
+    ).rejects.toThrow('admission failed');
+  });
+
+  it('preserves an unknown Durable Object outcome when failure fact persistence fails', async () => {
+    recordSessionFailureMock.mockRejectedValueOnce(new Error('reporting unavailable'));
+    const doStub = createMockDOStub({
+      createSessionWithInitialAdmission: vi.fn().mockRejectedValue(new Error('rpc unavailable')),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Unknown with reporting unavailable' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('rpc unavailable');
   });
 
   it('resolves organization profile defaults for an authorized member', async () => {
@@ -762,24 +1093,162 @@ describe('start endpoint', () => {
     expect(createCliSessionMock).toHaveBeenCalled();
   });
 
-  it('does not resolve web defaults for grouped non-web start without a profile', async () => {
+  it('resolves implicit profiles for grouped App Builder starts', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
 
     await caller.start({
-      message: { prompt: 'Other start' },
+      message: { prompt: 'App Builder start' },
       agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
       repository: { type: 'github', repo: 'acme/repo' },
       options: { createdOnPlatform: 'app-builder' },
     });
 
+    expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: undefined,
+        repoFullName: 'acme/repo',
+        platform: 'github',
+      })
+    );
+  });
+
+  it('does not resolve implicit profiles for grouped non-approved starts', async () => {
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    await caller.start({
+      message: { prompt: 'Automated start' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { createdOnPlatform: 'code-review' },
+    });
+
     expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
   });
 
-  it('admits the canonical initial turn through one grouped creation operation', async () => {
+  it('fails without later outcome facts when creating the session report fails', async () => {
+    createSessionReportMock.mockRejectedValueOnce(new Error('session report unavailable'));
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Do not allocate without a session report' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('session report unavailable');
+
+    expect(generateSandboxIdMock).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(recordVisibleSessionOutcomeMock).not.toHaveBeenCalled();
+    expect(recordInitialAdmissionMock).not.toHaveBeenCalled();
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('records sandbox identity failure without claiming visible-row compensation', async () => {
+    generateSandboxIdMock.mockRejectedValueOnce(new Error('sandbox identity unavailable'));
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Cannot allocate sandbox' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('sandbox identity unavailable');
+
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'sandbox_identity', code: 'sandbox_id_derivation_failed' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+  });
+
+  it('records ambiguous visible ownership creation without compensating it', async () => {
+    createCliSessionMock.mockRejectedValueOnce(new Error('visible create response unavailable'));
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Create ownership' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('visible create response unavailable');
+
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+  });
+
+  it('creates the session report before deriving sandbox identity, creating ownership, or admitting work', async () => {
+    const steps: string[] = [];
+    createSessionReportMock.mockImplementationOnce(async () => {
+      steps.push('session-report');
+    });
+    generateSandboxIdMock.mockImplementationOnce(async () => {
+      steps.push('sandbox');
+      return 'sb-test-123';
+    });
+    recordSandboxIdentityMock.mockImplementationOnce(async () => {
+      steps.push('sandbox-report');
+    });
+    createCliSessionMock.mockImplementationOnce(async () => {
+      steps.push('visible');
+      return { created: true };
+    });
+    const createSessionWithInitialAdmission = vi.fn().mockImplementationOnce(async () => {
+      steps.push('admission');
+      return {
+        success: true,
+        outcome: 'queued',
+        compatibilityDelivery: 'queued',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      };
+    });
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ doStub: createMockDOStub({ createSessionWithInitialAdmission }) })
+    );
+
+    await caller.start({
+      message: { id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'Trace allocation' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+    });
+
+    expect(steps).toEqual(['session-report', 'sandbox', 'sandbox-report', 'visible', 'admission']);
+    expect(createSessionReportMock).toHaveBeenCalledWith(
+      {
+        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        kiloSessionId: 'cli-session-abc123',
+        initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      },
+      expect.any(Object)
+    );
+    expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
+      {
+        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        sandboxId: 'sb-test-123',
+      },
+      expect.any(Object)
+    );
+    expect(recordSessionFailureMock).not.toHaveBeenCalled();
+  });
+
+  it('admits canonical document attachments through one grouped creation operation', async () => {
     const initialMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
-    const images = {
+    const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
     };
     const createSessionWithInitialAdmission = vi.fn().mockResolvedValue({
       success: true,
@@ -793,8 +1262,8 @@ describe('start endpoint', () => {
     const result = await caller.start({
       message: {
         id: initialMessageId,
-        prompt: 'Describe the attached image',
-        images,
+        prompt: 'Describe the attached document',
+        attachments,
       },
       agent: {
         mode: 'code',
@@ -818,14 +1287,41 @@ describe('start endpoint', () => {
           initialTurn: {
             type: 'prompt',
             messageId: initialMessageId,
-            prompt: 'Describe the attached image',
-            images,
+            prompt: 'Describe the attached document',
+            attachments,
           },
         },
       })
     );
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+  });
+
+  it('classifies grouped metadata registration rejection separately from initial admission', async () => {
+    const doStub = createMockDOStub({
+      createSessionWithInitialAdmission: vi.fn().mockResolvedValue({
+        success: false,
+        code: 'INTERNAL',
+        error: 'metadata invalid',
+        failureBoundary: 'registration',
+      }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Register the initial turn' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('metadata invalid');
+
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'registration', code: 'do_registration_rejected' },
+      }),
+      expect.any(Object)
+    );
   });
 
   it('compensates the ownership row when grouped Durable Object admission fails', async () => {
@@ -852,6 +1348,39 @@ describe('start endpoint', () => {
     );
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'initial_admission', code: 'initial_admission_rejected' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves failed admission evidence when empty-only deletion cannot compensate the visible row', async () => {
+    deleteCliSessionMock.mockResolvedValueOnce({ deleted: false });
+    const doStub = createMockDOStub({
+      createSessionWithInitialAdmission: vi
+        .fn()
+        .mockResolvedValue({ success: false, code: 'INTERNAL', error: 'admission failed' }),
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Already has visible activity' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toThrow('admission failed');
+
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'initial_admission', code: 'initial_admission_rejected' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('retains the ownership row when grouped Durable Object RPC outcome is unknown', async () => {
@@ -869,6 +1398,13 @@ describe('start endpoint', () => {
     ).rejects.toThrow('rpc unavailable');
 
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'transport', code: 'do_rpc_outcome_unknown' },
+      }),
+      expect.any(Object)
+    );
+    expect(recordInternalCompensationMock).not.toHaveBeenCalled();
   });
 
   it('rejects callbackTarget options before session registration or queueing', async () => {
@@ -974,7 +1510,7 @@ describe('schema validation', () => {
     ).toBe(false);
   });
 
-  it('restricts updateSession to callbackTarget', () => {
+  it('restricts updateSession to supported internal updates', () => {
     expect(
       schemas.UpdateSessionInput.safeParse({
         cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',

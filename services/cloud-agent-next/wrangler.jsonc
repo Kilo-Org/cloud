@@ -7,7 +7,7 @@
   "name": "cloud-agent-next",
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
-  "compatibility_date": "2025-09-15",
+  "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
@@ -27,12 +27,15 @@
       "invocation_logs": true,
     },
     "traces": {
-      "enabled": true,
+      "enabled": false,
       "persist": true,
       "head_sampling_rate": 1,
     },
   },
   "logpush": true,
+  "triggers": {
+    "crons": ["17 2 * * *"],
+  },
   "routes": [
     {
       "pattern": "cloud-agent-next.kilosessions.ai",
@@ -88,6 +91,11 @@
       "service": "git-token-service",
       "entrypoint": "GitTokenRPCEntrypoint",
     },
+    {
+      "binding": "NOTIFICATIONS",
+      "service": "notifications",
+      "entrypoint": "NotificationsService",
+    },
   ],
   "secrets_store_secrets": [
     {
@@ -138,19 +146,19 @@
       "image": "./Dockerfile",
       "instance_type": "standard-4",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.2.52",
+        "KILOCODE_CLI_VERSION": "7.3.21",
       },
-      "max_instances": 250,
+      "max_instances": 400,
       "rollout_active_grace_period": 1800,
     },
     {
       "class_name": "SandboxSmall",
       "image": "./Dockerfile",
-      "instance_type": "standard-2",
+      "instance_type": "standard-4",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.2.52",
+        "KILOCODE_CLI_VERSION": "7.3.21",
       },
-      "max_instances": 400,
+      "max_instances": 300,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -158,7 +166,7 @@
       "image": "./Dockerfile.dind",
       "instance_type": "standard-3",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.2.52",
+        "KILOCODE_CLI_VERSION": "7.3.21",
       },
       "max_instances": 20,
       "rollout_active_grace_period": 1800,
@@ -182,6 +190,10 @@
         "class_name": "CloudAgentSession",
         "name": "CLOUD_AGENT_SESSION",
       },
+      {
+        "class_name": "UserKiloFacade",
+        "name": "USER_KILO_FACADE",
+      },
     ],
   },
   "migrations": [
@@ -200,6 +212,10 @@
     {
       "new_sqlite_classes": ["SandboxDIND"],
       "tag": "v4",
+    },
+    {
+      "new_sqlite_classes": ["UserKiloFacade"],
+      "tag": "v5",
     },
   ],
   /**
@@ -224,6 +240,10 @@
         "binding": "CALLBACK_QUEUE",
         "queue": "cloud-agent-next-callback-queue",
       },
+      {
+        "binding": "CLOUD_AGENT_REPORT_QUEUE",
+        "queue": "cloud-agent-next-report-queue",
+      },
     ],
     "consumers": [
       {
@@ -231,6 +251,11 @@
         "max_batch_size": 5,
         // Keep aligned with CALLBACK_DELIVERY_MAX_ATTEMPTS = initial attempt + 4 redeliveries.
         "max_retries": 4,
+      },
+      {
+        "queue": "cloud-agent-next-report-queue",
+        "max_retries": 3,
+        "dead_letter_queue": "cloud-agent-next-report-queue-dlq",
       },
     ],
   },
@@ -241,6 +266,9 @@
   "env": {
     "dev": {
       "name": "cloud-agent-next-dev",
+      "triggers": {
+        "crons": ["17 2 * * *"],
+      },
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
@@ -274,6 +302,11 @@
           "service": "git-token-service-dev",
           "entrypoint": "GitTokenRPCEntrypoint",
         },
+        {
+          "binding": "NOTIFICATIONS",
+          "service": "notifications",
+          "entrypoint": "NotificationsService",
+        },
       ],
       "secrets_store_secrets": [
         {
@@ -294,7 +327,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.2.52",
+            "KILOCODE_CLI_VERSION": "7.3.21",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -302,9 +335,9 @@
         {
           "class_name": "SandboxSmall",
           "image": "./Dockerfile.dev",
-          "instance_type": "standard-2",
+          "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.2.52",
+            "KILOCODE_CLI_VERSION": "7.3.21",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -314,7 +347,7 @@
           "image": "./Dockerfile.dind",
           "instance_type": "standard-3",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.2.52",
+            "KILOCODE_CLI_VERSION": "7.3.21",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -338,6 +371,10 @@
             "class_name": "CloudAgentSession",
             "name": "CLOUD_AGENT_SESSION",
           },
+          {
+            "class_name": "UserKiloFacade",
+            "name": "USER_KILO_FACADE",
+          },
         ],
       },
       "queues": {
@@ -346,6 +383,10 @@
             "binding": "CALLBACK_QUEUE",
             "queue": "cloud-agent-next-callback-queue-dev",
           },
+          {
+            "binding": "CLOUD_AGENT_REPORT_QUEUE",
+            "queue": "cloud-agent-next-report-queue-dev",
+          },
         ],
         "consumers": [
           {
@@ -353,6 +394,11 @@
             "max_batch_size": 5,
             // Keep aligned with CALLBACK_DELIVERY_MAX_ATTEMPTS = initial attempt + 4 redeliveries.
             "max_retries": 4,
+          },
+          {
+            "queue": "cloud-agent-next-report-queue-dev",
+            "max_retries": 3,
+            "dead_letter_queue": "cloud-agent-next-report-queue-dlq-dev",
           },
         ],
       },

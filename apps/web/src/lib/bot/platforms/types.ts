@@ -18,6 +18,14 @@ export type RequesterInfo = {
   platform: Platform;
 };
 
+/**
+ * Called when the bot's synchronous turn is done. `handedOff` is true when
+ * the bot delegated to a cloud agent session that keeps running after this
+ * call — in that case GitHub leaves only the in-progress 👀 reaction in
+ * place and does not add 👍, since the work is not actually finished.
+ */
+export type StopProcessingIndicator = (outcome?: { handedOff?: boolean }) => Promise<void>;
+
 export type BotPlatform = {
   platform: Platform;
   documentationUrl: string;
@@ -55,6 +63,19 @@ export type BotPlatform = {
     platformIntegration: PlatformIntegration;
     displayName: string;
   }): Promise<RequesterInfo>;
+  /**
+   * Signal that the bot is processing the user's message. Slack/Linear use
+   * the platform-native typing indicator. GitHub has no typing concept and
+   * reacts to the triggering comment instead: 👀 on start, then 👍 added
+   * by the stop callback. Both the initial bot run and the cloud-agent
+   * callback go through this same start/stop lifecycle, with `handedOff`
+   * suppressing the 👍 when more work is still in flight.
+   */
+  startProcessingIndicator(params: {
+    thread: Thread;
+    messageId: string;
+    status?: string;
+  }): Promise<StopProcessingIndicator>;
   handleAction?(event: ActionEvent): Promise<void>;
   handleAssistantThreadStarted?(event: AssistantThreadStartedEvent): Promise<void>;
   handleMemberJoinedChannel?(event: MemberJoinedChannelEvent): Promise<void>;

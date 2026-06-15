@@ -5,7 +5,7 @@ import type { SlashCommandInfo } from './slash-commands.js';
  *
  * From wrapper -> DO:
  *   started, kilocode, output, status, heartbeat, pong, error, interrupted, complete, wrapper_resumed,
- *   autocommit_started, autocommit_completed
+ *   wrapper_finalizing, autocommit_started, autocommit_completed, cloud.message.completed
  *
  * From DO -> /stream clients:
  *   All of the above, plus wrapper_disconnected, wrapper_reconnected, preparing,
@@ -19,9 +19,10 @@ export type StreamEventType =
   | 'status' // Status message (e.g., "Auto-committing...")
   | 'heartbeat' // Keep-alive during idle periods
   | 'pong' // Response to ping command from DO
-  | 'error' // Error occurred { error: string, fatal: boolean }
-  | 'interrupted' // User/signal interrupt
-  | 'complete' // Execution finished { exitCode, currentBranch? }
+  | 'error' // Error occurred { error: string, fatal: boolean, errorSource?: 'assistant', failureCode?: WrapperTerminalFailureCode, modelNotFoundRuntimeDiagnostics?: unknown }
+  | 'interrupted' // User/signal interrupt { reason?: string, interruptionSource?: 'container_shutdown' }
+  | 'complete' // Execution finished { exitCode, currentBranch?, messageIds }
+  | 'wrapper_finalizing' // Wrapper sealed the current run batch before post-processing
   | 'wrapper_resumed' // Wrapper reconnected after disconnect (may have lost events)
   | 'autocommit_started' // Auto-commit process began
   | 'autocommit_completed' // Auto-commit finished (success, skip, or failure)
@@ -50,6 +51,9 @@ export type IngestEvent = {
   data: unknown;
 };
 
+export const WrapperTerminalFailureCodes = ['payment_required', 'model_missing'] as const;
+export type WrapperTerminalFailureCode = (typeof WrapperTerminalFailureCodes)[number];
+
 /**
  * Commands sent from DO to wrapper via /ingest WebSocket.
  */
@@ -65,6 +69,7 @@ export type CompleteEventData = {
   exitCode: number;
   currentBranch?: string; // Omitted if detached HEAD
   gateResult?: 'pass' | 'fail';
+  messageIds?: string[];
 };
 
 /**

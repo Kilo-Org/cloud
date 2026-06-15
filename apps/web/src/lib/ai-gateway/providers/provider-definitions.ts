@@ -1,8 +1,5 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import {
-  addCacheBreakpoints,
-  isReasoningExplicitlyDisabled,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
 
@@ -22,7 +19,6 @@ export default {
     supportedChatApis: ['chat_completions' /*, 'responses'*/],
     transformRequest(context) {
       context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
-      addCacheBreakpoints(context.request);
     },
   },
   SEED: {
@@ -52,11 +48,9 @@ export default {
     id: 'martian',
     apiUrl: 'https://api.withmartian.com/v1',
     apiKey: getEnvVariable('MARTIAN_API_KEY'),
-    supportedChatApis: ['responses', 'messages'],
+    supportedChatApis: ['chat_completions', 'responses', 'messages'],
     transformRequest(context) {
-      if (context.request.kind === 'messages') {
-        delete context.request.body.provider;
-      }
+      delete context.request.body.provider;
     },
   },
   MISTRAL: {
@@ -64,13 +58,6 @@ export default {
     apiUrl: 'https://api.mistral.ai/v1',
     apiKey: getEnvVariable('MISTRAL_API_KEY'),
     supportedChatApis: [],
-    transformRequest() {},
-  },
-  MORPH: {
-    id: 'morph',
-    apiUrl: 'https://api.morphllm.com/v1',
-    apiKey: getEnvVariable('MORPH_API_KEY'),
-    supportedChatApis: ['chat_completions'],
     transformRequest() {},
   },
   VERCEL_AI_GATEWAY: {

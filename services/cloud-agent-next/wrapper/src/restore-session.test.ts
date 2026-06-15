@@ -22,6 +22,30 @@ function makeSnapshot(diffs: Array<{ file: string; after: string; status: string
   });
 }
 
+function makeSessionDiffSnapshot(patch: string): string {
+  return JSON.stringify({
+    info: snapshotInfo(),
+    sessionDiff: [
+      {
+        file: 'src/index.ts',
+        patch,
+        additions: 1,
+        deletions: 0,
+        status: 'modified',
+      },
+    ],
+    messages: [
+      {
+        info: {
+          summary: {
+            diffs: [{ file: 'legacy.txt', after: 'legacy content', status: 'modified' }],
+          },
+        },
+      },
+    ],
+  });
+}
+
 function makeMultiMessageSnapshot(
   ...messageDiffs: Array<Array<{ file: string; after: string; status: string }>>
 ): string {
@@ -52,6 +76,25 @@ function mockFetchStatus(status: number, body = ''): void {
 
 function writeMockKilo(binDir: string, exitCode: number): void {
   const script = `#!/bin/sh\nexit ${exitCode}\n`;
+  const kiloPath = path.join(binDir, 'kilo');
+  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
+function writeSlowMockKilo(binDir: string): void {
+  const script = '#!/bin/sh\nsleep 1\nexit 0\n';
+  const kiloPath = path.join(binDir, 'kilo');
+  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
+function writeSignalTerminatedMockKilo(binDir: string): void {
+  const script = '#!/bin/sh\nkill -TERM $$\n';
+  const kiloPath = path.join(binDir, 'kilo');
+  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
+function writeSignalIgnoringDescendantMockKilo(binDir: string, descendantMarker: string): void {
+  const readyMarker = `${descendantMarker}.ready`;
+  const script = `#!/bin/sh\ntrap 'exit 0' TERM\nnode -e 'const fs = require("node:fs"); process.on("SIGTERM", () => {}); fs.writeFileSync(process.argv[1], "ready"); setTimeout(() => fs.writeFileSync(process.argv[2], "alive"), 800); setInterval(() => {}, 1000);' "${readyMarker}" "${descendantMarker}" </dev/null >/dev/null 2>&1 &\nwhile [ ! -f "${readyMarker}" ]; do sleep 0.01; done\nsleep 2\n`;
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
@@ -214,13 +257,14 @@ describe('restoreSession', () => {
     }
   });
 
-  it('returns download error when fetch throws', async () => {
-    globalThis.fetch = asFetch(() => Promise.reject(new Error('network failure')));
+  it('returns a fixed download error when fetch throws', async () => {
+    globalThis.fetch = asFetch(() => Promise.reject(new Error('network token secret')));
     const result = await restoreSession(SESSION_ID, workspace);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error).toContain('network failure');
+      expect(result.error).toBe('snapshot download failed');
+      expect(result.error).not.toContain('network token secret');
       expect(result.code).toBeNull();
       expect(result.step).toBe('download');
     }
@@ -303,8 +347,83 @@ describe('restoreSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.step).toBe('import');
+      expect(result.subtype).toBe('kilo_import_failed');
+      expect(result.error).toContain('kilo import failed');
+      expect(result.detail).toContain('exit code 1');
+    }
+  });
+
+  it('terminates and returns import error when kilo import exceeds its deadline', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeSlowMockKilo(binDir);
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, { importTimeoutMs: 50 });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.step).toBe('import');
+      expect(result.subtype).toBe('kilo_import_timeout');
+      expect(result.error).toContain('kilo import timed out');
+      expect(result.detail).toContain('timeout');
+    }
+    expect(fs.existsSync(TMP_PATH)).toBe(false);
+  });
+
+  it('terminates kilo import when the workspace deadline is aborted', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeSlowMockKilo(binDir);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 50);
+    const startedAt = Date.now();
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      importTimeoutMs: 5_000,
+      importTerminationGraceMs: 50,
+      signal: controller.signal,
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.step).toBe('import');
       expect(result.error).toContain('kilo import failed');
     }
+    expect(elapsedMs).toBeLessThan(800);
+    expect(fs.existsSync(TMP_PATH)).toBe(false);
+  });
+
+  it('returns import error when kilo import is terminated by a signal', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeSignalTerminatedMockKilo(binDir);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.step).toBe('import');
+      expect(result.error).toContain('kilo import failed');
+    }
+  });
+
+  it('kills signal-ignoring descendants after a kilo import timeout grace period', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const descendantMarker = path.join(tmpDir, 'import-descendant-survived');
+    writeSignalIgnoringDescendantMockKilo(binDir, descendantMarker);
+    const startedAt = Date.now();
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      importTimeoutMs: 500,
+      importTerminationGraceMs: 150,
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.step).toBe('import');
+      expect(result.error).toContain('kilo import timed out');
+    }
+    expect(elapsedMs).toBeGreaterThanOrEqual(600);
+    expect(fs.existsSync(descendantMarker)).toBe(false);
   });
 
   // ---- Happy paths ----
@@ -334,6 +453,68 @@ describe('restoreSession', () => {
 
     // Verify deleted file was removed
     expect(fs.existsSync(path.join(workspace, 'old-file.txt'))).toBe(false);
+  });
+
+  it('prefers top-level patch session diffs over legacy message summaries', async () => {
+    const repo = path.join(tmpDir, 'repo');
+    fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    Bun.spawnSync(['git', 'config', 'user.name', 'Test User'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'before\n');
+    Bun.spawnSync(['git', 'add', '.'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'commit', '-m', 'initial'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'after\n');
+    const proc = Bun.spawnSync(['git', 'diff', '--src-prefix=a/', '--dst-prefix=b/'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const patch = new TextDecoder().decode(proc.stdout);
+
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    Bun.spawnSync(['git', 'config', 'user.name', 'Test User'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(path.join(workspace, 'src/index.ts'), 'before\n');
+    Bun.spawnSync(['git', 'add', '.'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'commit', '-m', 'initial'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    mockFetchOk(makeSessionDiffSnapshot(patch));
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    });
+    expect(fs.readFileSync(path.join(workspace, 'src/index.ts'), 'utf-8')).toBe('after\n');
+    expect(fs.existsSync(path.join(workspace, 'legacy.txt'))).toBe(false);
   });
 
   it('succeeds with zero diffs when messages array is empty', async () => {
@@ -599,6 +780,23 @@ describe('extractDiffs', () => {
 
     const diffs = await extractDiffs(filePath);
     expect(diffs).toEqual([]);
+  });
+
+  it('does not start diff extraction after the workspace deadline expires', async () => {
+    const filePath = path.join(tmpDir, 'snapshot.json');
+    fs.writeFileSync(filePath, JSON.stringify({ messages: [] }));
+    const controller = new AbortController();
+    const deadlineError = new Error('workspace deadline reached');
+    controller.abort(deadlineError);
+    let caughtError: unknown;
+
+    try {
+      await extractDiffs(filePath, controller.signal);
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBe(deadlineError);
   });
 
   it('returns null on invalid JSON', async () => {

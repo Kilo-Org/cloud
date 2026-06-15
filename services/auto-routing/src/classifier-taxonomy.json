@@ -1,0 +1,622 @@
+{
+  "version": 1,
+  "outputContract": {
+    "taskType": "One taskTypes[].id. Classify the user's primary intent, not the implementation mechanism.",
+    "subtaskType": "One taskTypes[].subtypes[].id under the selected taskType.",
+    "contextComplexity": "One axes.contextComplexity.values[].id: small, medium, or large.",
+    "reasoningComplexity": "One axes.reasoningComplexity.values[].id: low, medium, or high.",
+    "riskLevel": "One axes.riskLevel.values[].id: low, medium, or high.",
+    "executionMode": "One axes.executionMode.values[].id.",
+    "requiresTools": "Boolean. Mark true when accurate completion likely requires repository, terminal, browser, or external tool use.",
+    "confidence": "Number from 0 to 1 representing classification confidence."
+  },
+  "decisionRules": [
+    "Classify taskType by the user's goal. Use executionMode and requiresTools for how the work must be done.",
+    "When a request mixes categories, choose the taskType that describes the final deliverable and use subtaskType for the most specific intent.",
+    "Use agentic_execution as the primary taskType only when the user explicitly asks the agent to operate tools, run commands, inspect state, or complete an operational workflow without a more specific software-delivery goal.",
+    "If the request is about understanding what exists before deciding what to do, prefer investigation over implementation or refactoring.",
+    "If the request is about deciding an approach, producing an architecture, or writing a plan without immediate code changes, prefer planning_design.",
+    "If the request is about changing behavior by adding or creating code, prefer implementation.",
+    "If the request is about broken, failing, or unexpected behavior, prefer debugging.",
+    "If the request is about preserving behavior while improving structure, readability, or architecture, prefer refactoring.",
+    "Risk should reflect potential blast radius and domain sensitivity, not task size.",
+    "Reasoning complexity should reflect ambiguity, causal depth, and design tradeoffs, not the amount of code to read.",
+    "Context complexity should reflect how much repository, product, and external context is needed, not how hard the reasoning is."
+  ],
+  "taskTypes": [
+    {
+      "id": "implementation",
+      "label": "Implementation",
+      "description": "The user wants new or changed functionality, code, tests, or generated artifacts that add behavior or capability.",
+      "useWhen": [
+        "The main outcome is code or tests that create behavior not currently present.",
+        "The user asks to build, add, create, implement, wire, expose, or integrate something.",
+        "The work can include design or investigation, but the requested deliverable is implementation."
+      ],
+      "avoidWhen": [
+        "The user only wants an explanation, plan, or architecture without code changes.",
+        "The requested work is primarily fixing broken existing behavior.",
+        "The requested work preserves behavior and only improves structure."
+      ],
+      "examples": [
+        "Add a new endpoint that accepts classifier payloads.",
+        "Create tests for the new request parser.",
+        "Generate a worker client for the OpenRouter SDK."
+      ],
+      "subtypes": [
+        {
+          "id": "feature_development",
+          "label": "Feature Development",
+          "description": "Adding user-facing or system-facing behavior with product or runtime impact.",
+          "useWhen": [
+            "The request adds a capability, workflow, endpoint, integration, service, UI state, or product behavior."
+          ],
+          "avoidWhen": [
+            "The request is only to create isolated code snippets or boilerplate.",
+            "The request is only to add tests around existing behavior."
+          ],
+          "examples": [
+            "Add classifier mirroring from Next.js to the worker.",
+            "Implement a routing decision API."
+          ]
+        },
+        {
+          "id": "code_generation",
+          "label": "Code Generation",
+          "description": "Creating code, schemas, config, or structured artifacts from a clear specification where integration complexity is limited.",
+          "useWhen": [
+            "The user asks to generate a file, helper, schema, fixture, or code block from known requirements."
+          ],
+          "avoidWhen": [
+            "The generated code must be deeply integrated into an existing flow.",
+            "The task is mostly architectural or investigative."
+          ],
+          "examples": [
+            "Create JSON describing the classifier taxonomy.",
+            "Generate a Zod schema for the mirrored payload."
+          ]
+        },
+        {
+          "id": "test_creation",
+          "label": "Test Creation",
+          "description": "Adding new tests, fixtures, or validation coverage for behavior that is not primarily broken.",
+          "useWhen": [
+            "The user explicitly asks to add tests or improve coverage.",
+            "The change is mainly about proving behavior rather than implementing behavior."
+          ],
+          "avoidWhen": [
+            "Existing tests are failing and need repair.",
+            "Tests are incidental to a feature implementation."
+          ],
+          "examples": [
+            "Add unit tests for classifier body parsing.",
+            "Create fixtures for chat completions and responses payloads."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "debugging",
+      "label": "Debugging",
+      "description": "The user wants to understand, reproduce, or fix broken, failing, flaky, or unexpected behavior.",
+      "useWhen": [
+        "The prompt mentions an error, failing test, broken behavior, regression, crash, bad output, or unexpected state.",
+        "The main outcome is restoring intended behavior or identifying the cause of failure."
+      ],
+      "avoidWhen": [
+        "The user wants new behavior and no existing failure is central.",
+        "The user wants behavior-preserving cleanup."
+      ],
+      "examples": [
+        "Fix the worker auth 401 during local E2E.",
+        "Find why pnpm dev:start passes duplicate --ip flags.",
+        "Debug a failing classifier validation test."
+      ],
+      "subtypes": [
+        {
+          "id": "bug_fixing",
+          "label": "Bug Fixing",
+          "description": "Changing code or configuration to correct confirmed broken behavior.",
+          "useWhen": [
+            "A specific defect or regression is known or strongly suspected.",
+            "The likely deliverable is a code or config fix."
+          ],
+          "avoidWhen": [
+            "The task is only to diagnose without making a fix.",
+            "The failure is only in test code."
+          ],
+          "examples": [
+            "Fix the local worker compatibility date error.",
+            "Correct a bad auth header in a service request."
+          ]
+        },
+        {
+          "id": "test_repair",
+          "label": "Test Repair",
+          "description": "Fixing failing, flaky, outdated, or incorrectly specified tests.",
+          "useWhen": [
+            "The user reports broken tests, snapshots, fixtures, or assertions.",
+            "The production behavior may be correct but test expectations or setup are stale."
+          ],
+          "avoidWhen": [
+            "The test is exposing a real production bug that must be fixed in product code."
+          ],
+          "examples": [
+            "Update a worker test after the response shape changed.",
+            "Fix a fixture that no longer matches the parser schema."
+          ]
+        },
+        {
+          "id": "root_cause_analysis",
+          "label": "Root Cause Analysis",
+          "description": "Tracing where and why a failure occurs before deciding whether or how to fix it.",
+          "useWhen": [
+            "The user asks why something is happening.",
+            "The system has multiple possible failure points and needs evidence gathering."
+          ],
+          "avoidWhen": ["The root cause is already known and the user only wants the fix applied."],
+          "examples": [
+            "Determine whether a mirror request is blocked in Next.js or the worker.",
+            "Trace why a local secret does not match the worker binding."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "refactoring",
+      "label": "Refactoring",
+      "description": "The user wants behavior-preserving improvement to structure, maintainability, boundaries, naming, or architecture.",
+      "useWhen": [
+        "The requested outcome is cleaner code, better organization, safer abstractions, or migration without intended behavior change.",
+        "The task is mostly changing internal shape rather than external capability."
+      ],
+      "avoidWhen": [
+        "The work introduces new user-visible or API-visible behavior.",
+        "The work is needed primarily to fix a bug."
+      ],
+      "examples": [
+        "Move auth middleware and classify handlers into separate files.",
+        "Replace deprecated Zod passthrough usage.",
+        "Reorganize worker helpers around shared packages."
+      ],
+      "subtypes": [
+        {
+          "id": "code_cleanup",
+          "label": "Code Cleanup",
+          "description": "Small to medium behavior-preserving simplification, naming, deduplication, formatting, or organization.",
+          "useWhen": ["The change improves readability or consistency with local patterns."],
+          "avoidWhen": ["The change alters major module boundaries or system design."],
+          "examples": [
+            "Extract duplicated parsing helpers.",
+            "Rename a service package consistently."
+          ]
+        },
+        {
+          "id": "architecture_improvement",
+          "label": "Architectural Improvement",
+          "description": "Changing internal boundaries, dependencies, or module structure to improve maintainability or scalability while preserving behavior.",
+          "useWhen": [
+            "The task changes how components are separated or how responsibilities are assigned."
+          ],
+          "avoidWhen": [
+            "The task is a new architecture design document with no code changes.",
+            "The task is a mechanical cleanup."
+          ],
+          "examples": [
+            "Introduce a classifier client boundary.",
+            "Move shared worker auth into a reusable helper."
+          ]
+        },
+        {
+          "id": "migration",
+          "label": "Migration",
+          "description": "Moving code, configuration, data, APIs, or dependencies from one pattern or platform to another.",
+          "useWhen": [
+            "The user asks to migrate, replace, upgrade, rename across surfaces, or move from old API to new API."
+          ],
+          "avoidWhen": ["The change is a one-line version bump without compatibility work."],
+          "examples": [
+            "Migrate from deprecated Zod passthrough to looseObject.",
+            "Move a worker from env vars to Secrets Store bindings."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "planning_design",
+      "label": "Planning and Design",
+      "description": "The user wants a plan, architecture, technical design, taxonomy, tradeoff analysis, or system shape before implementation.",
+      "useWhen": [
+        "The requested deliverable is a design, plan, taxonomy, options analysis, or technical direction.",
+        "The user is deciding how something should work rather than asking to build it immediately."
+      ],
+      "avoidWhen": [
+        "The user has already approved a design and is asking for implementation.",
+        "The request is mainly to inspect existing code without proposing a design."
+      ],
+      "examples": [
+        "Brainstorm classifier categories for model routing.",
+        "Design a smart auto-router architecture.",
+        "Plan how request classification should flow through the worker."
+      ],
+      "subtypes": [
+        {
+          "id": "architecture_design",
+          "label": "Architecture Design",
+          "description": "Designing components, boundaries, dependencies, data flow, and system responsibilities.",
+          "useWhen": ["The prompt asks how a system or subsystem should be structured."],
+          "avoidWhen": ["The prompt asks for a step-by-step implementation checklist only."],
+          "examples": [
+            "Design the classifier-worker to router integration.",
+            "Define service boundaries for the auto model router."
+          ]
+        },
+        {
+          "id": "technical_planning",
+          "label": "Technical Planning",
+          "description": "Creating an implementation plan, rollout plan, sequence of steps, or engineering approach.",
+          "useWhen": ["The user asks what to do next or how to break work into steps."],
+          "avoidWhen": [
+            "The prompt is about high-level architecture rather than execution sequence."
+          ],
+          "examples": [
+            "Plan the next classifier milestone.",
+            "Break implementation into validation, inference, and routing steps."
+          ]
+        },
+        {
+          "id": "system_design",
+          "label": "System Design",
+          "description": "Reasoning about scale, reliability, data contracts, failure modes, interfaces, and operational behavior.",
+          "useWhen": [
+            "The prompt asks about end-to-end system behavior or cross-service contracts."
+          ],
+          "avoidWhen": ["The prompt is about a single module's internal shape."],
+          "examples": [
+            "Design how classifier failures should affect routing.",
+            "Define contracts between Next.js, the classifier, and the router."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "investigation",
+      "label": "Investigation",
+      "description": "The user wants exploration, understanding, evidence, or research before deciding whether to change anything.",
+      "useWhen": [
+        "The main outcome is knowledge about a repo, dependency, behavior, product area, or external source.",
+        "The user asks to inspect, verify, compare, research, find, enumerate, or explain existing state."
+      ],
+      "avoidWhen": [
+        "The user already knows what to build or fix and wants it done.",
+        "The task is mostly designing a future system."
+      ],
+      "examples": [
+        "Find how other workers use Secrets Store.",
+        "Read OpenRouter SDK docs and summarize required secrets.",
+        "Inspect what body shape the Next.js mirror sends."
+      ],
+      "subtypes": [
+        {
+          "id": "repo_exploration",
+          "label": "Repository Exploration",
+          "description": "Searching files, package metadata, configs, tests, commits, or local runtime state to locate relevant code or patterns.",
+          "useWhen": ["The prompt asks where something lives or how the repo handles a pattern."],
+          "avoidWhen": ["The prompt asks for external product or library research only."],
+          "examples": [
+            "Search for existing timing safe equal helpers.",
+            "Find other worker service definitions."
+          ]
+        },
+        {
+          "id": "codebase_understanding",
+          "label": "Codebase Understanding",
+          "description": "Explaining how existing code works, including contracts, data flow, dependencies, or behavior.",
+          "useWhen": [
+            "The user asks whether we know a shape, flow, invariant, or existing behavior."
+          ],
+          "avoidWhen": ["The user asks to modify the code after understanding it."],
+          "examples": [
+            "Explain the mirrored request payload shape.",
+            "Describe how auth middleware validates worker requests."
+          ]
+        },
+        {
+          "id": "external_research",
+          "label": "External Research",
+          "description": "Using external docs, package pages, APIs, or web sources to understand current third-party behavior.",
+          "useWhen": [
+            "The answer depends on current external documentation, package APIs, pricing, model availability, or service behavior."
+          ],
+          "avoidWhen": ["The relevant facts are entirely inside the local repo."],
+          "examples": [
+            "Read current OpenRouter SDK documentation.",
+            "Check Cloudflare Wrangler Secrets Store command behavior."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "agentic_execution",
+      "label": "Agentic Execution",
+      "description": "The user primarily wants the agent to operate tools, terminal commands, browser sessions, local services, or multi-step execution workflows.",
+      "useWhen": [
+        "The requested deliverable is successful operation of tools or environment, not primarily code, design, or explanation.",
+        "The user asks to run commands, check tmux, inspect logs, start services, execute a CLI, or perform a multi-step local workflow."
+      ],
+      "avoidWhen": [
+        "Tool use is only the means to implement, debug, refactor, plan, or investigate something more specific.",
+        "A more specific taskType clearly describes the user's main goal."
+      ],
+      "examples": [
+        "Run the built CLI in tmux and check worker logs.",
+        "Start pnpm dev:start and verify service health.",
+        "Copy local secrets into the local Secrets Store."
+      ],
+      "subtypes": [
+        {
+          "id": "tool_usage",
+          "label": "Tool Usage",
+          "description": "Using browser, API, filesystem, search, or specialized tools as the primary requested action.",
+          "useWhen": ["The user explicitly asks to use a tool or inspect tool output."],
+          "avoidWhen": ["The tool use is incidental to a code change."],
+          "examples": [
+            "Use browser tooling to verify a page.",
+            "Look up a package page and report findings."
+          ]
+        },
+        {
+          "id": "terminal_operations",
+          "label": "Terminal Operations",
+          "description": "Running shell commands, package scripts, local services, tmux sessions, or process inspection as the primary work.",
+          "useWhen": ["The prompt centers on command execution or local process state."],
+          "avoidWhen": ["Commands are only part of verifying an implementation."],
+          "examples": ["Check tmux logs.", "Run a built CLI against a local backend."]
+        },
+        {
+          "id": "multi_step_execution",
+          "label": "Multi-step Execution",
+          "description": "Coordinating several tool or environment operations to reach a concrete operational outcome.",
+          "useWhen": [
+            "The user delegates a sequence of actions where success depends on multiple local or remote steps."
+          ],
+          "avoidWhen": ["The multi-step nature comes from a normal implementation project."],
+          "examples": [
+            "Build the CLI, run it, and confirm worker logs show classifier requests.",
+            "Start services, fix local secrets, rerun health checks, and report status."
+          ]
+        }
+      ]
+    }
+  ],
+  "axes": {
+    "contextComplexity": {
+      "kind": "derived_select",
+      "description": "How much context the model must read, retain, and connect to complete the task accurately.",
+      "values": [
+        {
+          "id": "small",
+          "label": "Small Context",
+          "description": "The task is local to one file, one function, one command, or a clearly specified snippet.",
+          "useWhen": [
+            "The needed context fits in a small number of files or in the prompt itself.",
+            "The user provided enough detail to act without broad exploration."
+          ],
+          "avoidWhen": [
+            "The task requires understanding several modules, services, or product rules."
+          ],
+          "examples": ["Add a single JSON fixture.", "Explain one function."]
+        },
+        {
+          "id": "medium",
+          "label": "Medium Context",
+          "description": "The task requires connecting a few files, tests, configs, or runtime components.",
+          "useWhen": [
+            "The model must inspect related modules or understand a short data flow.",
+            "The task touches one bounded subsystem."
+          ],
+          "avoidWhen": [
+            "The task requires repo-wide search, cross-service behavior, or long historical context."
+          ],
+          "examples": [
+            "Wire a worker binding and update its tests.",
+            "Trace a Next.js route into a worker call."
+          ]
+        },
+        {
+          "id": "large",
+          "label": "Large Context",
+          "description": "The task requires broad repository, product, runtime, or external context across multiple subsystems.",
+          "useWhen": [
+            "The model must synthesize many files, services, specs, logs, or external docs.",
+            "The answer depends on understanding cross-cutting contracts or repository conventions."
+          ],
+          "avoidWhen": ["Only one bounded subsystem is involved."],
+          "examples": [
+            "Design smart routing across Next.js, classifier worker, model gateway, and analytics.",
+            "Debug an E2E failure spanning CLI, Next.js, worker, and Secrets Store."
+          ]
+        }
+      ]
+    },
+    "reasoningComplexity": {
+      "kind": "derived_select",
+      "description": "How much ambiguity, causal reasoning, tradeoff analysis, or synthesis is required.",
+      "values": [
+        {
+          "id": "low",
+          "label": "Low Reasoning",
+          "description": "The task is mechanical, explicit, or follows an obvious local pattern.",
+          "useWhen": [
+            "There are few decisions and little ambiguity.",
+            "Correctness can be checked directly."
+          ],
+          "avoidWhen": [
+            "The task involves root cause analysis, architecture, or ambiguous tradeoffs."
+          ],
+          "examples": ["Rename a service in config files.", "Add a known secret binding."]
+        },
+        {
+          "id": "medium",
+          "label": "Medium Reasoning",
+          "description": "The task requires some judgment, local design choices, or connecting evidence from multiple places.",
+          "useWhen": [
+            "The model must choose among established local patterns.",
+            "The task has moderate ambiguity but a bounded answer."
+          ],
+          "avoidWhen": ["The task requires deep causal tracing or major architecture decisions."],
+          "examples": [
+            "Choose where to place classifier taxonomy data.",
+            "Split worker handlers while preserving auth behavior."
+          ]
+        },
+        {
+          "id": "high",
+          "label": "High Reasoning",
+          "description": "The task requires deep causal analysis, architecture tradeoffs, ambiguous requirements, or multi-step synthesis.",
+          "useWhen": [
+            "Several plausible approaches exist and wrong choices are costly.",
+            "The model must reason about failure modes, long-term design, or hidden interactions."
+          ],
+          "avoidWhen": ["The task is mostly broad search without hard decisions."],
+          "examples": [
+            "Design the classifier taxonomy for future model routing.",
+            "Find root cause across CLI, Next.js, worker auth, and local Secrets Store."
+          ]
+        }
+      ]
+    },
+    "riskLevel": {
+      "kind": "derived_select",
+      "description": "Potential blast radius if the task is done incorrectly.",
+      "values": [
+        {
+          "id": "low",
+          "label": "Low Risk",
+          "description": "Mistakes are local, easily reversible, and unlikely to affect production data, auth, billing, or security.",
+          "useWhen": [
+            "The task is read-only, test-only, documentation-only, or isolated to non-critical code."
+          ],
+          "avoidWhen": [
+            "The task touches credentials, auth, migrations, billing, production infra, or destructive operations."
+          ],
+          "examples": ["Add taxonomy JSON and validation tests.", "Explain a local helper."]
+        },
+        {
+          "id": "medium",
+          "label": "Medium Risk",
+          "description": "Mistakes could break a workflow, route, build, or service, but are unlikely to expose data or cause irreversible damage.",
+          "useWhen": [
+            "The task changes runtime code, service configuration, or request contracts."
+          ],
+          "avoidWhen": [
+            "The task involves secrets, payments, data deletion, access control, or schema migrations with user data."
+          ],
+          "examples": [
+            "Change worker auth wiring.",
+            "Add a new SDK dependency to a worker service."
+          ]
+        },
+        {
+          "id": "high",
+          "label": "High Risk",
+          "description": "Mistakes could affect credentials, security, billing, user data, production routing, migrations, or destructive operations.",
+          "useWhen": [
+            "The task touches authentication, authorization, secrets, billing, data retention, production deploys, database migrations, or destructive commands."
+          ],
+          "avoidWhen": ["The task is isolated and reversible with no sensitive domain impact."],
+          "examples": [
+            "Change how production OpenRouter API keys are stored or used.",
+            "Modify model routing behavior for production traffic."
+          ]
+        }
+      ]
+    },
+    "executionMode": {
+      "kind": "single_select",
+      "description": "The expected interaction mode needed to satisfy the user request.",
+      "values": [
+        {
+          "id": "answer_only",
+          "label": "Answer Only",
+          "description": "The user wants an explanation, recommendation, review, or design discussion without file edits or commands.",
+          "useWhen": [
+            "The final answer is prose or structured guidance.",
+            "No repo changes are implied."
+          ],
+          "avoidWhen": ["The user asks to implement, commit, run, verify, or inspect local state."],
+          "examples": ["Evaluate product's classifier taxonomy.", "Explain expected payload shape."]
+        },
+        {
+          "id": "code_change",
+          "label": "Code Change",
+          "description": "The user expects edits to tracked files and normal verification.",
+          "useWhen": ["The request says add, implement, fix, refactor, create files, or commit."],
+          "avoidWhen": ["The request only asks for an answer or to run an operational command."],
+          "examples": ["Add the OpenRouter SDK client helper.", "Create classifier taxonomy JSON."]
+        },
+        {
+          "id": "command_execution",
+          "label": "Command Execution",
+          "description": "The user primarily expects terminal commands, local process inspection, or service operation.",
+          "useWhen": [
+            "The request centers on running, checking, building, starting, stopping, or verifying with commands."
+          ],
+          "avoidWhen": ["Commands are only routine verification after code changes."],
+          "examples": ["Run pnpm dev:start and resolve the startup error.", "Inspect tmux logs."]
+        },
+        {
+          "id": "multi_step_project",
+          "label": "Multi-step Project",
+          "description": "The user expects a sequence of edits, commands, validation, and commits across more than one component.",
+          "useWhen": [
+            "The task is too broad for one isolated edit or one command.",
+            "Success requires coordinating multiple files, services, or verification steps."
+          ],
+          "avoidWhen": ["A single code change or command is enough."],
+          "examples": [
+            "Build the classifier service, wire Next.js mirroring, validate locally, and commit.",
+            "Run an E2E pass with CLI, Next.js, worker, and logs."
+          ]
+        }
+      ]
+    },
+    "requiresTools": {
+      "kind": "derived_select",
+      "description": "Whether accurate completion likely requires tool use beyond model-only reasoning.",
+      "values": [
+        {
+          "id": "false",
+          "label": "Tools Not Required",
+          "description": "The user request can be answered from the prompt and stable knowledge without local repo, terminal, browser, or external lookup.",
+          "useWhen": [
+            "The user is brainstorming or asking for conceptual advice.",
+            "No current or local state must be verified."
+          ],
+          "avoidWhen": [
+            "The answer depends on current files, logs, package docs, external state, or commands."
+          ],
+          "examples": [
+            "Discuss what classifier categories might be useful.",
+            "Explain tradeoffs of task taxonomy axes."
+          ]
+        },
+        {
+          "id": "true",
+          "label": "Tools Required",
+          "description": "The request depends on repository state, terminal output, browser inspection, local services, external docs, or persisted files.",
+          "useWhen": [
+            "The user asks to inspect, edit, verify, run, commit, browse, or use current local context."
+          ],
+          "avoidWhen": [
+            "The user only wants high-level reasoning with no dependence on current state."
+          ],
+          "examples": [
+            "Read package docs for the OpenRouter SDK.",
+            "Commit a worker change after running tests."
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,45 +1,26 @@
 /**
- * CLI live transport — connects to the UserConnectionDO WebSocket, subscribes
- * to a live CLI session, normalizes events, and routes them through TransportSink.
- * Uses createBaseConnection() for WebSocket lifecycle/reconnection.
+ * CLI live transport - consumes a shared user web connection and translates
+ * one remote CLI session into normalized transport events and commands.
  */
-import * as z from 'zod';
-import { createBaseConnection } from './base-connection';
-import type { Connection, ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { normalizeCliEvent, isChatEvent } from './normalizer';
-import { cloudAgentSdkRuntime } from './runtime';
-import { webInboundMessageSchema, heartbeatDataSchema, type WebInboundMessage } from './schemas';
+import { cliConnectionDataSchema, heartbeatDataSchema, sessionsListDataSchema } from './schemas';
 import type { TransportFactory, TransportSendPayload, TransportSink } from './transport';
 import type { KiloSessionId, SessionSnapshot } from './types';
+import type { UserWebCliEvent, UserWebConnection } from './user-web-connection';
 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
-  websocketUrl: string;
-  getAuthToken: () => string | Promise<string>;
+  userWebConnection: UserWebConnection;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   onError?: (message: string) => void;
-  lifecycleHooks?: ConnectionLifecycleHooks;
-  websocketHeaders?: WebSocketHeaders;
 };
-
-const COMMAND_TIMEOUT_MS = 30_000;
 
 function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactory {
   return (sink: TransportSink) => {
     let generation = 0;
-    let authToken = '';
-    let baseConnection: Connection | null = null;
-    let currentWs: WebSocket | null = null;
+    let cleanup: (() => void) | null = null;
     let sessionStopped = false;
     let ownerConnectionId: string | null = null;
-    const pendingCommands = new Map<
-      string,
-      {
-        resolve: (value: unknown) => void;
-        reject: (reason: Error) => void;
-        timer: ReturnType<typeof setTimeout>;
-      }
-    >();
 
     function replaySnapshot(snapshot: SessionSnapshot): void {
       sink.onServiceEvent({ type: 'session.created', info: snapshot.info });
@@ -71,284 +52,210 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       }
     }
 
+    function stopForDisconnectedSession(): void {
+      if (sessionStopped) return;
+      sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
+      sessionStopped = true;
+    }
+
     function handleSystemMessage(event: string, data: unknown): void {
       if (event === 'cli.disconnected') {
-        const parsed = z.object({ connectionId: z.string() }).safeParse(data);
-        const disconnectedId = parsed.success ? parsed.data.connectionId : undefined;
-        if (!ownerConnectionId || disconnectedId === ownerConnectionId) {
-          if (!sessionStopped) {
-            sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
-            sessionStopped = true;
-          }
+        const parsed = cliConnectionDataSchema.safeParse(data);
+        if (parsed.success && ownerConnectionId === parsed.data.connectionId) {
+          stopForDisconnectedSession();
         }
         return;
       }
 
-      if (event === 'sessions.heartbeat' || event === 'sessions.list') {
-        const r = heartbeatDataSchema.safeParse(data);
-        if (!r.success) return;
+      if (event === 'sessions.list') {
+        const parsed = sessionsListDataSchema.safeParse(data);
+        if (!parsed.success) return;
 
-        const session = r.data.sessions.find(s => s.id === config.kiloSessionId);
+        const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
         if (session) {
-          ownerConnectionId = r.data.connectionId;
+          ownerConnectionId = session.connectionId;
+          sessionStopped = false;
           return;
         }
 
-        // Session not in this heartbeat — only treat as stopped if this heartbeat
-        // is from the connection that owns the session (or we haven't learned the
-        // owner yet, in which case sessions.list is the authoritative source).
-        const isOwnerHeartbeat = !ownerConnectionId || r.data.connectionId === ownerConnectionId;
-        if (isOwnerHeartbeat && !sessionStopped) {
-          sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
-          sessionStopped = true;
-        }
-      }
-    }
-
-    function handleInboundMessage(msg: WebInboundMessage): void {
-      switch (msg.type) {
-        case 'event':
-          handleEventMessage(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
-          break;
-        case 'system':
-          handleSystemMessage(msg.event, msg.data);
-          break;
-        case 'response': {
-          const pending = pendingCommands.get(msg.id);
-          if (!pending) break;
-          clearTimeout(pending.timer);
-          pendingCommands.delete(msg.id);
-          if (msg.error) {
-            pending.reject(new Error(typeof msg.error === 'string' ? msg.error : 'Command failed'));
-          } else {
-            pending.resolve(msg.result);
-          }
-          break;
-        }
-      }
-    }
-
-    function openBaseConnection(expectedGeneration: number): void {
-      if (expectedGeneration !== generation) return;
-
-      baseConnection = createBaseConnection({
-        lifecycleHooks: config.lifecycleHooks,
-        websocketHeaders: config.websocketHeaders,
-        buildUrl: () => `${config.websocketUrl}?token=${authToken}`,
-        parseMessage: (data: unknown) => {
-          if (typeof data !== 'string') return null;
-          try {
-            const parsed: unknown = JSON.parse(data);
-            const r = webInboundMessageSchema.safeParse(parsed);
-            if (!r.success) return null;
-            return { type: 'event', payload: r.data };
-          } catch {
-            return null;
-          }
-        },
-        onEvent: payload => {
-          handleInboundMessage(payload);
-        },
-        onOpen: (ws: WebSocket) => {
-          currentWs = ws;
-          sessionStopped = false;
-          ownerConnectionId = null;
-          ws.send(JSON.stringify({ type: 'subscribe', sessionId: config.kiloSessionId }));
-        },
-        onConnected: () => {},
-        onReconnected: () => {
-          if (expectedGeneration !== generation) return;
-          if (!config.fetchSnapshot) return;
-          void config.fetchSnapshot(config.kiloSessionId).then(
-            snapshot => {
-              if (expectedGeneration !== generation) return;
-              replaySnapshot(snapshot);
-            },
-            () => {
-              // Snapshot refetch failure on reconnect is non-fatal
-            }
-          );
-        },
-        onDisconnected: () => {},
-        onError: config.onError,
-        isAuthFailure: (event: CloseEvent) => event.code === 4001 || event.code === 1008,
-        refreshAuth: async () => {
-          authToken = await config.getAuthToken();
-        },
-      });
-
-      baseConnection.connect();
-    }
-
-    function startConnection(expectedGeneration: number): void {
-      if (expectedGeneration !== generation) return;
-
-      if (!config.fetchSnapshot) {
-        openBaseConnection(expectedGeneration);
+        stopForDisconnectedSession();
         return;
       }
 
-      void config.fetchSnapshot(config.kiloSessionId).then(
-        snapshot => {
-          if (expectedGeneration !== generation) return;
-          replaySnapshot(snapshot);
-          openBaseConnection(expectedGeneration);
-        },
-        (error: unknown) => {
-          if (expectedGeneration !== generation) return;
-          const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
-          config.onError?.(message);
-          // Still try to connect for live events even if snapshot fails
-          openBaseConnection(expectedGeneration);
+      if (event === 'sessions.heartbeat') {
+        const parsed = heartbeatDataSchema.safeParse(data);
+        if (!parsed.success) return;
+
+        const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
+        if (session) {
+          ownerConnectionId = parsed.data.connectionId;
+          sessionStopped = false;
+          return;
         }
-      );
+
+        if (ownerConnectionId === parsed.data.connectionId) {
+          stopForDisconnectedSession();
+        }
+      }
     }
 
-    function rawSendCommand(command: string, data: unknown): Promise<unknown> {
-      if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
-        return Promise.reject(new Error('WebSocket is not connected'));
-      }
-      const id = cloudAgentSdkRuntime.randomUUID();
-      const ws = currentWs;
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          pendingCommands.delete(id);
-          reject(new Error('Command timed out'));
-        }, COMMAND_TIMEOUT_MS);
-        pendingCommands.set(id, { resolve, reject, timer });
-        ws.send(
-          JSON.stringify({
-            type: 'command',
-            id,
-            command,
-            sessionId: config.kiloSessionId,
-            data,
-          })
-        );
-      });
+    function sendCommand(command: string, data: unknown): Promise<unknown> {
+      return config.userWebConnection.sendCommand(config.kiloSessionId, command, data);
+    }
+
+    function releaseConnection(): void {
+      cleanup?.();
+      cleanup = null;
     }
 
     return {
       connect() {
         generation += 1;
         const expectedGeneration = generation;
+        releaseConnection();
+        sessionStopped = false;
+        ownerConnectionId = null;
 
-        // Clean up any existing connection
-        if (baseConnection) {
-          baseConnection.destroy();
-          baseConnection = null;
-        }
-        currentWs = null;
+        let bufferedCliEvents: UserWebCliEvent[] | null = [];
+        let bufferedEventsFromSupersededSnapshot: UserWebCliEvent[] = [];
+        let snapshotReplayGeneration = 0;
 
-        let tokenResult: string | Promise<string>;
-        try {
-          tokenResult = config.getAuthToken();
-        } catch {
-          config.onError?.('Failed to get auth token');
-          return;
-        }
-
-        if (typeof tokenResult === 'string') {
-          authToken = tokenResult;
-          startConnection(expectedGeneration);
-          return;
-        }
-
-        void tokenResult.then(
-          token => {
-            if (expectedGeneration !== generation) return;
-            authToken = token;
-            startConnection(expectedGeneration);
-          },
-          () => {
-            if (expectedGeneration !== generation) return;
-            config.onError?.('Failed to get auth token');
+        const drainBufferedCliEvents = (): void => {
+          const events = bufferedCliEvents;
+          bufferedCliEvents = null;
+          for (const msg of events ?? []) {
+            handleEventMessage(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
           }
+        };
+
+        const replayCurrentSnapshot = (reportError: boolean): void => {
+          snapshotReplayGeneration += 1;
+          const expectedSnapshotReplayGeneration = snapshotReplayGeneration;
+          if (bufferedCliEvents !== null) {
+            bufferedEventsFromSupersededSnapshot.push(...bufferedCliEvents);
+          }
+          bufferedCliEvents = [];
+
+          if (!config.fetchSnapshot) {
+            bufferedCliEvents = [
+              ...bufferedEventsFromSupersededSnapshot,
+              ...(bufferedCliEvents ?? []),
+            ];
+            bufferedEventsFromSupersededSnapshot = [];
+            drainBufferedCliEvents();
+            return;
+          }
+
+          void config.fetchSnapshot(config.kiloSessionId).then(
+            snapshot => {
+              if (
+                expectedGeneration !== generation ||
+                expectedSnapshotReplayGeneration !== snapshotReplayGeneration
+              ) {
+                return;
+              }
+              bufferedEventsFromSupersededSnapshot = [];
+              replaySnapshot(snapshot);
+              drainBufferedCliEvents();
+            },
+            (error: unknown) => {
+              if (
+                expectedGeneration !== generation ||
+                expectedSnapshotReplayGeneration !== snapshotReplayGeneration
+              ) {
+                return;
+              }
+              if (reportError) {
+                const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
+                config.onError?.(message);
+              }
+              bufferedCliEvents = [
+                ...bufferedEventsFromSupersededSnapshot,
+                ...(bufferedCliEvents ?? []),
+              ];
+              bufferedEventsFromSupersededSnapshot = [];
+              drainBufferedCliEvents();
+            }
+          );
+        };
+
+        replayCurrentSnapshot(true);
+        const offCli = config.userWebConnection.onCliEvent(config.kiloSessionId, msg => {
+          const normalized = normalizeCliEvent(msg.event, msg.data);
+          if (normalized && isChatEvent(normalized) && bufferedCliEvents !== null) {
+            bufferedCliEvents.push(msg);
+            return;
+          }
+          handleEventMessage(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
+        });
+        const offSystem = config.userWebConnection.onSystemEvent(msg => {
+          handleSystemMessage(msg.event, msg.data);
+        });
+        const offReconnect = config.userWebConnection.onReconnect(() => {
+          replayCurrentSnapshot(false);
+        });
+        const releaseSubscription = config.userWebConnection.subscribeToCliSession(
+          config.kiloSessionId
         );
+        let released = false;
+        cleanup = () => {
+          if (released) return;
+          released = true;
+          offCli();
+          offSystem();
+          offReconnect();
+          releaseSubscription();
+        };
       },
 
       send: (input: { payload: TransportSendPayload }) => {
-        // CLI live transport does not yet support structured slash command
-        // invocation — kilo CLI's command API needs to be plumbed through
-        // its own raw protocol command. Reject explicitly so callers see
-        // a clear error rather than a silently-dropped command.
         if (input.payload.type === 'command') {
           return Promise.reject(
             new Error('Slash commands are not supported on the CLI live transport yet')
           );
         }
-        const p = input.payload;
-        return rawSendCommand('send_message', {
+        const payload = input.payload;
+        return sendCommand('send_message', {
           sessionID: config.kiloSessionId,
-          parts: [{ type: 'text', text: p.prompt }],
-          ...(p.mode ? { agent: p.mode } : {}),
-          ...(p.model ? { model: p.model } : {}),
-          ...(p.variant ? { variant: p.variant } : {}),
+          parts: [{ type: 'text', text: payload.prompt }],
+          ...(payload.mode ? { agent: payload.mode } : {}),
+          ...(payload.model ? { model: payload.model } : {}),
+          ...(payload.variant ? { variant: payload.variant } : {}),
         });
       },
-      interrupt: () => rawSendCommand('interrupt', {}),
-      answer: (payload: { requestId: string; answers: unknown }) =>
-        rawSendCommand('question_reply', {
+      interrupt: () => sendCommand('interrupt', {}),
+      answer: payload =>
+        sendCommand('question_reply', {
           requestID: payload.requestId,
           answers: payload.answers,
         }),
-      reject: (payload: { requestId: string }) =>
-        rawSendCommand('question_reject', {
+      reject: payload =>
+        sendCommand('question_reject', {
           requestID: payload.requestId,
         }),
-      respondToPermission: (payload: { requestId: string; response: unknown }) =>
-        rawSendCommand('permission_respond', {
+      respondToPermission: payload =>
+        sendCommand('permission_respond', {
           requestID: payload.requestId,
           reply: payload.response,
         }),
-      acceptSuggestion: (payload: { requestId: string; index: number }) =>
-        rawSendCommand('suggestion_accept', {
+      acceptSuggestion: payload =>
+        sendCommand('suggestion_accept', {
           requestID: payload.requestId,
           index: payload.index,
         }),
-      dismissSuggestion: (payload: { requestId: string }) =>
-        rawSendCommand('suggestion_dismiss', {
+      dismissSuggestion: payload =>
+        sendCommand('suggestion_dismiss', {
           requestID: payload.requestId,
         }),
 
       disconnect() {
         generation += 1;
-
-        for (const [id, entry] of pendingCommands) {
-          clearTimeout(entry.timer);
-          entry.reject(new Error('Transport disconnected'));
-          pendingCommands.delete(id);
-        }
-
-        if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-          currentWs.send(JSON.stringify({ type: 'unsubscribe', sessionId: config.kiloSessionId }));
-        }
-
-        if (baseConnection) {
-          baseConnection.disconnect();
-          baseConnection = null;
-        }
-        currentWs = null;
+        releaseConnection();
       },
 
       destroy() {
         generation += 1;
-
-        for (const [id, entry] of pendingCommands) {
-          clearTimeout(entry.timer);
-          entry.reject(new Error('Transport disconnected'));
-          pendingCommands.delete(id);
-        }
-
-        if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-          currentWs.send(JSON.stringify({ type: 'unsubscribe', sessionId: config.kiloSessionId }));
-        }
-
-        if (baseConnection) {
-          baseConnection.destroy();
-          baseConnection = null;
-        }
-        currentWs = null;
+        releaseConnection();
       },
     };
   };

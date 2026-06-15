@@ -28,6 +28,7 @@ export const GITHUB_EVENT = {
   INSTALLATION: 'installation',
   INSTALLATION_REPOSITORIES: 'installation_repositories',
   INSTALLATION_TARGET: 'installation_target',
+  APP_AUTHORIZATION: 'github_app_authorization',
 
   // Repository events
   REPOSITORY: 'repository',
@@ -62,6 +63,8 @@ export const GITHUB_ACTION = {
   DELETED: 'deleted',
   SUSPEND: 'suspend',
   UNSUSPEND: 'unsuspend',
+  RENAMED: 'renamed',
+  REVOKED: 'revoked',
 
   // Repository actions
   ADDED: 'added',

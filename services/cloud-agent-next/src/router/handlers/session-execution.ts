@@ -20,14 +20,18 @@ import {
   LegacyExecutionResponse,
 } from '../schemas.js';
 import type { SessionId } from '../../types/ids.js';
-import { queueMessage } from '../../session/queue-message.js';
-import { admitLegacyPreparedInitialMessage } from '../../session/legacy-prepared-admission.js';
+import { preflightAndQueuePromptMessage, queueMessage } from '../../session/queue-message.js';
+import {
+  admitLegacyPreparedInitialMessage,
+  replayLegacyPreparedInitialMessageIfAlreadyAdmitted,
+} from '../../session/legacy-prepared-admission.js';
 import type {
   AgentSelectionOverride,
   ExecutionTurnSubmission,
   TurnFinalization,
 } from '../../execution/types.js';
 import type { QueueAckResponse } from '../schemas.js';
+import { preflightPreparedInitialPromptModel } from '../../session/model-preflight.js';
 
 function withLegacyExecutionId(ack: QueueAckResponse): LegacyExecutionResponse {
   return {
@@ -46,11 +50,22 @@ export function createSessionExecutionV2Handlers() {
           const sessionId = input.cloudAgentSessionId as SessionId;
           logger.setTags({ userId: ctx.userId, sessionId, preparedSession: true });
           logger.info('Initiating V2 session from prepared session');
-
-          const ack = await admitLegacyPreparedInitialMessage(
-            { cloudAgentSessionId: input.cloudAgentSessionId },
-            { env: ctx.env, userId: ctx.userId, botId: ctx.botId }
+          const admissionInput = { cloudAgentSessionId: input.cloudAgentSessionId };
+          const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
+          const replay = await replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
+            admissionInput,
+            admissionContext
           );
+          if (replay) return withLegacyExecutionId(replay);
+
+          await preflightPreparedInitialPromptModel({
+            env: ctx.env,
+            userId: ctx.userId,
+            cloudAgentSessionId: input.cloudAgentSessionId,
+            procedure: 'initiateFromKilocodeSessionV2',
+          });
+
+          const ack = await admitLegacyPreparedInitialMessage(admissionInput, admissionContext);
           return withLegacyExecutionId(ack);
         });
       }),
@@ -85,14 +100,14 @@ export function createSessionExecutionV2Handlers() {
               id: input.messageId ?? undefined,
               command: commandPayload.command,
               arguments: commandPayload.arguments,
-              images: input.images,
+              attachments: input.attachments ?? input.images,
             };
           } else if (promptPayload) {
             turn = {
               type: 'prompt',
               id: input.messageId ?? undefined,
               prompt: promptPayload.prompt,
-              images: input.images,
+              attachments: input.attachments ?? input.images,
             };
             agent = {
               mode: promptPayload.mode,
@@ -103,18 +118,24 @@ export function createSessionExecutionV2Handlers() {
             throw new Error('sendMessageV2 payload is missing a prompt or command turn');
           }
 
-          const ack = await queueMessage(
-            {
-              cloudAgentSessionId: input.cloudAgentSessionId,
-              turn,
-              agent,
-              finalization: {
-                autoCommit: input.autoCommit,
-                condenseOnComplete: input.condenseOnComplete,
-              } satisfies TurnFinalization,
-            },
-            { env: ctx.env, userId: ctx.userId, botId: ctx.botId }
-          );
+          const queuedMessage = {
+            cloudAgentSessionId: input.cloudAgentSessionId,
+            turn,
+            agent,
+            finalization: {
+              autoCommit: input.autoCommit,
+              condenseOnComplete: input.condenseOnComplete,
+            } satisfies TurnFinalization,
+          };
+          const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
+          const ack =
+            turn.type === 'prompt'
+              ? await preflightAndQueuePromptMessage(
+                  queuedMessage,
+                  admissionContext,
+                  'sendMessageV2'
+                )
+              : await queueMessage(queuedMessage, admissionContext);
           return withLegacyExecutionId(ack);
         });
       }),

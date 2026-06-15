@@ -15,17 +15,12 @@ import {
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
-import type { Images } from '@/lib/images-schema';
+import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { APP_URL } from '@/lib/constants';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
-import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
-import {
-  profileMcpServersToClientRecord,
-  type MergeProfileConfigurationResult,
-} from '@kilocode/cloud-agent-profile';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
@@ -95,10 +90,14 @@ export default async function spawnCloudAgentSession(
   model: string,
   platformIntegration: PlatformIntegration,
   authToken: string,
-  ticketUserId: string,
   botRequestId: string,
   onSessionReady?: RunSessionInput['onSessionReady'],
-  options?: { prSignature?: string; chatPlatform?: string; currentStep?: number; images?: Images }
+  options?: {
+    prSignature?: string;
+    chatPlatform?: string;
+    currentStep?: number;
+    attachments?: CloudAgentAttachments;
+  }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
 
@@ -134,14 +133,6 @@ export default async function spawnCloudAgentSession(
   }
 
   const owner: Owner = ownerFromIntegration(platformIntegration);
-  let profileConfig: MergeProfileConfigurationResult;
-  try {
-    profileConfig = await resolveBotSessionProfile(owner, ticketUserId, args);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { response: `Error resolving profile for Cloud Agent: ${message}` };
-  }
-
   const kilocodeOrganizationId = owner.type === 'org' ? owner.id : undefined;
 
   if (args.gitlabProject) {
@@ -183,13 +174,7 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
-      images: options?.images,
-      envVars: profileConfig.envVars,
-      encryptedSecrets: profileConfig.encryptedSecrets,
-      setupCommands: profileConfig.setupCommands,
-      mcpServers: profileMcpServersToClientRecord(profileConfig.mcpServers),
-      runtimeSkills: profileConfig.skills,
-      runtimeAgents: profileConfig.agents,
+      attachments: options?.attachments,
     };
   } else {
     // GitHub path: get token, use githubRepo/githubToken
@@ -214,13 +199,7 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
-      images: options?.images,
-      envVars: profileConfig.envVars,
-      encryptedSecrets: profileConfig.encryptedSecrets,
-      setupCommands: profileConfig.setupCommands,
-      mcpServers: profileMcpServersToClientRecord(profileConfig.mcpServers),
-      runtimeSkills: profileConfig.skills,
-      runtimeAgents: profileConfig.agents,
+      attachments: options?.attachments,
     };
   }
 

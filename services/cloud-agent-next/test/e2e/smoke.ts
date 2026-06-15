@@ -9,7 +9,7 @@
  * Not wired into `pnpm test` / `pnpm test:all` on purpose — this requires a
  * running stack with the fake-LLM harness configured:
  *   1. Edit `.dev.vars` so `KILO_OPENROUTER_BASE` points at the fake LLM:
- *        `KILO_OPENROUTER_BASE=http://host.docker.internal:<8811 + portOffset>/api`
+ *        `KILO_OPENROUTER_BASE=http://localhost:<8811 + portOffset>/api`
  *   2. `pnpm dev:start cloud-agent fake-llm`
  */
 
@@ -56,10 +56,7 @@ const DEFAULT_MATRIX: Case[] = [
   { lifecycle: 'unknown-model', conversation: '_' },
   { lifecycle: 'waiters-clean', conversation: '_' },
 
-  // Callback delivery via the outbound HTTP fetch from workerd.
-  { lifecycle: 'callback-completion', conversation: 'echo:done' },
-  { lifecycle: 'callback-batch-followup', conversation: '_' },
-  { lifecycle: 'callback-interrupt', conversation: '_' },
+  // Callback scenarios remain manual because callbackTarget uses the internal legacy API.
 
   // Legacy-API sanity: one cold boot plus the same reused hot turn sequence.
   { lifecycle: 'cold-hot', conversation: 'echo:legacy', api: 'legacy' },

@@ -2,8 +2,9 @@ import type { SandboxInstance, ExecutionSession, SystemSandboxUsageEvent } from 
 import type { ExecResult, ExecOptions } from '@cloudflare/sandbox';
 import { logger } from './logger.js';
 import {
+  inspectWrapperContainers,
   isWrapperLiveInProcessesOrContainers,
-  listWrapperContainers,
+  type LabeledWrapperRow,
 } from './kilo/wrapper-manager.js';
 import {
   DISK_CHECK_TIMEOUT_MS,
@@ -16,7 +17,14 @@ import {
 } from './sandbox-timeout-logging.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import { isSandboxInternalServerError } from './sandbox-recovery.js';
-import { WorkspaceFilesystemPreparationError } from './workspace-errors.js';
+import { shellQuote } from './kilo/utils.js';
+import {
+  isSandboxFilesystemUnusableError,
+  SandboxCapacityInspectionError,
+  WorkspaceCapacityAdmissionRejectedError,
+  WorkspaceCapacityInspectionUnavailableError,
+  WorkspaceFilesystemPreparationError,
+} from './workspace-errors.js';
 
 /**
  * Minimal interface for running shell commands.
@@ -179,37 +187,118 @@ export type SessionPaths = {
   sessionHome: string;
 };
 
+export type StaleWorkspaceCleanupResult = {
+  cleaned: number;
+  skipped: number;
+};
+
+export type StaleWorkspaceCleanupOptions = {
+  inspectContainers: boolean;
+};
+
+export type WorkspaceAdmissionResult = {
+  availableMB: number;
+  thresholdMB: number;
+  cleanup: StaleWorkspaceCleanupResult;
+};
+
+function throwIfSandboxFilesystemUnusable(operation: string, error: unknown): void {
+  if (!isSandboxFilesystemUnusableError(error)) return;
+  throw new SandboxCapacityInspectionError(
+    `${operation} cannot run because the sandbox filesystem is unusable`,
+    error
+  );
+}
+
 /**
- * Check disk space and clean up stale workspaces if low, using the sandbox
- * directly so it can run before any session or workspace directory exists.
- * Errors are caught and logged so cleanup failure never blocks setup, except
- * sandbox 500s which indicate a bad container that should be destroyed.
+ * Admit cold workspace setup only when measured capacity is safe, preserving
+ * conservative stale cleanup for live sibling wrappers on shared sandboxes.
  */
 export async function checkDiskAndCleanBeforeSetup(
   sandbox: SandboxInstance,
   orgId: string | undefined,
   userId: string,
-  sessionId: string
-): Promise<void> {
+  sessionId: string,
+  options: StaleWorkspaceCleanupOptions
+): Promise<WorkspaceAdmissionResult> {
   try {
-    const diskSpace = await checkDiskSpace(sandbox);
-    if (diskSpace.isLow) {
-      logger.info('Low disk space detected before workspace setup, cleaning stale workspaces');
-      await cleanupStaleWorkspaces(sandbox, getBaseWorkspacePath(orgId, userId), sessionId);
+    const initialCapacity = await checkDiskSpace(sandbox);
+    if (!initialCapacity.isLow) {
+      const admitted = {
+        availableMB: initialCapacity.availableMB,
+        thresholdMB: LOW_DISK_THRESHOLD_MB,
+        cleanup: { cleaned: 0, skipped: 0 },
+      } satisfies WorkspaceAdmissionResult;
+      logger.withFields(admitted).info('Workspace capacity admission accepted');
+      return admitted;
     }
+
+    const cleanup = await cleanupStaleWorkspaces(
+      sandbox,
+      getBaseWorkspacePath(orgId, userId),
+      sessionId,
+      options
+    );
+    const recheckedCapacity = await checkDiskSpace(sandbox);
+    if (recheckedCapacity.isLow) {
+      const rejection = new WorkspaceCapacityAdmissionRejectedError({
+        availableMB: recheckedCapacity.availableMB,
+        thresholdMB: LOW_DISK_THRESHOLD_MB,
+        cleaned: cleanup.cleaned,
+        skipped: cleanup.skipped,
+      });
+      logger
+        .withFields({
+          availableMB: rejection.availableMB,
+          thresholdMB: rejection.thresholdMB,
+          cleaned: rejection.cleaned,
+          skipped: rejection.skipped,
+          reason: 'low_capacity_after_cleanup',
+        })
+        .warn('Workspace capacity admission rejected');
+      throw rejection;
+    }
+
+    const admitted = {
+      availableMB: recheckedCapacity.availableMB,
+      thresholdMB: LOW_DISK_THRESHOLD_MB,
+      cleanup,
+    } satisfies WorkspaceAdmissionResult;
+    logger.withFields(admitted).info('Workspace capacity admission accepted after cleanup');
+    return admitted;
   } catch (error) {
+    if (
+      error instanceof WorkspaceCapacityAdmissionRejectedError ||
+      error instanceof SandboxCapacityInspectionError
+    ) {
+      throw error;
+    }
     if (isSandboxInternalServerError(error)) {
       logger
         .withFields({ error: error instanceof Error ? error.message : String(error) })
         .error('Pre-setup disk check hit sandbox 500, aborting workspace setup');
       throw error;
     }
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (isSandboxFilesystemUnusableError(error)) {
+      const unusableError = new SandboxCapacityInspectionError(
+        'Disk capacity inspection cannot run because the sandbox filesystem is unusable',
+        error
+      );
+      logger
+        .withFields({ error: errorMessage, reason: 'sandbox_filesystem_unusable' })
+        .error('Workspace capacity inspection cannot safely admit setup');
+      throw unusableError;
+    }
 
-    // Log and continue — a failed disk check should not block workspace setup.
-    // The worst case is that mkdir fails (which it would have anyway without cleanup).
+    const unavailableError = new WorkspaceCapacityInspectionUnavailableError(
+      'Workspace admission rejected because disk capacity could not be measured',
+      error
+    );
     logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
-      .warn('Pre-setup disk check failed, continuing with workspace setup');
+      .withFields({ error: errorMessage, reason: 'capacity_inspection_unavailable' })
+      .warn('Workspace capacity admission rejected without sandbox recovery');
+    throw unavailableError;
   }
 }
 
@@ -261,11 +350,23 @@ export async function cleanupWorkspace(
   workspacePath: string,
   sessionHome: string
 ): Promise<void> {
+  await cleanupWorkspaceBestEffort(executor, workspacePath, sessionHome);
+}
+
+type WorkspaceCleanupResult = {
+  cleaned: boolean;
+  filesystemUnusableCause?: unknown;
+};
+
+async function cleanupWorkspaceBestEffort(
+  executor: CommandExecutor,
+  workspacePath: string,
+  sessionHome: string
+): Promise<WorkspaceCleanupResult> {
   logger.setTags({ workspacePath, sessionHome });
   logger.info('Cleaning up workspace directories');
 
   try {
-    // Delete workspace directory
     const workspaceResult = await timedExec(
       executor,
       `rm -rf '${workspacePath}'`,
@@ -277,7 +378,6 @@ export async function cleanupWorkspace(
         .warn('Failed to delete workspace directory');
     }
 
-    // Delete session home directory
     const homeResult = await timedExec(
       executor,
       `rm -rf '${sessionHome}'`,
@@ -289,25 +389,34 @@ export async function cleanupWorkspace(
         .warn('Failed to delete session home directory');
     }
 
-    logger.info('Workspace cleanup completed');
+    const cleaned = workspaceResult.exitCode === 0 && homeResult.exitCode === 0;
+    if (cleaned) logger.info('Workspace cleanup completed');
+    const unusableResult = [workspaceResult, homeResult].find(result =>
+      isSandboxFilesystemUnusableError(result.stderr)
+    );
+    return unusableResult
+      ? { cleaned: false, filesystemUnusableCause: new Error(unusableResult.stderr) }
+      : { cleaned };
   } catch (error) {
     logger
       .withFields({ error: error instanceof Error ? error.message : String(error) })
       .warn('Workspace cleanup encountered an error');
-    // Don't throw - cleanup failures shouldn't block session termination
+    return isSandboxFilesystemUnusableError(error)
+      ? { cleaned: false, filesystemUnusableCause: error }
+      : { cleaned: false };
   }
 }
 
 /**
  * Clean up workspace directories for sessions that no longer have a running wrapper.
- * Called when disk space is low to reclaim space from abandoned sessions.
- * Errors are caught and logged — never rethrown — so cleanup failure never blocks setup.
+ * Candidate inspection fails closed: unknown or live sessions are counted as skipped.
  */
 export async function cleanupStaleWorkspaces(
   sandbox: SandboxInstance,
   baseWorkspacePath: string,
-  currentSessionId: string
-): Promise<void> {
+  currentSessionId: string,
+  options: StaleWorkspaceCleanupOptions
+): Promise<StaleWorkspaceCleanupResult> {
   logger
     .withFields({ baseWorkspacePath, currentSessionId })
     .info('Starting stale workspace cleanup');
@@ -321,9 +430,9 @@ export async function cleanupStaleWorkspaces(
     );
     if (lsResult.exitCode !== 0 || !lsResult.stdout) {
       logger
-        .withFields({ stderr: lsResult.stderr })
+        .withFields({ stderr: lsResult.stderr, cleaned: 0, skipped: 0 })
         .info('No sessions directory or listing failed, skipping cleanup');
-      return;
+      return { cleaned: 0, skipped: 0 };
     }
     sessionDirs = lsResult.stdout
       .trim()
@@ -331,10 +440,15 @@ export async function cleanupStaleWorkspaces(
       .map(d => d.trim())
       .filter(d => /^agent_[\w-]+$/.test(d));
   } catch (error) {
+    throwIfSandboxFilesystemUnusable('Stale workspace discovery', error);
     logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .withFields({
+        error: error instanceof Error ? error.message : String(error),
+        cleaned: 0,
+        skipped: 0,
+      })
       .warn('Failed to list sessions directory, skipping cleanup');
-    return;
+    return { cleaned: 0, skipped: 0 };
   }
 
   logger.withFields({ found: sessionDirs.length }).info('Found session directories');
@@ -344,15 +458,36 @@ export async function cleanupStaleWorkspaces(
   try {
     processes = await sandbox.listProcesses();
   } catch (error) {
+    throwIfSandboxFilesystemUnusable('Stale wrapper process inspection', error);
     logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .withFields({
+        error: error instanceof Error ? error.message : String(error),
+        cleaned: 0,
+        skipped: sessionDirs.length,
+      })
       .warn('Failed to list processes, skipping cleanup');
-    return;
+    return { cleaned: 0, skipped: sessionDirs.length };
   }
 
-  // Also fetch wrapper containers (devcontainer flow). Best-effort — on the
-  // non-DIND outer image `docker ps` simply returns empty, which is fine.
-  const wrapperContainers = await listWrapperContainers(sandbox);
+  let wrapperContainers: LabeledWrapperRow[] = [];
+  if (options.inspectContainers) {
+    const wrapperContainerInspection = await inspectWrapperContainers(sandbox);
+    if (wrapperContainerInspection.status === 'inspection-failed') {
+      throwIfSandboxFilesystemUnusable(
+        'Stale devcontainer wrapper inspection',
+        wrapperContainerInspection.error
+      );
+      logger
+        .withFields({
+          error: wrapperContainerInspection.error,
+          cleaned: 0,
+          skipped: sessionDirs.length,
+        })
+        .warn('Failed to inspect devcontainer wrappers, skipping cleanup');
+      return { cleaned: 0, skipped: sessionDirs.length };
+    }
+    wrapperContainers = wrapperContainerInspection.containers;
+  }
 
   // Get current epoch once so we can age-check directories without re-shelling per candidate
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -413,9 +548,19 @@ export async function cleanupStaleWorkspaces(
         .withFields({ candidateSessionId, workspacePath, sessionHome })
         .info('Removing stale session directories');
 
-      await cleanupWorkspace(sandbox, workspacePath, sessionHome);
-      cleaned++;
+      const cleanup = await cleanupWorkspaceBestEffort(sandbox, workspacePath, sessionHome);
+      if (cleanup.filesystemUnusableCause !== undefined) {
+        throwIfSandboxFilesystemUnusable(
+          'Stale workspace cleanup',
+          cleanup.filesystemUnusableCause
+        );
+      }
+      if (cleanup.cleaned) cleaned++;
+      else skipped++;
     } catch (error) {
+      if (error instanceof SandboxCapacityInspectionError) throw error;
+      throwIfSandboxFilesystemUnusable('Stale workspace cleanup', error);
+      skipped++;
       logger
         .withFields({
           candidateSessionId,
@@ -425,7 +570,9 @@ export async function cleanupStaleWorkspaces(
     }
   }
 
-  logger.withFields({ cleaned, skipped }).info('Stale workspace cleanup complete');
+  const result = { cleaned, skipped } satisfies StaleWorkspaceCleanupResult;
+  logger.withFields(result).info('Stale workspace cleanup complete');
+  return result;
 }
 
 export type GitAuthorConfig = {
@@ -458,18 +605,33 @@ export async function checkDiskSpace(executor: CommandExecutor): Promise<DiskSpa
   // df -B1 gives output in bytes for clean numeric parsing (no M/G/K suffixes)
   // --output=avail,size gives available and total space
   // Always use "/" since all container paths share the same root filesystem
-  const result = await timedExec(
-    executor,
-    'df -B1 --output=avail,size / | tail -1',
-    'workspace.checkDiskSpace',
-    { timeoutMs: DISK_CHECK_TIMEOUT_MS }
-  );
+  let result: ExecResult;
+  try {
+    result = await timedExec(
+      executor,
+      'df -B1 --output=avail,size / | tail -1',
+      'workspace.checkDiskSpace',
+      { timeoutMs: DISK_CHECK_TIMEOUT_MS }
+    );
+  } catch (error) {
+    if (isSandboxInternalServerError(error)) throw error;
+    if (isSandboxFilesystemUnusableError(error)) {
+      throw new SandboxCapacityInspectionError(
+        'Disk capacity inspection cannot run because the sandbox filesystem is unusable',
+        error
+      );
+    }
+    throw new WorkspaceCapacityInspectionUnavailableError(
+      'Workspace admission rejected because disk capacity could not be measured',
+      error
+    );
+  }
 
   if (result.exitCode !== 0) {
     logger
       .withFields({ exitCode: result.exitCode, stderr: result.stderr })
       .warn('Disk check: df command failed');
-    throw new Error('Disk check failed');
+    throw new Error(`Disk check failed: ${result.stderr || `exit ${result.exitCode}`}`);
   }
 
   // Output is like "123456789  5000000000" (pure numbers in bytes)
@@ -534,21 +696,10 @@ export async function cloneGitHubRepo(
   workspacePath: string,
   githubRepo: string,
   githubToken?: string,
-  env?: { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string },
+  gitAuthor?: GitAuthorConfig,
   options?: { shallow?: boolean }
 ): Promise<void> {
-  // Convert GitHub repo format (org/repo) to full HTTPS URL and delegate to cloneGitRepo
   const gitUrl = `https://github.com/${githubRepo}.git`;
-
-  // Build git author config from GitHub App environment variables
-  let gitAuthor: GitAuthorConfig | undefined;
-  if (env?.GITHUB_APP_SLUG && env?.GITHUB_APP_BOT_USER_ID) {
-    gitAuthor = {
-      name: `${env.GITHUB_APP_SLUG}[bot]`,
-      email: `${env.GITHUB_APP_BOT_USER_ID}+${env.GITHUB_APP_SLUG}[bot]@users.noreply.github.com`,
-    };
-  }
-
   await cloneGitRepo(session, workspacePath, gitUrl, githubToken, gitAuthor, options);
 }
 
@@ -605,18 +756,10 @@ export async function cloneGitRepo(
       throw new Error(`gitCheckout failed with exit code ${result.exitCode ?? 'unknown'}`);
     }
 
-    const authorName = gitAuthor?.name ?? 'Kilo Code Cloud';
-    const authorEmail = gitAuthor?.email ?? 'agent@kilocode.ai';
-
-    await timedExec(
+    await updateGitAuthor(
       session,
-      `cd ${workspacePath} && git config user.name "${authorName}"`,
-      'git.config.userName'
-    );
-    await timedExec(
-      session,
-      `cd ${workspacePath} && git config user.email "${authorEmail}"`,
-      'git.config.userEmail'
+      workspacePath,
+      gitAuthor ?? { name: 'Kilo Code Cloud', email: 'agent@kilocode.ai' }
     );
 
     logger.info('Successfully cloned generic git repository');
@@ -658,7 +801,7 @@ export type RestoreWorkspaceOptions = {
   githubToken?: string;
   gitUrl?: string;
   gitToken?: string;
-  gitAuthorEnv?: { GITHUB_APP_SLUG?: string; GITHUB_APP_BOT_USER_ID?: string };
+  gitAuthor?: GitAuthorConfig;
   lastSeenBranch?: string;
   platform?: 'github' | 'gitlab';
 };
@@ -679,7 +822,7 @@ export async function restoreWorkspace(
       workspacePath,
       options.githubRepo,
       options.githubToken,
-      options.gitAuthorEnv
+      options.gitAuthor
     );
   } else {
     throw new Error('No repository source provided for workspace restore');
@@ -687,6 +830,28 @@ export async function restoreWorkspace(
 
   const targetBranchName = options.lastSeenBranch ?? branchName;
   await manageBranch(session, workspacePath, targetBranchName, false);
+}
+
+export async function updateGitAuthor(
+  session: ExecutionSession,
+  workspacePath: string,
+  gitAuthor: GitAuthorConfig
+): Promise<void> {
+  const nameResult = await timedExec(
+    session,
+    `git config user.name ${shellQuote(gitAuthor.name)}`,
+    'git.config.userName',
+    { cwd: workspacePath }
+  );
+  const emailResult = await timedExec(
+    session,
+    `git config user.email ${shellQuote(gitAuthor.email)}`,
+    'git.config.userEmail',
+    { cwd: workspacePath }
+  );
+  if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
+    throw new Error('Failed to configure git author identity');
+  }
 }
 
 /**

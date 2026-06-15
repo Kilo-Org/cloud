@@ -30,7 +30,7 @@ function makeMigrateDeps(
   filesModified = profilesMigrated > 0 ? 1 : 0
 ): EnvRoutesDeps {
   return {
-    migrate: vi.fn(() => ({ filesScanned: 1, filesModified, profilesMigrated })),
+    migrate: vi.fn(() => ({ filesScanned: 1, filesModified, profilesMigrated, filesFailed: 0 })),
   };
 }
 
@@ -172,7 +172,7 @@ describe('/_kilo/env/patch', () => {
     const deps: EnvRoutesDeps = {
       migrate: vi.fn(() => {
         order.push('migrate');
-        return { filesScanned: 1, filesModified: 1, profilesMigrated: 1 };
+        return { filesScanned: 1, filesModified: 1, profilesMigrated: 1, filesFailed: 0 };
       }),
     };
     (supervisor.restart as ReturnType<typeof vi.fn>).mockImplementation(async () => {

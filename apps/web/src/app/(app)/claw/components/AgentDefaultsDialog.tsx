@@ -30,7 +30,7 @@ import {
 } from '@/lib/kiloclaw/agent-schemas';
 import type { AgentDefaultsSummary } from '@/lib/kiloclaw/types';
 
-import { useClawAgentMutations } from '../hooks/useClawHooks';
+import { reconcileAmbiguousMutation, useClawAgentMutations } from '../hooks/useClawHooks';
 import { useClawModelOptions } from '../hooks/useClawModelOptions';
 import { addKilocodeModelPrefix, stripKilocodeModelPrefix } from './modelSupport';
 
@@ -118,7 +118,7 @@ export function AgentDefaultsDialog({
   // caller tracks a pending-restart count.
   onApplied: () => void;
 }) {
-  const { updateDefaults } = useClawAgentMutations();
+  const { updateDefaults, refetchAgents } = useClawAgentMutations();
   const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
 
   const initial = useMemo(
@@ -180,6 +180,24 @@ export function AgentDefaultsDialog({
   const hasChanges = Object.keys(patch.set).length > 0 || patch.unset.length > 0;
   const canSubmit = hasChanges && !modelInvalid && !updateDefaults.isPending;
 
+  // Does a refetched defaults snapshot reflect the patch we tried to write?
+  // (Primary + thinking/verbose + unsets are the signal; deep fallback compare is
+  // skipped — a primary match is enough to confirm the write landed.)
+  const defaultsApplied = (d: AgentDefaultsSummary): boolean => {
+    const { set, unset } = patch;
+    if (set.model?.primary !== undefined && d.model?.primary !== set.model.primary) return false;
+    if (set.thinkingDefault !== undefined && d.settings.thinkingDefault !== set.thinkingDefault)
+      return false;
+    if (set.verboseDefault !== undefined && d.settings.verboseDefault !== set.verboseDefault)
+      return false;
+    for (const k of unset) {
+      if (k === 'model' && d.model != null) return false;
+      if (k === 'thinkingDefault' && d.settings.thinkingDefault != null) return false;
+      if (k === 'verboseDefault' && d.settings.verboseDefault != null) return false;
+    }
+    return true;
+  };
+
   const onSubmit = async () => {
     if (!canSubmit) return;
     try {
@@ -188,6 +206,17 @@ export function AgentDefaultsDialog({
       toast.success('Updated defaults');
       onOpenChange(false);
     } catch (err) {
+      // The update can time out AFTER the controller committed it; reconcile
+      // against the intended defaults before reporting failure.
+      const applied = await reconcileAmbiguousMutation(err, refetchAgents, list =>
+        defaultsApplied(list.defaults)
+      );
+      if (applied) {
+        onApplied();
+        toast.success('Updated defaults');
+        onOpenChange(false);
+        return;
+      }
       toast.error(err instanceof Error ? err.message : 'Failed to update defaults', {
         duration: 10000,
       });

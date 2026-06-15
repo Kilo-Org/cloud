@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { normalizeAgentId, workspaceFromName } from '@/lib/kiloclaw/agent-id';
+import { workspaceFromName } from '@/lib/kiloclaw/agent-id';
 import { reconcileAmbiguousMutation, useClawAgentMutations } from '../hooks/useClawHooks';
 import { useClawModelOptions } from '../hooks/useClawModelOptions';
 import { addKilocodeModelPrefix } from './modelSupport';
@@ -54,7 +54,6 @@ export function AgentCreateDialog({
 
   const onSubmit = async () => {
     if (!canSubmit) return;
-    const expectedId = normalizeAgentId(trimmedName);
     try {
       await createAgent.mutateAsync({
         name: trimmedName,
@@ -68,20 +67,21 @@ export function AgentCreateDialog({
       onOpenChange(false);
     } catch (err) {
       // Create can time out at the gateway after the controller already made the
-      // agent (fire-and-forget). Reconcile only when the id did NOT already exist
-      // before submit, so a deterministic conflict (`agent_exists`) or reserved
-      // `main` is reported as the real error, never a false success.
+      // agent (fire-and-forget). Reconcile by matching the agent's VERBATIM name
+      // (the controller stores the submitted name as agents.list[].name) among
+      // agents that did NOT exist before submit — so we don't have to predict the
+      // normalized id and the reconcile doesn't depend on the id-normalization
+      // mirror staying in lockstep with the controller. A deterministic conflict
+      // (`agent_exists`) or reserved `main` won't match (no new id) and surfaces
+      // as the real error.
       //
       // Residual race we accept: if THIS request is lost before reaching the
-      // controller while a concurrent writer creates the same id, the refetch can
-      // still find it and report success for an agent the other writer made
-      // (possibly with a different model). Narrow (same name, simultaneous,
-      // request lost pre-controller) and self-correcting on the next list view.
-      const applied =
-        !existingIds.includes(expectedId) &&
-        (await reconcileAmbiguousMutation(err, refetchAgents, list =>
-          list.agents.some(a => a.id === expectedId)
-        ));
+      // controller while a concurrent writer creates an agent with the same name,
+      // the refetch can match it. Narrow (same name, simultaneous, request lost
+      // pre-controller) and self-correcting on the next list view.
+      const applied = await reconcileAmbiguousMutation(err, refetchAgents, list =>
+        list.agents.some(a => a.name === trimmedName && !existingIds.includes(a.id))
+      );
       if (applied) {
         toast.success(`Created agent ${trimmedName} (took a moment)`);
         reset();

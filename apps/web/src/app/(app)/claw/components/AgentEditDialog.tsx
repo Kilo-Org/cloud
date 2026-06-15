@@ -27,8 +27,8 @@ import {
   VERBOSE_OPTIONS,
   type AgentUpdateInput,
 } from '@/lib/kiloclaw/agent-schemas';
-import type { AgentSummary } from '@/lib/kiloclaw/types';
-import { useClawAgentMutations } from '../hooks/useClawHooks';
+import type { AgentSettingsSummary, AgentSummary } from '@/lib/kiloclaw/types';
+import { reconcileAmbiguousMutation, useClawAgentMutations } from '../hooks/useClawHooks';
 
 const INHERIT = 'inherit';
 
@@ -126,7 +126,7 @@ export function AgentEditDialog({
   // caller tracks a pending-restart count.
   onApplied: () => void;
 }) {
-  const { updateAgent } = useClawAgentMutations();
+  const { updateAgent, refetchAgents } = useClawAgentMutations();
 
   // Initial select values. toOption maps null OR an unknown (forward-compat)
   // value to INHERIT; we diff against THESE rather than the raw settings so an
@@ -185,6 +185,25 @@ export function AgentEditDialog({
   const hasChanges = Object.keys(patch.set).length > 0 || patch.unset.length > 0;
   const canSubmit = hasChanges && !updateAgent.isPending;
 
+  // Does a refetched settings snapshot reflect the patch we tried to write?
+  const settingsApplied = (s: AgentSettingsSummary): boolean => {
+    const { set, unset } = patch;
+    if (set.thinkingDefault !== undefined && s.thinkingDefault !== set.thinkingDefault)
+      return false;
+    if (set.verboseDefault !== undefined && s.verboseDefault !== set.verboseDefault) return false;
+    if (set.reasoningDefault !== undefined && s.reasoningDefault !== set.reasoningDefault)
+      return false;
+    if (set.fastModeDefault !== undefined && s.fastModeDefault !== set.fastModeDefault)
+      return false;
+    for (const k of unset) {
+      if (k === 'thinkingDefault' && s.thinkingDefault != null) return false;
+      if (k === 'verboseDefault' && s.verboseDefault != null) return false;
+      if (k === 'reasoningDefault' && s.reasoningDefault != null) return false;
+      if (k === 'fastModeDefault' && s.fastModeDefault != null) return false;
+    }
+    return true;
+  };
+
   const onSubmit = async () => {
     if (!canSubmit) return;
     try {
@@ -193,6 +212,18 @@ export function AgentEditDialog({
       toast.success(`Updated ${agent.name ?? agent.id}`);
       onOpenChange(false);
     } catch (err) {
+      // The update can time out AFTER the controller committed it; reconcile
+      // against the intended settings before reporting failure.
+      const applied = await reconcileAmbiguousMutation(err, refetchAgents, list => {
+        const a = list.agents.find(x => x.id === agent.id);
+        return a !== undefined && settingsApplied(a.settings);
+      });
+      if (applied) {
+        onApplied();
+        toast.success(`Updated ${agent.name ?? agent.id}`);
+        onOpenChange(false);
+        return;
+      }
       toast.error(err instanceof Error ? err.message : 'Failed to update agent', {
         duration: 10000,
       });

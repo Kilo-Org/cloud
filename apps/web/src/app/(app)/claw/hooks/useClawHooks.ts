@@ -11,7 +11,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useTRPC } from '@/lib/trpc/utils';
 import type {
@@ -88,11 +88,13 @@ export function useClawControllerVersion(enabled: boolean) {
   // band on a redeploy. A long staleTime made the cached capabilities survive an
   // upgrade — e.g. /claw/agents showing "not available on this machine version"
   // until a hard refresh, because nothing refetched once the controller was back
-  // up. `staleTime: 0` makes it self-heal WITHOUT a steady poll: it refetches on
-  // mount, on window focus, and when the query re-enables as the instance returns
-  // to `running` after a restart (status leaves+re-enters `running`), plus the
-  // existing lifecycle invalidation (invalidateStatus invalidates this query).
-  const STALE_TIME = 0;
+  // up. A SHORT window self-heals without a steady poll (refetch on mount, focus,
+  // and re-enable as the instance returns to `running` after a restart — a restart
+  // is ≥5s, so the cached data is stale by then) plus the existing lifecycle
+  // invalidation (invalidateStatus invalidates this query). Not 0: that made a
+  // second subscriber mounting right after the page query (e.g. useClawModelOptions
+  // on /claw/agents) immediately refire the controller request.
+  const STALE_TIME = 5_000;
 
   const personal = useQuery({
     ...trpc.kiloclaw.controllerVersion.queryOptions(undefined, {
@@ -185,6 +187,41 @@ export async function reconcileAmbiguousMutation(
   } catch {
     return false;
   }
+}
+
+/**
+ * Per-instance "restart required" counter, persisted in localStorage so it
+ * survives navigating away / refreshing — the underlying agent config change is
+ * persistent and only goes live after a gateway restart, so the warning must
+ * outlive the component. `bump` on each saved-but-unapplied change, `clear` after
+ * a confirmed restart. Keyed per context (personal vs a given org instance).
+ */
+export function useRestartRequired(instanceKey: string) {
+  const storageKey = `kiloclaw:restart-required:${instanceKey}`;
+  // Init 0 (SSR-safe) and read localStorage on the client to avoid a hydration
+  // mismatch; re-read when the instance key changes.
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(storageKey);
+    const n = raw ? Number.parseInt(raw, 10) : 0;
+    setCount(Number.isFinite(n) && n > 0 ? n : 0);
+  }, [storageKey]);
+
+  const bump = useCallback(() => {
+    setCount(prev => {
+      const next = prev + 1;
+      if (typeof window !== 'undefined') window.localStorage.setItem(storageKey, String(next));
+      return next;
+    });
+  }, [storageKey]);
+
+  const clear = useCallback(() => {
+    setCount(0);
+    if (typeof window !== 'undefined') window.localStorage.removeItem(storageKey);
+  }, [storageKey]);
+
+  return { count, bump, clear };
 }
 
 export function useClawAgentMutations() {

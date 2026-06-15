@@ -21,6 +21,7 @@ import {
   useClawAgentMutations,
   useClawAgents,
   useClawChannelCatalog,
+  useRestartRequired,
 } from '../hooks/useClawHooks';
 import { useClawModelOptions } from '../hooks/useClawModelOptions';
 import { AgentCreateDialog } from './AgentCreateDialog';
@@ -31,6 +32,7 @@ import {
   AgentModelControl,
   managedChannels,
   ownModelFallbacks,
+  ownPrimaryModel,
   type ChannelCatalogEntry,
 } from './AgentInlineControls';
 import { useClawContext } from './ClawContext';
@@ -310,12 +312,18 @@ export function AgentsSection({
   const restartOpenClaw = organizationId
     ? orgInstance.restartOpenClaw
     : personalInstance.restartOpenClaw;
-  const [pendingChangeCount, setPendingChangeCount] = useState(0);
+  // Persisted per-instance so the "restart required" warning survives navigating
+  // away / refreshing (the config change is persistent, only the runtime is stale).
+  const {
+    count: pendingChangeCount,
+    bump: bumpPendingChange,
+    clear: clearPendingChange,
+  } = useRestartRequired(organizationId ?? 'personal');
 
   const onRestartToApply = async () => {
     try {
       await restartOpenClaw.mutateAsync(undefined);
-      setPendingChangeCount(0);
+      clearPendingChange();
       toast.success('Restarting OpenClaw — routing changes apply when it’s back.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to restart OpenClaw', {
@@ -410,13 +418,26 @@ export function AgentsSection({
       await updateAgent.mutateAsync(agent.id, patch);
       // Saved, but the model edit doesn't hot-reload — needs a restart to apply
       // (confirmed 2026-06-15, same as bindings).
-      setPendingChangeCount(n => n + 1);
+      bumpPendingChange();
       toast.success(`Saved model for ${label}`, { id: toastId });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update model', {
-        id: toastId,
-        duration: 10000,
+      // Like create/delete, an update can time out AFTER the controller committed
+      // it. Reconcile against the intended state; if it landed, treat as saved +
+      // mark restart-required so the banner appears.
+      const applied = await reconcileAmbiguousMutation(err, refetchAgents, list => {
+        const a = list.agents.find(x => x.id === agent.id);
+        if (!a) return false;
+        return value === null ? a.rawModel == null : ownPrimaryModel(a) === value;
       });
+      if (applied) {
+        bumpPendingChange();
+        toast.success(`Saved model for ${label}`, { id: toastId });
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Failed to update model', {
+          id: toastId,
+          duration: 10000,
+        });
+      }
     } finally {
       setSavingModelFor(null);
     }
@@ -430,13 +451,27 @@ export function AgentsSection({
     try {
       await updateBindings.mutateAsync(agent.id, { etag: data.etag, channels });
       // Saved, but routing doesn't hot-reload — needs a gateway restart (B2 finding).
-      setPendingChangeCount(n => n + 1);
+      bumpPendingChange();
       toast.success(`Saved channels for ${label}`, { id: toastId });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update channels', {
-        id: toastId,
-        duration: 10000,
+      // A binding write can time out AFTER the controller committed it; reconcile
+      // against the requested channel set before reporting failure.
+      const want = new Set(channels);
+      const applied = await reconcileAmbiguousMutation(err, refetchAgents, list => {
+        const a = list.agents.find(x => x.id === agent.id);
+        if (!a) return false;
+        const now = new Set(managedChannels(a));
+        return now.size === want.size && [...want].every(c => now.has(c));
       });
+      if (applied) {
+        bumpPendingChange();
+        toast.success(`Saved channels for ${label}`, { id: toastId });
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Failed to update channels', {
+          id: toastId,
+          duration: 10000,
+        });
+      }
     } finally {
       setSavingChannelsFor(null);
     }
@@ -562,7 +597,7 @@ export function AgentsSection({
           }}
           agent={editTarget.agent}
           etag={editTarget.etag}
-          onApplied={() => setPendingChangeCount(n => n + 1)}
+          onApplied={() => bumpPendingChange()}
         />
       )}
 
@@ -574,7 +609,7 @@ export function AgentsSection({
           }}
           defaults={data.defaults}
           etag={defaultsTarget.etag}
-          onApplied={() => setPendingChangeCount(n => n + 1)}
+          onApplied={() => bumpPendingChange()}
         />
       )}
 

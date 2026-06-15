@@ -12,7 +12,7 @@ import {
   type BenchmarkModelSummary,
   type ReasoningEffort,
 } from '@kilocode/auto-routing-contracts';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, Play, Plus, Save, Trash2 } from 'lucide-react';
@@ -194,15 +194,42 @@ function BenchmarkConfigEditor({
   onSaved: (next: { config: BenchmarkConfig | null }) => void;
 }) {
   const [form, setForm] = useState(() => configToFormState(config));
+  // Tracks unsaved local edits. A background config refetch (the runs list
+  // polls; the query also refetches on focus) must not silently overwrite
+  // in-progress edits, so the sync effect only resets the form while pristine.
+  const [dirty, setDirty] = useState(false);
 
-  // Sync when config changes from outside (initial load / after save)
+  // Any user edit goes through this so it marks the form dirty.
+  const updateForm = useCallback(
+    (
+      updater: (prev: ReturnType<typeof configToFormState>) => ReturnType<typeof configToFormState>
+    ) => {
+      setForm(updater);
+      setDirty(true);
+    },
+    []
+  );
+
+  // Sync from server config only on initial load / after a save — never while
+  // the admin has unsaved edits (that would discard their work).
   useEffect(() => {
+    if (!dirty) setForm(configToFormState(config));
+  }, [config, dirty]);
+
+  // Discard local edits and reload the latest server config (explicit conflict
+  // recovery when a remote update arrived while editing).
+  const handleReload = useCallback(() => {
     setForm(configToFormState(config));
+    setDirty(false);
   }, [config]);
 
   const saveMutation = useMutation({
     mutationFn: saveBenchmarkConfig,
     onSuccess: data => {
+      // The save is now the source of truth: clear dirty and re-sync so the
+      // next background refetch is free to update the form again.
+      setForm(configToFormState(data.config));
+      setDirty(false);
       onSaved(data);
       toast.success('Benchmark config saved');
     },
@@ -212,25 +239,33 @@ function BenchmarkConfigEditor({
   });
 
   const handleAddDeciderRow = useCallback(() => {
-    setForm(prev => ({
+    updateForm(prev => ({
       ...prev,
       deciderModels: [...prev.deciderModels, { id: '', reasoningEffort: null }],
     }));
-  }, []);
+  }, [updateForm]);
 
-  const handleRemoveDeciderRow = useCallback((index: number) => {
-    setForm(prev => ({
-      ...prev,
-      deciderModels: prev.deciderModels.filter((_, i) => i !== index),
-    }));
-  }, []);
+  const handleRemoveDeciderRow = useCallback(
+    (index: number) => {
+      updateForm(prev => ({
+        ...prev,
+        deciderModels: prev.deciderModels.filter((_, i) => i !== index),
+      }));
+    },
+    [updateForm]
+  );
 
-  const handleDeciderRowChange = useCallback((index: number, patch: Partial<DeciderModelRow>) => {
-    setForm(prev => ({
-      ...prev,
-      deciderModels: prev.deciderModels.map((row, i) => (i === index ? { ...row, ...patch } : row)),
-    }));
-  }, []);
+  const handleDeciderRowChange = useCallback(
+    (index: number, patch: Partial<DeciderModelRow>) => {
+      updateForm(prev => ({
+        ...prev,
+        deciderModels: prev.deciderModels.map((row, i) =>
+          i === index ? { ...row, ...patch } : row
+        ),
+      }));
+    },
+    [updateForm]
+  );
 
   const handleSave = useCallback(() => {
     saveMutation.mutate(formStateToConfig(form, config));
@@ -250,7 +285,7 @@ function BenchmarkConfigEditor({
           <Textarea
             id="benchmark-classifier-models"
             value={form.classifierModels}
-            onChange={e => setForm(prev => ({ ...prev, classifierModels: e.target.value }))}
+            onChange={e => updateForm(prev => ({ ...prev, classifierModels: e.target.value }))}
             rows={4}
             className="font-mono text-xs"
             placeholder="openai/gpt-4o-mini"
@@ -348,7 +383,7 @@ function BenchmarkConfigEditor({
               step={0.05}
               value={form.minAccuracy}
               onChange={e =>
-                setForm(prev => ({ ...prev, minAccuracy: parseFloat(e.target.value) || 0 }))
+                updateForm(prev => ({ ...prev, minAccuracy: parseFloat(e.target.value) || 0 }))
               }
               className="h-8 w-40 tabular-nums"
             />
@@ -365,7 +400,7 @@ function BenchmarkConfigEditor({
               step={0.5}
               value={form.switchCostFactor}
               onChange={e =>
-                setForm(prev => ({ ...prev, switchCostFactor: parseFloat(e.target.value) || 1 }))
+                updateForm(prev => ({ ...prev, switchCostFactor: parseFloat(e.target.value) || 1 }))
               }
               className="h-8 w-40 tabular-nums"
             />
@@ -382,7 +417,7 @@ function BenchmarkConfigEditor({
               step={1}
               value={form.maxConcurrency}
               onChange={e =>
-                setForm(prev => ({ ...prev, maxConcurrency: parseInt(e.target.value, 10) || 1 }))
+                updateForm(prev => ({ ...prev, maxConcurrency: parseInt(e.target.value, 10) || 1 }))
               }
               className="h-8 w-40 tabular-nums"
             />
@@ -399,7 +434,7 @@ function BenchmarkConfigEditor({
               step={1}
               value={form.classifierRepetitions}
               onChange={e =>
-                setForm(prev => ({
+                updateForm(prev => ({
                   ...prev,
                   classifierRepetitions: parseInt(e.target.value, 10) || 1,
                 }))
@@ -419,7 +454,7 @@ function BenchmarkConfigEditor({
               step={1}
               value={form.deciderRepetitions}
               onChange={e =>
-                setForm(prev => ({
+                updateForm(prev => ({
                   ...prev,
                   deciderRepetitions: parseInt(e.target.value, 10) || 1,
                 }))
@@ -437,7 +472,7 @@ function BenchmarkConfigEditor({
           <Input
             id="benchmark-user-id"
             value={form.benchmarkUserId}
-            onChange={e => setForm(prev => ({ ...prev, benchmarkUserId: e.target.value }))}
+            onChange={e => updateForm(prev => ({ ...prev, benchmarkUserId: e.target.value }))}
             className="h-8 font-mono text-xs"
             placeholder="(unset)"
           />
@@ -458,7 +493,7 @@ function BenchmarkConfigEditor({
             step={1}
             value={form.classifierMaxP95LatencyMs}
             onChange={e =>
-              setForm(prev => ({ ...prev, classifierMaxP95LatencyMs: e.target.value }))
+              updateForm(prev => ({ ...prev, classifierMaxP95LatencyMs: e.target.value }))
             }
             className="h-8 w-40 tabular-nums"
             placeholder="(no limit)"
@@ -470,11 +505,19 @@ function BenchmarkConfigEditor({
 
         {/* Actions + metadata */}
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" onClick={handleSave} disabled={saveMutation.isPending}>
               <Save className="size-4" />
               Save config
             </Button>
+            {dirty ? (
+              <>
+                <Button type="button" variant="outline" onClick={handleReload}>
+                  Discard &amp; reload
+                </Button>
+                <span className="text-muted-foreground text-xs">Unsaved changes</span>
+              </>
+            ) : null}
           </div>
           {config === null ? (
             <p className="text-muted-foreground text-xs">
@@ -498,7 +541,7 @@ function BenchmarkConfigEditor({
 
 const TIER_ORDER = { low: 0, medium: 1, high: 2, '*': 3 } as const;
 
-function RunSummariesTable({ run }: { run: BenchmarkRun }) {
+function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
   const isDecider = run.kind === 'decider';
 
   const sortedSummaries: BenchmarkModelSummary[] = isDecider
@@ -511,67 +554,67 @@ function RunSummariesTable({ run }: { run: BenchmarkRun }) {
       })
     : run.summaries;
 
-  if (sortedSummaries.length === 0) {
-    return (
-      <TableRow>
-        <TableCell colSpan={6} className="text-muted-foreground h-10 text-center text-xs">
-          No summaries
-        </TableCell>
-      </TableRow>
-    );
-  }
-
   return (
-    <>
-      <TableRow className="bg-muted/30">
-        <TableCell colSpan={6} className="px-4 py-2">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">Model</TableHead>
-                {isDecider ? <TableHead className="text-xs">Tier</TableHead> : null}
-                <TableHead className="text-right text-xs">Accuracy</TableHead>
-                <TableHead className="text-right text-xs">Avg cost</TableHead>
-                <TableHead className="text-right text-xs">Avg latency</TableHead>
-                <TableHead className="text-right text-xs">p50 latency</TableHead>
-                <TableHead className="text-right text-xs">p95 latency</TableHead>
-                <TableHead className="text-right text-xs">Cases</TableHead>
-                <TableHead className="text-right text-xs">Errors</TableHead>
-                <TableHead className="text-right text-xs">Timeouts</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedSummaries.map((s, i) => (
-                <TableRow key={`${s.model}-${s.tier}-${i}`}>
-                  <TableCell className="max-w-56 truncate font-mono text-xs">{s.model}</TableCell>
-                  {isDecider ? (
-                    <TableCell className="text-xs capitalize">{s.tier}</TableCell>
-                  ) : null}
-                  <TableCell className="text-right tabular-nums text-xs">
-                    {formatAccuracy(s.accuracy)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">
-                    {formatUsd(s.avgCostUsd)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">
-                    {s.avgLatencyMs.toFixed(0)} ms
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">
-                    {s.p50LatencyMs !== null ? `${s.p50LatencyMs.toFixed(0)} ms` : '—'}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">
-                    {s.p95LatencyMs !== null ? `${s.p95LatencyMs.toFixed(0)} ms` : '—'}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">{s.cases}</TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">{s.errors}</TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">{s.timeouts}</TableCell>
+    <TableRow className="bg-muted/30">
+      <TableCell colSpan={6} id={id} className="px-4 py-2">
+        {/* Full error text (the collapsed row's Error cell is truncated). */}
+        {run.error ? (
+          <div className="border-destructive/40 bg-destructive/10 text-destructive mb-2 rounded-md border px-3 py-2 text-xs whitespace-pre-wrap break-words">
+            {run.error}
+          </div>
+        ) : null}
+        {sortedSummaries.length === 0 ? (
+          <p className="text-muted-foreground py-1 text-center text-xs">No summaries</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table className="min-w-max">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Model</TableHead>
+                  {isDecider ? <TableHead className="text-xs">Tier</TableHead> : null}
+                  <TableHead className="text-right text-xs">Accuracy</TableHead>
+                  <TableHead className="text-right text-xs">Avg cost</TableHead>
+                  <TableHead className="text-right text-xs">Avg latency</TableHead>
+                  <TableHead className="text-right text-xs">p50 latency</TableHead>
+                  <TableHead className="text-right text-xs">p95 latency</TableHead>
+                  <TableHead className="text-right text-xs">Cases</TableHead>
+                  <TableHead className="text-right text-xs">Errors</TableHead>
+                  <TableHead className="text-right text-xs">Timeouts</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableCell>
-      </TableRow>
-    </>
+              </TableHeader>
+              <TableBody>
+                {sortedSummaries.map((s, i) => (
+                  <TableRow key={`${s.model}-${s.tier}-${i}`}>
+                    <TableCell className="max-w-56 truncate font-mono text-xs">{s.model}</TableCell>
+                    {isDecider ? (
+                      <TableCell className="text-xs capitalize">{s.tier}</TableCell>
+                    ) : null}
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {formatAccuracy(s.accuracy)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {formatUsd(s.avgCostUsd)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {s.avgLatencyMs.toFixed(0)} ms
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {s.p50LatencyMs !== null ? `${s.p50LatencyMs.toFixed(0)} ms` : '—'}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {s.p95LatencyMs !== null ? `${s.p95LatencyMs.toFixed(0)} ms` : '—'}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">{s.cases}</TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">{s.errors}</TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">{s.timeouts}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -616,19 +659,30 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
     <>
       {runs.map(run => {
         const expanded = expandedIds.has(run.id);
+        const summariesId = `run-summaries-${run.id}`;
         return (
           <React.Fragment key={run.id}>
-            <TableRow
-              className="cursor-pointer"
-              onClick={() => toggleExpand(run.id)}
-              aria-expanded={expanded}
-            >
+            {/* Row click is a mouse convenience; the button in the first cell is
+                the accessible (keyboard/AT) control that owns aria-expanded. */}
+            <TableRow className="cursor-pointer" onClick={() => toggleExpand(run.id)}>
               <TableCell className="w-8 py-2">
-                {expanded ? (
-                  <ChevronDown className="size-4" />
-                ) : (
-                  <ChevronRight className="size-4" />
-                )}
+                <button
+                  type="button"
+                  onClick={e => {
+                    e.stopPropagation();
+                    toggleExpand(run.id);
+                  }}
+                  aria-expanded={expanded}
+                  aria-controls={expanded ? summariesId : undefined}
+                  aria-label={`${expanded ? 'Collapse' : 'Expand'} ${run.kind} run details`}
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex size-5 items-center justify-center rounded focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {expanded ? (
+                    <ChevronDown className="size-4" />
+                  ) : (
+                    <ChevronRight className="size-4" />
+                  )}
+                </button>
               </TableCell>
               <TableCell className="py-2 capitalize text-sm">{run.kind}</TableCell>
               <TableCell className="py-2">
@@ -638,11 +692,14 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
               </TableCell>
               <TableCell className="py-2 text-xs tabular-nums">{run.startedAt}</TableCell>
               <TableCell className="py-2 text-xs tabular-nums">{run.completedAt ?? '—'}</TableCell>
-              <TableCell className="py-2 text-xs text-destructive max-w-48 truncate">
+              <TableCell
+                className="py-2 text-xs text-destructive max-w-48 truncate"
+                title={run.error ?? undefined}
+              >
                 {run.error ?? ''}
               </TableCell>
             </TableRow>
-            {expanded ? <RunSummariesTable run={run} /> : null}
+            {expanded ? <RunSummariesTable run={run} id={summariesId} /> : null}
           </React.Fragment>
         );
       })}
@@ -682,8 +739,8 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
       {tierEntries.map(({ tier, candidates }) => (
         <div key={tier}>
           <p className="text-sm font-medium capitalize mb-1.5">{tier} tier</p>
-          <div className="rounded-md border">
-            <Table>
+          <div className="overflow-x-auto rounded-md border">
+            <Table className="min-w-max">
               <TableHeader>
                 <TableRow>
                   <TableHead>Model</TableHead>
@@ -751,6 +808,22 @@ export function BenchmarksSection() {
     }, 30_000);
     return () => clearInterval(id);
   }, [hasRunningRun, refetchRuns]);
+
+  // When the last running run finishes, its completion publishes a routing
+  // table / classifier winner. Those live in their own query caches, so
+  // invalidate them on the running→terminal edge — otherwise the published
+  // routing table keeps showing stale data (or "No routing table published
+  // yet") until a focus refetch or manual reload.
+  const prevHasRunningRun = useRef(hasRunningRun);
+  useEffect(() => {
+    if (prevHasRunningRun.current && !hasRunningRun) {
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-routing-table'],
+      });
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-config'] });
+    }
+    prevHasRunningRun.current = hasRunningRun;
+  }, [hasRunningRun, queryClient]);
 
   const startRunMutation = useMutation({
     mutationFn: startBenchmarkRun,

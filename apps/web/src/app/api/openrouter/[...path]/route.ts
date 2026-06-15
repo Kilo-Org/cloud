@@ -276,14 +276,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     const efficientDecision =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id
         ? async () => {
-            const user = (await authPromise).user;
+            const { user, authFailedResponse } = await authPromise;
+            // The classifier is a paid call on Kilo's own credential. Skip it
+            // for unauthenticated requests: kilo-auto/efficient resolves to a
+            // paid model, so an unauthenticated caller is rejected downstream
+            // regardless, and a null decision simply falls back to balanced.
+            // This stops anonymous/abusive traffic from repeatedly spending
+            // Kilo-funded classification with no user to attribute it to.
+            if (!user || authFailedResponse) return null;
             const result = await fetchEfficientAutoDecision({
               apiKind: requestBodyParsed.kind,
               body: requestBodyParsed.body,
               requestedModel,
               providerHints: mirrorProviderHints,
               bodyBytes: Buffer.byteLength(requestBodyText),
-              userId: user?.id ?? `anon:${ipAddress ?? 'unknown'}`,
+              userId: user.id,
               sessionId: taskId ?? sessionHeader,
               machineId: machineIdHeader,
               clientRequestId,
@@ -425,6 +432,91 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user = maybeUser;
   }
 
+  // Fraud/project headers are pure header parsing; resolve them here so the
+  // classifier-overhead billing below can be scheduled before any downstream
+  // rejection path runs.
+  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+
+  // Bill the classifier overhead as soon as the cost is known and we have an
+  // authenticated user — via after(), so the row is persisted even when the
+  // request is rejected downstream (abuse block, provider/api-kind rejection,
+  // balance/org checks, upstream 4xx, …). The classifier already ran on Kilo's
+  // OpenRouter credential during model resolution, so the cost is owed
+  // regardless of how this request ends. Anonymous requests never reach a
+  // positive classifier cost (the classifier is skipped for them above), so
+  // this only bills real users.
+  if (classifierCostUsd > 0 && !isAnonymousContext(user)) {
+    const priorMicrodollarUsage = user.microdollars_used;
+    after(
+      (async () => {
+        try {
+          const classifierStats: MicrodollarUsageStats = {
+            messageId: null,
+            model: 'auto-routing/classifier',
+            responseContent: '',
+            hasError: false,
+            inference_provider: null,
+            upstream_id: null,
+            finish_reason: null,
+            latency: null,
+            moderation_latency: null,
+            generation_time: null,
+            streamed: false,
+            cancelled: false,
+            status_code: 200,
+            cost_mUsd: toMicrodollars(classifierCostUsd),
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheWriteTokens: 0,
+            cacheHitTokens: 0,
+            is_byok: false,
+          };
+          const classifierContext: MicrodollarUsageContext = {
+            api_kind: requestBodyParsed.kind,
+            kiloUserId: user.id,
+            fraudHeaders,
+            organizationId,
+            provider: 'openrouter',
+            requested_model: KILO_AUTO_EFFICIENT_MODEL.id,
+            promptInfo: {
+              system_prompt_prefix: '',
+              system_prompt_length: 0,
+              user_prompt_prefix: '',
+            },
+            max_tokens: null,
+            has_middle_out_transform: null,
+            isStreaming: false,
+            prior_microdollar_usage: priorMicrodollarUsage,
+            // No posthog_distinct_id: this internal overhead row must not emit
+            // the generic first_usage / first_microdollar_usage lifecycle
+            // events (those are gated on posthog_distinct_id in processUsage).
+            // Otherwise the classifier row could race the primary usage row and
+            // mis-attribute `auto-routing/classifier` as the user's first model.
+            // DB billing is unaffected — it keys on kiloUserId.
+            posthog_distinct_id: undefined,
+            project_id: projectId,
+            status_code: 200,
+            editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+            machine_id: machineIdHeader,
+            user_byok: false,
+            has_tools: false,
+            botId,
+            tokenSource,
+            feature,
+            session_id: taskId ?? sessionHeader ?? null,
+            mode: modeHeader,
+            auto_model: autoModel,
+            ttfb_ms: null,
+            clientRequestId,
+          };
+          await logMicrodollarUsage(classifierStats, classifierContext);
+        } catch (error) {
+          console.error('Failed to bill classifier cost for kilo-auto/efficient', error);
+        }
+      })()
+    );
+  }
+
   if (
     requestBodyParsed.kind === 'responses' &&
     (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
@@ -441,8 +533,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // Use new shared helper for fraud & project headers
-  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   // Resolve the initial provider before abuse enforcement because abuse needs
   // provider/BYOK context, and quarantine-3 may later rewrite these values.
   const initialProviderResultForAbuseService = await getProvider({
@@ -872,80 +962,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
-
-  // The classifier always runs on Kilo's own OpenRouter credential, so the
-  // overhead is owed whether or not the FINAL inference is BYOK — billing here
-  // must not depend on the final provider's BYOK status.
-  if (classifierCostUsd > 0) {
-    after(
-      (async () => {
-        try {
-          const classifierStats: MicrodollarUsageStats = {
-            messageId: null,
-            model: 'auto-routing/classifier',
-            responseContent: '',
-            hasError: false,
-            inference_provider: null,
-            upstream_id: null,
-            finish_reason: null,
-            latency: null,
-            moderation_latency: null,
-            generation_time: null,
-            streamed: false,
-            cancelled: false,
-            status_code: 200,
-            cost_mUsd: toMicrodollars(classifierCostUsd),
-            inputTokens: 0,
-            outputTokens: 0,
-            cacheWriteTokens: 0,
-            cacheHitTokens: 0,
-            is_byok: false,
-          };
-          const classifierContext: MicrodollarUsageContext = {
-            api_kind: usageContext.api_kind,
-            kiloUserId: usageContext.kiloUserId,
-            fraudHeaders: usageContext.fraudHeaders,
-            organizationId: usageContext.organizationId,
-            provider: 'openrouter',
-            requested_model: KILO_AUTO_EFFICIENT_MODEL.id,
-            promptInfo: {
-              system_prompt_prefix: '',
-              system_prompt_length: 0,
-              user_prompt_prefix: '',
-            },
-            max_tokens: null,
-            has_middle_out_transform: null,
-            isStreaming: false,
-            prior_microdollar_usage: usageContext.prior_microdollar_usage,
-            // No posthog_distinct_id: this internal overhead row must not emit
-            // the generic first_usage / first_microdollar_usage lifecycle
-            // events (those are gated on posthog_distinct_id in processUsage).
-            // Otherwise the classifier row could race the primary usage row and
-            // mis-attribute `auto-routing/classifier` as the user's first model.
-            // DB billing is unaffected — it keys on kiloUserId.
-            posthog_distinct_id: undefined,
-            project_id: usageContext.project_id,
-            status_code: 200,
-            editor_name: usageContext.editor_name,
-            machine_id: usageContext.machine_id,
-            user_byok: false,
-            has_tools: false,
-            botId: usageContext.botId,
-            tokenSource: usageContext.tokenSource,
-            feature: usageContext.feature,
-            session_id: usageContext.session_id,
-            mode: usageContext.mode,
-            auto_model: autoModel,
-            ttfb_ms: null,
-            clientRequestId,
-          };
-          await logMicrodollarUsage(classifierStats, classifierContext);
-        } catch (error) {
-          console.error('Failed to bill classifier cost for kilo-auto/efficient', error);
-        }
-      })()
-    );
-  }
 
   await handleRequestLogging({
     clonedResponse: response.clone(),

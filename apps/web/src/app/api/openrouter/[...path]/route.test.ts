@@ -533,6 +533,55 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(ctx.user_byok).toBe(false);
   });
 
+  it('skips the paid classifier and does not bill for unauthenticated requests', async () => {
+    // Unauthenticated: efficient resolves to a paid model and is rejected, so
+    // the classifier must not run (no Kilo-funded spend with no user to bill).
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const { POST } = await import('./route');
+    await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+  });
+
+  it('bills the classifier even when the request is rejected downstream (abuse block)', async () => {
+    // Exit-safe billing: the classifier already spent on Kilo's credential, so
+    // the row must persist even though the request is blocked before upstream.
+    mockedRedisGet.mockResolvedValue('block');
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('block'));
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        tier: 'low',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0.003,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(403);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.model).toBe('auto-routing/classifier');
+    expect(stats.cost_mUsd).toBe(3000);
+  });
+
   it('bills classifier cost even when decision is null but cost > 0', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: null,

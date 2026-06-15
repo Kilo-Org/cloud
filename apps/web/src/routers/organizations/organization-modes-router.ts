@@ -71,21 +71,32 @@ const ModeIdInputSchema = OrganizationIdInputSchema.extend({
   modeId: z.uuid(),
 });
 
-function hasDefaultModelUpdate(config: DefaultModelConfig | undefined): boolean {
-  return !!config && Object.prototype.hasOwnProperty.call(config, 'defaultModel');
+type DefaultModelChange =
+  | { kind: 'none' }
+  | { kind: 'clear' }
+  | { kind: 'set'; defaultModel: string };
+
+function getDefaultModelChange(config: DefaultModelConfig | undefined): DefaultModelChange {
+  if (!config || !Object.prototype.hasOwnProperty.call(config, 'defaultModel')) {
+    return { kind: 'none' };
+  }
+
+  if (config.defaultModel === null) {
+    return { kind: 'clear' };
+  }
+
+  if (typeof config.defaultModel === 'string') {
+    return { kind: 'set', defaultModel: config.defaultModel };
+  }
+
+  return { kind: 'none' };
 }
 
-function hasDefaultModelValue(
-  config: DefaultModelConfig | undefined
-): config is DefaultModelConfig & { defaultModel: string } {
-  return !!config && hasDefaultModelUpdate(config) && typeof config.defaultModel === 'string';
-}
-
-function ensureDefaultModelCanBeSet(
+function assertDefaultModelCanBeSet(
   organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>,
-  config: DefaultModelConfig | undefined
+  change: DefaultModelChange
 ): void {
-  if (!hasDefaultModelValue(config)) {
+  if (change.kind !== 'set') {
     return;
   }
 
@@ -97,11 +108,11 @@ function ensureDefaultModelCanBeSet(
   }
 }
 
-async function ensureDefaultModelConfigEnabled(
+async function assertDefaultModelConfigEnabled(
   userId: string,
-  config: DefaultModelConfig | undefined
+  change: DefaultModelChange
 ): Promise<void> {
-  if (!hasDefaultModelUpdate(config)) {
+  if (change.kind === 'none') {
     return;
   }
 
@@ -135,14 +146,9 @@ function normalizeModeConfig(
 }
 
 async function validateDefaultModel(
-  organization: Awaited<ReturnType<typeof getOrganizationById>>,
-  config: DefaultModelConfig | undefined
+  organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>,
+  defaultModel: string
 ): Promise<void> {
-  const defaultModel = config?.defaultModel;
-  if (!organization || defaultModel === undefined || defaultModel === null) {
-    return;
-  }
-
   const normalizedDefaultModel = normalizeModelId(defaultModel);
   if (normalizedDefaultModel.endsWith('/*')) {
     throw new TRPCError({
@@ -177,10 +183,11 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
-      ensureDefaultModelCanBeSet(organization, config);
-      await ensureDefaultModelConfigEnabled(ctx.user.id, config);
-      if (hasDefaultModelValue(config)) {
-        await validateDefaultModel(organization, config);
+      const defaultModelChange = getDefaultModelChange(config);
+      assertDefaultModelCanBeSet(organization, defaultModelChange);
+      await assertDefaultModelConfigEnabled(ctx.user.id, defaultModelChange);
+      if (defaultModelChange.kind === 'set') {
+        await validateDefaultModel(organization, defaultModelChange.defaultModel);
       }
 
       const mode = await createOrganizationMode(
@@ -255,10 +262,11 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
-      ensureDefaultModelCanBeSet(organization, updates.config);
-      await ensureDefaultModelConfigEnabled(ctx.user.id, updates.config);
-      if (hasDefaultModelValue(updates.config)) {
-        await validateDefaultModel(organization, updates.config);
+      const defaultModelChange = getDefaultModelChange(updates.config);
+      assertDefaultModelCanBeSet(organization, defaultModelChange);
+      await assertDefaultModelConfigEnabled(ctx.user.id, defaultModelChange);
+      if (defaultModelChange.kind === 'set') {
+        await validateDefaultModel(organization, defaultModelChange.defaultModel);
       }
       const normalizedConfig = normalizeModeConfig(updates.config);
 

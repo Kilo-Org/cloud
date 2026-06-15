@@ -15,15 +15,16 @@ import {
 } from '@/components/ui/dialog';
 import { Ban } from 'lucide-react';
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { useNullifyOrganizationCredits } from '@/app/admin/api/organizations/hooks';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { toast } from 'sonner';
+import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
+import { CreditManagementAccessOverlay } from '@/app/admin/components/CreditManagementAccessOverlay';
 
 export function OrganizationAdminCreditNullify({ organizationId }: { organizationId: string }) {
-  const { data: session } = useSession();
   const { data: organization } = useOrganizationWithMembers(organizationId);
   const nullifyCreditsMutation = useNullifyOrganizationCredits();
+  const { canManageCredits } = useAdminCreditManagementPermission();
 
   const [description, setDescription] = useState<string>('');
   const [isOpen, setIsOpen] = useState(false);
@@ -34,14 +35,12 @@ export function OrganizationAdminCreditNullify({ organizationId }: { organizatio
   const hasCredits = currentBalance > 0;
 
   const handleNullifyCredits = async () => {
-    try {
-      const finalDescription = description.trim()
-        ? `${description.trim()} (${session?.user?.name || session?.user?.email || 'Admin'})`
-        : undefined;
+    if (!canManageCredits) return;
 
+    try {
       await nullifyCreditsMutation.mutateAsync({
         organizationId,
-        description: finalDescription,
+        description: description.trim() || undefined,
       });
 
       toast.success(`Successfully nullified $${currentBalanceUsd.toFixed(2)} credits`);
@@ -53,24 +52,36 @@ export function OrganizationAdminCreditNullify({ organizationId }: { organizatio
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="relative">
+      {!canManageCredits && (
+        <CreditManagementAccessOverlay message="You don't have access to nullify organization credits. File an access request before adjusting balances." />
+      )}
+      <CardHeader className={canManageCredits ? '' : 'pointer-events-none select-none opacity-35'}>
         <CardTitle className="flex items-center gap-2">
           <Ban className="h-5 w-5" />
           Nullify Credits
         </CardTitle>
         <CardDescription>Remove all credits from this organization</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className={canManageCredits ? '' : 'pointer-events-none select-none opacity-35'}>
         <div className="space-y-4">
           <div className="text-sm">
             <span className="text-muted-foreground">Current Balance: </span>
             <span className="font-medium">${currentBalanceUsd.toFixed(2)}</span>
           </div>
 
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <Dialog
+            open={isOpen}
+            onOpenChange={open => {
+              if (canManageCredits || !open) setIsOpen(open);
+            }}
+          >
             <DialogTrigger asChild>
-              <Button variant="destructive" disabled={!hasCredits} className="w-full sm:w-auto">
+              <Button
+                variant="destructive"
+                disabled={!canManageCredits || !hasCredits}
+                className="w-full sm:w-auto"
+              >
                 Nullify All Credits
               </Button>
             </DialogTrigger>
@@ -97,6 +108,7 @@ export function OrganizationAdminCreditNullify({ organizationId }: { organizatio
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   id="nullify-description"
+                  disabled={!canManageCredits}
                 />
               </div>
 
@@ -107,7 +119,7 @@ export function OrganizationAdminCreditNullify({ organizationId }: { organizatio
                 <Button
                   variant="destructive"
                   onClick={handleNullifyCredits}
-                  disabled={nullifyCreditsMutation.isPending}
+                  disabled={!canManageCredits || nullifyCreditsMutation.isPending}
                 >
                   {nullifyCreditsMutation.isPending ? 'Nullifying...' : 'Confirm Nullification'}
                 </Button>

@@ -4,15 +4,24 @@ import test from 'node:test';
 
 import { getAlwaysOnGroupIds, getService, resolveGroups } from './services';
 
-test('starts auto routing as a core dev service', () => {
+test('keeps auto routing workers in their own opt-in group', () => {
   const service = getService('auto-routing');
 
-  assert.equal(service.group, 'core');
+  assert.equal(service.group, 'auto-routing');
   assert.equal(service.type, 'worker');
   assert.equal(service.dir, 'services/auto-routing');
   assert.equal(service.port, 8810);
   assert.match(service.command.join(' '), /pnpm run dev/);
-  assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('auto-routing'));
+
+  const benchmark = getService('auto-routing-benchmark');
+  assert.equal(benchmark.group, 'auto-routing');
+  assert.equal(benchmark.type, 'worker');
+  assert.equal(benchmark.dir, 'services/auto-routing-benchmark');
+  assert.equal(benchmark.port, 8814);
+
+  const alwaysOn = resolveGroups(getAlwaysOnGroupIds());
+  assert.ok(!alwaysOn.includes('auto-routing'));
+  assert.ok(!alwaysOn.includes('auto-routing-benchmark'));
 });
 
 test('keeps auto routing package dev script compatible with local launcher flags', () => {

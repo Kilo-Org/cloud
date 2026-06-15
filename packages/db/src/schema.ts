@@ -270,6 +270,7 @@ export const credit_transactions = pgTable(
     expiry_date: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     organization_id: uuid(),
+    created_by_kilo_user_id: text().references((): AnyPgColumn => kilocode_users.id),
     check_category_uniqueness: boolean().notNull().default(false),
   },
   table => [
@@ -364,6 +365,7 @@ export const kilocode_users = pgTable(
       .notNull()
       .unique(),
     is_admin: boolean().default(false).notNull(),
+    can_manage_credits: boolean().default(false).notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
       .notNull(),
@@ -416,6 +418,10 @@ export const kilocode_users = pgTable(
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
+    check(
+      'kilocode_users_can_manage_credits_requires_admin_check',
+      sql`NOT ${table.can_manage_credits} OR ${table.is_admin}`
+    ),
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
       .on(table.openrouter_upstream_safety_identifier)
       .where(sql`${table.openrouter_upstream_safety_identifier} IS NOT NULL`),

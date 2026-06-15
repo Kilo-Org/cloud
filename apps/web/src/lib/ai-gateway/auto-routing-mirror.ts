@@ -4,11 +4,10 @@ import { after } from 'next/server';
 import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { warnExceptInTest } from '@/lib/utils.server';
 
-type ScheduleAutoRoutingMirrorParams = {
+// Shared base params for both the mirror (fire-and-forget) and the
+// efficient-decision (blocking) call sites.
+export type DecideBaseParams = {
   apiKind: ClassifierApiKind;
-  // The parsed gateway request body. Provider transforms may mutate it after
-  // scheduling, which is why the requested model and provider hints are
-  // captured separately before any mutation.
   body: unknown;
   requestedModel: string;
   providerHints: MirrorPayload['input']['providerHints'];
@@ -19,6 +18,33 @@ type ScheduleAutoRoutingMirrorParams = {
   clientRequestId: string | null;
   mode: string | null;
   userAgent: string | null;
+};
+
+// Normalize and assemble the /decide payload. Returns null when the body
+// cannot be classified (normalization failed).
+export function buildDecidePayload(params: DecideBaseParams): MirrorPayload | null {
+  const normalizedInput = normalizeClassifierInput(params.apiKind, params.body, {
+    requestedModel: params.requestedModel,
+    providerHints: params.providerHints,
+  });
+  if (!normalizedInput) return null;
+
+  return {
+    input: normalizedInput,
+    userId: params.userId,
+    sessionId: params.sessionId,
+    machineId: params.machineId,
+    clientRequestId: params.clientRequestId,
+    mode: params.mode,
+    userAgent: params.userAgent,
+    bodyBytes: params.bodyBytes,
+  };
+}
+
+type ScheduleAutoRoutingMirrorParams = DecideBaseParams & {
+  // The parsed gateway request body. Provider transforms may mutate it after
+  // scheduling, which is why the requested model and provider hints are
+  // captured separately before any mutation.
   authContext?: Promise<{ organizationId?: string | null }>;
 };
 
@@ -41,28 +67,14 @@ async function sendAutoRoutingMirror(
   // Normalizing here (in background work, off the request path) keeps the
   // mirror payload at a few KB instead of the full request body, and lets
   // requests the worker could not classify anyway skip the mirror call.
-  const normalizedInput = normalizeClassifierInput(params.apiKind, params.body, {
-    requestedModel: params.requestedModel,
-    providerHints: params.providerHints,
-  });
-  if (!normalizedInput) {
+  const payload = buildDecidePayload(params);
+  if (!payload) {
     const onError = options.onError ?? warnExceptInTest;
     onError('Auto routing mirror skipped unclassifiable request body', {
       error: 'normalize_failed',
     });
     return;
   }
-
-  const payload: MirrorPayload = {
-    input: normalizedInput,
-    userId: params.userId,
-    sessionId: params.sessionId,
-    machineId: params.machineId,
-    clientRequestId: params.clientRequestId,
-    mode: params.mode,
-    userAgent: params.userAgent,
-    bodyBytes: params.bodyBytes,
-  };
 
   const response = await fetch(`${workerUrl}/decide`, {
     method: 'POST',

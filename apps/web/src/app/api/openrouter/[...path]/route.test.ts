@@ -10,6 +10,9 @@ import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.ser
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { redisClient } from '@/lib/redis';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
+import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 
 jest.mock('next/server', () => {
   return {
@@ -58,6 +61,21 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
     captureProxyError: jest.fn(),
   };
 });
+jest.mock('@/lib/ai-gateway/auto-routing-decision');
+jest.mock('@/lib/ai-gateway/processUsage', () => {
+  const actual = jest.requireActual('@/lib/ai-gateway/processUsage');
+  return {
+    ...(actual as Record<string, unknown>),
+    logMicrodollarUsage: jest.fn(),
+  };
+});
+jest.mock('@/lib/ai-gateway/auto-model/resolution', () => {
+  const actual = jest.requireActual('@/lib/ai-gateway/auto-model/resolution');
+  return {
+    ...(actual as Record<string, unknown>),
+    applyResolvedAutoModel: jest.fn(),
+  };
+});
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
@@ -69,6 +87,9 @@ const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
+const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
+const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
+const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 
 const provider = {
   id: 'openrouter',
@@ -386,5 +407,196 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(1);
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
+  });
+});
+
+describe('kilo-auto/efficient classifier billing', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
+    mockedRedisGet.mockResolvedValue(null);
+    mockedRedisSet.mockResolvedValue('OK');
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedUpstreamRequest.mockResolvedValue(
+      upstreamJsonResponse({ id: 'chatcmpl-1', model: 'anthropic/claude-haiku-4', choices: [] })
+    );
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedLogMicrodollarUsage.mockResolvedValue(null);
+    // Mock applyResolvedAutoModel to resolve the virtual model and invoke the efficientDecision thunk
+    mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
+      if (opts.efficientDecision) await opts.efficientDecision();
+      request.body.model = 'anthropic/claude-haiku-4';
+      return { kind: 'ok', resolved: { model: 'anthropic/claude-haiku-4' } };
+    });
+    // after() accepts a Promise or a function; the billing path passes a Promise
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+    mockedAfter.mockImplementation((_arg: unknown) => {
+      // no-op: the promise has already been started when passed to after()
+    });
+  });
+
+  it('bills classifier cost when cost > 0 and user is non-BYOK', async () => {
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        tier: 'low',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0.002,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(200);
+    // Wait for after() callback to settle
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(2000); // toMicrodollars(0.002)
+    expect(stats.model).toBe('auto-routing/classifier');
+    expect(stats.inputTokens).toBe(0);
+    expect(stats.outputTokens).toBe(0);
+    expect(ctx.requested_model).toBe('kilo-auto/efficient');
+    expect(ctx.user_byok).toBe(false);
+    // The internal classifier-overhead row must not carry a posthog distinct id,
+    // so it can't emit generic first_usage lifecycle events or be mistaken for
+    // the user's first model usage.
+    expect(ctx.posthog_distinct_id).toBeUndefined();
+  });
+
+  it('does not bill when classifier cost is 0 (cache hit)', async () => {
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        tier: 'low',
+        source: 'benchmark' as const,
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0,
+    });
+
+    const { POST } = await import('./route');
+    await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+  });
+
+  it('bills classifier cost even when the final inference is BYOK', async () => {
+    // The classifier runs on Kilo's OpenRouter credential regardless of the
+    // final provider, so its cost is owed even when the user is BYOK.
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
+      bypassAccessCheck: false,
+    });
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        tier: 'low',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0.002,
+    });
+
+    const { POST } = await import('./route');
+    await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(2000);
+    expect(stats.model).toBe('auto-routing/classifier');
+    // The classifier row is always Kilo-funded, never BYOK.
+    expect(stats.is_byok).toBe(false);
+    expect(ctx.user_byok).toBe(false);
+  });
+
+  it('skips the paid classifier and does not bill for unauthenticated requests', async () => {
+    // Unauthenticated: efficient resolves to a paid model and is rejected, so
+    // the classifier must not run (no Kilo-funded spend with no user to bill).
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const { POST } = await import('./route');
+    await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+  });
+
+  it('bills the classifier even when the request is rejected downstream (abuse block)', async () => {
+    // Exit-safe billing: the classifier already spent on Kilo's credential, so
+    // the row must persist even though the request is blocked before upstream.
+    mockedRedisGet.mockResolvedValue('block');
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('block'));
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        tier: 'low',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0.003,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(403);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.model).toBe('auto-routing/classifier');
+    expect(stats.cost_mUsd).toBe(3000);
+  });
+
+  it('bills classifier cost even when decision is null but cost > 0', async () => {
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: null,
+      costUsd: 0.001,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(200);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(1000); // toMicrodollars(0.001)
   });
 });

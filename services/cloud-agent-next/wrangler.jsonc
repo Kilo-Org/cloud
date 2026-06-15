@@ -39,6 +39,7 @@
   "routes": [
     {
       "pattern": "cloud-agent-next.kilosessions.ai",
+      "zone_name": "kilosessions.ai",
       "custom_domain": true,
     },
   ],

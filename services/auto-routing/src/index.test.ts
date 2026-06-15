@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearClassifierConfigCache } from './classifier-config';
+import { clearRoutingTableCache } from './routing-table';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
 import type * as ModelClassifierModule from './model-classifier';
@@ -13,11 +14,13 @@ vi.mock('./model-classifier', async importOriginal => {
 
 const writeDataPoint = vi.fn();
 const configGet = vi.fn();
+const configDelete = vi.fn();
 const configPut = vi.fn();
 const analyticsTokenGet = vi.fn();
 const cacheGetEntry = vi.fn();
 const cachePutEntry = vi.fn();
 const cacheIdFromName = vi.fn(() => 'cache-do-id');
+const benchmarkFetch = vi.fn();
 const originalFetch = globalThis.fetch;
 const mockedFetch = vi.fn<typeof globalThis.fetch>();
 
@@ -27,7 +30,11 @@ const env = {
   },
   AUTO_ROUTING_CONFIG: {
     get: configGet,
+    delete: configDelete,
     put: configPut,
+  },
+  BENCHMARK_SERVICE: {
+    fetch: benchmarkFetch,
   },
   AUTO_ROUTING_CLASSIFIER_METRICS_V2: {
     writeDataPoint,
@@ -74,6 +81,53 @@ const normalizedInput = {
   },
 };
 
+const benchmarkRoutingTable = {
+  version: 'bench-run-1',
+  generatedAt: '2026-06-12T00:00:00.000Z',
+  minAccuracy: 0.7,
+  switchCostFactor: 3,
+  source: 'benchmark',
+  tiers: {
+    low: [
+      {
+        model: 'google/gemini-2.5-flash-lite',
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        meetsThreshold: true,
+        reasoningEffort: null,
+      },
+    ],
+    medium: [
+      {
+        model: 'google/gemini-2.5-flash',
+        accuracy: 0.85,
+        avgCostUsd: 0.002,
+        meetsThreshold: true,
+        reasoningEffort: null,
+      },
+      // The high-tier model also qualifies for medium, within the 3x
+      // switch-cost factor of the fresh pick (0.002 * 3 >= 0.005): a session
+      // de-escalating from high stays on it.
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        accuracy: 0.8,
+        avgCostUsd: 0.005,
+        meetsThreshold: true,
+        reasoningEffort: null,
+      },
+    ],
+    high: [
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        accuracy: 0.8,
+        avgCostUsd: 0.01,
+        meetsThreshold: true,
+        reasoningEffort: null,
+      },
+    ],
+  },
+};
+
 function mirrorPayload(overrides: Record<string, unknown> = {}) {
   return {
     input: normalizedInput,
@@ -117,11 +171,32 @@ function decideRequest(payload: unknown) {
 describe('auto routing worker', () => {
   beforeEach(() => {
     clearClassifierConfigCache();
+    clearRoutingTableCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
     writeDataPoint.mockReset();
     configGet.mockReset();
+    // Real KV returns null for missing keys; an undefined here would send the
+    // routing-table loader down the JSON.parse-throw path instead.
+    configGet.mockResolvedValue(null);
+    configDelete.mockReset();
+    configDelete.mockResolvedValue(undefined);
     configPut.mockReset();
+    configPut.mockResolvedValue(undefined);
+    benchmarkFetch.mockReset();
+    benchmarkFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes('/admin/classifier-winner')) {
+        return { ok: true, status: 200, json: async () => ({ winner: null }) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          table: benchmarkRoutingTable,
+          publishedAt: benchmarkRoutingTable.generatedAt,
+        }),
+      };
+    });
     analyticsTokenGet.mockReset();
     analyticsTokenGet.mockResolvedValue('analytics-token');
     cacheGetEntry.mockReset();
@@ -158,7 +233,14 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       cost: 0.00000123,
-      decision: null,
+      decision: {
+        model: expect.any(String),
+        tier: expect.stringMatching(/^(low|medium|high)$/),
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
+        reasoningEffort: null,
+        sticky: false,
+      },
       classifierResult: {
         classification: mockClassification,
         normalized: normalizedInput,
@@ -201,6 +283,7 @@ describe('auto routing worker', () => {
       mode: 'code',
       uaPrefix: 'Kilo-Code/4.106.0',
       bodyBytes: 2048,
+      sticky: false,
     });
     // The raw user id (which embeds the client IP for anonymous users) must
     // never reach persisted logs.
@@ -215,12 +298,22 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       cost: 0,
-      decision: null,
+      decision: {
+        model: expect.any(String),
+        tier: expect.stringMatching(/^(low|medium|high)$/),
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
+        reasoningEffort: null,
+        sticky: false,
+      },
       classifierResult: { classification: mockClassification },
     });
     expect(cacheIdFromName).toHaveBeenCalledWith('user:user-1:task:task-123');
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
-    expect(cachePutEntry).not.toHaveBeenCalled();
+    // The classification is not re-cached; only the served model is
+    // remembered for session stickiness.
+    expect(cachePutEntry).toHaveBeenCalledTimes(1);
+    expect(cachePutEntry).toHaveBeenCalledWith('sticky', { model: expect.any(String) });
     expect(writeDataPoint).toHaveBeenCalledWith(
       expect.objectContaining({
         doubles: [0, 0, mockClassification.confidence, 1],
@@ -236,6 +329,44 @@ describe('auto routing worker', () => {
       expect.stringMatching(/^google\/gemini-2\.5-flash-lite:[0-9a-f]{16}$/),
       expect.objectContaining({ taskType: 'implementation' })
     );
+  });
+
+  it('keeps the session on the incumbent model when the tier de-escalates', async () => {
+    // Back the mocked DO stub with real storage so the sticky model written
+    // by the first request is visible to the second.
+    const store = new Map<string, unknown>();
+    cacheGetEntry.mockImplementation(async (key: string) => store.get(key) ?? null);
+    cachePutEntry.mockImplementation(async (key: string, value: unknown) => {
+      store.set(key, value);
+    });
+
+    classifyNormalizedInput.mockResolvedValueOnce({
+      ...mockClassifierResult,
+      classification: {
+        ...mockClassification,
+        reasoningComplexity: 'high',
+        contextComplexity: 'large',
+        executionMode: 'multi_step_project',
+      },
+    });
+    const first = await decideRequest(mirrorPayload());
+    expect(first.status).toBe(200);
+    await expect(first.json()).resolves.toMatchObject({
+      decision: { model: 'anthropic/claude-sonnet-4.6', tier: 'high', sticky: false },
+    });
+
+    // The second turn (different prompt, same session) classifies as medium.
+    // The fresh medium pick is cheaper, but not by more than the switch-cost
+    // factor, so the session keeps its incumbent.
+    const second = await decideRequest(
+      mirrorPayload({
+        input: { ...normalizedInput, userPromptPrefix: 'Now a much easier follow-up.' },
+      })
+    );
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toMatchObject({
+      decision: { model: 'anthropic/claude-sonnet-4.6', tier: 'medium', sticky: true },
+    });
   });
 
   it('falls back to a machine-scoped conversation key without a session id', async () => {
@@ -326,6 +457,29 @@ describe('auto routing worker', () => {
       ],
       doubles: [expect.any(Number), 0.00000123, 0, 0],
     });
+    // A heuristic fallback classification is served but must not re-anchor
+    // the session's sticky model (same rule as the classification cache).
+    expect(cachePutEntry).not.toHaveBeenCalledWith('sticky', expect.anything());
+  });
+
+  it('makes no decision when no routing table is published', async () => {
+    benchmarkFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes('/admin/classifier-winner')) {
+        return { ok: true, status: 200, json: async () => ({ winner: null }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ table: null, publishedAt: null }) };
+    });
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: 0.00000123,
+      decision: null,
+      classifierResult: { classification: mockClassification },
+    });
+    // A null decision must not overwrite the session's sticky model.
+    expect(cachePutEntry).not.toHaveBeenCalledWith('sticky', expect.anything());
   });
 
   it('returns a null classifier result when the classifier request fails', async () => {
@@ -448,8 +602,10 @@ describe('auto routing worker', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
-  it('returns the configured classifier model', async () => {
-    configGet.mockResolvedValueOnce('google/gemini-2.5-flash-lite');
+  it('returns the override as the effective classifier model', async () => {
+    configGet.mockImplementation(key =>
+      Promise.resolve(key === 'classifier_model' ? 'google/gemini-2.5-flash-lite' : null)
+    );
 
     const response = await request('/admin/classifier-model', {
       headers: { authorization: 'Bearer classifier-token' },
@@ -458,12 +614,48 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       model: 'google/gemini-2.5-flash-lite',
+      override: 'google/gemini-2.5-flash-lite',
+      benchmarkWinner: null,
       defaultModel: 'google/gemini-2.5-flash-lite',
     });
     expect(configGet).toHaveBeenCalledWith('classifier_model');
   });
 
-  it('updates the configured classifier model', async () => {
+  it('falls back to the benchmark winner when no override is set', async () => {
+    configGet.mockImplementation(key =>
+      Promise.resolve(
+        key === 'classifier_benchmark_winner'
+          ? JSON.stringify({
+              model: 'qwen/qwen3.7-plus',
+              runId: 'classifier-run-1',
+              accuracy: 0.93,
+              generatedAt: '2026-06-12T00:00:00.000Z',
+            })
+          : null
+      )
+    );
+
+    const response = await request('/admin/classifier-model', {
+      headers: { authorization: 'Bearer classifier-token' },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      model: 'qwen/qwen3.7-plus',
+      override: null,
+      benchmarkWinner: 'qwen/qwen3.7-plus',
+      defaultModel: 'google/gemini-2.5-flash-lite',
+    });
+  });
+
+  it('updates the classifier model override', async () => {
+    const stored = new Map<string, string>();
+    configGet.mockImplementation(key => Promise.resolve(stored.get(key) ?? null));
+    configPut.mockImplementation((key, value) => {
+      stored.set(key, value);
+      return Promise.resolve();
+    });
+
     const response = await request('/admin/classifier-model', {
       method: 'PUT',
       headers: {
@@ -476,9 +668,31 @@ describe('auto routing worker', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       model: 'google/gemini-2.5-flash-lite:free',
+      override: 'google/gemini-2.5-flash-lite:free',
+      benchmarkWinner: null,
       defaultModel: 'google/gemini-2.5-flash-lite',
     });
     expect(configPut).toHaveBeenCalledWith('classifier_model', 'google/gemini-2.5-flash-lite:free');
+  });
+
+  it('clears the override when model is null', async () => {
+    const response = await request('/admin/classifier-model', {
+      method: 'PUT',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ model: null }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      model: 'google/gemini-2.5-flash-lite',
+      override: null,
+      benchmarkWinner: null,
+      defaultModel: 'google/gemini-2.5-flash-lite',
+    });
+    expect(configDelete).toHaveBeenCalledWith('classifier_model');
   });
 
   it('rejects blank classifier model updates', async () => {

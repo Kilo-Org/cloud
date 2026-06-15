@@ -36,7 +36,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 - `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
-- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for client-side error reporting; used in `apps/web/instrumentation-client.ts`, `sentry.edge.config.ts`, `sentry.server.config.ts`. `[PUBLIC]`
+- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for server and Edge runtime error reporting; used in `apps/web/sentry.edge.config.ts` and `apps/web/sentry.server.config.ts`. `[PUBLIC]`
 
 ### Marketing Tags
 

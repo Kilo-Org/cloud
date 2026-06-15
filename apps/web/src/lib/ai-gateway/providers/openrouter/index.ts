@@ -27,12 +27,13 @@ import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrou
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
+import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 function buildAutoModels(): OpenRouterModel[] {
-  return AUTO_MODELS.map(m => {
+  return AUTO_MODELS.filter(m => m.status === 'public').map(m => {
     const input_modalities = ['text'];
     if (m.supports_images) {
       input_modalities.push('image');
@@ -128,7 +129,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         (model: OpenRouterModel) =>
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
-          ) && !isForbiddenFreeModel(model.id)
+          ) &&
+          !isForbiddenFreeModel(model.id) &&
+          !isFableModel(model.id)
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);

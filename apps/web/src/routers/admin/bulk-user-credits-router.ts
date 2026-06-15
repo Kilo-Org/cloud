@@ -1,7 +1,6 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
-import type { User } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { inArray } from 'drizzle-orm';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
@@ -98,7 +97,7 @@ export const bulkUserCreditsRouter = createTRPCRouter({
    * Grant credits to multiple users at once.
    * Uses the standard credit granting function for each user.
    */
-  grantBulkCredits: adminProcedure
+  grantBulkCredits: creditManagerProcedure
     .input(BulkUserCreditsInputSchema)
     .mutation(async ({ input, ctx }): Promise<BulkCreditResult[]> => {
       const { emails, amountUsd, expirationDate, description } = input;
@@ -140,14 +139,13 @@ export const bulkUserCreditsRouter = createTRPCRouter({
         }
 
         try {
-          const creditResult = await grantCreditForCategory(user as User, {
+          const creditResult = await grantCreditForCategory(user, {
             credit_category: 'admin-bulk-grant',
             counts_as_selfservice: false,
             amount_usd: amountUsd,
-            description:
-              description ||
-              `Bulk credit grant by ${ctx.user.google_user_name || ctx.user.google_user_email}`,
+            description: description || undefined,
             credit_expiry_date: expirationDate ? new Date(expirationDate) : undefined,
+            created_by_kilo_user_id: ctx.user.id,
           });
 
           if (creditResult.success) {

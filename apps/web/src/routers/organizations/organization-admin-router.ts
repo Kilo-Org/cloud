@@ -1,4 +1,4 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
   organizations,
@@ -26,7 +26,7 @@ import {
 } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
-import { OrganizationsApiGetResponseSchema } from '@/types/admin';
+import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
 import { isValidUUID, toMicrodollars } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
@@ -42,6 +42,7 @@ import { TRPCError } from '@trpc/server';
 import { successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
+import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
@@ -298,7 +299,14 @@ export const organizationAdminRouter = createTRPCRouter({
       return organizationDetails[0];
     }),
 
-  grantCredit: adminProcedure
+  creditTransactions: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .output(z.array(AdminCreditTransactionSchema))
+    .query(async ({ input }) => {
+      return getAdminCreditTransactionsForOrganization(input.organizationId);
+    }),
+
+  grantCredit: creditManagerProcedure
     .input(GrantCreditInputSchema)
     .output(GrantCreditOutputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -338,6 +346,7 @@ export const organizationAdminRouter = createTRPCRouter({
 
         await tx.insert(credit_transactions).values({
           kilo_user_id: user.id,
+          created_by_kilo_user_id: user.id,
           is_free: true,
           amount_microdollars: amountMicrodollars,
           description: description?.trim() || 'Admin credit grant',
@@ -382,7 +391,7 @@ export const organizationAdminRouter = createTRPCRouter({
       };
     }),
 
-  nullifyCredits: adminProcedure
+  nullifyCredits: creditManagerProcedure
     .input(NullifyCreditsInputSchema)
     .output(NullifyCreditsOutputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -418,6 +427,7 @@ export const organizationAdminRouter = createTRPCRouter({
 
         await tx.insert(credit_transactions).values({
           kilo_user_id: user.id,
+          created_by_kilo_user_id: user.id,
           is_free: true,
           amount_microdollars: -currentBalance,
           description: description?.trim() || 'Admin credit nullification',

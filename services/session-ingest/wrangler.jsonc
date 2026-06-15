@@ -27,6 +27,7 @@
   "routes": [
     {
       "pattern": "ingest.kilosessions.ai",
+      "zone_name": "kilosessions.ai",
       "custom_domain": true,
     },
   ],

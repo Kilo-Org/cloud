@@ -5,6 +5,7 @@ import type { User } from '@kilocode/db/schema';
 // Test users will be created dynamically
 let regularUser: User;
 let adminUser: User;
+let creditManagerUser: User;
 
 describe('trpc tests', () => {
   beforeAll(async () => {
@@ -19,6 +20,13 @@ describe('trpc tests', () => {
       google_user_email: 'admin@admin.example.com',
       google_user_name: 'Admin User',
       is_admin: true,
+    });
+
+    creditManagerUser = await insertTestUser({
+      google_user_email: 'credit-manager@admin.example.com',
+      google_user_name: 'Credit Manager User',
+      is_admin: true,
+      can_manage_credits: true,
     });
   });
 
@@ -51,6 +59,20 @@ describe('trpc tests', () => {
 
       expect(result).toEqual({
         greeting: `hello world from user ${regularUser.id}`,
+      });
+    });
+  });
+
+  describe('admin permissions', () => {
+    it('returns the authenticated admin credit capability', async () => {
+      const adminCaller = await createCallerForUser(adminUser.id);
+      const creditManagerCaller = await createCallerForUser(creditManagerUser.id);
+
+      await expect(adminCaller.admin.getPermissions()).resolves.toEqual({
+        canManageCredits: false,
+      });
+      await expect(creditManagerCaller.admin.getPermissions()).resolves.toEqual({
+        canManageCredits: true,
       });
     });
   });

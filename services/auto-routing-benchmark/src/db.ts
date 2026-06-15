@@ -344,6 +344,13 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
     .where(and(eq(benchmarkRuns.status, 'running'), lt(benchmarkRuns.started_at, olderThanIso)));
 }
 
+export async function markRunFailed(db: D1Database, runId: string, error: string): Promise<void> {
+  await drizzle(db)
+    .update(benchmarkRuns)
+    .set({ status: 'failed', error: error.slice(0, 500), completed_at: new Date().toISOString() })
+    .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
+}
+
 // ---------------------------------------------------------------------------
 // Latest summaries per model (for skip logic and classifier winner)
 // ---------------------------------------------------------------------------

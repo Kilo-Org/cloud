@@ -321,6 +321,29 @@ describe('POST /admin/runs', () => {
     expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
     expect(queueSendBatch).toHaveBeenCalledOnce();
   });
+
+  it('slices a >100-message decider fan-out into sendBatch-sized batches', async () => {
+    // 7 decider models × 1 rep × ceil(76/5)=16 chunks = 112 messages, which
+    // exceeds Cloudflare Queues' 100-per-sendBatch cap and must be sliced.
+    const manyModels = Array.from({ length: 7 }, (_, i) => ({
+      id: `vendor/model-${i}`,
+      reasoningEffort: null,
+    }));
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
+      deciderModels: manyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+
+    // 112 messages → two batches (100 + 12), neither over the limit.
+    expect(queueSendBatch).toHaveBeenCalledTimes(2);
+    const batchSizes = queueSendBatch.mock.calls.map(([batch]) => (batch as unknown[]).length);
+    expect(batchSizes).toEqual([100, 12]);
+    for (const size of batchSizes) expect(size).toBeLessThanOrEqual(100);
+  });
 });
 
 // ---------------------------------------------------------------------------

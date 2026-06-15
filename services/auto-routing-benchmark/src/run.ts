@@ -20,6 +20,7 @@ import {
   getSummaries,
   insertRun,
   markRunCompleted,
+  markRunFailed,
   markStaleRunsFailed,
   replaceModelSummaries,
   saveRoutingTable,
@@ -58,12 +59,40 @@ export const BenchmarkJobMessageSchema = z.object({
 // each stays well under CF's wall-clock limit.
 const DECIDER_CHUNK_SIZE = 5;
 
+// Cloudflare Queues caps a single sendBatch at 100 messages. A decider fan-out
+// is models × reps × ceil(76 / 5) messages, which clears 100 with as few as two
+// models, so the dispatch must be sliced.
+const QUEUE_SEND_BATCH_LIMIT = 100;
+
 export function chunkArray<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
     chunks.push(items.slice(i, i + size));
   }
   return chunks;
+}
+
+// Enqueues messages in sendBatch-sized slices. A mid-dispatch failure leaves a
+// partially-enqueued run that can never reach its expected result count, so the
+// run is marked failed (surfacing in the admin panel) before the throw
+// propagates to the POST handler.
+async function enqueueRunMessages(
+  env: Env,
+  runId: string,
+  messages: { body: BenchmarkJobMessage }[]
+): Promise<void> {
+  for (let i = 0; i < messages.length; i += QUEUE_SEND_BATCH_LIMIT) {
+    try {
+      await env.BENCH_QUEUE.sendBatch(messages.slice(i, i + QUEUE_SEND_BATCH_LIMIT));
+    } catch (error) {
+      await markRunFailed(
+        env.BENCH_DB,
+        runId,
+        `enqueue failed after ${i} of ${messages.length} messages: ${formatError(error).error}`
+      ).catch(() => {});
+      throw error;
+    }
+  }
 }
 
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
@@ -192,7 +221,9 @@ export async function startRun(
   }
 
   if (kind === 'classifier') {
-    await env.BENCH_QUEUE.sendBatch(
+    await enqueueRunMessages(
+      env,
+      runId,
       enqueuedModelIds.map(model => ({
         body: { runId, kind, model } satisfies BenchmarkJobMessage,
       }))
@@ -204,7 +235,7 @@ export async function startRun(
   // bounded. finalizeRunIfComplete expects enqueuedModels × DECIDER_CASES × repetitions rows.
   const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
   const messages = buildDeciderMessages(runId, kind, enqueuedModelIds, repetitions, chunks);
-  await env.BENCH_QUEUE.sendBatch(messages);
+  await enqueueRunMessages(env, runId, messages);
   return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
 }
 

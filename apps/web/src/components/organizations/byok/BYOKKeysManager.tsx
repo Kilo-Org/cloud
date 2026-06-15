@@ -92,6 +92,9 @@ const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).ma
 const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
   a.name.localeCompare(b.name)
 );
+const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
+  provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
+);
 
 function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: boolean }) {
   return (
@@ -604,7 +607,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    {BYOK_PROVIDERS.map(provider => {
+                    {(editingKeyId ? BYOK_PROVIDERS : ADD_BYOK_PROVIDERS).map(provider => {
                       const isDisabled = !editingKeyId && hasExistingKey(provider.id);
                       return (
                         <SelectItem

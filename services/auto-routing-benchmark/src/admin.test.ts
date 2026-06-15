@@ -1,7 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BenchmarkConfig, RoutingTable } from '@kilocode/auto-routing-contracts';
+import type {
+  BenchmarkConfig,
+  BenchmarkModelSummary,
+  RoutingTable,
+} from '@kilocode/auto-routing-contracts';
 import { app } from './index';
+import { computeEngineIdentity } from './run';
 import type * as DbModule from './db';
+
+function makeSummary(model: string): BenchmarkModelSummary {
+  return {
+    model,
+    tier: 'low',
+    accuracy: 0.9,
+    avgCostUsd: 0.001,
+    avgLatencyMs: 100,
+    p50LatencyMs: 90,
+    p95LatencyMs: 120,
+    cases: 10,
+    errors: 0,
+    timeouts: 0,
+  };
+}
 
 const TEST_CONFIG: BenchmarkConfig = {
   classifierModels: ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
@@ -336,6 +356,68 @@ describe('POST /admin/runs', () => {
     expect(runArg.min_accuracy).toBe(TEST_CONFIG.minAccuracy);
     expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
     expect(queueSendBatch).toHaveBeenCalledOnce();
+  });
+
+  it('carries a decider model only when its benchmark identity still matches', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
+      deciderModels: [
+        { model: 'vendor/a', reasoning_effort: null },
+        { model: 'vendor/b', reasoning_effort: null },
+      ],
+    });
+    // vendor/a has a prior result measured under the current engine identity,
+    // matching repetitions and reasoning_effort → carried (skipped). vendor/b
+    // has none → enqueued.
+    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
+      new Map([
+        [
+          'vendor/a',
+          {
+            engineIdentity: computeEngineIdentity('decider'),
+            repetitions: 1,
+            reasoningEffort: null,
+            summaries: [makeSummary('vendor/a')],
+          },
+        ],
+      ])
+    );
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
+    expect(body.skippedModels).toEqual(['vendor/a']);
+    expect(body.enqueuedModels).toBe(1);
+  });
+
+  it('re-benchmarks a model whose prior reasoning_effort differs (no stale carry)', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'user-123' },
+      deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
+    });
+    // Prior result was measured at reasoning_effort 'high'; current config runs
+    // it at null, so the carry is invalidated and the model is re-enqueued.
+    vi.mocked(getLatestSummariesByModel).mockResolvedValue(
+      new Map([
+        [
+          'vendor/a',
+          {
+            engineIdentity: computeEngineIdentity('decider'),
+            repetitions: 1,
+            reasoningEffort: 'high',
+            summaries: [makeSummary('vendor/a')],
+          },
+        ],
+      ])
+    );
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { enqueuedModels: number; skippedModels: string[] };
+    expect(body.skippedModels).toEqual([]);
+    expect(body.enqueuedModels).toBe(1);
   });
 
   it('slices a >100-message decider fan-out into sendBatch-sized batches', async () => {

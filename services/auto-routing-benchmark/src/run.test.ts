@@ -4,6 +4,7 @@ import {
   BenchmarkJobMessageSchema,
   buildDeciderMessages,
   chunkArray,
+  computeEngineIdentity,
   runCasesWithConcurrency,
   summarize,
 } from './run';
@@ -215,6 +216,21 @@ describe('runCasesWithConcurrency', () => {
         throw new Error('test error');
       })
     ).rejects.toThrow('test error');
+  });
+});
+
+describe('computeEngineIdentity', () => {
+  it('is deterministic for a given kind', () => {
+    expect(computeEngineIdentity('classifier')).toBe(computeEngineIdentity('classifier'));
+    expect(computeEngineIdentity('decider')).toBe(computeEngineIdentity('decider'));
+  });
+
+  it('differs between classifier and decider datasets', () => {
+    expect(computeEngineIdentity('classifier')).not.toBe(computeEngineIdentity('decider'));
+  });
+
+  it('is versioned (carries the engine version prefix)', () => {
+    expect(computeEngineIdentity('decider')).toMatch(/^v\d+:[0-9a-f]{8}$/);
   });
 });
 

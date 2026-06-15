@@ -137,6 +137,7 @@ export async function insertRun(
     benchmark_user_id: string | null;
     repetitions: number;
     classifier_max_p95_latency_ms: number | null;
+    engine_identity: string;
   },
   models: RunModelRow[],
   carriedSummaries: BenchmarkModelSummary[]
@@ -153,6 +154,7 @@ export async function insertRun(
     benchmark_user_id: run.benchmark_user_id,
     repetitions: run.repetitions,
     classifier_max_p95_latency_ms: run.classifier_max_p95_latency_ms,
+    engine_identity: run.engine_identity,
   });
 
   if (models.length === 0 && carriedSummaries.length === 0) {
@@ -355,13 +357,24 @@ export async function markRunFailed(db: D1Database, runId: string, error: string
 // Latest summaries per model (for skip logic and classifier winner)
 // ---------------------------------------------------------------------------
 
+// What the most recent completed run measured for a model, plus the
+// benchmark identity it was measured under. startRun carries these summaries
+// into a new run only when the identity (engine + repetitions + the model's
+// reasoning_effort) still matches; otherwise the model is re-benchmarked.
+export type PriorModelResult = {
+  engineIdentity: string;
+  repetitions: number;
+  reasoningEffort: string | null;
+  summaries: BenchmarkModelSummary[];
+};
+
 // Latest summaries per model for a benchmark kind: for each model, all tiers
 // from the most recent COMPLETED run that included it (mixing tiers across
 // runs would pair incomparable numbers).
 export async function getLatestSummariesByModel(
   db: D1Database,
   kind: BenchmarkKind
-): Promise<Map<string, BenchmarkModelSummary[]>> {
+): Promise<Map<string, PriorModelResult>> {
   const results = await drizzle(db)
     .select({
       run_id: modelSummaries.run_id,
@@ -376,9 +389,16 @@ export async function getLatestSummariesByModel(
       errors: modelSummaries.errors,
       timeouts: modelSummaries.timeouts,
       carried: modelSummaries.carried,
+      engine_identity: benchmarkRuns.engine_identity,
+      repetitions: benchmarkRuns.repetitions,
+      reasoning_effort: runModels.reasoning_effort,
     })
     .from(modelSummaries)
     .innerJoin(benchmarkRuns, eq(benchmarkRuns.id, modelSummaries.run_id))
+    .leftJoin(
+      runModels,
+      and(eq(runModels.run_id, modelSummaries.run_id), eq(runModels.model, modelSummaries.model))
+    )
     .where(and(eq(benchmarkRuns.kind, kind), eq(benchmarkRuns.status, 'completed')))
     .orderBy(desc(benchmarkRuns.started_at));
 
@@ -386,12 +406,20 @@ export async function getLatestSummariesByModel(
   for (const row of results) {
     if (!latestRunByModel.has(row.model)) latestRunByModel.set(row.model, row.run_id);
   }
-  const byModel = new Map<string, BenchmarkModelSummary[]>();
+  const byModel = new Map<string, PriorModelResult>();
   for (const row of results) {
     if (latestRunByModel.get(row.model) !== row.run_id) continue;
-    const list = byModel.get(row.model) ?? [];
-    list.push(mapSummaryRow(row));
-    byModel.set(row.model, list);
+    const existing = byModel.get(row.model);
+    if (existing) {
+      existing.summaries.push(mapSummaryRow(row));
+    } else {
+      byModel.set(row.model, {
+        engineIdentity: row.engine_identity,
+        repetitions: row.repetitions,
+        reasoningEffort: row.reasoning_effort,
+        summaries: [mapSummaryRow(row)],
+      });
+    }
   }
   return byModel;
 }

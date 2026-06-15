@@ -26,6 +26,7 @@ import {
   saveRoutingTable,
   upsertCaseResult,
   type CaseResultRow,
+  type PriorModelResult,
 } from './db';
 import { gradeClassifierOutput, runDeciderCheck } from './grading';
 import { createOpenRouterClient } from './openrouter';
@@ -97,6 +98,35 @@ async function enqueueRunMessages(
 
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 
+// Bump when grading logic, the CLI invocation/variant handling, the container
+// image's pinned CLI, or any other execution input NOT captured by the dataset
+// hash changes in a way that invalidates prior measurements. Forces every
+// carried summary to be re-benchmarked on the next run.
+const BENCHMARK_ENGINE_VERSION = 1;
+
+function fnv1aHex(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+// Identifies the benchmark inputs that a run measured under, beyond the
+// per-model reasoning_effort and run-level repetitions tracked separately:
+// the dataset contents (ids + grading checks/expectations) and an engine
+// version for code-level execution changes. Two runs sharing this identity
+// (plus repetitions + reasoning_effort) produced comparable measurements, so a
+// model's prior summaries can be carried instead of re-run.
+export function computeEngineIdentity(kind: BenchmarkKind): string {
+  const datasetSignature =
+    kind === 'classifier'
+      ? CLASSIFIER_CASES.map(c => ({ id: c.id, expected: c.expected }))
+      : DECIDER_CASES.map(c => ({ id: c.id, tier: c.tier, check: c.check }));
+  return `v${BENCHMARK_ENGINE_VERSION}:${fnv1aHex(JSON.stringify(datasetSignature))}`;
+}
+
 /** Pure helper: produces the sendBatch bodies for a decider run fan-out.
  * Extracted for unit-testability; the shape is models × reps × chunks messages.
  */
@@ -144,14 +174,33 @@ export async function startRun(
   const models =
     kind === 'classifier' ? config.classifierModels : config.deciderModels.map(m => m.id);
 
+  const engineIdentity = computeEngineIdentity(kind);
+  const reasoningEffortFor = (modelId: string): string | null =>
+    kind === 'classifier'
+      ? null
+      : (config.deciderModels.find(m => m.id === modelId)?.reasoningEffort ?? null);
+
   // Models with prior results are skipped (their latest summaries are carried
-  // into this run's aggregate) unless the admin forces a full re-run.
-  const priorSummaries = options.force
-    ? new Map<string, BenchmarkModelSummary[]>()
+  // into this run's aggregate) unless the admin forces a full re-run. A prior
+  // result is only carried when it was measured under the SAME benchmark
+  // identity — engine identity (dataset + grading/CLI version), repetitions,
+  // and the model's reasoning_effort — so a config/dataset change re-benchmarks
+  // the model instead of pairing current serving config with stale numbers.
+  const priorByModel = options.force
+    ? new Map<string, PriorModelResult>()
     : await getLatestSummariesByModel(env.BENCH_DB, kind);
-  const enqueuedModelIds = models.filter(m => !priorSummaries.has(m));
-  const skippedModels = models.filter(m => priorSummaries.has(m));
-  const carriedSummaries = skippedModels.flatMap(m => priorSummaries.get(m) ?? []);
+  const isCarryable = (modelId: string): boolean => {
+    const prior = priorByModel.get(modelId);
+    return (
+      prior !== undefined &&
+      prior.engineIdentity === engineIdentity &&
+      prior.repetitions === repetitions &&
+      (prior.reasoningEffort ?? null) === reasoningEffortFor(modelId)
+    );
+  };
+  const enqueuedModelIds = models.filter(m => !isCarryable(m));
+  const skippedModels = models.filter(m => isCarryable(m));
+  const carriedSummaries = skippedModels.flatMap(m => priorByModel.get(m)?.summaries ?? []);
 
   // Decider runs execute through the kilo CLI under a real Kilo user's
   // identity/billing. Fail fast (before inserting the run) when that user
@@ -169,10 +218,7 @@ export async function startRun(
     run_id: runId,
     model: modelId,
     enqueued: enqueuedModelIds.includes(modelId),
-    reasoning_effort:
-      kind === 'classifier'
-        ? null
-        : (config.deciderModels.find(m => m.id === modelId)?.reasoningEffort ?? null),
+    reasoning_effort: reasoningEffortFor(modelId),
   }));
 
   await insertRun(
@@ -188,6 +234,7 @@ export async function startRun(
       repetitions,
       classifier_max_p95_latency_ms:
         kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
+      engine_identity: engineIdentity,
     },
     runModelRows,
     carriedSummaries

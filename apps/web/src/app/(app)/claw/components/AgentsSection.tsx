@@ -1,12 +1,14 @@
 'use client';
 
-import { Bot, Check, Loader2, Pencil, Plus, Radio, Trash2 } from 'lucide-react';
+import { Bot, Check, Loader2, Pencil, Plus, Radio, RotateCw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
 import { type AgentUpdateInput } from '@/lib/kiloclaw/agent-schemas';
 import type {
   AgentDefaultsSummary,
@@ -31,6 +33,7 @@ import {
   ownModelFallbacks,
   type ChannelCatalogEntry,
 } from './AgentInlineControls';
+import { useClawContext } from './ClawContext';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { DetailTile } from './DetailTile';
 import { addKilocodeModelPrefix } from './modelSupport';
@@ -296,6 +299,31 @@ export function AgentsSection({
   const [savingModelFor, setSavingModelFor] = useState<string | null>(null);
   const [savingChannelsFor, setSavingChannelsFor] = useState<string | null>(null);
 
+  // A channel binding writes config but the running gateway does NOT hot-reload
+  // routing — it only takes effect after a gateway restart (the same way env /
+  // config changes apply across this product). So binds save instantly, we count
+  // the unapplied ones, and let the user restart ONCE when done (no per-toggle
+  // restart; batches a whole multi-agent setup into one apply). See plan B2.
+  const { organizationId } = useClawContext();
+  const personalInstance = useKiloClawMutations();
+  const orgInstance = useOrgKiloClawMutations(organizationId ?? '');
+  const restartOpenClaw = organizationId
+    ? orgInstance.restartOpenClaw
+    : personalInstance.restartOpenClaw;
+  const [pendingChangeCount, setPendingChangeCount] = useState(0);
+
+  const onRestartToApply = async () => {
+    try {
+      await restartOpenClaw.mutateAsync(undefined);
+      setPendingChangeCount(0);
+      toast.success('Restarting OpenClaw — routing changes apply when it’s back.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to restart OpenClaw', {
+        duration: 10000,
+      });
+    }
+  };
+
   const [createOpen, setCreateOpen] = useState(false);
   // Freeze the agent AND the etag together when opening an editor, so a
   // background list refetch can't advance the etag under a stale form (which
@@ -372,12 +400,21 @@ export function AgentsSection({
             },
             unset: [],
           };
+    const label = agent.name ?? agent.id;
     setSavingModelFor(agent.id);
+    // Inline saves have no Save button and the round-trip is slow, so a loading
+    // toast that resolves in place is the "working in the background" signal —
+    // otherwise the click looks dead until the control updates on refetch.
+    const toastId = toast.loading(`Saving model for ${label}…`);
     try {
       await updateAgent.mutateAsync(agent.id, patch);
-      toast.success(`Updated model for ${agent.name ?? agent.id}`);
+      // Saved, but the model edit doesn't hot-reload — needs a restart to apply
+      // (confirmed 2026-06-15, same as bindings).
+      setPendingChangeCount(n => n + 1);
+      toast.success(`Saved model for ${label}`, { id: toastId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update model', {
+        id: toastId,
         duration: 10000,
       });
     } finally {
@@ -387,12 +424,17 @@ export function AgentsSection({
 
   const handleSetChannels = async (agent: AgentSummary, channels: string[]) => {
     if (!data) return;
+    const label = agent.name ?? agent.id;
     setSavingChannelsFor(agent.id);
+    const toastId = toast.loading(`Saving channels for ${label}…`);
     try {
       await updateBindings.mutateAsync(agent.id, { etag: data.etag, channels });
-      toast.success(`Updated channels for ${agent.name ?? agent.id}`);
+      // Saved, but routing doesn't hot-reload — needs a gateway restart (B2 finding).
+      setPendingChangeCount(n => n + 1);
+      toast.success(`Saved channels for ${label}`, { id: toastId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update channels', {
+        id: toastId,
         duration: 10000,
       });
     } finally {
@@ -402,6 +444,31 @@ export function AgentsSection({
 
   return (
     <div>
+      {enabled && pendingChangeCount > 0 && (
+        <div className="bg-secondary/40 mb-3 flex items-center justify-between gap-3 rounded-lg border px-4 py-3">
+          <p className="text-muted-foreground text-xs">
+            <span className="text-foreground font-medium">
+              {pendingChangeCount} change{pendingChangeCount === 1 ? '' : 's'} saved.
+            </span>{' '}
+            Agent changes (model, channels, behavior) only take effect after the machine restarts —
+            restart OpenClaw to apply {pendingChangeCount === 1 ? 'it' : 'them'}.
+          </p>
+          <Button
+            size="sm"
+            className="shrink-0"
+            onClick={onRestartToApply}
+            disabled={restartOpenClaw.isPending}
+          >
+            {restartOpenClaw.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RotateCw className="h-4 w-4" />
+            )}
+            Restart OpenClaw
+          </Button>
+        </div>
+      )}
+
       {enabled && data && (
         <div className="mb-4 flex flex-col gap-3">
           {/* Stat tiles — same DetailTile pattern as the Settings page so the
@@ -495,6 +562,7 @@ export function AgentsSection({
           }}
           agent={editTarget.agent}
           etag={editTarget.etag}
+          onApplied={() => setPendingChangeCount(n => n + 1)}
         />
       )}
 
@@ -506,6 +574,7 @@ export function AgentsSection({
           }}
           defaults={data.defaults}
           etag={defaultsTarget.etag}
+          onApplied={() => setPendingChangeCount(n => n + 1)}
         />
       )}
 

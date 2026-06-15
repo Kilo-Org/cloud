@@ -116,11 +116,15 @@ export function AgentEditDialog({
   onOpenChange,
   agent,
   etag,
+  onApplied,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agent: AgentSummary;
   etag: string;
+  // Called after a successful save — settings edits don't hot-reload, so the
+  // caller tracks a pending-restart count.
+  onApplied: () => void;
 }) {
   const { updateAgent } = useClawAgentMutations();
 
@@ -185,6 +189,7 @@ export function AgentEditDialog({
     if (!canSubmit) return;
     try {
       await updateAgent.mutateAsync(agent.id, { etag, set: patch.set, unset: patch.unset });
+      onApplied();
       toast.success(`Updated ${agent.name ?? agent.id}`);
       onOpenChange(false);
     } catch (err) {

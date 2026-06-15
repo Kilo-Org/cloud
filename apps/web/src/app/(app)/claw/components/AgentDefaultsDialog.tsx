@@ -108,11 +108,15 @@ export function AgentDefaultsDialog({
   onOpenChange,
   defaults,
   etag,
+  onApplied,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaults: AgentDefaultsSummary;
   etag: string;
+  // Called after a successful save — defaults edits don't hot-reload, so the
+  // caller tracks a pending-restart count.
+  onApplied: () => void;
 }) {
   const { updateDefaults } = useClawAgentMutations();
   const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
@@ -180,6 +184,7 @@ export function AgentDefaultsDialog({
     if (!canSubmit) return;
     try {
       await updateDefaults.mutateAsync({ etag, set: patch.set, unset: patch.unset });
+      onApplied();
       toast.success('Updated defaults');
       onOpenChange(false);
     } catch (err) {

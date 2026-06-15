@@ -224,9 +224,7 @@ export function repairMessagesTools(body: GatewayMessagesRequest): void {
     msg.content = msg.content.filter(block => {
       if (typeof block !== 'object' || block.type !== 'tool_use') return true;
       if (toolUseIds.has(block.id)) {
-        console.warn(
-          `[repairMessagesTools] removing duplicate tool_use block with id ${block.id}`
-        );
+        console.warn(`[repairMessagesTools] removing duplicate tool_use block with id ${block.id}`);
         return false;
       }
       toolUseIds.add(block.id);

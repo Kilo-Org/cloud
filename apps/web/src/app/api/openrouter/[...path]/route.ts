@@ -873,7 +873,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  if (classifierCostUsd > 0 && !usageContext.user_byok) {
+  // The classifier always runs on Kilo's own OpenRouter credential, so the
+  // overhead is owed whether or not the FINAL inference is BYOK — billing here
+  // must not depend on the final provider's BYOK status.
+  if (classifierCostUsd > 0) {
     after(
       (async () => {
         try {

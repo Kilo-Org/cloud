@@ -498,7 +498,9 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
   });
 
-  it('does not bill when user is BYOK', async () => {
+  it('bills classifier cost even when the final inference is BYOK', async () => {
+    // The classifier runs on Kilo's OpenRouter credential regardless of the
+    // final provider, so its cost is owed even when the user is BYOK.
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider,
@@ -522,7 +524,13 @@ describe('kilo-auto/efficient classifier billing', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(2000);
+    expect(stats.model).toBe('auto-routing/classifier');
+    // The classifier row is always Kilo-funded, never BYOK.
+    expect(stats.is_byok).toBe(false);
+    expect(ctx.user_byok).toBe(false);
   });
 
   it('bills classifier cost even when decision is null but cost > 0', async () => {

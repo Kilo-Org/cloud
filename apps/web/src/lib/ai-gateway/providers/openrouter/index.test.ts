@@ -17,6 +17,7 @@ import {
   kiloExclusiveModels,
 } from '@/lib/ai-gateway/models';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadata: jest.fn(() => Promise.resolve({})),
@@ -168,6 +169,41 @@ describe('shouldSuppressOpenRouterModel', () => {
   it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {
     expect(gemma_4_26b_a4b_it_free_model.status).toBe('hidden');
     expect(shouldSuppressOpenRouterModel(gemma_4_26b_a4b_it_free_model)).toBe(true);
+  });
+});
+
+describe('isFableModel', () => {
+  it('only matches Claude Fable model IDs', () => {
+    expect(isFableModel('anthropic/claude-fable-5')).toBe(true);
+    expect(isFableModel('vendor/fable-model')).toBe(false);
+  });
+});
+
+describe('Fable model filtering', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [
+              buildModel({ id: 'anthropic/claude-fable-5' }),
+              buildModel({ id: 'vendor/fable-model' }),
+            ],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('excludes Claude Fable while retaining unrelated model IDs containing fable', async () => {
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === 'anthropic/claude-fable-5')).toBe(false);
+    expect(models.data.some(model => model.id === 'vendor/fable-model')).toBe(true);
   });
 });
 

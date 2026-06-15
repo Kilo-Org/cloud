@@ -34,6 +34,7 @@ import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { KiloclawExtendTrial } from '@/app/admin/components/KiloclawExtendTrial';
 import { downloadCsv } from '@/lib/admin-csv';
+import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 
 type MatchedUser = {
   email: string;
@@ -112,6 +113,7 @@ const isValidTab = (value: string | null): value is Tab =>
 
 function BulkCreditsTab() {
   const trpc = useTRPC();
+  const { canManageCredits } = useAdminCreditManagementPermission();
 
   // CSV upload state
   const [isDragging, setIsDragging] = useState(false);
@@ -218,7 +220,7 @@ function BulkCreditsTab() {
   };
 
   const handleGrantCredits = () => {
-    if (matchedUsers.length === 0) return;
+    if (!canManageCredits || matchedUsers.length === 0) return;
     const amount = parseFloat(amountUsd);
     if (isNaN(amount) || amount <= 0) {
       toast.error('Please enter a valid credit amount');
@@ -451,6 +453,11 @@ function BulkCreditsTab() {
                   <DollarSign className="h-4 w-4" />
                   Credit Allocation
                 </h3>
+                {!canManageCredits && (
+                  <p className="text-muted-foreground text-sm">
+                    Credit management permission is required to adjust balances.
+                  </p>
+                )}
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div>
                     <Label htmlFor="amount">Amount (USD) *</Label>
@@ -462,6 +469,7 @@ function BulkCreditsTab() {
                       onChange={e => setAmountUsd(e.target.value)}
                       min="0.01"
                       step="0.01"
+                      disabled={!canManageCredits}
                     />
                   </div>
                   <div>
@@ -474,6 +482,7 @@ function BulkCreditsTab() {
                       type="date"
                       value={expirationDate}
                       onChange={e => setExpirationDate(e.target.value)}
+                      disabled={!canManageCredits}
                     />
                   </div>
                   <div>
@@ -484,13 +493,14 @@ function BulkCreditsTab() {
                       placeholder="Optional description"
                       value={description}
                       onChange={e => setDescription(e.target.value)}
+                      disabled={!canManageCredits}
                     />
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <Button
                     onClick={handleGrantCredits}
-                    disabled={!isFormValid || grantCreditsMutation.isPending}
+                    disabled={!canManageCredits || !isFormValid || grantCreditsMutation.isPending}
                   >
                     {grantCreditsMutation.isPending
                       ? 'Sending Credits...'

@@ -1,6 +1,8 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { User } from '@kilocode/db/schema';
+import { kilocode_users, type User } from '@kilocode/db/schema';
+import { db } from '@/lib/drizzle';
+import { eq } from 'drizzle-orm';
 
 // Test users will be created dynamically
 let regularUser: User;
@@ -52,6 +54,21 @@ describe('trpc tests', () => {
       expect(result).toEqual({
         greeting: `hello world from user ${regularUser.id}`,
       });
+    });
+  });
+
+  describe('admin permissions', () => {
+    it('reflects database capability changes without recreating the caller', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(caller.admin.getPermissions()).resolves.toEqual({ canManageCredits: false });
+
+      await db
+        .update(kilocode_users)
+        .set({ can_manage_credits: true })
+        .where(eq(kilocode_users.id, adminUser.id));
+
+      await expect(caller.admin.getPermissions()).resolves.toEqual({ canManageCredits: true });
     });
   });
 

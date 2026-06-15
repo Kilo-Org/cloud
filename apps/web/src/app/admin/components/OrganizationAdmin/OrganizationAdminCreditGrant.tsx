@@ -6,13 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DollarSign } from 'lucide-react';
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { useGrantOrganizationCredit } from '@/app/admin/api/organizations/hooks';
 import { toast } from 'sonner';
+import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 
 export function OrganizationAdminCreditGrant({ organizationId }: { organizationId: string }) {
-  const { data: session } = useSession();
   const grantCreditMutation = useGrantOrganizationCredit();
+  const { canManageCredits } = useAdminCreditManagementPermission();
 
   const [amount, setAmount] = useState<string>('');
   const [description, setDescription] = useState<string>('');
@@ -30,13 +30,9 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
     (isNegative || hasExpiration);
 
   const handleGrantCredit = async () => {
-    if (!isFormValid) return;
+    if (!canManageCredits || !isFormValid) return;
 
     try {
-      const finalDescription = description.trim()
-        ? `${description.trim()} (${session?.user?.name || session?.user?.email || 'Admin'})`
-        : undefined;
-
       const expiry_date = expirationDate ? new Date(expirationDate).toISOString() : null;
       const expiry_hours_parsed = expiryHours ? parseFloat(expiryHours) : null;
       const expiry_hours_val =
@@ -45,7 +41,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
       await grantCreditMutation.mutateAsync({
         organizationId,
         amount_usd: parsedAmount,
-        description: finalDescription,
+        description: description.trim() || undefined,
         expiry_date: neverExpire ? null : expiry_date,
         expiry_hours: neverExpire ? null : expiry_hours_val,
       });
@@ -69,6 +65,11 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
           Grant Credits
         </CardTitle>
         <CardDescription>Grant promotional credits to this organization</CardDescription>
+        {!canManageCredits && (
+          <p className="text-muted-foreground text-sm">
+            Credit management permission is required to adjust balances.
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <form
@@ -91,6 +92,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
                 step="0.01"
                 id="org-amount"
                 required
+                disabled={!canManageCredits}
               />
             </div>
           </div>
@@ -112,7 +114,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
                   min="0"
                   step="0.01"
                   id="org-expiry-hours"
-                  disabled={neverExpire}
+                  disabled={!canManageCredits || neverExpire}
                 />
               </div>
               <div>
@@ -127,7 +129,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
                   value={expirationDate}
                   onChange={e => setExpirationDate(e.target.value)}
                   id="org-expiry-date"
-                  disabled={neverExpire}
+                  disabled={!canManageCredits || neverExpire}
                 />
               </div>
               <div className="flex items-end">
@@ -142,6 +144,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
                         setExpiryHours('');
                       }
                     }}
+                    disabled={!canManageCredits}
                   />
                   Never expire
                 </Label>
@@ -170,11 +173,12 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
               value={description}
               onChange={e => setDescription(e.target.value)}
               id="org-description"
+              disabled={!canManageCredits}
             />
           </div>
 
           <Button
-            disabled={!isFormValid || grantCreditMutation.isPending}
+            disabled={!canManageCredits || !isFormValid || grantCreditMutation.isPending}
             className="w-full sm:w-auto"
             type="submit"
           >

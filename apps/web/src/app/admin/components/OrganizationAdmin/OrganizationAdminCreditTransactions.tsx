@@ -1,10 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BooleanBadge } from '@/components/ui/boolean-badge';
-import {
-  useOrganizationCreditTransactions,
-  useOrganizationWithMembers,
-} from '@/app/api/organizations/hooks';
+import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
+import { useAdminOrganizationCreditTransactions } from '@/app/admin/api/organizations/hooks';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { FormattedMicrodollars } from '@/components/organizations/FormattedMicrodollars';
@@ -14,6 +12,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import { formatRelativeTime } from '@/lib/admin-utils';
+import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 
 export function OrganizationAdminCreditTransactions({
   organizationId,
@@ -23,13 +22,14 @@ export function OrganizationAdminCreditTransactions({
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const { data: orgData } = useOrganizationWithMembers(organizationId);
+  const { canManageCredits } = useAdminCreditManagementPermission();
 
   const invalidateOrgCreditQueries = () => {
     void queryClient.invalidateQueries({
       queryKey: trpc.organizations.withMembers.queryKey({ organizationId }),
     });
     void queryClient.invalidateQueries({
-      queryKey: trpc.organizations.creditTransactions.queryKey({ organizationId }),
+      queryKey: trpc.organizations.admin.creditTransactions.queryKey({ organizationId }),
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.organizations.getCreditBlocks.queryKey({ organizationId }),
@@ -85,7 +85,7 @@ export function OrganizationAdminCreditTransactions({
     isLoading,
     error,
     refetch,
-  } = useOrganizationCreditTransactions(organizationId);
+  } = useAdminOrganizationCreditTransactions(organizationId);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -115,12 +115,12 @@ export function OrganizationAdminCreditTransactions({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>
             <Receipt className="mr-2 inline h-5 w-5" />
             Credit Transactions ({credit_transactions.length})
           </CardTitle>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="text-muted-foreground text-xs">
               Next expiration:{' '}
               {orgData?.next_credit_expiration_at
@@ -147,6 +147,7 @@ export function OrganizationAdminCreditTransactions({
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  if (!canManageCredits) return;
                   const input = window.prompt('Amount to consume (USD):');
                   if (input) {
                     const amount = parseFloat(input);
@@ -155,7 +156,7 @@ export function OrganizationAdminCreditTransactions({
                     }
                   }
                 }}
-                disabled={consumeCreditsMutation.isPending}
+                disabled={!canManageCredits || consumeCreditsMutation.isPending}
               >
                 {consumeCreditsMutation.isPending ? (
                   <>
@@ -170,6 +171,11 @@ export function OrganizationAdminCreditTransactions({
           </div>
         </div>
         <CardDescription>Recent credit transactions for this organization</CardDescription>
+        {process.env.NODE_ENV === 'development' && !canManageCredits && (
+          <p className="text-muted-foreground text-sm">
+            Credit management permission is required to consume credits.
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         {credit_transactions.length === 0 ? (
@@ -206,6 +212,17 @@ export function OrganizationAdminCreditTransactions({
                   {transaction.description && (
                     <p className="text-muted-foreground text-sm">{transaction.description}</p>
                   )}
+                  <p className="text-muted-foreground text-xs">
+                    Created by:{' '}
+                    {transaction.created_by_kilo_user_id
+                      ? transaction.created_by_user_name ||
+                        transaction.created_by_user_email ||
+                        transaction.created_by_kilo_user_id
+                      : 'Creator not recorded'}
+                    {transaction.created_by_user_name && transaction.created_by_user_email
+                      ? ` (${transaction.created_by_user_email})`
+                      : ''}
+                  </p>
                   <p className="text-muted-foreground text-xs">
                     {formatDate(transaction.created_at)}
                   </p>

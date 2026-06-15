@@ -24,6 +24,7 @@ const mockUser: User = {
   stripe_customer_id: 'cus_test123',
   app_store_account_token: '550e8400-e29b-41d4-a716-446655440000',
   is_admin: false,
+  can_manage_credits: false,
   total_microdollars_acquired: 0,
   next_credit_expiration_at: null,
   has_validation_stytch: null,

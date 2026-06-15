@@ -13,6 +13,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import { formatRelativeTime } from '@/lib/admin-utils';
 import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function OrganizationAdminCreditTransactions({
   organizationId,
@@ -143,39 +144,50 @@ export function OrganizationAdminCreditTransactions({
               )}
             </Button>
             {process.env.NODE_ENV === 'development' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (!canManageCredits) return;
-                  const input = window.prompt('Amount to consume (USD):');
-                  if (input) {
-                    const amount = parseFloat(input);
-                    if (!isNaN(amount) && amount > 0) {
-                      consumeCreditsMutation.mutate(amount);
-                    }
-                  }
-                }}
-                disabled={!canManageCredits || consumeCreditsMutation.isPending}
-              >
-                {consumeCreditsMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    Consuming...
-                  </>
-                ) : (
-                  'Consume Credits (Dev)'
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    tabIndex={canManageCredits ? undefined : 0}
+                    className={canManageCredits ? 'inline-flex' : 'inline-flex cursor-not-allowed'}
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={canManageCredits ? '' : 'pointer-events-none opacity-35'}
+                      onClick={() => {
+                        if (!canManageCredits) return;
+                        const input = window.prompt('Amount to consume (USD):');
+                        if (input) {
+                          const amount = parseFloat(input);
+                          if (!isNaN(amount) && amount > 0) {
+                            consumeCreditsMutation.mutate(amount);
+                          }
+                        }
+                      }}
+                      disabled={!canManageCredits || consumeCreditsMutation.isPending}
+                    >
+                      {consumeCreditsMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          Consuming...
+                        </>
+                      ) : (
+                        'Consume Credits (Dev)'
+                      )}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canManageCredits && (
+                  <TooltipContent side="top" sideOffset={8} className="max-w-xs">
+                    You don&apos;t have access to consume organization credits. File an access
+                    request before adjusting balances.
+                  </TooltipContent>
                 )}
-              </Button>
+              </Tooltip>
             )}
           </div>
         </div>
         <CardDescription>Recent credit transactions for this organization</CardDescription>
-        {process.env.NODE_ENV === 'development' && !canManageCredits && (
-          <p className="text-muted-foreground text-sm">
-            Credit management permission is required to consume credits.
-          </p>
-        )}
       </CardHeader>
       <CardContent>
         {credit_transactions.length === 0 ? (

@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useGrantOrganizationCredit } from '@/app/admin/api/organizations/hooks';
 import { toast } from 'sonner';
 import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
+import { CreditManagementAccessOverlay } from '@/app/admin/components/CreditManagementAccessOverlay';
 
 export function OrganizationAdminCreditGrant({ organizationId }: { organizationId: string }) {
   const grantCreditMutation = useGrantOrganizationCredit();
@@ -58,20 +59,18 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="relative">
+      {!canManageCredits && (
+        <CreditManagementAccessOverlay message="You don't have access to grant organization credits. File an access request before handing out credits." />
+      )}
+      <CardHeader className={canManageCredits ? '' : 'pointer-events-none select-none opacity-35'}>
         <CardTitle className="flex items-center gap-2">
           <DollarSign className="h-5 w-5" />
           Grant Credits
         </CardTitle>
         <CardDescription>Grant promotional credits to this organization</CardDescription>
-        {!canManageCredits && (
-          <p className="text-muted-foreground text-sm">
-            Credit management permission is required to adjust balances.
-          </p>
-        )}
       </CardHeader>
-      <CardContent>
+      <CardContent className={canManageCredits ? '' : 'pointer-events-none select-none opacity-35'}>
         <form
           className="space-y-4"
           onSubmit={async e => {
@@ -152,12 +151,16 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
             </div>
           )}
 
-          {!isNegative && !isNaN(parsedAmount) && parsedAmount !== 0 && !hasExpiration && (
-            <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-              Please specify an expiration date or expiry hours, or check &quot;Never expire&quot;
-              to grant credits without expiration.
-            </div>
-          )}
+          {canManageCredits &&
+            !isNegative &&
+            !isNaN(parsedAmount) &&
+            parsedAmount !== 0 &&
+            !hasExpiration && (
+              <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                Please specify an expiration date or expiry hours, or check &quot;Never expire&quot;
+                to grant credits without expiration.
+              </div>
+            )}
 
           <div>
             <Label className="text-muted-foreground text-sm font-medium" htmlFor="org-description">

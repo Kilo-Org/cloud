@@ -19,6 +19,7 @@ import { useNullifyOrganizationCredits } from '@/app/admin/api/organizations/hoo
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { toast } from 'sonner';
 import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
+import { CreditManagementAccessOverlay } from '@/app/admin/components/CreditManagementAccessOverlay';
 
 export function OrganizationAdminCreditNullify({ organizationId }: { organizationId: string }) {
   const { data: organization } = useOrganizationWithMembers(organizationId);
@@ -51,20 +52,18 @@ export function OrganizationAdminCreditNullify({ organizationId }: { organizatio
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="relative">
+      {!canManageCredits && (
+        <CreditManagementAccessOverlay message="You don't have access to nullify organization credits. File an access request before adjusting balances." />
+      )}
+      <CardHeader className={canManageCredits ? '' : 'pointer-events-none select-none opacity-35'}>
         <CardTitle className="flex items-center gap-2">
           <Ban className="h-5 w-5" />
           Nullify Credits
         </CardTitle>
         <CardDescription>Remove all credits from this organization</CardDescription>
-        {!canManageCredits && (
-          <p className="text-muted-foreground text-sm">
-            Credit management permission is required to adjust balances.
-          </p>
-        )}
       </CardHeader>
-      <CardContent>
+      <CardContent className={canManageCredits ? '' : 'pointer-events-none select-none opacity-35'}>
         <div className="space-y-4">
           <div className="text-sm">
             <span className="text-muted-foreground">Current Balance: </span>

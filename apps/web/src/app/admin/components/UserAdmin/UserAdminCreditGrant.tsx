@@ -19,6 +19,7 @@ import type { GuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
 import { formatCategoryAsMarkdown } from '@/lib/PromoCreditCategoryConfig';
 import ReactMarkdown from 'react-markdown';
 import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
+import { CreditManagementAccessOverlay } from '@/app/admin/components/CreditManagementAccessOverlay';
 
 type CreditMessage = {
   type: 'success' | 'error';
@@ -140,9 +141,12 @@ export function UserAdminCreditGrant({
   };
 
   return (
-    <Card className="text-muted-foreground p-6 lg:col-span-2">
+    <Card className="text-muted-foreground relative p-6 lg:col-span-2">
+      {!canManageCredits && (
+        <CreditManagementAccessOverlay message="You don't have access to grant credits. File an access request before handing out credits." />
+      )}
       <form
-        className="space-y-4"
+        className={`space-y-4 ${canManageCredits ? '' : 'pointer-events-none select-none opacity-35'}`}
         onSubmit={async e => {
           e.preventDefault();
           await handleGrantCredit();
@@ -154,11 +158,6 @@ export function UserAdminCreditGrant({
               <DollarSign className="h-5 w-5" />
               Grant / Decrement Credits
             </CardTitle>
-            {!canManageCredits && (
-              <p className="text-muted-foreground text-sm">
-                Credit management permission is required to adjust balances.
-              </p>
-            )}
             <div className="flex flex-col gap-2">
               <Label className="flex items-center gap-2 text-sm font-medium">
                 <input
@@ -292,7 +291,7 @@ export function UserAdminCreditGrant({
           )}
         </div>
 
-        {!expectNegative && selectedCredit && !isExpirationValid && (
+        {canManageCredits && !expectNegative && selectedCredit && !isExpirationValid && (
           <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
             Please specify an expiration date or expiry hours, or check &quot;Never expire&quot; to
             grant credits without expiration.

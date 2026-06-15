@@ -228,6 +228,22 @@ describe('PUT /admin/config', () => {
     expect(replaceConfig).not.toHaveBeenCalled();
   });
 
+  it('returns 400 for duplicate decider model ids instead of a D1 PK violation', async () => {
+    const res = await authedPut('/admin/config', {
+      ...TEST_CONFIG,
+      deciderModels: [
+        { id: 'google/gemini-2.5-flash-lite', reasoningEffort: null },
+        { id: 'google/gemini-2.5-flash-lite', reasoningEffort: null },
+      ],
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: 'Invalid benchmark config',
+    });
+    expect(replaceConfig).not.toHaveBeenCalled();
+  });
+
   it('persists a valid config and returns it', async () => {
     const validConfig = {
       ...TEST_CONFIG,

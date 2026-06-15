@@ -148,3 +148,50 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(result.classifierMaxP95LatencyMs).toBe(1000);
   });
 });
+
+describe('BenchmarkConfigSchema duplicate model ids', () => {
+  const base = {
+    minAccuracy: 0.8,
+    maxConcurrency: 4,
+    benchmarkUserId: null,
+    switchCostFactor: 2,
+    updatedAt: null,
+    updatedBy: null,
+  };
+
+  it('rejects duplicate classifier model ids with a field-specific issue', () => {
+    const result = BenchmarkConfigSchema.safeParse({
+      ...base,
+      classifierModels: ['model/a', 'model/a'],
+      deciderModels: [{ id: 'model/b' }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(i => i.path[0] === 'classifierModels');
+      expect(issue?.path).toEqual(['classifierModels', 1]);
+      expect(issue?.message).toContain('Duplicate model id');
+    }
+  });
+
+  it('rejects duplicate decider model ids (trim-normalized)', () => {
+    const result = BenchmarkConfigSchema.safeParse({
+      ...base,
+      classifierModels: ['model/a'],
+      deciderModels: [{ id: 'model/b' }, { id: '  model/b  ' }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(i => i.path[0] === 'deciderModels');
+      expect(issue?.path).toEqual(['deciderModels', 1]);
+    }
+  });
+
+  it('accepts distinct model ids', () => {
+    const result = BenchmarkConfigSchema.safeParse({
+      ...base,
+      classifierModels: ['model/a', 'model/b'],
+      deciderModels: [{ id: 'model/c' }, { id: 'model/d' }],
+    });
+    expect(result.success).toBe(true);
+  });
+});

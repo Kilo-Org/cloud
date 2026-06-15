@@ -17,34 +17,61 @@ export const BenchmarkDeciderModelSchema = z.object({
 });
 export type BenchmarkDeciderModel = z.infer<typeof BenchmarkDeciderModelSchema>;
 
-export const BenchmarkConfigSchema = z.object({
-  classifierModels: z.array(z.string().trim().min(1)).min(1),
-  deciderModels: z.array(BenchmarkDeciderModelSchema).min(1),
-  // Accuracy threshold for "gets the job done" (per tier).
-  minAccuracy: z.number().min(0).max(1),
-  // Parallel OpenRouter calls per queue message.
-  maxConcurrency: z.number().int().min(1).max(16),
-  // The Kilo user whose identity/billing the decider CLI runs execute under.
-  // Null until an admin configures it; decider runs fail fast while null.
-  benchmarkUserId: z.string().trim().min(1).nullable(),
-  // Session stickiness knob carried into published routing tables: a session
-  // stays on its incumbent model while it meets the tier's accuracy
-  // threshold, unless the fresh pick is cheaper by more than this factor.
-  // Model switches discard provider prompt caches (cache reads are far
-  // cheaper than fresh input tokens), so switching only pays off when the
-  // recurring savings clearly outweigh the cache-rebuild penalty.
-  switchCostFactor: z.number().min(1).max(100),
-  // How many times to repeat each case for classifier / decider benchmarks.
-  // Repeated runs reduce variance; the default of 1 preserves the current
-  // single-pass behaviour.
-  classifierRepetitions: z.number().int().min(1).max(5).default(1),
-  deciderRepetitions: z.number().int().min(1).max(5).default(1),
-  // Maximum acceptable p95 latency for the classifier winner; null means no
-  // constraint (cost-only selection).
-  classifierMaxP95LatencyMs: z.number().int().positive().nullable().default(1000),
-  updatedAt: z.string().nullable(),
-  updatedBy: z.string().nullable(),
-});
+// Flags each list entry whose (trimmed) id already appeared earlier in the
+// array. Model ids are the D1 primary keys for config_classifier_models /
+// config_decider_models, so duplicates would otherwise reach the DB as an
+// opaque constraint violation (HTTP 500) instead of an actionable 400.
+function addDuplicateModelIssues(ids: string[], path: string, ctx: z.RefinementCtx): void {
+  const seen = new Set<string>();
+  ids.forEach((id, index) => {
+    if (seen.has(id)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [path, index],
+        message: `Duplicate model id: ${id}`,
+      });
+    }
+    seen.add(id);
+  });
+}
+
+export const BenchmarkConfigSchema = z
+  .object({
+    classifierModels: z.array(z.string().trim().min(1)).min(1),
+    deciderModels: z.array(BenchmarkDeciderModelSchema).min(1),
+    // Accuracy threshold for "gets the job done" (per tier).
+    minAccuracy: z.number().min(0).max(1),
+    // Parallel OpenRouter calls per queue message.
+    maxConcurrency: z.number().int().min(1).max(16),
+    // The Kilo user whose identity/billing the decider CLI runs execute under.
+    // Null until an admin configures it; decider runs fail fast while null.
+    benchmarkUserId: z.string().trim().min(1).nullable(),
+    // Session stickiness knob carried into published routing tables: a session
+    // stays on its incumbent model while it meets the tier's accuracy
+    // threshold, unless the fresh pick is cheaper by more than this factor.
+    // Model switches discard provider prompt caches (cache reads are far
+    // cheaper than fresh input tokens), so switching only pays off when the
+    // recurring savings clearly outweigh the cache-rebuild penalty.
+    switchCostFactor: z.number().min(1).max(100),
+    // How many times to repeat each case for classifier / decider benchmarks.
+    // Repeated runs reduce variance; the default of 1 preserves the current
+    // single-pass behaviour.
+    classifierRepetitions: z.number().int().min(1).max(5).default(1),
+    deciderRepetitions: z.number().int().min(1).max(5).default(1),
+    // Maximum acceptable p95 latency for the classifier winner; null means no
+    // constraint (cost-only selection).
+    classifierMaxP95LatencyMs: z.number().int().positive().nullable().default(1000),
+    updatedAt: z.string().nullable(),
+    updatedBy: z.string().nullable(),
+  })
+  .superRefine((config, ctx) => {
+    addDuplicateModelIssues(config.classifierModels, 'classifierModels', ctx);
+    addDuplicateModelIssues(
+      config.deciderModels.map(m => m.id),
+      'deciderModels',
+      ctx
+    );
+  });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 
 export const BenchmarkRunStatusSchema = z.enum(['running', 'completed', 'failed']);

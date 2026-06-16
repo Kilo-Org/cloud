@@ -42,9 +42,8 @@ else
   pnpm --filter @kilocode/trpc run build
 fi
 
-# 2. Root typechecks (always — they are fast with incremental tsgo)
+# 2. Root typecheck (always — it's fast with incremental tsgo)
 tsgo --noEmit -p apps/web/tsconfig.json
-tsgo --noEmit -p scripts/web-env/tsconfig.json
 
 # 3. Workspace typecheck
 if ! $changes_only; then

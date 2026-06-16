@@ -1,199 +1,90 @@
-import { chmod, mkdtemp, rm } from 'node:fs/promises';
+import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createBackfillReport, formatBackfillReport } from './backfill-report.js';
-import { executeCommand } from './command.js';
-import { OnePasswordAdapter } from './onepassword.js';
-import { createTerminalPrompts } from './prompts.js';
-import { WEB_ENV_PROJECTS, type VariableMetadata } from './plan.js';
-import { VercelAdapter } from './vercel.js';
-
-function byKey(variables: VariableMetadata[]): Map<string, VariableMetadata> {
-  return new Map(variables.map(variable => [variable.key, variable]));
-}
+import {
+  PROJECTS,
+  confirm,
+  listVariables,
+  pullValue,
+  resolveVault,
+  resolveVercelContexts,
+  setVariable,
+  setVaultValue,
+} from './shared.js';
 
 async function main(): Promise<void> {
-  const confirmed = await createTerminalPrompts().confirm(
-    'This temporary migration changes production and staging Vercel metadata. Continue?'
-  );
-  if (!confirmed) {
+  if (
+    !(await confirm('Backfill readable Production secrets into 1Password and mark them sensitive?'))
+  ) {
     console.log('Cancelled.');
     return;
   }
 
-  const prompts = createTerminalPrompts();
-  const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'kilo-web-env-backfill-'));
-  await chmod(tempRoot, 0o700);
-  const vercel = new VercelAdapter(executeCommand, tempRoot);
-  const onePassword = new OnePasswordAdapter(executeCommand);
-  const report = createBackfillReport();
+  const tempDirectory = mkdtempSync(path.join(os.tmpdir(), 'kilo-web-env-backfill-'));
+  const migrated: string[] = [];
+  const unresolved: string[] = [];
+  const skipped: string[] = [];
 
   try {
-    await vercel.initialize();
-    await onePassword.initialize();
+    const contexts = resolveVercelContexts(tempDirectory);
+    const vaultId = resolveVault();
+    const production = contexts.map(context => listVariables(context, 'production'));
+    const names = [...new Set(production.flatMap(variables => [...variables.keys()]))].sort();
 
-    const appProduction = byKey(await vercel.listVariables('kilocode-app', 'production'));
-    const globalProduction = byKey(await vercel.listVariables('kilocode-global-app', 'production'));
-    const names = [...new Set([...appProduction.keys(), ...globalProduction.keys()])].sort();
-
-    for (const variableName of names) {
-      const appMetadata = appProduction.get(variableName);
-      const globalMetadata = globalProduction.get(variableName);
-      if (appMetadata?.type === 'system' || globalMetadata?.type === 'system') continue;
-      if (!appMetadata || !globalMetadata) {
-        report.productionMismatches.push(variableName);
+    for (const name of names) {
+      const types = production.map(variables => variables.get(name));
+      if (types.includes('system')) continue;
+      if (types.some(type => !type) || types.includes('sensitive')) {
+        unresolved.push(`${name} (missing or already sensitive)`);
         continue;
       }
-      if (appMetadata.type === 'sensitive' && globalMetadata.type === 'sensitive') {
-        report.alreadySensitive.push(variableName);
-        continue;
-      }
-      if (appMetadata.type === 'sensitive' || globalMetadata.type === 'sensitive') {
-        report.productionMismatches.push(variableName);
+      if (!(await confirm(`Treat ${name} as a secret?`))) {
+        skipped.push(name);
         continue;
       }
 
-      let mutationStarted = false;
-      let activeOperation = 'read-only discovery';
-      const completedOperations: string[] = [];
-      let plannedOperations: string[] = [];
-      try {
-        const appProductionValue = await vercel.pullReadableValue(
-          'kilocode-app',
-          'production',
-          variableName
-        );
-        const globalProductionValue = await vercel.pullReadableValue(
-          'kilocode-global-app',
-          'production',
-          variableName
-        );
-        if (
-          appProductionValue === undefined ||
-          globalProductionValue === undefined ||
-          appProductionValue !== globalProductionValue
-        ) {
-          report.productionMismatches.push(variableName);
-          continue;
-        }
-
-        const isSecret = await prompts.confirm(`Store ${variableName} as a production secret?`);
-        if (!isSecret) {
-          report.skipped.push(variableName);
-          continue;
-        }
-
-        const appStaging = await vercel.getVariable('kilocode-app', 'staging', variableName);
-        const globalStaging = await vercel.getVariable(
-          'kilocode-global-app',
-          'staging',
-          variableName
-        );
-        let stagingValue: string | undefined;
-        const stagingAlreadySensitive =
-          appStaging?.type === 'sensitive' && globalStaging?.type === 'sensitive';
-        if (!stagingAlreadySensitive) {
-          if (
-            !appStaging ||
-            !globalStaging ||
-            appStaging.type === 'sensitive' ||
-            globalStaging.type === 'sensitive'
-          ) {
-            report.stagingUnresolved.push(variableName);
-            continue;
-          }
-          const appStagingValue = await vercel.pullReadableValue(
-            'kilocode-app',
-            'staging',
-            variableName
-          );
-          const globalStagingValue = await vercel.pullReadableValue(
-            'kilocode-global-app',
-            'staging',
-            variableName
-          );
-          if (
-            appStagingValue === undefined ||
-            globalStagingValue === undefined ||
-            appStagingValue !== globalStagingValue
-          ) {
-            report.stagingUnresolved.push(variableName);
-            continue;
-          }
-          stagingValue = appStagingValue;
-        }
-
-        if (await onePassword.findItem(variableName)) {
-          report.failed.push(`${variableName} (1Password item already exists)`);
-          continue;
-        }
-
-        plannedOperations = [
-          '1Password',
-          ...WEB_ENV_PROJECTS.map(project => `${project}/production`),
-          ...(stagingValue === undefined
-            ? []
-            : WEB_ENV_PROJECTS.map(project => `${project}/staging`)),
-        ];
-        activeOperation = '1Password';
-        mutationStarted = true;
-        await onePassword.writeProductionValue('add', variableName, appProductionValue);
-        completedOperations.push(activeOperation);
-
-        for (const project of WEB_ENV_PROJECTS) {
-          activeOperation = `${project}/production`;
-          await vercel.writeVariable({
-            mode: 'resume',
-            project,
-            environment: 'production',
-            key: variableName,
-            value: appProductionValue,
-            sensitive: true,
-            expectedType: 'sensitive',
-          });
-          completedOperations.push(activeOperation);
-        }
-        if (stagingValue !== undefined) {
-          for (const project of WEB_ENV_PROJECTS) {
-            activeOperation = `${project}/staging`;
-            await vercel.writeVariable({
-              mode: 'resume',
-              project,
-              environment: 'staging',
-              key: variableName,
-              value: stagingValue,
-              sensitive: true,
-              expectedType: 'sensitive',
-            });
-            completedOperations.push(activeOperation);
-          }
-        }
-        report.migrated.push(variableName);
-      } catch {
-        if (!mutationStarted) {
-          report.failed.push(variableName);
-          continue;
-        }
-        const pending = plannedOperations.filter(
-          operation => operation !== activeOperation && !completedOperations.includes(operation)
-        );
-        report.failed.push(
-          `${variableName} (completed: ${completedOperations.join(', ') || 'none'}; failed: ${activeOperation}; pending: ${pending.join(', ') || 'none'})`
-        );
-        throw new Error(
-          `Backfill stopped after a partial mutation of ${variableName}. Use the value-free report to reconcile it before retrying.`
-        );
+      const productionValues = contexts.map(context => pullValue(context, 'production', name));
+      if (!productionValues[0] || productionValues.some(value => value !== productionValues[0])) {
+        unresolved.push(`${name} (Production values differ)`);
+        continue;
       }
+
+      const stagingTypes = contexts.map(context => listVariables(context, 'staging').get(name));
+      let stagingValue: string | undefined;
+      if (stagingTypes.every(type => type === 'sensitive')) {
+        stagingValue = undefined;
+      } else {
+        const stagingValues = contexts.map(context => pullValue(context, 'staging', name));
+        if (!stagingValues[0] || stagingValues.some(value => value !== stagingValues[0])) {
+          unresolved.push(`${name} (Staging values differ or are unavailable)`);
+          continue;
+        }
+        stagingValue = stagingValues[0];
+      }
+
+      console.log(`Migrating ${name}...`);
+      setVaultValue(vaultId, name, productionValues[0]);
+      for (const context of contexts) {
+        setVariable(context, 'production', name, productionValues[0], true);
+      }
+      if (stagingValue) {
+        for (const context of contexts) setVariable(context, 'staging', name, stagingValue, true);
+      }
+      migrated.push(name);
     }
   } finally {
-    await rm(tempRoot, { recursive: true, force: true });
-    console.log(`\n${formatBackfillReport(report, new Date().toISOString())}`);
+    rmSync(tempDirectory, { recursive: true, force: true });
+    console.log('\nMigrated:');
+    console.log(migrated.length ? migrated.map(name => `- ${name}`).join('\n') : '- None');
+    console.log('\nUnresolved:');
+    console.log(unresolved.length ? unresolved.map(name => `- ${name}`).join('\n') : '- None');
+    console.log('\nSkipped:');
+    console.log(skipped.length ? skipped.map(name => `- ${name}`).join('\n') : '- None');
+    console.log(`\nProjects checked: ${PROJECTS.join(', ')}`);
   }
 }
 
 main().catch(error => {
-  console.error(
-    error instanceof Error ? error.message : 'Backfill failed. Provider output was redacted.'
-  );
+  console.error(error instanceof Error ? error.message : 'Backfill failed.');
   process.exitCode = 1;
 });

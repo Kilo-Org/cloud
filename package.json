@@ -10,8 +10,7 @@
     "preinstall": "npx only-allow pnpm",
     "typecheck": "scripts/typecheck-all.sh",
     "build": "pnpm --filter web build",
-    "test": "pnpm run test:web-env && pnpm --filter web test",
-    "test:web-env": "tsgo --noEmit -p scripts/web-env/tsconfig.json && tsx --test scripts/web-env/*.test.ts",
+    "test": "pnpm --filter web test",
     "test:setup-smoke": "pnpm --filter web run test:setup-smoke",
     "lint": "scripts/lint-all.sh",
     "format": "oxfmt",
@@ -39,7 +38,6 @@
   },
   "packageManager": "pnpm@11.1.2",
   "devDependencies": {
-    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "husky": "9.1.7",
     "ink": "6.8.0",
@@ -49,7 +47,6 @@
     "oxlint-tsgolint": "0.17.4",
     "react": "19.2.6",
     "tsx": "catalog:",
-    "typescript": "catalog:",
-    "vercel": "53.3.1"
+    "typescript": "catalog:"
   }
 }

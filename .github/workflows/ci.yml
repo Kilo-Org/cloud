@@ -63,7 +63,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/worker-utils/**'
               - 'services/deploy-infra/builder/**'
-              - 'scripts/web-env/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent:

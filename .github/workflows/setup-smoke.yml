@@ -10,7 +10,8 @@ on:
       - '.env.local.example'
       - 'apps/web/.env'
       - 'apps/web/.env.development.local.example'
-      - 'dev/local/**'
+      - 'dev/local/setup-env.ts'
+      - 'dev/local/env-sync/**'
       - 'scripts/dev.sh'
       - '.github/workflows/setup-smoke.yml'
 

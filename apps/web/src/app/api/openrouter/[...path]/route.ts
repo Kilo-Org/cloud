@@ -114,7 +114,7 @@ import {
   STREAM_ATTEMPT_HEADER,
 } from '@/lib/ai-gateway/o11y/stream-lifecycle.server';
 
-export const maxDuration = 800;
+export const maxDuration = 1800;
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 

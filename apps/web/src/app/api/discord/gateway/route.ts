@@ -8,7 +8,7 @@ import { db, sql } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { discord_gateway_listener } from '@kilocode/db';
 
-export const maxDuration = 800;
+export const maxDuration = 1800;
 
 /**
  * Maximum duration for the Gateway listener (in ms).

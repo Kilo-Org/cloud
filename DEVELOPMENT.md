@@ -150,6 +150,41 @@ The setup covers: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `POSTGRES_URL`, `CALLBACK_T
 
 These changes will allow you to do local testing with a fake account.
 
+#### c. Add or rotate shared web environment variables
+
+Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app` and `kilocode-global-app` together for Development, Staging, and Production:
+
+```bash
+pnpm web:env add EXAMPLE_API_TOKEN
+pnpm web:env update EXAMPLE_API_TOKEN
+```
+
+Prerequisites:
+
+- Sign in with `vercel login` and have access to both projects in the `kilocode` scope.
+- Sign in with `op signin` and have write access to the `Kilo Web ENV Production` vault.
+- Run `pnpm install` so the repository-pinned Vercel CLI is available.
+
+Variables are sensitive by default. Production and Staging become Vercel-sensitive, while the separate Development value remains encrypted but exportable through `vercel env pull`. The Production value is also stored as a concealed, exact-name item in `Kilo Web ENV Production`.
+
+For public or otherwise non-secret configuration, opt out explicitly:
+
+```bash
+pnpm web:env add EXAMPLE_FEATURE_FLAG --no-sensitive
+```
+
+`NEXT_PUBLIC_*` variables require `--no-sensitive` because Next.js exposes them to browsers. Non-sensitive values are not copied to 1Password.
+
+The command prompts for all three values using hidden input, then asks for an explicit safe default or skip decision for every tracked root and `apps/web` dotenv file. Real environment values are never written to tracked files. Use `--dry-run` to perform preflight and preview the redacted plan without retaining changes.
+
+Remote updates are not transactional. If a provider write fails, the command stops and writes a value-free resume journal under `.tmp/web-env/`. Re-enter all three values with the printed command:
+
+```bash
+pnpm web:env resume .tmp/web-env/<journal>.json
+```
+
+The workflow does not deploy. Trigger the appropriate Staging or Production deployment separately when the new values should take effect.
+
 ### 4. Start the database
 
 The project uses PostgreSQL 18 with pgvector, running via Docker. The compose file is at `dev/docker-compose.yml`:

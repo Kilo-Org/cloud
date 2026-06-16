@@ -10,7 +10,8 @@
     "preinstall": "npx only-allow pnpm",
     "typecheck": "scripts/typecheck-all.sh",
     "build": "pnpm --filter web build",
-    "test": "pnpm --filter web test",
+    "test": "pnpm run test:web-env && pnpm --filter web test",
+    "test:web-env": "tsgo --noEmit -p scripts/web-env/tsconfig.json && tsx --test scripts/web-env/*.test.ts",
     "test:setup-smoke": "pnpm --filter web run test:setup-smoke",
     "lint": "scripts/lint-all.sh",
     "format": "oxfmt",
@@ -33,10 +34,12 @@
     "dev:setup-env": "tsx dev/local/setup-env.ts",
     "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
-    "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts"
+    "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts",
+    "web:env": "tsx scripts/web-env/index.ts"
   },
   "packageManager": "pnpm@11.1.2",
   "devDependencies": {
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "husky": "9.1.7",
     "ink": "6.8.0",
@@ -46,6 +49,7 @@
     "oxlint-tsgolint": "0.17.4",
     "react": "19.2.6",
     "tsx": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vercel": "53.3.1"
   }
 }

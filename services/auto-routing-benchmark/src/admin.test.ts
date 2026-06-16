@@ -471,9 +471,10 @@ describe('POST /admin/runs', () => {
     expect(body.enqueuedModels).toBe(1);
   });
 
-  it('slices a >100-message decider fan-out into sendBatch-sized batches', async () => {
-    // 7 decider models × 1 rep × ceil(76/5)=16 chunks = 112 messages, which
-    // exceeds Cloudflare Queues' 100-per-sendBatch cap and must be sliced.
+  it('seeds one decider chunk per model repetition', async () => {
+    // Later chunks are chained by processJob after each chunk completes. Start
+    // only seeds one message per model/repetition so live container cardinality
+    // is bounded by models × repetitions, not models × repetitions × chunks.
     const manyModels = Array.from({ length: 7 }, (_, i) => ({
       id: `vendor/model-${i}`,
       reasoningEffort: null,
@@ -487,10 +488,9 @@ describe('POST /admin/runs', () => {
     const res = await authedPost('/admin/runs', { kind: 'decider' });
     expect(res.status).toBe(200);
 
-    // 112 messages → two batches (100 + 12), neither over the limit.
-    expect(queueSendBatch).toHaveBeenCalledTimes(2);
+    expect(queueSendBatch).toHaveBeenCalledTimes(1);
     const batchSizes = queueSendBatch.mock.calls.map(([batch]) => (batch as unknown[]).length);
-    expect(batchSizes).toEqual([100, 12]);
+    expect(batchSizes).toEqual([manyModels.length]);
     for (const size of batchSizes) expect(size).toBeLessThanOrEqual(100);
   });
 });

@@ -10,6 +10,7 @@ vi.mock('./db', async importOriginal => {
     countCaseResults: vi.fn(),
     existsNewerCompletedRun: vi.fn(),
     getCaseResults: vi.fn(),
+    getExistingCaseResultIds: vi.fn(),
     getRunWithModels: vi.fn(),
     getSummaries: vi.fn(),
     markRunCompleted: vi.fn(),
@@ -29,10 +30,16 @@ vi.mock('./cli-runner', async importOriginal => {
 });
 
 import { runDeciderCaseViaCli, warmUpCliContainer, type CliRunResult } from './cli-runner';
-import { countCaseResults, getRunWithModels, upsertCaseResult } from './db';
+import {
+  countCaseResults,
+  getExistingCaseResultIds,
+  getRunWithModels,
+  upsertCaseResult,
+} from './db';
 import { processJob } from './run';
 
 const tokenGet = vi.fn<() => Promise<string>>();
+const queueSendBatch = vi.fn<(messages: unknown[]) => Promise<void>>();
 const model = 'qwen/qwen3-coder-next';
 const runId = 'decider-test-run';
 const [benchCase] = DECIDER_CASES;
@@ -51,6 +58,7 @@ const successfulCliResult = {
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
   BENCH_DB: {} as D1Database,
+  BENCH_QUEUE: { sendBatch: queueSendBatch },
   AUTO_ROUTING_CONFIG: { delete: vi.fn() },
 } as unknown as Env;
 
@@ -83,6 +91,7 @@ function deciderMessage() {
 beforeEach(() => {
   vi.clearAllMocks();
   tokenGet.mockResolvedValue('internal-secret');
+  queueSendBatch.mockResolvedValue(undefined);
   vi.stubGlobal(
     'fetch',
     vi.fn(async () =>
@@ -91,6 +100,7 @@ beforeEach(() => {
   );
   mockRunSnapshot();
   vi.mocked(countCaseResults).mockResolvedValue(0);
+  vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set());
   vi.mocked(warmUpCliContainer).mockResolvedValue(undefined);
   vi.mocked(runDeciderCaseViaCli).mockResolvedValue(successfulCliResult);
 });
@@ -123,5 +133,53 @@ describe('processJob — decider container availability failures', () => {
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
     expect(countCaseResults).not.toHaveBeenCalled();
+  });
+});
+
+describe('processJob — decider chunk chaining', () => {
+  it('runs a chunk on the model-repetition container and enqueues the next chunk', async () => {
+    const message = {
+      ...deciderMessage(),
+      caseIds: DECIDER_CASES.slice(0, 5).map(c => c.id),
+    };
+
+    await processJob(env, message);
+
+    expect(warmUpCliContainer).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ instanceName: `${runId}:${model}:0` })
+    );
+    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ instanceName: `${runId}:${model}:0` })
+    );
+    expect(queueSendBatch).toHaveBeenCalledWith([
+      {
+        body: {
+          runId,
+          kind: 'decider',
+          model,
+          chunk: 1,
+          rep: 0,
+          caseIds: DECIDER_CASES.slice(5, 10).map(c => c.id),
+        },
+      },
+    ]);
+    expect(countCaseResults).not.toHaveBeenCalled();
+  });
+
+  it('does not rerun completed chunk cases or enqueue a next chunk that already started', async () => {
+    const currentCaseIds = DECIDER_CASES.slice(0, 5).map(c => c.id);
+    const nextCaseIds = DECIDER_CASES.slice(5, 10).map(c => c.id);
+    vi.mocked(getExistingCaseResultIds)
+      .mockResolvedValueOnce(new Set(currentCaseIds))
+      .mockResolvedValueOnce(new Set([nextCaseIds[0]]));
+
+    await processJob(env, { ...deciderMessage(), caseIds: currentCaseIds });
+
+    expect(warmUpCliContainer).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 });

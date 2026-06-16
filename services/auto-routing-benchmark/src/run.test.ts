@@ -6,6 +6,7 @@ import {
   buildDeciderMessages,
   chunkArray,
   computeEngineIdentity,
+  getDeciderContainerInstanceName,
   runCasesWithConcurrency,
   summarize,
 } from './run';
@@ -435,7 +436,7 @@ describe('decider message fan-out', () => {
     expect(withRep.rep).toBe(2);
   });
 
-  it('buildDeciderMessages: produces models × reps × ceil(76/5) messages with correct rep', () => {
+  it('buildDeciderMessages: seeds one chunk per model repetition', () => {
     // 76 cases, chunk size 5 → 16 chunks
     const cases76 = Array.from({ length: 76 }, (_, i) => ({ id: `case-${i}` }));
     const chunks = chunkArray(cases76, 5);
@@ -445,29 +446,30 @@ describe('decider message fan-out', () => {
     const repetitions = 3;
     const messages = buildDeciderMessages('run-test', 'decider', models, repetitions, chunks);
 
-    // Total: 2 models × 3 reps × 16 chunks = 96 messages
-    expect(messages).toHaveLength(models.length * repetitions * chunks.length);
+    // Initial fan-out is bounded to one active chunk per model/repetition.
+    expect(messages).toHaveLength(models.length * repetitions);
 
-    // Each rep index (0..2) should appear exactly models.length × chunks.length times
     for (let rep = 0; rep < repetitions; rep++) {
       const forRep = messages.filter(m => m.body.rep === rep);
-      expect(forRep).toHaveLength(models.length * chunks.length);
+      expect(forRep).toHaveLength(models.length);
     }
 
-    // Every message carries the correct rep in its body
     for (const { body } of messages) {
       expect(typeof body.rep).toBe('number');
       expect(body.rep).toBeGreaterThanOrEqual(0);
       expect(body.rep).toBeLessThan(repetitions);
+      expect(body.chunk).toBe(0);
+      expect(body.caseIds).toEqual(chunks[0].map(c => c.id));
     }
+  });
 
-    // caseIds on each message match the chunk
-    for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
-      const forChunk = messages.filter(m => m.body.chunk === chunkIdx);
-      for (const { body } of forChunk) {
-        expect(body.caseIds).toEqual(chunks[chunkIdx].map(c => c.id));
-      }
-    }
+  it('getDeciderContainerInstanceName reuses one container per model repetition', () => {
+    const base = { runId: 'run-test', kind: 'decider' as const, model: 'model/a', rep: 2 };
+    expect(getDeciderContainerInstanceName({ ...base, chunk: 0 })).toBe('run-test:model/a:2');
+    expect(getDeciderContainerInstanceName({ ...base, chunk: 15 })).toBe('run-test:model/a:2');
+    expect(getDeciderContainerInstanceName({ ...base, rep: 3, chunk: 0 })).toBe(
+      'run-test:model/a:3'
+    );
   });
 });
 

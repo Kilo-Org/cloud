@@ -44,10 +44,10 @@ type ContainerRunResponse = {
 /**
  * Run one decider case through the `kilo` CLI inside a Cloudflare Container.
  *
- * `instanceName` is the precomputed DO instance name (e.g.
- * `${runId}:${model}:${chunk}`); the caller owns the keying so chunks/models
- * map to stable instances. The CLI has no system-prompt flag, so we fold the
- * system prompt into the user prompt.
+ * `instanceName` is the precomputed DO instance name; the caller owns the
+ * keying so chunks for the same model/repetition share a stable instance. The
+ * CLI has no system-prompt flag, so we fold the system prompt into the user
+ * prompt.
  */
 export async function runDeciderCaseViaCli(
   env: Env,

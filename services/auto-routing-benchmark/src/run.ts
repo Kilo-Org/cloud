@@ -16,6 +16,7 @@ import {
   countCaseResults,
   existsNewerCompletedRun,
   getCaseResults,
+  getExistingCaseResultIds,
   getLatestSummariesByModel,
   getRunningRun,
   getRunWithModels,
@@ -146,8 +147,9 @@ export function computeEngineIdentity(kind: BenchmarkKind): string {
   return `v${BENCHMARK_ENGINE_VERSION}:${fnv1aHex(JSON.stringify(datasetSignature))}`;
 }
 
-/** Pure helper: produces the sendBatch bodies for a decider run fan-out.
- * Extracted for unit-testability; the shape is models × reps × chunks messages.
+/** Pure helper: produces the initial sendBatch bodies for a decider run.
+ * Extracted for unit-testability; the shape is models × reps messages. Later
+ * chunks are chained by processDeciderJob after the previous chunk completes.
  */
 export function buildDeciderMessages(
   runId: string,
@@ -156,20 +158,26 @@ export function buildDeciderMessages(
   repetitions: number,
   chunks: readonly (readonly { id: string }[])[]
 ): { body: BenchmarkJobMessage }[] {
+  const [firstChunk] = chunks;
+  if (!firstChunk) return [];
   return modelIds.flatMap(model =>
-    Array.from({ length: repetitions }, (_, rep) =>
-      chunks.map((chunkCases, chunk) => ({
-        body: {
-          runId,
-          kind,
-          model,
-          chunk,
-          rep,
-          caseIds: chunkCases.map(c => c.id),
-        } satisfies BenchmarkJobMessage,
-      }))
-    ).flat()
+    Array.from({ length: repetitions }, (_, rep) => ({
+      body: {
+        runId,
+        kind,
+        model,
+        chunk: 0,
+        rep,
+        caseIds: firstChunk.map(c => c.id),
+      } satisfies BenchmarkJobMessage,
+    }))
   );
+}
+
+export function getDeciderContainerInstanceName(
+  message: Pick<BenchmarkJobMessage, 'runId' | 'model' | 'rep' | 'chunk'>
+): string {
+  return `${message.runId}:${message.model}:${message.rep ?? 0}`;
 }
 
 export function buildClassifierMessages(
@@ -345,8 +353,9 @@ export async function startRun(
     return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
   }
 
-  // Decider: one message per (model, rep, chunk) so each queue invocation stays
-  // bounded. finalizeRunIfComplete expects enqueuedModels × DECIDER_CASES × repetitions rows.
+  // Decider: seed one chunk per (model, rep). Each completed chunk enqueues
+  // the next chunk for the same (model, rep), keeping queue invocations bounded
+  // without creating one live container per chunk.
   const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
   const messages = buildDeciderMessages(runId, kind, enqueuedModelIds, repetitions, chunks);
   await enqueueRunMessages(env, runId, messages);
@@ -371,6 +380,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
   const message = parsed.data;
   const state = await getRunState(env, message.runId);
 
+  let shouldFinalize = true;
   if (message.kind === 'classifier') {
     if (!message.caseIds?.length || message.rep === undefined) {
       console.warn(
@@ -427,10 +437,13 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
       }
     );
   } else {
-    await processDeciderJob(env, message, state);
+    const result = await processDeciderJob(env, message, state);
+    shouldFinalize = result.shouldFinalize;
   }
 
-  await finalizeRunIfComplete(env, message.runId, message.kind, state);
+  if (shouldFinalize) {
+    await finalizeRunIfComplete(env, message.runId, message.kind, state);
+  }
 }
 
 type RunState = {
@@ -465,15 +478,26 @@ async function processDeciderJob(
   env: Env,
   message: BenchmarkJobMessage,
   state: RunState
-): Promise<void> {
+): Promise<{ shouldFinalize: boolean }> {
   // Decider messages always carry their chunk's case ids; anything else is
   // malformed and dropped (same policy as unparseable messages).
   if (!message.caseIds?.length) {
     console.warn(JSON.stringify({ event: 'benchmark_job_missing_case_ids', runId: message.runId }));
-    return;
+    return { shouldFinalize: false };
   }
   const caseIds = new Set(message.caseIds);
   const cases = DECIDER_CASES.filter(c => caseIds.has(c.id));
+  if (cases.length === 0) {
+    console.warn(
+      JSON.stringify({
+        event: 'benchmark_job_empty_case_chunk',
+        runId: message.runId,
+        model: message.model,
+        chunk: message.chunk ?? 0,
+      })
+    );
+    return { shouldFinalize: false };
+  }
 
   if (!state.benchmarkUserId) {
     // startRun fails fast before enqueueing, so this only happens if the run
@@ -481,87 +505,138 @@ async function processDeciderJob(
     throw new Error(`run ${message.runId} has no benchmarkUserId`);
   }
 
-  // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
-  // queue retries the message. The token is never logged.
-  const kiloToken = await fetchBenchmarkUserToken(env, state.benchmarkUserId);
   const rep = message.rep ?? 0;
-  const instanceName = `${message.runId}:${message.model}:${rep}:${message.chunk ?? 0}`;
+  const chunk = message.chunk ?? 0;
+  const instanceName = getDeciderContainerInstanceName(message);
+
+  const existingCaseIds = await getExistingCaseResultIds(env.BENCH_DB, {
+    runId: message.runId,
+    model: message.model,
+    rep,
+    caseIds: cases.map(c => c.id),
+  });
+  const casesToRun = cases.filter(c => !existingCaseIds.has(c.id));
 
   // Reasoning effort comes from the run snapshot (run_models row), not live config.
   const modelRow = state.models.find(m => m.model === message.model);
   const reasoningEffort = modelRow?.reasoning_effort ?? null;
 
-  // Fresh container instances run the CLI's one-time sqlite migration; the
-  // container owns that via its /warmup endpoint so the first real case
-  // doesn't burn its timeout on it. Ordinary warmup failures are non-fatal:
-  // the first case absorbs whatever warmup work remains. Container capacity
-  // failures are infrastructure pressure, so the queue retries the message.
-  await warmUpCliContainer(env, { instanceName, model: message.model, kiloToken }).catch(error => {
-    if (isRetryableContainerAvailabilityError(error)) throw error;
-  });
+  if (casesToRun.length > 0) {
+    // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
+    // queue retries the message. The token is never logged.
+    const kiloToken = await fetchBenchmarkUserToken(env, state.benchmarkUserId);
 
-  // Concurrency 1: the CLI's sqlite state in the container is not safe under
-  // concurrent sessions (partial-migration crashes); the container serializes
-  // too, so higher concurrency here would only hold HTTP requests open.
-  await runCasesWithConcurrency(cases, 1, async benchCase => {
-    const startedAt = performance.now();
-    try {
-      let result = await runDeciderCaseViaCli(env, {
-        instanceName,
-        model: message.model,
-        benchCase,
-        kiloToken,
-        reasoningEffort,
-      });
-      // The CLI occasionally ends a session with no assistant text at all
-      // (transient empty completion: a lone step_finish with cost 0). Mirror
-      // the production classifier's policy and retry once.
-      let retried = false;
-      if (result.exitCode === 0 && result.text.length === 0) {
-        retried = true;
-        const retry = await runDeciderCaseViaCli(env, {
+    // Fresh container instances run the CLI's one-time sqlite migration; the
+    // container owns that via its /warmup endpoint so the first real case
+    // doesn't burn its timeout on it. Ordinary warmup failures are non-fatal:
+    // the first case absorbs whatever warmup work remains. Container capacity
+    // failures are infrastructure pressure, so the queue retries the message.
+    await warmUpCliContainer(env, { instanceName, model: message.model, kiloToken }).catch(
+      error => {
+        if (isRetryableContainerAvailabilityError(error)) throw error;
+      }
+    );
+
+    // Concurrency 1: the CLI's sqlite state in the container is not safe under
+    // concurrent sessions (partial-migration crashes); the container serializes
+    // too, so higher concurrency here would only hold HTTP requests open.
+    await runCasesWithConcurrency(casesToRun, 1, async benchCase => {
+      const startedAt = performance.now();
+      try {
+        let result = await runDeciderCaseViaCli(env, {
           instanceName,
           model: message.model,
           benchCase,
           kiloToken,
           reasoningEffort,
         });
-        retry.costUsd =
-          retry.costUsd === null && result.costUsd === null
-            ? null
-            : (retry.costUsd ?? 0) + (result.costUsd ?? 0);
-        result = retry;
+        // The CLI occasionally ends a session with no assistant text at all
+        // (transient empty completion: a lone step_finish with cost 0). Mirror
+        // the production classifier's policy and retry once.
+        let retried = false;
+        if (result.exitCode === 0 && result.text.length === 0) {
+          retried = true;
+          const retry = await runDeciderCaseViaCli(env, {
+            instanceName,
+            model: message.model,
+            benchCase,
+            kiloToken,
+            reasoningEffort,
+          });
+          retry.costUsd =
+            retry.costUsd === null && result.costUsd === null
+              ? null
+              : (retry.costUsd ?? 0) + (result.costUsd ?? 0);
+          result = retry;
+        }
+        const succeeded =
+          result.exitCode === 0 &&
+          result.text.length > 0 &&
+          runDeciderCheck(benchCase.check, result.text);
+        await upsertCaseResult(env.BENCH_DB, {
+          run_id: message.runId,
+          model: message.model,
+          case_id: benchCase.id,
+          tier: benchCase.tier,
+          score: succeeded ? 1 : 0,
+          latency_ms: result.latencyMs,
+          cost_usd: result.costUsd,
+          error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
+          fallback_reason: null,
+          retried,
+          exit_code: result.exitCode,
+          output_prefix: result.text.slice(0, 200),
+          event_count: result.eventCount,
+          last_event_types: result.lastEventTypes.join(' '),
+          rep,
+          timed_out: result.timedOut ? 1 : 0,
+        });
+      } catch (error) {
+        if (isRetryableContainerAvailabilityError(error)) throw error;
+        await upsertCaseResult(
+          env.BENCH_DB,
+          failedRow(message, benchCase.id, benchCase.tier, startedAt, error, rep)
+        );
       }
-      const succeeded =
-        result.exitCode === 0 &&
-        result.text.length > 0 &&
-        runDeciderCheck(benchCase.check, result.text);
-      await upsertCaseResult(env.BENCH_DB, {
-        run_id: message.runId,
-        model: message.model,
-        case_id: benchCase.id,
-        tier: benchCase.tier,
-        score: succeeded ? 1 : 0,
-        latency_ms: result.latencyMs,
-        cost_usd: result.costUsd,
-        error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
-        fallback_reason: null,
-        retried,
-        exit_code: result.exitCode,
-        output_prefix: result.text.slice(0, 200),
-        event_count: result.eventCount,
-        last_event_types: result.lastEventTypes.join(' '),
-        rep,
-        timed_out: result.timedOut ? 1 : 0,
-      });
-    } catch (error) {
-      if (isRetryableContainerAvailabilityError(error)) throw error;
-      await upsertCaseResult(
-        env.BENCH_DB,
-        failedRow(message, benchCase.id, benchCase.tier, startedAt, error, rep)
-      );
-    }
+    });
+  }
+
+  const hasNextChunk = await enqueueNextDeciderChunkIfNeeded(env, message, rep, chunk);
+  return { shouldFinalize: !hasNextChunk };
+}
+
+async function enqueueNextDeciderChunkIfNeeded(
+  env: Env,
+  message: BenchmarkJobMessage,
+  rep: number,
+  chunk: number
+): Promise<boolean> {
+  const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
+  const nextChunk = chunks[chunk + 1];
+  if (!nextChunk) return false;
+
+  const nextCaseIds = nextChunk.map(c => c.id);
+  const existingNextCaseIds = await getExistingCaseResultIds(env.BENCH_DB, {
+    runId: message.runId,
+    model: message.model,
+    rep,
+    caseIds: nextCaseIds,
   });
+  if (existingNextCaseIds.size > 0) return true;
+
+  await env.BENCH_QUEUE.sendBatch([
+    {
+      body: {
+        runId: message.runId,
+        kind: 'decider',
+        model: message.model,
+        chunk: chunk + 1,
+        rep,
+        caseIds: nextCaseIds,
+      } satisfies BenchmarkJobMessage,
+    },
+  ]);
+  return true;
 }
 
 const TokenResponseSchema = z.object({ token: z.string().min(1), expiresAt: z.string() });

@@ -251,6 +251,25 @@ export async function getCaseResults(db: D1Database, runId: string): Promise<Cas
   return drizzle(db).select().from(caseResults).where(eq(caseResults.run_id, runId));
 }
 
+export async function getExistingCaseResultIds(
+  db: D1Database,
+  params: { runId: string; model: string; rep: number; caseIds: string[] }
+): Promise<Set<string>> {
+  if (params.caseIds.length === 0) return new Set();
+  const rows = await drizzle(db)
+    .select({ case_id: caseResults.case_id })
+    .from(caseResults)
+    .where(
+      and(
+        eq(caseResults.run_id, params.runId),
+        eq(caseResults.model, params.model),
+        eq(caseResults.rep, params.rep),
+        inArray(caseResults.case_id, params.caseIds)
+      )
+    );
+  return new Set(rows.map(row => row.case_id));
+}
+
 // ---------------------------------------------------------------------------
 // Model summaries
 // ---------------------------------------------------------------------------

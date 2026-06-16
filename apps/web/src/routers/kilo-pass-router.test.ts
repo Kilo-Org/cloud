@@ -188,7 +188,8 @@ type KiloPassCaller = {
           | 'destroyed_instance'
           | 'requires_reprovision'
           | 'insufficient_credits'
-          | 'expired_commit';
+          | 'expired_commit'
+          | 'unexpected_error';
       }
   >;
   getCustomerPortalUrl: (input: { returnUrl?: string }) => Promise<{ url: string }>;
@@ -2286,6 +2287,64 @@ describe('kiloPassRouter', () => {
         .from(credit_transactions)
         .where(eq(credit_transactions.kilo_user_id, user.id));
       expect(deductions).toHaveLength(0);
+    });
+
+    it('returns non-retryable recovery when settled credits cannot cover hosting', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-hosting-insufficient-credits@example.com',
+      });
+      const instanceId = crypto.randomUUID();
+      await db.insert(kiloclaw_instances).values({
+        id: instanceId,
+        user_id: user.id,
+        sandbox_id: `test-${instanceId}`,
+      });
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        instance_id: instanceId,
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: '2026-05-10',
+      });
+      const { id: kiloPassSubscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_kilo_pass_hosting_insufficient_credits',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId: kiloPassSubscriptionId,
+        kiloUserId: user.id,
+      });
+
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        status: 'complete',
+        subscription: 'sub_kilo_pass_hosting_insufficient_credits',
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          kiloclawHostingPlan: 'standard',
+          kiloclawInstanceId: instanceId,
+          kiloclawPriceVersion: '2026-05-10',
+        },
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_kilo_pass_hosting_insufficient_credits',
+        created: Math.floor(new Date('2026-06-10T15:00:00.000Z').getTime() / 1000),
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.activateCheckoutHosting({
+          sessionId: 'cs_kilo_pass_hosting_insufficient_credits',
+        })
+      ).resolves.toEqual({
+        outcome: 'action_required',
+        hostingIntent: 'standard',
+        reason: 'insufficient_credits',
+      });
     });
 
     it('rejects a stale checkout price version before credit enrollment', async () => {

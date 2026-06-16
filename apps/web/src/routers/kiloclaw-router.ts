@@ -129,8 +129,10 @@ import {
   undoKiloClawCommitStandardContinuation,
 } from '@/lib/kiloclaw/commit-retirement';
 import {
+  CreditEnrollmentError,
   enrollWithCredits as enrollWithCreditsImpl,
   getEffectiveCreditBalancePreview,
+  type CreditEnrollmentErrorReason,
 } from '@/lib/kiloclaw/credit-billing';
 import {
   logCreditEnrollmentAttempted,
@@ -343,24 +345,37 @@ async function getLatestPersonalBillingInstance(
   return instance ?? null;
 }
 
-function classifyEnrollWithCreditsError(message: string): {
-  code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST' | 'INTERNAL_SERVER_ERROR';
+type CreditEnrollmentRouterErrorDisposition = {
+  code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST';
   failureReason: CreditEnrollmentFailureReason;
-} {
-  if (message.includes('requires reprovisioning')) {
-    return { code: 'CONFLICT', failureReason: 'precondition_failed' };
-  }
-  if (message.includes('not found')) {
-    return { code: 'NOT_FOUND', failureReason: 'user_not_found' };
-  }
-  if (message.includes('already processed')) {
-    return { code: 'CONFLICT', failureReason: 'duplicate_enrollment' };
-  }
-  if (message.includes('already exists')) {
-    return { code: 'CONFLICT', failureReason: 'active_subscription_exists' };
-  }
-  if (message.includes('Insufficient credit balance')) {
-    return { code: 'BAD_REQUEST', failureReason: 'insufficient_credits' };
+};
+
+const CREDIT_ENROLLMENT_ROUTER_ERROR_DISPOSITIONS = {
+  commit_unavailable: { code: 'BAD_REQUEST', failureReason: 'precondition_failed' },
+  user_not_found: { code: 'NOT_FOUND', failureReason: 'user_not_found' },
+  instance_not_found: { code: 'NOT_FOUND', failureReason: 'no_instance' },
+  instance_destroyed: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  active_subscription_exists: {
+    code: 'CONFLICT',
+    failureReason: 'active_subscription_exists',
+  },
+  unknown_price_version: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  price_version_mismatch: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  insufficient_credits: { code: 'BAD_REQUEST', failureReason: 'insufficient_credits' },
+  target_unavailable: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  target_changed: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  requires_reprovision: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  duplicate_enrollment: { code: 'CONFLICT', failureReason: 'duplicate_enrollment' },
+} satisfies Record<CreditEnrollmentErrorReason, CreditEnrollmentRouterErrorDisposition>;
+
+function classifyEnrollWithCreditsError(error: unknown):
+  | CreditEnrollmentRouterErrorDisposition
+  | {
+      code: 'INTERNAL_SERVER_ERROR';
+      failureReason: 'internal_error';
+    } {
+  if (error instanceof CreditEnrollmentError) {
+    return CREDIT_ENROLLMENT_ROUTER_ERROR_DISPOSITIONS[error.reason];
   }
   return { code: 'INTERNAL_SERVER_ERROR', failureReason: 'internal_error' };
 }
@@ -5230,7 +5245,7 @@ export const kiloclawRouter = createTRPCRouter({
         }
 
         const message = error instanceof Error ? error.message : 'Credit enrollment failed';
-        const { code, failureReason } = classifyEnrollWithCreditsError(message);
+        const { code, failureReason } = classifyEnrollWithCreditsError(error);
         logCreditEnrollmentFailed({
           userId: ctx.user.id,
           plan: input.plan,

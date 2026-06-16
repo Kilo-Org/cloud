@@ -73,5 +73,11 @@ describe('KiloClaw pricing catalog', () => {
     expect(() => getKiloClawPricingCatalogEntry('toString')).toThrow(
       'Unknown KiloClaw price version'
     );
+    expect(() =>
+      resolveKiloClawEnrollmentPriceVersion({
+        status: 'trialing',
+        kiloclawPriceVersion: '2099-01-01',
+      })
+    ).toThrow('Unknown KiloClaw price version');
   });
 });

@@ -1,7 +1,11 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@/lib/drizzle';
-import { enrollWithCredits } from '@/lib/kiloclaw/credit-billing';
+import {
+  CreditEnrollmentError,
+  enrollWithCredits,
+  type CreditEnrollmentErrorReason,
+} from '@/lib/kiloclaw/credit-billing';
 import {
   isBeforeKiloClawCommitSalesCutoff,
   isKiloClawPriceVersion,
@@ -801,9 +805,72 @@ const ActivateCheckoutHostingOutputSchema = z.discriminatedUnion('outcome', [
       'requires_reprovision',
       'insufficient_credits',
       'expired_commit',
+      'unexpected_error',
     ]),
   }),
 ]);
+
+type ActivateCheckoutHostingOutput = z.infer<typeof ActivateCheckoutHostingOutputSchema>;
+type HostingActivationActionRequiredReason = Extract<
+  ActivateCheckoutHostingOutput,
+  { outcome: 'action_required' }
+>['reason'];
+
+type CreditEnrollmentDisposition = {
+  idempotentConflict: boolean;
+  actionRequiredReason: HostingActivationActionRequiredReason;
+};
+
+const CREDIT_ENROLLMENT_DISPOSITIONS = {
+  commit_unavailable: {
+    idempotentConflict: false,
+    actionRequiredReason: 'expired_commit',
+  },
+  user_not_found: {
+    idempotentConflict: false,
+    actionRequiredReason: 'unexpected_error',
+  },
+  instance_not_found: {
+    idempotentConflict: false,
+    actionRequiredReason: 'missing_instance',
+  },
+  instance_destroyed: {
+    idempotentConflict: false,
+    actionRequiredReason: 'destroyed_instance',
+  },
+  active_subscription_exists: {
+    idempotentConflict: true,
+    actionRequiredReason: 'stale_intent',
+  },
+  unknown_price_version: {
+    idempotentConflict: false,
+    actionRequiredReason: 'unexpected_error',
+  },
+  price_version_mismatch: {
+    idempotentConflict: false,
+    actionRequiredReason: 'stale_intent',
+  },
+  insufficient_credits: {
+    idempotentConflict: false,
+    actionRequiredReason: 'insufficient_credits',
+  },
+  target_unavailable: {
+    idempotentConflict: false,
+    actionRequiredReason: 'destroyed_instance',
+  },
+  target_changed: {
+    idempotentConflict: true,
+    actionRequiredReason: 'stale_intent',
+  },
+  requires_reprovision: {
+    idempotentConflict: false,
+    actionRequiredReason: 'requires_reprovision',
+  },
+  duplicate_enrollment: {
+    idempotentConflict: true,
+    actionRequiredReason: 'stale_intent',
+  },
+} satisfies Record<CreditEnrollmentErrorReason, CreditEnrollmentDisposition>;
 
 const CreateCheckoutSessionInputSchema = z.object({
   tier: KiloPassTierSchema,
@@ -1523,12 +1590,12 @@ export const kiloPassRouter = createTRPCRouter({
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        const isIdempotentConflict =
-          errorMessage.includes('target changed before the deduction') ||
-          errorMessage.includes('Enrollment already processed') ||
-          errorMessage.includes('active subscription already exists');
+        const enrollmentDisposition =
+          error instanceof CreditEnrollmentError
+            ? CREDIT_ENROLLMENT_DISPOSITIONS[error.reason]
+            : null;
         const concurrentReplaySucceeded =
-          isIdempotentConflict &&
+          enrollmentDisposition?.idempotentConflict === true &&
           (await isExpectedCreditHostingActive({
             userId: ctx.user.id,
             instanceId: instance.id,
@@ -1547,20 +1614,7 @@ export const kiloPassRouter = createTRPCRouter({
           return { outcome: 'activated', hostingIntent: hostingPlan };
         }
 
-        const actionRequiredReason = errorMessage.includes('Insufficient credit balance')
-          ? 'insufficient_credits'
-          : errorMessage.includes('destroyed KiloClaw instance') ||
-              errorMessage.includes('no longer an active personal instance')
-            ? 'destroyed_instance'
-            : errorMessage.includes('personal instance not found')
-              ? 'missing_instance'
-              : errorMessage.includes('price version no longer matches') ||
-                  errorMessage.includes('target changed before the deduction') ||
-                  errorMessage.includes('active subscription already exists')
-                ? 'stale_intent'
-                : errorMessage.includes('requires reprovisioning')
-                  ? 'requires_reprovision'
-                  : null;
+        const actionRequiredReason = enrollmentDisposition?.actionRequiredReason ?? null;
         logHostingActivationWarning('Kilo Pass hosting activation failed', {
           user_id: ctx.user.id,
           checkout_session_id: input.sessionId,

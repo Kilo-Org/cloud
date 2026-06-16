@@ -7,6 +7,7 @@ import { db } from '@/lib/drizzle';
 import {
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
+  isKiloClawPriceVersion,
   resolveKiloClawEnrollmentPriceVersion,
   insertKiloClawSubscriptionChangeLog,
   type KiloClawPriceVersion,
@@ -96,6 +97,30 @@ class CreditSettlementResolutionError extends Error {
     this.name = 'CreditSettlementResolutionError';
     this.reason = reason;
     this.details = details;
+  }
+}
+
+export type CreditEnrollmentErrorReason =
+  | 'commit_unavailable'
+  | 'user_not_found'
+  | 'instance_not_found'
+  | 'instance_destroyed'
+  | 'active_subscription_exists'
+  | 'unknown_price_version'
+  | 'price_version_mismatch'
+  | 'insufficient_credits'
+  | 'target_unavailable'
+  | 'target_changed'
+  | 'requires_reprovision'
+  | 'duplicate_enrollment';
+
+export class CreditEnrollmentError extends Error {
+  readonly reason: CreditEnrollmentErrorReason;
+
+  constructor(reason: CreditEnrollmentErrorReason, message: string) {
+    super(message);
+    this.name = 'CreditEnrollmentError';
+    this.reason = reason;
   }
 }
 
@@ -1206,7 +1231,12 @@ export async function enrollWithCredits(params: {
   commitQualification?: KiloClawCommitEnrollmentQualification;
 }): Promise<void> {
   const { userId, instanceId, plan, hadPaidSubscription } = params;
-  assertKiloClawCommitAdmission({ plan, qualification: params.commitQualification });
+  try {
+    assertKiloClawCommitAdmission({ plan, qualification: params.commitQualification });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Commit enrollment is unavailable.';
+    throw new CreditEnrollmentError('commit_unavailable', message);
+  }
 
   // Step 1: Read current state
   const [user] = await db
@@ -1221,7 +1251,7 @@ export async function enrollWithCredits(params: {
 
   if (!user) {
     logError('Credit enrollment failed: user not found', { user_id: userId, instanceId });
-    throw new Error('User not found');
+    throw new CreditEnrollmentError('user_not_found', 'User not found');
   }
 
   const [targetInstance] = await db
@@ -1239,10 +1269,13 @@ export async function enrollWithCredits(params: {
     )
     .limit(1);
   if (!targetInstance) {
-    throw new Error('KiloClaw personal instance not found');
+    throw new CreditEnrollmentError('instance_not_found', 'KiloClaw personal instance not found');
   }
   if (targetInstance.destroyedAt) {
-    throw new Error('Cannot enroll a destroyed KiloClaw instance. Reprovision first.');
+    throw new CreditEnrollmentError(
+      'instance_destroyed',
+      'Cannot enroll a destroyed KiloClaw instance. Reprovision first.'
+    );
   }
 
   const [existingSub] = await db
@@ -1267,10 +1300,22 @@ export async function enrollWithCredits(params: {
 
   // Reject if subscription is active, past_due, or unpaid (spec rule 1)
   if (existingSub && existingSub.status !== 'trialing' && existingSub.status !== 'canceled') {
-    throw new Error('Cannot enroll: an active subscription already exists. Cancel it first.');
+    throw new CreditEnrollmentError(
+      'active_subscription_exists',
+      'Cannot enroll: an active subscription already exists. Cancel it first.'
+    );
   }
 
   const isLiveTrialLineage = existingSub?.status === 'trialing';
+  if (
+    existingSub?.status === 'trialing' &&
+    !isKiloClawPriceVersion(existingSub.kiloclaw_price_version)
+  ) {
+    throw new CreditEnrollmentError(
+      'unknown_price_version',
+      `Unknown KiloClaw price version: ${existingSub.kiloclaw_price_version}`
+    );
+  }
   const kiloclawPriceVersion = resolveKiloClawEnrollmentPriceVersion(
     existingSub
       ? {
@@ -1280,7 +1325,8 @@ export async function enrollWithCredits(params: {
       : null
   );
   if (params.expectedPriceVersion && params.expectedPriceVersion !== kiloclawPriceVersion) {
-    throw new Error(
+    throw new CreditEnrollmentError(
+      'price_version_mismatch',
       `Credit enrollment intent price version no longer matches target: intended=${params.expectedPriceVersion} expected=${kiloclawPriceVersion}`
     );
   }
@@ -1325,7 +1371,8 @@ export async function enrollWithCredits(params: {
 
   if (effectiveBalance < costMicrodollars) {
     const shortfall = costMicrodollars - effectiveBalance;
-    throw new Error(
+    throw new CreditEnrollmentError(
+      'insufficient_credits',
       `Insufficient credit balance. You need ${shortfall} more microdollars to enroll.`
     );
   }
@@ -1360,7 +1407,10 @@ export async function enrollWithCredits(params: {
       )
       .limit(1);
     if (!transactionTargetInstance || transactionTargetInstance.destroyedAt) {
-      throw new Error('Credit enrollment target is no longer an active personal instance.');
+      throw new CreditEnrollmentError(
+        'target_unavailable',
+        'Credit enrollment target is no longer an active personal instance.'
+      );
     }
 
     const [currentSubscription] = await tx
@@ -1379,7 +1429,10 @@ export async function enrollWithCredits(params: {
       currentSubscription?.status !== existingSub?.status ||
       currentSubscription?.kiloclaw_price_version !== existingSub?.kiloclaw_price_version
     ) {
-      throw new Error('Credit enrollment target changed before the deduction could be applied.');
+      throw new CreditEnrollmentError(
+        'target_changed',
+        'Credit enrollment target changed before the deduction could be applied.'
+      );
     }
 
     // 5a: Insert negative credit transaction with period-encoded idempotency key
@@ -1414,7 +1467,8 @@ export async function enrollWithCredits(params: {
       existingSub?.status === 'canceled' &&
       existingSub.kiloclaw_price_version !== kiloclawPriceVersion
     ) {
-      throw new Error(
+      throw new CreditEnrollmentError(
+        'requires_reprovision',
         'Canceled legacy KiloClaw history requires reprovisioning before credit enrollment.'
       );
     }
@@ -1512,7 +1566,10 @@ export async function enrollWithCredits(params: {
       });
     }
 
-    throw new Error('Enrollment already processed for this billing period.');
+    throw new CreditEnrollmentError(
+      'duplicate_enrollment',
+      'Enrollment already processed for this billing period.'
+    );
   }
 
   try {

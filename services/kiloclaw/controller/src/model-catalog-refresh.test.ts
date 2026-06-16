@@ -101,6 +101,46 @@ describe('fetchModelCatalog', () => {
     expect(headers['x-kilocode-feature']).toBe('kiloclaw');
   });
 
+  it('accepts null max_completion_tokens/context_length without rejecting the batch', async () => {
+    const body = {
+      data: [
+        {
+          id: 'm/nullable',
+          architecture: { input_modalities: ['text', 'image'] },
+          top_provider: { max_completion_tokens: null },
+          context_length: null,
+        },
+      ],
+    };
+    const models = await fetchModelCatalog(baseEnv, {
+      fetch: vi.fn(async () => mockResponse(body)),
+      readConfig: vi.fn(),
+      writeConfig: vi.fn(),
+    });
+
+    expect(models).toHaveLength(1);
+    expect(models[0].input).toEqual(['text', 'image']);
+    expect(models[0].maxTokens).toBe(128_000);
+    expect(models[0].contextWindow).toBe(1_000_000);
+  });
+
+  it('skips unparseable entries instead of failing the whole catalog', async () => {
+    const body = {
+      data: [
+        { id: 'ok/model', architecture: { input_modalities: ['text'] } },
+        { name: 'missing-id' },
+        42,
+      ],
+    };
+    const models = await fetchModelCatalog(baseEnv, {
+      fetch: vi.fn(async () => mockResponse(body)),
+      readConfig: vi.fn(),
+      writeConfig: vi.fn(),
+    });
+
+    expect(models.map(m => m.id)).toEqual(['ok/model']);
+  });
+
   it('throws when the API key is missing', async () => {
     await expect(
       fetchModelCatalog({} as NodeJS.ProcessEnv, {
@@ -140,6 +180,22 @@ describe('refreshModelCatalog', () => {
     expect(kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
     expect(kilocode.headers['X-KiloCode-OrganizationId']).toBe('org-1');
     expect(written.other).toBe('preserved');
+  });
+
+  it('skips the write when the catalog is byte-for-byte unchanged', async () => {
+    const fetchMock = vi.fn(async () => mockResponse(sampleResponse));
+    let stored = JSON.stringify(makeConfig());
+    const writeConfig = vi.fn((_p: string, data: string) => {
+      stored = data;
+    });
+    const deps = { fetch: fetchMock, readConfig: vi.fn(() => stored), writeConfig };
+
+    const first = await refreshModelCatalog(baseEnv, '/cfg.json', deps);
+    expect(first.written).toBe(true);
+
+    const second = await refreshModelCatalog(baseEnv, '/cfg.json', deps);
+    expect(second.written).toBe(false);
+    expect(writeConfig).toHaveBeenCalledTimes(1);
   });
 
   it('skips the write when the kilocode provider block is absent', async () => {

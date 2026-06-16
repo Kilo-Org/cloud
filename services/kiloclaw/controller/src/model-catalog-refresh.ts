@@ -35,6 +35,13 @@ const INITIAL_REFRESH_DELAY_MS = 30 * 1000;
 const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 30 * 1000;
 
+// Numeric/price fields can be `null` in the gateway/OpenRouter contract (e.g.
+// `top_provider.max_completion_tokens` is routinely null), so every optional
+// number/price is also nullable — otherwise one null model would fail the
+// schema. We additionally parse entries individually (see fetchModelCatalog)
+// so a single unexpected entry can never reject the whole catalog.
+const priceField = z.union([z.string(), z.number()]).nullable().optional();
+
 /** Subset of the Kilo Gateway `/models` response we map into the catalog. */
 const GatewayModelSchema = z
   .object({
@@ -44,18 +51,19 @@ const GatewayModelSchema = z
     supported_parameters: z.array(z.string()).optional(),
     pricing: z
       .object({
-        prompt: z.union([z.string(), z.number()]).optional(),
-        completion: z.union([z.string(), z.number()]).optional(),
-        input_cache_read: z.union([z.string(), z.number()]).optional(),
-        input_cache_write: z.union([z.string(), z.number()]).optional(),
+        prompt: priceField,
+        completion: priceField,
+        input_cache_read: priceField,
+        input_cache_write: priceField,
       })
       .optional(),
-    context_length: z.number().optional(),
-    top_provider: z.object({ max_completion_tokens: z.number().optional() }).optional(),
+    context_length: z.number().nullable().optional(),
+    top_provider: z.object({ max_completion_tokens: z.number().nullable().optional() }).optional(),
   })
   .passthrough();
 
-const GatewayModelsResponseSchema = z.object({ data: z.array(GatewayModelSchema) });
+// Only require the envelope shape here; each entry is validated individually.
+const GatewayResponseSchema = z.object({ data: z.array(z.unknown()) });
 
 /** OpenClaw provider model-definition shape written into the config. */
 export type OpenClawModelDef = {
@@ -80,7 +88,7 @@ const defaultDeps: ModelCatalogRefreshDeps = {
   writeConfig: (p, data) => atomicWrite(p, data, undefined, { mode: CONFIG_FILE_MODE }),
 };
 
-function toPricePerMillion(value: string | number | undefined): number {
+function toPricePerMillion(value: string | number | null | undefined): number {
   const n = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(n) && n >= 0 ? n * 1_000_000 : 0;
 }
@@ -138,8 +146,21 @@ export async function fetchModelCatalog(
   if (!res.ok) {
     throw new Error(`gateway /models returned HTTP ${res.status}`);
   }
-  const parsed = GatewayModelsResponseSchema.parse(await res.json());
-  return parsed.data.map(mapGatewayModel);
+  const parsed = GatewayResponseSchema.parse(await res.json());
+  const models: OpenClawModelDef[] = [];
+  let skipped = 0;
+  for (const raw of parsed.data) {
+    const entry = GatewayModelSchema.safeParse(raw);
+    if (!entry.success) {
+      skipped++;
+      continue;
+    }
+    models.push(mapGatewayModel(entry.data));
+  }
+  if (skipped > 0) {
+    console.warn(`[model-catalog-refresh] skipped ${skipped} unparseable model entries`);
+  }
+  return models;
 }
 
 /**
@@ -159,6 +180,12 @@ export async function refreshModelCatalog(
     return { written: false, count: 0 };
   }
 
+  // Read-modify-write is a single synchronous tick (no await between read and
+  // write), so no other handler in this controller process — config restore,
+  // patch, agent mutation — can interleave and have its write silently lost.
+  // The only residual window is the external OpenClaw gateway process writing
+  // this file between readFileSync and renameSync; skip-when-unchanged below
+  // keeps writes rare enough that this is negligible for a temporary shim.
   const config: unknown = JSON.parse(deps.readConfig(configPath));
   const kilocode = (config as { models?: { providers?: Record<string, unknown> } })?.models
     ?.providers?.kilocode;
@@ -167,6 +194,12 @@ export async function refreshModelCatalog(
       '[model-catalog-refresh] kilocode provider block missing; skipping (config-writer owns creation)'
     );
     return { written: false, count: 0 };
+  }
+
+  const current = (kilocode as { models?: unknown }).models;
+  if (JSON.stringify(current) === JSON.stringify(models)) {
+    // Catalog unchanged — avoid a needless write and OpenClaw hot reload.
+    return { written: false, count: models.length };
   }
 
   (kilocode as { models: OpenClawModelDef[] }).models = models;

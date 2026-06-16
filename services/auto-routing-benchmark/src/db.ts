@@ -34,6 +34,11 @@ type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 // ceiling while still batching the delete plus inserts together.
 const MODEL_SUMMARY_INSERT_BATCH_SIZE = 8;
 
+// Routing table candidates bind 8 values per row. Keep each INSERT comfortably
+// under D1's 100-variable ceiling; publishing is infrequent, so smaller
+// statements are preferable to risking a skipped routing-table update.
+const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
+
 // ---------------------------------------------------------------------------
 // Row mapping helpers
 // ---------------------------------------------------------------------------
@@ -587,8 +592,12 @@ export async function saveRoutingTable(
       }),
   ];
 
-  if (candidateRows.length > 0) {
-    stmts.push(orm.insert(routingTableCandidates).values(candidateRows));
+  for (let i = 0; i < candidateRows.length; i += ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE) {
+    stmts.push(
+      orm
+        .insert(routingTableCandidates)
+        .values(candidateRows.slice(i, i + ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE))
+    );
   }
 
   await orm.batch(stmts);

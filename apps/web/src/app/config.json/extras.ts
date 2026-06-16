@@ -64,6 +64,12 @@ export const kiloExtras = {
       type: 'string',
       enum: ['expanded', 'collapsed'],
     },
+    code_edit_display: {
+      description:
+        'Controls whether code edit and diff blocks are expanded or collapsed by default in the VS Code chat UI',
+      type: 'string',
+      enum: ['expanded', 'collapsed'],
+    },
     hide_prompt_training_models: {
       description: 'Hide Kilo Gateway models that may train on your prompts from model listings',
       type: 'boolean',

@@ -170,10 +170,27 @@ type KiloPassCaller = {
     hostingIntent: 'none' | 'expired_commit' | 'standard' | 'commit';
     welcomePromoIneligibleDueToReusedFingerprint: boolean;
   }>;
-  activateCheckoutHosting: (input: { sessionId: string }) => Promise<{
-    activated: boolean;
-    hostingIntent: 'none' | 'expired_commit' | 'standard' | 'commit';
-  }>;
+  activateCheckoutHosting: (input: { sessionId: string }) => Promise<
+    | { outcome: 'activated'; hostingIntent: 'standard' | 'commit' }
+    | { outcome: 'not_requested'; hostingIntent: 'none' }
+    | {
+        outcome: 'retryable_failure';
+        hostingIntent: 'standard' | 'commit';
+        reason: 'credits_not_settled' | 'enrollment_failed';
+      }
+    | {
+        outcome: 'action_required';
+        hostingIntent: 'standard' | 'commit' | 'expired_commit';
+        reason:
+          | 'invalid_intent'
+          | 'stale_intent'
+          | 'missing_instance'
+          | 'destroyed_instance'
+          | 'requires_reprovision'
+          | 'insufficient_credits'
+          | 'expired_commit';
+      }
+  >;
   getCustomerPortalUrl: (input: { returnUrl?: string }) => Promise<{ url: string }>;
   getChurnkeyAuthHash: () => Promise<{ hash: string; customerId: string }>;
   cancelSubscription: () => Promise<{ success: boolean }>;
@@ -2094,7 +2111,7 @@ describe('kiloPassRouter', () => {
   });
 
   describe('activateCheckoutHosting', () => {
-    it('activates canceled legacy Standard hosting at the checkout current price after Kilo Pass credits settle', async () => {
+    it('preserves canceled legacy lineage and requires reprovision after Kilo Pass credits settle', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-canceled-legacy-hosting@example.com',
         total_microdollars_acquired: 199_000_000,
@@ -2144,6 +2161,11 @@ describe('kiloPassRouter', () => {
       });
 
       const caller = await createCallerForUser(user.id);
+      const expectedResult = {
+        outcome: 'action_required',
+        hostingIntent: 'standard',
+        reason: 'requires_reprovision',
+      };
       await expect(
         Promise.all([
           caller.kiloPass.activateCheckoutHosting({
@@ -2153,15 +2175,12 @@ describe('kiloPassRouter', () => {
             sessionId: 'cs_kilo_pass_canceled_legacy_hosting',
           }),
         ])
-      ).resolves.toEqual([
-        { activated: true, hostingIntent: 'standard' },
-        { activated: true, hostingIntent: 'standard' },
-      ]);
+      ).resolves.toEqual([expectedResult, expectedResult]);
       await expect(
         caller.kiloPass.activateCheckoutHosting({
           sessionId: 'cs_kilo_pass_canceled_legacy_hosting',
         })
-      ).resolves.toEqual({ activated: true, hostingIntent: 'standard' });
+      ).resolves.toEqual(expectedResult);
 
       const [hosting] = await db
         .select()
@@ -2170,11 +2189,12 @@ describe('kiloPassRouter', () => {
         .limit(1);
       expect(hosting).toEqual(
         expect.objectContaining({
-          status: 'active',
+          status: 'canceled',
           plan: 'standard',
           payment_source: 'credits',
-          kiloclaw_price_version: '2026-05-10',
-          stripe_subscription_id: null,
+          kiloclaw_price_version: '2026-03-19',
+          stripe_subscription_id: 'sub_deleted_legacy_hosting',
+          transferred_to_subscription_id: null,
         })
       );
       const hostingRows = await db
@@ -2187,23 +2207,7 @@ describe('kiloPassRouter', () => {
         .select()
         .from(kiloclaw_subscription_change_log)
         .where(eq(kiloclaw_subscription_change_log.subscription_id, hosting?.id ?? ''));
-      expect(changeLog).toHaveLength(1);
-      expect(changeLog[0]).toEqual(
-        expect.objectContaining({
-          action: 'reactivated',
-          reason: 'credit_enrollment',
-          before_state: expect.objectContaining({
-            status: 'canceled',
-            kiloclaw_price_version: '2026-03-19',
-            stripe_subscription_id: 'sub_deleted_legacy_hosting',
-          }),
-          after_state: expect.objectContaining({
-            status: 'active',
-            kiloclaw_price_version: '2026-05-10',
-            stripe_subscription_id: null,
-          }),
-        })
-      );
+      expect(changeLog).toHaveLength(0);
 
       const hostingDeductions = await db
         .select()
@@ -2214,13 +2218,13 @@ describe('kiloPassRouter', () => {
             eq(credit_transactions.amount_microdollars, -55_000_000)
           )
         );
-      expect(hostingDeductions).toHaveLength(1);
+      expect(hostingDeductions).toHaveLength(0);
 
       const [updatedUser] = await db
         .select({ microdollarsUsed: kilocode_users.microdollars_used })
         .from(kilocode_users)
         .where(eq(kilocode_users.id, user.id));
-      expect(updatedUser?.microdollarsUsed).toBe(55_000_000);
+      expect(updatedUser?.microdollarsUsed).toBe(0);
     });
 
     it('rejects hosting activation until Kilo Pass base credits have settled', async () => {
@@ -2271,7 +2275,11 @@ describe('kiloPassRouter', () => {
         caller.kiloPass.activateCheckoutHosting({
           sessionId: 'cs_kilo_pass_hosting_pending_settlement',
         })
-      ).rejects.toThrow('Kilo Pass credits are still processing.');
+      ).resolves.toEqual({
+        outcome: 'retryable_failure',
+        hostingIntent: 'standard',
+        reason: 'credits_not_settled',
+      });
 
       const deductions = await db
         .select()
@@ -2294,9 +2302,9 @@ describe('kiloPassRouter', () => {
       await db.insert(kiloclaw_subscriptions).values({
         user_id: user.id,
         instance_id: instanceId,
-        plan: 'standard',
-        status: 'canceled',
-        kiloclaw_price_version: '2026-03-19',
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: '2026-05-10',
       });
       const { id: kiloPassSubscriptionId } = await insertSubscription({
         kiloUserId: user.id,
@@ -2330,7 +2338,11 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       await expect(
         caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_stale_hosting_intent' })
-      ).rejects.toThrow('Checkout hosting price version no longer matches instance.');
+      ).resolves.toEqual({
+        outcome: 'action_required',
+        hostingIntent: 'standard',
+        reason: 'stale_intent',
+      });
 
       const deductions = await db
         .select()
@@ -2364,10 +2376,57 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       await expect(
         caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_invalid_hosting_price_version' })
-      ).rejects.toThrow('Checkout hosting price version is invalid.');
+      ).resolves.toEqual({
+        outcome: 'action_required',
+        hostingIntent: 'standard',
+        reason: 'invalid_intent',
+      });
     });
 
-    it('rejects a destroyed hosting anchor before credit enrollment', async () => {
+    it('returns permanent recovery when checkout instance is missing', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-missing-hosting-instance@example.com',
+      });
+      const { id: kiloPassSubscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_kilo_pass_missing_hosting_instance',
+        tier: KiloPassTier.Tier199,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId: kiloPassSubscriptionId,
+        kiloUserId: user.id,
+      });
+
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.retrieve.mockResolvedValue({
+        status: 'complete',
+        subscription: 'sub_kilo_pass_missing_hosting_instance',
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+          kiloclawHostingPlan: 'standard',
+          kiloclawInstanceId: crypto.randomUUID(),
+          kiloclawPriceVersion: '2026-05-10',
+        },
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_kilo_pass_missing_hosting_instance',
+        created: Math.floor(new Date('2026-06-10T15:00:00.000Z').getTime() / 1000),
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_missing_hosting_instance' })
+      ).resolves.toEqual({
+        outcome: 'action_required',
+        hostingIntent: 'standard',
+        reason: 'missing_instance',
+      });
+    });
+
+    it('returns permanent recovery for a destroyed hosting anchor', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-destroyed-hosting-anchor@example.com',
         total_microdollars_acquired: 60_000_000,
@@ -2418,7 +2477,11 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       await expect(
         caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_destroyed_hosting_anchor' })
-      ).rejects.toThrow('Reprovision KiloClaw before activating hosting.');
+      ).resolves.toEqual({
+        outcome: 'action_required',
+        hostingIntent: 'standard',
+        reason: 'destroyed_instance',
+      });
 
       const deductions = await db
         .select()
@@ -2478,7 +2541,7 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       await expect(
         caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_qualified_commit_hosting' })
-      ).resolves.toEqual({ activated: true, hostingIntent: 'commit' });
+      ).resolves.toEqual({ outcome: 'activated', hostingIntent: 'commit' });
 
       const [hosting] = await db
         .select()
@@ -2514,7 +2577,11 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       await expect(
         caller.kiloPass.activateCheckoutHosting({ sessionId: 'cs_expired_commit_hosting' })
-      ).resolves.toEqual({ activated: false, hostingIntent: 'expired_commit' });
+      ).resolves.toEqual({
+        outcome: 'action_required',
+        hostingIntent: 'expired_commit',
+        reason: 'expired_commit',
+      });
     });
   });
 

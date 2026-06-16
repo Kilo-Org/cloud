@@ -169,23 +169,25 @@ describe('KiloClaw billing display helpers', () => {
 });
 
 describe('KiloClaw funding and recovery copy', () => {
-  it('prioritizes credit-funded recovery after bundled hosting activation fails', () => {
-    expect(getKiloPassHostingRecoveryCopy('standard')).toEqual({
-      title: 'Credit-funded hosting needs attention',
-      description:
-        'Your Kilo Pass credits are ready, but hosting activation did not finish. Retry credit-funded activation or choose a hosting plan.',
-      destination: '/claw/subscription',
-      destinationLabel: 'Choose hosting plan',
-      canRetry: true,
-    });
-    expect(getKiloPassHostingRecoveryCopy('expired_commit')).toEqual(
-      expect.objectContaining({
-        destination: '/claw/subscription',
-        destinationLabel: 'Choose Standard hosting',
-        canRetry: false,
-      })
-    );
-  });
+  it.each([
+    ['credits_not_settled', true, null, null],
+    ['enrollment_failed', true, '/claw/subscription', 'Choose hosting plan'],
+    ['requires_reprovision', false, null, null],
+    ['missing_instance', false, null, null],
+    ['destroyed_instance', false, null, null],
+    ['stale_intent', false, '/claw/subscription', 'Choose hosting plan'],
+    ['invalid_intent', false, '/claw/subscription', 'Choose hosting plan'],
+    ['insufficient_credits', false, '/claw/subscription', 'Review hosting options'],
+    ['expired_commit', false, '/claw/subscription', 'Choose Standard hosting'],
+    ['unexpected_error', false, null, null],
+  ] as const)(
+    'maps %s to the correct recovery policy',
+    (reason, canRetry, destination, destinationLabel) => {
+      expect(getKiloPassHostingRecoveryCopy(reason)).toEqual(
+        expect.objectContaining({ canRetry, destination, destinationLabel })
+      );
+    }
+  );
 
   it('distinguishes credit-funded hosting from a separate recurring Stripe subscription', () => {
     expect(

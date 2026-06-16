@@ -11,7 +11,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTRPC } from '@/lib/trpc/utils';
-import { getKiloPassHostingRecoveryCopy } from '@/app/(app)/claw/components/billing/billing-types';
+import {
+  getKiloPassHostingRecoveryCopy,
+  type KiloPassHostingRecoveryReason,
+} from '@/app/(app)/claw/components/billing/billing-types';
 
 const POLL_INTERVAL_MS = 1000;
 const TIMEOUT_MS = 90_000;
@@ -62,23 +65,24 @@ export function KiloPassAwardingCreditsClient() {
   const checkoutSessionId = searchParams.get('session_id') ?? '';
 
   const [activationStep, setActivationStep] = useState<ActivationStep>('payment');
-  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const [activationFailureReason, setActivationFailureReason] =
+    useState<KiloPassHostingRecoveryReason | null>(null);
 
   const activateCheckoutHosting = useMutation(
     trpc.kiloPass.activateCheckoutHosting.mutationOptions({
       onSuccess: result => {
-        if (result.activated) {
+        if (result.outcome === 'activated') {
           setActivationStep('done');
           return;
         }
-        setEnrollmentError(
-          result.hostingIntent === 'expired_commit'
-            ? 'Commit hosting is no longer available. Activate month-to-month Standard from KiloClaw.'
-            : 'Checkout did not include a hosting activation intent.'
-        );
+        if (result.outcome === 'not_requested') {
+          setActivationFailureReason('invalid_intent');
+          return;
+        }
+        setActivationFailureReason(result.reason);
       },
-      onError: error => {
-        setEnrollmentError(error.message);
+      onError: () => {
+        setActivationFailureReason('unexpected_error');
       },
     })
   );
@@ -180,10 +184,12 @@ export function KiloPassAwardingCreditsClient() {
 
   const fallbackDestination = isClawAutoActivation ? '/claw' : '/profile';
   const fallbackLabel = isClawAutoActivation ? 'Go to KiloClaw' : 'Go to profile';
-  const hostingRecovery = getKiloPassHostingRecoveryCopy(checkoutState?.hostingIntent ?? 'none');
+  const hostingRecovery = activationFailureReason
+    ? getKiloPassHostingRecoveryCopy(activationFailureReason)
+    : null;
 
   function retryCreditFundedHostingActivation() {
-    setEnrollmentError(null);
+    setActivationFailureReason(null);
     activateCheckoutHosting.mutate({ sessionId: checkoutSessionId });
   }
 
@@ -271,7 +277,7 @@ export function KiloPassAwardingCreditsClient() {
   // KiloClaw auto-activation: show progress steps
   if (isClawAutoActivation) {
     // Enrollment error: show fallback with manual activation option
-    if (enrollmentError) {
+    if (hostingRecovery) {
       return (
         <PageContainer>
           <div className="flex min-h-[70vh] items-center justify-center">
@@ -284,7 +290,6 @@ export function KiloPassAwardingCreditsClient() {
               </CardHeader>
               <CardContent className="grid gap-4">
                 <div className="text-muted-foreground text-sm">{hostingRecovery.description}</div>
-                <div className="text-muted-foreground text-sm">Details: {enrollmentError}</div>
                 {showWelcomePromoIneligibleNotice ? <WelcomePromoIneligibleNotice /> : null}
                 <div className="flex flex-wrap gap-2">
                   {hostingRecovery.canRetry ? (
@@ -298,14 +303,29 @@ export function KiloPassAwardingCreditsClient() {
                         : 'Retry credit-funded activation'}
                     </Button>
                   ) : null}
-                  <Button
-                    type="button"
-                    variant={hostingRecovery.canRetry ? 'outline' : 'default'}
-                    onClick={() => router.replace(hostingRecovery.destination)}
-                  >
-                    {hostingRecovery.destinationLabel}
-                  </Button>
+                  {hostingRecovery.destination && hostingRecovery.destinationLabel ? (
+                    <Button
+                      type="button"
+                      variant={hostingRecovery.canRetry ? 'outline' : 'default'}
+                      onClick={() => {
+                        if (hostingRecovery.destination) {
+                          router.replace(hostingRecovery.destination);
+                        }
+                      }}
+                    >
+                      {hostingRecovery.destinationLabel}
+                    </Button>
+                  ) : null}
                 </div>
+                {hostingRecovery.showSupport ? (
+                  <div className="text-muted-foreground text-sm">
+                    If this keeps happening, contact support at{' '}
+                    <a href="https://kilo.ai/support" className="text-primary underline">
+                      https://kilo.ai/support
+                    </a>
+                    .
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           </div>

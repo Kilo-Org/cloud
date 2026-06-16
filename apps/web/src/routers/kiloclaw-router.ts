@@ -347,6 +347,9 @@ function classifyEnrollWithCreditsError(message: string): {
   code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST' | 'INTERNAL_SERVER_ERROR';
   failureReason: CreditEnrollmentFailureReason;
 } {
+  if (message.includes('requires reprovisioning')) {
+    return { code: 'CONFLICT', failureReason: 'precondition_failed' };
+  }
   if (message.includes('not found')) {
     return { code: 'NOT_FOUND', failureReason: 'user_not_found' };
   }
@@ -5303,6 +5306,23 @@ export const kiloclawRouter = createTRPCRouter({
             }
           : null
       );
+      if (
+        currentRow?.subscription.status === 'canceled' &&
+        currentRow.subscription.kiloclaw_price_version !== intendedPriceVersion
+      ) {
+        logBillingWarning('KiloClaw Kilo Pass checkout rejected before provider access', {
+          user_id: ctx.user.id,
+          instance_id: anchorInstance.id,
+          subscription_id: currentRow.subscription.id,
+          reason: 'canceled_legacy_requires_reprovision',
+          persisted_price_version: currentRow.subscription.kiloclaw_price_version,
+          intended_price_version: intendedPriceVersion,
+        });
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Reprovision KiloClaw before purchasing Kilo Pass with bundled hosting.',
+        });
+      }
       const intendedPricing = getKiloClawPricingCatalogEntry(intendedPriceVersion);
       const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
       const useStandardIntro =

@@ -1410,6 +1410,15 @@ export async function enrollWithCredits(params: {
       return;
     }
 
+    if (
+      existingSub?.status === 'canceled' &&
+      existingSub.kiloclaw_price_version !== kiloclawPriceVersion
+    ) {
+      throw new Error(
+        'Canceled legacy KiloClaw history requires reprovisioning before credit enrollment.'
+      );
+    }
+
     // 5b: Atomically increment microdollars_used so the deduction counts
     //     as spend toward the Kilo Pass bonus unlock threshold.
     await tx

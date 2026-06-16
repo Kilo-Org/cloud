@@ -2791,7 +2791,7 @@ describe('createKiloPassUpsellCheckout', () => {
     expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
   });
 
-  it('records the current hosting price version for canceled legacy Kilo Pass checkout intent', async () => {
+  it('rejects canceled legacy Kilo Pass hosting before provider checkout', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -2802,32 +2802,26 @@ describe('createKiloPassUpsellCheckout', () => {
       kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
       stripe_subscription_id: 'sub_deleted_legacy_kilo_pass_intent',
     });
-    stripeMock.checkout.sessions.create.mockResolvedValue({
-      url: 'https://checkout.stripe.com/test',
-    });
-
     const caller = await createCallerForUser(user.id);
-    await caller.kiloclaw.createKiloPassUpsellCheckout({
-      instanceId: instance.id,
-      tier: '199',
-      cadence: 'monthly',
-      hostingPlan: 'standard',
-    });
+    await expect(
+      caller.kiloclaw.createKiloPassUpsellCheckout({
+        instanceId: instance.id,
+        tier: '199',
+        cadence: 'monthly',
+        hostingPlan: 'standard',
+      })
+    ).rejects.toThrow('Reprovision KiloClaw before purchasing Kilo Pass with bundled hosting.');
 
-    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+    expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+    const [unchangedSubscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, instance.id));
+    expect(unchangedSubscription).toEqual(
       expect.objectContaining({
-        metadata: expect.objectContaining({
-          kiloclawHostingPlan: 'standard',
-          kiloclawInstanceId: instance.id,
-          kiloclawPriceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
-        }),
-        subscription_data: {
-          metadata: expect.objectContaining({
-            kiloclawHostingPlan: 'standard',
-            kiloclawInstanceId: instance.id,
-            kiloclawPriceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
-          }),
-        },
+        status: 'canceled',
+        kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+        stripe_subscription_id: 'sub_deleted_legacy_kilo_pass_intent',
       })
     );
   });
@@ -6835,7 +6829,7 @@ describe('enrollWithCredits', () => {
       user_id: user.id,
       instance_id: instance.id,
       plan: 'trial',
-      status: 'canceled',
+      status: 'trialing',
       trial_started_at: new Date(now.getTime() - 17 * 86_400_000).toISOString(),
       trial_ends_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
       suspended_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
@@ -6895,7 +6889,7 @@ describe('enrollWithCredits', () => {
       user_id: user.id,
       instance_id: instance.id,
       plan: 'trial',
-      status: 'canceled',
+      status: 'trialing',
       trial_started_at: new Date(now.getTime() - 17 * 86_400_000).toISOString(),
       trial_ends_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
       suspended_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
@@ -7340,25 +7334,25 @@ describe('enrollWithCredits', () => {
     );
   });
 
-  it('enrolls returning subscriber at current recurring standard price after canceled history', async () => {
+  it('rejects canceled legacy credit enrollment without rewriting historical lineage', async () => {
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 60_000_000);
 
-    // A canceled non-trial subscription means this is a fresh current-price
-    // enrollment and should not preserve legacy economics.
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
       instance_id: instance.id,
       payment_source: 'credits',
       plan: 'standard',
       status: 'canceled',
+      kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+      stripe_subscription_id: 'sub_deleted_legacy_direct_enrollment',
       cancel_at_period_end: false,
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
-
-    expect(result).toEqual({ success: true });
+    await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
+      'Canceled legacy KiloClaw history requires reprovisioning before credit enrollment.'
+    );
 
     const [sub] = await db
       .select()
@@ -7366,27 +7360,27 @@ describe('enrollWithCredits', () => {
       .where(eq(kiloclaw_subscriptions.user_id, user.id))
       .limit(1);
 
-    expect(sub.status).toBe('active');
-    expect(sub.payment_source).toBe('credits');
-    expect(sub.kiloclaw_price_version).toBe(CURRENT_KILOCLAW_PRICE_VERSION);
+    expect(sub).toEqual(
+      expect.objectContaining({
+        status: 'canceled',
+        payment_source: 'credits',
+        kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+        stripe_subscription_id: 'sub_deleted_legacy_direct_enrollment',
+      })
+    );
 
-    // Verify current recurring price deduction ($55, not legacy $9 or $4)
     const txns = await db
       .select()
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, user.id));
-
-    const deduction = txns.find(t => t.amount_microdollars < 0);
-    expect(deduction).toBeDefined();
-    expect(deduction!.amount_microdollars).toBe(-55_000_000);
+    expect(txns).toHaveLength(0);
 
     const [updatedUser] = await db
       .select({ used: kilocode_users.microdollars_used })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, user.id))
       .limit(1);
-
-    expect(updatedUser.used).toBe(55_000_000);
+    expect(updatedUser.used).toBe(0);
   });
 
   it('allows enrollment when subscription is trialing', async () => {
@@ -7485,6 +7479,7 @@ describe('enrollWithCredits', () => {
       instance_id: instance.id,
       plan: 'standard',
       status: 'canceled',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       current_period_end: '2026-04-01T00:00:00.000Z',
     });
 
@@ -7537,6 +7532,7 @@ describe('enrollWithCredits', () => {
       instance_id: instance.id,
       plan: 'trial',
       status: 'canceled',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
       cancel_at_period_end: false,
     });
 

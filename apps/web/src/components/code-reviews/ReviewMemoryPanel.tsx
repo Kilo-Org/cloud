@@ -245,7 +245,7 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
             Review memory
           </CardTitle>
           <CardDescription>
-            Learn from maintainer replies to Kilo review comments and propose editable REVIEW.md
+            Learn from repository feedback on Kilo review comments and propose editable REVIEW.md
             guidance.
           </CardDescription>
         </CardHeader>
@@ -253,8 +253,8 @@ export function ReviewMemoryPanel({ organizationId, platform }: ReviewMemoryPane
           <div className="space-y-1">
             <Label htmlFor="review-memory-enabled">Enable review memory</Label>
             <p className="text-muted-foreground text-sm">
-              Disabled by default. When enabled, Kilo records the first maintainer reply to each
-              Kilo inline review comment.
+              Disabled by default. When enabled, Kilo records the first eligible repository reply to
+              each Kilo inline review comment.
             </p>
           </div>
           <Switch

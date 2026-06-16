@@ -162,7 +162,7 @@ describe('GitHub review memory feedback', () => {
     await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
   });
 
-  it('skips contributor replies to Kilo inline comments', async () => {
+  it('records contributor replies to Kilo inline comments', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
     await setReviewMemoryEnabled({ owner, platform: 'github', enabled: true, createdBy: user.id });
@@ -172,13 +172,45 @@ describe('GitHub review memory feedback', () => {
         parentCommentId: 353,
         body: 'I do not think this applies.',
         authorAssociation: 'CONTRIBUTOR',
+        userLogin: 'contributor',
       }),
       integration: buildIntegration(user.id),
       deliveryId: 'delivery-4b',
       fetchParentComment: parentFetcher({ userLogin: 'kilo-code[bot]' }),
     });
 
-    expect(result).toEqual({ recorded: false, reason: 'not-maintainer-reply' });
+    expect(result.recorded).toBe(true);
+    const events = await db.select().from(code_review_feedback_events);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        repo_full_name: 'acme/widgets',
+        pr_number: 42,
+        kilo_comment_id: '353',
+        reply_excerpt: 'I do not think this applies.',
+        kilo_comment_excerpt: 'Kilo review comment',
+      })
+    );
+  });
+
+  it('skips first-time contributor replies to Kilo inline comments', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    await setReviewMemoryEnabled({ owner, platform: 'github', enabled: true, createdBy: user.id });
+
+    const result = await handleGitHubReviewCommentReply({
+      payload: buildPayload({
+        parentCommentId: 363,
+        body: 'I do not think this applies.',
+        authorAssociation: 'FIRST_TIME_CONTRIBUTOR',
+        userLogin: 'first-time-contributor',
+      }),
+      integration: buildIntegration(user.id),
+      deliveryId: 'delivery-4c',
+      fetchParentComment: parentFetcher({ userLogin: 'kilo-code[bot]' }),
+    });
+
+    expect(result).toEqual({ recorded: false, reason: 'ineligible-author-association' });
     await expect(db.select().from(code_review_feedback_events)).resolves.toHaveLength(0);
   });
 
@@ -209,13 +241,16 @@ function buildPayload(input: {
   parentCommentId: number;
   body: string;
   authorAssociation?: PullRequestReviewCommentPayload['comment']['author_association'];
+  userLogin?: string;
 }): PullRequestReviewCommentPayload {
+  const userLogin = input.userLogin ?? 'maintainer';
+
   return {
     action: 'created',
     comment: {
       id: input.parentCommentId + 1,
       body: input.body,
-      user: { login: 'maintainer' },
+      user: { login: userLogin },
       in_reply_to_id: input.parentCommentId,
       created_at: '2026-06-01T00:00:00.000Z',
       html_url: `https://github.com/acme/widgets/pull/42#discussion_r${input.parentCommentId + 1}`,
@@ -240,7 +275,7 @@ function buildPayload(input: {
       owner: { login: 'acme' },
     },
     installation: { id: 123 },
-    sender: { login: 'maintainer' },
+    sender: { login: userLogin },
   };
 }
 

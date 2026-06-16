@@ -4,7 +4,10 @@ import {
   getGitHubReviewComment,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
-import type { PullRequestReviewCommentPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
+import type {
+  GitHubAuthorAssociation,
+  PullRequestReviewCommentPayload,
+} from '@/lib/integrations/platforms/github/webhook-schemas';
 import { recordReplyFeedbackEvent, type ReviewMemoryOwner } from './db';
 import { isReviewMemoryEnabled } from './settings';
 
@@ -18,7 +21,12 @@ export const KILO_GITHUB_BOT_LOGINS: ReadonlySet<string> = new Set([
   'kilocode[bot]',
 ]);
 
-const MAINTAINER_AUTHOR_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+const ELIGIBLE_FEEDBACK_AUTHOR_ASSOCIATIONS = new Set<GitHubAuthorAssociation>([
+  'OWNER',
+  'MEMBER',
+  'COLLABORATOR',
+  'CONTRIBUTOR',
+]);
 export const REVIEW_MEMORY_FEEDBACK_EXCERPT_MAX_LENGTH = 2_000;
 
 export function isLikelyKiloBotActor(login: string | undefined): boolean {
@@ -48,8 +56,8 @@ export async function handleGitHubReviewCommentReply(input: {
     return { recorded: false, reason: 'bot-authored-comment' };
   }
 
-  if (!MAINTAINER_AUTHOR_ASSOCIATIONS.has(input.payload.comment.author_association)) {
-    return { recorded: false, reason: 'not-maintainer-reply' };
+  if (!ELIGIBLE_FEEDBACK_AUTHOR_ASSOCIATIONS.has(input.payload.comment.author_association)) {
+    return { recorded: false, reason: 'ineligible-author-association' };
   }
 
   const owner = ownerFromIntegration(input.integration);

@@ -30,12 +30,14 @@ describe('review memory change requests', () => {
       rationale: 'Maintainers corrected repeated generated fixture comments.',
     });
 
-    expect(buildChangeRequestBody(proposal)).toContain(
-      '<!-- kilo-review-memory-change-request -->'
-    );
-    expect(buildChangeRequestBody(proposal)).toContain('## Proposal');
-    expect(buildChangeRequestBody(proposal)).toContain('Generated fixtures');
-    expect(buildChangeRequestBody(proposal)).toContain('## Rationale');
+    const body = buildChangeRequestBody(proposal);
+
+    expect(body).toContain('<!-- kilo-review-memory-change-request -->');
+    expect(body).toContain('## Proposal');
+    expect(body).toContain('Generated fixtures');
+    expect(body).toContain('## Rationale');
+    expect(body).toContain('Kilo analyzed recent replies to review comments');
+    expect(body).toContain('Review and edit the proposed REVIEW.md changes before merging.');
   });
 
   it('applies guarded proposal status transitions', async () => {

@@ -52,7 +52,7 @@ ${proposal.title}
 
 ${proposal.rationale}
 
-Kilo analyzed maintainer replies to recent review comments and found repeated feedback that this repository guidance should address. Review and edit the proposed REVIEW.md changes before merging.`;
+Kilo analyzed recent replies to review comments and found repeated feedback that this repository guidance should address. Review and edit the proposed REVIEW.md changes before merging.`;
 }
 
 export async function approveAndOpenReviewMemoryChangeRequest(input: {

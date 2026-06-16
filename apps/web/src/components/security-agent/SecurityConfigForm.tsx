@@ -2,7 +2,7 @@
 
 import { type SetStateAction, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, Save } from 'lucide-react';
+import { Bell, Bot, Clock, Loader2, Save, SlidersHorizontal } from 'lucide-react';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import {
@@ -139,7 +139,7 @@ function configsMatch(left: SecurityConfigFormState, right: SecurityConfigFormSt
 }
 
 const SETTINGS_TAB_TRIGGER_CLASS =
-  'data-[state=active]:bg-background data-[state=active]:border-border data-[state=active]:text-foreground data-[state=active]:shadow-sm';
+  'gap-2 border border-transparent px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground data-[state=active]:border-foreground/20 data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-sm';
 const SETTINGS_TABS = ['config', 'automation', 'notifications', 'sla'] as const;
 
 type SettingsTab = (typeof SETTINGS_TABS)[number];
@@ -208,7 +208,7 @@ export function SecurityConfigForm({
   const { enabled, isLoadingRepositories, isSaving, isToggling } = viewState;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const defaultSettingsTab = settingsTabFromParam(searchParams.get('tab'));
+  const defaultSettingsTab = enabled ? settingsTabFromParam(searchParams.get('tab')) : 'config';
   const handleSettingsTabChange = useSettingsTabTracking(enabled, defaultSettingsTab);
   const initialConfigFingerprint = configFingerprint(initialConfig);
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
@@ -351,42 +351,57 @@ export function SecurityConfigForm({
 
   return (
     <div className="space-y-6">
-      <AgentStatusSection
-        enabled={enabled}
-        isToggling={isToggling}
-        availableRepositoryCount={repositories.length}
-        repositoryCount={repositoryCount}
-        slaEnabled={state.slaEnabled}
-        onToggle={nextEnabled =>
-          onToggleEnabled(nextEnabled, {
-            repositorySelectionMode: state.repositorySelectionMode,
-            selectedRepositoryIds: state.selectedRepositoryIds,
-          })
-        }
-      />
-      {enabled && (
-        <>
-          <Tabs
-            defaultValue={defaultSettingsTab}
-            className="space-y-6"
-            onValueChange={handleSettingsTabChange}
+      <Tabs
+        defaultValue={defaultSettingsTab}
+        className="space-y-6"
+        onValueChange={handleSettingsTabChange}
+      >
+        <TabsList
+          aria-label="Security Agent settings sections"
+          className="border-border bg-card h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border p-1.5 shadow-sm sm:w-fit"
+        >
+          <TabsTrigger value="config" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            <SlidersHorizontal className="size-4" aria-hidden="true" />
+            General
+          </TabsTrigger>
+          <TabsTrigger
+            value="automation"
+            className={SETTINGS_TAB_TRIGGER_CLASS}
+            disabled={!enabled}
           >
-            <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl p-1 sm:w-fit">
-              <TabsTrigger value="config" className={SETTINGS_TAB_TRIGGER_CLASS}>
-                Config
-              </TabsTrigger>
-              <TabsTrigger value="automation" className={SETTINGS_TAB_TRIGGER_CLASS}>
-                Automation
-              </TabsTrigger>
-              <TabsTrigger value="notifications" className={SETTINGS_TAB_TRIGGER_CLASS}>
-                Notifications
-              </TabsTrigger>
-              <TabsTrigger value="sla" className={SETTINGS_TAB_TRIGGER_CLASS}>
-                SLA
-              </TabsTrigger>
-            </TabsList>
+            <Bot className="size-4" aria-hidden="true" />
+            Automation
+          </TabsTrigger>
+          <TabsTrigger
+            value="notifications"
+            className={SETTINGS_TAB_TRIGGER_CLASS}
+            disabled={!enabled}
+          >
+            <Bell className="size-4" aria-hidden="true" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="sla" className={SETTINGS_TAB_TRIGGER_CLASS} disabled={!enabled}>
+            <Clock className="size-4" aria-hidden="true" />
+            SLA
+          </TabsTrigger>
+        </TabsList>
 
-            <TabsContent value="config" className="mt-0 space-y-6">
+        <TabsContent value="config" className="mt-0 space-y-6">
+          <AgentStatusSection
+            enabled={enabled}
+            isToggling={isToggling}
+            availableRepositoryCount={repositories.length}
+            repositoryCount={repositoryCount}
+            slaEnabled={state.slaEnabled}
+            onToggle={nextEnabled =>
+              onToggleEnabled(nextEnabled, {
+                repositorySelectionMode: state.repositorySelectionMode,
+                selectedRepositoryIds: state.selectedRepositoryIds,
+              })
+            }
+          />
+          {enabled && (
+            <>
               <RepositorySection
                 {...stateProps}
                 repositories={repositories}
@@ -398,63 +413,65 @@ export function SecurityConfigForm({
                 isLoading={isLoadingModels}
               />
               <AnalysisModeSection {...stateProps} />
-            </TabsContent>
+            </>
+          )}
+        </TabsContent>
 
-            <TabsContent value="automation" className="mt-0 space-y-6">
-              <AutoAnalysisSection {...stateProps} />
-              <AutoRemediationSection {...stateProps} />
-              <AutoDismissSection {...stateProps} />
-            </TabsContent>
+        <TabsContent value="automation" className="mt-0 space-y-6">
+          <AutoAnalysisSection {...stateProps} />
+          <AutoRemediationSection {...stateProps} />
+          <AutoDismissSection {...stateProps} />
+        </TabsContent>
 
-            <TabsContent value="notifications" className="mt-0 space-y-6">
-              <NotificationSection
-                {...stateProps}
-                isOrganization={Boolean(organizationId)}
-                disabled={isSaving}
+        <TabsContent value="notifications" className="mt-0 space-y-6">
+          <NotificationSection
+            {...stateProps}
+            isOrganization={Boolean(organizationId)}
+            disabled={isSaving}
+          />
+        </TabsContent>
+
+        <TabsContent value="sla" className="mt-0 space-y-6">
+          <SlaSection
+            {...stateProps}
+            isOrganization={Boolean(organizationId)}
+            disabled={isSaving}
+          />
+        </TabsContent>
+      </Tabs>
+      {enabled && (
+        <div className="border-border flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              setState({
+                ...DEFAULT_FORM_CONFIG,
+                slaConfig: { ...DEFAULT_FORM_CONFIG.slaConfig },
+                selectedRepositoryIds: [],
+              })
+            }
+            disabled={isSaving}
+          >
+            Reset to defaults
+          </Button>
+          <Button
+            type="button"
+            className="bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-60"
+            onClick={() => handleSave()}
+            disabled={saveDisabled}
+          >
+            {isSaving ? (
+              <Loader2
+                className="size-4 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
               />
-            </TabsContent>
-
-            <TabsContent value="sla" className="mt-0 space-y-6">
-              <SlaSection
-                {...stateProps}
-                isOrganization={Boolean(organizationId)}
-                disabled={isSaving}
-              />
-            </TabsContent>
-          </Tabs>
-          <div className="border-border flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                setState({
-                  ...DEFAULT_FORM_CONFIG,
-                  slaConfig: { ...DEFAULT_FORM_CONFIG.slaConfig },
-                  selectedRepositoryIds: [],
-                })
-              }
-              disabled={isSaving}
-            >
-              Reset to defaults
-            </Button>
-            <Button
-              type="button"
-              className="bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-60"
-              onClick={() => handleSave()}
-              disabled={saveDisabled}
-            >
-              {isSaving ? (
-                <Loader2
-                  className="size-4 animate-spin motion-reduce:animate-none"
-                  aria-hidden="true"
-                />
-              ) : (
-                <Save className="size-4" aria-hidden="true" />
-              )}
-              {isSaving ? 'Saving...' : 'Save changes'}
-            </Button>
-          </div>
-        </>
+            ) : (
+              <Save className="size-4" aria-hidden="true" />
+            )}
+            {isSaving ? 'Saving...' : 'Save changes'}
+          </Button>
+        </div>
       )}
       <AlertDialog
         open={Boolean(pendingNavigationHref)}

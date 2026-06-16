@@ -1161,9 +1161,32 @@ export type SecurityFindingSandboxAnalysis = {
   modelUsed?: string;
 };
 
+export type SecurityFindingAnalysisInput = {
+  schemaVersion: 1;
+  source: string;
+  sourceId: string;
+  sourceUpdatedAt: string | null;
+  repoFullName: string;
+  status: string;
+  severity: string | null;
+  packageName: string;
+  packageEcosystem: string;
+  dependencyScope: string | null;
+  cveId: string | null;
+  ghsaId: string | null;
+  cweIds: string[];
+  cvssScore: string | null;
+  title: string;
+  description: string | null;
+  vulnerableVersionRange: string | null;
+  patchedVersion: string | null;
+  manifestPath: string | null;
+};
+
 export type SecurityFindingAnalysis = {
   triage?: SecurityFindingTriage;
   sandboxAnalysis?: SecurityFindingSandboxAnalysis;
+  findingDataSnapshot?: SecurityFindingAnalysisInput;
   rawMarkdown?: string;
   analyzedAt: string;
   modelUsed?: string;

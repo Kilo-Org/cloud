@@ -606,6 +606,7 @@ export async function getSecurityFindingById(db: WorkerDb, findingId: string) {
       analysis_status: security_findings.analysis_status,
       analysis: security_findings.analysis,
       analysis_started_at: security_findings.analysis_started_at,
+      analysis_completed_at: security_findings.analysis_completed_at,
       session_id: security_findings.session_id,
       cli_session_id: security_findings.cli_session_id,
       ignored_reason: security_findings.ignored_reason,

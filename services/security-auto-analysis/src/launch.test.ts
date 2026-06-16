@@ -312,7 +312,16 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       2,
       {},
       finding.id,
-      expect.objectContaining({ triage: existingTriage })
+      expect.objectContaining({
+        triage: existingTriage,
+        findingDataSnapshot: expect.objectContaining({
+          schemaVersion: 1,
+          source: 'dependabot',
+          sourceId: '42',
+          repoFullName: 'kilo/repo',
+          packageName: 'package-name',
+        }),
+      })
     );
     expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
       {},
@@ -346,7 +355,16 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       {},
       expect.objectContaining({
         claim: expect.objectContaining({ source: 'manual', claimToken: 'manual-claim-token' }),
-        outcome: expect.objectContaining({ type: 'triage-only-completed' }),
+        outcome: expect.objectContaining({
+          type: 'triage-only-completed',
+          analysis: expect.objectContaining({
+            findingDataSnapshot: expect.objectContaining({
+              schemaVersion: 1,
+              sourceId: '42',
+              packageName: 'package-name',
+            }),
+          }),
+        }),
       })
     );
     expect(clearAnalysisStatus).not.toHaveBeenCalled();

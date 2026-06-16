@@ -209,8 +209,11 @@ export async function upsertSecurityFinding(
           ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
           ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
           ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
+          ${sql.identifier(security_findings.package_name.name)} = EXCLUDED.${sql.identifier(security_findings.package_name.name)},
+          ${sql.identifier(security_findings.package_ecosystem.name)} = EXCLUDED.${sql.identifier(security_findings.package_ecosystem.name)},
           ${sql.identifier(security_findings.vulnerable_version_range.name)} = EXCLUDED.${sql.identifier(security_findings.vulnerable_version_range.name)},
           ${sql.identifier(security_findings.patched_version.name)} = EXCLUDED.${sql.identifier(security_findings.patched_version.name)},
+          ${sql.identifier(security_findings.manifest_path.name)} = EXCLUDED.${sql.identifier(security_findings.manifest_path.name)},
           ${sql.identifier(security_findings.title.name)} = EXCLUDED.${sql.identifier(security_findings.title.name)},
           ${sql.identifier(security_findings.description.name)} = EXCLUDED.${sql.identifier(security_findings.description.name)},
           ${sql.identifier(security_findings.status.name)} = CASE

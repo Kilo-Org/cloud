@@ -41,6 +41,7 @@ type CustomModesLayoutProps = {
 type DisplayMode = OrganizationMode & {
   isDefault: boolean;
   isOverridden: boolean;
+  routeModel?: string;
 };
 
 type ModesListProps = {
@@ -113,13 +114,13 @@ function ModesList({
             </CardHeader>
             <CardContent className="flex-1">
               <div className="flex h-full flex-col gap-4">
-                {isDefaultModelConfigEnabled && mode.config.defaultModel && (
+                {isDefaultModelConfigEnabled && mode.routeModel && (
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-muted-foreground text-xs font-medium">
                       Organization Auto route
                     </span>
                     <Badge variant="secondary" className="max-w-full font-mono text-xs">
-                      <span className="break-all">{mode.config.defaultModel}</span>
+                      <span className="break-all">{mode.routeModel}</span>
                     </Badge>
                   </div>
                 )}
@@ -200,6 +201,9 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
           ...customMode,
           isDefault: true,
           isOverridden: true,
+          routeModel: organizationData
+            ? getOrganizationAutoRoute(organizationData.settings, customMode.slug)
+            : undefined,
         };
       } else {
         // This default mode is not overridden
@@ -209,12 +213,10 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
           organization_id: organizationId,
           slug: defaultMode.slug,
           name: defaultMode.name,
-          config: {
-            ...defaultMode.config,
-            defaultModel: organizationData
-              ? getOrganizationAutoRoute(organizationData.settings, defaultMode.slug)
-              : defaultMode.config.defaultModel,
-          },
+          config: defaultMode.config,
+          routeModel: organizationData
+            ? getOrganizationAutoRoute(organizationData.settings, defaultMode.slug)
+            : undefined,
           created_by: '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -232,6 +234,9 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
         ...mode,
         isDefault: false,
         isOverridden: false,
+        routeModel: organizationData
+          ? getOrganizationAutoRoute(organizationData.settings, mode.slug)
+          : undefined,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -417,6 +422,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
               defaultModeSlug={
                 editingMode?.isDefault && !editingMode?.isOverridden ? editingMode.slug : undefined
               }
+              routeModel={editingMode?.routeModel}
               isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
               canSetDefaultModel={canSetDefaultModel}
               onSuccess={handleDrawerClose}
@@ -427,6 +433,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
               organizationId={organizationId}
               modeId={editingMode.id}
               defaultModeSlug={editingMode.isDefault ? editingMode.slug : undefined}
+              routeModel={editingMode.routeModel}
               isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
               canSetDefaultModel={canSetDefaultModel}
               onSuccess={handleDrawerClose}

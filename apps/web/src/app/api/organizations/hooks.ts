@@ -237,6 +237,30 @@ export function useSetOrganizationAutoFallback() {
   );
 }
 
+export function useSetOrganizationAutoRoute() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.settings.setOrganizationAutoRoute.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
+export function useClearOrganizationAutoRoute() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.settings.clearOrganizationAutoRoute.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
 export function useUpdateOrganizationSeatsRequired() {
   const trpc = useTRPC();
   const invalidate = useInvalidateAllOrganizationData();

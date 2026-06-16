@@ -10,10 +10,19 @@ const defaultConfig: OrganizationModeConfig = {
   roleDefinition: 'default',
 };
 
-function mergeToSatisfy(config: Partial<OrganizationModeConfig>): OrganizationModeConfig {
+type OrganizationModeConfigWithLegacyDefaultModel = Partial<OrganizationModeConfig> & {
+  defaultModel?: string;
+};
+
+function mergeToSatisfy(
+  config: OrganizationModeConfigWithLegacyDefaultModel
+): OrganizationModeConfig {
+  const configWithoutLegacyDefaultModel = { ...config };
+  delete configWithoutLegacyDefaultModel.defaultModel;
+
   return {
     ...defaultConfig,
-    ...config,
+    ...configWithoutLegacyDefaultModel,
   };
 }
 
@@ -89,13 +98,12 @@ export async function updateOrganizationMode(
   }
   if (updates.config !== undefined) {
     const configPatch = Object.fromEntries(
-      Object.entries(updates.config).map(([key, value]) => [
-        key,
-        value === undefined ? null : value,
-      ])
+      Object.entries(updates.config)
+        .filter(([key]) => key !== 'defaultModel')
+        .map(([key, value]) => [key, value === undefined ? null : value])
     );
 
-    updateData.config = sql`jsonb_strip_nulls(((${JSON.stringify(defaultConfig)}::jsonb || COALESCE(${orgnaization_modes.config}, '{}'::jsonb)) || ${JSON.stringify(configPatch)}::jsonb))`;
+    updateData.config = sql`jsonb_strip_nulls(((${JSON.stringify(defaultConfig)}::jsonb || (COALESCE(${orgnaization_modes.config}, '{}'::jsonb) - 'defaultModel')) || ${JSON.stringify(configPatch)}::jsonb))`;
   }
 
   try {

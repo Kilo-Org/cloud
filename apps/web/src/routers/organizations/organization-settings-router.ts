@@ -17,7 +17,6 @@ import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
 import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
 import { db } from '@/lib/drizzle';
 import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
@@ -438,25 +437,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const freshOrgAutoModel =
               existingOrgAutoModel ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
             const seededRoutes = { ...freshOrgAutoModel.routes };
-            if (!existingOrgAutoModel) {
-              const existingModes = await getAllOrganizationModes(organizationId, tx);
-              for (const mode of existingModes) {
-                if (!mode.config.defaultModel) {
-                  continue;
-                }
-                const validation = await validateOrganizationAutoTarget(
-                  organization,
-                  mode.config.defaultModel
-                );
-                if (validation.kind === 'error') {
-                  throw new TRPCError({
-                    code: 'BAD_REQUEST',
-                    message: `Cannot enable Organization Auto because mode "${mode.slug}" has an invalid route: ${validation.message}`,
-                  });
-                }
-                seededRoutes[mode.slug] = validation.modelId;
-              }
-            }
 
             assertOrganizationAutoRouteCount(seededRoutes);
             for (const [slug, targetModelId] of Object.entries(seededRoutes)) {

@@ -28,23 +28,9 @@ import { db } from '@/lib/drizzle';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   ORGANIZATION_AUTO_MODEL_FLAG,
-  projectOrganizationAutoRouteIntoMode,
-  projectOrganizationAutoRoutesIntoModes,
-  validateOrganizationAutoTarget,
 } from '@/lib/organizations/organization-auto-model';
 
-const MAX_ORGANIZATION_AUTO_ROUTES = 100;
-
 const ModeConfigInputSchema = OrganizationModeConfigSchema.partial();
-
-const ModeUpdateConfigInputSchema = ModeConfigInputSchema.extend({
-  defaultModel: z.string().min(1, 'Default model cannot be empty').nullable().optional(),
-});
-
-type ModeUpdateConfigInput = z.infer<typeof ModeUpdateConfigInputSchema>;
-type DefaultModelConfig = {
-  defaultModel?: string | null;
-};
 
 const CreateModeInputSchema = OrganizationIdInputSchema.extend({
   name: z
@@ -68,7 +54,7 @@ const UpdateModeInputSchema = OrganizationIdInputSchema.extend({
     .max(50)
     .regex(/^[a-z0-9-]+$/)
     .optional(),
-  config: ModeUpdateConfigInputSchema.optional(),
+  config: ModeConfigInputSchema.optional(),
 });
 
 const DeleteModeInputSchema = OrganizationIdInputSchema.extend({
@@ -79,56 +65,8 @@ const ModeIdInputSchema = OrganizationIdInputSchema.extend({
   modeId: z.uuid(),
 });
 
-type DefaultModelChange =
-  | { kind: 'none' }
-  | { kind: 'clear' }
-  | { kind: 'set'; defaultModel: string };
-
-function getDefaultModelChange(config: DefaultModelConfig | undefined): DefaultModelChange {
-  if (!config || !Object.prototype.hasOwnProperty.call(config, 'defaultModel')) {
-    return { kind: 'none' };
-  }
-
-  if (config.defaultModel === null) {
-    return { kind: 'clear' };
-  }
-
-  if (typeof config.defaultModel === 'string') {
-    return { kind: 'set', defaultModel: config.defaultModel };
-  }
-
-  return { kind: 'none' };
-}
-
-function normalizeModeConfig(
-  config: ModeUpdateConfigInput | undefined
-): Partial<OrganizationModeConfig> | undefined {
-  if (!config) {
-    return undefined;
-  }
-
-  const { defaultModel, ...rest } = config;
-  if (defaultModel === null) {
-    return { ...rest, defaultModel: undefined };
-  }
-  if (defaultModel === undefined) {
-    return rest;
-  }
-
-  return { ...rest, defaultModel };
-}
-
 function hasRoute(routes: Record<string, string>, slug: string): boolean {
   return Object.prototype.hasOwnProperty.call(routes, slug);
-}
-
-function assertOrganizationAutoRouteCount(routes: Record<string, string>): void {
-  if (Object.keys(routes).length > MAX_ORGANIZATION_AUTO_ROUTES) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: `Organization Auto supports at most ${MAX_ORGANIZATION_AUTO_ROUTES} routes`,
-    });
-  }
 }
 
 async function assertOrganizationAutoWriteEnabled(userId: string): Promise<void> {
@@ -143,43 +81,6 @@ async function assertOrganizationAutoWriteEnabled(userId: string): Promise<void>
   }
 }
 
-function assertModeDefaultModelCanBeSet(
-  organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>
-): void {
-  if (organization.plan !== 'enterprise') {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Model access configuration is not available for this organization.',
-    });
-  }
-}
-
-async function validateModeRouteTarget(
-  organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>,
-  targetModelId: string
-): Promise<string> {
-  const validation = await validateOrganizationAutoTarget(organization, targetModelId);
-  if (validation.kind === 'ok') {
-    return validation.modelId;
-  }
-
-  if (validation.message.includes('is not a concrete model identifier')) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: `Default model '${targetModelId}' is not a concrete model identifier`,
-    });
-  }
-
-  if (validation.message.includes("is not allowed by the organization's model policy")) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: `Default model '${targetModelId}' is not in the organization's allowed models list`,
-    });
-  }
-
-  throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
-}
-
 function getOrganizationAutoSettings(
   settings: OrganizationSettings
 ): typeof DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS {
@@ -188,8 +89,7 @@ function getOrganizationAutoSettings(
 
 function createModeUpdateAuditMessage(
   existingMode: OrganizationMode,
-  updates: { name?: string; slug?: string; config?: ModeUpdateConfigInput },
-  normalizedConfig: Partial<OrganizationModeConfig> | undefined
+  updates: { name?: string; slug?: string; config?: Partial<OrganizationModeConfig> }
 ): string {
   const changes: string[] = [];
   if (updates.name && updates.name !== existingMode.name) {
@@ -199,7 +99,7 @@ function createModeUpdateAuditMessage(
     changes.push(`slug: "${existingMode.slug}" → "${updates.slug}"`);
   }
   if (updates.config) {
-    const auditConfig = normalizedConfig ?? updates.config;
+    const auditConfig = updates.config;
     const configChanges: string[] = [];
 
     if (
@@ -240,20 +140,6 @@ function createModeUpdateAuditMessage(
       );
     }
     if (
-      'defaultModel' in auditConfig &&
-      auditConfig.defaultModel !== existingMode.config.defaultModel
-    ) {
-      if (existingMode.config.defaultModel && auditConfig.defaultModel) {
-        configChanges.push(
-          `defaultModel: "${existingMode.config.defaultModel}" → "${auditConfig.defaultModel}"`
-        );
-      } else if (auditConfig.defaultModel) {
-        configChanges.push(`defaultModel: set to "${auditConfig.defaultModel}"`);
-      } else if (existingMode.config.defaultModel) {
-        configChanges.push(`defaultModel: cleared "${existingMode.config.defaultModel}"`);
-      }
-    }
-    if (
       auditConfig.groups !== undefined &&
       existingMode.config.groups !== undefined &&
       JSON.stringify(auditConfig.groups) !== JSON.stringify(existingMode.config.groups)
@@ -280,8 +166,6 @@ export const organizationModesRouter = createTRPCRouter({
     .input(CreateModeInputSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, name, slug, config } = input;
-      const defaultModelChange = getDefaultModelChange(config);
-
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
         throw new TRPCError({
@@ -290,55 +174,17 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
-      if (defaultModelChange.kind !== 'none') {
-        await assertOrganizationAutoWriteEnabled(ctx.user.id);
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
-      }
-
       let createdMode: OrganizationMode | null | undefined;
-      const settings = await db.transaction(async tx => {
-        const settings = await mutateOrganizationSettings(
+      await db.transaction(async tx => {
+        await mutateOrganizationSettings(
           organizationId,
           async lockedOrganization => {
-            let nextSettings = lockedOrganization.settings;
-
-            if (defaultModelChange.kind === 'set') {
-              assertModeDefaultModelCanBeSet(lockedOrganization);
-              const targetModelId = await validateModeRouteTarget(
-                lockedOrganization,
-                defaultModelChange.defaultModel
-              );
-              const orgAutoModel = getOrganizationAutoSettings(lockedOrganization.settings);
-              const routes = { ...orgAutoModel.routes, [slug]: targetModelId };
-              assertOrganizationAutoRouteCount(routes);
-              nextSettings = {
-                ...lockedOrganization.settings,
-                org_auto_model: {
-                  ...orgAutoModel,
-                  routes,
-                },
-              };
-            }
-
-            if (defaultModelChange.kind === 'clear') {
-              const orgAutoModel = getOrganizationAutoSettings(lockedOrganization.settings);
-              const routes = { ...orgAutoModel.routes };
-              delete routes[slug];
-              nextSettings = {
-                ...lockedOrganization.settings,
-                org_auto_model: {
-                  ...orgAutoModel,
-                  routes,
-                },
-              };
-            }
-
             createdMode = await createOrganizationMode(
               organizationId,
               ctx.user.id,
               name,
               slug,
-              normalizeModeConfig(config),
+              config,
               tx
             );
 
@@ -349,7 +195,7 @@ export const organizationModesRouter = createTRPCRouter({
               });
             }
 
-            return nextSettings;
+            return lockedOrganization.settings;
           },
           tx
         );
@@ -367,33 +213,20 @@ export const organizationModesRouter = createTRPCRouter({
           organization_id: organizationId,
           tx,
         });
-
-        return settings;
       });
 
       if (!createdMode) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Mode creation failed' });
       }
 
-      return { mode: projectOrganizationAutoRouteIntoMode(createdMode, settings) };
+      return { mode: createdMode };
     }),
 
   list: organizationMemberProcedure.input(OrganizationIdInputSchema).query(async ({ input }) => {
     const { organizationId } = input;
 
     return await db.transaction(
-      async tx => {
-        const [modes, organization] = await Promise.all([
-          getAllOrganizationModes(organizationId, tx),
-          getOrganizationById(organizationId, tx),
-        ]);
-
-        return {
-          modes: organization
-            ? projectOrganizationAutoRoutesIntoModes(modes, organization.settings)
-            : modes,
-        };
-      },
+      async tx => ({ modes: await getAllOrganizationModes(organizationId, tx) }),
       { isolationLevel: 'repeatable read', accessMode: 'read only' }
     );
   }),
@@ -403,10 +236,7 @@ export const organizationModesRouter = createTRPCRouter({
 
     return await db.transaction(
       async tx => {
-        const [mode, organization] = await Promise.all([
-          getOrganizationModeById(organizationId, modeId, tx),
-          getOrganizationById(organizationId, tx),
-        ]);
+        const mode = await getOrganizationModeById(organizationId, modeId, tx);
 
         if (!mode) {
           throw new TRPCError({
@@ -415,11 +245,7 @@ export const organizationModesRouter = createTRPCRouter({
           });
         }
 
-        return {
-          mode: organization
-            ? projectOrganizationAutoRouteIntoMode(mode, organization.settings)
-            : mode,
-        };
+        return { mode };
       },
       { isolationLevel: 'repeatable read', accessMode: 'read only' }
     );
@@ -429,8 +255,6 @@ export const organizationModesRouter = createTRPCRouter({
     .input(UpdateModeInputSchema)
     .mutation(async ({ input, ctx }) => {
       const { modeId, organizationId, ...updates } = input;
-      const defaultModelChange = getDefaultModelChange(updates.config);
-      const normalizedConfig = normalizeModeConfig(updates.config);
 
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
@@ -440,15 +264,10 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
-      if (defaultModelChange.kind !== 'none') {
-        await assertOrganizationAutoWriteEnabled(ctx.user.id);
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
-      }
-
       let existingMode: OrganizationMode | undefined;
       let updatedMode: OrganizationMode | null | undefined;
-      const settings = await db.transaction(async tx => {
-        const settings = await mutateOrganizationSettings(
+      await db.transaction(async tx => {
+        await mutateOrganizationSettings(
           organizationId,
           async lockedOrganization => {
             const lockedMode = await getOrganizationModeById(organizationId, modeId, tx, true);
@@ -465,7 +284,8 @@ export const organizationModesRouter = createTRPCRouter({
             const nextSlug = updates.slug ?? lockedMode.slug;
             const slugChanged = nextSlug !== lockedMode.slug;
             const sourceHasRoute = hasRoute(routes, lockedMode.slug);
-            let routeChanged = false;
+
+            let nextSettings = lockedOrganization.settings;
 
             if (sourceHasRoute && slugChanged) {
               await assertOrganizationAutoWriteEnabled(ctx.user.id);
@@ -476,54 +296,20 @@ export const organizationModesRouter = createTRPCRouter({
                   message: `Organization Auto route already exists for mode "${nextSlug}"`,
                 });
               }
-            }
 
-            if (defaultModelChange.kind === 'set') {
-              assertModeDefaultModelCanBeSet(lockedOrganization);
-              const targetModelId = await validateModeRouteTarget(
-                lockedOrganization,
-                defaultModelChange.defaultModel
-              );
-              if (sourceHasRoute && slugChanged) {
-                delete routes[lockedMode.slug];
-              }
-              routes[nextSlug] = targetModelId;
-              assertOrganizationAutoRouteCount(routes);
-              routeChanged = true;
-            } else if (defaultModelChange.kind === 'clear') {
-              if (sourceHasRoute) {
-                delete routes[lockedMode.slug];
-                routeChanged = true;
-              }
-            } else if (sourceHasRoute && slugChanged) {
-              const targetModelId = await validateModeRouteTarget(
-                lockedOrganization,
-                routes[lockedMode.slug]
-              );
+              const targetModelId = routes[lockedMode.slug];
               delete routes[lockedMode.slug];
               routes[nextSlug] = targetModelId;
-              routeChanged = true;
+              nextSettings = {
+                ...lockedOrganization.settings,
+                org_auto_model: {
+                  ...orgAutoModel,
+                  routes,
+                },
+              };
             }
 
-            const nextSettings = routeChanged
-              ? {
-                  ...lockedOrganization.settings,
-                  org_auto_model: {
-                    ...orgAutoModel,
-                    routes,
-                  },
-                }
-              : lockedOrganization.settings;
-
-            updatedMode = await updateOrganizationMode(
-              organizationId,
-              modeId,
-              {
-                ...updates,
-                config: normalizedConfig,
-              },
-              tx
-            );
+            updatedMode = await updateOrganizationMode(organizationId, modeId, updates, tx);
 
             if (!updatedMode) {
               throw new TRPCError({
@@ -546,19 +332,17 @@ export const organizationModesRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
-          message: createModeUpdateAuditMessage(existingMode, updates, normalizedConfig),
+          message: createModeUpdateAuditMessage(existingMode, updates),
           organization_id: existingMode.organization_id,
           tx,
         });
-
-        return settings;
       });
 
       if (!updatedMode) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Mode update failed' });
       }
 
-      return { mode: projectOrganizationAutoRouteIntoMode(updatedMode, settings) };
+      return { mode: updatedMode };
     }),
 
   delete: organizationMemberMutationProcedure

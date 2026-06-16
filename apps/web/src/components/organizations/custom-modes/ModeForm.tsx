@@ -56,6 +56,7 @@ export type ModeFormData = z.infer<typeof modeFormSchema>;
 type ModeFormProps = {
   organizationId: string;
   mode?: OrganizationMode;
+  routeModel?: string;
   onSubmit: (data: ModeFormData) => Promise<void>;
   isSubmitting: boolean;
   isEditingBuiltIn?: boolean;
@@ -102,6 +103,7 @@ function denormalizeGroups(
 export function ModeForm({
   organizationId,
   mode,
+  routeModel,
   onSubmit,
   isSubmitting,
   isEditingBuiltIn = false,
@@ -118,7 +120,7 @@ export function ModeForm({
     description: mode?.config?.description || '',
     whenToUse: mode?.config?.whenToUse || '',
     customInstructions: mode?.config?.customInstructions || '',
-    defaultModel: mode?.config?.defaultModel || '',
+    defaultModel: routeModel || '',
   });
   const [selectedGroups, setSelectedGroups] = useState<string[]>(() => {
     const { simpleGroups } = normalizeGroups(mode?.config?.groups || []);
@@ -136,7 +138,7 @@ export function ModeForm({
     description: mode?.config?.description || '',
     whenToUse: mode?.config?.whenToUse || '',
     customInstructions: mode?.config?.customInstructions || '',
-    defaultModel: mode?.config?.defaultModel || '',
+    defaultModel: routeModel || '',
   });
   const [initialGroups, setInitialGroups] = useState<string[]>(() => {
     const { simpleGroups } = normalizeGroups(mode?.config?.groups || []);
@@ -189,7 +191,7 @@ export function ModeForm({
         description: mode.config?.description || '',
         whenToUse: mode.config?.whenToUse || '',
         customInstructions: mode.config?.customInstructions || '',
-        defaultModel: mode.config?.defaultModel || '',
+        defaultModel: routeModel || '',
       };
       const { simpleGroups, editConfig } = normalizeGroups(mode.config?.groups || []);
       const newEditConfig = editConfig || { fileRegex: '', description: '' };
@@ -201,7 +203,7 @@ export function ModeForm({
       setInitialGroups(simpleGroups);
       setInitialEditConfig(newEditConfig);
     }
-  }, [mode]);
+  }, [mode, routeModel]);
 
   // Check if form is dirty (has changes)
   const isDirty =
@@ -212,7 +214,7 @@ export function ModeForm({
     formData.whenToUse !== initialFormData.whenToUse ||
     formData.customInstructions !== initialFormData.customInstructions ||
     formData.defaultModel !== initialFormData.defaultModel ||
-    JSON.stringify(selectedGroups.sort()) !== JSON.stringify(initialGroups.sort()) ||
+    JSON.stringify([...selectedGroups].sort()) !== JSON.stringify([...initialGroups].sort()) ||
     editGroupConfig.fileRegex !== initialEditConfig.fileRegex ||
     editGroupConfig.description !== initialEditConfig.description;
 

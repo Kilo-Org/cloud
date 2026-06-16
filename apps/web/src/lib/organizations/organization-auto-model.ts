@@ -58,25 +58,6 @@ export function getOrganizationAutoRoute(
   return settings.org_auto_model.routes[slug];
 }
 
-export function projectOrganizationAutoRouteIntoMode<
-  T extends { slug: string; config: { defaultModel?: string } },
->(mode: T, settings: Organization['settings'] | undefined): T {
-  if (!settings?.org_auto_model) {
-    return mode;
-  }
-  const route = getOrganizationAutoRoute(settings, mode.slug);
-  if (!route) {
-    return { ...mode, config: { ...mode.config, defaultModel: undefined } };
-  }
-  return { ...mode, config: { ...mode.config, defaultModel: route } };
-}
-
-export function projectOrganizationAutoRoutesIntoModes<
-  T extends { slug: string; config: { defaultModel?: string } },
->(modes: T[], settings: Organization['settings'] | undefined): T[] {
-  return modes.map(mode => projectOrganizationAutoRouteIntoMode(mode, settings));
-}
-
 export function isOrganizationAutoTargetModel(modelId: string): boolean {
   return (ORGANIZATION_AUTO_TARGET_MODELS as readonly string[]).includes(modelId);
 }

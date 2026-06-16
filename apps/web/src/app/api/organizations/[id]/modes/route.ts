@@ -3,7 +3,6 @@ import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
 import type { OrganizationMode } from '@/lib/organizations/organization-modes';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
-import { projectOrganizationAutoRoutesIntoModes } from '@/lib/organizations/organization-auto-model';
 
 export async function GET(
   _request: NextRequest,
@@ -16,12 +15,8 @@ export async function GET(
   }
 
   const { organization } = data;
-  const modes = projectOrganizationAutoRoutesIntoModes(
-    await getAllOrganizationModes(organization.id),
-    organization.settings
-  );
 
   return NextResponse.json({
-    modes,
+    modes: await getAllOrganizationModes(organization.id),
   });
 }

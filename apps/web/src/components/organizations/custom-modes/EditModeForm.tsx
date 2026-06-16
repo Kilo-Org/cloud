@@ -4,7 +4,10 @@ import {
   useOrganizationModeById,
   useUpdateOrganizationMode,
   useOrganizationModes,
+  useClearOrganizationAutoRoute,
   useDeleteOrganizationMode,
+  useOrganizationWithMembers,
+  useSetOrganizationAutoRoute,
 } from '@/app/api/organizations/hooks';
 import { ModeForm, type ModeFormData } from './ModeForm';
 import { LoadingCard } from '@/components/LoadingCard';
@@ -16,6 +19,7 @@ type EditModeFormProps = {
   organizationId: string;
   modeId: string;
   defaultModeSlug?: string;
+  routeModel?: string;
   isDefaultModelConfigEnabled?: boolean;
   canSetDefaultModel?: boolean;
   onSuccess?: () => void;
@@ -56,6 +60,7 @@ export function EditModeForm({
   organizationId,
   modeId,
   defaultModeSlug,
+  routeModel: propRouteModel,
   isDefaultModelConfigEnabled = false,
   canSetDefaultModel = true,
   onSuccess,
@@ -65,30 +70,43 @@ export function EditModeForm({
   const { data: modesData } = useOrganizationModes(organizationId);
   const updateMutation = useUpdateOrganizationMode();
   const deleteMutation = useDeleteOrganizationMode();
+  const setRouteMutation = useSetOrganizationAutoRoute();
+  const clearRouteMutation = useClearOrganizationAutoRoute();
+  const { data: organizationData } = useOrganizationWithMembers(organizationId);
+  const currentRouteModel =
+    propRouteModel ??
+    (defaultModeSlug
+      ? organizationData?.settings.org_auto_model?.routes[defaultModeSlug]
+      : data?.mode
+        ? organizationData?.settings.org_auto_model?.routes[data.mode.slug]
+        : undefined);
+
+  const persistRoute = async (modeSlug: string, targetModelId: string | undefined) => {
+    if (targetModelId) {
+      await setRouteMutation.mutateAsync({
+        organizationId,
+        mode_slug: modeSlug,
+        model_id: targetModelId,
+      });
+    } else {
+      await clearRouteMutation.mutateAsync({ organizationId, mode_slug: modeSlug });
+    }
+  };
 
   const handleSubmit = async (formData: ModeFormData) => {
     try {
-      if (
-        defaultModeSlug &&
-        !formData.defaultModel &&
-        matchesBuiltInModeState(formData, defaultModeSlug)
-      ) {
+      if (defaultModeSlug && matchesBuiltInModeState(formData, defaultModeSlug)) {
         await deleteMutation.mutateAsync({
           organizationId,
           modeId,
         });
+        await persistRoute(defaultModeSlug, formData.defaultModel);
         toast.success(`Mode "${formData.name}" reverted successfully`);
         onSuccess?.();
         return;
       }
 
-      const persistedDefaultModel = data?.mode?.config.defaultModel ?? '';
-      const defaultModelUpdate =
-        formData.defaultModel === persistedDefaultModel
-          ? {}
-          : { defaultModel: formData.defaultModel || null };
-
-      await updateMutation.mutateAsync({
+      const updated = await updateMutation.mutateAsync({
         organizationId,
         modeId,
         name: formData.name,
@@ -99,9 +117,11 @@ export function EditModeForm({
           whenToUse: formData.whenToUse,
           groups: formData.groups as ('read' | 'edit' | 'browser' | 'command' | 'mcp')[],
           customInstructions: formData.customInstructions,
-          ...defaultModelUpdate,
         },
       });
+      if (formData.defaultModel !== currentRouteModel) {
+        await persistRoute(updated.mode.slug, formData.defaultModel);
+      }
       toast.success(`Mode "${formData.name}" updated successfully`);
       onSuccess?.();
     } catch (error) {
@@ -130,8 +150,14 @@ export function EditModeForm({
     <ModeForm
       organizationId={organizationId}
       mode={data.mode}
+      routeModel={currentRouteModel}
       onSubmit={handleSubmit}
-      isSubmitting={updateMutation.isPending || deleteMutation.isPending}
+      isSubmitting={
+        updateMutation.isPending ||
+        deleteMutation.isPending ||
+        setRouteMutation.isPending ||
+        clearRouteMutation.isPending
+      }
       isEditingBuiltIn={!!defaultModeSlug}
       isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
       canSetDefaultModel={canSetDefaultModel}

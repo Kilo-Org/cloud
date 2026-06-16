@@ -526,37 +526,6 @@ describe('organizations settings trpc router', () => {
       expect(updatedOrg?.settings.org_auto_model?.routes.code).toBeUndefined();
     });
 
-    it('does not reseed a cleared canonical route from the legacy mode default', async () => {
-      const organization = await createTestOrganization('Canonical Route', owner.id, 0, {}, false);
-      const caller = await createCallerForUser(owner.id);
-
-      try {
-        const mode = await caller.organizations.modes.create({
-          organizationId: organization.id,
-          name: 'Canonical Route Mode',
-          slug: 'canonical-route-mode',
-          config: {
-            defaultModel: 'kilo-auto/balanced',
-          },
-        });
-        await caller.organizations.settings.clearOrganizationAutoRoute({
-          organizationId: organization.id,
-          mode_slug: mode.mode.slug,
-        });
-
-        await caller.organizations.settings.enableOrganizationAuto({
-          organizationId: organization.id,
-        });
-
-        const updatedOrganization = await getOrganizationById(organization.id);
-        expect(
-          updatedOrganization?.settings.org_auto_model?.routes['canonical-route-mode']
-        ).toBeUndefined();
-      } finally {
-        await db.delete(organizations).where(eq(organizations.id, organization.id));
-      }
-    });
-
     it('requires a replacement model when disabling Organization Auto', async () => {
       const caller = await createCallerForUser(owner.id);
 

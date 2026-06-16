@@ -5,9 +5,9 @@ import { addMonths, format } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
 import {
-  CURRENT_KILOCLAW_PRICE_VERSION,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
+  resolveKiloClawEnrollmentPriceVersion,
   insertKiloClawSubscriptionChangeLog,
   type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeAction,
@@ -1201,6 +1201,7 @@ export async function enrollWithCredits(params: {
   instanceId: string;
   plan: 'commit' | 'standard';
   hadPaidSubscription: boolean;
+  expectedPriceVersion?: KiloClawPriceVersion;
   actor?: KiloClawSubscriptionChangeActor;
   commitQualification?: KiloClawCommitEnrollmentQualification;
 }): Promise<void> {
@@ -1221,6 +1222,27 @@ export async function enrollWithCredits(params: {
   if (!user) {
     logError('Credit enrollment failed: user not found', { user_id: userId, instanceId });
     throw new Error('User not found');
+  }
+
+  const [targetInstance] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      destroyedAt: kiloclaw_instances.destroyed_at,
+    })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.id, instanceId),
+        eq(kiloclaw_instances.user_id, userId),
+        isNull(kiloclaw_instances.organization_id)
+      )
+    )
+    .limit(1);
+  if (!targetInstance) {
+    throw new Error('KiloClaw personal instance not found');
+  }
+  if (targetInstance.destroyedAt) {
+    throw new Error('Cannot enroll a destroyed KiloClaw instance. Reprovision first.');
   }
 
   const [existingSub] = await db
@@ -1249,9 +1271,19 @@ export async function enrollWithCredits(params: {
   }
 
   const isLiveTrialLineage = existingSub?.status === 'trialing';
-  const kiloclawPriceVersion = isLiveTrialLineage
-    ? existingSub.kiloclaw_price_version
-    : CURRENT_KILOCLAW_PRICE_VERSION;
+  const kiloclawPriceVersion = resolveKiloClawEnrollmentPriceVersion(
+    existingSub
+      ? {
+          status: existingSub.status,
+          kiloclawPriceVersion: existingSub.kiloclaw_price_version,
+        }
+      : null
+  );
+  if (params.expectedPriceVersion && params.expectedPriceVersion !== kiloclawPriceVersion) {
+    throw new Error(
+      `Credit enrollment intent price version no longer matches target: intended=${params.expectedPriceVersion} expected=${kiloclawPriceVersion}`
+    );
+  }
   const kiloclawPricing = getKiloClawPricingCatalogEntry(kiloclawPriceVersion);
 
   // First-time standard-plan subscribers in an eligible live pre-rollout lineage
@@ -1316,6 +1348,40 @@ export async function enrollWithCredits(params: {
   const trialEndEntityId = existingSub?.status === 'trialing' ? existingSub.id : undefined;
 
   await db.transaction(async tx => {
+    const [transactionTargetInstance] = await tx
+      .select({ destroyedAt: kiloclaw_instances.destroyed_at })
+      .from(kiloclaw_instances)
+      .where(
+        and(
+          eq(kiloclaw_instances.id, instanceId),
+          eq(kiloclaw_instances.user_id, userId),
+          isNull(kiloclaw_instances.organization_id)
+        )
+      )
+      .limit(1);
+    if (!transactionTargetInstance || transactionTargetInstance.destroyedAt) {
+      throw new Error('Credit enrollment target is no longer an active personal instance.');
+    }
+
+    const [currentSubscription] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, userId),
+          eq(kiloclaw_subscriptions.instance_id, instanceId),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+        )
+      )
+      .limit(1);
+    if (
+      currentSubscription?.id !== existingSub?.id ||
+      currentSubscription?.status !== existingSub?.status ||
+      currentSubscription?.kiloclaw_price_version !== existingSub?.kiloclaw_price_version
+    ) {
+      throw new Error('Credit enrollment target changed before the deduction could be applied.');
+    }
+
     // 5a: Insert negative credit transaction with period-encoded idempotency key
     const deductionResult = await tx
       .insert(credit_transactions)
@@ -1352,18 +1418,6 @@ export async function enrollWithCredits(params: {
         microdollars_used: sql`${kilocode_users.microdollars_used} + ${costMicrodollars}`,
       })
       .where(eq(kilocode_users.id, userId));
-
-    const [currentSubscription] = await tx
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, userId),
-          eq(kiloclaw_subscriptions.instance_id, instanceId),
-          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
-        )
-      )
-      .limit(1);
 
     // 5c: Upsert subscription row as pure credit
     const commitEndsAt = plan === 'commit' ? periodEndIso : null;
@@ -1410,9 +1464,12 @@ export async function enrollWithCredits(params: {
       .returning();
 
     if (mutatedSubscription) {
-      const action: KiloClawSubscriptionChangeAction = currentSubscription
-        ? 'payment_source_changed'
-        : 'created';
+      const action: KiloClawSubscriptionChangeAction =
+        currentSubscription?.status === 'canceled'
+          ? 'reactivated'
+          : currentSubscription
+            ? 'payment_source_changed'
+            : 'created';
       await insertKiloClawSubscriptionChangeLog(tx, {
         subscriptionId: mutatedSubscription.id,
         actor: params.actor ?? CREDIT_BILLING_ACTOR,

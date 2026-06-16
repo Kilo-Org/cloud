@@ -5,7 +5,9 @@ import {
   deriveBannerState,
   deriveLockReason,
   formatKiloClawPlanPrice,
+  getKiloClawFundingChoiceCopy,
   getKiloClawRetirementDisplay,
+  getKiloPassHostingRecoveryCopy,
   type ClawBillingStatus,
   type KiloPassUpsellActivationPreview,
 } from './billing-types';
@@ -163,6 +165,40 @@ describe('KiloClaw billing display helpers', () => {
     expect(formatKiloClawPlanPrice({ plan: 'commit', priceVersion: '2026-05-10' })).toBe(
       '$306/6-month commit'
     );
+  });
+});
+
+describe('KiloClaw funding and recovery copy', () => {
+  it('prioritizes credit-funded recovery after bundled hosting activation fails', () => {
+    expect(getKiloPassHostingRecoveryCopy('standard')).toEqual({
+      title: 'Credit-funded hosting needs attention',
+      description:
+        'Your Kilo Pass credits are ready, but hosting activation did not finish. Retry credit-funded activation or choose a hosting plan.',
+      destination: '/claw/subscription',
+      destinationLabel: 'Choose hosting plan',
+      canRetry: true,
+    });
+    expect(getKiloPassHostingRecoveryCopy('expired_commit')).toEqual(
+      expect.objectContaining({
+        destination: '/claw/subscription',
+        destinationLabel: 'Choose Standard hosting',
+        canRetry: false,
+      })
+    );
+  });
+
+  it('distinguishes credit-funded hosting from a separate recurring Stripe subscription', () => {
+    expect(
+      getKiloClawFundingChoiceCopy({ plan: 'standard', costMicrodollars: 55_000_000 })
+    ).toEqual({
+      creditHeading: 'Credit-funded hosting',
+      creditDescription:
+        'Standard first charge: $55/month. Future hosting charges use your credit balance.',
+      creditButtonLabel: 'Activate Standard with credits',
+      stripeDividerLabel: 'or start a separate Stripe subscription',
+      stripeButtonLabel: 'Subscribe with Stripe, $55/month',
+      stripeDescription: 'Creates a separate recurring Stripe charge for hosting.',
+    });
   });
 });
 

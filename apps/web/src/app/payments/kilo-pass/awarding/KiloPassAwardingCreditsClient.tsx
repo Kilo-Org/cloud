@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTRPC } from '@/lib/trpc/utils';
+import { getKiloPassHostingRecoveryCopy } from '@/app/(app)/claw/components/billing/billing-types';
 
 const POLL_INTERVAL_MS = 1000;
 const TIMEOUT_MS = 90_000;
@@ -95,7 +96,7 @@ export function KiloPassAwardingCreditsClient() {
     };
   }, []);
 
-  const query = useQuery({
+  const { data: checkoutState, isError: checkoutStateIsError } = useQuery({
     ...trpc.kiloPass.getCheckoutReturnState.queryOptions({ sessionId: checkoutSessionId }),
     enabled: checkoutSessionId.length > 0,
     refetchInterval: query => {
@@ -108,12 +109,12 @@ export function KiloPassAwardingCreditsClient() {
     retry: false,
   });
 
-  const isReady = query.data?.creditsAwarded === true;
+  const isReady = checkoutState?.creditsAwarded === true;
   const isClawAutoActivation =
-    query.data?.hostingIntent !== 'none' && query.data?.hostingIntent != null;
-  const hasSubscription = query.data?.subscription != null;
+    checkoutState?.hostingIntent !== 'none' && checkoutState?.hostingIntent != null;
+  const hasSubscription = checkoutState?.subscription != null;
   const showWelcomePromoIneligibleNotice =
-    query.data?.welcomePromoIneligibleDueToReusedFingerprint === true;
+    checkoutState?.welcomePromoIneligibleDueToReusedFingerprint === true;
   const visibleActivationStep =
     activationStep === 'done'
       ? activationStep
@@ -179,8 +180,14 @@ export function KiloPassAwardingCreditsClient() {
 
   const fallbackDestination = isClawAutoActivation ? '/claw' : '/profile';
   const fallbackLabel = isClawAutoActivation ? 'Go to KiloClaw' : 'Go to profile';
+  const hostingRecovery = getKiloPassHostingRecoveryCopy(checkoutState?.hostingIntent ?? 'none');
 
-  if (query.isError) {
+  function retryCreditFundedHostingActivation() {
+    setEnrollmentError(null);
+    activateCheckoutHosting.mutate({ sessionId: checkoutSessionId });
+  }
+
+  if (checkoutStateIsError) {
     return (
       <PageContainer>
         <div className="flex min-h-[70vh] items-center justify-center">
@@ -272,21 +279,31 @@ export function KiloPassAwardingCreditsClient() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
-                  Hosting activation failed
+                  {hostingRecovery.title}
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4">
-                <div className="text-muted-foreground text-sm">
-                  Your credits were added successfully, but we couldn't activate hosting
-                  automatically: {enrollmentError}
-                </div>
-                <div className="text-muted-foreground text-sm">
-                  You can activate hosting manually from the KiloClaw dashboard.
-                </div>
+                <div className="text-muted-foreground text-sm">{hostingRecovery.description}</div>
+                <div className="text-muted-foreground text-sm">Details: {enrollmentError}</div>
                 {showWelcomePromoIneligibleNotice ? <WelcomePromoIneligibleNotice /> : null}
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" onClick={() => router.replace('/claw')}>
-                    Go to KiloClaw
+                  {hostingRecovery.canRetry ? (
+                    <Button
+                      type="button"
+                      disabled={activateCheckoutHosting.isPending}
+                      onClick={retryCreditFundedHostingActivation}
+                    >
+                      {activateCheckoutHosting.isPending
+                        ? 'Retrying credit activation…'
+                        : 'Retry credit-funded activation'}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant={hostingRecovery.canRetry ? 'outline' : 'default'}
+                    onClick={() => router.replace(hostingRecovery.destination)}
+                  >
+                    {hostingRecovery.destinationLabel}
                   </Button>
                 </div>
               </CardContent>

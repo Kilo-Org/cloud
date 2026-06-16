@@ -2,7 +2,12 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@/lib/drizzle';
 import { enrollWithCredits } from '@/lib/kiloclaw/credit-billing';
-import { CURRENT_KILOCLAW_PRICE_VERSION, isBeforeKiloClawCommitSalesCutoff } from '@kilocode/db';
+import {
+  isBeforeKiloClawCommitSalesCutoff,
+  isKiloClawPriceVersion,
+  resolveKiloClawEnrollmentPriceVersion,
+  type KiloClawPriceVersion,
+} from '@kilocode/db';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { client as stripe } from '@/lib/stripe-client';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
@@ -67,6 +72,10 @@ import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import { getInitialWelcomePromoEligibilityReasonForSubscription } from '@/lib/kilo-pass/welcome-promo-context';
+import { sentryLogger } from '@/lib/utils.server';
+
+const logHostingActivationInfo = sentryLogger('kilo-pass-hosting-activation', 'info');
+const logHostingActivationWarning = sentryLogger('kilo-pass-hosting-activation', 'warning');
 
 const CursorInputSchema = z.object({
   cursor: z.string().nullable().optional(),
@@ -814,6 +823,79 @@ const GetScheduledChangeOutputSchema = z.object({
     .nullable(),
 });
 
+async function isExpectedCreditHostingActive(params: {
+  userId: string;
+  instanceId: string;
+  plan: 'standard' | 'commit';
+  priceVersion: KiloClawPriceVersion;
+}): Promise<boolean> {
+  const [activeSubscription] = await db
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId),
+        eq(kiloclaw_subscriptions.status, 'active'),
+        eq(kiloclaw_subscriptions.plan, params.plan),
+        eq(kiloclaw_subscriptions.payment_source, 'credits'),
+        isNull(kiloclaw_subscriptions.stripe_subscription_id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+        eq(kiloclaw_subscriptions.kiloclaw_price_version, params.priceVersion),
+        isNull(kiloclaw_instances.destroyed_at),
+        isNull(kiloclaw_instances.organization_id)
+      )
+    )
+    .limit(1);
+
+  return activeSubscription !== undefined;
+}
+
+async function getSettledKiloPassCheckoutSubscription(params: {
+  userId: string;
+  stripeSubscriptionId: string;
+}): Promise<{
+  id: string;
+  creditsAwarded: boolean;
+  welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
+} | null> {
+  const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(kilo_pass_subscriptions.kilo_user_id, params.userId),
+      eq(kilo_pass_subscriptions.stripe_subscription_id, params.stripeSubscriptionId)
+    ),
+  });
+  if (!subscription) {
+    return null;
+  }
+
+  const [issuedBaseCredits] = await db
+    .select({
+      welcomePromoEligibilityReason: kilo_pass_issuances.initial_welcome_promo_eligibility_reason,
+    })
+    .from(kilo_pass_issuance_items)
+    .innerJoin(
+      kilo_pass_issuances,
+      eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
+    )
+    .where(
+      and(
+        eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription.id),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      )
+    )
+    .orderBy(asc(kilo_pass_issuances.issue_month))
+    .limit(1);
+
+  return {
+    id: subscription.id,
+    creditsAwarded: issuedBaseCredits !== undefined,
+    welcomePromoEligibilityReason: issuedBaseCredits?.welcomePromoEligibilityReason ?? null,
+  };
+}
+
 export const kiloPassRouter = createTRPCRouter({
   getMobileStoreProducts: baseProcedure.query(({ ctx }) => ({
     appAccountToken: ctx.user.app_store_account_token,
@@ -1126,48 +1208,17 @@ export const kiloPassRouter = createTRPCRouter({
         };
       }
 
-      const settledSubscription = await db.query.kilo_pass_subscriptions.findFirst({
-        columns: { id: true },
-        where: and(
-          eq(kilo_pass_subscriptions.kilo_user_id, ctx.user.id),
-          eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId)
-        ),
+      const settledSubscription = await getSettledKiloPassCheckoutSubscription({
+        userId: ctx.user.id,
+        stripeSubscriptionId,
       });
-      if (!settledSubscription) {
-        return {
-          subscription: null,
-          creditsAwarded: false,
-          hostingIntent,
-          welcomePromoIneligibleDueToReusedFingerprint: false,
-        };
-      }
-
-      const issuedBaseCredits = await db
-        .select({
-          id: kilo_pass_issuance_items.id,
-          welcomePromoEligibilityReason:
-            kilo_pass_issuances.initial_welcome_promo_eligibility_reason,
-        })
-        .from(kilo_pass_issuance_items)
-        .innerJoin(
-          kilo_pass_issuances,
-          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
-        )
-        .where(
-          and(
-            eq(kilo_pass_issuances.kilo_pass_subscription_id, settledSubscription.id),
-            eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
-          )
-        )
-        .orderBy(asc(kilo_pass_issuances.issue_month))
-        .limit(1);
 
       return {
-        subscription,
-        creditsAwarded: issuedBaseCredits.length > 0,
+        subscription: settledSubscription ? subscription : null,
+        creditsAwarded: settledSubscription?.creditsAwarded ?? false,
         hostingIntent,
         welcomePromoIneligibleDueToReusedFingerprint:
-          issuedBaseCredits[0]?.welcomePromoEligibilityReason ===
+          settledSubscription?.welcomePromoEligibilityReason ===
           KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
       };
     }),
@@ -1176,6 +1227,11 @@ export const kiloPassRouter = createTRPCRouter({
     .input(z.object({ sessionId: z.string().min(1) }))
     .output(ActivateCheckoutHostingOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      const startedAt = Date.now();
+      logHostingActivationInfo('Kilo Pass hosting activation started', {
+        user_id: ctx.user.id,
+        checkout_session_id: input.sessionId,
+      });
       const checkoutSession = await stripe.checkout.sessions.retrieve(input.sessionId);
       const metadata = checkoutSession.metadata ?? {};
       if (
@@ -1183,6 +1239,12 @@ export const kiloPassRouter = createTRPCRouter({
         metadata.type !== 'kilo-pass' ||
         metadata.kiloUserId !== ctx.user.id
       ) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          reason: 'invalid_checkout_ownership',
+          duration_ms: Date.now() - startedAt,
+        });
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'Checkout session does not belong to user.',
@@ -1191,6 +1253,12 @@ export const kiloPassRouter = createTRPCRouter({
 
       const hostingPlan = metadata.kiloclawHostingPlan;
       if (hostingPlan !== 'standard' && hostingPlan !== 'commit') {
+        logHostingActivationInfo('Kilo Pass hosting activation skipped', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          reason: 'no_hosting_intent',
+          duration_ms: Date.now() - startedAt,
+        });
         return { activated: false, hostingIntent: 'none' };
       }
 
@@ -1198,6 +1266,13 @@ export const kiloPassRouter = createTRPCRouter({
       const stripeSubscriptionId =
         typeof stripeSubscription === 'string' ? stripeSubscription : stripeSubscription?.id;
       if (!stripeSubscriptionId) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          reason: 'missing_kilo_pass_subscription',
+          intended_plan: hostingPlan,
+          duration_ms: Date.now() - startedAt,
+        });
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Kilo Pass checkout is not complete.',
@@ -1206,29 +1281,93 @@ export const kiloPassRouter = createTRPCRouter({
       const verifiedSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
       const checkoutConfirmedAt = new Date(verifiedSubscription.created * 1000).toISOString();
       if (hostingPlan === 'commit' && !isBeforeKiloClawCommitSalesCutoff(checkoutConfirmedAt)) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          reason: 'expired_commit_intent',
+          intended_plan: hostingPlan,
+          duration_ms: Date.now() - startedAt,
+        });
         return { activated: false, hostingIntent: 'expired_commit' };
       }
 
       const instanceId = metadata.kiloclawInstanceId;
       const priceVersion = metadata.kiloclawPriceVersion;
       if (!instanceId || !priceVersion) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          reason: 'missing_hosting_metadata',
+          intended_plan: hostingPlan,
+          intended_price_version: priceVersion,
+          duration_ms: Date.now() - startedAt,
+        });
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Checkout is missing hosting intent metadata.',
         });
       }
+      if (!isKiloClawPriceVersion(priceVersion)) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          instance_id: instanceId,
+          reason: 'invalid_price_version',
+          intended_price_version: priceVersion,
+          duration_ms: Date.now() - startedAt,
+        });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Checkout hosting price version is invalid.',
+        });
+      }
       const [instance] = await db
-        .select({ id: kiloclaw_instances.id })
+        .select({
+          id: kiloclaw_instances.id,
+          destroyedAt: kiloclaw_instances.destroyed_at,
+        })
         .from(kiloclaw_instances)
         .where(
-          and(eq(kiloclaw_instances.id, instanceId), eq(kiloclaw_instances.user_id, ctx.user.id))
+          and(
+            eq(kiloclaw_instances.id, instanceId),
+            eq(kiloclaw_instances.user_id, ctx.user.id),
+            isNull(kiloclaw_instances.organization_id)
+          )
         )
         .limit(1);
       if (!instance) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          instance_id: instanceId,
+          reason: 'missing_personal_instance',
+          intended_price_version: priceVersion,
+          duration_ms: Date.now() - startedAt,
+        });
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Hosting instance not found.' });
       }
+      if (instance.destroyedAt) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          instance_id: instance.id,
+          reason: 'destroyed_billing_anchor',
+          intended_price_version: priceVersion,
+          duration_ms: Date.now() - startedAt,
+        });
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Reprovision KiloClaw before activating hosting.',
+        });
+      }
       const [existingSubscription] = await db
-        .select({ priceVersion: kiloclaw_subscriptions.kiloclaw_price_version })
+        .select({
+          status: kiloclaw_subscriptions.status,
+          plan: kiloclaw_subscriptions.plan,
+          paymentSource: kiloclaw_subscriptions.payment_source,
+          stripeSubscriptionId: kiloclaw_subscriptions.stripe_subscription_id,
+          priceVersion: kiloclaw_subscriptions.kiloclaw_price_version,
+        })
         .from(kiloclaw_subscriptions)
         .where(
           and(
@@ -1237,26 +1376,64 @@ export const kiloPassRouter = createTRPCRouter({
           )
         )
         .limit(1);
-      const expectedPriceVersion =
-        existingSubscription?.priceVersion ?? CURRENT_KILOCLAW_PRICE_VERSION;
-      if (priceVersion !== expectedPriceVersion) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'Checkout hosting price version no longer matches instance.',
-        });
-      }
-
-      const settledSubscription = await db.query.kilo_pass_subscriptions.findFirst({
-        columns: { id: true, started_at: true },
-        where: and(
-          eq(kilo_pass_subscriptions.kilo_user_id, ctx.user.id),
-          eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId)
-        ),
+      const settledSubscription = await getSettledKiloPassCheckoutSubscription({
+        userId: ctx.user.id,
+        stripeSubscriptionId,
       });
-      if (!settledSubscription) {
+      if (!settledSubscription?.creditsAwarded) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          instance_id: instance.id,
+          reason: 'credits_not_settled',
+          intended_price_version: priceVersion,
+          duration_ms: Date.now() - startedAt,
+        });
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Kilo Pass credits are still processing.',
+        });
+      }
+
+      const alreadyActivated =
+        existingSubscription?.status === 'active' &&
+        existingSubscription.plan === hostingPlan &&
+        existingSubscription.paymentSource === 'credits' &&
+        existingSubscription.stripeSubscriptionId === null &&
+        existingSubscription.priceVersion === priceVersion;
+      if (alreadyActivated) {
+        logHostingActivationInfo('Kilo Pass hosting activation replayed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          instance_id: instance.id,
+          outcome: 'idempotent_noop',
+          intended_price_version: priceVersion,
+          duration_ms: Date.now() - startedAt,
+        });
+        return { activated: true, hostingIntent: hostingPlan };
+      }
+
+      const expectedPriceVersion = resolveKiloClawEnrollmentPriceVersion(
+        existingSubscription
+          ? {
+              status: existingSubscription.status,
+              kiloclawPriceVersion: existingSubscription.priceVersion,
+            }
+          : null
+      );
+      if (priceVersion !== expectedPriceVersion) {
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          instance_id: instance.id,
+          reason: 'stale_price_version',
+          intended_price_version: priceVersion,
+          expected_price_version: expectedPriceVersion,
+          duration_ms: Date.now() - startedAt,
+        });
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Checkout hosting price version no longer matches instance.',
         });
       }
 
@@ -1272,16 +1449,63 @@ export const kiloPassRouter = createTRPCRouter({
         )
         .limit(1);
 
-      await enrollWithCredits({
-        userId: ctx.user.id,
-        instanceId: instance.id,
-        plan: hostingPlan,
-        hadPaidSubscription: Boolean(priorPaidSubscription),
-        actor: { actorType: 'user', actorId: ctx.user.id },
-        commitQualification:
-          hostingPlan === 'commit'
-            ? { source: 'checkout_confirmed_before_cutoff', qualifiedAt: checkoutConfirmedAt }
-            : undefined,
+      try {
+        await enrollWithCredits({
+          userId: ctx.user.id,
+          instanceId: instance.id,
+          plan: hostingPlan,
+          hadPaidSubscription: Boolean(priorPaidSubscription),
+          expectedPriceVersion,
+          actor: { actorType: 'user', actorId: ctx.user.id },
+          commitQualification:
+            hostingPlan === 'commit'
+              ? { source: 'checkout_confirmed_before_cutoff', qualifiedAt: checkoutConfirmedAt }
+              : undefined,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isIdempotentConflict =
+          errorMessage.includes('target changed before the deduction') ||
+          errorMessage.includes('Enrollment already processed') ||
+          errorMessage.includes('active subscription already exists');
+        const concurrentReplaySucceeded =
+          isIdempotentConflict &&
+          (await isExpectedCreditHostingActive({
+            userId: ctx.user.id,
+            instanceId: instance.id,
+            plan: hostingPlan,
+            priceVersion: expectedPriceVersion,
+          }));
+        if (concurrentReplaySucceeded) {
+          logHostingActivationInfo('Kilo Pass hosting activation replayed', {
+            user_id: ctx.user.id,
+            checkout_session_id: input.sessionId,
+            instance_id: instance.id,
+            outcome: 'concurrent_idempotent_noop',
+            intended_price_version: priceVersion,
+            duration_ms: Date.now() - startedAt,
+          });
+          return { activated: true, hostingIntent: hostingPlan };
+        }
+
+        logHostingActivationWarning('Kilo Pass hosting activation failed', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          instance_id: instance.id,
+          reason: 'credit_enrollment_failed',
+          intended_price_version: priceVersion,
+          expected_price_version: expectedPriceVersion,
+          duration_ms: Date.now() - startedAt,
+          error: errorMessage,
+        });
+        throw error;
+      }
+      logHostingActivationInfo('Kilo Pass hosting activation succeeded', {
+        user_id: ctx.user.id,
+        checkout_session_id: input.sessionId,
+        instance_id: instance.id,
+        intended_price_version: priceVersion,
+        duration_ms: Date.now() - startedAt,
       });
       return { activated: true, hostingIntent: hostingPlan };
     }),

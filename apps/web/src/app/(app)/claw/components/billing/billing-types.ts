@@ -262,6 +262,63 @@ export function formatKiloClawFirstChargeLabel(params: {
   return `${price}/month`;
 }
 
+export function getKiloClawFundingChoiceCopy(params: {
+  plan: ClawPlan;
+  costMicrodollars: number;
+}): {
+  creditHeading: string;
+  creditDescription: string;
+  creditButtonLabel: string;
+  stripeDividerLabel: string;
+  stripeButtonLabel: string;
+  stripeDescription: string;
+} {
+  const planLabel = params.plan === 'commit' ? 'Commit' : 'Standard';
+  const priceLabel = formatKiloClawFirstChargeLabel(params);
+
+  return {
+    creditHeading: 'Credit-funded hosting',
+    creditDescription: `${planLabel} first charge: ${priceLabel}. Future hosting charges use your credit balance.`,
+    creditButtonLabel: `Activate ${planLabel} with credits`,
+    stripeDividerLabel: 'or start a separate Stripe subscription',
+    stripeButtonLabel: `Subscribe with Stripe, ${priceLabel}`,
+    stripeDescription:
+      params.plan === 'standard'
+        ? 'Creates a separate recurring Stripe charge for hosting.'
+        : 'Creates separate Stripe billing for hosting.',
+  };
+}
+
+export function getKiloPassHostingRecoveryCopy(
+  hostingIntent: 'none' | 'expired_commit' | 'standard' | 'commit'
+): {
+  title: string;
+  description: string;
+  destination: string;
+  destinationLabel: string;
+  canRetry: boolean;
+} {
+  if (hostingIntent === 'expired_commit') {
+    return {
+      title: 'Kilo Pass credits are ready',
+      description:
+        'Commit hosting is no longer available. Choose Standard and fund hosting from your credit balance.',
+      destination: '/claw/subscription',
+      destinationLabel: 'Choose Standard hosting',
+      canRetry: false,
+    };
+  }
+
+  return {
+    title: 'Credit-funded hosting needs attention',
+    description:
+      'Your Kilo Pass credits are ready, but hosting activation did not finish. Retry credit-funded activation or choose a hosting plan.',
+    destination: '/claw/subscription',
+    destinationLabel: 'Choose hosting plan',
+    canRetry: true,
+  };
+}
+
 /** e.g. "Commit ($51/mo)" or "Standard ($55/mo)" */
 export function planLabel(plan: ClawPlan, priceVersion?: string): string {
   if (plan === 'commit') {

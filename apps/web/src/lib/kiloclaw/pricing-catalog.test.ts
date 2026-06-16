@@ -5,6 +5,7 @@ import {
   LEGACY_KILOCLAW_PRICE_VERSION,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
+  resolveKiloClawEnrollmentPriceVersion,
 } from '@kilocode/db';
 
 describe('KiloClaw pricing catalog', () => {
@@ -47,6 +48,22 @@ describe('KiloClaw pricing catalog', () => {
         useStandardIntro: true,
       })
     ).toBe(55_000_000);
+  });
+
+  it('preserves live trial pricing and uses current pricing after canceled history', () => {
+    expect(
+      resolveKiloClawEnrollmentPriceVersion({
+        status: 'trialing',
+        kiloclawPriceVersion: LEGACY_KILOCLAW_PRICE_VERSION,
+      })
+    ).toBe(LEGACY_KILOCLAW_PRICE_VERSION);
+    expect(
+      resolveKiloClawEnrollmentPriceVersion({
+        status: 'canceled',
+        kiloclawPriceVersion: LEGACY_KILOCLAW_PRICE_VERSION,
+      })
+    ).toBe(CURRENT_KILOCLAW_PRICE_VERSION);
+    expect(resolveKiloClawEnrollmentPriceVersion(null)).toBe(CURRENT_KILOCLAW_PRICE_VERSION);
   });
 
   it('fails closed for unknown price versions', () => {

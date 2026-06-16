@@ -38,6 +38,7 @@
   },
   "packageManager": "pnpm@11.1.2",
   "devDependencies": {
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "husky": "9.1.7",
     "ink": "6.8.0",

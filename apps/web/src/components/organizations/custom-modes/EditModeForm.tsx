@@ -4,26 +4,90 @@ import {
   useOrganizationModeById,
   useUpdateOrganizationMode,
   useOrganizationModes,
+  useDeleteOrganizationMode,
 } from '@/app/api/organizations/hooks';
 import { ModeForm, type ModeFormData } from './ModeForm';
 import { LoadingCard } from '@/components/LoadingCard';
 import { ErrorCard } from '@/components/ErrorCard';
 import { toast } from 'sonner';
+import { DEFAULT_MODES } from './default-modes';
 
 type EditModeFormProps = {
   organizationId: string;
   modeId: string;
+  defaultModeSlug?: string;
+  isDefaultModelConfigEnabled?: boolean;
+  canSetDefaultModel?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 };
 
-export function EditModeForm({ organizationId, modeId, onSuccess, onCancel }: EditModeFormProps) {
+function normalizeOptionalValue(value: string | undefined): string | undefined {
+  return value || undefined;
+}
+
+function normalizeGroups(groups: unknown): string[] | undefined {
+  if (!Array.isArray(groups)) {
+    return undefined;
+  }
+
+  return groups.map(group => JSON.stringify(group)).sort();
+}
+
+export function matchesBuiltInModeState(formData: ModeFormData, defaultModeSlug: string): boolean {
+  const defaultMode = DEFAULT_MODES.find(mode => mode.slug === defaultModeSlug);
+  if (!defaultMode) {
+    return false;
+  }
+
+  return (
+    formData.name === defaultMode.name &&
+    formData.slug === defaultMode.slug &&
+    formData.roleDefinition === defaultMode.config.roleDefinition &&
+    normalizeOptionalValue(formData.description) === defaultMode.config.description &&
+    normalizeOptionalValue(formData.whenToUse) === defaultMode.config.whenToUse &&
+    JSON.stringify(normalizeGroups(formData.groups)) ===
+      JSON.stringify(normalizeGroups(defaultMode.config.groups)) &&
+    normalizeOptionalValue(formData.customInstructions) === defaultMode.config.customInstructions
+  );
+}
+
+export function EditModeForm({
+  organizationId,
+  modeId,
+  defaultModeSlug,
+  isDefaultModelConfigEnabled = false,
+  canSetDefaultModel = true,
+  onSuccess,
+  onCancel,
+}: EditModeFormProps) {
   const { data, isLoading, error } = useOrganizationModeById(organizationId, modeId);
   const { data: modesData } = useOrganizationModes(organizationId);
   const updateMutation = useUpdateOrganizationMode();
+  const deleteMutation = useDeleteOrganizationMode();
 
   const handleSubmit = async (formData: ModeFormData) => {
     try {
+      if (
+        defaultModeSlug &&
+        !formData.defaultModel &&
+        matchesBuiltInModeState(formData, defaultModeSlug)
+      ) {
+        await deleteMutation.mutateAsync({
+          organizationId,
+          modeId,
+        });
+        toast.success(`Mode "${formData.name}" reverted successfully`);
+        onSuccess?.();
+        return;
+      }
+
+      const persistedDefaultModel = data?.mode?.config.defaultModel ?? '';
+      const defaultModelUpdate =
+        formData.defaultModel === persistedDefaultModel
+          ? {}
+          : { defaultModel: formData.defaultModel || null };
+
       await updateMutation.mutateAsync({
         organizationId,
         modeId,
@@ -35,6 +99,7 @@ export function EditModeForm({ organizationId, modeId, onSuccess, onCancel }: Ed
           whenToUse: formData.whenToUse,
           groups: formData.groups as ('read' | 'edit' | 'browser' | 'command' | 'mcp')[],
           customInstructions: formData.customInstructions,
+          ...defaultModelUpdate,
         },
       });
       toast.success(`Mode "${formData.name}" updated successfully`);
@@ -63,9 +128,13 @@ export function EditModeForm({ organizationId, modeId, onSuccess, onCancel }: Ed
 
   return (
     <ModeForm
+      organizationId={organizationId}
       mode={data.mode}
       onSubmit={handleSubmit}
-      isSubmitting={updateMutation.isPending}
+      isSubmitting={updateMutation.isPending || deleteMutation.isPending}
+      isEditingBuiltIn={!!defaultModeSlug}
+      isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+      canSetDefaultModel={canSetDefaultModel}
       existingModes={modesData?.modes || []}
       onCancel={onCancel}
       renderButtons={() => null}

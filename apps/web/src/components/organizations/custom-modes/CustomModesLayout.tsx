@@ -2,7 +2,11 @@
 
 import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { useOrganizationModes, useDeleteOrganizationMode } from '@/app/api/organizations/hooks';
+import {
+  useOrganizationModes,
+  useDeleteOrganizationMode,
+  useOrganizationWithMembers,
+} from '@/app/api/organizations/hooks';
 import { Button } from '@/components/ui/button';
 import { LockableContainer } from '../LockableContainer';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +31,7 @@ import { ModeDrawer } from './ModeDrawer';
 import { NewModeForm } from './NewModeForm';
 import { EditModeForm } from './EditModeForm';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
 
 type CustomModesLayoutProps = {
   organizationId: string;
@@ -43,9 +48,16 @@ type ModesListProps = {
   readonly: boolean;
   onDeleteClick: (mode: DisplayMode) => void;
   onEditClick: (mode: DisplayMode) => void;
+  isDefaultModelConfigEnabled: boolean;
 };
 
-function ModesList({ modes, readonly, onDeleteClick, onEditClick }: ModesListProps) {
+function ModesList({
+  modes,
+  readonly,
+  onDeleteClick,
+  onEditClick,
+  isDefaultModelConfigEnabled,
+}: ModesListProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {modes.map((mode, index) => (
@@ -99,7 +111,15 @@ function ModesList({ modes, readonly, onDeleteClick, onEditClick }: ModesListPro
               </div>
             </CardHeader>
             <CardContent className="flex-1">
-              <div className="flex h-full flex-col">
+              <div className="flex h-full flex-col gap-4">
+                {isDefaultModelConfigEnabled && mode.config.defaultModel && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground text-xs font-medium">Default model</span>
+                    <Badge variant="secondary" className="max-w-full font-mono text-xs">
+                      <span className="break-all">{mode.config.defaultModel}</span>
+                    </Badge>
+                  </div>
+                )}
                 {mode.config?.groups && mode.config.groups.length > 0 && (
                   <div className="flex-1">
                     <h4 className="mb-2 text-sm font-medium">Available Tools</h4>
@@ -146,6 +166,7 @@ function ModesList({ modes, readonly, onDeleteClick, onEditClick }: ModesListPro
 
 export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
   const { data, isLoading, error } = useOrganizationModes(organizationId);
+  const { data: organizationData } = useOrganizationWithMembers(organizationId);
   const deleteMutation = useDeleteOrganizationMode();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [modeToDelete, setModeToDelete] = useState<DisplayMode | null>(null);
@@ -153,7 +174,10 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
   const [editingMode, setEditingMode] = useState<DisplayMode | null>(null);
   const isReadOnly = useOrganizationReadOnly(organizationId);
-
+  const isDefaultModelFeatureEnabled = useFeatureFlagEnabled('org-default-model-config');
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isDefaultModelConfigEnabled = isDevelopment || isDefaultModelFeatureEnabled === true;
+  const canSetDefaultModel = organizationData?.plan === 'enterprise';
   const readonly = isReadOnly;
 
   // Separate built-in modes and custom modes
@@ -297,6 +321,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
               readonly={readonly}
               onDeleteClick={openDeleteDialog}
               onEditClick={handleEditMode}
+              isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
             />
           </div>
 
@@ -310,6 +335,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
                 readonly={readonly}
                 onDeleteClick={openDeleteDialog}
                 onEditClick={handleEditMode}
+                isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
               />
             </div>
           )}
@@ -383,6 +409,8 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
               defaultModeSlug={
                 editingMode?.isDefault && !editingMode?.isOverridden ? editingMode.slug : undefined
               }
+              isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+              canSetDefaultModel={canSetDefaultModel}
               onSuccess={handleDrawerClose}
               onCancel={handleDrawerClose}
             />
@@ -390,6 +418,9 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
             <EditModeForm
               organizationId={organizationId}
               modeId={editingMode.id}
+              defaultModeSlug={editingMode.isDefault ? editingMode.slug : undefined}
+              isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+              canSetDefaultModel={canSetDefaultModel}
               onSuccess={handleDrawerClose}
               onCancel={handleDrawerClose}
             />

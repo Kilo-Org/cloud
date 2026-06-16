@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,8 @@ export function ConfirmActionDialog({
   description,
   confirmLabel,
   confirmIcon,
+  confirmVariant,
+  cancelLabel = 'Cancel',
   isPending,
   pendingLabel,
   onConfirm,
@@ -30,6 +32,12 @@ export function ConfirmActionDialog({
   description: string;
   confirmLabel: string;
   confirmIcon?: ReactNode;
+  // Prefer the semantic Button variant (e.g. "destructive") over a className
+  // override so destructive styling comes from the design system, not ad-hoc.
+  confirmVariant?: ComponentProps<typeof Button>['variant'];
+  // Name the keep-action ("Keep agent") instead of a generic "Cancel" for
+  // destructive confirms (ux-writing). Defaults to "Cancel" for other callers.
+  cancelLabel?: string;
   isPending: boolean;
   pendingLabel: string;
   onConfirm: () => void;
@@ -44,9 +52,14 @@ export function ConfirmActionDialog({
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
-            Cancel
+            {cancelLabel}
           </Button>
-          <Button className={className} onClick={onConfirm} disabled={isPending}>
+          <Button
+            variant={confirmVariant}
+            className={className}
+            onClick={onConfirm}
+            disabled={isPending}
+          >
             {isPending ? (
               <>
                 {pendingLabel}

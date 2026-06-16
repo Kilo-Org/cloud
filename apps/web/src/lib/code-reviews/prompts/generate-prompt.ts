@@ -9,7 +9,7 @@
  * 4. Adding dynamic context (existing comments table)
  * 5. Selecting CREATE vs UPDATE summary command
  * 6. Platform-specific template selection (GitHub vs GitLab)
- * 7. Injecting style guidance, custom instructions, and focus areas from config
+ * 7. Injecting style guidance and focus areas from config
  * 8. Applying per-style comment format and summary format overrides
  */
 
@@ -22,7 +22,6 @@ import { logExceptInTest } from '@/lib/utils.server';
 import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
 import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { sanitizeUserInput } from './prompt-utils';
 import { formatRepositoryReviewInstructions } from './repository-review-instructions';
 import { getCurrentReviewSummaryForContext } from '../summary/history';
 
@@ -263,15 +262,10 @@ export async function generateReviewPrompt(
     prompt += styleGuide + '\n\n';
   }
 
-  // 3. Custom instructions (user-provided, sanitized to prevent injection)
-  if (config.custom_instructions) {
-    prompt += '# CUSTOM INSTRUCTIONS\n\n' + sanitizeUserInput(config.custom_instructions) + '\n\n';
-  }
-
-  // 4. Hard constraints (MOST IMPORTANT - always included)
+  // 3. Hard constraints (MOST IMPORTANT - always included)
   prompt += template.hardConstraints + '\n\n';
 
-  // 5. Workflow with placeholders replaced
+  // 4. Workflow with placeholders replaced
   // Use incremental workflow when we have a previous completed review SHA and a summary comment
   if (
     previousHeadSha &&
@@ -305,19 +299,19 @@ export async function generateReviewPrompt(
     }
   }
 
-  // 6. What to review
+  // 5. What to review
   prompt +=
     (repositoryReviewInstructions
       ? formatRepositoryReviewInstructions(repositoryReviewInstructions)
       : template.whatToReview) + '\n\n';
 
-  // 7. Focus areas (if any selected)
+  // 6. Focus areas (if any selected)
   if (config.focus_areas.length > 0) {
     prompt +=
       '# FOCUS AREAS\n\nPay special attention to: ' + config.focus_areas.join(', ') + '\n\n';
   }
 
-  // 8. Comment format (use style override if available, otherwise default)
+  // 7. Comment format (use style override if available, otherwise default)
   const commentFormat = template.commentFormatOverrides?.[reviewStyle] ?? template.commentFormat;
   prompt += commentFormat + '\n\n';
 
@@ -325,7 +319,7 @@ export async function generateReviewPrompt(
     prompt += template.inlineCommentFooter + '\n\n';
   }
 
-  // 9. Dynamic context section (separator)
+  // 8. Dynamic context section (separator)
   prompt += '---\n\n# CONTEXT FOR THIS ' + platformConfig.prTerm + '\n\n';
   prompt += `**${platform === PLATFORM.GITLAB ? 'Project' : 'Repository'}:** ${repository}\n`;
   prompt += `**${platformConfig.prTerm} Number:** ${pr}\n\n`;

@@ -454,7 +454,7 @@ export function ReviewConfigForm({
         platform,
         reviewStyle,
         focusAreas,
-        customInstructions: customInstructions.trim() || undefined,
+        customInstructions: customInstructions || undefined,
         modelSlug: selectedModel,
         thinkingEffort,
         gateThreshold,
@@ -470,7 +470,7 @@ export function ReviewConfigForm({
         platform,
         reviewStyle,
         focusAreas,
-        customInstructions: customInstructions.trim() || undefined,
+        customInstructions: customInstructions || undefined,
         modelSlug: selectedModel,
         thinkingEffort,
         gateThreshold,
@@ -1047,18 +1047,30 @@ export function ReviewConfigForm({
 
             {/* Custom Instructions */}
             <div className="space-y-3">
-              <Label htmlFor="custom-instructions">Custom Instructions (Optional)</Label>
+              <Label htmlFor="custom-instructions">Custom Instructions (Deprecated)</Label>
               <Textarea
                 id="custom-instructions"
-                placeholder="e.g., 'Always check for TypeScript strict mode compliance' or 'Focus on React best practices'"
                 value={customInstructions}
-                onChange={e => setCustomInstructions(e.target.value)}
                 rows={4}
                 className="resize-none"
+                disabled
+                aria-describedby="custom-instructions-deprecation"
               />
-              <p className="text-muted-foreground text-sm">
-                Add specific guidelines for your team's code review standards
-              </p>
+              <Alert id="custom-instructions-deprecation" variant="warning">
+                <AlertCircle className="size-4" />
+                <AlertTitle>Custom instructions are no longer applied</AlertTitle>
+                <AlertDescription>
+                  This value remains visible to help you migrate it, but Code Reviewer no longer
+                  uses it. Move any guidance you still need to a REVIEW.md file in the repository
+                  root.{' '}
+                  <Link
+                    href={reviewMdGuideHref}
+                    className="text-blue-400 underline-offset-4 hover:text-blue-300 hover:underline"
+                  >
+                    Learn about REVIEW.md
+                  </Link>
+                </AlertDescription>
+              </Alert>
             </div>
 
             {/* Save Button */}

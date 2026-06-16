@@ -138,10 +138,12 @@ describe('resolveTemplate', () => {
 
 // --- generateReviewPrompt (integration) ---
 
+const legacyCustomInstructions = 'Also consider account-level policy.';
+
 const baseConfig = {
   review_style: 'balanced' as const,
   focus_areas: [],
-  custom_instructions: '',
+  custom_instructions: legacyCustomInstructions,
   model_slug: 'test-model',
 } satisfies CodeReviewAgentConfig;
 
@@ -152,6 +154,8 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain('# WHAT TO REVIEW');
     expect(prompt).toContain('Security vulnerabilities (injection, XSS, auth bypass)');
     expect(prompt).not.toContain(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`);
+    expect(prompt).not.toContain('# CUSTOM INSTRUCTIONS');
+    expect(prompt).not.toContain(legacyCustomInstructions);
   });
 
   it('replaces built-in review guidance with REVIEW.md instructions at the same prompt point', async () => {
@@ -164,7 +168,6 @@ describe('generateReviewPrompt', () => {
     ].join('\n');
     const customConfig = {
       ...baseConfig,
-      custom_instructions: 'Also consider account-level policy.',
       focus_areas: ['security'],
     } satisfies CodeReviewAgentConfig;
 
@@ -172,8 +175,8 @@ describe('generateReviewPrompt', () => {
       repositoryReviewInstructions,
     });
 
-    expect(prompt).toContain('# CUSTOM INSTRUCTIONS');
-    expect(prompt).toContain('Also consider account-level policy.');
+    expect(prompt).not.toContain('# CUSTOM INSTRUCTIONS');
+    expect(prompt).not.toContain(legacyCustomInstructions);
     expect(prompt).toContain(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`);
     expect(prompt).toContain('Only flag regressions with direct evidence.');
     expect(prompt).toContain('```ts\nconst markdown = true;\n```');
@@ -185,9 +188,6 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain('# COMMENT FORMAT');
     expect(prompt).toContain('## Inline Comments API Call');
 
-    expect(prompt.indexOf('# CUSTOM INSTRUCTIONS')).toBeLessThan(
-      prompt.indexOf(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`)
-    );
     expect(prompt.indexOf(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`)).toBeLessThan(
       prompt.indexOf('# FOCUS AREAS')
     );

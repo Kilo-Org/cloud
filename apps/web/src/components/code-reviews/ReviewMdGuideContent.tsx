@@ -27,7 +27,7 @@ const guidanceItems = [
 
 const limits = [
   'Hard safety, tooling, platform, and read-only constraints still apply.',
-  'Custom instructions and focus areas are still applied around repository guidance.',
+  'Focus areas are still applied around repository guidance.',
   '@ imports are not expanded. Keep the guidance directly in REVIEW.md.',
   'Content is truncated after 10,000 characters.',
   'Do not include secrets, credentials, tokens, or private operational data.',

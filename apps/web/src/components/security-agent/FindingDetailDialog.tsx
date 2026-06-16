@@ -131,7 +131,7 @@ type FindingDetailDialogProps = {
   finding: SecurityFindingWithRemediation | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onDismiss: () => void;
+  onDismiss: (analysis: FindingAnalysis) => void;
   canDismiss: boolean;
   organizationId?: string;
   showSla?: boolean;
@@ -1104,7 +1104,7 @@ export function FindingDetailDialog({
           <FindingFooter
             finding={finding}
             canDismiss={canDismiss}
-            onDismiss={onDismiss}
+            onDismiss={() => onDismiss(analysis)}
             onClose={() => onOpenChange(false)}
           />
         </Tabs>

@@ -357,8 +357,10 @@ export function SecurityFindingsPage() {
         finding={activeFinding}
         open={detailDialogOpen}
         onOpenChange={handleDetailOpenChange}
-        onDismiss={() => {
-          if (activeFinding) dispatch({ type: 'open-dismiss', finding: activeFinding });
+        onDismiss={analysis => {
+          if (activeFinding) {
+            dispatch({ type: 'open-dismiss', finding: { ...activeFinding, analysis } });
+          }
         }}
         canDismiss={activeFinding?.status === 'open'}
         organizationId={organizationId}
@@ -366,6 +368,7 @@ export function SecurityFindingsPage() {
       />
 
       <DismissFindingDialog
+        key={`${state.selectedFinding?.id ?? 'none'}:${state.selectedFinding?.analysis?.analyzedAt ?? 'none'}`}
         finding={state.selectedFinding}
         open={state.dismissDialogOpen}
         onOpenChange={open => dispatch({ type: 'set-dismiss-open', open })}

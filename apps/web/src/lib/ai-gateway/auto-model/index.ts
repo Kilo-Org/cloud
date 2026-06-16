@@ -9,7 +9,7 @@ import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
-type AutoModel = {
+export type AutoModel = {
   id: string;
   name: string;
   description: string;
@@ -172,6 +172,21 @@ export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
   status: 'hidden',
 };
 
+export const ORG_AUTO_MODEL: AutoModel = {
+  ...KILO_AUTO_BALANCED_MODEL,
+  id: 'kilo-auto/org',
+  name: 'Organization Auto',
+  description: "Routes requests using your organization's mode-specific model settings.",
+  status: 'hidden',
+};
+
+export const ORGANIZATION_AUTO_TARGET_MODELS = [
+  KILO_AUTO_FREE_MODEL.id,
+  KILO_AUTO_SMALL_MODEL.id,
+  KILO_AUTO_BALANCED_MODEL.id,
+  KILO_AUTO_FRONTIER_MODEL.id,
+] as const;
+
 export const AUTO_MODELS = [
   KILO_AUTO_FRONTIER_MODEL,
   KILO_AUTO_BALANCED_MODEL,
@@ -181,5 +196,9 @@ export const AUTO_MODELS = [
 ];
 
 export function isKiloAutoModel(model: string) {
-  return AUTO_MODELS.some(m => m.id === model) || model === KILO_AUTO_LEGACY_MODEL;
+  return (
+    AUTO_MODELS.some(m => m.id === model) ||
+    model === ORG_AUTO_MODEL.id ||
+    model === KILO_AUTO_LEGACY_MODEL
+  );
 }

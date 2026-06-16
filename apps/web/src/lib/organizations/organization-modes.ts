@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { orgnaization_modes, ORGANIZATION_MODES_ORG_SLUG_CONSTRAINT } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import type { OrganizationModeConfig } from '@/lib/organizations/organization-types';
@@ -22,9 +22,10 @@ export async function createOrganizationMode(
   createdBy: string,
   name: string,
   slug: string,
-  config: Partial<OrganizationModeConfig> = {}
+  config: Partial<OrganizationModeConfig> = {},
+  txn?: DrizzleTransaction
 ): Promise<OrganizationMode | null> {
-  const [mode] = await db
+  const [mode] = await (txn ?? db)
     .insert(orgnaization_modes)
     .values({
       organization_id: organizationId,
@@ -39,8 +40,11 @@ export async function createOrganizationMode(
   return mode || null;
 }
 
-export async function getAllOrganizationModes(organizationId: string): Promise<OrganizationMode[]> {
-  const modes = await db
+export async function getAllOrganizationModes(
+  organizationId: string,
+  txn?: DrizzleTransaction
+): Promise<OrganizationMode[]> {
+  const modes = await (txn ?? db)
     .select()
     .from(orgnaization_modes)
     .where(eq(orgnaization_modes.organization_id, organizationId));
@@ -50,14 +54,17 @@ export async function getAllOrganizationModes(organizationId: string): Promise<O
 
 export async function getOrganizationModeById(
   organizationId: string,
-  modeId: string
+  modeId: string,
+  txn?: DrizzleTransaction,
+  lockForUpdate = false
 ): Promise<OrganizationMode | null> {
-  const [mode] = await db
+  const query = (txn ?? db)
     .select()
     .from(orgnaization_modes)
     .where(
       and(eq(orgnaization_modes.id, modeId), eq(orgnaization_modes.organization_id, organizationId))
     );
+  const [mode] = await (lockForUpdate ? query.for('update') : query);
 
   return mode ? { ...mode, config: mergeToSatisfy(mode.config) } : null;
 }
@@ -69,7 +76,8 @@ export async function updateOrganizationMode(
     name?: string;
     slug?: string;
     config?: Partial<OrganizationModeConfig>;
-  }
+  },
+  txn?: DrizzleTransaction
 ): Promise<OrganizationMode | null> {
   const updateData: Record<string, unknown> = {};
 
@@ -91,7 +99,7 @@ export async function updateOrganizationMode(
   }
 
   try {
-    const [mode] = await db
+    const [mode] = await (txn ?? db)
       .update(orgnaization_modes)
       .set(updateData)
       .where(
@@ -112,6 +120,9 @@ export async function updateOrganizationMode(
   }
 }
 
-export async function deleteOrganizationMode(modeId: string): Promise<void> {
-  await db.delete(orgnaization_modes).where(eq(orgnaization_modes.id, modeId));
+export async function deleteOrganizationMode(
+  modeId: string,
+  txn?: DrizzleTransaction
+): Promise<void> {
+  await (txn ?? db).delete(orgnaization_modes).where(eq(orgnaization_modes.id, modeId));
 }

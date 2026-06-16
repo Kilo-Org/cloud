@@ -8,6 +8,7 @@ export type {
   OrganizationRole,
   OrganizationPlan,
   OrganizationSettings,
+  OrganizationAutoModelSettings,
   OrganizationModeConfig,
   EditGroupConfig,
 } from './organization-base-types';
@@ -15,6 +16,7 @@ export {
   OrganizationPlanSchema,
   OrganizationModeConfigSchema,
   OrganizationSettingsSchema,
+  OrganizationAutoModelSettingsSchema,
 } from './organization-base-types';
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';

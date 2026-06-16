@@ -715,12 +715,44 @@ export const OrganizationPlanSchema = z.enum(['teams', 'enterprise']);
 
 export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
+const OrganizationAutoModelRouteSlugSchema = z
+  .string()
+  .min(1, 'Organization Auto route slug is required')
+  .max(50, 'Organization Auto route slug must be less than 50 characters')
+  .regex(
+    /^[a-z0-9-]+$/,
+    'Organization Auto route slug must contain only lowercase letters, numbers, and hyphens'
+  );
+
+const OrganizationAutoModelTargetSchema = z
+  .string()
+  .min(1, 'Organization Auto route target is required')
+  .max(200, 'Organization Auto route target must be less than 200 characters')
+  .refine(value => !value.endsWith('/*'), {
+    message: 'Organization Auto route target must be a concrete model identifier',
+  })
+  .refine(value => value !== 'kilo-auto/org', {
+    message: 'Organization Auto cannot target itself',
+  });
+
+export const OrganizationAutoModelSettingsSchema = z.object({
+  routes: z
+    .record(OrganizationAutoModelRouteSlugSchema, OrganizationAutoModelTargetSchema)
+    .refine(routes => Object.keys(routes).length <= 100, {
+      message: 'Organization Auto supports at most 100 routes',
+    }),
+  fallback_model: OrganizationAutoModelTargetSchema,
+});
+
+export type OrganizationAutoModelSettings = z.infer<typeof OrganizationAutoModelSettingsSchema>;
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
   model_deny_list: z.array(z.string()).optional(),
 
   default_model: z.string().optional(),
+  org_auto_model: OrganizationAutoModelSettingsSchema.optional(),
   data_collection: z.enum(['allow', 'deny']).nullable().optional(),
   // null means they were grandfathered in and so they have usage limits enabled
   enable_usage_limits: z.boolean().optional(),

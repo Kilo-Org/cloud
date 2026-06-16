@@ -201,6 +201,42 @@ export function useUpdateDefaultModel() {
   );
 }
 
+export function useEnableOrganizationAuto() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.settings.enableOrganizationAuto.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
+export function useDisableOrganizationAuto() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.settings.disableOrganizationAuto.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
+export function useSetOrganizationAutoFallback() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.settings.setOrganizationAutoFallback.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
 export function useUpdateOrganizationSeatsRequired() {
   const trpc = useTRPC();
   const invalidate = useInvalidateAllOrganizationData();

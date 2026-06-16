@@ -15,9 +15,23 @@ import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '@/lib/drizzle';
 
+jest.mock('@/lib/posthog-feature-flags', () => ({
+  isReleaseToggleEnabled: jest.fn(async () => true),
+}));
+
 jest.mock('@/lib/ai-gateway/providers/openrouter', () => {
   return {
     getEnhancedOpenRouterModels: jest.fn(),
+    buildAutoModelCatalogEntry: jest.fn(model => ({
+      id: model.id,
+      name: model.name,
+      created: 0,
+      description: model.description,
+      architecture: { input_modalities: ['text'], output_modalities: ['text'], tokenizer: 'test' },
+      top_provider: { is_moderated: false },
+      pricing: { prompt: '0', completion: '0' },
+      context_length: 8192,
+    })),
   };
 });
 
@@ -357,6 +371,35 @@ describe('organizations settings trpc router', () => {
       expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o']);
     });
 
+    it('should include Organization Auto only for enabled enterprise organizations', async () => {
+      const openRouterModelsResponse = {
+        data: [makeOpenRouterModel('openai/gpt-4o')],
+      } satisfies OpenRouterModelsResponse;
+
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
+      const organization = await createTestOrganization(
+        'Organization Auto Catalog',
+        owner.id,
+        0,
+        {
+          default_model: 'kilo-auto/org',
+          org_auto_model: {
+            routes: {},
+            fallback_model: 'kilo-auto/balanced',
+          },
+        },
+        false
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+
+      const caller = await createCallerForUser(member.id);
+      const result = await caller.organizations.settings.listAvailableModels({
+        organizationId: organization.id,
+      });
+
+      expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o', 'kilo-auto/org']);
+    });
+
     it('should return all models for a non-enterprise org even if access settings are set', async () => {
       const openRouterModelsResponse = {
         data: [
@@ -444,6 +487,153 @@ describe('organizations settings trpc router', () => {
           default_model: 'gpt-4',
         })
       ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+  });
+
+  describe('Organization Auto procedures', () => {
+    it('enables Organization Auto and preserves its default route settings', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.enableOrganizationAuto({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.settings.default_model).toBe('kilo-auto/org');
+      expect(result.settings.org_auto_model).toEqual({
+        routes: {},
+        fallback_model: 'kilo-auto/balanced',
+      });
+    });
+
+    it('sets and clears Organization Auto routes', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await caller.organizations.settings.setOrganizationAutoRoute({
+        organizationId: testOrganization.id,
+        mode_slug: 'code',
+        model_id: 'kilo-auto/frontier',
+      });
+
+      let updatedOrg = await getOrganizationById(testOrganization.id);
+      expect(updatedOrg?.settings.org_auto_model?.routes.code).toBe('kilo-auto/frontier');
+
+      await caller.organizations.settings.clearOrganizationAutoRoute({
+        organizationId: testOrganization.id,
+        mode_slug: 'code',
+      });
+
+      updatedOrg = await getOrganizationById(testOrganization.id);
+      expect(updatedOrg?.settings.org_auto_model?.routes.code).toBeUndefined();
+    });
+
+    it('does not reseed a cleared canonical route from the legacy mode default', async () => {
+      const organization = await createTestOrganization('Canonical Route', owner.id, 0, {}, false);
+      const caller = await createCallerForUser(owner.id);
+
+      try {
+        const mode = await caller.organizations.modes.create({
+          organizationId: organization.id,
+          name: 'Canonical Route Mode',
+          slug: 'canonical-route-mode',
+          config: {
+            defaultModel: 'kilo-auto/balanced',
+          },
+        });
+        await caller.organizations.settings.clearOrganizationAutoRoute({
+          organizationId: organization.id,
+          mode_slug: mode.mode.slug,
+        });
+
+        await caller.organizations.settings.enableOrganizationAuto({
+          organizationId: organization.id,
+        });
+
+        const updatedOrganization = await getOrganizationById(organization.id);
+        expect(
+          updatedOrganization?.settings.org_auto_model?.routes['canonical-route-mode']
+        ).toBeUndefined();
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+      }
+    });
+
+    it('requires a replacement model when disabling Organization Auto', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await caller.organizations.settings.enableOrganizationAuto({
+        organizationId: testOrganization.id,
+      });
+      const result = await caller.organizations.settings.disableOrganizationAuto({
+        organizationId: testOrganization.id,
+        replacement_model: 'kilo-auto/balanced',
+      });
+
+      expect(result.settings.default_model).toBe('kilo-auto/balanced');
+      expect(result.settings.org_auto_model).toEqual({
+        routes: {},
+        fallback_model: 'kilo-auto/balanced',
+      });
+    });
+
+    it('rejects disableOrganizationAuto when Organization Auto is not enabled', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.disableOrganizationAuto({
+          organizationId: testOrganization.id,
+          replacement_model: 'kilo-auto/balanced',
+        })
+      ).rejects.toThrow('Organization Auto is not enabled for this organization.');
+    });
+
+    it('does not allow updateDefaultModel to clear an active Organization Auto default', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await caller.organizations.settings.enableOrganizationAuto({
+        organizationId: testOrganization.id,
+      });
+
+      await expect(
+        caller.organizations.settings.updateDefaultModel({
+          organizationId: testOrganization.id,
+          default_model: null,
+        })
+      ).rejects.toThrow('Disable Organization Auto through its dedicated controls.');
+    });
+
+    it('preserves Organization Auto routes when unrelated settings change', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await caller.organizations.settings.enableOrganizationAuto({
+        organizationId: testOrganization.id,
+      });
+      await caller.organizations.settings.setOrganizationAutoRoute({
+        organizationId: testOrganization.id,
+        mode_slug: 'code',
+        model_id: 'kilo-auto/frontier',
+      });
+      await caller.organizations.settings.updateDataCollection({
+        organizationId: testOrganization.id,
+        dataCollection: 'deny',
+      });
+
+      const updatedOrg = await getOrganizationById(testOrganization.id);
+      expect(updatedOrg?.settings.org_auto_model?.routes.code).toBe('kilo-auto/frontier');
+      expect(updatedOrg?.settings.data_collection).toBe('deny');
+    });
+
+    it('keeps Organization Auto enabled when access lists change', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await caller.organizations.settings.enableOrganizationAuto({
+        organizationId: testOrganization.id,
+      });
+      const result = await caller.organizations.settings.updateAllowLists({
+        organizationId: testOrganization.id,
+        provider_allow_list: ['anthropic'],
+      });
+
+      expect(result.settings.default_model).toBe('kilo-auto/org');
     });
   });
 

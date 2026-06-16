@@ -1,7 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
+import { addUserToOrganization, getOrganizationById } from '@/lib/organizations/organizations';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
 import { db } from '@/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
@@ -11,6 +11,10 @@ import { randomUUID } from 'crypto';
 
 jest.mock('@/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
+}));
+
+jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+  getEnhancedOpenRouterModels: jest.fn(async () => ({ data: [{ id: 'openai/gpt-4o' }] })),
 }));
 
 const mockedIsReleaseToggleEnabled = jest.mocked(
@@ -248,7 +252,7 @@ describe('organization modes tRPC router', () => {
             defaultModel: 'openai/gpt-4o',
           },
         })
-      ).rejects.toThrow('Mode default model configuration is not available');
+      ).rejects.toThrow('Organization Auto routing configuration is not available');
     });
 
     it('should allow mode default writes in development when the release flag is disabled', async () => {
@@ -316,6 +320,42 @@ describe('organization modes tRPC router', () => {
         })
       ).rejects.toThrow("Default model 'openai/*:free' is not a concrete model identifier");
     });
+
+    it('should reject Organization Auto as a mode route target', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.modes.create({
+          organizationId: testOrganization.id,
+          name: 'Code Mode',
+          slug: 'self-route-default-model',
+          config: {
+            roleDefinition: 'You are a coding assistant',
+            groups: ['read'],
+            defaultModel: 'kilo-auto/org',
+          },
+        })
+      ).rejects.toThrow('Organization Auto cannot target itself.');
+    });
+
+    it('should reject custom LLM models as mode route targets', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.modes.create({
+          organizationId: testOrganization.id,
+          name: 'Code Mode',
+          slug: 'byok-route-default-model',
+          config: {
+            roleDefinition: 'You are a coding assistant',
+            groups: ['read'],
+            defaultModel: 'kilo-internal/example-model',
+          },
+        })
+      ).rejects.toThrow(
+        'must be a Kilo-hosted model, supported auto tier, or organization-owned BYOK model'
+      );
+    });
   });
 
   describe('list procedure', () => {
@@ -344,6 +384,28 @@ describe('organization modes tRPC router', () => {
 
       expect(result.modes).toHaveLength(2);
       expect(result.modes.map(m => m.slug).sort()).toEqual(['mode-1', 'mode-2']);
+    });
+
+    it('projects canonical Organization Auto routes into mode responses', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const created = await caller.organizations.modes.create({
+        organizationId: testOrganization.id,
+        name: 'Projected Mode',
+        slug: 'projected-mode',
+      });
+
+      await caller.organizations.settings.setOrganizationAutoRoute({
+        organizationId: testOrganization.id,
+        mode_slug: 'projected-mode',
+        model_id: 'kilo-auto/frontier',
+      });
+
+      const result = await caller.organizations.modes.getById({
+        organizationId: testOrganization.id,
+        modeId: created.mode.id,
+      });
+
+      expect(result.mode.config.defaultModel).toBe('kilo-auto/frontier');
     });
 
     it('should return empty array for organization with no modes', async () => {
@@ -752,7 +814,7 @@ describe('organization modes tRPC router', () => {
             defaultModel: null,
           },
         })
-      ).rejects.toThrow('Mode default model configuration is not available');
+      ).rejects.toThrow('Organization Auto routing configuration is not available');
     });
 
     it('should allow ordinary mode edits when the release flag is disabled', async () => {
@@ -815,6 +877,132 @@ describe('organization modes tRPC router', () => {
     });
   });
 
+  it('migrates an Organization Auto route when a custom mode slug changes', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const created = await caller.organizations.modes.create({
+      organizationId: testOrganization.id,
+      name: 'Route Mode',
+      slug: 'route-mode',
+      config: {
+        roleDefinition: 'You are a coding assistant',
+        groups: ['read'],
+        defaultModel: 'openai/gpt-4o',
+      },
+    });
+
+    await caller.organizations.modes.update({
+      organizationId: testOrganization.id,
+      modeId: created.mode.id,
+      slug: 'renamed-route-mode',
+    });
+
+    const updatedOrganization = await getOrganizationById(testOrganization.id);
+    expect(updatedOrganization?.settings.org_auto_model?.routes['route-mode']).toBeUndefined();
+    expect(updatedOrganization?.settings.org_auto_model?.routes['renamed-route-mode']).toBe(
+      'openai/gpt-4o'
+    );
+  });
+
+  it('rejects a rename when the destination already has an Organization Auto route', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const created = await caller.organizations.modes.create({
+      organizationId: testOrganization.id,
+      name: 'Source Route Mode',
+      slug: 'source-route-conflict',
+      config: {
+        roleDefinition: 'You are a coding assistant',
+        groups: ['read'],
+        defaultModel: 'kilo-auto/balanced',
+      },
+    });
+    await caller.organizations.settings.setOrganizationAutoRoute({
+      organizationId: testOrganization.id,
+      mode_slug: 'destination-route-conflict',
+      model_id: 'kilo-auto/frontier',
+    });
+
+    await expect(
+      caller.organizations.modes.update({
+        organizationId: testOrganization.id,
+        modeId: created.mode.id,
+        slug: 'destination-route-conflict',
+      })
+    ).rejects.toThrow(
+      'Organization Auto route already exists for mode "destination-route-conflict"'
+    );
+
+    const updatedOrganization = await getOrganizationById(testOrganization.id);
+    expect(updatedOrganization?.settings.org_auto_model?.routes['source-route-conflict']).toBe(
+      'kilo-auto/balanced'
+    );
+    expect(updatedOrganization?.settings.org_auto_model?.routes['destination-route-conflict']).toBe(
+      'kilo-auto/frontier'
+    );
+  });
+
+  it('prevents members from renaming a mode with an Organization Auto route', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const created = await caller.organizations.modes.create({
+      organizationId: testOrganization.id,
+      name: 'Routed Rename Mode',
+      slug: 'routed-rename-test',
+      config: {
+        roleDefinition: 'You are a coding assistant',
+        groups: ['read'],
+        defaultModel: 'kilo-auto/balanced',
+      },
+    });
+
+    const memberCaller = await createCallerForUser(member.id);
+    await expect(
+      memberCaller.organizations.modes.update({
+        organizationId: testOrganization.id,
+        modeId: created.mode.id,
+        slug: 'member-renamed-mode',
+      })
+    ).rejects.toThrow('You do not have the required organizational role to access this feature');
+
+    const updatedOrganization = await getOrganizationById(testOrganization.id);
+    expect(updatedOrganization?.settings.org_auto_model?.routes['routed-rename-test']).toBe(
+      'kilo-auto/balanced'
+    );
+  });
+
+  it('rolls back route migration when a renamed mode collides', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const routedMode = await caller.organizations.modes.create({
+      organizationId: testOrganization.id,
+      name: 'Routed Collision Mode',
+      slug: 'routed-collision-test',
+      config: {
+        roleDefinition: 'You are a coding assistant',
+        groups: ['read'],
+        defaultModel: 'kilo-auto/balanced',
+      },
+    });
+    await caller.organizations.modes.create({
+      organizationId: testOrganization.id,
+      name: 'Existing Collision Mode',
+      slug: 'existing-collision-test',
+    });
+
+    await expect(
+      caller.organizations.modes.update({
+        organizationId: testOrganization.id,
+        modeId: routedMode.mode.id,
+        slug: 'existing-collision-test',
+      })
+    ).rejects.toThrow();
+
+    const updatedOrganization = await getOrganizationById(testOrganization.id);
+    expect(updatedOrganization?.settings.org_auto_model?.routes['routed-collision-test']).toBe(
+      'kilo-auto/balanced'
+    );
+    expect(updatedOrganization?.settings.org_auto_model?.routes['existing-collision-test']).toBe(
+      undefined
+    );
+  });
+
   describe('delete procedure', () => {
     it('should delete a mode', async () => {
       const caller = await createCallerForUser(owner.id);
@@ -838,6 +1026,30 @@ describe('organization modes tRPC router', () => {
       expect(modes.find(m => m.id === created.mode.id)).toBeUndefined();
     });
 
+    it('removes an Organization Auto route when a custom mode is deleted', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const created = await caller.organizations.modes.create({
+        organizationId: testOrganization.id,
+        name: 'Delete Route Mode',
+        slug: 'delete-route-mode',
+        config: {
+          roleDefinition: 'You are a coding assistant',
+          groups: ['read'],
+          defaultModel: 'openai/gpt-4o',
+        },
+      });
+
+      await caller.organizations.modes.delete({
+        organizationId: testOrganization.id,
+        modeId: created.mode.id,
+      });
+
+      const updatedOrganization = await getOrganizationById(testOrganization.id);
+      expect(
+        updatedOrganization?.settings.org_auto_model?.routes['delete-route-mode']
+      ).toBeUndefined();
+    });
+
     it('should allow members to delete modes', async () => {
       const caller = await createCallerForUser(owner.id);
 
@@ -856,6 +1068,33 @@ describe('organization modes tRPC router', () => {
       });
 
       expect(result.success).toBe(true);
+    });
+
+    it('prevents members from deleting a mode with an Organization Auto route', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const created = await caller.organizations.modes.create({
+        organizationId: testOrganization.id,
+        name: 'Routed Mode',
+        slug: 'routed-delete-test',
+      });
+      await caller.organizations.settings.setOrganizationAutoRoute({
+        organizationId: testOrganization.id,
+        mode_slug: 'routed-delete-test',
+        model_id: 'kilo-auto/balanced',
+      });
+
+      const memberCaller = await createCallerForUser(member.id);
+      await expect(
+        memberCaller.organizations.modes.delete({
+          organizationId: testOrganization.id,
+          modeId: created.mode.id,
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+
+      const updatedOrganization = await getOrganizationById(testOrganization.id);
+      expect(updatedOrganization?.settings.org_auto_model?.routes['routed-delete-test']).toBe(
+        'kilo-auto/balanced'
+      );
     });
 
     it('should throw error for non-existent mode', async () => {

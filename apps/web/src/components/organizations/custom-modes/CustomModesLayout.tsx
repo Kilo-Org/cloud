@@ -32,6 +32,7 @@ import { NewModeForm } from './NewModeForm';
 import { EditModeForm } from './EditModeForm';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { getOrganizationAutoRoute } from '@/lib/organizations/organization-auto-model';
 
 type CustomModesLayoutProps = {
   organizationId: string;
@@ -114,7 +115,9 @@ function ModesList({
               <div className="flex h-full flex-col gap-4">
                 {isDefaultModelConfigEnabled && mode.config.defaultModel && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground text-xs font-medium">Default model</span>
+                    <span className="text-muted-foreground text-xs font-medium">
+                      Organization Auto route
+                    </span>
                     <Badge variant="secondary" className="max-w-full font-mono text-xs">
                       <span className="break-all">{mode.config.defaultModel}</span>
                     </Badge>
@@ -174,7 +177,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
   const [editingMode, setEditingMode] = useState<DisplayMode | null>(null);
   const isReadOnly = useOrganizationReadOnly(organizationId);
-  const isDefaultModelFeatureEnabled = useFeatureFlagEnabled('org-default-model-config');
+  const isDefaultModelFeatureEnabled = useFeatureFlagEnabled('organization-auto-model-routing');
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isDefaultModelConfigEnabled = isDevelopment || isDefaultModelFeatureEnabled === true;
   const canSetDefaultModel = organizationData?.plan === 'enterprise';
@@ -206,7 +209,12 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
           organization_id: organizationId,
           slug: defaultMode.slug,
           name: defaultMode.name,
-          config: defaultMode.config,
+          config: {
+            ...defaultMode.config,
+            defaultModel: organizationData
+              ? getOrganizationAutoRoute(organizationData.settings, defaultMode.slug)
+              : defaultMode.config.defaultModel,
+          },
           created_by: '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -231,7 +239,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
       builtInModes: builtInDisplayModes,
       customModes: customDisplayModes,
     };
-  }, [data?.modes, organizationId]);
+  }, [data?.modes, organizationData?.settings, organizationId]);
 
   const handleDelete = async () => {
     if (!modeToDelete) return;

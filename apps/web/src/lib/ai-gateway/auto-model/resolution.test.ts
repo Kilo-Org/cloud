@@ -9,7 +9,12 @@ jest.mock('@/lib/kiloclaw/setup-promo', () => ({
 }));
 
 import { resolveAutoModel } from './resolution';
-import { BALANCED_QWEN_MODEL, KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import {
+  BALANCED_QWEN_MODEL,
+  FRONTIER_CODE_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
+  ORG_AUTO_MODEL,
+} from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 
 const baseParams = {
@@ -138,5 +143,144 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     );
 
     expect(thunk).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('resolveAutoModel — Organization Auto branch', () => {
+  it('uses canonical built-in routes before legacy aliases', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'build',
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: {
+              routes: {
+                code: 'kilo-auto/frontier',
+                build: 'kilo-auto/small',
+              },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: FRONTIER_CODE_MODEL,
+      routingTarget: 'kilo-auto/frontier',
+    });
+  });
+
+  it('uses the configured fallback when no mode route exists', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'custom-mode',
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: {
+              routes: {},
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: BALANCED_QWEN_MODEL,
+      routingTarget: 'kilo-auto/balanced',
+    });
+  });
+
+  it('rejects Organization Auto without an organization context', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        apiKind: 'chat_completions',
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'organization_auto_configuration_error',
+      message: 'Organization Auto is not available for this account.',
+    });
+  });
+
+  it('rejects direct Organization Auto requests after it is disabled', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: 'kilo-auto/balanced',
+            org_auto_model: {
+              routes: {},
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'organization_auto_configuration_error',
+      message: 'Organization Auto is not enabled for this organization.',
+    });
+  });
+
+  it('rejects self-referential route targets at runtime', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'code',
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: {
+              routes: { code: ORG_AUTO_MODEL.id },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'organization_auto_configuration_error',
+      message: 'Organization Auto cannot target itself.',
+    });
   });
 });

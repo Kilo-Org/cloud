@@ -706,6 +706,28 @@ export function getAcceptInviteUrl(inviteToken: OrganizationInvitation['token'])
   return acceptInviteUrl;
 }
 
+export async function mutateOrganizationSettings(
+  organizationId: Organization['id'],
+  mutate: (organization: Organization) => Promise<OrganizationSettings> | OrganizationSettings,
+  txn?: DrizzleTransaction
+): Promise<OrganizationSettings> {
+  const run = async (tx: DrizzleTransaction): Promise<OrganizationSettings> => {
+    const [organization] = await tx
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .for('update');
+    if (!organization) {
+      throw new Error(`Organization ${organizationId} not found`);
+    }
+    const settings = await mutate(organization);
+    await tx.update(organizations).set({ settings }).where(eq(organizations.id, organizationId));
+    return settings;
+  };
+
+  return txn ? run(txn) : db.transaction(run);
+}
+
 export async function updateOrganizationSettings(
   organizationId: Organization['id'],
   settings: OrganizationSettings,

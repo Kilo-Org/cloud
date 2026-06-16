@@ -3,7 +3,12 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { LockableContainer } from '../LockableContainer';
-import { useUpdateDefaultModel } from '@/app/api/organizations/hooks';
+import {
+  useDisableOrganizationAuto,
+  useEnableOrganizationAuto,
+  useSetOrganizationAutoFallback,
+  useUpdateDefaultModel,
+} from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,6 +29,10 @@ import {
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { toast } from 'sonner';
 import { Settings2 } from 'lucide-react';
+import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { isOrganizationAutoTargetModel } from '@/lib/organizations/organization-auto-model';
+import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
 
 type DefaultModelDialogProps = {
   open: boolean;
@@ -31,6 +40,7 @@ type DefaultModelDialogProps = {
   organizationId: string;
   organizationSettings?: OrganizationSettings;
   currentDefaultModel?: string;
+  organizationPlan?: 'teams' | 'enterprise';
 };
 
 export function DefaultModelDialog({
@@ -39,15 +49,38 @@ export function DefaultModelDialog({
   organizationId,
   organizationSettings,
   currentDefaultModel,
+  organizationPlan,
 }: DefaultModelDialogProps) {
   const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [selectedFallbackModel, setSelectedFallbackModel] = useState<string>('');
 
   const { data: openRouterModels, isLoading: modelsLoading } = useModelSelectorList(organizationId);
   const updateDefaultModelMutation = useUpdateDefaultModel();
+  const enableOrganizationAutoMutation = useEnableOrganizationAuto();
+  const disableOrganizationAutoMutation = useDisableOrganizationAuto();
+  const setOrganizationAutoFallbackMutation = useSetOrganizationAutoFallback();
 
   const organizationDefaultModel = organizationSettings?.default_model;
-  const availableModels = openRouterModels?.data ?? [];
+  const organizationAutoFallbackModel = organizationSettings?.org_auto_model?.fallback_model;
+  const organizationAutoEnabled = organizationDefaultModel === ORG_AUTO_MODEL.id;
+  const organizationAutoFeatureEnabled = useFeatureFlagEnabled('organization-auto-model-routing');
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const canConfigureOrganizationAuto =
+    organizationPlan === 'enterprise' && (isDevelopment || organizationAutoFeatureEnabled === true);
+  const showOrganizationAutoSection = organizationAutoEnabled || canConfigureOrganizationAuto;
+  const availableModels = (openRouterModels?.data ?? []).filter(
+    model => model.id !== ORG_AUTO_MODEL.id
+  );
+  const organizationAutoTargetModels = availableModels.filter(model => {
+    if (model.id.startsWith(CUSTOM_LLM_PREFIX)) {
+      return false;
+    }
+    if (model.id.startsWith('kilo-auto/')) {
+      return isOrganizationAutoTargetModel(model.id);
+    }
+    return true;
+  });
 
   const handleUpdateDefaultModel = async () => {
     if (!selectedModel) return;
@@ -93,6 +126,56 @@ export function DefaultModelDialog({
     }
   };
 
+  const handleEnableOrganizationAuto = async () => {
+    try {
+      await enableOrganizationAutoMutation.mutateAsync({ organizationId });
+      await queryClient.invalidateQueries({ queryKey: ['organization-defaults', organizationId] });
+      setSelectedModel('');
+      onOpenChange(false);
+      toast.success('Organization Auto enabled');
+    } catch (error) {
+      console.error('Failed to enable Organization Auto:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to enable Organization Auto');
+    }
+  };
+
+  const handleDisableOrganizationAuto = async () => {
+    if (!selectedModel) return;
+
+    try {
+      await disableOrganizationAutoMutation.mutateAsync({
+        organizationId,
+        replacement_model: selectedModel,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['organization-defaults', organizationId] });
+      setSelectedModel('');
+      onOpenChange(false);
+      toast.success('Organization Auto disabled');
+    } catch (error) {
+      console.error('Failed to disable Organization Auto:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to disable Organization Auto');
+    }
+  };
+
+  const handleSetOrganizationAutoFallback = async () => {
+    const fallbackModel = selectedFallbackModel || organizationAutoFallbackModel;
+    if (!fallbackModel) return;
+
+    try {
+      await setOrganizationAutoFallbackMutation.mutateAsync({
+        organizationId,
+        model_id: fallbackModel,
+      });
+      setSelectedFallbackModel('');
+      toast.success('Organization Auto fallback updated');
+    } catch (error) {
+      console.error('Failed to update Organization Auto fallback:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update Organization Auto fallback'
+      );
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <LockableContainer>
@@ -129,6 +212,86 @@ export function DefaultModelDialog({
               </div>
             </div>
 
+            {showOrganizationAutoSection && (
+              <div className="border-border space-y-3 rounded-lg border p-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Organization Auto</label>
+                  <p className="text-muted-foreground text-xs">
+                    Route the organization default by mode. Local model selections still override
+                    it.
+                  </p>
+                  {canConfigureOrganizationAuto && (
+                    <a
+                      className="text-xs text-primary underline underline-offset-4"
+                      href={`/organizations/${organizationId}/custom-modes`}
+                    >
+                      Configure mode routes
+                    </a>
+                  )}
+                </div>
+                {organizationAutoEnabled ? (
+                  <p className="text-muted-foreground text-xs">
+                    Enabled. Choose a replacement model below to disable it.
+                  </p>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleEnableOrganizationAuto}
+                    disabled={enableOrganizationAutoMutation.isPending}
+                  >
+                    {enableOrganizationAutoMutation.isPending
+                      ? 'Enabling...'
+                      : 'Enable Organization Auto'}
+                  </Button>
+                )}
+                {canConfigureOrganizationAuto && organizationSettings?.org_auto_model && (
+                  <div className="space-y-2">
+                    <label className="text-muted-foreground text-xs font-medium">
+                      Organization Auto fallback
+                    </label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={selectedFallbackModel || organizationAutoFallbackModel || ''}
+                        onValueChange={setSelectedFallbackModel}
+                        disabled={setOrganizationAutoFallbackMutation.isPending || modelsLoading}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Choose fallback model..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {organizationAutoTargetModels.map(model => (
+                            <SelectItem key={model.id} value={model.id}>
+                              <div className="flex flex-col">
+                                <span className="font-mono text-sm">{model.id}</span>
+                                {model.name !== model.id && (
+                                  <span className="text-muted-foreground text-xs">
+                                    {model.name}
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSetOrganizationAutoFallback}
+                        disabled={
+                          !selectedFallbackModel ||
+                          selectedFallbackModel === organizationAutoFallbackModel ||
+                          setOrganizationAutoFallbackMutation.isPending
+                        }
+                      >
+                        {setOrganizationAutoFallbackMutation.isPending ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="text-muted-foreground text-sm font-medium">New Default Model</label>
               <Select
@@ -162,7 +325,7 @@ export function DefaultModelDialog({
           </div>
 
           <DialogFooter className="flex space-x-2">
-            {organizationDefaultModel && (
+            {organizationDefaultModel && !organizationAutoEnabled && (
               <Button
                 variant="outline"
                 onClick={handleClearDefaultModel}
@@ -171,9 +334,22 @@ export function DefaultModelDialog({
                 Clear Default
               </Button>
             )}
+            {organizationAutoEnabled && (
+              <Button
+                variant="outline"
+                onClick={handleDisableOrganizationAuto}
+                disabled={!selectedModel || disableOrganizationAutoMutation.isPending}
+              >
+                {disableOrganizationAutoMutation.isPending
+                  ? 'Disabling...'
+                  : 'Disable Organization Auto'}
+              </Button>
+            )}
             <Button
               onClick={handleUpdateDefaultModel}
-              disabled={!selectedModel || updateDefaultModelMutation.isPending}
+              disabled={
+                organizationAutoEnabled || !selectedModel || updateDefaultModelMutation.isPending
+              }
             >
               {updateDefaultModelMutation.isPending ? 'Updating...' : 'Set Default'}
             </Button>

@@ -20,6 +20,8 @@ import type { EditGroupConfig } from '@/lib/organizations/organization-types';
 import { Save, FileText } from 'lucide-react';
 import { useModeTemplates } from './useModeTemplates';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { isOrganizationAutoTargetModel } from '@/lib/organizations/organization-auto-model';
+import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 
 const availableGroups = [
   { value: 'read', label: 'Read Files' },
@@ -153,7 +155,19 @@ export function ModeForm({
     isLoading: modelsLoading,
     error: modelsError,
   } = useModelSelectorList(organizationId, isDefaultModelConfigEnabled && canSetDefaultModel);
-  const modelOptions = useMemo(() => modelsData?.data || [], [modelsData?.data]);
+  const modelOptions = useMemo(
+    () =>
+      (modelsData?.data || []).filter(model => {
+        if (model.id.startsWith(CUSTOM_LLM_PREFIX)) {
+          return false;
+        }
+        if (model.id.startsWith('kilo-auto/')) {
+          return isOrganizationAutoTargetModel(model.id);
+        }
+        return true;
+      }),
+    [modelsData?.data]
+  );
   const hasCurrentDefaultModelOption =
     canSetDefaultModel &&
     !!formData.defaultModel &&
@@ -456,7 +470,7 @@ export function ModeForm({
 
           {shouldShowDefaultModelControl && (
             <div className="space-y-2">
-              <Label htmlFor="defaultModel">Mode Default Model</Label>
+              <Label htmlFor="defaultModel">Route Organization Auto to</Label>
               <Select
                 value={formData.defaultModel || noDefaultModelValue}
                 onValueChange={value =>
@@ -480,18 +494,22 @@ export function ModeForm({
                   aria-invalid={Boolean(errors.defaultModel)}
                 >
                   <SelectValue
-                    placeholder={modelsLoading ? 'Loading models...' : 'No default model'}
+                    placeholder={
+                      modelsLoading ? 'Loading models...' : 'Use Organization Auto fallback'
+                    }
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={noDefaultModelValue}>No mode-specific default</SelectItem>
+                  <SelectItem value={noDefaultModelValue}>
+                    Use Organization Auto fallback
+                  </SelectItem>
                   {shouldRenderCurrentDefaultModel && (
                     <SelectItem value={formData.defaultModel} disabled>
                       <div className="flex flex-col">
                         <span className="font-mono text-sm">{formData.defaultModel}</span>
                         <span className="text-muted-foreground text-xs">
                           {!canSetDefaultModel
-                            ? 'Existing default; clear only while on Teams plan'
+                            ? 'Existing route; clear only while on Enterprise'
                             : modelsLoading
                               ? 'Checking organization policy...'
                               : modelsError
@@ -516,14 +534,14 @@ export function ModeForm({
               </Select>
               <p id="defaultModel-help" className="text-muted-foreground text-xs">
                 {!canSetDefaultModel
-                  ? 'This organization must be on Enterprise to set mode defaults. Existing defaults can still be cleared.'
+                  ? 'This organization must be on Enterprise to configure Organization Auto routes. Existing routes can still be cleared.'
                   : modelsLoading
                     ? 'Loading organization-allowed models...'
                     : modelsError
                       ? 'Unable to load organization models.'
                       : modelOptions.length === 0
                         ? 'No organization-allowed models are available.'
-                        : 'Members can still override this locally in Kilo Code.'}
+                        : 'Members can still override Organization Auto locally in Kilo Code.'}
               </p>
               {hasUnavailableDefaultModel && (
                 <p id="defaultModel-warning" className="text-sm text-amber-600">

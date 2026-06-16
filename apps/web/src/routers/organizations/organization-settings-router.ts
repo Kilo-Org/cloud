@@ -1,4 +1,4 @@
-import { getOrganizationById, updateOrganizationSettings } from '@/lib/organizations/organizations';
+import { getOrganizationById, mutateOrganizationSettings } from '@/lib/organizations/organizations';
 import type {
   OpenRouterModelsResponse,
   OrganizationSettings,
@@ -17,6 +17,16 @@ import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
+import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
+import { db } from '@/lib/drizzle';
+import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import {
+  DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
+  ORGANIZATION_AUTO_MODEL_FLAG,
+  isOrganizationAutoEligible,
+  validateOrganizationAutoTarget,
+} from '@/lib/organizations/organization-auto-model';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings
@@ -91,6 +101,17 @@ function createDefaultModelDiffMessage(
   return 'Updated default model';
 }
 
+const MAX_ORGANIZATION_AUTO_ROUTES = 100;
+
+function assertOrganizationAutoRouteCount(routes: Record<string, string>): void {
+  if (Object.keys(routes).length > MAX_ORGANIZATION_AUTO_ROUTES) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Organization Auto supports at most ${MAX_ORGANIZATION_AUTO_ROUTES} routes`,
+    });
+  }
+}
+
 const UpdateAllowListsInputSchema = OrganizationIdInputSchema.extend({
   provider_allow_list: z.array(z.string()).optional(),
   model_deny_list: z.array(z.string()).optional(),
@@ -104,8 +125,85 @@ function dedupeStrings(values: string[]): string[] {
   return [...new Set(values)];
 }
 
+async function assertOrganizationAutoWriteEnabled(userId: string): Promise<void> {
+  if (
+    process.env.NODE_ENV !== 'development' &&
+    !(await isReleaseToggleEnabled(ORGANIZATION_AUTO_MODEL_FLAG, userId))
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Organization Auto configuration is not available',
+    });
+  }
+}
+
+function assertOrganizationAutoEligible(
+  organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>
+): void {
+  if (!isOrganizationAutoEligible(organization)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Organization Auto is only available for Enterprise organizations.',
+    });
+  }
+}
+
+async function validateOrganizationDefaultReplacement(
+  organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>,
+  replacementModel: string
+): Promise<string> {
+  const normalizedReplacementModel = normalizeModelId(replacementModel);
+  if (!normalizedReplacementModel || normalizedReplacementModel.endsWith('/*')) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Default model '${replacementModel}' is not a concrete model identifier`,
+    });
+  }
+
+  if (normalizedReplacementModel === ORG_AUTO_MODEL.id) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Choose a replacement model other than Organization Auto.',
+    });
+  }
+
+  const validation = await validateOrganizationAutoTarget(organization, replacementModel);
+  if (validation.kind === 'error') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
+  }
+
+  return validation.modelId;
+}
+
 const UpdateDefaultModelInputSchema = OrganizationIdInputSchema.extend({
   default_model: z.string().or(z.null()),
+});
+
+const EnableOrganizationAutoInputSchema = OrganizationIdInputSchema;
+
+const DisableOrganizationAutoInputSchema = OrganizationIdInputSchema.extend({
+  replacement_model: z.string().min(1),
+});
+
+const SetOrganizationAutoRouteInputSchema = OrganizationIdInputSchema.extend({
+  mode_slug: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/, 'Mode slug must contain only lowercase letters, numbers, and hyphens'),
+  model_id: z.string().min(1).max(200),
+});
+
+const ClearOrganizationAutoRouteInputSchema = OrganizationIdInputSchema.extend({
+  mode_slug: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/, 'Mode slug must contain only lowercase letters, numbers, and hyphens'),
+});
+
+const SetOrganizationAutoFallbackInputSchema = OrganizationIdInputSchema.extend({
+  model_id: z.string().min(1).max(200),
 });
 
 const UpdateDataCollectionInputSchema = OrganizationIdInputSchema.extend({
@@ -184,50 +282,58 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Merge with existing settings
-      const currentSettings = existingOrg.settings || {};
-      const settingsUpdate: OrganizationSettings = {
-        ...currentSettings,
-      };
+      let previousSettings: OrganizationSettings | undefined;
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          async organization => {
+            previousSettings = organization.settings;
+            const currentSettings = organization.settings || {};
+            const settingsUpdate: OrganizationSettings = {
+              ...currentSettings,
+            };
 
-      if (provider_allow_list !== undefined) {
-        settingsUpdate.provider_allow_list = dedupeStrings(provider_allow_list);
-      }
+            if (provider_allow_list !== undefined) {
+              settingsUpdate.provider_allow_list = dedupeStrings(provider_allow_list);
+            }
 
-      if (model_deny_list !== undefined) {
-        settingsUpdate.model_deny_list = dedupeModels(model_deny_list);
-      }
+            if (model_deny_list !== undefined) {
+              settingsUpdate.model_deny_list = dedupeModels(model_deny_list);
+            }
 
-      // Check if default_model needs to be cleared when access lists change
-      if (
-        (provider_allow_list !== undefined || model_deny_list !== undefined) &&
-        currentSettings.default_model
-      ) {
-        const isAllowed = createAllowPredicateFromRestrictions({
-          providerAllowList: settingsUpdate.provider_allow_list,
-          modelDenyList: settingsUpdate.model_deny_list ?? [],
+            if (
+              (provider_allow_list !== undefined || model_deny_list !== undefined) &&
+              currentSettings.default_model &&
+              currentSettings.default_model !== ORG_AUTO_MODEL.id
+            ) {
+              const isAllowed = createAllowPredicateFromRestrictions({
+                providerAllowList: settingsUpdate.provider_allow_list,
+                modelDenyList: settingsUpdate.model_deny_list ?? [],
+              });
+
+              if (!(await isAllowed(currentSettings.default_model))) {
+                settingsUpdate.default_model = undefined;
+              }
+            }
+
+            return settingsUpdate;
+          },
+          tx
+        );
+
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: createAccessListsDiffMessage(previousSettings, settings),
+          organization_id: organizationId,
+          tx,
         });
-
-        if (!(await isAllowed(currentSettings.default_model))) {
-          // Clear default_model if it's no longer allowed
-          settingsUpdate.default_model = undefined;
-        }
-      }
-
-      const updatedSettings = await updateOrganizationSettings(organizationId, settingsUpdate);
-
-      await createAuditLog({
-        action: 'organization.settings.change',
-        actor_email: ctx.user.google_user_email,
-        actor_id: ctx.user.id,
-        actor_name: ctx.user.google_user_name,
-        message: createAccessListsDiffMessage(existingOrg.settings, updatedSettings),
-        organization_id: organizationId,
+        return settings;
       });
 
-      return {
-        settings: updatedSettings,
-      };
+      return { settings: updatedSettings };
     }),
 
   updateDefaultModel: organizationBillingMutationProcedure
@@ -252,6 +358,20 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
+      if (existingOrg.settings.default_model === ORG_AUTO_MODEL.id) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Disable Organization Auto through its dedicated controls.',
+        });
+      }
+
+      if (default_model === ORG_AUTO_MODEL.id) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Enable Organization Auto through its dedicated controls.',
+        });
+      }
+
       const isAllowed = createAllowPredicateFromRestrictions(
         getEffectiveModelRestrictions(existingOrg)
       );
@@ -263,25 +383,338 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Merge with existing settings
-      const currentSettings = existingOrg.settings || {};
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...currentSettings,
-        default_model: default_model ? default_model : undefined,
+      let previousSettings: OrganizationSettings | undefined;
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            if (organization.settings.default_model === ORG_AUTO_MODEL.id) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Disable Organization Auto through its dedicated controls.',
+              });
+            }
+            previousSettings = organization.settings;
+            return {
+              ...organization.settings,
+              default_model: default_model ? default_model : undefined,
+            };
+          },
+          tx
+        );
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: createDefaultModelDiffMessage(previousSettings, settings),
+          organization_id: organizationId,
+          tx,
+        });
+        return settings;
       });
 
-      await createAuditLog({
-        action: 'organization.settings.change',
-        actor_email: ctx.user.google_user_email,
-        actor_id: ctx.user.id,
-        actor_name: ctx.user.google_user_name,
-        message: createDefaultModelDiffMessage(existingOrg.settings, updatedSettings),
-        organization_id: organizationId,
+      return { settings: updatedSettings };
+    }),
+
+  enableOrganizationAuto: organizationBillingMutationProcedure
+    .input(EnableOrganizationAutoInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId } = input;
+      await assertOrganizationAutoWriteEnabled(ctx.user.id);
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      assertOrganizationAutoEligible(existingOrg);
+
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          async organization => {
+            const existingOrgAutoModel = organization.settings.org_auto_model;
+            const freshOrgAutoModel =
+              existingOrgAutoModel ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
+            const seededRoutes = { ...freshOrgAutoModel.routes };
+            if (!existingOrgAutoModel) {
+              const existingModes = await getAllOrganizationModes(organizationId, tx);
+              for (const mode of existingModes) {
+                if (!mode.config.defaultModel) {
+                  continue;
+                }
+                const validation = await validateOrganizationAutoTarget(
+                  organization,
+                  mode.config.defaultModel
+                );
+                if (validation.kind === 'error') {
+                  throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: `Cannot enable Organization Auto because mode "${mode.slug}" has an invalid route: ${validation.message}`,
+                  });
+                }
+                seededRoutes[mode.slug] = validation.modelId;
+              }
+            }
+
+            assertOrganizationAutoRouteCount(seededRoutes);
+            for (const [slug, targetModelId] of Object.entries(seededRoutes)) {
+              const validation = await validateOrganizationAutoTarget(organization, targetModelId);
+              if (validation.kind === 'error') {
+                throw new TRPCError({
+                  code: 'BAD_REQUEST',
+                  message: `Cannot enable Organization Auto because route "${slug}" is invalid: ${validation.message}`,
+                });
+              }
+              seededRoutes[slug] = validation.modelId;
+            }
+            const fallbackValidation = await validateOrganizationAutoTarget(
+              organization,
+              freshOrgAutoModel.fallback_model
+            );
+            if (fallbackValidation.kind === 'error') {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: `Cannot enable Organization Auto because fallback model is invalid: ${fallbackValidation.message}`,
+              });
+            }
+
+            return {
+              ...organization.settings,
+              default_model: ORG_AUTO_MODEL.id,
+              org_auto_model: {
+                ...freshOrgAutoModel,
+                routes: seededRoutes,
+                fallback_model: fallbackValidation.modelId,
+              },
+            };
+          },
+          tx
+        );
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: 'Enabled Organization Auto and set it as the organization default model.',
+          organization_id: organizationId,
+          tx,
+        });
+        return settings;
       });
 
-      return {
-        settings: updatedSettings,
-      };
+      return { settings: updatedSettings };
+    }),
+
+  disableOrganizationAuto: organizationBillingMutationProcedure
+    .input(DisableOrganizationAutoInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, replacement_model } = input;
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      assertOrganizationAutoEligible(existingOrg);
+      if (existingOrg.settings.default_model !== ORG_AUTO_MODEL.id) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Organization Auto is not enabled for this organization.',
+        });
+      }
+
+      let normalizedReplacementModel: string | undefined;
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          async organization => {
+            if (organization.settings.default_model !== ORG_AUTO_MODEL.id) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Organization Auto is not enabled for this organization.',
+              });
+            }
+            normalizedReplacementModel = await validateOrganizationDefaultReplacement(
+              organization,
+              replacement_model
+            );
+            return {
+              ...organization.settings,
+              default_model: normalizedReplacementModel,
+            };
+          },
+          tx
+        );
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `Disabled Organization Auto and set replacement default model: ${normalizedReplacementModel}`,
+          organization_id: organizationId,
+          tx,
+        });
+        return settings;
+      });
+
+      return { settings: updatedSettings };
+    }),
+
+  setOrganizationAutoRoute: organizationBillingMutationProcedure
+    .input(SetOrganizationAutoRouteInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, mode_slug, model_id } = input;
+      await assertOrganizationAutoWriteEnabled(ctx.user.id);
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      assertOrganizationAutoEligible(existingOrg);
+
+      let validatedModelId: string | undefined;
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          async organization => {
+            const validation = await validateOrganizationAutoTarget(organization, model_id);
+            if (validation.kind === 'error') {
+              throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
+            }
+            validatedModelId = validation.modelId;
+            const orgAutoModel =
+              organization.settings.org_auto_model ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
+            const routes = {
+              ...orgAutoModel.routes,
+              [mode_slug]: validation.modelId,
+            };
+            assertOrganizationAutoRouteCount(routes);
+            return {
+              ...organization.settings,
+              org_auto_model: {
+                ...orgAutoModel,
+                routes,
+              },
+            };
+          },
+          tx
+        );
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `Set Organization Auto route for mode "${mode_slug}" to ${validatedModelId}`,
+          organization_id: organizationId,
+          tx,
+        });
+        return settings;
+      });
+
+      return { settings: updatedSettings };
+    }),
+
+  clearOrganizationAutoRoute: organizationBillingMutationProcedure
+    .input(ClearOrganizationAutoRouteInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, mode_slug } = input;
+      await assertOrganizationAutoWriteEnabled(ctx.user.id);
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      assertOrganizationAutoEligible(existingOrg);
+
+      const updatedSettings = await db.transaction(async tx => {
+        let removedRoute: string | undefined;
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            const orgAutoModel =
+              organization.settings.org_auto_model ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
+            const routes = { ...orgAutoModel.routes };
+            removedRoute = routes[mode_slug];
+            delete routes[mode_slug];
+            return {
+              ...organization.settings,
+              org_auto_model: {
+                ...orgAutoModel,
+                routes,
+              },
+            };
+          },
+          tx
+        );
+        if (removedRoute) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: `Cleared Organization Auto route for mode "${mode_slug}"`,
+            organization_id: organizationId,
+            tx,
+          });
+        }
+        return settings;
+      });
+
+      return { settings: updatedSettings };
+    }),
+
+  setOrganizationAutoFallback: organizationBillingMutationProcedure
+    .input(SetOrganizationAutoFallbackInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, model_id } = input;
+      await assertOrganizationAutoWriteEnabled(ctx.user.id);
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      assertOrganizationAutoEligible(existingOrg);
+
+      let validatedModelId: string | undefined;
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          async organization => {
+            const validation = await validateOrganizationAutoTarget(organization, model_id);
+            if (validation.kind === 'error') {
+              throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
+            }
+            validatedModelId = validation.modelId;
+            const orgAutoModel =
+              organization.settings.org_auto_model ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
+            return {
+              ...organization.settings,
+              org_auto_model: {
+                ...orgAutoModel,
+                fallback_model: validation.modelId,
+              },
+            };
+          },
+          tx
+        );
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `Set Organization Auto fallback model to ${validatedModelId}`,
+          organization_id: organizationId,
+          tx,
+        });
+        return settings;
+      });
+
+      return { settings: updatedSettings };
     }),
 
   updateDataCollection: organizationBillingMutationProcedure
@@ -298,11 +731,16 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Update the data collection setting
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...existingOrg.settings,
-        data_collection: dataCollection,
-      });
+      const updatedSettings = await db.transaction(async tx =>
+        mutateOrganizationSettings(
+          organizationId,
+          organization => ({
+            ...organization.settings,
+            data_collection: dataCollection,
+          }),
+          tx
+        )
+      );
 
       return {
         settings: updatedSettings,
@@ -335,24 +773,34 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Merge with existing settings
-      const currentSettings = existingOrg.settings || {};
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...currentSettings,
-        projects_ui_enabled,
-      });
+      let previousSettings: OrganizationSettings | undefined;
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousSettings = organization.settings;
+            return {
+              ...organization.settings,
+              projects_ui_enabled,
+            };
+          },
+          tx
+        );
 
-      // Create audit log if the value changed
-      if (currentSettings.projects_ui_enabled !== projects_ui_enabled) {
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
-          organization_id: organizationId,
-        });
-      }
+        if (previousSettings?.projects_ui_enabled !== projects_ui_enabled) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
+            organization_id: organizationId,
+            tx,
+          });
+        }
+
+        return settings;
+      });
 
       return {
         settings: updatedSettings,
@@ -373,24 +821,34 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Merge with existing settings
-      const currentSettings = existingOrg.settings || {};
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...currentSettings,
-        code_indexing_enabled,
-      });
+      let previousSettings: OrganizationSettings | undefined;
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousSettings = organization.settings;
+            return {
+              ...organization.settings,
+              code_indexing_enabled,
+            };
+          },
+          tx
+        );
 
-      // Create audit log if the value changed
-      if (currentSettings.code_indexing_enabled !== code_indexing_enabled) {
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: `[Admin] Code indexing: ${code_indexing_enabled ? 'enabled' : 'disabled'}`,
-          organization_id: organizationId,
-        });
-      }
+        if (previousSettings?.code_indexing_enabled !== code_indexing_enabled) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: `[Admin] Code indexing: ${code_indexing_enabled ? 'enabled' : 'disabled'}`,
+            organization_id: organizationId,
+            tx,
+          });
+        }
+
+        return settings;
+      });
 
       return {
         settings: updatedSettings,
@@ -411,41 +869,47 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      const currentSettings = existingOrg.settings || {};
-      let updatedSettings: OrganizationSettings;
+      let previousSettings: OrganizationSettings | undefined;
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousSettings = organization.settings;
+            if (enabled) {
+              return {
+                ...organization.settings,
+                minimum_balance,
+                minimum_balance_alert_email,
+              };
+            }
 
-      if (enabled) {
-        updatedSettings = await updateOrganizationSettings(organizationId, {
-          ...currentSettings,
-          minimum_balance,
-          minimum_balance_alert_email,
-        });
-      } else {
-        // Remove the fields when disabled
-        const {
-          minimum_balance: _mb,
-          minimum_balance_alert_email: _mbae,
-          ...rest
-        } = currentSettings;
-        updatedSettings = await updateOrganizationSettings(organizationId, rest);
-      }
+            const settings = { ...organization.settings };
+            delete settings.minimum_balance;
+            delete settings.minimum_balance_alert_email;
+            return settings;
+          },
+          tx
+        );
 
-      // Create audit log
-      const wasEnabled =
-        currentSettings.minimum_balance !== undefined &&
-        currentSettings.minimum_balance_alert_email !== undefined;
-      if (enabled !== wasEnabled || enabled) {
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: enabled
-            ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
-            : 'Minimum balance alert: disabled',
-          organization_id: organizationId,
-        });
-      }
+        const wasEnabled =
+          previousSettings?.minimum_balance !== undefined &&
+          previousSettings?.minimum_balance_alert_email !== undefined;
+        if (enabled !== wasEnabled || enabled) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: enabled
+              ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
+              : 'Minimum balance alert: disabled',
+            organization_id: organizationId,
+            tx,
+          });
+        }
+
+        return settings;
+      });
 
       return {
         settings: updatedSettings,

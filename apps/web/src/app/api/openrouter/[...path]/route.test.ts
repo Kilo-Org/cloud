@@ -13,6 +13,7 @@ import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
+import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 
 jest.mock('next/server', () => {
   return {
@@ -40,6 +41,9 @@ jest.mock('@/lib/ai-gateway/abuse-service', () => {
   };
 });
 jest.mock('@/lib/ai-gateway/providers/get-provider');
+jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+  getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
+}));
 jest.mock('@/lib/ai-gateway/providers/upstream-request');
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache');
 jest.mock('@/lib/redis', () => ({
@@ -90,6 +94,7 @@ const mockedRedisSet = jest.mocked(redisClient.set);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
+const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 
 const provider = {
   id: 'openrouter',
@@ -413,7 +418,9 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 describe('kilo-auto/efficient classifier billing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
     setUserAuth();
+
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider,
@@ -441,6 +448,48 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedAfter.mockImplementation((_arg: unknown) => {
       // no-op: the promise has already been started when passed to after()
     });
+  });
+
+  it('rejects Organization Auto direct-BYOK routes when provider selection falls through', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        default_model: 'kilo-auto/org',
+        org_auto_model: { routes: {}, fallback_model: 'kilo-auto/balanced' },
+      },
+      plan: 'enterprise',
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (_params, request) => {
+      request.body.model = 'martian/moonshotai/kimi-k2.6';
+      return {
+        kind: 'ok',
+        resolved: { model: 'martian/moonshotai/kimi-k2.6' },
+        routingTarget: 'martian/moonshotai/kimi-k2.6',
+      };
+    });
+    mockedGetDirectByokModel.mockResolvedValue({
+      provider: { id: 'martian' } as never,
+      model: {} as never,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/org')) as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'organization_auto_configuration',
+      message: expect.stringContaining('does not have an enabled BYOK credential for martian'),
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('bills classifier cost when cost > 0 and user is non-BYOK', async () => {

@@ -213,6 +213,7 @@ const OpenRouterModelSchema = z.object({
   created: z.number(),
   description: z.string(),
   architecture: z.object({
+    modality: z.string().nullable().optional(),
     input_modalities: z.array(z.string()),
     output_modalities: z.array(z.string()),
     tokenizer: z.string(),

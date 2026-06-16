@@ -3,7 +3,12 @@ import { db } from '@/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from './organizations';
-import { createOrganizationMode, getAllOrganizationModes } from './organization-modes';
+import {
+  createOrganizationMode,
+  getAllOrganizationModes,
+  getOrganizationModeById,
+  updateOrganizationMode,
+} from './organization-modes';
 
 describe('createOrganizationMode', () => {
   afterEach(async () => {
@@ -133,6 +138,111 @@ describe('createOrganizationMode', () => {
 
     expect(mode).not.toBeNull();
     expect(mode?.config).toEqual(config);
+  });
+
+  test('should preserve an optional default model', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Test Org', user.id);
+
+    const mode = await createOrganizationMode(organization.id, user.id, 'Code Mode', 'code', {
+      roleDefinition: 'You are a coding assistant',
+      groups: ['read', 'edit'],
+      defaultModel: 'openai/gpt-4o',
+    });
+
+    expect(mode?.config.defaultModel).toBe('openai/gpt-4o');
+  });
+});
+
+describe('updateOrganizationMode', () => {
+  afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organizations);
+  });
+
+  test('should preserve existing config when updating only defaultModel', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Test Org', user.id);
+    const mode = await createOrganizationMode(organization.id, user.id, 'Code Mode', 'code', {
+      roleDefinition: 'You are a coding assistant',
+      description: 'Write code',
+      groups: ['read', 'edit'],
+    });
+
+    const updatedMode = await updateOrganizationMode(organization.id, mode!.id, {
+      config: { defaultModel: 'openai/gpt-4o' },
+    });
+
+    expect(updatedMode?.config).toEqual({
+      roleDefinition: 'You are a coding assistant',
+      description: 'Write code',
+      groups: ['read', 'edit'],
+      defaultModel: 'openai/gpt-4o',
+    });
+  });
+
+  test('should clear defaultModel without dropping the rest of config', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Test Org', user.id);
+    const mode = await createOrganizationMode(organization.id, user.id, 'Code Mode', 'code', {
+      roleDefinition: 'You are a coding assistant',
+      description: 'Write code',
+      groups: ['read', 'edit'],
+      defaultModel: 'openai/gpt-4o',
+    });
+
+    const updatedMode = await updateOrganizationMode(organization.id, mode!.id, {
+      config: { defaultModel: undefined },
+    });
+
+    expect(updatedMode?.config).toEqual({
+      roleDefinition: 'You are a coding assistant',
+      description: 'Write code',
+      groups: ['read', 'edit'],
+    });
+  });
+
+  test('should not lose concurrent partial config updates', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Test Org', user.id);
+    const mode = await createOrganizationMode(organization.id, user.id, 'Code Mode', 'code', {
+      roleDefinition: 'You are a coding assistant',
+      groups: ['read'],
+    });
+
+    await Promise.all([
+      updateOrganizationMode(organization.id, mode!.id, {
+        config: { description: 'Write code' },
+      }),
+      updateOrganizationMode(organization.id, mode!.id, {
+        config: { defaultModel: 'openai/gpt-4o' },
+      }),
+    ]);
+
+    const updatedMode = await getOrganizationModeById(organization.id, mode!.id);
+
+    expect(updatedMode?.config).toEqual({
+      roleDefinition: 'You are a coding assistant',
+      groups: ['read'],
+      description: 'Write code',
+      defaultModel: 'openai/gpt-4o',
+    });
+  });
+
+  test('should not update a mode through another organization', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Test Org', user.id);
+    const otherOrganization = await createOrganization('Other Org', user.id);
+    const mode = await createOrganizationMode(organization.id, user.id, 'Code Mode', 'code', {
+      roleDefinition: 'You are a coding assistant',
+      groups: ['read'],
+    });
+
+    const updatedMode = await updateOrganizationMode(otherOrganization.id, mode!.id, {
+      config: { defaultModel: 'openai/gpt-4o' },
+    });
+
+    expect(updatedMode).toBeNull();
   });
 });
 

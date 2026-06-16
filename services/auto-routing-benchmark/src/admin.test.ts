@@ -7,6 +7,7 @@ import type {
 import { app } from './index';
 import { computeEngineIdentity } from './run';
 import type * as DbModule from './db';
+import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 
 function makeSummary(model: string): BenchmarkModelSummary {
   return {
@@ -394,7 +395,18 @@ describe('POST /admin/runs', () => {
     const [, runArg] = vi.mocked(insertRun).mock.calls[0];
     expect(runArg.min_accuracy).toBe(TEST_CONFIG.minAccuracy);
     expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
-    expect(queueSendBatch).toHaveBeenCalledOnce();
+    const queuedMessages = queueSendBatch.mock.calls.flatMap(([messages]) => messages);
+    expect(queueSendBatch).toHaveBeenCalledTimes(2);
+    expect(queuedMessages).toHaveLength(
+      TEST_CONFIG.classifierModels.length *
+        TEST_CONFIG.classifierRepetitions *
+        CLASSIFIER_CASES.length
+    );
+    expect(queuedMessages[0].body).toMatchObject({
+      kind: 'classifier',
+      caseIds: [CLASSIFIER_CASES[0].id],
+      rep: 0,
+    });
   });
 
   it('carries a decider model only when its benchmark identity still matches', async () => {

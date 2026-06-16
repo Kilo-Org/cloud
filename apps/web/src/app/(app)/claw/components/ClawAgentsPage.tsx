@@ -92,7 +92,15 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
   if (!running) {
     // Machine stopped — AgentsSection renders the "start your machine" hint.
     content = (
-      <AgentsSection enabled={false} canCreate={false} canUpdate={false} canDelete={false} />
+      <AgentsSection
+        enabled={false}
+        instanceId={status?.instanceId ?? null}
+        canCreate={false}
+        canUpdate={false}
+        canDelete={false}
+        canBindings={false}
+        canEditDefaults={false}
+      />
     );
   } else if (versionQuery.isLoading) {
     content = <LoadingCard />;
@@ -123,19 +131,22 @@ function ClawAgentsWithStatus({ organizationId }: { organizationId?: string }) {
     content = (
       <AgentsSection
         enabled
+        instanceId={status?.instanceId ?? null}
         canCreate={has('config.agents.create.basic.cli')}
         canUpdate={has('config.agents.update')}
         canDelete={has('config.agents.delete.cli')}
+        canBindings={has('config.agents.bindings.update')}
+        canEditDefaults={has('config.agent-defaults.update')}
       />
     );
   }
 
   const body = (
     <div className="flex flex-col gap-4">
-      <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
-        <p className="flex items-center gap-1.5 text-xs font-medium text-amber-400">
+      <div className="rounded-md border border-yellow-500/20 bg-yellow-500/5 px-3 py-2">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-yellow-400">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          Internal — work in progress
+          Internal · work in progress
         </p>
         <p className="text-muted-foreground mt-1 text-xs">
           Agent management is admin-only and shipped to production for limited testing. Expect rough

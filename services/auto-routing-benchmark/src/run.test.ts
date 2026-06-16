@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CaseResultRow } from './db';
 import {
   BenchmarkJobMessageSchema,
+  buildClassifierMessages,
   buildDeciderMessages,
   chunkArray,
   computeEngineIdentity,
@@ -464,6 +465,34 @@ describe('decider message fan-out', () => {
     for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
       const forChunk = messages.filter(m => m.body.chunk === chunkIdx);
       for (const { body } of forChunk) {
+        expect(body.caseIds).toEqual(chunks[chunkIdx].map(c => c.id));
+      }
+    }
+  });
+});
+
+describe('classifier message fan-out', () => {
+  it('buildClassifierMessages: produces models × reps × chunks messages with case IDs', () => {
+    const cases72 = Array.from({ length: 72 }, (_, i) => ({ id: `case-${i}` }));
+    const chunks = chunkArray(cases72, 4);
+    expect(chunks).toHaveLength(18);
+
+    const models = ['model/a', 'model/b'];
+    const repetitions = 3;
+    const messages = buildClassifierMessages('run-test', models, repetitions, chunks);
+
+    expect(messages).toHaveLength(models.length * repetitions * chunks.length);
+
+    for (let rep = 0; rep < repetitions; rep++) {
+      const forRep = messages.filter(m => m.body.rep === rep);
+      expect(forRep).toHaveLength(models.length * chunks.length);
+    }
+
+    for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+      const forChunk = messages.filter(m => m.body.chunk === chunkIdx);
+      expect(forChunk).toHaveLength(models.length * repetitions);
+      for (const { body } of forChunk) {
+        expect(body.kind).toBe('classifier');
         expect(body.caseIds).toEqual(chunks[chunkIdx].map(c => c.id));
       }
     }

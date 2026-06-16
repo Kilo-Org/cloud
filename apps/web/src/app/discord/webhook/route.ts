@@ -22,7 +22,7 @@ import {
   type ForwardedGatewayEvent,
 } from '@/lib/discord-bot/forwarded-gateway-event';
 
-export const maxDuration = 800;
+export const maxDuration = 1800;
 
 /**
  * Reaction emoji for processing state

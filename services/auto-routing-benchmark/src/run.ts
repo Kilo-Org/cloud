@@ -40,11 +40,11 @@ export type BenchmarkJobMessage = {
   runId: string;
   kind: BenchmarkKind;
   model: string;
-  // Decider only: the case ids this message is responsible for, plus the chunk
-  // index used to key the container instance. Absent for classifier messages.
+  // The case ids this message is responsible for, plus the chunk index. Decider
+  // chunks also use this index to key their container instance.
   caseIds?: string[];
   chunk?: number;
-  // Repetition index (0-based). Absent for classifier messages.
+  // Repetition index (0-based).
   rep?: number;
 };
 
@@ -61,6 +61,11 @@ export const BenchmarkJobMessageSchema = z.object({
 // each). Chunking caps how many cases a single queue invocation processes so
 // each stays well under CF's wall-clock limit.
 const DECIDER_CHUNK_SIZE = 5;
+
+// Classifier calls are OpenRouter HTTP requests. Some candidate models can take
+// several minutes per request, so each queue invocation owns exactly one case to
+// keep it below Cloudflare Queues' 15-minute wall-clock limit.
+const CLASSIFIER_CHUNK_SIZE = 1;
 
 // Cloudflare Queues caps a single sendBatch at 100 messages. A decider fan-out
 // is models × reps × ceil(76 / 5) messages, which clears 100 with as few as two
@@ -153,6 +158,28 @@ export function buildDeciderMessages(
         body: {
           runId,
           kind,
+          model,
+          chunk,
+          rep,
+          caseIds: chunkCases.map(c => c.id),
+        } satisfies BenchmarkJobMessage,
+      }))
+    ).flat()
+  );
+}
+
+export function buildClassifierMessages(
+  runId: string,
+  modelIds: string[],
+  repetitions: number,
+  chunks: readonly (readonly { id: string }[])[]
+): { body: BenchmarkJobMessage }[] {
+  return modelIds.flatMap(model =>
+    Array.from({ length: repetitions }, (_, rep) =>
+      chunks.map((chunkCases, chunk) => ({
+        body: {
+          runId,
+          kind: 'classifier',
           model,
           chunk,
           rep,
@@ -308,13 +335,9 @@ export async function startRun(
   }
 
   if (kind === 'classifier') {
-    await enqueueRunMessages(
-      env,
-      runId,
-      enqueuedModelIds.map(model => ({
-        body: { runId, kind, model } satisfies BenchmarkJobMessage,
-      }))
-    );
+    const chunks = chunkArray(CLASSIFIER_CASES, CLASSIFIER_CHUNK_SIZE);
+    const messages = buildClassifierMessages(runId, enqueuedModelIds, repetitions, chunks);
+    await enqueueRunMessages(env, runId, messages);
     return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
   }
 
@@ -345,15 +368,24 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
   const state = await getRunState(env, message.runId);
 
   if (message.kind === 'classifier') {
+    if (!message.caseIds?.length || message.rep === undefined) {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_classifier_job_missing_chunk',
+          runId: message.runId,
+          model: message.model,
+        })
+      );
+      return;
+    }
+
     // Create the OpenRouter client inside processJob — no module-scope transport clients.
     const client = await createOpenRouterClient(env);
-    // Expand cases × repetitions into a flat work list.
-    const expandedItems: { benchCase: (typeof CLASSIFIER_CASES)[number]; rep: number }[] = [];
-    for (let rep = 0; rep < state.repetitions; rep++) {
-      for (const benchCase of CLASSIFIER_CASES) {
-        expandedItems.push({ benchCase, rep });
-      }
-    }
+    const caseIds = new Set(message.caseIds);
+    const rep = message.rep;
+    const expandedItems = CLASSIFIER_CASES.filter(benchCase => caseIds.has(benchCase.id)).map(
+      benchCase => ({ benchCase, rep })
+    );
     await runCasesWithConcurrency(
       expandedItems,
       state.maxConcurrency,

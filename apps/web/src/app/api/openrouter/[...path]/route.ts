@@ -114,7 +114,7 @@ import {
   STREAM_ATTEMPT_HEADER,
 } from '@/lib/ai-gateway/o11y/stream-lifecycle.server';
 
-export const maxDuration = 800;
+export const maxDuration = 1800;
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -599,7 +599,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // previously blocking/quarantine decision wait for a fresh abuse-service result.
   const shouldBlockOnClassify = isRulesEngineBlockingAction(cachedRulesEngineAction);
 
-  // Large responses may run longer than the 800s serverless function timeout.
+  // Large responses may run longer than the 1800s serverless function timeout.
   const requestMaxTokens = getMaxTokens(requestBodyParsed);
   if (requestMaxTokens && requestMaxTokens > MAX_TOKENS_LIMIT) {
     console.warn(`SECURITY: Max tokens limit exceeded: ${user.id}`, {

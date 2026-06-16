@@ -72,7 +72,6 @@ function vercel(
     'pnpm',
     [
       'dlx',
-      '--yes',
       'vercel@53.3.1',
       ...args,
       '--scope',

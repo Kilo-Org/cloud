@@ -29,6 +29,11 @@ export type RunModelRow = typeof runModels.$inferSelect;
 export type ConfigDeciderModelRow = typeof configDeciderModels.$inferSelect;
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 
+// D1 rejects statements with too many bound variables. A model summary insert
+// binds 12 values per row, so 8 rows keeps each INSERT below the 100-variable
+// ceiling while still batching the delete plus inserts together.
+const MODEL_SUMMARY_INSERT_BATCH_SIZE = 8;
+
 // ---------------------------------------------------------------------------
 // Row mapping helpers
 // ---------------------------------------------------------------------------
@@ -265,25 +270,30 @@ export async function replaceModelSummaries(
     await deleteStmt;
     return;
   }
-  await orm.batch([
-    deleteStmt,
-    orm.insert(modelSummaries).values(
-      summaries.map(s => ({
-        run_id: runId,
-        model: s.model,
-        tier: s.tier,
-        accuracy: s.accuracy,
-        avg_cost_usd: s.avgCostUsd,
-        avg_latency_ms: s.avgLatencyMs,
-        p50_latency_ms: s.p50LatencyMs,
-        p95_latency_ms: s.p95LatencyMs,
-        cases: s.cases,
-        errors: s.errors,
-        timeouts: s.timeouts,
-        carried: false,
-      }))
-    ),
-  ]);
+
+  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [deleteStmt];
+  for (let i = 0; i < summaries.length; i += MODEL_SUMMARY_INSERT_BATCH_SIZE) {
+    const summaryChunk = summaries.slice(i, i + MODEL_SUMMARY_INSERT_BATCH_SIZE);
+    stmts.push(
+      orm.insert(modelSummaries).values(
+        summaryChunk.map(s => ({
+          run_id: runId,
+          model: s.model,
+          tier: s.tier,
+          accuracy: s.accuracy,
+          avg_cost_usd: s.avgCostUsd,
+          avg_latency_ms: s.avgLatencyMs,
+          p50_latency_ms: s.p50LatencyMs,
+          p95_latency_ms: s.p95LatencyMs,
+          cases: s.cases,
+          errors: s.errors,
+          timeouts: s.timeouts,
+          carried: false,
+        }))
+      )
+    );
+  }
+  await orm.batch(stmts);
 }
 
 export async function getSummaries(

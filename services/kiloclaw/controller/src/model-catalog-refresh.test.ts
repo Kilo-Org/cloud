@@ -40,7 +40,7 @@ const sampleResponse = {
 const baseEnv = {
   KILOCODE_API_KEY: 'secret-key',
   KILOCODE_ORGANIZATION_ID: 'org-1',
-} as NodeJS.ProcessEnv;
+} as unknown as NodeJS.ProcessEnv;
 
 function makeConfig(): Record<string, unknown> {
   return {
@@ -143,7 +143,7 @@ describe('fetchModelCatalog', () => {
 
   it('throws when the API key is missing', async () => {
     await expect(
-      fetchModelCatalog({} as NodeJS.ProcessEnv, {
+      fetchModelCatalog({} as unknown as NodeJS.ProcessEnv, {
         fetch: vi.fn(),
         readConfig: vi.fn(),
         writeConfig: vi.fn(),
@@ -259,7 +259,7 @@ describe('startModelCatalogRefresh', () => {
   it('is disabled when the API key is absent', async () => {
     vi.useFakeTimers();
     const deps = timerDeps();
-    startModelCatalogRefresh({} as NodeJS.ProcessEnv, '/cfg.json', deps);
+    startModelCatalogRefresh({} as unknown as NodeJS.ProcessEnv, '/cfg.json', deps);
 
     await vi.advanceTimersByTimeAsync(30 * 1000 + 24 * 60 * 60 * 1000);
     expect(deps.fetch).not.toHaveBeenCalled();

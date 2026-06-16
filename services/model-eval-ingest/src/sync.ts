@@ -140,7 +140,7 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
             openrouterData: sql`'{}'::jsonb`,
           }))
         )
-        .onConflictDoNothing({ target: modelStats.openrouterId });
+        .onConflictDoNothing();
     },
 
     async findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>> {

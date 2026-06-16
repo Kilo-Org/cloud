@@ -1313,6 +1313,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           owner: securityOwner,
           actorUserId: ctx.user.id,
         });
+        if (!queued.queued) return { success: false, ...queued };
 
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,
@@ -1361,6 +1362,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           actorUserId: ctx.user.id,
           retry: true,
         });
+        if (!queued.queued) return { success: false, ...queued };
 
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,

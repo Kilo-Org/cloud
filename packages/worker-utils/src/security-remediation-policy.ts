@@ -56,7 +56,7 @@ export type SecurityFindingAnalysisInputSource = {
 
 export type SecurityRemediationFinding = SecurityFindingAnalysisInputSource & {
   id: string;
-  last_synced_at?: string | null;
+  last_synced_at: string | null;
   analysis_status: string | null;
   analysis_completed_at: string | null;
   analysis: SecurityRemediationAnalysis | null;
@@ -69,28 +69,40 @@ export type SecurityRemediationBlockState = {
   hasRetryableTerminalForFinding?: boolean;
 };
 
-export type SecurityRemediationCapabilityReason =
-  | 'eligible'
-  | 'finding_not_open'
-  | 'repo_not_in_scope'
-  | 'analysis_required'
-  | 'sandbox_analysis_required'
-  | 'stale_analysis'
-  | 'not_exploitable'
-  | 'exploitability_unknown'
-  | 'manual_review_required'
-  | 'monitor_required'
-  | 'triage_only'
-  | 'action_not_concrete'
-  | 'remediation_active'
-  | 'pr_already_opened'
-  | 'duplicate_analysis_result'
-  | 'retry_not_allowed'
-  | 'security_agent_disabled'
-  | 'auto_remediation_disabled'
-  | 'include_existing_disabled'
-  | 'below_threshold'
-  | 'before_enablement';
+export const SECURITY_REMEDIATION_REJECTION_REASONS = [
+  'finding_not_open',
+  'repo_not_in_scope',
+  'analysis_required',
+  'sandbox_analysis_required',
+  'stale_analysis',
+  'not_exploitable',
+  'exploitability_unknown',
+  'manual_review_required',
+  'monitor_required',
+  'triage_only',
+  'action_not_concrete',
+  'remediation_active',
+  'pr_already_opened',
+  'duplicate_analysis_result',
+  'retry_not_allowed',
+  'security_agent_disabled',
+  'auto_remediation_disabled',
+  'include_existing_disabled',
+  'below_threshold',
+  'before_enablement',
+] as const;
+
+export type SecurityRemediationRejectionReason =
+  (typeof SECURITY_REMEDIATION_REJECTION_REASONS)[number];
+export type SecurityRemediationCapabilityReason = 'eligible' | SecurityRemediationRejectionReason;
+
+export const SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS = [
+  ...SECURITY_REMEDIATION_REJECTION_REASONS,
+  'finding_not_found',
+] as const;
+
+export type SecurityRemediationAdmissionRejectionReason =
+  (typeof SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS)[number];
 
 export type SecurityRemediationEligibilityParams = {
   finding: SecurityRemediationFinding;

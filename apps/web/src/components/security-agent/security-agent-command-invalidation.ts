@@ -49,6 +49,7 @@ const analysisScopes = [
 const remediationScopes = [
   'findings',
   'findingDetails',
+  'analysis',
   'stats',
   'dashboardStats',
 ] as const satisfies readonly SecurityAgentInvalidationScope[];

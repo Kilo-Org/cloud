@@ -11,9 +11,11 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
+import type { SecurityRemediationAdmissionRejectionReason } from '@kilocode/worker-utils/security-remediation-policy';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
+import { getRemediationUnavailableCopy } from './remediation-unavailable-copy';
 import type { SlaConfig } from './security-config-types';
 import {
   getSecurityAgentCommandFailureTitle,
@@ -586,6 +588,31 @@ function useSecurityAgentProviderValue(
     );
   }
 
+  function settleRemediationAdmission(
+    result:
+      | { queued: true }
+      | { queued: false; reason: SecurityRemediationAdmissionRejectionReason },
+    findingId: string,
+    messages: { queued: string; unavailable: string }
+  ) {
+    if (result.queued) {
+      toast.success(messages.queued);
+    } else {
+      toast.error(messages.unavailable, {
+        description: getRemediationUnavailableCopy(result.reason),
+        duration: 8000,
+      });
+    }
+    dispatchProviderState({ type: 'remove-optimistic-remediation', findingId });
+    invalidateRemediationQueries();
+  }
+
+  function settleRemediationError(error: { message: string }, findingId: string, title: string) {
+    toast.error(title, { description: error.message, duration: 8000 });
+    dispatchProviderState({ type: 'remove-optimistic-remediation', findingId });
+    invalidateRemediationQueries();
+  }
+
   // Permission status query
   const { data: permissionData, isLoading: isLoadingPermission } = useQuery(
     isOrg
@@ -850,40 +877,28 @@ function useSecurityAgentProviderValue(
 
   const { mutate: orgStartRemediationMutate } = useMutation(
     trpc.organizations.securityAgent.startRemediation.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        toast.success('Remediation queued');
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
+      onSuccess: (data, variables) => {
+        settleRemediationAdmission(data, variables.findingId, {
+          queued: 'Remediation queued',
+          unavailable: 'Remediation unavailable',
         });
-        invalidateRemediationQueries();
       },
       onError: (error, variables) => {
-        toast.error('Failed to queue remediation', { description: error.message, duration: 8000 });
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
-        });
+        settleRemediationError(error, variables.findingId, 'Failed to queue remediation');
       },
     })
   );
 
   const { mutate: orgRetryRemediationMutate } = useMutation(
     trpc.organizations.securityAgent.retryRemediation.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        toast.success('Remediation retry queued');
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
+      onSuccess: (data, variables) => {
+        settleRemediationAdmission(data, variables.findingId, {
+          queued: 'Remediation retry queued',
+          unavailable: 'Remediation retry unavailable',
         });
-        invalidateRemediationQueries();
       },
       onError: (error, variables) => {
-        toast.error('Failed to retry remediation', { description: error.message, duration: 8000 });
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
-        });
+        settleRemediationError(error, variables.findingId, 'Failed to retry remediation');
       },
     })
   );
@@ -1053,40 +1068,28 @@ function useSecurityAgentProviderValue(
 
   const { mutate: personalStartRemediationMutate } = useMutation(
     trpc.securityAgent.startRemediation.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        toast.success('Remediation queued');
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
+      onSuccess: (data, variables) => {
+        settleRemediationAdmission(data, variables.findingId, {
+          queued: 'Remediation queued',
+          unavailable: 'Remediation unavailable',
         });
-        invalidateRemediationQueries();
       },
       onError: (error, variables) => {
-        toast.error('Failed to queue remediation', { description: error.message, duration: 8000 });
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
-        });
+        settleRemediationError(error, variables.findingId, 'Failed to queue remediation');
       },
     })
   );
 
   const { mutate: personalRetryRemediationMutate } = useMutation(
     trpc.securityAgent.retryRemediation.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        toast.success('Remediation retry queued');
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
+      onSuccess: (data, variables) => {
+        settleRemediationAdmission(data, variables.findingId, {
+          queued: 'Remediation retry queued',
+          unavailable: 'Remediation retry unavailable',
         });
-        invalidateRemediationQueries();
       },
       onError: (error, variables) => {
-        toast.error('Failed to retry remediation', { description: error.message, duration: 8000 });
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
-        });
+        settleRemediationError(error, variables.findingId, 'Failed to retry remediation');
       },
     })
   );

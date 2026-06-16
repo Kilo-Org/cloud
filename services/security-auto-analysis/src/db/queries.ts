@@ -603,6 +603,7 @@ export async function getSecurityFindingById(db: WorkerDb, findingId: string) {
       fixed_at: security_findings.fixed_at,
       sla_due_at: security_findings.sla_due_at,
       raw_data: security_findings.raw_data,
+      last_synced_at: security_findings.last_synced_at,
       analysis_status: security_findings.analysis_status,
       analysis: security_findings.analysis,
       analysis_started_at: security_findings.analysis_started_at,

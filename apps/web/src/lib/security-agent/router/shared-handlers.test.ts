@@ -480,6 +480,21 @@ describe('remediation action tracking', () => {
     });
   });
 
+  it('returns typed policy rejections without tracking accepted remediation', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({ id: findingId });
+    mockSubmitManualRemediationStart.mockResolvedValue({
+      queued: false,
+      reason: 'analysis_required',
+    });
+    const handlers = createHandlers();
+
+    await expect(
+      handlers.startRemediation.handler({ ctx: context, input: { findingId } })
+    ).resolves.toEqual({ success: false, queued: false, reason: 'analysis_required' });
+
+    expect(mockTrackSecurityAgentRemediationAction).not.toHaveBeenCalled();
+  });
+
   it('does not track remediation actions rejected by admission handlers', async () => {
     mockGetSecurityFindingById.mockResolvedValue({ id: findingId });
     mockSubmitManualRemediationStart.mockRejectedValue(new Error('not admitted'));

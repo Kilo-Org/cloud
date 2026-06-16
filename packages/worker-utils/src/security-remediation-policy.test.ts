@@ -116,6 +116,36 @@ describe('decideSecurityRemediationEligibility', () => {
     expect(decision).toMatchObject({ eligible: true, reason: 'eligible' });
   });
 
+  it('uses the database completion timestamp when legacy analysis JSON omits timestamps', () => {
+    const decision = decideSecurityRemediationEligibility({
+      finding: {
+        ...baseFinding,
+        last_synced_at: '2026-01-03T00:00:00.000Z',
+        analysis: {
+          ...baseFinding.analysis,
+          analyzedAt: null,
+          sandboxAnalysis: {
+            ...baseFinding.analysis?.sandboxAnalysis,
+            isExploitable: true,
+            suggestedAction: 'open_pr',
+            analysisAt: null,
+          },
+        },
+      },
+      config: baseConfig,
+      isAgentEnabled: true,
+      repoFullNamesInScope: ['kilo/repo'],
+      origin: 'manual',
+      blockState: emptyBlockState,
+    });
+
+    expect(decision).toMatchObject({
+      eligible: true,
+      reason: 'eligible',
+      analysisCompletedAt: '2026-01-02T00:05:00.000Z',
+    });
+  });
+
   it('rejects analysis when material finding data changed', () => {
     const decision = decideSecurityRemediationEligibility({
       finding: {

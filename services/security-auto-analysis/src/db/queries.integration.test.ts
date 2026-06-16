@@ -62,6 +62,7 @@ describe('security analysis durable database invariants', () => {
         first_detected_at: '2026-03-04T12:00:00.000Z',
         fixed_at: null,
         sla_due_at: '2026-03-19T12:00:00.000Z',
+        last_synced_at: '2026-03-06T12:00:00.000Z',
         analysis_completed_at: '2026-03-05T12:00:00.000Z',
       })
       .where(eq(security_findings.id, findingId));
@@ -78,6 +79,9 @@ describe('security analysis durable database invariants', () => {
     );
     expect(finding?.sla_due_at && new Date(finding.sla_due_at).toISOString()).toBe(
       '2026-03-19T12:00:00.000Z'
+    );
+    expect(finding?.last_synced_at && new Date(finding.last_synced_at).toISOString()).toBe(
+      '2026-03-06T12:00:00.000Z'
     );
     expect(
       finding?.analysis_completed_at && new Date(finding.analysis_completed_at).toISOString()

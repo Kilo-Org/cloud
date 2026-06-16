@@ -26,7 +26,7 @@ import {
 import {
   computeSecurityRemediationAnalysisFingerprint,
   decideSecurityRemediationEligibility,
-  type SecurityRemediationCapabilityReason,
+  type SecurityRemediationAdmissionRejectionReason,
   type SecurityRemediationOrigin,
 } from '@kilocode/worker-utils/security-remediation-policy';
 import { and, asc, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
@@ -193,8 +193,21 @@ type AdmissionResult =
     }
   | {
       admitted: false;
-      reason: SecurityRemediationCapabilityReason;
+      reason: SecurityRemediationAdmissionRejectionReason;
     };
+
+function rejectRemediationAdmission(params: {
+  findingId: string;
+  origin: SecurityRemediationOrigin;
+  reason: SecurityRemediationAdmissionRejectionReason;
+}): AdmissionResult {
+  logger.info('Security remediation admission rejected', {
+    finding_id: params.findingId,
+    origin: params.origin,
+    reason: params.reason,
+  });
+  return { admitted: false, reason: params.reason };
+}
 
 type ApplyAutoRemediationCommandResult = {
   scanned: number;
@@ -582,6 +595,7 @@ async function markAttemptQueueAdmissionFailed(db: WorkerDb, attemptId: string):
         fixed_at: security_findings.fixed_at,
         sla_due_at: security_findings.sla_due_at,
         raw_data: security_findings.raw_data,
+        last_synced_at: security_findings.last_synced_at,
         analysis_status: security_findings.analysis_status,
         analysis: security_findings.analysis,
         analysis_started_at: security_findings.analysis_started_at,
@@ -668,10 +682,20 @@ export async function admitRemediationAttempt(params: {
   runtimeConfig?: RuntimeConfig;
 }): Promise<AdmissionResult> {
   const finding = await getSecurityFindingById(params.db, params.findingId);
-  if (!finding) return { admitted: false, reason: 'analysis_required' };
+  if (!finding) {
+    return rejectRemediationAdmission({
+      findingId: params.findingId,
+      origin: params.origin,
+      reason: 'finding_not_found',
+    });
+  }
   const owner = params.owner ?? ownerFromFinding(finding);
   if (!owner || !findingMatchesOwner(finding, owner)) {
-    return { admitted: false, reason: 'repo_not_in_scope' };
+    return rejectRemediationAdmission({
+      findingId: params.findingId,
+      origin: params.origin,
+      reason: 'repo_not_in_scope',
+    });
   }
 
   const runtime = params.runtimeConfig ?? (await getRuntimeConfig(params.db, owner));
@@ -689,8 +713,19 @@ export async function admitRemediationAttempt(params: {
 
   const acceptedAnalysisFingerprint = decision.analysisFingerprint;
   const acceptedAnalysisCompletedAt = decision.analysisCompletedAt;
-  if (!decision.eligible || !acceptedAnalysisFingerprint || !acceptedAnalysisCompletedAt) {
-    return { admitted: false, reason: decision.reason };
+  if (!decision.eligible) {
+    return rejectRemediationAdmission({
+      findingId: params.findingId,
+      origin: params.origin,
+      reason: decision.reason === 'eligible' ? 'analysis_required' : decision.reason,
+    });
+  }
+  if (!acceptedAnalysisFingerprint || !acceptedAnalysisCompletedAt) {
+    return rejectRemediationAdmission({
+      findingId: params.findingId,
+      origin: params.origin,
+      reason: 'analysis_required',
+    });
   }
 
   return params.db.transaction(async tx => {
@@ -1660,7 +1695,13 @@ export async function startManualRemediation(params: {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const owner = commandOwner(params.request.owner);
   const actor = await getAnalysisActorById(db, params.request.actorUserId);
-  if (!actor) return { admitted: false, reason: 'security_agent_disabled' };
+  if (!actor) {
+    return rejectRemediationAdmission({
+      findingId: params.request.findingId,
+      origin: 'manual',
+      reason: 'security_agent_disabled',
+    });
+  }
   const result = await admitRemediationAttempt({
     db,
     findingId: params.request.findingId,

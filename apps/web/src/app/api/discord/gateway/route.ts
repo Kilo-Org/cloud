@@ -15,7 +15,7 @@ export const maxDuration = 1800;
  * On Vercel, this should be less than the function's maxDuration.
  * The cron job should run more frequently than this duration to ensure overlap.
  */
-const GATEWAY_DURATION_MS = 600 * 1000; // 10 minutes
+const GATEWAY_DURATION_MS = 1770 * 1000; // 29.5 minutes (30s buffer before 1800s maxDuration)
 
 /**
  * How often the listener checks if it's been superseded (in ms).

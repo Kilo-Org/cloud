@@ -599,7 +599,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // previously blocking/quarantine decision wait for a fresh abuse-service result.
   const shouldBlockOnClassify = isRulesEngineBlockingAction(cachedRulesEngineAction);
 
-  // Large responses may run longer than the 800s serverless function timeout.
+  // Large responses may run longer than the 1800s serverless function timeout.
   const requestMaxTokens = getMaxTokens(requestBodyParsed);
   if (requestMaxTokens && requestMaxTokens > MAX_TOKENS_LIMIT) {
     console.warn(`SECURITY: Max tokens limit exceeded: ${user.id}`, {

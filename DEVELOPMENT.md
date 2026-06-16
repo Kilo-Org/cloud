@@ -155,35 +155,28 @@ These changes will allow you to do local testing with a fake account.
 Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app` and `kilocode-global-app` together for Development, Staging, and Production:
 
 ```bash
-pnpm web:env add EXAMPLE_API_TOKEN
-pnpm web:env update EXAMPLE_API_TOKEN
+pnpm web:env set EXAMPLE_API_TOKEN
 ```
 
 Prerequisites:
 
 - Sign in with `vercel login` and have access to both projects in the `kilocode` scope.
 - Sign in with `op signin` and have write access to the `Kilo Web ENV Production` vault.
-- Run `pnpm install` so the repository-pinned Vercel CLI is available.
+- Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
 
 Variables are sensitive by default. Production and Staging become Vercel-sensitive, while the separate Development value remains encrypted but exportable through `vercel env pull`. The Production value is also stored as a concealed, exact-name item in `Kilo Web ENV Production`.
 
 For public or otherwise non-secret configuration, opt out explicitly:
 
 ```bash
-pnpm web:env add EXAMPLE_FEATURE_FLAG --no-sensitive
+pnpm web:env set EXAMPLE_FEATURE_FLAG --no-sensitive
 ```
 
 `NEXT_PUBLIC_*` variables require `--no-sensitive` because Next.js exposes them to browsers. Non-sensitive values are not copied to 1Password.
 
-The command prompts for all three values using hidden input, then asks for an explicit safe default or skip decision for every tracked root and `apps/web` dotenv file. Real environment values are never written to tracked files. Use `--dry-run` to perform preflight and preview the redacted plan without retaining changes.
+The command prompts for single-line values without echoing them, then asks for a safe default or skip decision for each tracked root and `apps/web` dotenv file. For multiline values, use `--development-file`, `--staging-file`, and `--production-file`. Use `--dry-run` to preview the redacted plan.
 
-Remote updates are not transactional. If a provider write fails, the command stops and writes a value-free resume journal under `.tmp/web-env/`. Re-enter all three values with the printed command:
-
-```bash
-pnpm web:env resume .tmp/web-env/<journal>.json
-```
-
-The workflow does not deploy. Trigger the appropriate Staging or Production deployment separately when the new values should take effect.
+Remote updates are sequential rather than transactional. If a provider fails partway through, fix the problem and rerun the same command; it safely upserts every target. The workflow does not deploy, so trigger the appropriate deployment separately.
 
 ### 4. Start the database
 

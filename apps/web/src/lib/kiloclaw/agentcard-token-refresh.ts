@@ -6,6 +6,7 @@ import { kiloclaw_agentcard_oauth_connections } from '@kilocode/db/schema';
 import { getInstanceById, workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { refreshAgentCardToken } from '@/lib/integrations/agentcard/agentcard-service';
 import {
+  claimAgentCardConnectionForRefresh,
   decryptRefreshToken,
   setKiloClawAgentCardOAuthConnectionError,
   upsertKiloClawAgentCardOAuthConnection,
@@ -68,6 +69,14 @@ export async function refreshExpiringAgentCardConnections(opts: {
 
     const instance = await getInstanceById(conn.instance_id);
     if (!instance) {
+      skipped++;
+      continue;
+    }
+
+    // Claim the row before the (token-rotating) refresh so an overlapping sweep
+    // can't refresh the same connection and invalidate our rotated token.
+    const claimed = await claimAgentCardConnectionForRefresh(conn);
+    if (!claimed) {
       skipped++;
       continue;
     }

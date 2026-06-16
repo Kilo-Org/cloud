@@ -5944,7 +5944,7 @@ export const kiloclaw_agentcard_oauth_connections = pgTable(
       .notNull(),
     instance_id: uuid()
       .notNull()
-      .references(() => kiloclaw_instances.id),
+      .references(() => kiloclaw_instances.id, { onDelete: 'cascade' }),
     provider: text().notNull().default('agentcard'),
     // The OAuth user's email, when known (AgentCard issues opaque tokens and
     // has no userinfo endpoint, so this may be null).

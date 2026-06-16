@@ -9,14 +9,7 @@ import {
   type KiloClawAgentCardOAuthConnection,
   type KiloClawAgentCardOAuthStatus,
 } from '@kilocode/db/schema';
-import {
-  refreshAgentCardToken,
-  type AgentCardTokenSet,
-} from '@/lib/integrations/agentcard/agentcard-service';
-
-// Refresh the access token when it expires within this window so the worker is
-// never handed a token that's about to die.
-const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+import type { AgentCardTokenSet } from '@/lib/integrations/agentcard/agentcard-service';
 
 function encryptToken(value: string): string {
   if (!BYOK_ENCRYPTION_KEY) {
@@ -148,52 +141,33 @@ export function decryptRefreshToken(connection: KiloClawAgentCardOAuthConnection
     : null;
 }
 
+/** Decrypt the stored access token. */
+export function decryptAccessToken(connection: KiloClawAgentCardOAuthConnection): string {
+  return decryptToken(connection.access_token_encrypted);
+}
+
 /**
- * Returns a valid (non-expired) access token for the connection's instance,
- * refreshing via AgentCard if it's within the refresh buffer of expiry. On
- * refresh failure the connection is marked `action_required` and the error is
- * rethrown so callers can surface a reconnect prompt.
+ * Optimistically claim a connection for refresh so two overlapping sweeps don't
+ * both refresh the same row. AgentCard rotates refresh tokens (each refresh
+ * invalidates the previous one), so a concurrent double-refresh would make one
+ * side fail and needlessly flip the connection to `action_required`.
  *
- * AgentCard access tokens are short-lived (~1h); the OpenClaw gateway hits the
- * MCP server directly with a static Bearer header, so the web app must keep a
- * fresh token in the worker secret. Call this before pushing to the worker.
+ * Bumps `updated_at` only if it still matches what the caller read; the row
+ * lock makes this atomic, so exactly one concurrent caller gets `true`.
  */
-export async function getValidAgentCardAccessToken(
+export async function claimAgentCardConnectionForRefresh(
   connection: KiloClawAgentCardOAuthConnection
-): Promise<string> {
-  const expiresAt = connection.token_expires_at
-    ? new Date(connection.token_expires_at).getTime()
-    : null;
-  const needsRefresh = expiresAt !== null && expiresAt - Date.now() <= REFRESH_BUFFER_MS;
-
-  if (!needsRefresh) {
-    return decryptToken(connection.access_token_encrypted);
-  }
-
-  const refreshToken = decryptRefreshToken(connection);
-  if (!refreshToken) {
-    // No refresh token — return the (possibly stale) access token; the worker
-    // call will fail and the user can reconnect.
-    return decryptToken(connection.access_token_encrypted);
-  }
-
-  try {
-    const tokens = await refreshAgentCardToken({
-      refreshToken,
-      clientId: connection.oauth_client_id,
-    });
-    const updated = await upsertKiloClawAgentCardOAuthConnection({
-      instanceId: connection.instance_id,
-      oauthClientId: connection.oauth_client_id,
-      tokens,
-      accountEmail: connection.account_email,
-    });
-    return decryptToken(updated.access_token_encrypted);
-  } catch (error) {
-    await setKiloClawAgentCardOAuthConnectionError(
-      connection.instance_id,
-      error instanceof Error ? error.message : 'AgentCard token refresh failed'
-    );
-    throw error;
-  }
+): Promise<boolean> {
+  const claimedAt = new Date().toISOString();
+  const claimed = await db
+    .update(kiloclaw_agentcard_oauth_connections)
+    .set({ updated_at: claimedAt })
+    .where(
+      and(
+        eq(kiloclaw_agentcard_oauth_connections.id, connection.id),
+        eq(kiloclaw_agentcard_oauth_connections.updated_at, connection.updated_at)
+      )
+    )
+    .returning({ id: kiloclaw_agentcard_oauth_connections.id });
+  return claimed.length === 1;
 }

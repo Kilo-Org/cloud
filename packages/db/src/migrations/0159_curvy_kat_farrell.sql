@@ -17,6 +17,6 @@ CREATE TABLE "kiloclaw_agentcard_oauth_connections" (
 	CONSTRAINT "kiloclaw_agentcard_oauth_connections_status_check" CHECK ("kiloclaw_agentcard_oauth_connections"."status" IN ('active', 'action_required', 'disconnected'))
 );
 --> statement-breakpoint
-ALTER TABLE "kiloclaw_agentcard_oauth_connections" ADD CONSTRAINT "kiloclaw_agentcard_oauth_connections_instance_id_kiloclaw_instances_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."kiloclaw_instances"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kiloclaw_agentcard_oauth_connections" ADD CONSTRAINT "kiloclaw_agentcard_oauth_connections_instance_id_kiloclaw_instances_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."kiloclaw_instances"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "UQ_kiloclaw_agentcard_oauth_connections_instance" ON "kiloclaw_agentcard_oauth_connections" USING btree ("instance_id");--> statement-breakpoint
 CREATE INDEX "IDX_kiloclaw_agentcard_oauth_connections_status" ON "kiloclaw_agentcard_oauth_connections" USING btree ("status");

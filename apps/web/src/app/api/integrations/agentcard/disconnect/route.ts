@@ -12,6 +12,7 @@ import {
 } from '@/lib/kiloclaw/instance-registry';
 import {
   clearKiloClawAgentCardOAuthConnection,
+  decryptAccessToken,
   decryptRefreshToken,
   getKiloClawAgentCardOAuthConnection,
 } from '@/lib/kiloclaw/agentcard-oauth-connections';
@@ -82,11 +83,11 @@ export async function POST(request: NextRequest) {
 
     const existing = await getKiloClawAgentCardOAuthConnection(instance.id);
 
-    // Clear the stored connection first so disconnect fails closed.
-    await clearKiloClawAgentCardOAuthConnection(instance.id);
-
-    // Remove the worker secret so the `agentcard` MCP server is dropped from
-    // the gateway config on next sync.
+    // Remove the worker secret FIRST — this is what actually cuts off the
+    // agent's access. Do it before deleting the DB row so that if it throws we
+    // bail to the catch with the row still present and the user can retry,
+    // rather than orphaning a live token on the worker with no row to retry
+    // from.
     const kiloclawClient = new KiloClawInternalClient();
     await kiloclawClient.patchSecrets(
       user.id,
@@ -94,12 +95,17 @@ export async function POST(request: NextRequest) {
       workerInstanceId(instance)
     );
 
-    // Best-effort revocation of the OAuth grant at AgentCard.
+    // Worker secret is gone; now drop the stored connection.
+    await clearKiloClawAgentCardOAuthConnection(instance.id);
+
+    // Best-effort revocation of the OAuth grant at AgentCard — revoke both the
+    // refresh token and the (still ~1h-valid) access token.
     if (existing) {
       const refreshToken = decryptRefreshToken(existing);
       if (refreshToken) {
         await revokeAgentCardToken(refreshToken);
       }
+      await revokeAgentCardToken(decryptAccessToken(existing));
     }
 
     return NextResponse.redirect(

@@ -13,7 +13,10 @@ import {
   type VerifiedAgentCardOAuthState,
   verifyAgentCardOAuthState,
 } from '@/lib/integrations/agentcard/oauth-state';
-import { upsertKiloClawAgentCardOAuthConnection } from '@/lib/kiloclaw/agentcard-oauth-connections';
+import {
+  setKiloClawAgentCardOAuthConnectionError,
+  upsertKiloClawAgentCardOAuthConnection,
+} from '@/lib/kiloclaw/agentcard-oauth-connections';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
@@ -180,22 +183,48 @@ export async function GET(request: NextRequest) {
 
     // Push the freshly-minted access token to the worker. config-writer turns
     // AGENTCARD_API_KEY into the `agentcard` MCP server's Bearer header.
-    // Best-effort: the OAuth grant is already persisted above, so a transient
-    // secret-push failure (e.g. worker unavailable) must not discard the
-    // connection — the token-refresh job / next checkin re-pushes it.
-    try {
-      const kiloclawClient = new KiloClawInternalClient();
-      await kiloclawClient.patchSecrets(
-        user.id,
-        { secrets: { [AGENTCARD_SECRET_KEY]: encryptKiloClawSecret(tokens.accessToken) } },
-        workerInstanceId(instance)
-      );
-    } catch (pushError) {
-      console.error('AgentCard secret push failed (connection kept):', pushError);
-      captureException(pushError, {
+    // Retry a few times: the grant is already persisted, but the cron only
+    // refreshes near-expiry tokens, so it won't re-push this fresh (~1h) token
+    // for ~40 min — a silent push failure would leave the agent "connected" but
+    // unable to use AgentCard until then.
+    const kiloclawClient = new KiloClawInternalClient();
+    let pushed = false;
+    let lastPushError: unknown = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await kiloclawClient.patchSecrets(
+          user.id,
+          { secrets: { [AGENTCARD_SECRET_KEY]: encryptKiloClawSecret(tokens.accessToken) } },
+          workerInstanceId(instance)
+        );
+        pushed = true;
+        break;
+      } catch (pushError) {
+        lastPushError = pushError;
+        if (attempt < 3) {
+          await new Promise(resolve => {
+            setTimeout(resolve, 300 * attempt);
+          });
+        }
+      }
+    }
+
+    if (!pushed) {
+      // Persisted grant but the worker never got the token. Mark the connection
+      // so the dashboard shows "Reconnect", and surface an error instead of a
+      // misleading success.
+      console.error('AgentCard secret push failed after retries:', lastPushError);
+      captureException(lastPushError, {
         tags: { endpoint: 'agentcard/callback', source: 'agentcard_oauth_push' },
         extra: oauthSentryContext(searchParams),
       });
+      await setKiloClawAgentCardOAuthConnectionError(
+        verifiedState.instanceId,
+        lastPushError instanceof Error ? lastPushError.message : 'AgentCard secret push failed'
+      );
+      return NextResponse.redirect(
+        new URL(buildRedirectPath(verifiedState, 'error=agentcard_connect_incomplete'), APP_URL)
+      );
     }
 
     const successPath = buildRedirectPath(verifiedState, 'success=agentcard_connected');

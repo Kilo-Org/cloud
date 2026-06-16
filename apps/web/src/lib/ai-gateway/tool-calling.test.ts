@@ -1068,7 +1068,7 @@ describe('sanitizeBinaryToolResults', () => {
       repairMessagesTools(request.body);
 
       if (request.kind !== 'messages') throw new Error('expected messages');
-      expect(request.body.messages[1]).toEqual({
+      expect(request.body.messages[0]).toEqual({
         role: 'assistant',
         content: [
           { type: 'text', text: 'hi' },

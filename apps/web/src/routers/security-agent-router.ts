@@ -21,6 +21,9 @@ const handlers = createSecurityAgentHandlers({
 });
 
 export const securityAgentRouter = createTRPCRouter({
+  trackUiInteraction: baseProcedure
+    .input(handlers.trackUiInteraction.inputSchema)
+    .mutation(handlers.trackUiInteraction.handler),
   getPermissionStatus: baseProcedure.query(handlers.getPermissionStatus),
   getConfig: baseProcedure.query(handlers.getConfig),
   saveConfig: baseProcedure

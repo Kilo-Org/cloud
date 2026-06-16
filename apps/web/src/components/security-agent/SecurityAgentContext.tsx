@@ -11,6 +11,7 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
+import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
 import type { SlaConfig } from './security-config-types';
@@ -76,6 +77,7 @@ type SecurityAgentContextValue = {
   filteredRepositories: Array<{ id: number; fullName: string; name: string; private: boolean }>;
 
   // Mutation handlers
+  trackUiInteraction: (interaction: SecurityAgentUiInteraction) => void;
   handleSync: (repoFullName?: string) => void;
   handleDismiss: (
     finding: SecurityFinding,
@@ -718,6 +720,9 @@ function useSecurityAgentProviderValue(
   ]);
 
   // ---- Mutations (org) ----
+  const { mutate: orgTrackUiInteractionMutate } = useMutation(
+    trpc.organizations.securityAgent.trackUiInteraction.mutationOptions()
+  );
   const { mutate: orgSyncMutate, isPending: isOrgSyncPending } = useMutation(
     trpc.organizations.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
@@ -918,6 +923,9 @@ function useSecurityAgentProviderValue(
   );
 
   // ---- Mutations (personal) ----
+  const { mutate: personalTrackUiInteractionMutate } = useMutation(
+    trpc.securityAgent.trackUiInteraction.mutationOptions()
+  );
   const { mutate: personalSyncMutate, isPending: isPersonalSyncPending } = useMutation(
     trpc.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
@@ -1392,6 +1400,13 @@ function useSecurityAgentProviderValue(
       refetchConfig,
       allRepositories,
       filteredRepositories,
+      trackUiInteraction: interaction => {
+        if (isOrg && organizationId) {
+          orgTrackUiInteractionMutate({ organizationId, interaction });
+        } else {
+          personalTrackUiInteractionMutate({ interaction });
+        }
+      },
       handleSync,
       handleDismiss,
       handleSaveConfig,
@@ -1427,6 +1442,8 @@ function useSecurityAgentProviderValue(
       refetchConfig,
       allRepositories,
       filteredRepositories,
+      orgTrackUiInteractionMutate,
+      personalTrackUiInteractionMutate,
       handleSync,
       handleDismiss,
       handleSaveConfig,

@@ -76,6 +76,7 @@ import {
   GetCommandStatusInputSchema,
   DeleteFindingsByRepoInputSchema,
   GetDashboardStatsInputSchema,
+  TrackSecurityAgentUiInteractionInputSchema,
   type SaveSecurityConfigInput,
   type ListFindingsInput,
   type TriggerSyncInput,
@@ -90,6 +91,7 @@ import {
   type GetCommandStatusInput,
   type DeleteFindingsByRepoInput,
   type GetDashboardStatsInput,
+  type TrackSecurityAgentUiInteractionInput,
 } from '@/lib/security-agent/core/schemas';
 import {
   DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
@@ -102,6 +104,8 @@ import {
   trackSecurityAgentConfigSaved,
   trackSecurityAgentSync,
   trackSecurityAgentFindingDismissed,
+  trackSecurityAgentUiInteraction,
+  trackSecurityAgentRemediationAction,
 } from '@/lib/security-agent/posthog-tracking';
 import {
   createSecurityAuditLog,
@@ -128,7 +132,7 @@ type SecurityAgentDeps<TExtra = {}> = {
   resolveResourceId: (ctx: TRPCContext, input: TExtra) => string;
   verifyFindingOwnership: (finding: SecurityFinding, ctx: TRPCContext, input: TExtra) => boolean;
   getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
-  trackingExtras: (ctx: TRPCContext, input: TExtra) => Record<string, string>;
+  trackingExtras: (ctx: TRPCContext, input: TExtra) => { organizationId?: string };
 };
 
 function getRepoFullNamesInScope(
@@ -253,6 +257,26 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
   const toExtra = (input: unknown): TExtra => (input ?? {}) as any;
 
   return {
+    trackUiInteraction: {
+      inputSchema: TrackSecurityAgentUiInteractionInputSchema,
+      handler: async ({
+        ctx,
+        input,
+      }: {
+        ctx: TRPCContext;
+        input: TrackSecurityAgentUiInteractionInput & TExtra;
+      }) => {
+        trackSecurityAgentUiInteraction({
+          distinctId: ctx.user.id,
+          userId: ctx.user.id,
+          organizationId: deps.trackingExtras(ctx, input).organizationId,
+          interaction: input.interaction,
+        });
+
+        return { success: true };
+      },
+    },
+
     // -----------------------------------------------------------------------
     // 1. getPermissionStatus
     // -----------------------------------------------------------------------
@@ -1290,6 +1314,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           actorUserId: ctx.user.id,
         });
 
+        trackSecurityAgentRemediationAction({
+          distinctId: ctx.user.id,
+          userId: ctx.user.id,
+          organizationId: deps.trackingExtras(ctx, input).organizationId,
+          action: 'start',
+        });
+
         return { success: true, ...queued };
       },
     },
@@ -1331,6 +1362,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           retry: true,
         });
 
+        trackSecurityAgentRemediationAction({
+          distinctId: ctx.user.id,
+          userId: ctx.user.id,
+          organizationId: deps.trackingExtras(ctx, input).organizationId,
+          action: 'retry',
+        });
+
         return { success: true, ...queued };
       },
     },
@@ -1353,6 +1391,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           attemptId: input.attemptId,
           owner: securityOwner,
           actorUserId: ctx.user.id,
+        });
+
+        trackSecurityAgentRemediationAction({
+          distinctId: ctx.user.id,
+          userId: ctx.user.id,
+          organizationId: deps.trackingExtras(ctx, input).organizationId,
+          action: 'cancel',
         });
 
         return result;

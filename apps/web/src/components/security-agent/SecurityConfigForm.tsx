@@ -1,6 +1,6 @@
 'use client';
 
-import { type SetStateAction, useEffect, useState } from 'react';
+import { type SetStateAction, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Save } from 'lucide-react';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import {
   DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
   DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
@@ -40,6 +41,7 @@ import type {
   SecurityRepository,
   SlaConfig,
 } from './security-config-types';
+import { useSecurityAgent } from './SecurityAgentContext';
 
 type SecurityConfigFormProps = {
   organizationId?: string;
@@ -142,8 +144,36 @@ const SETTINGS_TABS = ['config', 'automation', 'notifications', 'sla'] as const;
 
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
+const SETTINGS_TAB_INTERACTIONS = {
+  config: 'settings_config_viewed',
+  automation: 'settings_automation_viewed',
+  notifications: 'settings_notifications_viewed',
+  sla: 'settings_sla_viewed',
+} satisfies Record<SettingsTab, SecurityAgentUiInteraction>;
+
 function settingsTabFromParam(tab: string | null): SettingsTab {
   return SETTINGS_TABS.find(value => value === tab) ?? 'config';
+}
+
+function useSettingsTabTracking(enabled: boolean, initialTab: SettingsTab) {
+  const { trackUiInteraction } = useSecurityAgent();
+  const trackedInitialTabRef = useRef(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      trackedInitialTabRef.current = false;
+      return;
+    }
+    if (trackedInitialTabRef.current) return;
+
+    trackedInitialTabRef.current = true;
+    trackUiInteraction(SETTINGS_TAB_INTERACTIONS[initialTab]);
+  }, [enabled, initialTab, trackUiInteraction]);
+
+  return (value: string) => {
+    const tab = SETTINGS_TABS.find(settingsTab => settingsTab === value);
+    if (tab) trackUiInteraction(SETTINGS_TAB_INTERACTIONS[tab]);
+  };
 }
 
 const SECURITY_AGENT_DEFAULT_MODEL_OPTIONS: ModelOption[] = SECURITY_AGENT_MODELS.map(model => ({
@@ -179,6 +209,7 @@ export function SecurityConfigForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const defaultSettingsTab = settingsTabFromParam(searchParams.get('tab'));
+  const handleSettingsTabChange = useSettingsTabTracking(enabled, defaultSettingsTab);
   const initialConfigFingerprint = configFingerprint(initialConfig);
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
   const [savingBeforeNavigation, setSavingBeforeNavigation] = useState(false);
@@ -335,7 +366,11 @@ export function SecurityConfigForm({
       />
       {enabled && (
         <>
-          <Tabs defaultValue={defaultSettingsTab} className="space-y-6">
+          <Tabs
+            defaultValue={defaultSettingsTab}
+            className="space-y-6"
+            onValueChange={handleSettingsTabChange}
+          >
             <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl p-1 sm:w-fit">
               <TabsTrigger value="config" className={SETTINGS_TAB_TRIGGER_CLASS}>
                 Config

@@ -129,6 +129,7 @@ export function SecurityFindingsPage() {
     hasIntegration,
     isEnabled,
     filteredRepositories,
+    trackUiInteraction,
     handleSync,
     handleDismiss,
     handleStartAnalysis,
@@ -253,6 +254,16 @@ export function SecurityFindingsPage() {
     handleDismiss(activeFinding, reason, comment, () => dispatch({ type: 'finish-dismiss' }));
   };
 
+  const handleFiltersChange = (filters: Filters) => {
+    trackUiInteraction('findings_filtered');
+    dispatch({ type: 'set-filters', filters });
+  };
+
+  const handleSortByChange = (sortBy: SortBy) => {
+    trackUiInteraction('findings_filtered');
+    dispatch({ type: 'set-sort', sortBy });
+  };
+
   const basePath = isOrg ? `/organizations/${organizationId}/security-agent` : '/security-agent';
   const installUrl = isOrg
     ? `/organizations/${organizationId}/integrations`
@@ -324,7 +335,7 @@ export function SecurityFindingsPage() {
           hasIntegration,
         }}
         filters={state.filters}
-        onFiltersChange={filters => dispatch({ type: 'set-filters', filters })}
+        onFiltersChange={handleFiltersChange}
         installUrl={installUrl}
         onEnableClick={() => router.push(`${basePath}/config`)}
         lastSyncTime={lastSyncData?.lastSyncTime}
@@ -336,7 +347,7 @@ export function SecurityFindingsPage() {
         startingRemediationIds={startingRemediationIds}
         cancellingRemediationAttemptIds={cancellingRemediationAttemptIds}
         sortBy={effectiveSortBy}
-        onSortByChange={sortBy => dispatch({ type: 'set-sort', sortBy })}
+        onSortByChange={handleSortByChange}
         showSla={slaEnabled}
         runningCount={runningCount}
         concurrencyLimit={findingsData?.concurrencyLimit ?? 3}

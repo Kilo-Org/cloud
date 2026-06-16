@@ -30,6 +30,9 @@ const handlers = createSecurityAgentHandlers<{ organizationId: string }>({
 });
 
 export const organizationSecurityAgentRouter = createTRPCRouter({
+  trackUiInteraction: organizationMemberProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.trackUiInteraction.inputSchema))
+    .mutation(handlers.trackUiInteraction.handler),
   getPermissionStatus: organizationMemberProcedure.query(handlers.getPermissionStatus),
   getConfig: organizationMemberProcedure.query(handlers.getConfig),
   saveConfig: organizationBillingMutationProcedure

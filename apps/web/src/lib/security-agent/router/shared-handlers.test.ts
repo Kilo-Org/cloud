@@ -3,6 +3,7 @@ import type { createSecurityAgentHandlers as createSecurityAgentHandlersType } f
 import type * as manualSyncClientModule from '../services/manual-sync-client';
 import type * as manualDismissClientModule from '../services/manual-dismiss-client';
 import type * as manualAnalysisClientModule from '../services/manual-analysis-client';
+import type * as manualRemediationClientModule from '../services/manual-remediation-client';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const mockSubmitManualSecuritySync = jest.fn() as jest.MockedFunction<
@@ -14,12 +15,26 @@ const mockSubmitManualFindingDismissal = jest.fn() as jest.MockedFunction<
 const mockSubmitManualAnalysisStart = jest.fn() as jest.MockedFunction<
   typeof manualAnalysisClientModule.submitManualAnalysisStart
 >;
+const mockSubmitApplyAutoRemediation = jest.fn() as jest.MockedFunction<
+  typeof manualRemediationClientModule.submitApplyAutoRemediation
+>;
+const mockSubmitManualRemediationStart = jest.fn() as jest.MockedFunction<
+  typeof manualRemediationClientModule.submitManualRemediationStart
+>;
+const mockSubmitRemediationCancellation = jest.fn() as jest.MockedFunction<
+  typeof manualRemediationClientModule.submitRemediationCancellation
+>;
 const mockGetSecurityFindingById = jest.fn<() => Promise<unknown>>();
 const mockCanStartAnalysis = jest.fn<() => Promise<unknown>>();
 const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
 const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
 const mockTrackSecurityAgentSync = jest.fn();
+const mockTrackSecurityAgentUiInteraction = jest.fn();
+const mockTrackSecurityAgentRemediationAction = jest.fn();
 const mockLogSecurityAudit = jest.fn();
+const mockCreateSecurityAuditLog = jest.fn();
+const mockUpsertSecurityAgentConfig = jest.fn();
+const mockSetSecurityAgentEnabled = jest.fn();
 const mockAutoDismissEligibleFindings =
   jest.fn<
     (
@@ -37,6 +52,11 @@ jest.mock('../services/manual-dismiss-client', () => ({
 jest.mock('../services/manual-analysis-client', () => ({
   submitManualAnalysisStart: mockSubmitManualAnalysisStart,
 }));
+jest.mock('../services/manual-remediation-client', () => ({
+  submitApplyAutoRemediation: mockSubmitApplyAutoRemediation,
+  submitManualRemediationStart: mockSubmitManualRemediationStart,
+  submitRemediationCancellation: mockSubmitRemediationCancellation,
+}));
 jest.mock('../github/permissions', () => ({
   hasSecurityReviewPermissions: () => true,
   getReauthorizeUrl: jest.fn(),
@@ -46,8 +66,11 @@ jest.mock('../posthog-tracking', () => ({
   trackSecurityAgentConfigSaved: jest.fn(),
   trackSecurityAgentSync: mockTrackSecurityAgentSync,
   trackSecurityAgentFindingDismissed: jest.fn(),
+  trackSecurityAgentUiInteraction: mockTrackSecurityAgentUiInteraction,
+  trackSecurityAgentRemediationAction: mockTrackSecurityAgentRemediationAction,
 }));
 jest.mock('../services/audit-log-service', () => ({
+  createSecurityAuditLog: mockCreateSecurityAuditLog,
   logSecurityAudit: mockLogSecurityAudit,
   SecurityAuditLogAction: {
     ConfigEnabled: 'config_enabled',
@@ -59,8 +82,8 @@ jest.mock('../services/audit-log-service', () => ({
 }));
 jest.mock('../db/security-config', () => ({
   getSecurityAgentConfigWithStatus: mockGetSecurityAgentConfigWithStatus,
-  upsertSecurityAgentConfig: jest.fn(),
-  setSecurityAgentEnabled: jest.fn(),
+  upsertSecurityAgentConfig: mockUpsertSecurityAgentConfig,
+  setSecurityAgentEnabled: mockSetSecurityAgentEnabled,
 }));
 jest.mock('../db/security-findings', () => ({
   listSecurityFindings: jest.fn(),
@@ -123,6 +146,45 @@ function createHandlers() {
   });
 }
 
+function createPersonalHandlers() {
+  return createSecurityAgentHandlers({
+    resolveOwner: () => ({ type: 'user', id: 'user-123', userId: 'user-123' }),
+    resolveSecurityOwner: () => ({ userId: 'user-123' }),
+    resolveResourceId: () => 'user-123',
+    verifyFindingOwnership: () => true,
+    getIntegration: async () =>
+      ({
+        id: 'integration-123',
+        integration_status: 'active',
+        platform_installation_id: 'installation-123',
+        repositories: [],
+      }) as never,
+    trackingExtras: () => ({}),
+  });
+}
+
+function createOrganizationTrackingHandlers() {
+  return createSecurityAgentHandlers<{ organizationId: string }>({
+    resolveOwner: (ctx, input) => ({
+      type: 'org',
+      id: input.organizationId,
+      userId: ctx.user.id,
+    }),
+    resolveSecurityOwner: (_ctx, input) => ({ organizationId: input.organizationId }),
+    resolveResourceId: (_ctx, input) => input.organizationId,
+    verifyFindingOwnership: (finding, _ctx, input) =>
+      finding.owned_by_organization_id === input.organizationId,
+    getIntegration: async () =>
+      ({
+        id: 'integration-123',
+        integration_status: 'active',
+        platform_installation_id: 'installation-123',
+        repositories: [],
+      }) as never,
+    trackingExtras: (_ctx, input) => ({ organizationId: input.organizationId }),
+  });
+}
+
 const context = {
   user: {
     id: 'user-123',
@@ -130,6 +192,61 @@ const context = {
     google_user_name: 'Owner Example',
   },
 } as never;
+
+describe('trackUiInteraction', () => {
+  it('tracks an allowlisted interaction with authenticated personal identity', async () => {
+    await expect(
+      createPersonalHandlers().trackUiInteraction.handler({
+        ctx: context,
+        input: { interaction: 'finding_detail_opened' },
+      })
+    ).resolves.toEqual({ success: true });
+
+    expect(mockTrackSecurityAgentUiInteraction).toHaveBeenCalledWith({
+      distinctId: 'user-123',
+      userId: 'user-123',
+      organizationId: undefined,
+      interaction: 'finding_detail_opened',
+    });
+  });
+
+  it('uses trusted organization context from the router input', async () => {
+    await createOrganizationTrackingHandlers().trackUiInteraction.handler({
+      ctx: context,
+      input: {
+        organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        interaction: 'settings_automation_viewed',
+      },
+    });
+
+    expect(mockTrackSecurityAgentUiInteraction).toHaveBeenCalledWith({
+      distinctId: 'user-123',
+      userId: 'user-123',
+      organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      interaction: 'settings_automation_viewed',
+    });
+  });
+
+  it('rejects unsupported interaction values at the schema boundary', () => {
+    expect(
+      createPersonalHandlers().trackUiInteraction.inputSchema.safeParse({
+        interaction: 'finding_exported',
+      }).success
+    ).toBe(false);
+  });
+
+  it('does not write UI interactions to database or audit storage', async () => {
+    await createPersonalHandlers().trackUiInteraction.handler({
+      ctx: context,
+      input: { interaction: 'findings_filtered' },
+    });
+
+    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+    expect(mockCreateSecurityAuditLog).not.toHaveBeenCalled();
+    expect(mockLogSecurityAudit).not.toHaveBeenCalled();
+  });
+});
 
 describe('getConfig', () => {
   it('marks new owners without config as setup state', async () => {
@@ -318,5 +435,67 @@ describe('queue-backed handlers', () => {
         input: { findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
       })
     ).resolves.toEqual({ success: true, queued: true, commandId });
+  });
+});
+
+describe('remediation action tracking', () => {
+  const findingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const attemptId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+  it('tracks accepted start, retry, and cancel actions', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({ id: findingId });
+    mockSubmitManualRemediationStart.mockResolvedValue({
+      queued: true,
+      remediationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      attemptId,
+      attemptNumber: 1,
+    });
+    mockSubmitRemediationCancellation.mockResolvedValue({
+      success: true,
+      status: 'cancellation_requested',
+    });
+    const handlers = createHandlers();
+
+    await handlers.startRemediation.handler({ ctx: context, input: { findingId } });
+    await handlers.retryRemediation.handler({ ctx: context, input: { findingId } });
+    await handlers.cancelRemediation.handler({ ctx: context, input: { attemptId } });
+
+    expect(mockTrackSecurityAgentRemediationAction).toHaveBeenNthCalledWith(1, {
+      distinctId: 'user-123',
+      userId: 'user-123',
+      organizationId: undefined,
+      action: 'start',
+    });
+    expect(mockTrackSecurityAgentRemediationAction).toHaveBeenNthCalledWith(2, {
+      distinctId: 'user-123',
+      userId: 'user-123',
+      organizationId: undefined,
+      action: 'retry',
+    });
+    expect(mockTrackSecurityAgentRemediationAction).toHaveBeenNthCalledWith(3, {
+      distinctId: 'user-123',
+      userId: 'user-123',
+      organizationId: undefined,
+      action: 'cancel',
+    });
+  });
+
+  it('does not track remediation actions rejected by admission handlers', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({ id: findingId });
+    mockSubmitManualRemediationStart.mockRejectedValue(new Error('not admitted'));
+    mockSubmitRemediationCancellation.mockRejectedValue(new Error('not cancellable'));
+    const handlers = createHandlers();
+
+    await expect(
+      handlers.startRemediation.handler({ ctx: context, input: { findingId } })
+    ).rejects.toThrow('not admitted');
+    await expect(
+      handlers.retryRemediation.handler({ ctx: context, input: { findingId } })
+    ).rejects.toThrow('not admitted');
+    await expect(
+      handlers.cancelRemediation.handler({ ctx: context, input: { attemptId } })
+    ).rejects.toThrow('not cancellable');
+
+    expect(mockTrackSecurityAgentRemediationAction).not.toHaveBeenCalled();
   });
 });

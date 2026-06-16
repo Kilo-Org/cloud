@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -776,10 +777,25 @@ export function FindingDetailDialog({
     handleStartRemediation,
     handleRetryRemediation,
     handleCancelRemediation,
+    trackUiInteraction,
     startingAnalysisIds,
     startingRemediationIds,
     cancellingRemediationAttemptIds,
   } = useSecurityAgent();
+  const trackedOpenFindingIdRef = useRef<string | null>(null);
+  const findingId = finding?.id;
+
+  useEffect(() => {
+    if (!open || !findingId) {
+      trackedOpenFindingIdRef.current = null;
+      return;
+    }
+    if (trackedOpenFindingIdRef.current === findingId) return;
+
+    trackedOpenFindingIdRef.current = findingId;
+    trackUiInteraction('finding_detail_opened');
+  }, [findingId, open, trackUiInteraction]);
+
   const hasActiveAnalysisStartCommand = finding ? startingAnalysisIds.has(finding.id) : false;
   const isAwaitingRemediationStart = finding ? startingRemediationIds.has(finding.id) : false;
 
@@ -824,6 +840,20 @@ export function FindingDetailDialog({
   const analysisData = isOrg ? orgAnalysisQuery.data : personalAnalysisQuery.data;
 
   if (!finding) return null;
+
+  const handleTabChange = (tab: string) => {
+    switch (tab) {
+      case 'triage':
+        trackUiInteraction('finding_triage_viewed');
+        break;
+      case 'analysis':
+        trackUiInteraction('finding_analysis_viewed');
+        break;
+      case 'remediation':
+        trackUiInteraction('finding_remediation_viewed');
+        break;
+    }
+  };
 
   const analysisStatus = analysisData?.status ?? finding.analysis_status;
   const isAwaitingAnalysisAdmission = isAwaitingManualAnalysisAdmission(
@@ -1014,7 +1044,12 @@ export function FindingDetailDialog({
           showSla={showSla}
         />
 
-        <Tabs key={finding.id} defaultValue="details" className="min-w-0">
+        <Tabs
+          key={finding.id}
+          defaultValue="details"
+          className="min-w-0"
+          onValueChange={handleTabChange}
+        >
           <TabsList className="grid w-full grid-cols-4 sm:max-w-xl">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="triage" className="flex min-w-0 items-center gap-1.5">

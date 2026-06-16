@@ -24,6 +24,21 @@ export const AnalysisModeSchema = z.enum(['auto', 'shallow', 'deep']);
 export const AutoAnalysisMinSeveritySchema = z.enum(['critical', 'high', 'medium', 'all']);
 export const AutoRemediationMinSeveritySchema = z.enum(['critical', 'high', 'medium', 'all']);
 export const NotificationMinSeveritySchema = SecurityNotificationSeveritySchema;
+export const SecurityAgentUiInteractionSchema = z.enum([
+  'finding_detail_opened',
+  'finding_triage_viewed',
+  'finding_analysis_viewed',
+  'finding_remediation_viewed',
+  'findings_filtered',
+  'settings_config_viewed',
+  'settings_automation_viewed',
+  'settings_notifications_viewed',
+  'settings_sla_viewed',
+]);
+
+export const TrackSecurityAgentUiInteractionInputSchema = z.object({
+  interaction: SecurityAgentUiInteractionSchema,
+});
 
 export const SaveSecurityConfigInputSchema = z.object({
   slaCriticalDays: z.number().min(1).max(365).optional(),
@@ -186,6 +201,10 @@ export const GetDashboardStatsInputSchema = z.object({
   repoFullName: z.string().optional(),
 });
 
+export type SecurityAgentUiInteraction = z.infer<typeof SecurityAgentUiInteractionSchema>;
+export type TrackSecurityAgentUiInteractionInput = z.infer<
+  typeof TrackSecurityAgentUiInteractionInputSchema
+>;
 export type SaveSecurityConfigInput = z.infer<typeof SaveSecurityConfigInputSchema>;
 export type ListFindingsInput = z.infer<typeof ListFindingsInputSchema>;
 export type TriggerSyncInput = z.infer<typeof TriggerSyncInputSchema>;

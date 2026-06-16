@@ -1,6 +1,7 @@
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { resolveTemplate, generateReviewPrompt } from './generate-prompt';
 import type { PromptTemplate, ExistingReviewState } from './generate-prompt';
+import type { GitHubReviewThreadResolutionCandidate } from '../github-review-thread-resolution';
 import {
   REVIEW_INSTRUCTIONS_FILE,
   normalizeRepositoryReviewInstructions,
@@ -392,6 +393,15 @@ const existingReviewStateWithHistory: ExistingReviewState = {
   headCommitSha: 'currentsha123',
 };
 
+const githubResolutionCandidate = {
+  threadId: 'PRRT_thread_1',
+  path: 'src/foo.ts',
+  line: 10,
+  isOutdated: false,
+  body: '**WARNING:** Fixed issue body',
+  token: 'a'.repeat(64),
+} satisfies GitHubReviewThreadResolutionCandidate;
+
 describe('generateReviewPrompt (incremental review)', () => {
   it('uses incremental workflow when previousHeadSha and summary comment are provided', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
@@ -569,6 +579,58 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).not.toContain('## Previous Summary Preservation');
     expect(prompt).not.toContain(REVIEW_SUMMARY_HISTORY_START);
   });
+
+  it.each([
+    {
+      name: 'GitHub incremental review with candidates',
+      options: {
+        reviewId: 'review-123',
+        existingReviewState: existingReviewStateWithSummary,
+        previousHeadSha: 'abc123prev',
+        githubReviewThreadResolutionCandidates: [githubResolutionCandidate],
+      },
+      shouldIncludeProtocol: true,
+    },
+    {
+      name: 'GitHub full review with candidates',
+      options: {
+        reviewId: 'review-123',
+        existingReviewState: existingReviewStateWithSummary,
+        previousHeadSha: null,
+        githubReviewThreadResolutionCandidates: [githubResolutionCandidate],
+      },
+      shouldIncludeProtocol: false,
+    },
+    {
+      name: 'GitLab incremental review with candidates',
+      options: {
+        reviewId: 'review-456',
+        existingReviewState: existingReviewStateWithSummary,
+        platform: 'gitlab' as const,
+        gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+        previousHeadSha: 'abc123prev',
+        githubReviewThreadResolutionCandidates: [githubResolutionCandidate],
+      },
+      shouldIncludeProtocol: false,
+    },
+  ])(
+    '$name gates the GitHub thread-resolution protocol',
+    async ({ options, shouldIncludeProtocol }) => {
+      const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, options);
+
+      if (shouldIncludeProtocol) {
+        expect(prompt).toContain('## Addressed Review Thread Resolution Candidates');
+        expect(prompt).toContain('KILO_RESOLVED_GITHUB_REVIEW_THREADS=');
+        expect(prompt).toContain('git diff abc123prev..HEAD');
+        expect(prompt).toContain('PRRT_thread_1');
+        expect(prompt).toContain('a'.repeat(64));
+        expect(prompt).toContain('Fixed issue body');
+      } else {
+        expect(prompt).not.toContain('## Addressed Review Thread Resolution Candidates');
+        expect(prompt).not.toContain('KILO_RESOLVED_GITHUB_REVIEW_THREADS=');
+      }
+    }
+  );
 
   it('allows GitLab agents to fetch and pull latest changes in standard mode', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {

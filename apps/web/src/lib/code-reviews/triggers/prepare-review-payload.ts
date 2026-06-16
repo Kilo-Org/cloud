@@ -52,6 +52,7 @@ import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { logExceptInTest, errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import type { CodeReviewPlatform } from '../core/schemas';
 import {
   normalizeRepositoryReviewInstructions,
@@ -60,6 +61,10 @@ import {
 import { getCurrentReviewSummaryForContext } from '../summary/history';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
+import {
+  fetchGitHubReviewThreadResolutionCandidates,
+  type GitHubReviewThreadResolutionCandidate,
+} from '../github-review-thread-resolution';
 
 export type PreparePayloadParams = {
   reviewId: string;
@@ -165,6 +170,12 @@ export async function prepareReviewPayload(
     let gitlabContext: GitLabDiffContext | undefined;
     let repositoryReviewInstructionsLookup = unusedRepositoryReviewInstructionsLookup();
     let repositorySize: string | null = null;
+    let githubReviewThreadResolutionContext: {
+      token: string;
+      appType: GitHubAppType;
+      repoOwner: string;
+      repoName: string;
+    } | null = null;
 
     if (review.platform_integration_id) {
       const integration = await getIntegrationById(review.platform_integration_id);
@@ -181,6 +192,14 @@ export async function prepareReviewPayload(
         const installationToken = tokenData.token;
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
+        if (repoOwner && repoName) {
+          githubReviewThreadResolutionContext = {
+            token: installationToken,
+            appType,
+            repoOwner,
+            repoName,
+          };
+        }
 
         try {
           repositorySize = await fetchGitHubRepositorySize({
@@ -476,6 +495,41 @@ export async function prepareReviewPayload(
       );
     }
 
+    let githubReviewThreadResolutionCandidates: GitHubReviewThreadResolutionCandidate[] = [];
+    const currentHeadSha = existingReviewState?.headCommitSha ?? review.head_sha;
+    if (
+      platform === PLATFORM.GITHUB &&
+      githubReviewThreadResolutionContext &&
+      githubReviewThreadResolutionContext.appType === 'standard' &&
+      previousHeadSha &&
+      existingReviewState?.summaryComment &&
+      currentHeadSha === review.head_sha &&
+      CALLBACK_TOKEN_SECRET
+    ) {
+      try {
+        githubReviewThreadResolutionCandidates = await fetchGitHubReviewThreadResolutionCandidates({
+          token: githubReviewThreadResolutionContext.token,
+          appType: githubReviewThreadResolutionContext.appType,
+          owner: githubReviewThreadResolutionContext.repoOwner,
+          repo: githubReviewThreadResolutionContext.repoName,
+          prNumber: review.pr_number,
+          reviewId,
+          expectedHeadSha: review.head_sha,
+          secret: CALLBACK_TOKEN_SECRET,
+        });
+      } catch (error) {
+        logExceptInTest(
+          '[prepareReviewPayload] Failed to fetch GitHub review-thread resolution candidates, continuing without them',
+          {
+            reviewId,
+            repoFullName: review.repo_full_name,
+            prNumber: review.pr_number,
+            error: getReviewInstructionsFetchErrorMetadata(error),
+          }
+        );
+      }
+    }
+
     await Promise.all([
       updatePreviousReviewSummary(reviewId, {
         body: existingReviewState?.summaryComment?.body ?? null,
@@ -503,6 +557,7 @@ export async function prepareReviewPayload(
         gitlabContext,
         previousHeadSha,
         repositoryReviewInstructions: repositoryReviewInstructionsLookup.content,
+        githubReviewThreadResolutionCandidates,
       }
     );
 

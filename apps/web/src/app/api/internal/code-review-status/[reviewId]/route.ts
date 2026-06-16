@@ -88,6 +88,7 @@ import {
   type CodeReviewActionRequiredReason,
 } from '@/lib/code-reviews/action-required';
 import type { Owner } from '@/lib/code-reviews/core';
+import { resolveAddressedGitHubReviewThreads } from '@/lib/code-reviews/github-review-thread-resolution';
 
 /**
  * Payload from the orchestrator DO (legacy format).
@@ -114,6 +115,7 @@ type CloudAgentNextCallbackPayload = {
   terminalReason?: CodeReviewTerminalReason;
   modelNotFoundRuntimeDiagnostics?: unknown;
   failure?: unknown;
+  lastAssistantMessageText?: string;
   lastSeenBranch?: string;
   gateResult?: 'pass' | 'fail';
 };
@@ -984,6 +986,8 @@ export async function POST(
     const attemptId = callbackAttemptId || undefined;
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult, failure } =
       normalizePayload(rawPayload);
+    const lastAssistantMessageText =
+      'lastAssistantMessageText' in rawPayload ? rawPayload.lastAssistantMessageText : undefined;
     const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;
 
     // Validate payload
@@ -1328,6 +1332,56 @@ export async function POST(
             () => undefined
           )
         : undefined;
+
+    if (
+      status === 'completed' &&
+      integration &&
+      !isGitLab &&
+      integration.platform_installation_id &&
+      (integration.github_app_type || 'standard') === 'standard' &&
+      review.previous_summary_body &&
+      review.previous_summary_head_sha &&
+      CALLBACK_TOKEN_SECRET
+    ) {
+      try {
+        const [repoOwner, repoName] = review.repo_full_name.split('/');
+        if (repoOwner && repoName) {
+          const result = await resolveAddressedGitHubReviewThreads({
+            installationId: integration.platform_installation_id,
+            appType: 'standard',
+            owner: repoOwner,
+            repo: repoName,
+            prNumber: review.pr_number,
+            reviewId,
+            expectedHeadSha: review.head_sha,
+            secret: CALLBACK_TOKEN_SECRET,
+            assistantMessageText: lastAssistantMessageText,
+          });
+
+          if (result.resolvedCount > 0) {
+            logExceptInTest('[code-review-status] Resolved addressed GitHub review threads', {
+              reviewId,
+              repoFullName: review.repo_full_name,
+              prNumber: review.pr_number,
+              resolvedCount: result.resolvedCount,
+            });
+          }
+        }
+      } catch (threadResolutionError) {
+        logExceptInTest(
+          '[code-review-status] Failed to resolve addressed GitHub review threads:',
+          threadResolutionError
+        );
+        captureException(threadResolutionError, {
+          tags: { source: 'code-review-status-thread-resolution' },
+          extra: {
+            reviewId,
+            repoFullName: review.repo_full_name,
+            prNumber: review.pr_number,
+          },
+        });
+      }
+    }
 
     if (integration) {
       try {

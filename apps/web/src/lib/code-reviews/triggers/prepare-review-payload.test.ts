@@ -15,6 +15,7 @@ const mockFindPreviousCompletedReview = jest.fn();
 const mockUpdatePreviousReviewSummary = jest.fn();
 const mockUpdateRepositoryReviewInstructionsMetadata = jest.fn();
 const mockGenerateReviewPrompt = jest.fn();
+const mockFetchGitHubReviewThreadResolutionCandidates = jest.fn();
 
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import type * as CodeReviewsDb from '@/lib/code-reviews/db/code-reviews';
@@ -45,6 +46,11 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 
 jest.mock('@/lib/code-reviews/prompts/generate-prompt', () => ({
   generateReviewPrompt: (...args: unknown[]) => mockGenerateReviewPrompt(...args),
+}));
+
+jest.mock('@/lib/code-reviews/github-review-thread-resolution', () => ({
+  fetchGitHubReviewThreadResolutionCandidates: (...args: unknown[]) =>
+    mockFetchGitHubReviewThreadResolutionCandidates(...args),
 }));
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => {
@@ -177,6 +183,7 @@ describe('prepareReviewPayload', () => {
     mockFindPreviousCompletedReview.mockResolvedValue(null);
     mockUpdatePreviousReviewSummary.mockResolvedValue(undefined);
     mockUpdateRepositoryReviewInstructionsMetadata.mockResolvedValue(undefined);
+    mockFetchGitHubReviewThreadResolutionCandidates.mockResolvedValue([]);
     mockGenerateReviewPrompt.mockResolvedValue({
       prompt: 'generated prompt',
       version: 'test-version',
@@ -204,6 +211,7 @@ describe('prepareReviewPayload', () => {
     mockFindPreviousCompletedReview.mockReset();
     mockUpdatePreviousReviewSummary.mockReset();
     mockUpdateRepositoryReviewInstructionsMetadata.mockReset();
+    mockFetchGitHubReviewThreadResolutionCandidates.mockReset();
     mockGenerateReviewPrompt.mockReset();
   });
 

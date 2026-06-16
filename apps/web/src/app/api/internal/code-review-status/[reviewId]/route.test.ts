@@ -80,6 +80,8 @@ const mockBuildReviewSummaryFooter = jest.fn<any>();
 const mockRetryReviewFresh = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockResolveAddressedGitHubReviewThreads = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -162,6 +164,11 @@ jest.mock('@/lib/code-reviews/action-required', () => {
       mockDisableCodeReviewForActionRequiredFailure(...args),
   };
 });
+
+jest.mock('@/lib/code-reviews/github-review-thread-resolution', () => ({
+  resolveAddressedGitHubReviewThreads: (...args: unknown[]) =>
+    mockResolveAddressedGitHubReviewThreads(...args),
+}));
 
 jest.mock('@/lib/constants', () => ({
   APP_URL: 'https://test.kilo.ai',
@@ -401,6 +408,11 @@ beforeEach(async () => {
       footer.usage || footer.reviewGuidance?.used ? 'body with footer' : body
   );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
+  mockResolveAddressedGitHubReviewThreads.mockResolvedValue({
+    status: 'no-marker',
+    requestedCount: 0,
+    resolvedCount: 0,
+  });
   ({ POST } = await import('./route'));
 });
 

@@ -131,11 +131,14 @@ export enum CliSessionSharedState {
  */
 export enum SecurityAuditLogAction {
   FindingCreated = 'security.finding.created',
+  FindingSeverityChanged = 'security.finding.severity_changed',
   FindingStatusChange = 'security.finding.status_change',
   FindingDismissed = 'security.finding.dismissed',
   FindingAutoDismissed = 'security.finding.auto_dismissed',
+  FindingSuperseded = 'security.finding.superseded',
   FindingAnalysisStarted = 'security.finding.analysis_started',
   FindingAnalysisCompleted = 'security.finding.analysis_completed',
+  FindingAnalysisFailed = 'security.finding.analysis_failed',
   RemediationQueued = 'security.remediation.queued',
   RemediationStarted = 'security.remediation.started',
   RemediationPrOpened = 'security.remediation.pr_opened',
@@ -151,6 +154,15 @@ export enum SecurityAuditLogAction {
   SyncTriggered = 'security.sync.triggered',
   SyncCompleted = 'security.sync.completed',
   AuditLogExported = 'security.audit_log.exported',
+  AuditReportGenerated = 'security.audit_report.generated',
+}
+
+export enum SecurityFindingAuditSourceContext {
+  SecuritySync = 'security_sync',
+  Web = 'web',
+  AnalysisWorker = 'analysis_worker',
+  RemediationCallback = 'remediation_callback',
+  RolloutBaseline = 'rollout_baseline',
 }
 
 // --- KiloClaw enums ---
@@ -1138,6 +1150,7 @@ export type SandboxSuggestedAction =
 
 export type SecurityFindingSandboxAnalysis = {
   isExploitable: boolean | 'unknown';
+  extractionStatus?: 'succeeded' | 'failed';
   exploitabilityReasoning: string;
   usageLocations: string[];
   suggestedFix: string;

@@ -35,6 +35,13 @@ import {
   getRemediationAttemptHistory,
 } from '@/lib/security-agent/db/security-remediation';
 import {
+  SecurityAgentAuditReportInputSchema,
+  SecurityAgentAuditReportQueryError,
+  getSecurityAgentAuditReport,
+  type SecurityAgentAuditReportInput,
+  type SecurityAgentAuditReportOwner,
+} from '@/lib/security-agent/db/security-audit-report';
+import {
   hasSecurityReviewPermissions,
   getReauthorizeUrl,
 } from '@/lib/security-agent/github/permissions';
@@ -51,7 +58,9 @@ import {
   countEligibleForAutoDismiss,
 } from '@/lib/security-agent/services/auto-dismiss-service';
 import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
-import type { SecurityFinding } from '@kilocode/db/schema';
+import { organizations, type SecurityFinding } from '@kilocode/db/schema';
+import { db } from '@/lib/drizzle';
+import { eq } from 'drizzle-orm';
 import {
   SaveSecurityConfigInputSchema,
   ListFindingsInputSchema,
@@ -95,6 +104,7 @@ import {
   trackSecurityAgentFindingDismissed,
 } from '@/lib/security-agent/posthog-tracking';
 import {
+  createSecurityAuditLog,
   logSecurityAudit,
   SecurityAuditLogAction,
 } from '@/lib/security-agent/services/audit-log-service';
@@ -134,6 +144,99 @@ function getRepoFullNamesInScope(
     .filter(repo => selectedIds.has(repo.id))
     .map(repo => repo.full_name)
     .filter((name): name is string => !!name);
+}
+
+async function resolveAuditReportOwner(
+  ctx: TRPCContext,
+  owner: Owner
+): Promise<SecurityAgentAuditReportOwner> {
+  if (owner.type === 'user') {
+    return {
+      type: 'user',
+      id: ctx.user.id,
+      displayName: ctx.user.google_user_name || ctx.user.google_user_email || 'Personal owner',
+    };
+  }
+
+  const [organization] = await db
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, owner.id))
+    .limit(1);
+
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+
+  return {
+    type: 'organization',
+    id: owner.id,
+    displayName: organization.name,
+  };
+}
+
+async function logPlatformAdminAuditReportAccess(params: {
+  ctx: TRPCContext;
+  owner: SecurityAgentAuditReportOwner;
+  periodStart: string;
+  periodEndExclusive: string;
+}): Promise<void> {
+  if (!params.ctx.user.is_admin) return;
+
+  const securityOwner =
+    params.owner.type === 'organization'
+      ? { organizationId: params.owner.id }
+      : { userId: params.owner.id };
+
+  await createSecurityAuditLog({
+    owner: securityOwner,
+    actor_id: params.ctx.user.id,
+    actor_email: params.ctx.user.google_user_email,
+    actor_name: params.ctx.user.google_user_name,
+    action: SecurityAuditLogAction.AuditReportGenerated,
+    resource_type: 'security_agent_audit_report',
+    resource_id: `${params.owner.type}:${params.owner.id}`,
+    metadata: {
+      owner_type: params.owner.type,
+      period_start: params.periodStart,
+      period_end_exclusive: params.periodEndExclusive,
+      report_version: 1,
+    },
+  });
+}
+
+async function assembleAuditReportResponse<TExtra>(params: {
+  ctx: TRPCContext;
+  input: SecurityAgentAuditReportInput & TExtra;
+  deps: SecurityAgentDeps<TExtra>;
+}): Promise<
+  | { status: 'ok'; report: Awaited<ReturnType<typeof getSecurityAgentAuditReport>> }
+  | { status: 'query_failed'; message: 'Report query did not finish' }
+> {
+  const owner = await resolveAuditReportOwner(
+    params.ctx,
+    params.deps.resolveOwner(params.ctx, params.input)
+  );
+
+  try {
+    const report = await getSecurityAgentAuditReport({
+      owner,
+      input: params.input,
+      isRequestingUserKiloAdmin: params.ctx.user.is_admin,
+    });
+    await logPlatformAdminAuditReportAccess({
+      ctx: params.ctx,
+      owner,
+      periodStart: report.period.start,
+      periodEndExclusive: report.period.endExclusive,
+    });
+    return { status: 'ok', report };
+  } catch (error) {
+    if (error instanceof SecurityAgentAuditReportQueryError) {
+      return { status: 'query_failed', message: 'Report query did not finish' };
+    }
+    throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +298,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       if (!result) {
         return {
+          hasConfig: false,
           isEnabled: false,
           slaCriticalDays: 15,
           slaHighDays: 30,
@@ -245,6 +349,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
       return {
+        hasConfig: true,
         isEnabled: result.isEnabled,
         slaCriticalDays: result.config.sla_critical_days,
         slaHighDays: result.config.sla_high_days,
@@ -1391,17 +1496,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const result = await deleteFindingsByRepositoryDb({
           owner: securityOwner,
           repoFullName: input.repoFullName,
-        });
-
-        logSecurityAudit({
-          owner: securityOwner,
-          actor_id: ctx.user.id,
-          actor_email: ctx.user.google_user_email,
-          actor_name: ctx.user.google_user_name,
-          action: SecurityAuditLogAction.FindingDeleted,
-          resource_type: 'security_finding',
-          resource_id: input.repoFullName,
-          metadata: { repoFullName: input.repoFullName, deletedCount: result.deletedCount },
+          actor: {
+            id: ctx.user.id,
+            email: ctx.user.google_user_email,
+            name: ctx.user.google_user_name,
+          },
         });
 
         return {
@@ -1431,22 +1530,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     autoDismissEligible: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
-      const result = await autoDismissEligibleFindings(securityOwner, ctx.user.id);
-
-      logSecurityAudit({
-        owner: securityOwner,
-        actor_id: ctx.user.id,
-        actor_email: ctx.user.google_user_email,
-        actor_name: ctx.user.google_user_name,
-        action: SecurityAuditLogAction.FindingAutoDismissed,
-        resource_type: 'security_finding',
-        resource_id: 'bulk',
-        metadata: {
-          source: 'bulk',
-          dismissed: result.dismissed,
-          skipped: result.skipped,
-          errors: result.errors,
-        },
+      const result = await autoDismissEligibleFindings(securityOwner, {
+        id: ctx.user.id,
+        email: ctx.user.google_user_email,
+        name: ctx.user.google_user_name,
       });
 
       return {
@@ -1457,7 +1544,27 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     },
 
     // -----------------------------------------------------------------------
-    // 18. getDashboardStats
+    // 18. getAuditReport
+    // -----------------------------------------------------------------------
+    getAuditReport: {
+      inputSchema: SecurityAgentAuditReportInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: SecurityAgentAuditReportInput & TExtra;
+      }) => {
+        return assembleAuditReportResponse({
+          ctx,
+          input: rawInput,
+          deps,
+        });
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 19. getDashboardStats
     // -----------------------------------------------------------------------
     getDashboardStats: {
       inputSchema: GetDashboardStatsInputSchema,

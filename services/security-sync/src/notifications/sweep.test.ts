@@ -44,6 +44,55 @@ function createStagedRecoveryDb(
         }),
       }),
     }),
+    transaction: async <T>(callback: (tx: unknown) => Promise<T>) => {
+      const tx = {
+        execute: async () => {
+          operations.push('canonicalize');
+          return {
+            rows: [
+              {
+                findingId: '11111111-1111-4111-8111-111111111111',
+                previousStatus: 'open',
+                previousSeverity: 'high',
+                effectiveStatus: 'ignored',
+                effectiveSeverity: 'high',
+                findingCreatedAt: '2026-06-01T10:00:00.000Z',
+                ownedByUserId: 'user-1',
+                ownedByOrganizationId: null,
+                source: 'dependabot',
+                sourceId: '42',
+                repoFullName: 'acme/api',
+                title: 'Prototype Pollution in lodash',
+                packageName: 'lodash',
+                packageEcosystem: 'npm',
+                manifestPath: 'package.json',
+                patchedVersion: '4.17.21',
+                ghsaId: 'GHSA-xxxx-yyyy-zzzz',
+                cveId: null,
+                cweIds: null,
+                cvssScore: null,
+                dependabotHtmlUrl: null,
+                firstDetectedAt: '2026-06-01T10:00:00.000Z',
+                fixedAt: null,
+                slaDueAt: '2026-06-08T10:00:00.000Z',
+                canonicalFindingId: '22222222-2222-4222-8222-222222222222',
+              },
+            ],
+          };
+        },
+        insert: () => ({
+          values: (values: Record<string, unknown>) => {
+            operations.push(`insert-audit:${String(values.action)}`);
+            return {
+              onConflictDoNothing: () => ({
+                returning: async () => [{ id: 'audit-1' }],
+              }),
+            };
+          },
+        }),
+      };
+      return callback(tx);
+    },
     select: () => {
       selectCount++;
       if (selectCount === 1) {
@@ -78,7 +127,7 @@ function createStagedRecoveryDb(
               return [
                 {
                   notificationId: 'notification-1',
-                  findingId: 'finding-1',
+                  findingId: '11111111-1111-4111-8111-111111111111',
                   recipientUserId: 'user-1',
                   kind: 'new_finding',
                   status: 'staged',
@@ -100,7 +149,7 @@ function createStagedRecoveryDb(
     },
     execute: async () => {
       executeCount++;
-      operations.push(executeCount === 1 ? 'canonicalize' : 'load-backlog-observability');
+      operations.push(`load-backlog-observability:${executeCount}`);
       return { rows: [] };
     },
   };
@@ -170,7 +219,12 @@ describe('runSecurityNotificationSweep', () => {
     });
 
     expect(result).toMatchObject({ stagedRecovered: 0, cancelled: 1 });
-    expect(operations.slice(0, 3)).toEqual(['recover-stuck-claims', 'canonicalize', 'update']);
+    expect(operations.slice(0, 4)).toEqual([
+      'recover-stuck-claims',
+      'canonicalize',
+      'insert-audit:security.finding.superseded',
+      'update',
+    ]);
   });
 
   it('canonicalizes owner-scoped duplicate findings before publishing staged notifications', async () => {
@@ -185,9 +239,10 @@ describe('runSecurityNotificationSweep', () => {
     });
 
     expect(result).toMatchObject({ stagedRecovered: 1, cancelled: 0 });
-    expect(operations.slice(0, 3)).toEqual([
+    expect(operations.slice(0, 4)).toEqual([
       'recover-stuck-claims',
       'canonicalize',
+      'insert-audit:security.finding.superseded',
       'publish-staged',
     ]);
   });

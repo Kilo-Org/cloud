@@ -115,6 +115,7 @@ export type SecurityFindingTriage = {
 
 export type SecurityFindingSandboxAnalysis = {
   isExploitable: boolean | 'unknown';
+  extractionStatus?: 'succeeded' | 'failed';
   exploitabilityReasoning: string;
   usageLocations: string[];
   suggestedFix: string;

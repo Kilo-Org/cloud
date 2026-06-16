@@ -120,6 +120,7 @@ export const SandboxSuggestedActionSchema = z.enum([
 
 export const SecurityFindingSandboxAnalysisSchema = z.object({
   isExploitable: z.union([z.boolean(), z.literal('unknown')]),
+  extractionStatus: z.enum(['succeeded', 'failed']).optional(),
   exploitabilityReasoning: z.string(),
   usageLocations: z.array(z.string()),
   suggestedFix: z.string(),

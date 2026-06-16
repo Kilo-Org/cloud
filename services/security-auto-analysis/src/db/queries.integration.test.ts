@@ -50,6 +50,36 @@ describe('security analysis durable database invariants', () => {
     await client.pool.end();
   });
 
+  it('loads complete finding evidence for audit snapshots', async () => {
+    const findingId = await insertFinding('audit-snapshot-evidence');
+    await client.db
+      .update(security_findings)
+      .set({
+        cwe_ids: ['CWE-1321'],
+        cvss_score: '9.8',
+        dependabot_html_url:
+          'https://github.com/kilo/audit-snapshot-evidence/security/dependabot/42',
+        first_detected_at: '2026-03-04T12:00:00.000Z',
+        fixed_at: null,
+        sla_due_at: '2026-03-19T12:00:00.000Z',
+      })
+      .where(eq(security_findings.id, findingId));
+
+    const finding = await getSecurityFindingById(client.db as never, findingId);
+    expect(finding).toMatchObject({
+      cwe_ids: ['CWE-1321'],
+      cvss_score: '9.8',
+      dependabot_html_url: 'https://github.com/kilo/audit-snapshot-evidence/security/dependabot/42',
+      fixed_at: null,
+    });
+    expect(finding?.first_detected_at && new Date(finding.first_detected_at).toISOString()).toBe(
+      '2026-03-04T12:00:00.000Z'
+    );
+    expect(finding?.sla_due_at && new Date(finding.sla_due_at).toISOString()).toBe(
+      '2026-03-19T12:00:00.000Z'
+    );
+  });
+
   it('enforces one manual queue row per finding against Postgres constraints', async () => {
     const findingId = await insertFinding('manual-unique');
     const finding = await getSecurityFindingById(client.db as never, findingId);

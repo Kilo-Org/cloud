@@ -112,3 +112,27 @@ export type {
   CloudAgentQueueReport,
   CloudAgentRunStateReport,
 } from './cloud-agent-queue-report.js';
+
+export {
+  REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
+  SECURITY_FINDING_AUDIT_EVENT_KEY_PREFIX,
+  SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+  SecurityFindingAuditEventSchema,
+  SecurityFindingAuditOwnerSchema,
+  SecurityFindingAuditSnapshotSchema,
+  buildSecurityFindingAuditLogValues,
+  buildSecurityFindingAuditSnapshot,
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+} from './security-finding-audit.js';
+export type {
+  NewSecurityFindingAuditLogValues,
+  SecurityFindingAuditEventFinding,
+  SecurityFindingAuditEventInput,
+  SecurityFindingAuditLogEntry,
+  SecurityFindingAuditOwner,
+  SecurityFindingAuditSnapshot,
+  SecurityFindingAuditSnapshotExtras,
+  SecurityFindingAuditSnapshotSource,
+  SecurityFindingAuditWriterDb,
+} from './security-finding-audit.js';

@@ -27,6 +27,8 @@ export type ClaimedQueueRow = {
 
 export type ActorUser = {
   id: string;
+  email?: string;
+  name?: string;
   api_token_pepper: string | null;
 };
 
@@ -449,7 +451,12 @@ export async function getAnalysisActorById(
   userId: string
 ): Promise<ActorUser | null> {
   const rows = await db
-    .select({ id: kilocode_users.id, api_token_pepper: kilocode_users.api_token_pepper })
+    .select({
+      id: kilocode_users.id,
+      email: kilocode_users.google_user_email,
+      name: kilocode_users.google_user_name,
+      api_token_pepper: kilocode_users.api_token_pepper,
+    })
     .from(kilocode_users)
     .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.blocked_reason)))
     .limit(1);
@@ -464,6 +471,8 @@ export async function resolveAutoAnalysisActor(
     const rows = await db
       .select({
         id: kilocode_users.id,
+        email: kilocode_users.google_user_email,
+        name: kilocode_users.google_user_name,
         api_token_pepper: kilocode_users.api_token_pepper,
       })
       .from(kilocode_users)
@@ -582,11 +591,17 @@ export async function getSecurityFindingById(db: WorkerDb, findingId: string) {
       dependency_scope: security_findings.dependency_scope,
       cve_id: security_findings.cve_id,
       ghsa_id: security_findings.ghsa_id,
+      cwe_ids: security_findings.cwe_ids,
+      cvss_score: security_findings.cvss_score,
+      dependabot_html_url: security_findings.dependabot_html_url,
       title: security_findings.title,
       description: security_findings.description,
       vulnerable_version_range: security_findings.vulnerable_version_range,
       patched_version: security_findings.patched_version,
       manifest_path: security_findings.manifest_path,
+      first_detected_at: security_findings.first_detected_at,
+      fixed_at: security_findings.fixed_at,
+      sla_due_at: security_findings.sla_due_at,
       raw_data: security_findings.raw_data,
       analysis_status: security_findings.analysis_status,
       analysis: security_findings.analysis,

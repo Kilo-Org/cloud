@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import {
   AlertTriangle,
   ExternalLink,
+  FileClock,
   RefreshCw,
   LayoutDashboard,
   ListChecks,
@@ -34,17 +35,26 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
     hasIntegration,
     hasPermission,
     isLoadingPermission,
+    isLoadingConfig,
     isEnabled,
+    hasConfig,
     reauthorizeUrl,
   } = useSecurityAgent();
 
   const basePath = isOrg ? `/organizations/${organizationId}/security-agent` : '/security-agent';
+  const showSetupOnly =
+    (!isLoadingPermission && !hasIntegration) || (!isLoadingConfig && !hasConfig);
 
-  const navItems = [
-    { label: 'Dashboard', href: basePath, icon: LayoutDashboard },
-    ...(isEnabled ? [{ label: 'Findings', href: `${basePath}/findings`, icon: ListChecks }] : []),
-    { label: 'Settings', href: `${basePath}/config`, icon: Settings2 },
-  ];
+  const navItems = showSetupOnly
+    ? [{ label: 'Settings', href: `${basePath}/config`, icon: Settings2 }]
+    : [
+        { label: 'Dashboard', href: basePath, icon: LayoutDashboard },
+        ...(isEnabled
+          ? [{ label: 'Findings', href: `${basePath}/findings`, icon: ListChecks }]
+          : []),
+        { label: 'Audit report', href: `${basePath}/audit-report`, icon: FileClock },
+        { label: 'Settings', href: `${basePath}/config`, icon: Settings2 },
+      ];
 
   // Refresh installation mutation (only used in layout for permission alert)
   const { mutate: refreshMutate, isPending: isRefreshing } = useMutation(
@@ -121,34 +131,31 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
         </a>
       </div>
 
-      {/* Sub-navigation — hidden when GitHub is not installed */}
-      {hasIntegration && (
-        <nav
-          className="border-border flex gap-1 overflow-x-auto border-b"
-          aria-label="Security Agent"
-        >
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'focus-visible:ring-ring flex shrink-0 items-center gap-2 rounded-t-md border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
-                  active
-                    ? 'border-brand-primary text-foreground'
-                    : 'text-muted-foreground hover:text-foreground border-transparent hover:border-border'
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      )}
+      <nav
+        className="border-border flex gap-1 overflow-x-auto border-b"
+        aria-label="Security Agent"
+      >
+        {navItems.map(item => {
+          const Icon = item.icon;
+          const active = isActive(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'focus-visible:ring-ring flex shrink-0 items-center gap-2 rounded-t-md border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
+                active
+                  ? 'border-brand-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground border-transparent hover:border-border'
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
 
       {/* Additional Permissions Required Alert */}
       {showPermissionRequired && (

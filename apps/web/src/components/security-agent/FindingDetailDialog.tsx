@@ -33,8 +33,10 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSecurityAgent } from './SecurityAgentContext';
-import { securityAgentCommandAdmissionCopy } from './security-agent-command-copy';
-import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
+import {
+  isAwaitingManualAnalysisAdmission,
+  manualAnalysisAdmissionCopy,
+} from './manual-analysis-admission-copy';
 import type { SecurityFindingWithRemediation } from './SecurityFindingRow';
 import { getRemediationUnavailableCopy } from './remediation-unavailable-copy';
 
@@ -286,7 +288,7 @@ type AnalysisPanelProps = {
   analysis: FindingAnalysis;
   analysisStatus: string | null;
   analysisError: string | null;
-  isAwaitingAnalysisStart: boolean;
+  isAwaitingAnalysisAdmission: boolean;
   isAnalyzing: boolean;
   onStartAnalysis: StartAnalysis;
 };
@@ -295,7 +297,7 @@ function FindingTriage({
   analysis,
   analysisStatus,
   analysisError,
-  isAwaitingAnalysisStart,
+  isAwaitingAnalysisAdmission,
   isAnalyzing,
   onStartAnalysis,
 }: AnalysisPanelProps) {
@@ -338,16 +340,18 @@ function FindingTriage({
   }
 
   const isLoading =
-    isAwaitingAnalysisStart || analysisStatus === 'running' || analysisStatus === 'pending';
+    isAwaitingAnalysisAdmission || analysisStatus === 'running' || analysisStatus === 'pending';
 
   return (
     <TabsContent value="triage" className="space-y-4 pt-2">
       {isLoading ? (
         <LoadingPanel
           message={
-            isAwaitingAnalysisStart || analysisStatus === 'pending'
-              ? `${securityAgentCommandAdmissionCopy.start_analysis.pendingLabel}…`
-              : 'Triage in progress…'
+            isAwaitingAnalysisAdmission
+              ? `${manualAnalysisAdmissionCopy.pendingLabel}…`
+              : analysisStatus === 'pending'
+                ? `${manualAnalysisAdmissionCopy.successTitle}…`
+                : 'Triage in progress…'
           }
         />
       ) : analysisStatus === 'failed' ? (
@@ -390,7 +394,7 @@ function FindingAnalysis({
   analysis,
   analysisStatus,
   analysisError,
-  isAwaitingAnalysisStart,
+  isAwaitingAnalysisAdmission,
   isAnalyzing,
   onStartAnalysis,
   cliSessionId,
@@ -463,16 +467,18 @@ function FindingAnalysis({
   } else if (analysisStatus === 'completed' && analysis?.rawMarkdown) {
     content = <MarkdownProse markdown={analysis.rawMarkdown} className="text-muted-foreground" />;
   } else if (
-    isAwaitingAnalysisStart ||
+    isAwaitingAnalysisAdmission ||
     analysisStatus === 'running' ||
     analysisStatus === 'pending'
   ) {
     content = (
       <LoadingPanel
         message={
-          isAwaitingAnalysisStart || analysisStatus === 'pending'
-            ? `${securityAgentCommandAdmissionCopy.start_analysis.pendingLabel}…`
-            : 'Codebase analysis in progress…'
+          isAwaitingAnalysisAdmission
+            ? `${manualAnalysisAdmissionCopy.pendingLabel}…`
+            : analysisStatus === 'pending'
+              ? `${manualAnalysisAdmissionCopy.successTitle}…`
+              : 'Codebase analysis in progress…'
         }
         detail="This usually takes 1–2 minutes. The agent is searching your codebase."
       >
@@ -774,7 +780,7 @@ export function FindingDetailDialog({
     startingRemediationIds,
     cancellingRemediationAttemptIds,
   } = useSecurityAgent();
-  const isAwaitingAnalysisStart = finding ? startingAnalysisIds.has(finding.id) : false;
+  const hasActiveAnalysisStartCommand = finding ? startingAnalysisIds.has(finding.id) : false;
   const isAwaitingRemediationStart = finding ? startingRemediationIds.has(finding.id) : false;
 
   const pollWhileActive = (query: {
@@ -790,7 +796,7 @@ export function FindingDetailDialog({
       isActiveRemediationStatus(attempt.status)
     );
     if (
-      isAwaitingAnalysisStart ||
+      hasActiveAnalysisStartCommand ||
       isAwaitingRemediationStart ||
       status === 'pending' ||
       status === 'running' ||
@@ -820,6 +826,10 @@ export function FindingDetailDialog({
   if (!finding) return null;
 
   const analysisStatus = analysisData?.status ?? finding.analysis_status;
+  const isAwaitingAnalysisAdmission = isAwaitingManualAnalysisAdmission(
+    hasActiveAnalysisStartCommand,
+    analysisStatus
+  );
   const analysis = analysisData?.analysis ?? finding.analysis;
   const analysisError = analysisData?.error ?? finding.analysis_error;
   const cliSessionId = analysisData?.cliSessionId ?? finding.cli_session_id;
@@ -889,16 +899,18 @@ export function FindingDetailDialog({
         latestHistoryAttempt?.failureCode ?? remediationSummary?.failureCode
       );
   const isAnalyzing =
-    isAwaitingAnalysisStart || analysisStatus === 'pending' || analysisStatus === 'running';
-  const remediationAnalysisRefreshLabel =
-    isAwaitingAnalysisStart || analysisStatus === 'pending'
-      ? manualAnalysisAdmissionCopy.pendingLabel
+    isAwaitingAnalysisAdmission || analysisStatus === 'pending' || analysisStatus === 'running';
+  const remediationAnalysisRefreshLabel = isAwaitingAnalysisAdmission
+    ? manualAnalysisAdmissionCopy.pendingLabel
+    : analysisStatus === 'pending'
+      ? manualAnalysisAdmissionCopy.successTitle
       : analysisStatus === 'running'
         ? 'Analysis running'
         : 'Rerun analysis';
-  const codebaseAnalysisActionLabel =
-    isAwaitingAnalysisStart || analysisStatus === 'pending'
-      ? manualAnalysisAdmissionCopy.pendingLabel
+  const codebaseAnalysisActionLabel = isAwaitingAnalysisAdmission
+    ? manualAnalysisAdmissionCopy.pendingLabel
+    : analysisStatus === 'pending'
+      ? manualAnalysisAdmissionCopy.successTitle
       : analysisStatus === 'running'
         ? 'Analysis running'
         : 'Run codebase analysis';
@@ -987,7 +999,7 @@ export function FindingDetailDialog({
     analysis,
     analysisStatus,
     analysisError,
-    isAwaitingAnalysisStart,
+    isAwaitingAnalysisAdmission,
     isAnalyzing,
     onStartAnalysis: handleStartAnalysis,
   } satisfies AnalysisPanelProps;

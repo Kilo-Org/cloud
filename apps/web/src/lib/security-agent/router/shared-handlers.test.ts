@@ -20,6 +20,13 @@ const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
 const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
 const mockTrackSecurityAgentSync = jest.fn();
 const mockLogSecurityAudit = jest.fn();
+const mockAutoDismissEligibleFindings =
+  jest.fn<
+    (
+      owner: unknown,
+      actor: unknown
+    ) => Promise<{ dismissed: number; skipped: number; errors: number }>
+  >();
 
 jest.mock('../services/manual-sync-client', () => ({
   submitManualSecuritySync: mockSubmitManualSecuritySync,
@@ -73,7 +80,7 @@ jest.mock('../db/security-analysis', () => ({
   enqueueBacklogFindings: mockEnqueueBacklogFindings,
 }));
 jest.mock('../services/auto-dismiss-service', () => ({
-  autoDismissEligibleFindings: jest.fn(),
+  autoDismissEligibleFindings: mockAutoDismissEligibleFindings,
   countEligibleForAutoDismiss: jest.fn(),
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
@@ -123,6 +130,56 @@ const context = {
     google_user_name: 'Owner Example',
   },
 } as never;
+
+describe('getConfig', () => {
+  it('marks new owners without config as setup state', async () => {
+    await expect(createHandlers().getConfig({ ctx: context, input: {} })).resolves.toMatchObject({
+      hasConfig: false,
+      isEnabled: false,
+    });
+  });
+
+  it('marks existing disabled config as configured', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: false,
+      storedConfig: {},
+      config: {
+        sla_critical_days: 15,
+        sla_high_days: 30,
+        sla_medium_days: 45,
+        sla_low_days: 90,
+        sla_enabled: true,
+        auto_sync_enabled: true,
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [],
+        model_slug: 'analysis-model',
+        triage_model_slug: 'triage-model',
+        analysis_model_slug: 'analysis-model',
+        analysis_mode: 'auto',
+        auto_dismiss_enabled: false,
+        auto_dismiss_confidence_threshold: 'high',
+        auto_analysis_enabled: false,
+        auto_analysis_min_severity: 'high',
+        auto_analysis_include_existing: false,
+        auto_remediation_enabled: false,
+        auto_remediation_min_severity: 'high',
+        auto_remediation_include_existing: false,
+        auto_remediation_enabled_at: null,
+        remediation_model_slug: 'remediation-model',
+        sla_notifications_enabled: false,
+        sla_notification_min_severity: 'high',
+        sla_notification_warning_days: 3,
+        new_finding_notifications_enabled: false,
+        new_finding_notification_min_severity: 'high',
+      },
+    });
+
+    await expect(createHandlers().getConfig({ ctx: context, input: {} })).resolves.toMatchObject({
+      hasConfig: true,
+      isEnabled: false,
+    });
+  });
+});
 
 describe('setEnabled', () => {
   it('returns initial sync command correlation after enable', async () => {
@@ -193,6 +250,26 @@ describe('saveConfig', () => {
       success: true,
       backlogAdmissionWarning: expect.stringContaining('Settings saved'),
     });
+  });
+});
+
+describe('autoDismissEligible', () => {
+  it('attributes per-finding bulk dismissal events without writing aggregate finding activity', async () => {
+    mockAutoDismissEligibleFindings.mockResolvedValue({ dismissed: 2, skipped: 1, errors: 0 });
+
+    await expect(
+      createHandlers().autoDismissEligible({ ctx: context, input: {} })
+    ).resolves.toEqual({ dismissed: 2, skipped: 1, errors: 0 });
+
+    expect(mockAutoDismissEligibleFindings).toHaveBeenCalledWith(
+      { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      {
+        id: 'user-123',
+        email: 'owner@example.com',
+        name: 'Owner Example',
+      }
+    );
+    expect(mockLogSecurityAudit).not.toHaveBeenCalled();
   });
 });
 

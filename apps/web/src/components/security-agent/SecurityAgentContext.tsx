@@ -36,8 +36,10 @@ type SecurityAgentContextValue = {
   isLoadingConfig: boolean;
   reauthorizeUrl: string | undefined;
   isEnabled: boolean | undefined;
+  hasConfig: boolean;
   configData:
     | {
+        hasConfig: boolean;
         isEnabled: boolean;
         slaCriticalDays: number;
         slaHighDays: number;
@@ -187,7 +189,12 @@ export function mergeSecurityAgentActiveCommands(
     if (isActiveSecurityAgentCommand(command)) activeCommands.set(command.id, command);
   }
   for (const command of polledCommands) {
-    if (command && isActiveSecurityAgentCommand(command)) activeCommands.set(command.id, command);
+    if (!command) continue;
+    if (isActiveSecurityAgentCommand(command)) {
+      activeCommands.set(command.id, command);
+    } else {
+      activeCommands.delete(command.id);
+    }
   }
   return [...activeCommands.values()];
 }
@@ -1333,6 +1340,7 @@ function useSecurityAgentProviderValue(
   const hasPermission = permissionData?.hasPermissions ?? false;
   const reauthorizeUrl = permissionData?.reauthorizeUrl ?? undefined;
   const isEnabled = configData ? configData.isEnabled : undefined;
+  const hasConfig = configData?.hasConfig ?? false;
   const allRepositories = reposData ?? EMPTY_REPOSITORIES;
   const repositorySelectionMode = configData?.repositorySelectionMode ?? 'selected';
   const selectedRepositoryIds = configData?.selectedRepositoryIds ?? EMPTY_REPOSITORY_IDS;
@@ -1359,6 +1367,7 @@ function useSecurityAgentProviderValue(
       isLoadingConfig,
       reauthorizeUrl,
       isEnabled,
+      hasConfig,
       configData: configData
         ? {
             ...configData,
@@ -1413,6 +1422,7 @@ function useSecurityAgentProviderValue(
       isLoadingConfig,
       reauthorizeUrl,
       isEnabled,
+      hasConfig,
       configData,
       refetchConfig,
       allRepositories,

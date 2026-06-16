@@ -74,4 +74,7 @@ export const securityAgentRouter = createTRPCRouter({
     .mutation(handlers.deleteFindingsByRepository.handler),
   getAutoDismissEligible: baseProcedure.query(handlers.getAutoDismissEligible),
   autoDismissEligible: baseProcedure.mutation(handlers.autoDismissEligible),
+  getAuditReport: baseProcedure
+    .input(handlers.getAuditReport.inputSchema)
+    .query(handlers.getAuditReport.handler),
 });

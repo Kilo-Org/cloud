@@ -42,6 +42,21 @@ describe('SecurityAgentContext command helpers', () => {
     ]);
   });
 
+  it('removes recovered commands after polling observes a terminal state', () => {
+    const recovered = command({
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      commandType: 'start_analysis',
+      findingId: 'finding-id',
+      status: 'running',
+    });
+    const terminal = command({
+      ...recovered,
+      status: 'succeeded',
+    });
+
+    expect(mergeSecurityAgentActiveCommands([recovered], [terminal])).toEqual([]);
+  });
+
   it('derives active-action disabling and optimistic analysis ids', () => {
     const state = getSecurityAgentActiveCommandState(
       [

@@ -2,6 +2,7 @@ import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
+  organizationBillingProcedure,
   organizationBillingMutationProcedure,
   OrganizationIdInputSchema,
 } from './utils';
@@ -82,4 +83,7 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
     .mutation(handlers.deleteFindingsByRepository.handler),
   getAutoDismissEligible: organizationMemberProcedure.query(handlers.getAutoDismissEligible),
   autoDismissEligible: organizationBillingMutationProcedure.mutation(handlers.autoDismissEligible),
+  getAuditReport: organizationBillingProcedure
+    .input(OrganizationIdInputSchema.merge(handlers.getAuditReport.inputSchema))
+    .query(handlers.getAuditReport.handler),
 });

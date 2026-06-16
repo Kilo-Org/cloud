@@ -4,10 +4,9 @@ import { useState } from 'react';
 import { useSecurityAgent } from './SecurityAgentContext';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
-import { Shield, RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
 import { RepositoryFilter } from './RepositoryFilter';
 import { SlaComplianceHero } from './dashboard/SlaComplianceHero';
 import { SeverityBreakdown } from './dashboard/SeverityBreakdown';
@@ -16,6 +15,7 @@ import { AnalysisCoverage } from './dashboard/AnalysisCoverage';
 import { MeanTimeToResolution } from './dashboard/MeanTimeToResolution';
 import { OverdueFindingsTable } from './dashboard/OverdueFindingsTable';
 import { RepositoryHealthTable } from './dashboard/RepositoryHealthTable';
+import { SecurityAgentGitHubInstallCta } from './SecurityAgentGitHubInstallCta';
 
 const emptySla = {
   overall: { total: 0, withinSla: 0, overdue: 0 },
@@ -112,22 +112,7 @@ export function SecurityDashboard() {
     const installUrl = isOrg
       ? `/organizations/${organizationId}/integrations`
       : '/integrations/github';
-    return (
-      <div className="border-border flex flex-col items-center justify-center rounded-xl border border-dashed px-6 py-16 text-center">
-        <Shield className="text-muted-foreground mb-4 size-12 opacity-40" aria-hidden="true" />
-        <h3 className="text-lg font-medium">Connect GitHub to get started</h3>
-        <p className="text-muted-foreground mt-2 max-w-md text-center text-sm">
-          Install the Kilo GitHub App to automatically sync Dependabot alerts and manage security
-          findings across your repositories.
-        </p>
-        <Button
-          asChild
-          className="bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 mt-6"
-        >
-          <Link href={installUrl}>Install GitHub App</Link>
-        </Button>
-      </div>
-    );
+    return <SecurityAgentGitHubInstallCta installUrl={installUrl} />;
   }
 
   const sla = data?.sla ?? emptySla;

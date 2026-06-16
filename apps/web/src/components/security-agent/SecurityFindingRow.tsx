@@ -22,7 +22,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { cn } from '@/lib/utils';
 import { SeverityBadge } from './SeverityBadge';
-import { securityAgentCommandAdmissionCopy } from './security-agent-command-copy';
+import {
+  isAwaitingManualAnalysisAdmission,
+  manualAnalysisAdmissionCopy,
+} from './manual-analysis-admission-copy';
 
 type Outcome = {
   icon: typeof CheckCircle2;
@@ -56,7 +59,7 @@ function getOutcome(finding: SecurityFinding): Outcome | null {
   if (finding.analysis_status === 'pending' || finding.analysis_status === 'running') {
     return {
       icon: Loader2,
-      label: 'Analyzing',
+      label: finding.analysis_status === 'pending' ? 'Queued' : 'Analyzing',
       className: 'text-yellow-400',
       spin: true,
       tooltip: finding.analysis_status === 'pending' ? 'Analysis is queued' : 'Analysis is running',
@@ -230,6 +233,10 @@ export function SecurityFindingRow({
     (!finding.analysis_status || finding.analysis_status === 'failed') &&
     Boolean(onStartAnalysis) &&
     !isStartingAnalysis;
+  const isAwaitingAnalysisAdmission = isAwaitingManualAnalysisAdmission(
+    Boolean(isStartingAnalysis),
+    finding.analysis_status
+  );
   const outcome = getOutcome(finding);
   const remediation = finding.remediationSummary;
   const capability = finding.remediationCapability;
@@ -266,7 +273,7 @@ export function SecurityFindingRow({
       <button
         type="button"
         onClick={onClick}
-        className="focus-visible:ring-ring group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-md px-4 py-3 text-left focus-visible:ring-2 focus-visible:outline-none md:grid-cols-[72px_minmax(0,1fr)_140px_16px] md:gap-x-3"
+        className="focus-visible:ring-ring group grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-md px-4 py-3 text-left focus-visible:ring-2 focus-visible:outline-none md:grid-cols-[72px_minmax(0,1fr)_140px] md:gap-x-3"
         aria-label={`View ${finding.title}`}
       >
         <SeverityBadge severity={severity} size="sm" />
@@ -277,10 +284,6 @@ export function SecurityFindingRow({
             <span className="truncate">{finding.package_name}</span>
           </span>
         </span>
-        <ChevronRight
-          className="text-muted-foreground size-4 md:col-start-4 md:row-start-1"
-          aria-hidden="true"
-        />
         <span className="col-start-2 space-y-1 text-xs md:col-start-3 md:row-start-1">
           {outcome ? (
             <OutcomeLabel outcome={outcome} />
@@ -314,7 +317,7 @@ export function SecurityFindingRow({
         </span>
       </button>
 
-      <div className="flex items-center justify-end pr-4">
+      <div className="flex items-center justify-end gap-3 pr-4 md:w-44">
         {openRemediationPrUrl ? (
           <Button variant="outline" size="sm" asChild className="gap-1">
             <a
@@ -369,13 +372,13 @@ export function SecurityFindingRow({
             <Brain className="size-3" aria-hidden="true" />
             {finding.analysis_status === 'failed' ? 'Retry' : 'Analyze'}
           </Button>
-        ) : isStartingAnalysis ? (
+        ) : isAwaitingAnalysisAdmission ? (
           <Button variant="outline" size="sm" disabled className="gap-1">
             <Loader2
               className="size-3 animate-spin motion-reduce:animate-none"
               aria-hidden="true"
             />
-            {securityAgentCommandAdmissionCopy.start_analysis.pendingLabel}
+            {manualAnalysisAdmissionCopy.pendingLabel}
           </Button>
         ) : finding.analysis?.triage?.suggestedAction === 'manual_review' &&
           finding.status === 'open' ? (
@@ -389,6 +392,7 @@ export function SecurityFindingRow({
             View details
           </Button>
         ) : null}
+        <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
       </div>
     </article>
   );

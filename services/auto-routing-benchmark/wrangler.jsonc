@@ -32,7 +32,7 @@
       "class_name": "BenchRunnerContainer",
       "image": "./container/Dockerfile",
       "instance_type": "standard-2",
-      "max_instances": 40,
+      "max_instances": 50,
     },
   ],
   "durable_objects": {

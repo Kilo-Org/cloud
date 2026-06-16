@@ -1,6 +1,6 @@
 import { handleWebhook } from '@/lib/bot/webhook-handler';
 
-export const maxDuration = 800;
+export const maxDuration = 1800;
 
 type RouteContext = {
   params: Promise<{ platform: string }>;

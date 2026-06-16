@@ -12,19 +12,10 @@ import { domainIsRestrictedFromStytchFreeCredits } from './domainIsRestrictedFro
 import { grantCreditForCategory } from './promotionalCredits';
 import PostHogClient from '@/lib/posthog';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
-import { allow_fake_login } from '@/lib/constants';
 
 const NEXT_PUBLIC_STYTCH_PROJECT_ENV = getEnvVariable('NEXT_PUBLIC_STYTCH_PROJECT_ENV');
 const STYTCH_PROJECT_ID = getEnvVariable('STYTCH_PROJECT_ID');
 const STYTCH_PROJECT_SECRET = getEnvVariable('STYTCH_PROJECT_SECRET');
-
-// Local-dev only: when fake-login is enabled and no real Stytch project is
-// configured (the placeholder `test-fake-…` creds, or empty), the client-side
-// telemetry/fingerprint round-trip in <StytchClient> can never complete, so
-// `/account-verification` hangs forever on "Creating Your Account". Detect that
-// case so getStytchStatus can auto-pass validation. Gated on allow_fake_login,
-// which is false in production and on Vercel, so this never affects real envs.
-const STYTCH_NOT_CONFIGURED = !STYTCH_PROJECT_ID || STYTCH_PROJECT_ID.includes('fake');
 
 const client = new Client({
   project_id: STYTCH_PROJECT_ID,
@@ -38,19 +29,6 @@ export const getStytchStatus = async (
   headers: Headers
 ): Promise<boolean | null> => {
   if (user.has_validation_stytch !== null) return user.has_validation_stytch;
-
-  // Local-dev bypass: no real Stytch project, so auto-approve validation and
-  // persist it (mirrors the success path in saveFingerprints) instead of
-  // looping on the "Creating Your Account" spinner. See STYTCH_NOT_CONFIGURED.
-  if (allow_fake_login && STYTCH_NOT_CONFIGURED) {
-    if (process.env.NODE_ENV !== 'test')
-      console.log(
-        `SECURITY: Stytch not configured + fake-login enabled — auto-passing validation for ${user.google_user_email} (local dev only)`
-      );
-    await updateStytchValidation(user, { ...user, has_validation_stytch: true });
-    return true;
-  }
-
   if (!telemetryId) return null;
 
   const fingerprintData = await client.fraud.fingerprint

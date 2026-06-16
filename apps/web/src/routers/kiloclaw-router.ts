@@ -60,15 +60,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { and, asc, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
-import {
-  ImpactReferralProduct,
-  ImpactReferralRewardKind,
-  KiloClawPlan,
-  KiloClawProvider,
-  KiloClawSubscriptionStatus,
-  KiloClawSubscriptionChangeAction,
-  KiloClawSubscriptionChangeActorType,
-} from '@kilocode/db/schema-types';
+import { ImpactReferralProduct, ImpactReferralRewardKind } from '@kilocode/db/schema-types';
 import { alias } from 'drizzle-orm/pg-core';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
@@ -101,8 +93,7 @@ import {
   mapStripeInvoiceToBillingHistoryEntry,
 } from '@/lib/subscriptions/subscription-center';
 import { client as stripe } from '@/lib/stripe-client';
-import { APP_URL, allow_fake_login } from '@/lib/constants';
-import { randomUUID } from 'node:crypto';
+import { APP_URL } from '@/lib/constants';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import {
   buildAffiliateEventDedupeKey,
@@ -1136,115 +1127,12 @@ function sanitizeKiloCodeConfigResponse(
   };
 }
 
-// Local-dev provision mock. When fake-login is enabled and no KiloClaw worker
-// URL is configured, there is no backend to provision a real agent instance, so
-// `provisionInstance` would throw at `new KiloClawInternalClient()`. Instead,
-// create a DB-only "fake seed" instance (sandbox_id `ki_fake_…`, provider
-// docker-local) — the exact shape `dev/seed/kiloclaw/fake-instance.ts` produces
-// and that `getStatus` renders via `createFakeSeedInstanceStatus`. This lets the
-// onboarding flow complete locally. Gated on `allow_fake_login`, which is false
-// in production and on Vercel, so it can never run outside local dev.
-// Opt in with `KILOCLAW_DEV_MOCK=1` in `.env.local` (or simply leave
-// `KILOCLAW_API_URL` unset). Note: `apps/web/.env.development.local` sets
-// `KILOCLAW_API_URL=http://localhost:8795`, which outranks `.env.local`, so an
-// explicit flag is the reliable switch when the worker isn't actually running.
-const KILOCLAW_DEV_MOCK =
-  allow_fake_login && (process.env.KILOCLAW_DEV_MOCK === '1' || !KILOCLAW_API_URL);
-
-async function provisionFakeLocalInstanceForDev(
-  user: Parameters<typeof generateApiToken>[0],
-  params: { instanceId: string | null; bootstrapSubscription: boolean },
-  executor: typeof db | DrizzleTransaction
-): Promise<{ sandboxId: string; instanceId: string }> {
-  // Re-provision / updateConfig path: the instance row already exists, so just
-  // echo back its ids. No worker means there's nothing live to reconfigure.
-  if (params.instanceId) {
-    const [existing] = await executor
-      .select({ id: kiloclaw_instances.id, sandbox_id: kiloclaw_instances.sandbox_id })
-      .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.id, params.instanceId))
-      .limit(1);
-    if (existing) {
-      return { sandboxId: existing.sandbox_id, instanceId: existing.id };
-    }
-  }
-
-  const nowIso = new Date().toISOString();
-  const instanceId = randomUUID();
-  const sandboxId = `ki_fake_${instanceId.replaceAll('-', '')}`;
-
-  const [instance] = await executor
-    .insert(kiloclaw_instances)
-    .values({
-      id: instanceId,
-      user_id: user.id,
-      sandbox_id: sandboxId,
-      provider: KiloClawProvider.DockerLocal,
-      organization_id: null,
-      name: 'Local KiloClaw (dev)',
-      inbound_email_enabled: true,
-      inactive_trial_stopped_at: null,
-      created_at: nowIso,
-      destroyed_at: null,
-      tracked_image_tag: 'fake-local-instance',
-    })
-    .returning();
-
-  // Mirror the worker's trial-bootstrap so billing/status reads resolve.
-  if (params.bootstrapSubscription) {
-    const trialEndsIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    const [subscription] = await executor
-      .insert(kiloclaw_subscriptions)
-      .values({
-        user_id: user.id,
-        instance_id: instance.id,
-        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
-        payment_source: null,
-        plan: KiloClawPlan.Trial,
-        status: KiloClawSubscriptionStatus.Trialing,
-        cancel_at_period_end: false,
-        pending_conversion: false,
-        trial_started_at: nowIso,
-        trial_ends_at: trialEndsIso,
-        current_period_start: null,
-        current_period_end: null,
-        credit_renewal_at: null,
-        commit_ends_at: null,
-      })
-      .returning();
-
-    await insertKiloClawSubscriptionChangeLog(executor, {
-      subscriptionId: subscription.id,
-      actor: {
-        actorType: KiloClawSubscriptionChangeActorType.System,
-        actorId: 'dev-mock:kiloclaw/provision',
-      },
-      action: KiloClawSubscriptionChangeAction.Created,
-      reason: 'dev_mock:fake_instance',
-      before: null,
-      after: subscription,
-    });
-  }
-
-  console.log(
-    `KILOCLAW DEV MOCK: provisioned fake local instance ${instanceId} (sandbox ${sandboxId}) for ${user.google_user_email} — DB-only, no worker/container exists`
-  );
-  return { sandboxId, instanceId };
-}
-
 async function provisionInstance(
   user: Parameters<typeof generateApiToken>[0],
   input: z.infer<typeof updateConfigSchema>,
   params: { instanceId: string | null; bootstrapSubscription: boolean },
   executor: typeof db | DrizzleTransaction = db
 ) {
-  // No KiloClaw worker in local dev — fabricate a DB-only instance instead of
-  // throwing at `new KiloClawInternalClient()`. Must run before secret
-  // encryption below, since the worker encryption key is also unset locally.
-  if (KILOCLAW_DEV_MOCK) {
-    return await provisionFakeLocalInstanceForDev(user, params, executor);
-  }
-
   const encryptedSecrets = encryptProvisionSecretsForWorker(input.secrets);
 
   const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;

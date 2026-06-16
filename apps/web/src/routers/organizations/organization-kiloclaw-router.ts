@@ -146,12 +146,15 @@ function handleFileOperationError(err: unknown, operation: string): never {
       cause: code ? new UpstreamApiError(code) : undefined,
     });
   }
+  const payload = err instanceof KiloClawApiError ? getKiloClawApiErrorPayload(err) : {};
   throw new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
-    message:
-      err instanceof KiloClawApiError
-        ? (getKiloClawApiErrorPayload(err).message ?? `Failed to ${operation}`)
-        : `Failed to ${operation}`,
+    message: payload.message ?? `Failed to ${operation}`,
+    // Surface the controller's code so the client can tell a genuine timeout
+    // (openclaw_cli_timeout — may have applied) from an explicit failure
+    // (agent_binding_rollback_failed, openclaw_cli_failed) that must NOT be
+    // reconciled into a false success.
+    cause: payload.code ? new UpstreamApiError(payload.code) : undefined,
   });
 }
 

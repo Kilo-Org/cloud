@@ -47,6 +47,12 @@ type PrepareSessionOutput = {
   cloudAgentSessionId: string;
 };
 
+type RouteContext = {
+  params: Promise<{ reviewId: string }>;
+};
+
+type RouteGet = (request: NextRequest, context: RouteContext) => Promise<Response>;
+
 const mockCreateTRPCContext = jest.fn<() => Promise<TrpcContextFixture>>();
 const mockCodeReviewsGet = jest.fn<(input: { reviewId: string }) => Promise<ReviewResult>>();
 const mockPersonalPrepareSession =
@@ -81,7 +87,7 @@ jest.mock('@/routers/root-router', () => ({
   rootRouter: {},
 }));
 
-let getRoute: typeof import('./route').GET;
+let getRoute: RouteGet;
 
 const REVIEW_ID = '00000000-0000-4000-8000-000000000001';
 const ORG_ID = '11111111-1111-4111-8111-111111111111';
@@ -113,7 +119,7 @@ function makeRequest(reviewId = REVIEW_ID): NextRequest {
   return new NextRequest(`https://kilo.test/cloud-agent-fork/review/${reviewId}`);
 }
 
-function makeContext(reviewId = REVIEW_ID) {
+function makeContext(reviewId = REVIEW_ID): RouteContext {
   return { params: Promise.resolve({ reviewId }) };
 }
 

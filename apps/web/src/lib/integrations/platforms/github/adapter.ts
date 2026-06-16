@@ -344,7 +344,7 @@ export async function addReactionToPRReviewComment(
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
  * @param appType - The type of GitHub App to use (defaults to 'standard')
  */
-type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
+export type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
 
 const KNOWN_PERMISSIONS = new Set<string>(['admin', 'write', 'read', 'none']);
 

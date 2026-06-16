@@ -53,7 +53,8 @@
       {
         "queue": "auto-routing-benchmark-jobs",
         "max_batch_size": 1,
-        "max_retries": 2,
+        "max_retries": 6,
+        "retry_delay": 180,
         "max_concurrency": 4,
         "dead_letter_queue": "auto-routing-benchmark-dlq",
       },

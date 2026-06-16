@@ -20,6 +20,19 @@ const DECIDER_CLI_TIMEOUT_MS = 180_000;
 const FINAL_ANSWER_SUFFIX =
   '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
 
+export function isRetryableContainerAvailabilityError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('container /run failed: http 503') ||
+    normalized.includes('container /warmup failed: http 503') ||
+    normalized.includes('no container instance available') ||
+    normalized.includes('no container instance that can be provided') ||
+    normalized.includes('max concurrent instance count') ||
+    normalized.includes('maximum number of running container instances exceeded')
+  );
+}
+
 type ContainerRunResponse = {
   exitCode: number;
   durationMs: number;
@@ -141,6 +154,7 @@ export async function warmUpCliContainer(
     })
   );
   if (!response.ok) {
-    throw new Error(`container /warmup failed: HTTP ${response.status}`);
+    const detail = (await response.text().catch(() => '')).slice(0, 500);
+    throw new Error(`container /warmup failed: HTTP ${response.status} ${detail}`);
   }
 }

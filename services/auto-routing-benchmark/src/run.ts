@@ -33,7 +33,11 @@ import {
 import { gradeClassifierOutput, runDeciderCheck } from './grading';
 import { createOpenRouterClient } from './openrouter';
 import { buildRoutingTable } from './routing-table-builder';
-import { runDeciderCaseViaCli, warmUpCliContainer } from './cli-runner';
+import {
+  isRetryableContainerAvailabilityError,
+  runDeciderCaseViaCli,
+  warmUpCliContainer,
+} from './cli-runner';
 import { pickClassifierWinner } from './winner';
 
 export type BenchmarkJobMessage = {
@@ -489,9 +493,12 @@ async function processDeciderJob(
 
   // Fresh container instances run the CLI's one-time sqlite migration; the
   // container owns that via its /warmup endpoint so the first real case
-  // doesn't burn its timeout on it. Failures are non-fatal: the first case
-  // simply absorbs whatever warmup work remains.
-  await warmUpCliContainer(env, { instanceName, model: message.model, kiloToken }).catch(() => {});
+  // doesn't burn its timeout on it. Ordinary warmup failures are non-fatal:
+  // the first case absorbs whatever warmup work remains. Container capacity
+  // failures are infrastructure pressure, so the queue retries the message.
+  await warmUpCliContainer(env, { instanceName, model: message.model, kiloToken }).catch(error => {
+    if (isRetryableContainerAvailabilityError(error)) throw error;
+  });
 
   // Concurrency 1: the CLI's sqlite state in the container is not safe under
   // concurrent sessions (partial-migration crashes); the container serializes
@@ -548,6 +555,7 @@ async function processDeciderJob(
         timed_out: result.timedOut ? 1 : 0,
       });
     } catch (error) {
+      if (isRetryableContainerAvailabilityError(error)) throw error;
       await upsertCaseResult(
         env.BENCH_DB,
         failedRow(message, benchCase.id, benchCase.tier, startedAt, error, rep)

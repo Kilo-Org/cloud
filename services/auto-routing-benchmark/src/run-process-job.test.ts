@@ -24,12 +24,18 @@ vi.mock('./cli-runner', async importOriginal => {
   const actual = await importOriginal<typeof CliRunnerModule>();
   return {
     ...actual,
+    destroyDeciderCliContainer: vi.fn(),
     runDeciderCaseViaCli: vi.fn(),
     warmUpCliContainer: vi.fn(),
   };
 });
 
-import { runDeciderCaseViaCli, warmUpCliContainer, type CliRunResult } from './cli-runner';
+import {
+  destroyDeciderCliContainer,
+  runDeciderCaseViaCli,
+  warmUpCliContainer,
+  type CliRunResult,
+} from './cli-runner';
 import {
   countCaseResults,
   getExistingCaseResultIds,
@@ -101,6 +107,7 @@ beforeEach(() => {
   mockRunSnapshot();
   vi.mocked(countCaseResults).mockResolvedValue(0);
   vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set());
+  vi.mocked(destroyDeciderCliContainer).mockResolvedValue(undefined);
   vi.mocked(warmUpCliContainer).mockResolvedValue(undefined);
   vi.mocked(runDeciderCaseViaCli).mockResolvedValue(successfulCliResult);
 });
@@ -181,5 +188,18 @@ describe('processJob — decider chunk chaining', () => {
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('destroys the model-repetition container after the terminal chunk', async () => {
+    const terminalChunk = Math.floor((DECIDER_CASES.length - 1) / 5);
+    const terminalCaseIds = DECIDER_CASES.slice(terminalChunk * 5).map(c => c.id);
+
+    await processJob(env, { ...deciderMessage(), chunk: terminalChunk, caseIds: terminalCaseIds });
+
+    expect(queueSendBatch).not.toHaveBeenCalled();
+    expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
+      instanceName: `${runId}:${model}:0`,
+    });
+    expect(countCaseResults).toHaveBeenCalled();
   });
 });

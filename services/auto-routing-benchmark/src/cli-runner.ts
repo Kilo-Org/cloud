@@ -158,3 +158,19 @@ export async function warmUpCliContainer(
     throw new Error(`container /warmup failed: HTTP ${response.status} ${detail}`);
   }
 }
+
+export async function destroyDeciderCliContainer(
+  env: Env,
+  params: { instanceName: string }
+): Promise<void> {
+  const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(params.instanceName));
+  const response = await stub.fetch(
+    new Request('http://container/admin/destroy', {
+      method: 'POST',
+    })
+  );
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => '')).slice(0, 500);
+    throw new Error(`container /admin/destroy failed: HTTP ${response.status} ${detail}`);
+  }
+}

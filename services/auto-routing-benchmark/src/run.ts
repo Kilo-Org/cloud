@@ -35,6 +35,7 @@ import { gradeClassifierOutput, runDeciderCheck } from './grading';
 import { createOpenRouterClient } from './openrouter';
 import { buildRoutingTable } from './routing-table-builder';
 import {
+  destroyDeciderCliContainer,
   isRetryableContainerAvailabilityError,
   runDeciderCaseViaCli,
   warmUpCliContainer,
@@ -602,6 +603,9 @@ async function processDeciderJob(
   }
 
   const hasNextChunk = await enqueueNextDeciderChunkIfNeeded(env, message, rep, chunk);
+  if (!hasNextChunk) {
+    await destroyDeciderCliContainer(env, { instanceName });
+  }
   return { shouldFinalize: !hasNextChunk };
 }
 

@@ -12,4 +12,13 @@ export class BenchRunnerContainer extends Container<Env> {
   // points at the real gateway; local dev overrides it via .dev.vars so the
   // benchmark runs against the local apps/web instance.
   envVars = { KILO_API_URL: this.env.KILO_CLI_API_URL };
+
+  override async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (request.method === 'POST' && url.pathname === '/admin/destroy') {
+      await this.destroy();
+      return new Response('destroyed');
+    }
+    return super.fetch(request);
+  }
 }

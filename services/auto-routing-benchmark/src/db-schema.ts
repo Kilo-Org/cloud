@@ -77,7 +77,7 @@ export const modelSummaries = sqliteTable(
   {
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
-    tier: text('tier').notNull(),
+    route_key: text('route_key').notNull(),
     accuracy: real('accuracy').notNull(),
     avg_cost_usd: real('avg_cost_usd'),
     avg_latency_ms: real('avg_latency_ms').notNull(),
@@ -89,7 +89,7 @@ export const modelSummaries = sqliteTable(
     // carried=true rows are prior-run summaries copied in at startRun for skipped models.
     carried: integer('carried', { mode: 'boolean' }).notNull().default(false),
   },
-  table => [primaryKey({ columns: [table.run_id, table.model, table.tier] })]
+  table => [primaryKey({ columns: [table.run_id, table.model, table.route_key] })]
 );
 
 export const caseResults = sqliteTable(
@@ -98,7 +98,7 @@ export const caseResults = sqliteTable(
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
     case_id: text('case_id').notNull(),
-    tier: text('tier'),
+    route_key: text('route_key'),
     score: real('score').notNull(),
     latency_ms: integer('latency_ms').notNull(),
     cost_usd: real('cost_usd'),
@@ -134,7 +134,7 @@ export const routingTableCandidates = sqliteTable(
   'routing_table_candidates',
   {
     run_id: text('run_id').notNull(),
-    tier: text('tier').notNull(),
+    route_key: text('route_key').notNull(),
     rank: integer('rank').notNull(),
     model: text('model').notNull(),
     accuracy: real('accuracy').notNull(),
@@ -145,5 +145,5 @@ export const routingTableCandidates = sqliteTable(
     meets_threshold: integer('meets_threshold', { mode: 'boolean' }).notNull(),
     reasoning_effort: text('reasoning_effort'),
   },
-  table => [primaryKey({ columns: [table.run_id, table.tier, table.rank] })]
+  table => [primaryKey({ columns: [table.run_id, table.route_key, table.rank] })]
 );

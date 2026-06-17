@@ -12,7 +12,7 @@ import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 function makeSummary(model: string): BenchmarkModelSummary {
   return {
     model,
-    tier: 'low',
+    routeKey: 'implementation/code_generation',
     accuracy: 0.9,
     avgCostUsd: 0.001,
     avgLatencyMs: 100,
@@ -519,7 +519,7 @@ describe('GET /admin/routing-table', () => {
       minAccuracy: 0.7,
       switchCostFactor: 3,
       source: 'benchmark',
-      tiers: { low: [candidate], medium: [candidate], high: [candidate] },
+      routes: { 'implementation/code_generation': [candidate] },
     };
     vi.mocked(getLatestRoutingTable).mockResolvedValueOnce({
       table: tableData as RoutingTable,

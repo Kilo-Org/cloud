@@ -12,9 +12,9 @@ design, invariants, and rollout/rollback.
   OpenRouter using the exact production classifier code
   (`@kilocode/auto-routing-contracts/classifier`), grades per-field, and derives
   the cheapest above-threshold model as the classifier winner.
-- **Decider benchmark** — runs 76 golden tasks per candidate through the real
+- **Decider benchmark** — runs 112 golden tasks per candidate through the real
   `kilo` CLI inside a Cloudflare Container, grades mechanically, and publishes a
-  per-difficulty-tier routing table.
+  per-taxonomy-route routing table.
 - Normalized results live in D1 (`BENCH_DB`); published artifacts are cached in
   the shared `AUTO_ROUTING_CONFIG` KV namespace (publish = delete the keys so the
   next read repopulates from D1).
@@ -111,7 +111,7 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 Failed queue messages land in `auto-routing-benchmark-dlq` after `max_retries`
 (2) on `auto-routing-benchmark-jobs`. A message is one (model, chunk) job, so a
 DLQ'd message means that chunk never produced results; its model's summaries for
-the affected tier(s) will be missing or incomplete and `finalizeRunIfComplete`
+the affected route(s) will be missing or incomplete and `finalizeRunIfComplete`
 will mark the run accordingly.
 
 To inspect / handle:

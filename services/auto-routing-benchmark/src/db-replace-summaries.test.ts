@@ -25,7 +25,7 @@ import { replaceModelSummaries } from './db';
 function makeSummary(model: string): BenchmarkModelSummary {
   return {
     model,
-    tier: '*',
+    routeKey: '*',
     accuracy: 0.9,
     avgCostUsd: 0.001,
     avgLatencyMs: 100,

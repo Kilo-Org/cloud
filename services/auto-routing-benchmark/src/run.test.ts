@@ -17,7 +17,7 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     run_id: 'run-1',
     model: 'model/a',
     case_id: 'case-1',
-    tier: null,
+    route_key: null,
     score: 1,
     latency_ms: 100,
     cost_usd: 0.001,
@@ -35,12 +35,12 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
 }
 
 describe('summarize — classifier kind', () => {
-  it('groups all classifier rows under * tier', () => {
+  it('groups all classifier rows under * route key', () => {
     const rows: CaseResultRow[] = [
       makeRow({
         model: 'model/a',
         case_id: 'c1',
-        tier: null,
+        route_key: null,
         score: 1,
         latency_ms: 100,
         cost_usd: 0.001,
@@ -48,7 +48,7 @@ describe('summarize — classifier kind', () => {
       makeRow({
         model: 'model/a',
         case_id: 'c2',
-        tier: null,
+        route_key: null,
         score: 0.5,
         latency_ms: 200,
         cost_usd: 0.002,
@@ -59,7 +59,7 @@ describe('summarize — classifier kind', () => {
     expect(summaries).toHaveLength(1);
     const [s] = summaries;
     expect(s.model).toBe('model/a');
-    expect(s.tier).toBe('*');
+    expect(s.routeKey).toBe('*');
     expect(s.cases).toBe(2);
   });
 
@@ -124,39 +124,65 @@ describe('summarize — classifier kind', () => {
 });
 
 describe('summarize — decider kind', () => {
-  it('groups by tier', () => {
+  it('groups by taxonomy route key', () => {
     const rows: CaseResultRow[] = [
-      makeRow({ model: 'model/a', case_id: 'low-1', tier: 'low', score: 1 }),
-      makeRow({ model: 'model/a', case_id: 'low-2', tier: 'low', score: 0 }),
-      makeRow({ model: 'model/a', case_id: 'med-1', tier: 'medium', score: 1 }),
-      makeRow({ model: 'model/b', case_id: 'low-3', tier: 'low', score: 1 }),
+      makeRow({
+        model: 'model/a',
+        case_id: 'impl-1',
+        route_key: 'implementation/code_generation',
+        score: 1,
+      }),
+      makeRow({
+        model: 'model/a',
+        case_id: 'impl-2',
+        route_key: 'implementation/code_generation',
+        score: 0,
+      }),
+      makeRow({
+        model: 'model/a',
+        case_id: 'debug-1',
+        route_key: 'debugging/bug_fixing',
+        score: 1,
+      }),
+      makeRow({
+        model: 'model/b',
+        case_id: 'impl-3',
+        route_key: 'implementation/code_generation',
+        score: 1,
+      }),
     ];
 
     const summaries = summarize(rows, 'decider');
     expect(summaries).toHaveLength(3);
 
-    const aLow = summaries.find(s => s.model === 'model/a' && s.tier === 'low');
-    expect(aLow?.cases).toBe(2);
-    expect(aLow?.accuracy).toBe(0.5);
+    const aImpl = summaries.find(
+      s => s.model === 'model/a' && s.routeKey === 'implementation/code_generation'
+    );
+    expect(aImpl?.cases).toBe(2);
+    expect(aImpl?.accuracy).toBe(0.5);
 
-    const aMed = summaries.find(s => s.model === 'model/a' && s.tier === 'medium');
-    expect(aMed?.cases).toBe(1);
-    expect(aMed?.accuracy).toBe(1);
+    const aDebug = summaries.find(
+      s => s.model === 'model/a' && s.routeKey === 'debugging/bug_fixing'
+    );
+    expect(aDebug?.cases).toBe(1);
+    expect(aDebug?.accuracy).toBe(1);
 
-    const bLow = summaries.find(s => s.model === 'model/b' && s.tier === 'low');
-    expect(bLow?.cases).toBe(1);
+    const bImpl = summaries.find(
+      s => s.model === 'model/b' && s.routeKey === 'implementation/code_generation'
+    );
+    expect(bImpl?.cases).toBe(1);
   });
 
-  it('uses * fallback when tier is null', () => {
-    const rows: CaseResultRow[] = [makeRow({ tier: null, score: 1 })];
+  it('uses * fallback when route key is null', () => {
+    const rows: CaseResultRow[] = [makeRow({ route_key: null, score: 1 })];
     const [s] = summarize(rows, 'decider');
-    expect(s.tier).toBe('*');
+    expect(s.routeKey).toBe('*');
   });
 
   it('computes avgLatencyMs as rounded mean', () => {
     const rows: CaseResultRow[] = [
-      makeRow({ case_id: 'c1', tier: 'low', latency_ms: 100 }),
-      makeRow({ case_id: 'c2', tier: 'low', latency_ms: 301 }),
+      makeRow({ case_id: 'c1', route_key: 'implementation/code_generation', latency_ms: 100 }),
+      makeRow({ case_id: 'c2', route_key: 'implementation/code_generation', latency_ms: 301 }),
     ];
 
     const [s] = summarize(rows, 'decider');
@@ -164,7 +190,9 @@ describe('summarize — decider kind', () => {
   });
 
   it('handles single-element groups for p50', () => {
-    const rows: CaseResultRow[] = [makeRow({ tier: 'high', latency_ms: 500 })];
+    const rows: CaseResultRow[] = [
+      makeRow({ route_key: 'implementation/code_generation', latency_ms: 500 }),
+    ];
     const [s] = summarize(rows, 'decider');
     expect(s.p50LatencyMs).toBe(500);
   });
@@ -267,7 +295,7 @@ describe('chunkArray', () => {
 describe('pickClassifierWinner', () => {
   const summary = (model: string, accuracy: number, avgCostUsd: number | null) => ({
     model,
-    tier: '*' as const,
+    routeKey: '*' as const,
     accuracy,
     avgCostUsd,
     avgLatencyMs: 100,
@@ -299,9 +327,12 @@ describe('pickClassifierWinner', () => {
     expect(winner?.model).toBe('cheap');
   });
 
-  it('ignores decider-tier summaries and returns null when nothing is graded', () => {
+  it('ignores decider route summaries and returns null when nothing is graded', () => {
     expect(
-      pickClassifierWinner([{ ...summary('m', 1, 0.001), tier: 'low' as const }], 0.7)
+      pickClassifierWinner(
+        [{ ...summary('m', 1, 0.001), routeKey: 'implementation/code_generation' as const }],
+        0.7
+      )
     ).toBeNull();
     expect(pickClassifierWinner([], 0.7)).toBeNull();
   });
@@ -314,7 +345,7 @@ describe('pickClassifierWinner', () => {
     p95: number | null = 90
   ) => ({
     model,
-    tier: '*' as const,
+    routeKey: '*' as const,
     accuracy,
     avgCostUsd,
     avgLatencyMs: 100,

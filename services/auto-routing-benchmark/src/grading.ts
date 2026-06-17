@@ -2,8 +2,7 @@ import type { ClassifierOutput } from '@kilocode/auto-routing-contracts';
 
 // Golden labels grade every classifier field except confidence. subtaskType
 // is worth less than taskType: a wrong subtype under the right type is a near
-// miss. riskLevel gets a small weight matching its small influence on tier
-// derivation.
+// miss. riskLevel gets a small weight because it is a secondary routing signal.
 export type ClassifierExpectation = {
   taskType: ClassifierOutput['taskType'];
   subtaskType: ClassifierOutput['subtaskType'];

@@ -8,8 +8,8 @@ const SAMPLE_TABLE: RoutingTable = {
   minAccuracy: 0.7,
   switchCostFactor: 3,
   source: 'benchmark',
-  tiers: {
-    low: [
+  routes: {
+    'implementation/feature_development': [
       {
         model: 'google/gemini-2.5-flash-lite',
         accuracy: 0.9,
@@ -18,7 +18,7 @@ const SAMPLE_TABLE: RoutingTable = {
         reasoningEffort: null,
       },
     ],
-    medium: [
+    'debugging/bug_fixing': [
       {
         model: 'google/gemini-2.5-flash',
         accuracy: 0.85,
@@ -27,7 +27,7 @@ const SAMPLE_TABLE: RoutingTable = {
         reasoningEffort: null,
       },
     ],
-    high: [
+    'planning_design/system_design': [
       {
         model: 'anthropic/claude-sonnet-4.6',
         accuracy: 0.8,

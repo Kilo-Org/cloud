@@ -5,6 +5,7 @@ import {
   type BenchmarkDeciderModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
+  taxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import * as z from 'zod';
@@ -144,7 +145,12 @@ export function computeEngineIdentity(kind: BenchmarkKind): string {
   const datasetSignature =
     kind === 'classifier'
       ? CLASSIFIER_CASES.map(c => ({ id: c.id, expected: c.expected }))
-      : DECIDER_CASES.map(c => ({ id: c.id, tier: c.tier, check: c.check }));
+      : DECIDER_CASES.map(c => ({
+          id: c.id,
+          taskType: c.taskType,
+          subtaskType: c.subtaskType,
+          check: c.check,
+        }));
   return `v${BENCHMARK_ENGINE_VERSION}:${fnv1aHex(JSON.stringify(datasetSignature))}`;
 }
 
@@ -415,7 +421,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
             run_id: message.runId,
             model: message.model,
             case_id: benchCase.id,
-            tier: null,
+            route_key: null,
             score,
             latency_ms: Math.round(performance.now() - startedAt),
             cost_usd: result.cost,
@@ -578,7 +584,7 @@ async function processDeciderJob(
           run_id: message.runId,
           model: message.model,
           case_id: benchCase.id,
-          tier: benchCase.tier,
+          route_key: taxonomyRouteKey(benchCase),
           score: succeeded ? 1 : 0,
           latency_ms: result.latencyMs,
           cost_usd: result.costUsd,
@@ -596,7 +602,7 @@ async function processDeciderJob(
         if (isRetryableContainerAvailabilityError(error)) throw error;
         await upsertCaseResult(
           env.BENCH_DB,
-          failedRow(message, benchCase.id, benchCase.tier, startedAt, error, rep)
+          failedRow(message, benchCase.id, taxonomyRouteKey(benchCase), startedAt, error, rep)
         );
       }
     });
@@ -674,7 +680,7 @@ export async function fetchBenchmarkUserToken(env: Env, userId: string): Promise
 function failedRow(
   message: BenchmarkJobMessage,
   caseId: string,
-  tier: string | null,
+  routeKey: string | null,
   startedAt: number,
   error: unknown,
   rep: number = 0
@@ -683,7 +689,7 @@ function failedRow(
     run_id: message.runId,
     model: message.model,
     case_id: caseId,
-    tier,
+    route_key: routeKey,
     score: 0,
     latency_ms: Math.round(performance.now() - startedAt),
     cost_usd: null,
@@ -816,13 +822,12 @@ async function finalizeRunIfComplete(
 }
 
 export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): BenchmarkModelSummary[] {
-  // Group by "model tier-key" using a plain reduce so this works in all runtimes.
-  // Classifier rows use '*' as the tier (no tiering); decider rows use the actual tier
-  // (falling back to '*' when tier is null).
+  // Group by "model route-key" using a plain reduce so this works in all runtimes.
+  // Classifier rows use '*' because classification has no decider taxonomy route.
   const groups = new Map<string, CaseResultRow[]>();
   for (const row of rows) {
-    const tierKey = kind === 'classifier' ? '*' : (row.tier ?? '*');
-    const key = `${row.model}\0${tierKey}`;
+    const routeKey = kind === 'classifier' ? '*' : (row.route_key ?? '*');
+    const key = `${row.model}\0${routeKey}`;
     const existing = groups.get(key);
     if (existing) {
       existing.push(row);
@@ -832,7 +837,7 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
   }
 
   return [...groups.entries()].map(([key, group]) => {
-    const [model, tier] = key.split('\0');
+    const [model, routeKey] = key.split('\0');
     const latencies = group.map(r => r.latency_ms).toSorted((a, b) => a - b);
     const costs = group.filter(r => r.cost_usd !== null);
     const p95LatencyMs =
@@ -842,7 +847,7 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
         : null;
     return {
       model,
-      tier: tier as BenchmarkModelSummary['tier'],
+      routeKey: routeKey as BenchmarkModelSummary['routeKey'],
       accuracy: Number((group.reduce((a, r) => a + r.score, 0) / group.length).toFixed(4)),
       avgCostUsd: costs.length
         ? Number((costs.reduce((a, r) => a + (r.cost_usd ?? 0), 0) / costs.length).toFixed(8))

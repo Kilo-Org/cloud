@@ -41,10 +41,12 @@ describe('saveRoutingTable', () => {
       minAccuracy: 0.7,
       switchCostFactor: 3,
       source: 'benchmark',
-      tiers: {
-        low: Array.from({ length: 23 }, (_, index) => candidate(`low-model-${index}`)),
-        medium: [candidate('medium-model')],
-        high: [candidate('high-model')],
+      routes: {
+        'implementation/code_generation': Array.from({ length: 23 }, (_, index) =>
+          candidate(`impl-model-${index}`)
+        ),
+        'debugging/bug_fixing': [candidate('debug-model')],
+        'planning_design/system_design': [candidate('plan-model')],
       },
     };
 

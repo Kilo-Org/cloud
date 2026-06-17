@@ -25,7 +25,8 @@ const zeroBalancePromise = Promise.resolve(0);
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',
-  tier: 'low',
+  taskType: 'implementation',
+  subtaskType: 'feature_development',
   source: 'benchmark',
   tableVersion: 'v1',
   sticky: false,

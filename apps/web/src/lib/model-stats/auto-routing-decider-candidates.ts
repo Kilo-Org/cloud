@@ -5,6 +5,7 @@ import {
   AUTO_DECIDER_DEFAULT_MIN_COST_USD,
 } from '@kilocode/auto-routing-contracts';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
+import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
 import { and, eq, notLike } from 'drizzle-orm';
 
 const TerminalBenchSchema = ModelStatsBenchmarksSchema.unwrap()
@@ -61,7 +62,10 @@ export function summarizeAutoRoutingDeciderCandidates(
     ) {
       continue;
     }
-    candidates.push({ id: row.openrouterId, avgAttemptCostUsd: bench.avgAttemptCostUsd });
+    candidates.push({
+      id: unprefixKiloGatewayModelId(row.openrouterId) ?? row.openrouterId,
+      avgAttemptCostUsd: bench.avgAttemptCostUsd,
+    });
   }
 
   return candidates.sort((left, right) => {

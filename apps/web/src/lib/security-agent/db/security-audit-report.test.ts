@@ -11,6 +11,7 @@ import {
   defaultSecurityAgentAuditReportInput,
   getSecurityAgentAuditReport,
   normalizeSecurityAgentAuditReportPeriod,
+  resolveSecurityAgentAuditReliableCoverageStart,
   SECURITY_AGENT_AUDIT_REPORT_MAX_EVENTS,
   SECURITY_AGENT_AUDIT_REPORT_MAX_SERIALIZED_BYTES,
   SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE,
@@ -21,6 +22,8 @@ import {
 } from './security-audit-report';
 
 type AuditReportRow = Parameters<typeof buildSecurityAgentAuditReportFromRows>[0]['rows'][number];
+
+process.env.SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START = '2026-06-17T12:00:00.000Z';
 
 const period = normalizeSecurityAgentAuditReportPeriod(
   { startDate: '2026-06-01', endDate: '2026-06-12' },
@@ -113,6 +116,20 @@ function row(overrides: Partial<AuditReportRow>): AuditReportRow {
     ...overrides,
   };
 }
+
+describe('resolveSecurityAgentAuditReliableCoverageStart', () => {
+  it('requires and normalizes deployment-time coverage configuration', () => {
+    expect(resolveSecurityAgentAuditReliableCoverageStart('2026-06-17T14:00:00+02:00')).toBe(
+      '2026-06-17T12:00:00.000Z'
+    );
+    expect(() => resolveSecurityAgentAuditReliableCoverageStart('')).toThrow(
+      'SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START is required'
+    );
+    expect(() => resolveSecurityAgentAuditReliableCoverageStart('2026-06-17')).toThrow(
+      'SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START must be an ISO timestamp'
+    );
+  });
+});
 
 describe('defaultSecurityAgentAuditReportInput', () => {
   it('defaults to 90 UTC calendar days ending on the current day', () => {

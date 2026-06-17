@@ -12,7 +12,6 @@ import * as z from 'zod';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
 export const SECURITY_AGENT_AUDIT_REPORT_VERSION = 1;
-export const SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START = '2026-06-12T00:00:00.000Z';
 export const SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE = 1000;
 export const SECURITY_AGENT_AUDIT_REPORT_MAX_EVENTS = 10_000;
 export const SECURITY_AGENT_AUDIT_REPORT_MAX_SERIALIZED_BYTES = 8 * 1024 * 1024;
@@ -25,6 +24,23 @@ export const SecurityAgentAuditReportInputSchema = z.object({
   startDate: DateOnlySchema.optional(),
   endDate: DateOnlySchema.optional(),
 });
+
+const ReliableCoverageStartSchema = z.string().datetime({ offset: true });
+
+export function resolveSecurityAgentAuditReliableCoverageStart(
+  value = process.env.SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START
+): string {
+  if (!value) {
+    throw new Error('SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START is required');
+  }
+
+  const parsed = ReliableCoverageStartSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error('SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START must be an ISO timestamp');
+  }
+
+  return new Date(parsed.data).toISOString();
+}
 
 export type SecurityAgentAuditReportInput = z.infer<typeof SecurityAgentAuditReportInputSchema>;
 
@@ -481,7 +497,7 @@ export function buildSecurityAgentAuditReportFromRows(params: {
     period: params.period,
     generatedAt: params.generatedAt,
     dataThrough: params.dataThrough,
-    reliableCoverageStart: SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START,
+    reliableCoverageStart: resolveSecurityAgentAuditReliableCoverageStart(),
     evidenceBasis: 'recorded_by_kilo',
     hasLegacySupplementalActivity: findings.some(finding => finding.hasLegacySupplementalActivity),
     summary: {

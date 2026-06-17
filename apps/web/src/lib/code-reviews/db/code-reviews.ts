@@ -355,6 +355,7 @@ export async function createCodeReviewAttempt(params: {
   terminalReason?: CodeReviewTerminalReason;
   startedAt?: Date;
   completedAt?: Date;
+  analyticsEnabledAtDispatch?: boolean;
 }): Promise<CloudAgentCodeReviewAttempt> {
   try {
     return await db.transaction(async tx => {
@@ -386,6 +387,7 @@ export async function createCodeReviewAttempt(params: {
           session_id: params.sessionId ?? null,
           cli_session_id: params.cliSessionId ?? null,
           execution_id: params.executionId ?? null,
+          analytics_enabled_at_dispatch: params.analyticsEnabledAtDispatch ?? null,
           status,
           error_message: params.errorMessage ?? null,
           terminal_reason: params.terminalReason ?? null,
@@ -446,6 +448,23 @@ export async function createInfraRetryAttemptIfMissing(params: {
         };
       }
 
+      const [sourceAttempt] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.id, params.retryOfAttemptId),
+            eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId)
+          )
+        )
+        .limit(1);
+
+      if (!sourceAttempt) {
+        throw new Error(
+          `Code review attempt ${params.retryOfAttemptId} not found for review ${params.codeReviewId}`
+        );
+      }
+
       const [existingForAttempt] = await tx
         .select()
         .from(cloud_agent_code_review_attempts)
@@ -491,6 +510,7 @@ export async function createInfraRetryAttemptIfMissing(params: {
           attempt_number: (latest?.attempt_number ?? 0) + 1,
           retry_of_attempt_id: params.retryOfAttemptId,
           retry_reason: 'infra_failure',
+          analytics_enabled_at_dispatch: sourceAttempt.analytics_enabled_at_dispatch,
           status: 'pending',
         })
         .returning();
@@ -721,12 +741,13 @@ export async function hasInfraRetryAttempt(codeReviewId: string): Promise<boolea
 }
 
 export async function ensureCurrentCodeReviewAttemptFromReview(
-  review: CloudAgentCodeReview
+  review: CloudAgentCodeReview,
+  analyticsEnabledAtDispatch?: boolean
 ): Promise<CloudAgentCodeReviewAttempt> {
-  const latestAttempt = await getLatestCodeReviewAttempt(review.id);
-  if (latestAttempt) {
+  let attempt = await getLatestCodeReviewAttempt(review.id);
+  if (attempt) {
     if (
-      latestAttempt.status === 'pending' &&
+      attempt.status === 'pending' &&
       (review.session_id || review.cli_session_id || review.status !== 'pending')
     ) {
       const [updated] = await db
@@ -742,25 +763,46 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
             completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
           })
         )
-        .where(eq(cloud_agent_code_review_attempts.id, latestAttempt.id))
+        .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
         .returning();
 
-      return updated ?? latestAttempt;
+      attempt = updated ?? attempt;
     }
-
-    return latestAttempt;
+  } else {
+    attempt = await createCodeReviewAttempt({
+      codeReviewId: review.id,
+      status: review.status as CodeReviewAttemptStatus,
+      sessionId: review.session_id ?? undefined,
+      cliSessionId: review.cli_session_id ?? undefined,
+      errorMessage: review.error_message ?? undefined,
+      terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
+      startedAt: review.started_at ? new Date(review.started_at) : undefined,
+      completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
+      analyticsEnabledAtDispatch,
+    });
   }
 
-  return await createCodeReviewAttempt({
-    codeReviewId: review.id,
-    status: review.status as CodeReviewAttemptStatus,
-    sessionId: review.session_id ?? undefined,
-    cliSessionId: review.cli_session_id ?? undefined,
-    errorMessage: review.error_message ?? undefined,
-    terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
-    startedAt: review.started_at ? new Date(review.started_at) : undefined,
-    completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
-  });
+  if (analyticsEnabledAtDispatch === undefined || attempt.analytics_enabled_at_dispatch !== null) {
+    return attempt;
+  }
+
+  const [snapshotted] = await db
+    .update(cloud_agent_code_review_attempts)
+    .set({
+      analytics_enabled_at_dispatch: analyticsEnabledAtDispatch,
+      updated_at: new Date().toISOString(),
+    })
+    .where(
+      and(
+        eq(cloud_agent_code_review_attempts.id, attempt.id),
+        isNull(cloud_agent_code_review_attempts.analytics_enabled_at_dispatch)
+      )
+    )
+    .returning();
+
+  if (snapshotted) return snapshotted;
+
+  return (await getCodeReviewAttemptForReview(review.id, attempt.id)) ?? attempt;
 }
 
 /**

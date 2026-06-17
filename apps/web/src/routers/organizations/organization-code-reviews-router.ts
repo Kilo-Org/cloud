@@ -224,7 +224,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         const previousRepoIds =
           (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
           [];
-        const reviewMemoryEnabled = getReviewMemoryEnabledFromConfig(previousConfig?.config);
 
         // Save the agent config
         await upsertAgentConfig({
@@ -242,8 +241,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
             disable_review_md: input.disableReviewMd ?? true,
-            review_memory_enabled: reviewMemoryEnabled,
+            review_memory_enabled: false,
+            review_analytics_enabled: false,
           },
+          preserveCodeReviewFeatureSettings: true,
           createdBy: ctx.user.id,
         });
 

@@ -6,12 +6,20 @@ import { ReviewConfigForm } from '@/components/code-reviews/ReviewConfigForm';
 import { CodeReviewActionRequiredAlert } from '@/components/code-reviews/CodeReviewActionRequiredAlert';
 import { CodeReviewJobsCard } from '@/components/code-reviews/CodeReviewJobsCard';
 import { ReviewMemoryPanel } from '@/components/code-reviews/ReviewMemoryPanel';
+import { CodeReviewAnalyticsPanel } from '@/components/code-reviews/analytics/CodeReviewAnalyticsPanel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Rocket, ExternalLink, Settings2, ListChecks, Brain } from 'lucide-react';
+import {
+  Brain,
+  ChartColumnIncreasing,
+  ExternalLink,
+  ListChecks,
+  Rocket,
+  Settings2,
+} from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -164,7 +172,7 @@ export function ReviewAgentPageClient({
 
           {/* GitHub Configuration Tabs */}
           <Tabs defaultValue="config" className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-3">
+            <TabsList className="grid h-auto w-full max-w-2xl grid-cols-2 sm:grid-cols-4">
               <TabsTrigger value="config" className="flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />
                 Config
@@ -184,6 +192,10 @@ export function ReviewAgentPageClient({
               >
                 <Brain className="h-4 w-4" />
                 Memory
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <ChartColumnIncreasing className="h-4 w-4" />
+                Analytics
               </TabsTrigger>
             </TabsList>
 
@@ -219,6 +231,10 @@ export function ReviewAgentPageClient({
                 </Alert>
               )}
             </TabsContent>
+
+            <TabsContent value="analytics" className="mt-6 space-y-4">
+              <CodeReviewAnalyticsPanel platform="github" />
+            </TabsContent>
           </Tabs>
         </TabsContent>
 
@@ -250,7 +266,7 @@ export function ReviewAgentPageClient({
 
           {/* GitLab Configuration Tabs */}
           <Tabs defaultValue="config" className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-2">
+            <TabsList className="grid h-auto w-full max-w-2xl grid-cols-2 sm:grid-cols-3">
               <TabsTrigger value="config" className="flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />
                 Config
@@ -262,6 +278,10 @@ export function ReviewAgentPageClient({
               >
                 <ListChecks className="h-4 w-4" />
                 Jobs
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <ChartColumnIncreasing className="h-4 w-4" />
+                Analytics
               </TabsTrigger>
             </TabsList>
 
@@ -297,6 +317,10 @@ export function ReviewAgentPageClient({
                   </AlertDescription>
                 </Alert>
               )}
+            </TabsContent>
+
+            <TabsContent value="analytics" className="mt-6 space-y-4">
+              <CodeReviewAnalyticsPanel platform="gitlab" />
             </TabsContent>
           </Tabs>
         </TabsContent>

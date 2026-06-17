@@ -59,6 +59,7 @@ import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/session-log';
+import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
 
 /**
  * Re-creates the PR gate check (GitHub Check Run / GitLab commit status)
@@ -195,6 +196,8 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview) {
 }
 
 export const codeReviewRouter = createTRPCRouter({
+  analytics: codeReviewAnalyticsRouter,
+
   /**
    * List code reviews for an organization
    * Requires organization membership

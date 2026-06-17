@@ -1,6 +1,7 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
+import type * as analyticsDbModule from '@/lib/code-reviews/analytics/db';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import type {
   CloudAgentCodeReview,
@@ -34,6 +35,9 @@ const mockGetLatestCodeReviewAttempt = jest.fn() as jest.MockedFunction<
 >;
 const mockCreateInfraRetryAttemptIfMissing = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.createInfraRetryAttemptIfMissing
+>;
+const mockFinalizeCompletedCodeReviewWithAnalytics = jest.fn() as jest.MockedFunction<
+  typeof analyticsDbModule.finalizeCompletedCodeReviewWithAnalytics
 >;
 const mockGetIntegrationById = jest.fn() as jest.MockedFunction<
   typeof platformIntegrationsModule.getIntegrationById
@@ -96,6 +100,10 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt: mockGetLatestCodeReviewAttempt,
   createInfraRetryAttemptIfMissing: mockCreateInfraRetryAttemptIfMissing,
+}));
+
+jest.mock('@/lib/code-reviews/analytics/db', () => ({
+  finalizeCompletedCodeReviewWithAnalytics: mockFinalizeCompletedCodeReviewWithAnalytics,
 }));
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
@@ -261,6 +269,7 @@ function makeAttempt(
     session_id: null,
     cli_session_id: null,
     execution_id: null,
+    analytics_enabled_at_dispatch: null,
     status: 'running',
     error_message: null,
     terminal_reason: null,
@@ -391,6 +400,7 @@ beforeEach(async () => {
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
+  mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'applied' });
   mockAppendPreviousReviewSummaryHistory.mockImplementation((body: string) => body);
   mockBuildReviewSummaryFooter.mockImplementation(
     (footer: { usage?: unknown; reviewGuidance?: { used: boolean } }) =>
@@ -456,6 +466,91 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(401);
+    });
+  });
+
+  describe('analytics completion callbacks', () => {
+    it('rejects invalid callback payloads at runtime', async () => {
+      const response = await POST(makeRequest({ status: 'unknown' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'Invalid callback payload' });
+      expect(mockGetCodeReviewById).not.toHaveBeenCalled();
+    });
+
+    it('finalizes an enrolled captured result before provider side effects', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      const attempt = makeAttempt({ analytics_enabled_at_dispatch: true });
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(attempt);
+      const marker =
+        '<!-- kilo-review-analytics:v1 {"schemaVersion":1,"taxonomyVersion":1,"change":{"type":"feature","impact":"medium","complexity":"high","confidence":"high"},"findings":[{"severity":"warning","category":"correctness","securityClass":null}]} -->';
+
+      const response = await POST(
+        makeRequest({
+          status: 'completed',
+          sessionId: 'agent-session',
+          lastAssistantMessageText: `Review complete.\n${marker}`,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockFinalizeCompletedCodeReviewWithAnalytics).toHaveBeenCalledWith(
+        expect.objectContaining({
+          codeReviewId: REVIEW_ID,
+          capture: expect.objectContaining({
+            status: 'captured',
+            manifest: expect.objectContaining({ findings: [expect.any(Object)] }),
+          }),
+        })
+      );
+      expect(mockUpdateCodeReviewAttemptForCallback).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['missing', { lastAssistantMessageText: 'Review complete.' }],
+      ['invalid', { lastAssistantMessageText: '<!-- kilo-review-analytics:v1 {bad-json} -->' }],
+      [
+        'omitted',
+        {
+          lastAssistantMessageTextTruncation: {
+            originalUtf8ByteLength: 200000,
+            retainedUtf8ByteLength: 0,
+          },
+        },
+      ],
+    ] as const)('maps assistant output to %s coverage', async (expectedStatus, payload) => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ analytics_enabled_at_dispatch: true })
+      );
+
+      await POST(makeRequest({ status: 'completed', ...payload }), makeParams(REVIEW_ID));
+
+      expect(mockFinalizeCompletedCodeReviewWithAnalytics).toHaveBeenCalledWith(
+        expect.objectContaining({ capture: { status: expectedStatus } })
+      );
+    });
+
+    it('does not replay provider completion side effects for analytics repair', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'completed' }));
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ status: 'completed', analytics_enabled_at_dispatch: true })
+      );
+      mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'repaired' });
+
+      const response = await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetIntegrationById).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
   });
 

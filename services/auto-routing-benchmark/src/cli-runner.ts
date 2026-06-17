@@ -56,11 +56,12 @@ export async function runDeciderCaseViaCli(
     model: string;
     benchCase: DeciderCase;
     kiloToken: string;
+    kiloApiUrl: string;
     orgId?: string | null;
     reasoningEffort?: string | null;
   }
 ): Promise<CliRunResult> {
-  const { instanceName, model, benchCase, kiloToken, orgId, reasoningEffort } = params;
+  const { instanceName, model, benchCase, kiloToken, kiloApiUrl, orgId, reasoningEffort } = params;
   const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(instanceName));
   const prompt = `${benchCase.systemPrompt}\n\n${benchCase.userPrompt}${FINAL_ANSWER_SUFFIX}`;
 
@@ -73,6 +74,7 @@ export async function runDeciderCaseViaCli(
         model,
         prompt,
         kiloToken,
+        kiloApiUrl,
         orgId: orgId ?? null,
         timeoutMs: DECIDER_CLI_TIMEOUT_MS,
         variant: reasoningEffort ?? null,
@@ -105,7 +107,13 @@ export async function runDeciderCaseViaCli(
 // be diagnosed without redeploying.
 export async function debugRunCli(
   env: Env,
-  params: { model: string; prompt: string; kiloToken: string; orgId?: string | null }
+  params: {
+    model: string;
+    prompt: string;
+    kiloToken: string;
+    kiloApiUrl: string;
+    orgId?: string | null;
+  }
 ): Promise<{
   exitCode: number;
   durationMs: number;
@@ -122,6 +130,7 @@ export async function debugRunCli(
         model: params.model,
         prompt: params.prompt,
         kiloToken: params.kiloToken,
+        kiloApiUrl: params.kiloApiUrl,
         orgId: params.orgId ?? null,
         timeoutMs: DECIDER_CLI_TIMEOUT_MS,
       }),
@@ -146,7 +155,13 @@ export async function debugRunCli(
 // before the case loop starts. Best-effort: callers ignore failures.
 export async function warmUpCliContainer(
   env: Env,
-  params: { instanceName: string; model: string; kiloToken: string; orgId?: string | null }
+  params: {
+    instanceName: string;
+    model: string;
+    kiloToken: string;
+    kiloApiUrl: string;
+    orgId?: string | null;
+  }
 ): Promise<void> {
   const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(params.instanceName));
   const response = await stub.fetch(
@@ -156,6 +171,7 @@ export async function warmUpCliContainer(
       body: JSON.stringify({
         model: params.model,
         kiloToken: params.kiloToken,
+        kiloApiUrl: params.kiloApiUrl,
         orgId: params.orgId ?? null,
       }),
     })

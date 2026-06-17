@@ -636,6 +636,7 @@ async function processDeciderJob(
       instanceName,
       model: message.model,
       kiloToken,
+      kiloApiUrl: env.KILO_CLI_API_URL,
       orgId: state.benchmarkOrgId,
     }).catch(error => {
       if (isRetryableContainerAvailabilityError(error)) throw error;
@@ -652,6 +653,7 @@ async function processDeciderJob(
           model: message.model,
           benchCase,
           kiloToken,
+          kiloApiUrl: env.KILO_CLI_API_URL,
           orgId: state.benchmarkOrgId,
           reasoningEffort,
         });
@@ -666,6 +668,7 @@ async function processDeciderJob(
             model: message.model,
             benchCase,
             kiloToken,
+            kiloApiUrl: env.KILO_CLI_API_URL,
             orgId: state.benchmarkOrgId,
             reasoningEffort,
           });

@@ -40,7 +40,7 @@ function runCaseSerialized(params) {
   return next;
 }
 
-function runCase({ model, prompt, kiloToken, orgId, timeoutMs, variant }) {
+function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, variant }) {
   return new Promise(resolve => {
     void (async () => {
       const dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
@@ -72,6 +72,7 @@ function runCase({ model, prompt, kiloToken, orgId, timeoutMs, variant }) {
               ...(resolvedOrgId ? { organizationId: resolvedOrgId } : {}),
             },
           }),
+          KILO_API_URL: kiloApiUrl,
           ...(resolvedOrgId ? { KILO_ORG_ID: resolvedOrgId } : {}),
           NO_COLOR: '1',
         },
@@ -162,9 +163,13 @@ const server = createServer((req, res) => {
         sendJson(res, 400, { error: 'invalid JSON body' });
         return;
       }
-      const { model, kiloToken, orgId } = parsed ?? {};
-      if (typeof model !== 'string' || typeof kiloToken !== 'string') {
-        sendJson(res, 400, { error: 'model and kiloToken are required strings' });
+      const { model, kiloToken, kiloApiUrl, orgId } = parsed ?? {};
+      if (
+        typeof model !== 'string' ||
+        typeof kiloToken !== 'string' ||
+        typeof kiloApiUrl !== 'string'
+      ) {
+        sendJson(res, 400, { error: 'model, kiloToken and kiloApiUrl are required strings' });
         return;
       }
       if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
@@ -175,6 +180,7 @@ const server = createServer((req, res) => {
         model,
         prompt: 'Reply with exactly: ok',
         kiloToken,
+        kiloApiUrl,
         orgId,
         timeoutMs: DEFAULT_TIMEOUT_MS,
       });
@@ -191,7 +197,7 @@ const server = createServer((req, res) => {
         return;
       }
 
-      const { model, prompt, kiloToken, orgId, variant } = parsed ?? {};
+      const { model, prompt, kiloToken, kiloApiUrl, orgId, variant } = parsed ?? {};
       const timeoutMs =
         typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
           ? parsed.timeoutMs
@@ -200,9 +206,12 @@ const server = createServer((req, res) => {
       if (
         typeof model !== 'string' ||
         typeof prompt !== 'string' ||
-        typeof kiloToken !== 'string'
+        typeof kiloToken !== 'string' ||
+        typeof kiloApiUrl !== 'string'
       ) {
-        sendJson(res, 400, { error: 'model, prompt and kiloToken are required strings' });
+        sendJson(res, 400, {
+          error: 'model, prompt, kiloToken and kiloApiUrl are required strings',
+        });
         return;
       }
       if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
@@ -219,6 +228,7 @@ const server = createServer((req, res) => {
           model,
           prompt,
           kiloToken,
+          kiloApiUrl,
           orgId,
           timeoutMs,
           variant,

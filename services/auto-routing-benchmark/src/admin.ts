@@ -104,6 +104,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       const result = await debugRunCli(c.env, {
         ...c.req.valid('json'),
         kiloToken,
+        kiloApiUrl: c.env.KILO_CLI_API_URL,
         orgId: config.benchmarkOrgId,
       });
       return c.json(result);

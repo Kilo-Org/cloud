@@ -37,6 +37,7 @@ describe('runDeciderCaseViaCli', () => {
       model: 'vendor/model',
       benchCase,
       kiloToken: 'kilo-user-token',
+      kiloApiUrl: 'http://host.docker.internal:3000',
       orgId: 'org-123',
     });
 
@@ -45,6 +46,7 @@ describe('runDeciderCaseViaCli', () => {
     await expect(readJsonBody(request)).resolves.toMatchObject({
       model: 'vendor/model',
       kiloToken: 'kilo-user-token',
+      kiloApiUrl: 'http://host.docker.internal:3000',
       orgId: 'org-123',
     });
   });
@@ -61,6 +63,7 @@ describe('warmUpCliContainer', () => {
       instanceName: 'run:model:0',
       model: 'vendor/model',
       kiloToken: 'kilo-user-token',
+      kiloApiUrl: 'http://host.docker.internal:3000',
       orgId: 'org-123',
     });
 

@@ -229,11 +229,11 @@ function OptionGrid<Value extends string>({
               className={cn('mt-0.5', selected && 'border-brand-primary text-brand-primary')}
               disabled={disabled}
             />
-            <span className="space-y-1">
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className={cn('block font-medium', selected && 'text-brand-primary')}>
                 {option.label}
               </span>
-              <span className="text-muted-foreground block text-xs font-normal">
+              <span className="text-muted-foreground block min-h-10 text-xs leading-5 font-normal">
                 {option.description}
               </span>
             </span>

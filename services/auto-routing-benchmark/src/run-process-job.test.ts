@@ -63,6 +63,7 @@ const successfulCliResult = {
 
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
+  KILO_CLI_API_URL: 'http://host.docker.internal:3000',
   BENCH_DB: {} as D1Database,
   BENCH_QUEUE: { sendBatch: queueSendBatch },
   AUTO_ROUTING_CONFIG: { delete: vi.fn() },
@@ -75,6 +76,7 @@ function mockRunSnapshot(): void {
       min_accuracy: 0.7,
       switch_cost_factor: 3,
       benchmark_user_id: 'benchmark-user',
+      benchmark_org_id: 'benchmark-org',
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       started_at: '2026-06-16T00:00:00.000Z',
@@ -154,11 +156,19 @@ describe('processJob — decider chunk chaining', () => {
 
     expect(warmUpCliContainer).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ instanceName: `${runId}:${model}:0:0` })
+      expect.objectContaining({
+        instanceName: `${runId}:${model}:0:0`,
+        kiloApiUrl: 'http://host.docker.internal:3000',
+        orgId: 'benchmark-org',
+      })
     );
     expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ instanceName: `${runId}:${model}:0:0` })
+      expect.objectContaining({
+        instanceName: `${runId}:${model}:0:0`,
+        kiloApiUrl: 'http://host.docker.internal:3000',
+        orgId: 'benchmark-org',
+      })
     );
     expect(queueSendBatch).toHaveBeenCalledWith([
       {

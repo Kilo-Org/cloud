@@ -183,6 +183,7 @@ export function applyProviderSpecificLogic(
 
   if (
     isMinimaxModel(requestedModel) &&
+    requestedModel.includes('m3') &&
     !isReasoningExplicitlyEnabled(requestToMutate) &&
     requestToMutate.kind === 'messages'
   ) {

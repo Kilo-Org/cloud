@@ -5,17 +5,21 @@ jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
 }));
 
-// Chainable drizzle query builder mock. `.limit()` resolves to the rows we set.
 const mockRows: unknown[] = [];
+const mockMembershipRows: unknown[] = [];
+let mockSelectCallCount = 0;
 jest.mock('@/lib/drizzle', () => ({
   db: {
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve(mockRows),
+    select: () => {
+      const callIndex = mockSelectCallCount++;
+      return {
+        from: () => ({
+          where: () => ({
+            limit: () => Promise.resolve(callIndex === 0 ? mockRows : mockMembershipRows),
+          }),
         }),
-      }),
-    }),
+      };
+    },
   },
 }));
 
@@ -39,6 +43,8 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockRows.length = 0;
+    mockMembershipRows.length = 0;
+    mockSelectCallCount = 0;
   });
 
   it('returns 401 without the bearer secret', async () => {
@@ -82,6 +88,26 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
       {
         expiresIn: 6 * 60 * 60,
       }
+    );
+  });
+
+  it('mints an organization-scoped token when organizationId is provided', async () => {
+    const user = { id: 'user-1', api_token_pepper: 'pepper' };
+    mockRows.push(user);
+    mockMembershipRows.push({ role: 'owner' });
+
+    const res = await POST(
+      createRequest(
+        { userId: 'user-1', organizationId: 'org-1' },
+        { authorization: 'Bearer internal-secret' }
+      )
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockGenerateApiToken).toHaveBeenCalledWith(
+      user,
+      { tokenSource: 'auto-routing-benchmark', organizationId: 'org-1', organizationRole: 'owner' },
+      { expiresIn: 6 * 60 * 60 }
     );
   });
 });

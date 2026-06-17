@@ -99,6 +99,7 @@ export async function replaceConfig(
     switch_cost_factor: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
+    benchmark_org_id: string | null;
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
@@ -145,6 +146,7 @@ export async function insertRun(
     switch_cost_factor: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
+    benchmark_org_id: string | null;
     repetitions: number;
     classifier_max_p95_latency_ms: number | null;
     engine_identity: string;
@@ -162,6 +164,7 @@ export async function insertRun(
     switch_cost_factor: run.switch_cost_factor,
     max_concurrency: run.max_concurrency,
     benchmark_user_id: run.benchmark_user_id,
+    benchmark_org_id: run.benchmark_org_id,
     repetitions: run.repetitions,
     classifier_max_p95_latency_ms: run.classifier_max_p95_latency_ms,
     engine_identity: run.engine_identity,

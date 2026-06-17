@@ -25,13 +25,16 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
-import { kilocode_users } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { generateApiToken } from '@/lib/tokens';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 
-const RequestSchema = z.object({ userId: z.string().min(1) });
+const RequestSchema = z.object({
+  userId: z.string().min(1),
+  organizationId: z.string().min(1).optional(),
+});
 
 const SIX_HOURS_IN_SECONDS = 6 * 60 * 60;
 
@@ -76,12 +79,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  const apiToken = generateApiToken(
-    user,
-    { tokenSource: 'auto-routing-benchmark' },
-    { expiresIn: SIX_HOURS_IN_SECONDS }
-  );
+  const extraPayload = { tokenSource: 'auto-routing-benchmark' };
+  const organizationId = parsed.data.organizationId;
+  if (organizationId) {
+    const organizationRole = await getOrganizationRole(parsed.data.userId, organizationId);
+    if (organizationRole === null) {
+      return NextResponse.json({ error: 'Organization membership not found' }, { status: 404 });
+    }
+
+    const apiToken = generateApiToken(
+      user,
+      {
+        ...extraPayload,
+        organizationId,
+        organizationRole,
+      },
+      { expiresIn: SIX_HOURS_IN_SECONDS }
+    );
+    const expiresAt = new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString();
+
+    return NextResponse.json({ token: apiToken, expiresAt });
+  }
+
+  const apiToken = generateApiToken(user, extraPayload, { expiresIn: SIX_HOURS_IN_SECONDS });
   const expiresAt = new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString();
 
   return NextResponse.json({ token: apiToken, expiresAt });
+}
+
+async function getOrganizationRole(userId: string, organizationId: string) {
+  const [membership] = await db
+    .select({ role: organization_memberships.role })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.kilo_user_id, userId),
+        eq(organization_memberships.organization_id, organizationId)
+      )
+    )
+    .limit(1);
+
+  return membership?.role ?? null;
 }

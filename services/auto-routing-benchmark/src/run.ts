@@ -383,6 +383,7 @@ export async function startRun(
         switch_cost_factor: config.switchCostFactor,
         max_concurrency: config.maxConcurrency,
         benchmark_user_id: config.benchmarkUserId,
+        benchmark_org_id: config.benchmarkOrgId,
         repetitions,
         classifier_max_p95_latency_ms:
           kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
@@ -422,6 +423,7 @@ export async function startRun(
       minAccuracy: config.minAccuracy,
       switchCostFactor: config.switchCostFactor,
       benchmarkUserId: config.benchmarkUserId,
+      benchmarkOrgId: config.benchmarkOrgId,
       models: runModelRows,
       repetitions,
       classifierMaxP95LatencyMs: kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
@@ -542,6 +544,7 @@ type RunState = {
   minAccuracy: number;
   switchCostFactor: number;
   benchmarkUserId: string | null;
+  benchmarkOrgId: string | null;
   models: RunModelRow[];
   repetitions: number;
   classifierMaxP95LatencyMs: number | null;
@@ -558,6 +561,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     minAccuracy: run.min_accuracy,
     switchCostFactor: run.switch_cost_factor,
     benchmarkUserId: run.benchmark_user_id,
+    benchmarkOrgId: run.benchmark_org_id,
     models,
     repetitions: run.repetitions,
     classifierMaxP95LatencyMs: run.classifier_max_p95_latency_ms,
@@ -617,18 +621,26 @@ async function processDeciderJob(
   if (casesToRun.length > 0) {
     // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
     // queue retries the message. The token is never logged.
-    const kiloToken = await fetchBenchmarkUserToken(env, state.benchmarkUserId);
+    const kiloToken = await fetchBenchmarkUserToken(
+      env,
+      state.benchmarkUserId,
+      state.benchmarkOrgId
+    );
 
     // Fresh container instances run the CLI's one-time sqlite migration; the
     // container owns that via its /warmup endpoint so the first real case
     // doesn't burn its timeout on it. Ordinary warmup failures are non-fatal:
     // the first case absorbs whatever warmup work remains. Container capacity
     // failures are infrastructure pressure, so the queue retries the message.
-    await warmUpCliContainer(env, { instanceName, model: message.model, kiloToken }).catch(
-      error => {
-        if (isRetryableContainerAvailabilityError(error)) throw error;
-      }
-    );
+    await warmUpCliContainer(env, {
+      instanceName,
+      model: message.model,
+      kiloToken,
+      kiloApiUrl: env.KILO_CLI_API_URL,
+      orgId: state.benchmarkOrgId,
+    }).catch(error => {
+      if (isRetryableContainerAvailabilityError(error)) throw error;
+    });
 
     // Concurrency 1: the CLI's sqlite state in the container is not safe under
     // concurrent sessions (partial-migration crashes); the container serializes
@@ -641,6 +653,8 @@ async function processDeciderJob(
           model: message.model,
           benchCase,
           kiloToken,
+          kiloApiUrl: env.KILO_CLI_API_URL,
+          orgId: state.benchmarkOrgId,
           reasoningEffort,
         });
         // The CLI occasionally ends a session with no assistant text at all
@@ -654,6 +668,8 @@ async function processDeciderJob(
             model: message.model,
             benchCase,
             kiloToken,
+            kiloApiUrl: env.KILO_CLI_API_URL,
+            orgId: state.benchmarkOrgId,
             reasoningEffort,
           });
           retry.costUsd =
@@ -759,7 +775,11 @@ const TokenResponseSchema = z.object({ token: z.string().min(1), expiresAt: z.st
 
 // Calls apps/web's internal endpoint to mint a short-lived user API token for
 // the decider CLI. Never logs the token.
-export async function fetchBenchmarkUserToken(env: Env, userId: string): Promise<string> {
+export async function fetchBenchmarkUserToken(
+  env: Env,
+  userId: string,
+  organizationId: string | null = null
+): Promise<string> {
   const secret = await env.INTERNAL_API_SECRET_PROD.get();
   const response = await fetch(
     `${env.KILO_WEB_API_BASE_URL}/api/internal/auto-routing-benchmark/token`,
@@ -769,7 +789,7 @@ export async function fetchBenchmarkUserToken(env: Env, userId: string): Promise
         'content-type': 'application/json',
         authorization: `Bearer ${secret}`,
       },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, ...(organizationId ? { organizationId } : {}) }),
     }
   );
   if (!response.ok) {

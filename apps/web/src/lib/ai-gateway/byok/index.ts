@@ -70,14 +70,12 @@ export async function addUserByokAvailability(
   const enabledProviders = new Set(enabledProviderIds);
   return Promise.all(
     models.map(async model => {
-      if (isKiloExclusiveModel(model.id)) {
-        return { ...model, hasUserByokAvailable: false };
-      }
-      const supportedProviders = await getModelUserByokProviders(model.id);
-      return {
-        ...model,
-        hasUserByokAvailable: supportedProviders.some(provider => enabledProviders.has(provider)),
-      };
+      const hasUserByokAvailable =
+        !isKiloExclusiveModel(model.id) &&
+        (await getModelUserByokProviders(model.id)).some(provider =>
+          enabledProviders.has(provider)
+        );
+      return { ...model, hasUserByokAvailable };
     })
   );
 }

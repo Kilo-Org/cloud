@@ -33,13 +33,13 @@ import {
 import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
-  CURRENT_KILOCLAW_PRICE_VERSION,
   classifyKiloClawCommitTerm,
   deriveKiloClawCommitFinalBoundary,
   findLatestPreCutoffUserCommitSwitchQualification,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
   insertKiloClawSubscriptionChangeLog,
+  resolveKiloClawEnrollmentPriceVersion,
   maySelectKiloClawCommit,
   PersonalSubscriptionCollapseUQConflictError,
 } from '@kilocode/db';
@@ -129,8 +129,10 @@ import {
   undoKiloClawCommitStandardContinuation,
 } from '@/lib/kiloclaw/commit-retirement';
 import {
+  CreditEnrollmentError,
   enrollWithCredits as enrollWithCreditsImpl,
   getEffectiveCreditBalancePreview,
+  type CreditEnrollmentErrorReason,
 } from '@/lib/kiloclaw/credit-billing';
 import {
   logCreditEnrollmentAttempted,
@@ -343,21 +345,37 @@ async function getLatestPersonalBillingInstance(
   return instance ?? null;
 }
 
-function classifyEnrollWithCreditsError(message: string): {
-  code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST' | 'INTERNAL_SERVER_ERROR';
+type CreditEnrollmentRouterErrorDisposition = {
+  code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST';
   failureReason: CreditEnrollmentFailureReason;
-} {
-  if (message.includes('not found')) {
-    return { code: 'NOT_FOUND', failureReason: 'user_not_found' };
-  }
-  if (message.includes('already processed')) {
-    return { code: 'CONFLICT', failureReason: 'duplicate_enrollment' };
-  }
-  if (message.includes('already exists')) {
-    return { code: 'CONFLICT', failureReason: 'active_subscription_exists' };
-  }
-  if (message.includes('Insufficient credit balance')) {
-    return { code: 'BAD_REQUEST', failureReason: 'insufficient_credits' };
+};
+
+const CREDIT_ENROLLMENT_ROUTER_ERROR_DISPOSITIONS = {
+  commit_unavailable: { code: 'BAD_REQUEST', failureReason: 'precondition_failed' },
+  user_not_found: { code: 'NOT_FOUND', failureReason: 'user_not_found' },
+  instance_not_found: { code: 'NOT_FOUND', failureReason: 'no_instance' },
+  instance_destroyed: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  active_subscription_exists: {
+    code: 'CONFLICT',
+    failureReason: 'active_subscription_exists',
+  },
+  unknown_price_version: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  price_version_mismatch: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  insufficient_credits: { code: 'BAD_REQUEST', failureReason: 'insufficient_credits' },
+  target_unavailable: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  target_changed: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  requires_reprovision: { code: 'CONFLICT', failureReason: 'precondition_failed' },
+  duplicate_enrollment: { code: 'CONFLICT', failureReason: 'duplicate_enrollment' },
+} satisfies Record<CreditEnrollmentErrorReason, CreditEnrollmentRouterErrorDisposition>;
+
+function classifyEnrollWithCreditsError(error: unknown):
+  | CreditEnrollmentRouterErrorDisposition
+  | {
+      code: 'INTERNAL_SERVER_ERROR';
+      failureReason: 'internal_error';
+    } {
+  if (error instanceof CreditEnrollmentError) {
+    return CREDIT_ENROLLMENT_ROUTER_ERROR_DISPOSITIONS[error.reason];
   }
   return { code: 'INTERNAL_SERVER_ERROR', failureReason: 'internal_error' };
 }
@@ -1982,8 +2000,14 @@ async function getPersonalBillingStatus(user: {
 
   const creditIntroEligible = !(await hadPriorPaidSubscription(user.id));
   const creditBalanceMicrodollars = user.total_microdollars_acquired - user.microdollars_used;
-  const creditEnrollmentPriceVersion =
-    sub?.status === 'trialing' ? sub.kiloclaw_price_version : CURRENT_KILOCLAW_PRICE_VERSION;
+  const creditEnrollmentPriceVersion = resolveKiloClawEnrollmentPriceVersion(
+    sub
+      ? {
+          status: sub.status,
+          kiloclawPriceVersion: sub.kiloclaw_price_version,
+        }
+      : null
+  );
   const intendedPricing = getKiloClawPricingCatalogEntry(creditEnrollmentPriceVersion);
   const standardCreditCostMicrodollars = getKiloClawPlanCostMicrodollars({
     priceVersion: creditEnrollmentPriceVersion,
@@ -5033,6 +5057,41 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
+      if (anchorInstance.destroyed_at || !currentRow) {
+        logBillingWarning('KiloClaw direct checkout rejected before provider access', {
+          user_id: ctx.user.id,
+          instance_id: anchorInstance.id,
+          reason: anchorInstance.destroyed_at ? 'destroyed_billing_anchor' : 'missing_billing_row',
+        });
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Reprovision KiloClaw before starting a new Stripe subscription.',
+        });
+      }
+
+      const intendedPriceVersion = resolveKiloClawEnrollmentPriceVersion({
+        status: currentRow.subscription.status,
+        kiloclawPriceVersion: currentRow.subscription.kiloclaw_price_version,
+      });
+      if (
+        currentRow.subscription.status === 'canceled' &&
+        currentRow.subscription.kiloclaw_price_version !== intendedPriceVersion
+      ) {
+        logBillingWarning('KiloClaw direct checkout rejected before provider access', {
+          user_id: ctx.user.id,
+          instance_id: anchorInstance.id,
+          subscription_id: currentRow.subscription.id,
+          reason: 'incompatible_canceled_lineage',
+          persisted_price_version: currentRow.subscription.kiloclaw_price_version,
+          intended_price_version: intendedPriceVersion,
+        });
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            'This KiloClaw lineage cannot accept a new Stripe subscription. Activate hosting with credits or reprovision first.',
+        });
+      }
+
       // Guard against duplicate Stripe subscriptions: the DB check above exempts
       // trialing rows, so also verify against live Stripe state.
       const [activeSubs, trialingSubs, openSessions] = await Promise.all([
@@ -5062,10 +5121,6 @@ export const kiloclawRouter = createTRPCRouter({
         staleKiloClawSessions.map(s => stripe.checkout.sessions.expire(s.id).catch(() => {}))
       );
 
-      const intendedPriceVersion =
-        currentRow?.subscription.status === 'trialing'
-          ? currentRow.subscription.kiloclaw_price_version
-          : CURRENT_KILOCLAW_PRICE_VERSION;
       const intendedPricing = getKiloClawPricingCatalogEntry(intendedPriceVersion);
 
       // Intro pricing eligibility (spec Credit Enrollment rule 3).
@@ -5141,6 +5196,12 @@ export const kiloclawRouter = createTRPCRouter({
             message: 'Provision KiloClaw first before enrolling hosting with credits.',
           });
         }
+        if (anchorInstance.destroyed_at) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Reprovision KiloClaw before enrolling hosting with credits.',
+          });
+        }
         resolvedInstanceId = anchorInstance.id;
 
         // Intro pricing eligibility (spec Credit Enrollment rule 3).
@@ -5187,7 +5248,7 @@ export const kiloclawRouter = createTRPCRouter({
         }
 
         const message = error instanceof Error ? error.message : 'Credit enrollment failed';
-        const { code, failureReason } = classifyEnrollWithCreditsError(message);
+        const { code, failureReason } = classifyEnrollWithCreditsError(error);
         logCreditEnrollmentFailed({
           userId: ctx.user.id,
           plan: input.plan,
@@ -5226,6 +5287,12 @@ export const kiloclawRouter = createTRPCRouter({
           message: 'Provision KiloClaw first before starting Kilo Pass hosting activation.',
         });
       }
+      if (anchorInstance.destroyed_at) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Reprovision KiloClaw before starting Kilo Pass hosting activation.',
+        });
+      }
 
       const hasBlockingSubscription = await hasBlockingPersonalKiloclawSubscriptionAtInstance({
         userId: ctx.user.id,
@@ -5249,10 +5316,31 @@ export const kiloclawRouter = createTRPCRouter({
 
       const kiloPassTier = KILO_PASS_UPSELL_TIER_MAP[input.tier];
       const kiloPassCadence = KILO_PASS_UPSELL_CADENCE_MAP[input.cadence];
-      const intendedPriceVersion =
-        currentRow?.subscription.status === 'trialing'
-          ? currentRow.subscription.kiloclaw_price_version
-          : CURRENT_KILOCLAW_PRICE_VERSION;
+      const intendedPriceVersion = resolveKiloClawEnrollmentPriceVersion(
+        currentRow
+          ? {
+              status: currentRow.subscription.status,
+              kiloclawPriceVersion: currentRow.subscription.kiloclaw_price_version,
+            }
+          : null
+      );
+      if (
+        currentRow?.subscription.status === 'canceled' &&
+        currentRow.subscription.kiloclaw_price_version !== intendedPriceVersion
+      ) {
+        logBillingWarning('KiloClaw Kilo Pass checkout rejected before provider access', {
+          user_id: ctx.user.id,
+          instance_id: anchorInstance.id,
+          subscription_id: currentRow.subscription.id,
+          reason: 'canceled_legacy_requires_reprovision',
+          persisted_price_version: currentRow.subscription.kiloclaw_price_version,
+          intended_price_version: intendedPriceVersion,
+        });
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Reprovision KiloClaw before purchasing Kilo Pass with bundled hosting.',
+        });
+      }
       const intendedPricing = getKiloClawPricingCatalogEntry(intendedPriceVersion);
       const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
       const useStandardIntro =

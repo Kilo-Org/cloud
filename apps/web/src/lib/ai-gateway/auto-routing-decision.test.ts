@@ -47,7 +47,8 @@ const options = {
 
 const validDecision = {
   model: 'anthropic/claude-haiku-4',
-  tier: 'low' as const,
+  taskType: 'implementation' as const,
+  subtaskType: 'feature_development' as const,
   source: 'benchmark' as const,
   tableVersion: 'v1',
   sticky: false,

@@ -110,7 +110,6 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (
     isMinimaxModel(model) ||
     isKimiModel(model) ||
-    isGlmModel(model) ||
     isGrokToggleableReasoningModel(model) ||
     isQwenModel(model) ||
     isGemmaModel(model) ||
@@ -127,7 +126,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (isStepModel(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
   }
-  if (isDeepseekModel(model)) {
+  if (isDeepseekModel(model) || isGlmModel(model)) {
     return REASONING_VARIANTS_NONE_HIGH_XHIGH;
   }
   return undefined;
@@ -143,8 +142,10 @@ export function getAiSdkProvider(
   if (isOpenCodeGoAnthropicMessagesModel(model)) {
     return 'anthropic';
   }
-  if (isClaudeModel(model)) {
-    // on Vercel AI Gateway, this is necessary to support document attachments
+  if (
+    isClaudeModel(model) || // on Vercel AI Gateway, this is necessary to support document attachments
+    isMinimaxModel(model) // on Vercel AI Gateway, this is necessary for reasoning to show
+  ) {
     return 'anthropic';
   }
   if (isOpenAiModel(model) || isGrokModel(model)) {

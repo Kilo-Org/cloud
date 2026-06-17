@@ -138,6 +138,7 @@ describe('BenchmarkConfigSchema defaults', () => {
       minAccuracy: 0.8,
       maxConcurrency: 4,
       benchmarkUserId: null,
+      benchmarkOrgId: null,
       switchCostFactor: 2,
       updatedAt: null,
       updatedBy: null,
@@ -147,6 +148,21 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(result.deciderRepetitions).toBe(1);
     expect(result.classifierMaxP95LatencyMs).toBe(1000);
   });
+
+  it('accepts the benchmark maximum concurrency cap of 100', () => {
+    const result = BenchmarkConfigSchema.safeParse({
+      classifierModels: ['model/a'],
+      deciderModels: [{ id: 'model/b' }],
+      minAccuracy: 0.8,
+      maxConcurrency: 100,
+      benchmarkUserId: null,
+      benchmarkOrgId: null,
+      switchCostFactor: 2,
+      updatedAt: null,
+      updatedBy: null,
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('BenchmarkConfigSchema duplicate model ids', () => {
@@ -154,6 +170,7 @@ describe('BenchmarkConfigSchema duplicate model ids', () => {
     minAccuracy: 0.8,
     maxConcurrency: 4,
     benchmarkUserId: null,
+    benchmarkOrgId: null,
     switchCostFactor: 2,
     updatedAt: null,
     updatedBy: null,

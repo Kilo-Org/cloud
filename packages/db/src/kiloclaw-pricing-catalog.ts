@@ -63,6 +63,22 @@ export function getKiloClawPricingCatalogEntry(priceVersion: string): KiloClawPr
   return KILOCLAW_PRICING_CATALOG[priceVersion];
 }
 
+export function resolveKiloClawEnrollmentPriceVersion(
+  subscription:
+    | {
+        status: string;
+        kiloclawPriceVersion: string;
+      }
+    | null
+    | undefined
+): KiloClawPriceVersion {
+  if (subscription?.status !== 'trialing') {
+    return CURRENT_KILOCLAW_PRICE_VERSION;
+  }
+
+  return getKiloClawPricingCatalogEntry(subscription.kiloclawPriceVersion).priceVersion;
+}
+
 export function getKiloClawPlanCostMicrodollars(params: {
   priceVersion: string;
   plan: Extract<KiloClawPlan, 'standard' | 'commit'>;

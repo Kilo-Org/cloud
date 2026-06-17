@@ -19,8 +19,8 @@ const table: RoutingTable = {
   minAccuracy: 0.7,
   switchCostFactor: 3,
   source: 'benchmark',
-  tiers: {
-    low: [
+  routes: {
+    'implementation/code_generation': [
       {
         model: 'cheap/chat',
         accuracy: 0.85,
@@ -47,7 +47,7 @@ const table: RoutingTable = {
         meetsThreshold: false,
       },
     ],
-    medium: [
+    'debugging/bug_fixing': [
       {
         model: 'mid/chat',
         accuracy: 0.8,
@@ -55,7 +55,7 @@ const table: RoutingTable = {
         meetsThreshold: true,
       },
     ],
-    high: [
+    'planning_design/system_design': [
       {
         model: 'big/chat',
         accuracy: 0.9,
@@ -67,59 +67,39 @@ const table: RoutingTable = {
 };
 
 describe('computeDecision', () => {
-  it('picks the first candidate of the tier', () => {
+  it('picks the first candidate of the classifier taxonomy route', () => {
     const decision = computeDecision(classification, table, null);
     expect(decision).toEqual({
       model: 'cheap/chat',
-      tier: 'low',
+      taskType: 'implementation',
+      subtaskType: 'code_generation',
       source: 'benchmark',
       tableVersion: 'run-1',
       reasoningEffort: null,
       sticky: false,
     });
   });
-  it('uses the tier derived from the classification', () => {
-    const hard: ClassifierOutput = {
+  it('uses the classifier task type and subtype directly', () => {
+    const debugging: ClassifierOutput = {
       ...classification,
-      reasoningComplexity: 'high',
-      contextComplexity: 'large',
-      executionMode: 'multi_step_project',
+      taskType: 'debugging',
+      subtaskType: 'bug_fixing',
     };
-    expect(computeDecision(hard, table, null)?.model).toBe('big/chat');
-  });
-  it('returns a decision for every tier of a valid table', () => {
-    const byTier: Array<[ClassifierOutput, string]> = [
-      [classification, 'cheap/chat'],
-      [
-        { ...classification, reasoningComplexity: 'medium', contextComplexity: 'medium' },
-        'mid/chat',
-      ],
-      [
-        {
-          ...classification,
-          reasoningComplexity: 'high',
-          contextComplexity: 'large',
-          executionMode: 'multi_step_project',
-        },
-        'big/chat',
-      ],
-    ];
-    for (const [input, expected] of byTier) {
-      expect(computeDecision(input, table, null)?.model).toBe(expected);
-    }
+    expect(computeDecision(debugging, table, null)?.model).toBe('mid/chat');
   });
   it('returns null when there is no routing table', () => {
     expect(computeDecision(classification, null, null)).toBeNull();
   });
 
   describe('session stickiness', () => {
-    it('keeps the incumbent on tier de-escalation when it is within the switch-cost factor', () => {
+    it('keeps the incumbent on route changes when it is within the switch-cost factor', () => {
       // Fresh pick cheap/chat at 0.002; mid/chat at 0.005 is not cheaper by
       // more than 3x (0.002 * 3 = 0.006 >= 0.005), so the session stays put.
       const decision = computeDecision(classification, table, 'mid/chat');
       expect(decision).toEqual({
         model: 'mid/chat',
-        tier: 'low',
+        taskType: 'implementation',
+        subtaskType: 'code_generation',
         source: 'benchmark',
         tableVersion: 'run-1',
         // The incumbent's benchmarked effort, not the fresh pick's.
@@ -132,11 +112,19 @@ describe('computeDecision', () => {
       // Integer costs avoid float noise on the equality case (1 * 3 === 3).
       const boundaryTable: RoutingTable = {
         ...table,
-        tiers: {
-          ...table.tiers,
-          low: [
-            { ...table.tiers.low[0]!, model: 'fresh/chat', avgCostUsd: 1 },
-            { ...table.tiers.low[1]!, model: 'incumbent/chat', avgCostUsd: 3 },
+        routes: {
+          ...table.routes,
+          'implementation/code_generation': [
+            {
+              ...table.routes['implementation/code_generation'][0]!,
+              model: 'fresh/chat',
+              avgCostUsd: 1,
+            },
+            {
+              ...table.routes['implementation/code_generation'][1]!,
+              model: 'incumbent/chat',
+              avgCostUsd: 3,
+            },
           ],
         },
       };
@@ -148,11 +136,11 @@ describe('computeDecision', () => {
       const decision = computeDecision(classification, table, 'pricey/chat');
       expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
     });
-    it('switches when the incumbent no longer meets the tier threshold', () => {
+    it('switches when the incumbent no longer meets the route threshold', () => {
       const decision = computeDecision(classification, table, 'weak/chat');
       expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
     });
-    it('serves the fresh pick when the incumbent is not in the tier', () => {
+    it('serves the fresh pick when the incumbent is not in the route', () => {
       const decision = computeDecision(classification, table, 'gone/model');
       expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
     });

@@ -87,17 +87,15 @@ const benchmarkRoutingTable = {
   minAccuracy: 0.7,
   switchCostFactor: 3,
   source: 'benchmark',
-  tiers: {
-    low: [
+  routes: {
+    'implementation/feature_development': [
       {
         model: 'google/gemini-2.5-flash-lite',
         accuracy: 0.9,
-        avgCostUsd: 0.001,
+        avgCostUsd: 0.002,
         meetsThreshold: true,
         reasoningEffort: null,
       },
-    ],
-    medium: [
       {
         model: 'google/gemini-2.5-flash',
         accuracy: 0.85,
@@ -105,9 +103,9 @@ const benchmarkRoutingTable = {
         meetsThreshold: true,
         reasoningEffort: null,
       },
-      // The high-tier model also qualifies for medium, within the 3x
+      // The planning route's model also qualifies for implementation, within the 3x
       // switch-cost factor of the fresh pick (0.002 * 3 >= 0.005): a session
-      // de-escalating from high stays on it.
+      // moving routes stays on it.
       {
         model: 'anthropic/claude-sonnet-4.6',
         accuracy: 0.8,
@@ -116,7 +114,7 @@ const benchmarkRoutingTable = {
         reasoningEffort: null,
       },
     ],
-    high: [
+    'planning_design/system_design': [
       {
         model: 'anthropic/claude-sonnet-4.6',
         accuracy: 0.8,
@@ -235,7 +233,8 @@ describe('auto routing worker', () => {
       cost: 0.00000123,
       decision: {
         model: expect.any(String),
-        tier: expect.stringMatching(/^(low|medium|high)$/),
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'bench-run-1',
         reasoningEffort: null,
@@ -300,7 +299,8 @@ describe('auto routing worker', () => {
       cost: 0,
       decision: {
         model: expect.any(String),
-        tier: expect.stringMatching(/^(low|medium|high)$/),
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'bench-run-1',
         reasoningEffort: null,
@@ -331,7 +331,7 @@ describe('auto routing worker', () => {
     );
   });
 
-  it('keeps the session on the incumbent model when the tier de-escalates', async () => {
+  it('keeps the session on the incumbent model when the taxonomy route changes', async () => {
     // Back the mocked DO stub with real storage so the sticky model written
     // by the first request is visible to the second.
     const store = new Map<string, unknown>();
@@ -344,19 +344,24 @@ describe('auto routing worker', () => {
       ...mockClassifierResult,
       classification: {
         ...mockClassification,
-        reasoningComplexity: 'high',
-        contextComplexity: 'large',
-        executionMode: 'multi_step_project',
+        taskType: 'planning_design',
+        subtaskType: 'system_design',
       },
     });
     const first = await decideRequest(mirrorPayload());
     expect(first.status).toBe(200);
     await expect(first.json()).resolves.toMatchObject({
-      decision: { model: 'anthropic/claude-sonnet-4.6', tier: 'high', sticky: false },
+      decision: {
+        model: 'anthropic/claude-sonnet-4.6',
+        taskType: 'planning_design',
+        subtaskType: 'system_design',
+        sticky: false,
+      },
     });
+    store.set('sticky', { model: 'anthropic/claude-sonnet-4.6' });
 
-    // The second turn (different prompt, same session) classifies as medium.
-    // The fresh medium pick is cheaper, but not by more than the switch-cost
+    // The second turn (different prompt, same session) classifies to a cheaper route.
+    // The fresh implementation pick is cheaper, but not by more than the switch-cost
     // factor, so the session keeps its incumbent.
     const second = await decideRequest(
       mirrorPayload({
@@ -365,7 +370,12 @@ describe('auto routing worker', () => {
     );
     expect(second.status).toBe(200);
     await expect(second.json()).resolves.toMatchObject({
-      decision: { model: 'anthropic/claude-sonnet-4.6', tier: 'medium', sticky: true },
+      decision: {
+        model: 'anthropic/claude-sonnet-4.6',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        sticky: true,
+      },
     });
   });
 

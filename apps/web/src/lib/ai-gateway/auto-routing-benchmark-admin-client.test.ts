@@ -22,6 +22,7 @@ const configResponse = {
     switchCostFactor: 3,
     maxConcurrency: 4,
     benchmarkUserId: null,
+    benchmarkOrgId: null,
     classifierRepetitions: 1,
     deciderRepetitions: 1,
     classifierMaxP95LatencyMs: 1000,

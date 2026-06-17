@@ -1,13 +1,8 @@
-import type {
-  ClassifierSubtaskType,
-  ClassifierTaskType,
-  DifficultyTier,
-} from '@kilocode/auto-routing-contracts';
+import type { ClassifierSubtaskType, ClassifierTaskType } from '@kilocode/auto-routing-contracts';
 import type { DeciderCheck } from '../grading';
 
 export type DeciderCase = {
   id: string; // stable slug, e.g. 'impl-gen-squares-array' (<taskType>-<subtype>-<topic>)
-  tier: DifficultyTier;
   taskType: ClassifierTaskType;
   subtaskType: ClassifierSubtaskType;
   systemPrompt: string;
@@ -28,19 +23,15 @@ const AGENT_SYS =
 // noise (fences/case/whitespace) but never wrong values. For json_equal cases
 // the prompt pins the exact key set in the same order as the expected value
 // (the comparison is JSON.stringify-based and order-sensitive). Each case
-// carries exactly one difficulty tier: low = mechanical lookups / trivial
-// evaluation, medium = multi-step reasoning / off-by-one traps / spec
-// application, high = deep tracing / multi-constraint puzzles / subtle
-// semantics. agentic_execution cases are self-contained tasks performed with
-// file/terminal tools inside the benchmark container (node:22-slim, no repo,
-// no network) and every command involved is deterministic there.
+// agentic_execution cases are self-contained tasks performed with file/terminal
+// tools inside the benchmark container (node:22-slim, no repo, no network) and
+// every command involved is deterministic there.
 export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   // implementation / feature_development
   // ---------------------------------------------------------------------------
   {
     id: 'impl-feat-ternary-parity',
-    tier: 'low',
     taskType: 'implementation',
     subtaskType: 'feature_development',
     systemPrompt: CODE_SYS,
@@ -50,7 +41,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-feat-array-pipeline',
-    tier: 'low',
     taskType: 'implementation',
     subtaskType: 'feature_development',
     systemPrompt: CODE_SYS,
@@ -60,7 +50,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-feat-closure-counter',
-    tier: 'medium',
     taskType: 'implementation',
     subtaskType: 'feature_development',
     systemPrompt: CODE_SYS,
@@ -70,7 +59,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-feat-recursion-fib',
-    tier: 'medium',
     taskType: 'implementation',
     subtaskType: 'feature_development',
     systemPrompt: CODE_SYS,
@@ -80,7 +68,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-feat-this-binding',
-    tier: 'high',
     taskType: 'implementation',
     subtaskType: 'feature_development',
     systemPrompt: CODE_SYS,
@@ -94,7 +81,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'impl-gen-package-manifest',
-    tier: 'low',
     taskType: 'implementation',
     subtaskType: 'code_generation',
     systemPrompt: CODE_SYS,
@@ -104,7 +90,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-gen-squares-array',
-    tier: 'low',
     taskType: 'implementation',
     subtaskType: 'code_generation',
     systemPrompt: CODE_SYS,
@@ -114,7 +99,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-gen-no-consecutive-ones',
-    tier: 'medium',
     taskType: 'implementation',
     subtaskType: 'code_generation',
     systemPrompt: CODE_SYS,
@@ -124,7 +108,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-gen-two-ones-strings',
-    tier: 'high',
     taskType: 'implementation',
     subtaskType: 'code_generation',
     systemPrompt: CODE_SYS,
@@ -141,7 +124,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'impl-test-sort-expectation',
-    tier: 'low',
     taskType: 'implementation',
     subtaskType: 'test_creation',
     systemPrompt: CODE_SYS,
@@ -151,7 +133,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-test-upper-expectation',
-    tier: 'low',
     taskType: 'implementation',
     subtaskType: 'test_creation',
     systemPrompt: CODE_SYS,
@@ -161,7 +142,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-test-mock-call-count',
-    tier: 'medium',
     taskType: 'implementation',
     subtaskType: 'test_creation',
     systemPrompt: CODE_SYS,
@@ -171,7 +151,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'impl-test-trailing-zeros',
-    tier: 'high',
     taskType: 'implementation',
     subtaskType: 'test_creation',
     systemPrompt: CODE_SYS,
@@ -185,7 +164,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'debug-fix-parseint-suffix',
-    tier: 'low',
     taskType: 'debugging',
     subtaskType: 'bug_fixing',
     systemPrompt: CODE_SYS,
@@ -195,7 +173,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'debug-fix-binary-search',
-    tier: 'medium',
     taskType: 'debugging',
     subtaskType: 'bug_fixing',
     systemPrompt: CODE_SYS,
@@ -207,7 +184,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
     // 'pages' rather than 'pagination' so the id never collides with the
     // classifier dataset's debug-fix-pagination-slice in shared telemetry.
     id: 'debug-fix-pages-slice',
-    tier: 'medium',
     taskType: 'debugging',
     subtaskType: 'bug_fixing',
     systemPrompt: CODE_SYS,
@@ -217,7 +193,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'debug-fix-regex-lastindex',
-    tier: 'high',
     taskType: 'debugging',
     subtaskType: 'bug_fixing',
     systemPrompt: CODE_SYS,
@@ -231,7 +206,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'debug-repair-compound-assign',
-    tier: 'low',
     taskType: 'debugging',
     subtaskType: 'test_repair',
     systemPrompt: CODE_SYS,
@@ -241,7 +215,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'debug-repair-date-format',
-    tier: 'medium',
     taskType: 'debugging',
     subtaskType: 'test_repair',
     systemPrompt: CODE_SYS,
@@ -251,7 +224,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'debug-repair-entries-shape',
-    tier: 'medium',
     taskType: 'debugging',
     subtaskType: 'test_repair',
     systemPrompt: CODE_SYS,
@@ -267,7 +239,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'debug-repair-float-sum',
-    tier: 'high',
     taskType: 'debugging',
     subtaskType: 'test_repair',
     systemPrompt: CODE_SYS,
@@ -281,7 +252,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'debug-rca-async-order',
-    tier: 'medium',
     taskType: 'debugging',
     subtaskType: 'root_cause_analysis',
     systemPrompt: CODE_SYS,
@@ -291,7 +261,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'debug-rca-shared-ref',
-    tier: 'medium',
     taskType: 'debugging',
     subtaskType: 'root_cause_analysis',
     systemPrompt: CODE_SYS,
@@ -301,7 +270,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'debug-rca-closure-loop-var',
-    tier: 'high',
     taskType: 'debugging',
     subtaskType: 'root_cause_analysis',
     systemPrompt: CODE_SYS,
@@ -311,7 +279,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'debug-rca-float-equality',
-    tier: 'high',
     taskType: 'debugging',
     subtaskType: 'root_cause_analysis',
     systemPrompt: CODE_SYS,
@@ -325,7 +292,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'refactor-cleanup-loop-to-reduce',
-    tier: 'low',
     taskType: 'refactoring',
     subtaskType: 'code_cleanup',
     systemPrompt: CODE_SYS,
@@ -335,7 +301,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'refactor-cleanup-extract-helper',
-    tier: 'low',
     taskType: 'refactoring',
     subtaskType: 'code_cleanup',
     systemPrompt: CODE_SYS,
@@ -345,7 +310,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'refactor-cleanup-map-equivalent',
-    tier: 'medium',
     taskType: 'refactoring',
     subtaskType: 'code_cleanup',
     systemPrompt: CODE_SYS,
@@ -355,7 +319,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'refactor-cleanup-short-circuit',
-    tier: 'high',
     taskType: 'refactoring',
     subtaskType: 'code_cleanup',
     systemPrompt: CODE_SYS,
@@ -369,7 +332,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'refactor-arch-import-updates',
-    tier: 'low',
     taskType: 'refactoring',
     subtaskType: 'architecture_improvement',
     systemPrompt: CODE_SYS,
@@ -379,7 +341,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'refactor-arch-layer-depth',
-    tier: 'medium',
     taskType: 'refactoring',
     subtaskType: 'architecture_improvement',
     systemPrompt: CODE_SYS,
@@ -389,7 +350,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'refactor-arch-interface-edges',
-    tier: 'medium',
     taskType: 'refactoring',
     subtaskType: 'architecture_improvement',
     systemPrompt: CODE_SYS,
@@ -399,7 +359,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'refactor-arch-cycle-cut',
-    tier: 'high',
     taskType: 'refactoring',
     subtaskType: 'architecture_improvement',
     systemPrompt: CODE_SYS,
@@ -413,7 +372,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'refactor-migrate-substr-slice',
-    tier: 'low',
     taskType: 'refactoring',
     subtaskType: 'migration',
     systemPrompt: CODE_SYS,
@@ -423,7 +381,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'refactor-migrate-promise-chain',
-    tier: 'medium',
     taskType: 'refactoring',
     subtaskType: 'migration',
     systemPrompt: CODE_SYS,
@@ -433,7 +390,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'refactor-migrate-strict-equality',
-    tier: 'medium',
     taskType: 'refactoring',
     subtaskType: 'migration',
     systemPrompt: CODE_SYS,
@@ -443,7 +399,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'refactor-migrate-var-to-let',
-    tier: 'high',
     taskType: 'refactoring',
     subtaskType: 'migration',
     systemPrompt: CODE_SYS,
@@ -456,18 +411,16 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // planning_design / architecture_design
   // ---------------------------------------------------------------------------
   {
-    id: 'plan-arch-three-tier',
-    tier: 'low',
+    id: 'plan-arch-three-layer',
     taskType: 'planning_design',
     subtaskType: 'architecture_design',
     systemPrompt: SYS_SYS,
     userPrompt:
-      'In a classic three-tier architecture with presentation, business, and data tiers, which tier should contain the SQL queries? Answer with only one word: presentation, business, or data.',
+      'In a classic three-layer architecture with presentation, business, and data layers, which layer should contain the SQL queries? Answer with only one word: presentation, business, or data.',
     check: { kind: 'exact', value: 'data' },
   },
   {
     id: 'plan-arch-call-chain',
-    tier: 'medium',
     taskType: 'planning_design',
     subtaskType: 'architecture_design',
     systemPrompt: SYS_SYS,
@@ -477,7 +430,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-arch-dependency-rules',
-    tier: 'medium',
     taskType: 'planning_design',
     subtaskType: 'architecture_design',
     systemPrompt: SYS_SYS,
@@ -487,7 +439,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-arch-latency-budget',
-    tier: 'high',
     taskType: 'planning_design',
     subtaskType: 'architecture_design',
     systemPrompt: SYS_SYS,
@@ -501,7 +452,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'plan-steps-rollout-order',
-    tier: 'low',
     taskType: 'planning_design',
     subtaskType: 'technical_planning',
     systemPrompt: SYS_SYS,
@@ -511,7 +461,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-steps-batch-count',
-    tier: 'medium',
     taskType: 'planning_design',
     subtaskType: 'technical_planning',
     systemPrompt: SYS_SYS,
@@ -521,7 +470,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-steps-deploy-waves',
-    tier: 'medium',
     taskType: 'planning_design',
     subtaskType: 'technical_planning',
     systemPrompt: SYS_SYS,
@@ -531,7 +479,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-steps-critical-path',
-    tier: 'high',
     taskType: 'planning_design',
     subtaskType: 'technical_planning',
     systemPrompt: SYS_SYS,
@@ -545,7 +492,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'plan-system-write-quorum',
-    tier: 'low',
     taskType: 'planning_design',
     subtaskType: 'system_design',
     systemPrompt: SYS_SYS,
@@ -555,7 +501,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-system-rate-limit-window',
-    tier: 'medium',
     taskType: 'planning_design',
     subtaskType: 'system_design',
     systemPrompt: SYS_SYS,
@@ -565,7 +510,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-system-replica-availability',
-    tier: 'medium',
     taskType: 'planning_design',
     subtaskType: 'system_design',
     systemPrompt: SYS_SYS,
@@ -575,7 +519,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-system-cache-staleness',
-    tier: 'high',
     taskType: 'planning_design',
     subtaskType: 'system_design',
     systemPrompt: SYS_SYS,
@@ -585,7 +528,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-system-queue-trace',
-    tier: 'high',
     taskType: 'planning_design',
     subtaskType: 'system_design',
     systemPrompt: SYS_SYS,
@@ -595,7 +537,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-system-deadlock-order',
-    tier: 'high',
     taskType: 'planning_design',
     subtaskType: 'system_design',
     systemPrompt: SYS_SYS,
@@ -605,7 +546,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'plan-system-txn-isolation',
-    tier: 'high',
     taskType: 'planning_design',
     subtaskType: 'system_design',
     systemPrompt: SYS_SYS,
@@ -619,7 +559,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'invest-repo-test-file-count',
-    tier: 'low',
     taskType: 'investigation',
     subtaskType: 'repo_exploration',
     systemPrompt: CODE_SYS,
@@ -629,7 +568,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'invest-repo-glob-match',
-    tier: 'medium',
     taskType: 'investigation',
     subtaskType: 'repo_exploration',
     systemPrompt: CODE_SYS,
@@ -639,7 +577,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'invest-repo-grep-case',
-    tier: 'medium',
     taskType: 'investigation',
     subtaskType: 'repo_exploration',
     systemPrompt: CODE_SYS,
@@ -649,7 +586,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'invest-repo-gitignore',
-    tier: 'high',
     taskType: 'investigation',
     subtaskType: 'repo_exploration',
     systemPrompt: CODE_SYS,
@@ -663,7 +599,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'invest-code-char-count',
-    tier: 'low',
     taskType: 'investigation',
     subtaskType: 'codebase_understanding',
     systemPrompt: CODE_SYS,
@@ -673,7 +608,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'invest-code-object-keys',
-    tier: 'low',
     taskType: 'investigation',
     subtaskType: 'codebase_understanding',
     systemPrompt: CODE_SYS,
@@ -683,7 +617,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'invest-code-regex-groups',
-    tier: 'medium',
     taskType: 'investigation',
     subtaskType: 'codebase_understanding',
     systemPrompt: CODE_SYS,
@@ -693,7 +626,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'invest-code-collatz-depth',
-    tier: 'high',
     taskType: 'investigation',
     subtaskType: 'codebase_understanding',
     systemPrompt: CODE_SYS,
@@ -707,7 +639,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'invest-ext-http-created',
-    tier: 'low',
     taskType: 'investigation',
     subtaskType: 'external_research',
     systemPrompt:
@@ -718,7 +649,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'invest-ext-utf8-euro',
-    tier: 'medium',
     taskType: 'investigation',
     subtaskType: 'external_research',
     systemPrompt: SYS_SYS,
@@ -728,7 +658,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'invest-ext-semver-caret',
-    tier: 'medium',
     taskType: 'investigation',
     subtaskType: 'external_research',
     systemPrompt: CODE_SYS,
@@ -738,7 +667,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'invest-ext-json-spec',
-    tier: 'high',
     taskType: 'investigation',
     subtaskType: 'external_research',
     systemPrompt: CODE_SYS,
@@ -752,7 +680,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'agentic-tool-json-read',
-    tier: 'low',
     taskType: 'agentic_execution',
     subtaskType: 'tool_usage',
     systemPrompt: AGENT_SYS,
@@ -762,7 +689,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'agentic-tool-notes-count',
-    tier: 'low',
     taskType: 'agentic_execution',
     subtaskType: 'tool_usage',
     systemPrompt: AGENT_SYS,
@@ -772,7 +698,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'agentic-tool-log-grep',
-    tier: 'medium',
     taskType: 'agentic_execution',
     subtaskType: 'tool_usage',
     systemPrompt: AGENT_SYS,
@@ -782,7 +707,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'agentic-tool-csv-filter-sum',
-    tier: 'high',
     taskType: 'agentic_execution',
     subtaskType: 'tool_usage',
     systemPrompt: AGENT_SYS,
@@ -796,7 +720,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'agentic-term-node-major',
-    tier: 'low',
     taskType: 'agentic_execution',
     subtaskType: 'terminal_operations',
     systemPrompt: AGENT_SYS,
@@ -806,7 +729,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'agentic-term-wc-lines',
-    tier: 'low',
     taskType: 'agentic_execution',
     subtaskType: 'terminal_operations',
     systemPrompt: AGENT_SYS,
@@ -816,7 +738,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'agentic-term-sort-pipeline',
-    tier: 'medium',
     taskType: 'agentic_execution',
     subtaskType: 'terminal_operations',
     systemPrompt: AGENT_SYS,
@@ -826,7 +747,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'agentic-term-sha256-prefix',
-    tier: 'high',
     taskType: 'agentic_execution',
     subtaskType: 'terminal_operations',
     systemPrompt: AGENT_SYS,
@@ -840,7 +760,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   // ---------------------------------------------------------------------------
   {
     id: 'agentic-multi-seq-sum',
-    tier: 'medium',
     taskType: 'agentic_execution',
     subtaskType: 'multi_step_execution',
     systemPrompt: AGENT_SYS,
@@ -850,7 +769,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'agentic-multi-node-script',
-    tier: 'medium',
     taskType: 'agentic_execution',
     subtaskType: 'multi_step_execution',
     systemPrompt: AGENT_SYS,
@@ -860,7 +778,6 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'agentic-multi-find-count',
-    tier: 'medium',
     taskType: 'agentic_execution',
     subtaskType: 'multi_step_execution',
     systemPrompt: AGENT_SYS,
@@ -870,12 +787,950 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   },
   {
     id: 'agentic-multi-json-transform',
-    tier: 'high',
     taskType: 'agentic_execution',
     subtaskType: 'multi_step_execution',
     systemPrompt: AGENT_SYS,
     userPrompt:
       'Create a file /tmp/bench-in.json containing exactly this JSON array: [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]. Then write and run a Node.js script that reads the file, computes the sum of the distinct values in the array, and prints it. Answer with only the number.',
+    check: { kind: 'exact', value: '30' },
+  },
+  // ---------------------------------------------------------------------------
+  // Supplemental taxonomy-route coverage
+  // ---------------------------------------------------------------------------
+  {
+    id: 'supp-impl-feat-clamp',
+    taskType: 'implementation',
+    subtaskType: 'feature_development',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'Implement mentally: clamp(14, 3, 9) returns min when low, max when high, otherwise value. Answer with only the returned number.',
+    check: { kind: 'exact', value: '9' },
+  },
+  {
+    id: 'supp-impl-feat-join-slugs',
+    taskType: 'implementation',
+    subtaskType: 'feature_development',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'What should slug(["Kilo", "Code", "Cloud"]) return if it lowercases words and joins them with hyphens? Answer only the return value.',
+    check: { kind: 'exact', value: 'kilo-code-cloud' },
+  },
+  {
+    id: 'supp-impl-code-nullish',
+    taskType: 'implementation',
+    subtaskType: 'code_generation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'What does this print? Answer with only the output.\n\nconst x = null ?? "fallback";\nconsole.log(x);',
+    check: { kind: 'exact', value: 'fallback' },
+  },
+  {
+    id: 'supp-impl-code-set-size',
+    taskType: 'implementation',
+    subtaskType: 'code_generation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'What does this JavaScript print? Answer only the number.\n\nconst s = new Set(["a", "b", "a", "c"]);\nconsole.log(s.size);',
+    check: { kind: 'exact', value: '3' },
+  },
+  {
+    id: 'supp-impl-test-boundary-count',
+    taskType: 'implementation',
+    subtaskType: 'test_creation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A clamp(value, min, max) function needs tests for below min, at min, inside range, at max, and above max. How many cases is that? Answer only the number.',
+    check: { kind: 'exact', value: '5' },
+  },
+  {
+    id: 'supp-impl-test-error-case',
+    taskType: 'implementation',
+    subtaskType: 'test_creation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'For parsePort(input), which invalid input should a test include: "3000", "0", or "abc"? Answer only the invalid value.',
+    check: { kind: 'exact', value: 'abc' },
+  },
+  {
+    id: 'supp-debug-bug-off-by-one',
+    taskType: 'debugging',
+    subtaskType: 'bug_fixing',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A loop uses i <= items.length and reads items[i]. What operator should replace <= to avoid reading past the end? Answer only the operator.',
+    check: { kind: 'exact', value: '<' },
+  },
+  {
+    id: 'supp-debug-bug-json-parse',
+    taskType: 'debugging',
+    subtaskType: 'bug_fixing',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'JSON.parse("{bad}") throws. Should the fix catch SyntaxError or TypeError? Answer only the error class.',
+    check: { kind: 'exact', value: 'SyntaxError' },
+  },
+  {
+    id: 'supp-debug-test-expected',
+    taskType: 'debugging',
+    subtaskType: 'test_repair',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A function returns ["a", "b"]. The failing test expects ["b", "a"] but order is part of the contract. Which expected array is correct? Answer JSON only.',
+    check: { kind: 'json_equal', value: ['a', 'b'] },
+  },
+  {
+    id: 'supp-debug-test-timeout',
+    taskType: 'debugging',
+    subtaskType: 'test_repair',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A test waits for text that appears after clicking Save, but it never clicks Save. What single action is missing? Answer only the verb.',
+    check: { kind: 'exact', value: 'click' },
+  },
+  {
+    id: 'supp-debug-root-cause-cache',
+    taskType: 'debugging',
+    subtaskType: 'root_cause_analysis',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A value updates in the database but the page shows the old value until cache expiry. Which layer is the likely root cause: database, cache, or compiler? Answer one word.',
+    check: { kind: 'exact', value: 'cache' },
+  },
+  {
+    id: 'supp-debug-root-cause-env',
+    taskType: 'debugging',
+    subtaskType: 'root_cause_analysis',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Local requests hit port 8810 but the worker config says the target service runs on 8814. What kind of mismatch is this? Answer one word.',
+    check: { kind: 'exact', value: 'port' },
+  },
+  {
+    id: 'supp-refactor-cleanup-dead-branch',
+    taskType: 'refactoring',
+    subtaskType: 'code_cleanup',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A condition checks if status === "done" inside a branch where status is already known to be "pending". What should happen to that inner branch? Answer one word.',
+    check: { kind: 'exact', value: 'remove' },
+  },
+  {
+    id: 'supp-refactor-cleanup-name',
+    taskType: 'refactoring',
+    subtaskType: 'code_cleanup',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'Which name is clearer for a boolean: data, flag, or hasErrors? Answer only the best name.',
+    check: { kind: 'exact', value: 'hasErrors' },
+  },
+  {
+    id: 'supp-refactor-arch-shared-helper',
+    taskType: 'refactoring',
+    subtaskType: 'architecture_improvement',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Three modules duplicate the same pure validation logic. Should the shared code be a pure helper, global mutable state, or copied again? Answer two words.',
+    check: { kind: 'exact', value: 'pure helper' },
+  },
+  {
+    id: 'supp-refactor-arch-boundary',
+    taskType: 'refactoring',
+    subtaskType: 'architecture_improvement',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A UI component directly opens database connections. Which boundary should own the database call: UI, server, or CSS? Answer one word.',
+    check: { kind: 'exact', value: 'server' },
+  },
+  {
+    id: 'supp-refactor-migration-column',
+    taskType: 'refactoring',
+    subtaskType: 'migration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A migration renames user_name to display_name without changing values. What SQL operation is this: INSERT, RENAME COLUMN, or DROP TABLE? Answer only the operation.',
+    check: { kind: 'exact', value: 'RENAME COLUMN' },
+  },
+  {
+    id: 'supp-refactor-migration-backfill',
+    taskType: 'refactoring',
+    subtaskType: 'migration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'After adding a non-null slug column to existing rows, what data operation fills slug for old rows? Answer one word.',
+    check: { kind: 'exact', value: 'backfill' },
+  },
+  {
+    id: 'supp-plan-arch-cache-layer',
+    taskType: 'planning_design',
+    subtaskType: 'architecture_design',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'For read-heavy config that changes rarely, should the hot path read every request from origin storage or use a short cache? Answer two words.',
+    check: { kind: 'exact', value: 'short cache' },
+  },
+  {
+    id: 'supp-plan-arch-queue',
+    taskType: 'planning_design',
+    subtaskType: 'architecture_design',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A long-running benchmark exceeds request time limits. Which primitive should carry the work asynchronously: queue, cookie, or CSS? Answer one word.',
+    check: { kind: 'exact', value: 'queue' },
+  },
+  {
+    id: 'supp-plan-technical-rollout',
+    taskType: 'planning_design',
+    subtaskType: 'technical_planning',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Order these rollout steps: deploy code, run migration, monitor logs. Which step should be last? Answer two words.',
+    check: { kind: 'exact', value: 'monitor logs' },
+  },
+  {
+    id: 'supp-plan-technical-risk',
+    taskType: 'planning_design',
+    subtaskType: 'technical_planning',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A plan changes a shared API contract. Should verification focus on one file only or all direct consumers? Answer three words.',
+    check: { kind: 'exact', value: 'all direct consumers' },
+  },
+  {
+    id: 'supp-plan-system-slo',
+    taskType: 'planning_design',
+    subtaskType: 'system_design',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A service retries failed jobs and eventually sends hopeless jobs to a separate queue. What is that queue commonly called? Answer only the abbreviation.',
+    check: { kind: 'exact', value: 'DLQ' },
+  },
+  {
+    id: 'supp-plan-system-idempotency',
+    taskType: 'planning_design',
+    subtaskType: 'system_design',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'If the same queue message may be delivered twice, should writes be idempotent or random? Answer one word.',
+    check: { kind: 'exact', value: 'idempotent' },
+  },
+  {
+    id: 'supp-invest-repo-rg',
+    taskType: 'investigation',
+    subtaskType: 'repo_exploration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Which command is the fastest common choice to search a repository for the string saveRoutingTable: rg, cat, or date? Answer one word.',
+    check: { kind: 'exact', value: 'rg' },
+  },
+  {
+    id: 'supp-invest-repo-package',
+    taskType: 'investigation',
+    subtaskType: 'repo_exploration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'In a pnpm monorepo, which file usually names a package and its scripts: package.json or README.md? Answer only the file name.',
+    check: { kind: 'exact', value: 'package.json' },
+  },
+  {
+    id: 'supp-invest-code-flow',
+    taskType: 'investigation',
+    subtaskType: 'codebase_understanding',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A handler calls validateInput, then saveRow, then enqueueJob. Which function creates the async follow-up? Answer only the function name.',
+    check: { kind: 'exact', value: 'enqueueJob' },
+  },
+  {
+    id: 'supp-invest-code-owner',
+    taskType: 'investigation',
+    subtaskType: 'codebase_understanding',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'If a type is imported from @kilocode/auto-routing-contracts, which package owns that type? Answer only the package name.',
+    check: { kind: 'exact', value: '@kilocode/auto-routing-contracts' },
+  },
+  {
+    id: 'supp-invest-research-source',
+    taskType: 'investigation',
+    subtaskType: 'external_research',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'For a question about current Cloudflare Workers limits, should you prefer official docs or an old blog post? Answer two words.',
+    check: { kind: 'exact', value: 'official docs' },
+  },
+  {
+    id: 'supp-invest-research-date',
+    taskType: 'investigation',
+    subtaskType: 'external_research',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'When comparing two search results for current pricing, which field matters most: publish date, font size, or title length? Answer two words.',
+    check: { kind: 'exact', value: 'publish date' },
+  },
+  {
+    id: 'supp-agent-tool-json-file',
+    taskType: 'agentic_execution',
+    subtaskType: 'tool_usage',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-tool.json containing exactly {"a":2,"b":5}. Then read it and answer with only the sum of a and b.',
+    check: { kind: 'exact', value: '7' },
+  },
+  {
+    id: 'supp-agent-tool-grep-count',
+    taskType: 'agentic_execution',
+    subtaskType: 'tool_usage',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-tool.txt with lines alpha, beta, alphabet, gamma. Count lines containing alpha and answer only the number.',
+    check: { kind: 'exact', value: '2' },
+  },
+  {
+    id: 'supp-agent-term-node-eval',
+    taskType: 'agentic_execution',
+    subtaskType: 'terminal_operations',
+    systemPrompt: AGENT_SYS,
+    userPrompt: 'Run node -e "console.log(6*7)" in the terminal and answer with only the output.',
+    check: { kind: 'exact', value: '42' },
+  },
+  {
+    id: 'supp-agent-term-pwd-base',
+    taskType: 'agentic_execution',
+    subtaskType: 'terminal_operations',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Run pwd in the terminal. If it ends with /app, answer app; otherwise answer other. Answer one word.',
+    check: { kind: 'regex', pattern: '^(app|other)$' },
+  },
+  {
+    id: 'supp-agent-multi-script',
+    taskType: 'agentic_execution',
+    subtaskType: 'multi_step_execution',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Write /tmp/bench-multi.js that prints ["k","i","l","o"].join(""). Run it with node and answer with only what it prints.',
+    check: { kind: 'exact', value: 'kilo' },
+  },
+  {
+    id: 'supp-agent-multi-files',
+    taskType: 'agentic_execution',
+    subtaskType: 'multi_step_execution',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-a.txt containing 11 and /tmp/bench-b.txt containing 31. Read both files, add the numbers, and answer only the sum.',
+    check: { kind: 'exact', value: '42' },
+  },
+
+  // ---------------------------------------------------------------------------
+  // Additional taxonomy-route coverage to keep every pair at 10+ cases
+  // ---------------------------------------------------------------------------
+  {
+    id: 'supp2-impl-feat-nullish-total',
+    taskType: 'implementation',
+    subtaskType: 'feature_development',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'What does this JavaScript print? Answer with only the number.\n\nconst input = { count: null };\nconst total = (input.count ?? 4) + 6;\nconsole.log(total);',
+    check: { kind: 'exact', value: '10' },
+  },
+  {
+    id: 'supp2-impl-feat-spread-merge',
+    taskType: 'implementation',
+    subtaskType: 'feature_development',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'What does this JavaScript print? Answer with the exact output line only.\n\nconst base = { a: 1, b: 2 };\nconst next = { ...base, b: 5, c: 8 };\nconsole.log(Object.keys(next).join(","));',
+    check: { kind: 'exact', value: 'a,b,c' },
+  },
+  {
+    id: 'supp2-impl-feat-set-size',
+    taskType: 'implementation',
+    subtaskType: 'feature_development',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'What does this JavaScript print? Answer with only the number.\n\nconst tags = new Set(["api", "web", "api", "cli"]);\nconsole.log(tags.size);',
+    check: { kind: 'exact', value: '3' },
+  },
+  {
+    id: 'supp2-impl-gen-config-object',
+    taskType: 'implementation',
+    subtaskType: 'code_generation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'Generate a config fixture. Reply with only a JSON object with exactly the keys "enabled" and "retries" in that order, where enabled is true and retries is 3.',
+    check: { kind: 'json_equal', value: { enabled: true, retries: 3 } },
+  },
+  {
+    id: 'supp2-impl-gen-primes-array',
+    taskType: 'implementation',
+    subtaskType: 'code_generation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'Generate a test fixture: a JSON array containing the prime numbers less than 12, in increasing order. Reply with only the JSON array.',
+    check: { kind: 'json_equal', value: [2, 3, 5, 7, 11] },
+  },
+  {
+    id: 'supp2-impl-gen-user-slug',
+    taskType: 'implementation',
+    subtaskType: 'code_generation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'Generate a slug for the title "Ship Fast, Stay Safe!". Reply with only the lowercase slug.',
+    check: { kind: 'exact', value: 'ship-fast-stay-safe' },
+  },
+  {
+    id: 'supp2-impl-gen-initials-object',
+    taskType: 'implementation',
+    subtaskType: 'code_generation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'Generate a fixture. Reply with only a JSON object with exactly the keys "name" and "initials" in that order, where name is "Ada Lovelace" and initials is "AL".',
+    check: { kind: 'json_equal', value: { name: 'Ada Lovelace', initials: 'AL' } },
+  },
+  {
+    id: 'supp2-impl-test-array-length',
+    taskType: 'implementation',
+    subtaskType: 'test_creation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'You are writing a unit test. What number makes this assertion pass? Answer with only the number.\n\nexpect(["red", "blue", "green"].length).toBe(?)',
+    check: { kind: 'exact', value: '3' },
+  },
+  {
+    id: 'supp2-impl-test-trim-expectation',
+    taskType: 'implementation',
+    subtaskType: 'test_creation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'You are writing a unit test. What exact string makes this assertion pass? Answer with only the string.\n\nexpect("  done\\n".trim()).toBe(?)',
+    check: { kind: 'exact', value: 'done' },
+  },
+  {
+    id: 'supp2-impl-test-map-output',
+    taskType: 'implementation',
+    subtaskType: 'test_creation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'You are writing a unit test. What JSON array should be expected?\n\n[2, 4, 6].map(n => n / 2)',
+    check: { kind: 'json_equal', value: [1, 2, 3] },
+  },
+  {
+    id: 'supp2-impl-test-url-search-param',
+    taskType: 'implementation',
+    subtaskType: 'test_creation',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'You are writing a unit test. What value should this assertion expect? Answer with the exact string only.\n\nnew URL("https://example.test/path?mode=fast").searchParams.get("mode")',
+    check: { kind: 'exact', value: 'fast' },
+  },
+  {
+    id: 'supp2-debug-bug-loop-bound',
+    taskType: 'debugging',
+    subtaskType: 'bug_fixing',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A loop should visit indexes 0, 1, and 2 of a 3-item array. Which comparison operator should the loop use with i and length: < or <=? Answer only the operator.',
+    check: { kind: 'exact', value: '<' },
+  },
+  {
+    id: 'supp2-debug-bug-negated-guard',
+    taskType: 'debugging',
+    subtaskType: 'bug_fixing',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A guard should return early when user is missing. Complete the condition: if (___user) return "anonymous"; Answer with only the missing operator.',
+    check: { kind: 'exact', value: '!' },
+  },
+  {
+    id: 'supp2-debug-bug-assignment-condition',
+    taskType: 'debugging',
+    subtaskType: 'bug_fixing',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A condition accidentally uses = instead of comparing status to "ready". Which operator should replace = for strict comparison? Answer only the operator.',
+    check: { kind: 'exact', value: '===' },
+  },
+  {
+    id: 'supp2-debug-bug-missing-await',
+    taskType: 'debugging',
+    subtaskType: 'bug_fixing',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'An async function returns Promise { <pending> } where the resolved value was expected. What keyword is missing before the promise call? Answer one word.',
+    check: { kind: 'exact', value: 'await' },
+  },
+  {
+    id: 'supp2-debug-test-boolean-expect',
+    taskType: 'debugging',
+    subtaskType: 'test_repair',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A test expected isAdmin("owner") to be false, but the fixed function correctly returns true. What boolean should the test expect? Answer one word.',
+    check: { kind: 'exact', value: 'true' },
+  },
+  {
+    id: 'supp2-debug-test-error-message',
+    taskType: 'debugging',
+    subtaskType: 'test_repair',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A validation test expected "bad input"; the implementation now intentionally throws "missing email". What exact message should the repaired test expect?',
+    check: { kind: 'exact', value: 'missing email' },
+  },
+  {
+    id: 'supp2-debug-test-json-shape',
+    taskType: 'debugging',
+    subtaskType: 'test_repair',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A response fixture changed from {ok:true} to {status:"ok"}. Reply with only the new expected JSON object.',
+    check: { kind: 'json_equal', value: { status: 'ok' } },
+  },
+  {
+    id: 'supp2-debug-test-async-resolve',
+    taskType: 'debugging',
+    subtaskType: 'test_repair',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A test should assert that fetchName() resolves to "Kilo". Which matcher should be used before toBe("Kilo"): resolves or rejects? Answer one word.',
+    check: { kind: 'exact', value: 'resolves' },
+  },
+  {
+    id: 'supp2-debug-rca-unset-secret',
+    taskType: 'debugging',
+    subtaskType: 'root_cause_analysis',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A deploy works locally but production calls fail with "missing OPENROUTER_API_KEY". Which category is the root cause: secret, schema, or css? Answer one word.',
+    check: { kind: 'exact', value: 'secret' },
+  },
+  {
+    id: 'supp2-debug-rca-race-condition',
+    taskType: 'debugging',
+    subtaskType: 'root_cause_analysis',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Two workers update the same counter concurrently and one increment disappears. What kind of bug is this? Answer two words.',
+    check: { kind: 'exact', value: 'race condition' },
+  },
+  {
+    id: 'supp2-debug-rca-cache-key',
+    taskType: 'debugging',
+    subtaskType: 'root_cause_analysis',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Two users see each other cached results because the cache key omits userId. Which part is wrong: cache key, database type, or font? Answer two words.',
+    check: { kind: 'exact', value: 'cache key' },
+  },
+  {
+    id: 'supp2-debug-rca-timeout',
+    taskType: 'debugging',
+    subtaskType: 'root_cause_analysis',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A request always fails after exactly 30 seconds while the downstream job completes at 45 seconds. What limit is most likely being hit? Answer one word.',
+    check: { kind: 'exact', value: 'timeout' },
+  },
+  {
+    id: 'supp2-refactor-cleanup-unused-import',
+    taskType: 'refactoring',
+    subtaskType: 'code_cleanup',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'A file imports formatDate but never uses it. What should happen to that import? Answer one word.',
+    check: { kind: 'exact', value: 'remove' },
+  },
+  {
+    id: 'supp2-refactor-cleanup-nested-if',
+    taskType: 'refactoring',
+    subtaskType: 'code_cleanup',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'Replacing nested if statements with early returns primarily reduces what? Answer one word.',
+    check: { kind: 'exact', value: 'nesting' },
+  },
+  {
+    id: 'supp2-refactor-cleanup-magic-number',
+    taskType: 'refactoring',
+    subtaskType: 'code_cleanup',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'The number 86400000 appears repeatedly to mean milliseconds per day. What should it become: named constant, random value, or inline comment only? Answer two words.',
+    check: { kind: 'exact', value: 'named constant' },
+  },
+  {
+    id: 'supp2-refactor-cleanup-duplicate-branch',
+    taskType: 'refactoring',
+    subtaskType: 'code_cleanup',
+    systemPrompt: CODE_SYS,
+    userPrompt:
+      'Two switch cases have identical bodies. What refactor can combine them: fallthrough, mutation, or sleep? Answer one word.',
+    check: { kind: 'exact', value: 'fallthrough' },
+  },
+  {
+    id: 'supp2-refactor-arch-adapter',
+    taskType: 'refactoring',
+    subtaskType: 'architecture_improvement',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'To isolate provider-specific API calls behind a common interface, what pattern is commonly used? Answer one word.',
+    check: { kind: 'exact', value: 'adapter' },
+  },
+  {
+    id: 'supp2-refactor-arch-pure-core',
+    taskType: 'refactoring',
+    subtaskType: 'architecture_improvement',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Moving business rules out of HTTP handlers into pure functions mainly improves what? Answer one word.',
+    check: { kind: 'exact', value: 'testability' },
+  },
+  {
+    id: 'supp2-refactor-arch-layering',
+    taskType: 'refactoring',
+    subtaskType: 'architecture_improvement',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A router imports a React component to reuse validation logic. Should validation move to shared domain code or stay in the component? Answer three words.',
+    check: { kind: 'exact', value: 'shared domain code' },
+  },
+  {
+    id: 'supp2-refactor-arch-contract-package',
+    taskType: 'refactoring',
+    subtaskType: 'architecture_improvement',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Two services duplicate the same Zod request schema. Where should that schema live: shared contracts package, CSS file, or log line? Answer three words.',
+    check: { kind: 'exact', value: 'shared contracts package' },
+  },
+  {
+    id: 'supp2-refactor-migration-add-index',
+    taskType: 'refactoring',
+    subtaskType: 'migration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A frequent lookup filters by run_id and model. Which database object usually speeds that lookup? Answer one word.',
+    check: { kind: 'exact', value: 'index' },
+  },
+  {
+    id: 'supp2-refactor-migration-nullable-first',
+    taskType: 'refactoring',
+    subtaskType: 'migration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'For a large table, adding a new column before backfilling is usually safer if it starts nullable or non-null with no default? Answer one word.',
+    check: { kind: 'exact', value: 'nullable' },
+  },
+  {
+    id: 'supp2-refactor-migration-drop-column',
+    taskType: 'refactoring',
+    subtaskType: 'migration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Removing an obsolete database column is which SQL operation: DROP COLUMN, SELECT, or COMMIT? Answer only the operation.',
+    check: { kind: 'exact', value: 'DROP COLUMN' },
+  },
+  {
+    id: 'supp2-refactor-migration-rename-table',
+    taskType: 'refactoring',
+    subtaskType: 'migration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A migration changes table name old_events to events while preserving rows. What operation is this? Answer two words.',
+    check: { kind: 'exact', value: 'rename table' },
+  },
+  {
+    id: 'supp2-plan-arch-separate-writer',
+    taskType: 'planning_design',
+    subtaskType: 'architecture_design',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'If one service should own writes to a shared routing table and others only read, what role does that service have? Answer two words.',
+    check: { kind: 'exact', value: 'sole writer' },
+  },
+  {
+    id: 'supp2-plan-arch-event-queue',
+    taskType: 'planning_design',
+    subtaskType: 'architecture_design',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A user request should return quickly while heavy work continues later. Which architecture primitive usually decouples the work? Answer one word.',
+    check: { kind: 'exact', value: 'queue' },
+  },
+  {
+    id: 'supp2-plan-arch-cache-invalidation',
+    taskType: 'planning_design',
+    subtaskType: 'architecture_design',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'After publishing a new config, should readers keep the old KV cache forever or invalidate it? Answer two words.',
+    check: { kind: 'exact', value: 'invalidate it' },
+  },
+  {
+    id: 'supp2-plan-arch-idempotent-writes',
+    taskType: 'planning_design',
+    subtaskType: 'architecture_design',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'If a queue retries messages, should database writes be idempotent or time-randomized? Answer one word.',
+    check: { kind: 'exact', value: 'idempotent' },
+  },
+  {
+    id: 'supp2-plan-technical-order',
+    taskType: 'planning_design',
+    subtaskType: 'technical_planning',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'For a schema-breaking rollout, which should be planned before deploy: migration or celebration? Answer one word.',
+    check: { kind: 'exact', value: 'migration' },
+  },
+  {
+    id: 'supp2-plan-technical-rollback',
+    taskType: 'planning_design',
+    subtaskType: 'technical_planning',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A rollout plan should include how to return to the previous version. What is that called? Answer one word.',
+    check: { kind: 'exact', value: 'rollback' },
+  },
+  {
+    id: 'supp2-plan-technical-verification',
+    taskType: 'planning_design',
+    subtaskType: 'technical_planning',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A plan touches a worker and a web consumer. Should verification include both surfaces or only the worker? Answer two words.',
+    check: { kind: 'exact', value: 'both surfaces' },
+  },
+  {
+    id: 'supp2-plan-technical-owner',
+    taskType: 'planning_design',
+    subtaskType: 'technical_planning',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'When a launch depends on CI deploy finishing, what should the plan wait for before starting a new benchmark? Answer two words.',
+    check: { kind: 'exact', value: 'deploy completion' },
+  },
+  {
+    id: 'supp2-plan-system-backpressure',
+    taskType: 'planning_design',
+    subtaskType: 'system_design',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Limiting how many jobs run at once to protect downstream capacity is called what? Answer one word.',
+    check: { kind: 'exact', value: 'backpressure' },
+  },
+  {
+    id: 'supp2-invest-repo-find-schema',
+    taskType: 'investigation',
+    subtaskType: 'repo_exploration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'To find where benchmark_runs is defined in a repo, which command should you use first: rg, sleep, or curl? Answer one word.',
+    check: { kind: 'exact', value: 'rg' },
+  },
+  {
+    id: 'supp2-invest-repo-list-files',
+    taskType: 'investigation',
+    subtaskType: 'repo_exploration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Which command lists tracked and untracked file changes in a git worktree: git status or npm version? Answer two words.',
+    check: { kind: 'exact', value: 'git status' },
+  },
+  {
+    id: 'supp2-invest-repo-find-tests',
+    taskType: 'investigation',
+    subtaskType: 'repo_exploration',
+    systemPrompt: SYS_SYS,
+    userPrompt: 'Files ending in .test.ts usually contain what? Answer one word.',
+    check: { kind: 'exact', value: 'tests' },
+  },
+  {
+    id: 'supp2-invest-repo-read-config',
+    taskType: 'investigation',
+    subtaskType: 'repo_exploration',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'In a Cloudflare Worker service, which config file commonly defines bindings: wrangler.jsonc or tsconfig.tsbuildinfo? Answer only the file name.',
+    check: { kind: 'exact', value: 'wrangler.jsonc' },
+  },
+  {
+    id: 'supp2-invest-code-call-chain',
+    taskType: 'investigation',
+    subtaskType: 'codebase_understanding',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'Given the call chain handleRequest -> classify -> computeDecision, which function chooses the model? Answer only the function name.',
+    check: { kind: 'exact', value: 'computeDecision' },
+  },
+  {
+    id: 'supp2-invest-code-schema-owner',
+    taskType: 'investigation',
+    subtaskType: 'codebase_understanding',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'If RoutingTableSchema parses published artifacts, is it a runtime schema or CSS class? Answer two words.',
+    check: { kind: 'exact', value: 'runtime schema' },
+  },
+  {
+    id: 'supp2-invest-code-field-rename',
+    taskType: 'investigation',
+    subtaskType: 'codebase_understanding',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A database row field route_key maps to API field routeKey. What naming conversion is this: snake to camel, camel to snake, or uppercase? Answer three words.',
+    check: { kind: 'exact', value: 'snake to camel' },
+  },
+  {
+    id: 'supp2-invest-code-consumer',
+    taskType: 'investigation',
+    subtaskType: 'codebase_understanding',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'A type change in @kilocode/auto-routing-contracts breaks services/auto-routing and apps/web. What are those packages called relative to the type? Answer one word.',
+    check: { kind: 'exact', value: 'consumers' },
+  },
+  {
+    id: 'supp2-invest-research-primary-source',
+    taskType: 'investigation',
+    subtaskType: 'external_research',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'For library API behavior, should you prefer official docs or a random forum answer? Answer two words.',
+    check: { kind: 'exact', value: 'official docs' },
+  },
+  {
+    id: 'supp2-invest-research-cross-check',
+    taskType: 'investigation',
+    subtaskType: 'external_research',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'If two current sources disagree, should you cross-check or guess? Answer one word.',
+    check: { kind: 'exact', value: 'cross-check' },
+  },
+  {
+    id: 'supp2-invest-research-version',
+    taskType: 'investigation',
+    subtaskType: 'external_research',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'When reading framework docs, which detail matters for compatibility: version or logo color? Answer one word.',
+    check: { kind: 'exact', value: 'version' },
+  },
+  {
+    id: 'supp2-invest-research-quote-limit',
+    taskType: 'investigation',
+    subtaskType: 'external_research',
+    systemPrompt: SYS_SYS,
+    userPrompt:
+      'When using a source, should long copyrighted passages be quoted in full or summarized? Answer one word.',
+    check: { kind: 'exact', value: 'summarized' },
+  },
+  {
+    id: 'supp2-agent-tool-sort-file',
+    taskType: 'agentic_execution',
+    subtaskType: 'tool_usage',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-sort.txt with lines delta, alpha, charlie. Sort the lines alphabetically and answer with the first line only.',
+    check: { kind: 'exact', value: 'alpha' },
+  },
+  {
+    id: 'supp2-agent-tool-json-length',
+    taskType: 'agentic_execution',
+    subtaskType: 'tool_usage',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-items.json containing ["a","b","c","d"]. Read it and answer only the array length.',
+    check: { kind: 'exact', value: '4' },
+  },
+  {
+    id: 'supp2-agent-tool-word-count',
+    taskType: 'agentic_execution',
+    subtaskType: 'tool_usage',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-words.txt containing exactly "one two three". Count the words and answer only the number.',
+    check: { kind: 'exact', value: '3' },
+  },
+  {
+    id: 'supp2-agent-tool-file-exists',
+    taskType: 'agentic_execution',
+    subtaskType: 'tool_usage',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-exists.txt containing ok. Then check that the file exists and answer only yes or no.',
+    check: { kind: 'exact', value: 'yes' },
+  },
+  {
+    id: 'supp2-agent-term-node-json',
+    taskType: 'agentic_execution',
+    subtaskType: 'terminal_operations',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Run node -e "console.log(JSON.stringify([1,2,3].reduce((a,b)=>a+b,0)))" in the terminal and answer with only the output.',
+    check: { kind: 'exact', value: '6' },
+  },
+  {
+    id: 'supp2-agent-term-printf',
+    taskType: 'agentic_execution',
+    subtaskType: 'terminal_operations',
+    systemPrompt: AGENT_SYS,
+    userPrompt: 'Run printf kilo in the terminal and answer with only the output.',
+    check: { kind: 'exact', value: 'kilo' },
+  },
+  {
+    id: 'supp2-agent-term-sort',
+    taskType: 'agentic_execution',
+    subtaskType: 'terminal_operations',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Run a shell command that sorts the words "zeta alpha" alphabetically one per line. Answer with only the first sorted word.',
+    check: { kind: 'exact', value: 'alpha' },
+  },
+  {
+    id: 'supp2-agent-term-expr',
+    taskType: 'agentic_execution',
+    subtaskType: 'terminal_operations',
+    systemPrompt: AGENT_SYS,
+    userPrompt: 'Run a terminal calculation for 9 + 8 + 7 and answer with only the result.',
+    check: { kind: 'exact', value: '24' },
+  },
+  {
+    id: 'supp2-agent-multi-generate-run',
+    taskType: 'agentic_execution',
+    subtaskType: 'multi_step_execution',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Write /tmp/bench-sum.js that prints 14 + 28. Run it with node and answer with only what it prints.',
+    check: { kind: 'exact', value: '42' },
+  },
+  {
+    id: 'supp2-agent-multi-read-transform',
+    taskType: 'agentic_execution',
+    subtaskType: 'multi_step_execution',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-name.txt containing kilo. Read it, uppercase it, and answer only the uppercase text.',
+    check: { kind: 'exact', value: 'KILO' },
+  },
+  {
+    id: 'supp2-agent-multi-two-files-join',
+    taskType: 'agentic_execution',
+    subtaskType: 'multi_step_execution',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-left.txt containing auto and /tmp/bench-right.txt containing route. Read both and answer with the two words joined by a hyphen.',
+    check: { kind: 'exact', value: 'auto-route' },
+  },
+  {
+    id: 'supp2-agent-multi-json-sum',
+    taskType: 'agentic_execution',
+    subtaskType: 'multi_step_execution',
+    systemPrompt: AGENT_SYS,
+    userPrompt:
+      'Create /tmp/bench-numbers.json containing [5,10,15]. Read it, sum the numbers, and answer only the sum.',
     check: { kind: 'exact', value: '30' },
   },
 ];

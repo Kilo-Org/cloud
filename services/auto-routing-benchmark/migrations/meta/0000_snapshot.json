@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ba559fc8-fdd3-4c96-b116-53573fb79c74",
+  "id": "fa33fcda-13d6-4952-84d7-0ad12cd02fea",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "benchmark_config": {
@@ -222,8 +222,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "tier": {
-          "name": "tier",
+        "route_key": {
+          "name": "route_key",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -390,8 +390,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "tier": {
-          "name": "tier",
+        "route_key": {
+          "name": "route_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -466,13 +466,13 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "model_summaries_run_id_model_tier_pk": {
+        "model_summaries_run_id_model_route_key_pk": {
           "columns": [
             "run_id",
             "model",
-            "tier"
+            "route_key"
           ],
-          "name": "model_summaries_run_id_model_tier_pk"
+          "name": "model_summaries_run_id_model_route_key_pk"
         }
       },
       "uniqueConstraints": {},
@@ -488,8 +488,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "tier": {
-          "name": "tier",
+        "route_key": {
+          "name": "route_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -541,13 +541,13 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "routing_table_candidates_run_id_tier_rank_pk": {
+        "routing_table_candidates_run_id_route_key_rank_pk": {
           "columns": [
             "run_id",
-            "tier",
+            "route_key",
             "rank"
           ],
-          "name": "routing_table_candidates_run_id_tier_rank_pk"
+          "name": "routing_table_candidates_run_id_route_key_rank_pk"
         }
       },
       "uniqueConstraints": {},

@@ -18,18 +18,18 @@ describe('DECIDER_CASES', () => {
     expect(TAXONOMY_PAIRS.length).toBe(18);
   });
 
-  it('has exactly 76 cases with unique ids', () => {
-    expect(DECIDER_CASES.length).toBe(76);
+  it('has exactly 180 cases with unique ids', () => {
+    expect(DECIDER_CASES.length).toBe(180);
     const ids = new Set(DECIDER_CASES.map(c => c.id));
     expect(ids.size).toBe(DECIDER_CASES.length);
   });
 
-  it('has at least 4 cases per (taskType, subtaskType) pair', () => {
+  it('has at least 10 cases per (taskType, subtaskType) pair', () => {
     for (const pair of TAXONOMY_PAIRS) {
       const count = DECIDER_CASES.filter(
         c => c.taskType === pair.taskType && c.subtaskType === pair.subtaskType
       ).length;
-      expect(count, `${pair.taskType}/${pair.subtaskType}`).toBeGreaterThanOrEqual(4);
+      expect(count, `${pair.taskType}/${pair.subtaskType}`).toBeGreaterThanOrEqual(10);
     }
   });
 
@@ -41,19 +41,6 @@ describe('DECIDER_CASES', () => {
         subtypes?.has(c.subtaskType),
         `case ${c.id}: ${c.subtaskType} does not belong to ${c.taskType}`
       ).toBe(true);
-    }
-  });
-
-  it('has at least 20 cases per tier', () => {
-    for (const tier of ['low', 'medium', 'high'] as const) {
-      expect(DECIDER_CASES.filter(c => c.tier === tier).length, tier).toBeGreaterThanOrEqual(20);
-    }
-  });
-
-  it('covers at least 4 distinct task types per tier', () => {
-    for (const tier of ['low', 'medium', 'high'] as const) {
-      const taskTypes = new Set(DECIDER_CASES.filter(c => c.tier === tier).map(c => c.taskType));
-      expect(taskTypes.size, tier).toBeGreaterThanOrEqual(4);
     }
   });
 

@@ -9,7 +9,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE="${IMAGE:-kiloclaw:controller}"
 IMAGE_BEFORE="${IMAGE_BEFORE:-$IMAGE}"
 IMAGE_AFTER="${IMAGE_AFTER:-$IMAGE}"
-PORT="${PORT:-18791}"
+# Default to a free ephemeral loopback port so the smoke never collides with a
+# running dev stack (e.g. workerd holding the old fixed 18791). Set PORT to pin
+# one. The brief bind/close races against `docker run`, but on a random high port
+# a collision is far less likely than the previous fixed default.
+PORT="${PORT:-$(python3 -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')}"
 TOKEN="${TOKEN:-$(python3 -c 'import secrets; print(secrets.token_hex(32))')}"
 KILOCODE_CONFIG_PATH="${KILOCODE_CONFIG_PATH:-$HOME/.kilocode/cli/config.json}"
 KILOCODE_SMOKE_MODEL="${KILOCODE_SMOKE_MODEL:-kilocode/kilo-auto/free}"
@@ -330,6 +338,9 @@ run_phase() {
   assert_configured_model
   assert_kilo_chat_smoke "$CID" "$PORT" "$TOKEN"
   assert_app_config_patch "$CID" "$PORT" "$TOKEN"
+  assert_app_config_agent_defaults "$CID" "$PORT" "$TOKEN"
+  assert_app_config_agents_crud "$CID" "$PORT" "$TOKEN"
+  assert_exec_approvals_seeded "$CID"
   echo
   echo "--- live Auto Free agent turn ---"
   assert_live_agent_turn

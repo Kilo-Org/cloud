@@ -162,6 +162,46 @@ assert_kilo_chat_smoke() {
   assert_kilo_chat_webhook_route "$port" "$token"
 }
 
+# ── Shared helpers for the app config-write assertions ────────────────────────
+
+# Echoes agents.defaults.model.primary from the live openclaw.json (empty if
+# unset). Used to drive behavior-preserving, catalog-independent no-op writes.
+_read_config_model_primary() {
+  docker exec -i "$1" python3 - <<'PY' 2>/dev/null
+import json
+from pathlib import Path
+
+doc = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
+print(doc.get('agents', {}).get('defaults', {}).get('model', {}).get('primary', ''))
+PY
+}
+
+# Runs THIS image's own `openclaw config validate` and asserts it still accepts
+# the on-disk config. The app config-write routes either skip inline validation
+# (/_kilo/config/patch) or write through the OpenClaw CLI, so re-validating after
+# each app-shaped write is what catches a newer OpenClaw rejecting our config.
+_check_config_validates() {
+  local cid="$1"
+  local label="$2"
+  local result="invalid"
+  local output
+
+  if output=$(docker exec "$cid" openclaw config validate --json 2>/dev/null); then
+    result=$(python3 -c '
+import json
+import sys
+
+try:
+    doc = json.load(sys.stdin)
+except json.JSONDecodeError:
+    print("invalid")
+    raise SystemExit(0)
+print("valid" if doc.get("valid") is True else "invalid")
+' <<< "$output")
+  fi
+  check "$label" "valid" "$result"
+}
+
 # Verifies the cloud app's config-write path survives the packaged OpenClaw
 # version. The Kilo app (apps/web kiloclaw-internal-client) writes agent/model
 # settings by POSTing a deep-merge patch to `/_kilo/config/patch`. That route
@@ -175,9 +215,7 @@ assert_kilo_chat_smoke() {
 # then re-runs THIS image's own validator against the freshly app-written config.
 # To stay order-safe and catalog-independent it re-writes `agents.defaults.model
 # .primary` to its current value — a behavior-preserving no-op that still drives
-# the full deep-merge + atomic-write + validate path. A stronger follow-up could
-# create/delete an agent via `POST /_kilo/config/agents` to also exercise the
-# `openclaw agents` selector validation 2026.6.8 changed.
+# the full deep-merge + atomic-write + validate path.
 assert_app_config_patch() {
   local cid="$1"
   local port="$2"
@@ -185,7 +223,6 @@ assert_app_config_patch() {
   local current
   local body
   local code
-  local validate_result
   local readback
 
   echo
@@ -193,14 +230,7 @@ assert_app_config_patch() {
 
   # Snapshot the configured model primary so the patch is a no-op: a later
   # assertion (and the live turn) still observe the same configured model.
-  current=$(docker exec -i "$cid" python3 - <<'PY' 2>/dev/null
-import json
-from pathlib import Path
-
-doc = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
-print(doc.get('agents', {}).get('defaults', {}).get('model', {}).get('primary', ''))
-PY
-  )
+  current=$(_read_config_model_primary "$cid")
   if [ -z "$current" ]; then
     check "app config patch accepted -> 200" "200" "no configured model to patch"
     return
@@ -219,30 +249,170 @@ PY
 
   # The patch route never validates inline — prove the NEW OpenClaw still accepts
   # the app-written config. This is the assertion the per-version boot lacks.
-  validate_result="invalid"
-  if output=$(docker exec "$cid" openclaw config validate --json 2>/dev/null); then
-    validate_result=$(python3 -c '
+  _check_config_validates "$cid" "app-written config still validates"
+
+  # Deep-merge integrity: the value we wrote is the value on disk.
+  readback=$(_read_config_model_primary "$cid")
+  check "app config patch persisted" "$current" "$readback"
+}
+
+# Exercises the fleet-wide defaults write the app sends via
+# `PATCH /_kilo/config/agent-defaults`. Unlike the deep-merge patch route, this
+# goes through the controller's OpenClaw agent-config writer, so it covers a
+# distinct serialize/validate path. The model primary is re-set to its current
+# value (no-op) to stay order-safe and catalog-independent.
+assert_app_config_agent_defaults() {
+  local cid="$1"
+  local port="$2"
+  local token="$3"
+  local current
+  local body
+  local code
+  local readback
+
+  echo
+  echo "--- app config write (/_kilo/config/agent-defaults) ---"
+
+  current=$(_read_config_model_primary "$cid")
+  if [ -z "$current" ]; then
+    check "app agent-defaults patch -> 200" "200" "no configured model to patch"
+    return
+  fi
+
+  # AgentDefaultsPatchBodySchema: { set: { model: { primary } }, unset: [] }.
+  body=$(python3 -c 'import json,sys; print(json.dumps({"set":{"model":{"primary":sys.argv[1]}}}))' "$current")
+
+  code=$(curl -sS -o /dev/null -w "%{http_code}" \
+    -X PATCH \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    --data "$body" \
+    "http://127.0.0.1:${port}/_kilo/config/agent-defaults" 2>/dev/null || true)
+  check "app agent-defaults patch -> 200" "200" "$code"
+
+  _check_config_validates "$cid" "config valid after agent-defaults patch"
+
+  readback=$(_read_config_model_primary "$cid")
+  check "app agent-defaults persisted" "$current" "$readback"
+}
+
+# Exercises the agent CRUD the app drives via `/_kilo/config/agents`, which the
+# controller fulfils by shelling out to `openclaw agents add/delete`. This is the
+# other half of the surface 2026.6.8 tightened ("rejects unknown OpenAI agent
+# selectors"): a model-selector or agent-schema change in a new OpenClaw would
+# make `agents add` fail here even though the deep-merge patch path still works.
+# Creates a smoke agent (using the configured model selector), reads it back,
+# re-validates, then deletes it so the persisted /root carries nothing into the
+# next upgrade phase. A pre-delete clears any leftover from a crashed prior run.
+assert_app_config_agents_crud() {
+  local cid="$1"
+  local port="$2"
+  local token="$3"
+  local name="kc-config-smoke"
+  local ws="/root/clawd/kc-config-smoke-ws"
+  local model
+  local body
+  local create_resp
+  local create_body
+  local create_code
+  local agent_id
+  local get_code
+  local del_code
+
+  echo
+  echo "--- app config write (/_kilo/config/agents CRUD) ---"
+
+  model=$(_read_config_model_primary "$cid")
+
+  # Ensure the workspace exists and clear any leftover smoke agent (best effort).
+  docker exec "$cid" mkdir -p "$ws" >/dev/null 2>&1 || true
+  curl -sS -o /dev/null -X DELETE \
+    -H "Authorization: Bearer $token" \
+    "http://127.0.0.1:${port}/_kilo/config/agents/${name}" >/dev/null 2>&1 || true
+
+  # BasicAgentCreateBodySchema: { name, workspace(absolute), model? }.
+  body=$(python3 -c 'import json,sys
+b = {"name": sys.argv[1], "workspace": sys.argv[2]}
+if sys.argv[3]:
+    b["model"] = sys.argv[3]
+print(json.dumps(b))' "$name" "$ws" "$model")
+
+  create_resp=$(curl -sS -w "\n%{http_code}" \
+    -X POST \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    --data "$body" \
+    "http://127.0.0.1:${port}/_kilo/config/agents" 2>/dev/null || true)
+  create_code="${create_resp##*$'\n'}"
+  create_body="${create_resp%$'\n'*}"
+  check "app agent create -> 200" "200" "$create_code"
+
+  # Normalized agent id from the create response (fall back to the raw name).
+  agent_id=$(python3 -c '
 import json
 import sys
 
 try:
-    doc = json.load(sys.stdin)
-except json.JSONDecodeError:
-    print("invalid")
+    doc = json.loads(sys.stdin.read())
+except Exception:
+    print("")
     raise SystemExit(0)
-print("valid" if doc.get("valid") is True else "invalid")
-' <<< "$output")
-  fi
-  check "app-written config still validates" "valid" "$validate_result"
+created = doc.get("created") or {}
+agent = doc.get("agent") or {}
+print(created.get("agentId") or agent.get("id") or "")
+' <<< "$create_body")
+  [ -z "$agent_id" ] && agent_id="$name"
 
-  # Deep-merge integrity: the value we wrote is the value on disk.
-  readback=$(docker exec -i "$cid" python3 - <<'PY' 2>/dev/null
+  # The new OpenClaw must still accept the config its own CLI just wrote.
+  _check_config_validates "$cid" "config valid after agent create"
+
+  get_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer $token" \
+    "http://127.0.0.1:${port}/_kilo/config/agents/${agent_id}" 2>/dev/null || true)
+  check "app agent read-back -> 200" "200" "$get_code"
+
+  # Clean up so the persisted /root carries no smoke agent into the next phase.
+  del_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+    -X DELETE \
+    -H "Authorization: Bearer $token" \
+    "http://127.0.0.1:${port}/_kilo/config/agents/${agent_id}" 2>/dev/null || true)
+  check "app agent delete -> 200" "200" "$del_code"
+}
+
+# Read-only check that the controller's bootstrap seeded exec-approvals.json.
+# 2026.6.8 made the exec-approval timeout fail closed, and our bootstrap seeds
+# the exec-approval defaults; this confirms that plumbing is intact on the image
+# (the file exists with a defaults block and the expected askFallback). No
+# mutation, so it is safe to run in any phase order.
+assert_exec_approvals_seeded() {
+  local cid="$1"
+  local details
+
+  echo
+  echo "--- exec approvals seeding ---"
+
+  if details=$(docker exec -i "$cid" python3 - <<'PY' 2>&1
 import json
 from pathlib import Path
 
-doc = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
-print(doc.get('agents', {}).get('defaults', {}).get('model', {}).get('primary', ''))
+path = Path('/root/.openclaw/exec-approvals.json')
+if not path.exists():
+    raise SystemExit('exec-approvals.json missing')
+doc = json.loads(path.read_text())
+defaults = doc.get('defaults') if isinstance(doc, dict) else None
+if not isinstance(defaults, dict):
+    raise SystemExit('no defaults object')
+missing = [key for key in ('security', 'ask', 'askFallback') if not defaults.get(key)]
+if missing:
+    raise SystemExit('missing defaults: ' + ', '.join(missing))
+if defaults.get('askFallback') != 'full':
+    raise SystemExit(f"askFallback={defaults.get('askFallback')!r} (expected full)")
+print('seeded')
 PY
-  )
-  check "app config patch persisted" "$current" "$readback"
+  ); then
+    check "exec-approvals.json seeded" "seeded" "$details"
+  else
+    check "exec-approvals.json seeded" "seeded" "failed"
+    echo "  details: $details"
+  fi
 }

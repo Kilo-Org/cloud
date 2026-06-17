@@ -13,9 +13,15 @@ import {
 } from './shared.js';
 
 async function main(): Promise<void> {
-  if (
-    !(await confirm('Backfill readable Production secrets into 1Password and mark them sensitive?'))
-  ) {
+  const args = process.argv.slice(2);
+  if (args.some(argument => argument !== '--apply')) {
+    throw new Error('Usage: tsx scripts/web-env/backfill.ts [--apply]');
+  }
+  const apply = args.includes('--apply');
+  if (!apply) {
+    console.log('DRY RUN: no 1Password or Vercel values will be changed.');
+  }
+  if (!(await confirm(`${apply ? 'Run' : 'Preview'} the Production secret backfill?`))) {
     console.log('Cancelled.');
     return;
   }
@@ -27,7 +33,7 @@ async function main(): Promise<void> {
 
   try {
     const contexts = resolveVercelContexts(tempDirectory);
-    const vaultId = resolveVault();
+    const vaultId = apply ? resolveVault() : undefined;
     const production = contexts.map(context => listVariables(context, 'production'));
     const staging = contexts.map(context => listVariables(context, 'staging'));
     const productionValues = contexts.map(context => pullValues(context, 'production'));
@@ -71,25 +77,31 @@ async function main(): Promise<void> {
         stagingValue = projectStagingValues[0];
       }
 
-      console.log(`Migrating ${name}...`);
-      setVaultValue(vaultId, name, projectProductionValues[0]);
-      for (const context of contexts) {
-        setVariable(context, 'production', name, projectProductionValues[0], true);
-      }
-      if (stagingValue) {
-        for (const context of contexts) setVariable(context, 'staging', name, stagingValue, true);
+      console.log(`${apply ? 'Migrating' : 'Would migrate'} ${name}...`);
+      if (apply) {
+        if (!vaultId) throw new Error('Could not resolve the 1Password vault.');
+        setVaultValue(vaultId, name, projectProductionValues[0]);
+        for (const context of contexts) {
+          setVariable(context, 'production', name, projectProductionValues[0], true);
+        }
+        if (stagingValue) {
+          for (const context of contexts) setVariable(context, 'staging', name, stagingValue, true);
+        }
       }
       migrated.push(name);
     }
   } finally {
     rmSync(tempDirectory, { recursive: true, force: true });
-    console.log('\nMigrated:');
+    console.log(`\n${apply ? 'Migrated' : 'Would migrate'}:`);
     console.log(migrated.length ? migrated.map(name => `- ${name}`).join('\n') : '- None');
     console.log('\nUnresolved:');
     console.log(unresolved.length ? unresolved.map(name => `- ${name}`).join('\n') : '- None');
     console.log('\nSkipped:');
     console.log(skipped.length ? skipped.map(name => `- ${name}`).join('\n') : '- None');
     console.log(`\nProjects checked: ${PROJECTS.join(', ')}`);
+  }
+  if (!apply) {
+    console.log('\nDry run complete. Re-run with --apply to perform the migration.');
   }
 }
 

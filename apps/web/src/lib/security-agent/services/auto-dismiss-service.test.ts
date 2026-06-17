@@ -576,5 +576,23 @@ describe('maybeAutoDismissAnalysis', () => {
         byConfidence: { high: 1, medium: 0, low: 0 },
       });
     });
+
+    it('excludes malformed triage confidence from eligibility counts', async () => {
+      mockBulkFindings.push({
+        id: 'malformed-confidence',
+        analysis: {
+          analyzedAt: '2026-06-16T10:00:00.000Z',
+          triage: {
+            ...triageResult,
+            confidence: 'certain',
+          },
+        } as unknown as SecurityFindingAnalysis,
+      });
+
+      await expect(countEligibleForAutoDismiss({ userId: 'user-1' }, 'user-1')).resolves.toEqual({
+        eligible: 0,
+        byConfidence: { high: 0, medium: 0, low: 0 },
+      });
+    });
   });
 });

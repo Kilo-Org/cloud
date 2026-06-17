@@ -31,7 +31,6 @@ import {
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
   type SecurityFindingAuditActor,
-  type SecurityFindingAuditEventFinding,
   type SecurityFindingAuditHumanActor,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
@@ -39,6 +38,13 @@ import { parseDependabotDismissalTarget } from '@kilocode/worker-utils/dependabo
 
 const log = sentryLogger('security-agent:auto-dismiss', 'info');
 const logError = sentryLogger('security-agent:auto-dismiss', 'error');
+const TRIAGE_CONFIDENCES = ['high', 'medium', 'low'] as const;
+
+type TriageConfidence = (typeof TRIAGE_CONFIDENCES)[number];
+
+function isTriageConfidence(value: unknown): value is TriageConfidence {
+  return TRIAGE_CONFIDENCES.includes(value as TriageConfidence);
+}
 
 /**
  * Convert SecurityReviewOwner + userId to Owner format for config lookups.
@@ -79,12 +85,6 @@ function ownerFindingCondition(owner: SecurityReviewOwner) {
     return eq(security_findings.owned_by_user_id, owner.userId);
   }
   throw new Error('Invalid owner: must have either organizationId or userId');
-}
-
-function toAuditFinding(
-  finding: SecurityFindingAuditEventFinding
-): SecurityFindingAuditEventFinding {
-  return finding;
 }
 
 /**
@@ -158,7 +158,7 @@ async function dismissFindingWithAuditEvent(
 
     await insertSecurityFindingAuditEvent(tx, {
       owner: toAuditOwner(params.owner),
-      finding: toAuditFinding(updatedFinding),
+      finding: updatedFinding,
       actor: params.actor,
       action: SecurityAuditLogAction.FindingAutoDismissed,
       occurredAt,
@@ -553,6 +553,8 @@ export async function countEligibleForAutoDismiss(
     ) {
       continue;
     }
+
+    if (!isTriageConfidence(triage.confidence)) continue;
 
     eligible++;
     byConfidence[triage.confidence]++;

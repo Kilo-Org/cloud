@@ -22,6 +22,7 @@ export type AutoModel = {
   supports_images: boolean;
   supports_pdf: boolean;
   opencode_settings: OpenCodeSettings | undefined;
+  status?: 'public' | 'hidden';
 };
 
 export type ResolvedAutoModel = {

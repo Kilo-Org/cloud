@@ -70,14 +70,6 @@ export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy
   return Number.isFinite(value) ? formatUsd(value) : '—';
 }
 
-export function sortCandidatesByCostPerAccuracy<
-  T extends Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>,
->(candidates: readonly T[]): T[] {
-  return [...candidates].sort(
-    (a, b) => costPerAccuracy(a) - costPerAccuracy(b) || b.accuracy - a.accuracy
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Fetch helpers
 // ---------------------------------------------------------------------------
@@ -754,7 +746,7 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
 // Routing table view
 // ---------------------------------------------------------------------------
 
-function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
+export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
   if (!data.table) {
     return <p className="text-muted-foreground text-sm">No routing table published yet.</p>;
   }
@@ -776,7 +768,6 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
       </div>
 
       {routeEntries.map(([routeKey, candidates]) => {
-        const sortedCandidates = sortCandidatesByCostPerAccuracy(candidates);
         return (
           <div key={routeKey}>
             <p className="mb-1.5 font-mono text-sm font-medium">{routeKey}</p>
@@ -792,7 +783,7 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedCandidates.map((c, i) => (
+                  {candidates.map((c, i) => (
                     <TableRow key={`${routeKey}-${c.model}-${i}`}>
                       <TableCell className="max-w-56 truncate font-mono text-xs">
                         {c.model}

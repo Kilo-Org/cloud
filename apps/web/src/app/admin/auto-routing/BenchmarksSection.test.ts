@@ -1,4 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
   configToFormState,
   costPerAccuracy,
@@ -6,7 +8,7 @@ import {
   formatAccuracy,
   formatUsd,
   formStateToConfig,
-  sortCandidatesByCostPerAccuracy,
+  RoutingTableView,
 } from './BenchmarksSection';
 
 describe('formatAccuracy', () => {
@@ -72,28 +74,42 @@ describe('costPerAccuracy', () => {
   });
 });
 
-describe('sortCandidatesByCostPerAccuracy', () => {
-  it('sorts candidates by lowest cost per accuracy', () => {
-    const sorted = sortCandidatesByCostPerAccuracy([
-      { model: 'higher-cost-per-accuracy', avgCostUsd: 0.006, accuracy: 0.75 },
-      { model: 'zero-accuracy', avgCostUsd: 0, accuracy: 0 },
-      { model: 'best-value', avgCostUsd: 0.004, accuracy: 0.8 },
-    ]);
+describe('RoutingTableView', () => {
+  it('renders candidates in the published serving rank order', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(RoutingTableView, {
+        data: {
+          publishedAt: '2026-06-17T00:00:00.000Z',
+          table: {
+            version: 'run-1',
+            generatedAt: '2026-06-17T00:00:00.000Z',
+            minAccuracy: 0.7,
+            switchCostFactor: 3,
+            source: 'benchmark',
+            routes: {
+              'implementation/code_generation': [
+                {
+                  model: 'threshold-meeting',
+                  accuracy: 0.75,
+                  avgCostUsd: 0.006,
+                  meetsThreshold: true,
+                  reasoningEffort: null,
+                },
+                {
+                  model: 'below-threshold-cheaper',
+                  accuracy: 0.5,
+                  avgCostUsd: 0.001,
+                  meetsThreshold: false,
+                  reasoningEffort: null,
+                },
+              ],
+            },
+          },
+        },
+      })
+    );
 
-    expect(sorted.map(candidate => candidate.model)).toEqual([
-      'best-value',
-      'higher-cost-per-accuracy',
-      'zero-accuracy',
-    ]);
-  });
-
-  it('breaks cost-per-accuracy ties by higher accuracy', () => {
-    const sorted = sortCandidatesByCostPerAccuracy([
-      { model: 'less-accurate', avgCostUsd: 0.004, accuracy: 0.5 },
-      { model: 'more-accurate', avgCostUsd: 0.008, accuracy: 1 },
-    ]);
-
-    expect(sorted.map(candidate => candidate.model)).toEqual(['more-accurate', 'less-accurate']);
+    expect(html.indexOf('threshold-meeting')).toBeLessThan(html.indexOf('below-threshold-cheaper'));
   });
 });
 

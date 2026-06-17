@@ -11,7 +11,68 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-staging-db-startup:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    environment: staging
+
+    env:
+      DATABASE_CA: ${{ secrets.DATABASE_CA }}
+      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check staging DB startup path
+        run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
+
+  run-migrations:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    environment: staging
+
+    env:
+      DATABASE_CA: ${{ secrets.DATABASE_CA }}
+      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Drizzle migrations
+        run: NODE_ENV=production pnpm run drizzle migrate
+
   deploy-app:
+    needs: [check-staging-db-startup, run-migrations]
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
@@ -19,6 +80,7 @@ jobs:
     secrets: inherit
 
   deploy-global-app:
+    needs: [check-staging-db-startup, run-migrations]
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging

@@ -106,21 +106,6 @@ export function resolveVercelContexts(tempDirectory: string): VercelContext[] {
   return PROJECTS.map(project => ({ project, orgId, cwd: tempDirectory }));
 }
 
-export function listVariables(
-  context: VercelContext,
-  environment: Environment
-): Map<string, string> {
-  const response = parseJson(
-    vercel(context, ['env', 'list', environment, '--format=json']),
-    `List ${context.project}/${environment}`
-  );
-  return new Map(
-    records(response.envs)
-      .map(variable => [stringValue(variable, 'key'), stringValue(variable, 'type')] as const)
-      .filter((entry): entry is [string, string] => Boolean(entry[0] && entry[1]))
-  );
-}
-
 export function setVariable(
   context: VercelContext,
   environment: Environment,
@@ -141,18 +126,6 @@ export function setVariable(
       '--yes',
     ],
     value
-  );
-}
-
-export function pullValues(context: VercelContext, environment: Environment): Map<string, string> {
-  const endpoint = `/v3/env/pull/${encodeURIComponent(context.project)}/${encodeURIComponent(environment)}?source=vercel-cli%3Aenv%3Apull`;
-  const response = parseJson(vercel(context, ['api', endpoint, '--raw']), 'Pull Vercel values');
-  const values = isRecord(response.env) ? response.env : undefined;
-  if (!values) throw new Error(`Could not pull ${context.project}/${environment} values.`);
-  return new Map(
-    Object.entries(values).filter(
-      (entry): entry is [string, string] => typeof entry[1] === 'string'
-    )
   );
 }
 

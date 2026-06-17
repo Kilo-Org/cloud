@@ -10,6 +10,7 @@ import { getDirectByokModelsForOrganization } from '@/lib/ai-gateway/providers/d
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
+import { hasBestEffortGuessDataCollectionRequirement } from '@/lib/ai-gateway/is-free-model';
 
 export async function getAvailableModelsForOrganization(
   organizationId: string
@@ -38,6 +39,13 @@ export async function getAvailableModelsForOrganization(
       }
     }
     filteredModels = models;
+  }
+
+  if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {
+    const dataCollectionRequirements = await Promise.all(
+      filteredModels.map(model => hasBestEffortGuessDataCollectionRequirement(model.id))
+    );
+    filteredModels = filteredModels.filter((_, index) => !dataCollectionRequirements[index]);
   }
 
   if (organization.plan !== 'enterprise' && organization.settings.data_collection !== 'deny') {

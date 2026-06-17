@@ -225,9 +225,17 @@ export function setVaultValue(vaultId: string, name: string, value: string): voi
       ],
       sections: [],
     };
-    run('op', ['item', 'create', '--template=/dev/stdin', '--vault', vaultId, '--format=json'], {
-      input: JSON.stringify(item),
-    });
+    const created = parseJson(
+      run('op', ['item', 'create', '--template=/dev/stdin', '--vault', vaultId, '--format=json'], {
+        input: JSON.stringify(item),
+      }),
+      `Create ${name}`
+    );
+    const createdPassword = records(created.fields).find(field => field.id === 'password');
+    const createdNotes = records(created.fields).find(field => field.id === 'notesPlain');
+    if (createdPassword?.value !== value || createdNotes?.value !== note) {
+      throw new Error(`1Password did not persist the new ${name} value and audit note.`);
+    }
     return;
   }
 
@@ -243,9 +251,21 @@ export function setVaultValue(vaultId: string, name: string, value: string): voi
   }
   password.value = value;
   setAuditNote(item, note);
-  run('op', ['item', 'edit', id, '--vault', vaultId, '--format=json'], {
-    input: JSON.stringify(item),
-  });
+  const expectedNotes = stringValue(
+    records(item.fields).find(field => field.id === 'notesPlain') ?? {},
+    'value'
+  );
+  const updated = parseJson(
+    run('op', ['item', 'edit', id, '--template=/dev/stdin', '--vault', vaultId, '--format=json'], {
+      input: JSON.stringify(item),
+    }),
+    `Update ${name}`
+  );
+  const updatedPassword = records(updated.fields).find(field => field.id === 'password');
+  const updatedNotes = records(updated.fields).find(field => field.id === 'notesPlain');
+  if (updatedPassword?.value !== value || updatedNotes?.value !== expectedNotes) {
+    throw new Error(`1Password did not persist the updated ${name} value and audit note.`);
+  }
 }
 
 export function findRepoRoot(): string {

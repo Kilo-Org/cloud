@@ -20,6 +20,19 @@ const DECIDER_CLI_TIMEOUT_MS = 180_000;
 const FINAL_ANSWER_SUFFIX =
   '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
 
+export function isRetryableContainerAvailabilityError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('container /run failed: http 503') ||
+    normalized.includes('container /warmup failed: http 503') ||
+    normalized.includes('no container instance available') ||
+    normalized.includes('no container instance that can be provided') ||
+    normalized.includes('max concurrent instance count') ||
+    normalized.includes('maximum number of running container instances exceeded')
+  );
+}
+
 type ContainerRunResponse = {
   exitCode: number;
   durationMs: number;
@@ -31,10 +44,10 @@ type ContainerRunResponse = {
 /**
  * Run one decider case through the `kilo` CLI inside a Cloudflare Container.
  *
- * `instanceName` is the precomputed DO instance name (e.g.
- * `${runId}:${model}:${chunk}`); the caller owns the keying so chunks/models
- * map to stable instances. The CLI has no system-prompt flag, so we fold the
- * system prompt into the user prompt.
+ * `instanceName` is the precomputed DO instance name; the caller owns the
+ * keying so chunks for the same model/repetition share a stable instance. The
+ * CLI has no system-prompt flag, so we fold the system prompt into the user
+ * prompt.
  */
 export async function runDeciderCaseViaCli(
   env: Env,
@@ -141,6 +154,23 @@ export async function warmUpCliContainer(
     })
   );
   if (!response.ok) {
-    throw new Error(`container /warmup failed: HTTP ${response.status}`);
+    const detail = (await response.text().catch(() => '')).slice(0, 500);
+    throw new Error(`container /warmup failed: HTTP ${response.status} ${detail}`);
+  }
+}
+
+export async function destroyDeciderCliContainer(
+  env: Env,
+  params: { instanceName: string }
+): Promise<void> {
+  const stub = env.BENCH_RUNNER.get(env.BENCH_RUNNER.idFromName(params.instanceName));
+  const response = await stub.fetch(
+    new Request('http://container/admin/destroy', {
+      method: 'POST',
+    })
+  );
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => '')).slice(0, 500);
+    throw new Error(`container /admin/destroy failed: HTTP ${response.status} ${detail}`);
   }
 }

@@ -93,15 +93,6 @@ export const kiloExclusiveModels = [
   stepfun_37_flash_free_model,
 ] as KiloExclusiveModel[];
 
-export function isKiloExclusiveModelRequiringDataCollection(model: string): boolean {
-  return kiloExclusiveModels.some(
-    m =>
-      m.public_id === model &&
-      m.status !== 'disabled' &&
-      (!m.pricing || m.flags.includes('requires-data-collection'))
-  );
-}
-
 export function isKiloStealthModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));
 }

@@ -1,5 +1,5 @@
 import {
-  deriveDifficultyTier,
+  taxonomyRouteKey,
   type AutoRoutingDecision,
   type ClassifierOutput,
   type RoutingTable,
@@ -11,14 +11,13 @@ export function computeDecision(
   incumbentModel: string | null
 ): AutoRoutingDecision | null {
   if (!table) return null;
-  const tier = deriveDifficultyTier(classification);
-  const candidates = table.tiers[tier];
-  // A parsed table guarantees a non-empty tier (schema .min(1)), so with a
-  // table and a classification a decision always exists.
+  const routeKey = taxonomyRouteKey(classification);
+  const candidates = table.routes[routeKey];
+  if (!candidates?.length) return null;
   const freshPick = candidates[0];
 
   // Keep the session on its incumbent model when it is still good enough for
-  // the current tier. A model switch discards the provider's prompt cache,
+  // the current taxonomy route. A model switch discards the provider's prompt cache,
   // and rebuilding it costs full-price input tokens (4-10x cache-read rates)
   // on a context that dominates agent-session spend — so a switch is only
   // worth it when the fresh pick's recurring per-turn savings clearly exceed
@@ -33,7 +32,8 @@ export function computeDecision(
   ) {
     return {
       model: incumbent.model,
-      tier,
+      taskType: classification.taskType,
+      subtaskType: classification.subtaskType,
       source: table.source,
       tableVersion: table.version,
       reasoningEffort: incumbent.reasoningEffort ?? null,
@@ -43,7 +43,8 @@ export function computeDecision(
 
   return {
     model: freshPick.model,
-    tier,
+    taskType: classification.taskType,
+    subtaskType: classification.subtaskType,
     source: table.source,
     tableVersion: table.version,
     reasoningEffort: freshPick.reasoningEffort ?? null,

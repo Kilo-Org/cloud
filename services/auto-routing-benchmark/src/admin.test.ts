@@ -12,7 +12,7 @@ import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 function makeSummary(model: string): BenchmarkModelSummary {
   return {
     model,
-    tier: 'low',
+    routeKey: 'implementation/code_generation',
     accuracy: 0.9,
     avgCostUsd: 0.001,
     avgLatencyMs: 100,
@@ -32,7 +32,7 @@ const TEST_CONFIG: BenchmarkConfig = {
   ],
   minAccuracy: 0.7,
   switchCostFactor: 3,
-  maxConcurrency: 4,
+  maxConcurrency: 100,
   benchmarkUserId: null,
   classifierRepetitions: 1,
   deciderRepetitions: 1,
@@ -471,9 +471,10 @@ describe('POST /admin/runs', () => {
     expect(body.enqueuedModels).toBe(1);
   });
 
-  it('slices a >100-message decider fan-out into sendBatch-sized batches', async () => {
-    // 7 decider models × 1 rep × ceil(76/5)=16 chunks = 112 messages, which
-    // exceeds Cloudflare Queues' 100-per-sendBatch cap and must be sliced.
+  it('seeds sharded decider lanes bounded by the container cap', async () => {
+    // Later chunks are chained by processJob within each shard lane. Start
+    // seeds as many lanes as fit under the 100-container cap so the benchmark
+    // runs much faster without creating one live container per chunk.
     const manyModels = Array.from({ length: 7 }, (_, i) => ({
       id: `vendor/model-${i}`,
       reasoningEffort: null,
@@ -487,11 +488,74 @@ describe('POST /admin/runs', () => {
     const res = await authedPost('/admin/runs', { kind: 'decider' });
     expect(res.status).toBe(200);
 
-    // 112 messages → two batches (100 + 12), neither over the limit.
-    expect(queueSendBatch).toHaveBeenCalledTimes(2);
+    expect(queueSendBatch).toHaveBeenCalledTimes(1);
     const batchSizes = queueSendBatch.mock.calls.map(([batch]) => (batch as unknown[]).length);
-    expect(batchSizes).toEqual([100, 12]);
+    expect(batchSizes).toEqual([98]);
     for (const size of batchSizes) expect(size).toBeLessThanOrEqual(100);
+    const queuedMessages = queueSendBatch.mock.calls.flatMap(([batch]) => batch as unknown[]);
+    for (const message of queuedMessages) {
+      expect(message).toMatchObject({
+        body: {
+          kind: 'decider',
+          shardCount: 14,
+        },
+      });
+    }
+  });
+
+  it('keeps 10 decider models with 3 repetitions under the 100-container cap', async () => {
+    const manyModels = Array.from({ length: 10 }, (_, i) => ({
+      id: `vendor/model-${i}`,
+      reasoningEffort: null,
+    }));
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        benchmark_user_id: 'user-123',
+        decider_repetitions: 3,
+      },
+      deciderModels: manyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+
+    expect(queueSendBatch).toHaveBeenCalledTimes(1);
+    const queuedMessages = queueSendBatch.mock.calls.flatMap(([batch]) => batch as unknown[]);
+    expect(queuedMessages).toHaveLength(90);
+    for (const message of queuedMessages) {
+      expect(message).toMatchObject({
+        body: {
+          kind: 'decider',
+          shardCount: 3,
+        },
+      });
+    }
+  });
+
+  it('rejects decider starts when model repetitions alone exceed the container cap', async () => {
+    const tooManyModels = Array.from({ length: 21 }, (_, i) => ({
+      id: `vendor/model-${i}`,
+      reasoningEffort: null,
+    }));
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        benchmark_user_id: 'user-123',
+        decider_repetitions: 5,
+      },
+      deciderModels: tooManyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('requires at least one live container lane'),
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 });
 
@@ -519,7 +583,7 @@ describe('GET /admin/routing-table', () => {
       minAccuracy: 0.7,
       switchCostFactor: 3,
       source: 'benchmark',
-      tiers: { low: [candidate], medium: [candidate], high: [candidate] },
+      routes: { 'implementation/code_generation': [candidate] },
     };
     vi.mocked(getLatestRoutingTable).mockResolvedValueOnce({
       table: tableData as RoutingTable,

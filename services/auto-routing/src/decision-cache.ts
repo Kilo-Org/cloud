@@ -82,7 +82,7 @@ function entryKey(contentHash: string, classifierModel: string): string {
 
 // Single per-conversation slot remembering the last model the decision
 // engine served, so the session can stay on it (keeping the provider's
-// prompt cache warm) instead of ping-ponging when its tier oscillates.
+// prompt cache warm) instead of ping-ponging when its route oscillates.
 // Cannot collide with classification keys, which always contain a ':'.
 const STICKY_DECISION_KEY = 'sticky';
 

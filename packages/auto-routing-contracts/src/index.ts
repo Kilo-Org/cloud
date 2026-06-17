@@ -1,6 +1,12 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
-import { DifficultyTierSchema, ReasoningEffortSchema } from './tiers';
+import { ReasoningEffortSchema } from './reasoning';
+import {
+  ClassifierSubtaskTypeSchema,
+  ClassifierTaskTypeSchema,
+  SUBTYPES_BY_TASK_TYPE,
+  type ClassifierSubtaskType,
+} from './taxonomy';
 
 export {
   NormalizedClassifierInputSchema,
@@ -29,47 +35,6 @@ export const MirrorPayloadSchema = z.object({
 });
 export type MirrorPayload = z.infer<typeof MirrorPayloadSchema>;
 
-export const ClassifierTaskTypeSchema = z.enum([
-  'implementation',
-  'debugging',
-  'refactoring',
-  'planning_design',
-  'investigation',
-  'agentic_execution',
-]);
-export type ClassifierTaskType = z.infer<typeof ClassifierTaskTypeSchema>;
-
-export const ClassifierSubtaskTypeSchema = z.enum([
-  'feature_development',
-  'code_generation',
-  'test_creation',
-  'bug_fixing',
-  'test_repair',
-  'root_cause_analysis',
-  'code_cleanup',
-  'architecture_improvement',
-  'migration',
-  'architecture_design',
-  'technical_planning',
-  'system_design',
-  'repo_exploration',
-  'codebase_understanding',
-  'external_research',
-  'tool_usage',
-  'terminal_operations',
-  'multi_step_execution',
-]);
-export type ClassifierSubtaskType = z.infer<typeof ClassifierSubtaskTypeSchema>;
-
-const subtypesByTaskType: Record<ClassifierTaskType, readonly ClassifierSubtaskType[]> = {
-  implementation: ['feature_development', 'code_generation', 'test_creation'],
-  debugging: ['bug_fixing', 'test_repair', 'root_cause_analysis'],
-  refactoring: ['code_cleanup', 'architecture_improvement', 'migration'],
-  planning_design: ['architecture_design', 'technical_planning', 'system_design'],
-  investigation: ['repo_exploration', 'codebase_understanding', 'external_research'],
-  agentic_execution: ['tool_usage', 'terminal_operations', 'multi_step_execution'],
-};
-
 export const ClassifierOutputSchema = z
   .strictObject({
     taskType: ClassifierTaskTypeSchema,
@@ -87,7 +52,10 @@ export const ClassifierOutputSchema = z
     confidence: z.number().min(0).max(1),
   })
   .superRefine((output, ctx) => {
-    if (!subtypesByTaskType[output.taskType].includes(output.subtaskType)) {
+    const allowedSubtypes = SUBTYPES_BY_TASK_TYPE[
+      output.taskType
+    ] as readonly ClassifierSubtaskType[];
+    if (!allowedSubtypes.includes(output.subtaskType)) {
       ctx.addIssue({
         code: 'custom',
         path: ['subtaskType'],
@@ -99,7 +67,8 @@ export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
 export const AutoRoutingDecisionSchema = z.object({
   model: z.string(),
-  tier: DifficultyTierSchema,
+  taskType: ClassifierTaskTypeSchema,
+  subtaskType: ClassifierSubtaskTypeSchema,
   source: z.enum(['benchmark']),
   tableVersion: z.string(),
   // Mirrors the effort the chosen model was benchmarked with, when set.
@@ -180,6 +149,7 @@ export type AutoRoutingClassifierAnalyticsResponse = z.infer<
 
 export { normalizeClassifierInput, redactProviderHints, type ClassifierApiKind } from './normalize';
 
-export * from './tiers';
+export * from './reasoning';
+export * from './taxonomy';
 export * from './routing-table';
 export * from './benchmark';

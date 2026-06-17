@@ -13,7 +13,7 @@ describe('mapSummaryRow', () => {
     const row = {
       run_id: 'run-1',
       model: 'openai/gpt-4o',
-      tier: 'high',
+      route_key: 'implementation/code_generation',
       accuracy: 0.92,
       avg_cost_usd: 0.0015,
       avg_latency_ms: 320.5,
@@ -27,7 +27,7 @@ describe('mapSummaryRow', () => {
     const result = mapSummaryRow(row);
     expect(result).toEqual<BenchmarkModelSummary>({
       model: 'openai/gpt-4o',
-      tier: 'high',
+      routeKey: 'implementation/code_generation',
       accuracy: 0.92,
       avgCostUsd: 0.0015,
       avgLatencyMs: 320.5,
@@ -43,7 +43,7 @@ describe('mapSummaryRow', () => {
     const row = {
       run_id: 'run-2',
       model: 'anthropic/claude-3-haiku',
-      tier: '*',
+      route_key: '*',
       accuracy: 0.85,
       avg_cost_usd: null,
       avg_latency_ms: 150.0,
@@ -58,7 +58,7 @@ describe('mapSummaryRow', () => {
     expect(result.avgCostUsd).toBeNull();
     expect(result.p50LatencyMs).toBeNull();
     expect(result.p95LatencyMs).toBeNull();
-    expect(result.tier).toBe('*');
+    expect(result.routeKey).toBe('*');
     expect(result.errors).toBe(0);
     expect(result.timeouts).toBe(0);
   });
@@ -88,7 +88,7 @@ describe('mapRunRow', () => {
     const summaries: BenchmarkModelSummary[] = [
       {
         model: 'openai/gpt-4o-mini',
-        tier: '*',
+        routeKey: '*',
         accuracy: 0.78,
         avgCostUsd: 0.0002,
         avgLatencyMs: 120,
@@ -150,10 +150,9 @@ const sampleTable: RoutingTable = {
   minAccuracy: 0.7,
   switchCostFactor: 3,
   source: 'benchmark',
-  tiers: {
-    low: [candidate('model-a'), candidate('model-b')],
-    medium: [candidate('model-c')],
-    high: [candidate('model-a')],
+  routes: {
+    'implementation/code_generation': [candidate('model-a'), candidate('model-b')],
+    'debugging/bug_fixing': [candidate('model-c')],
   },
 };
 
@@ -168,14 +167,16 @@ describe('routingTableToRows', () => {
     expect(tableRow.source).toBe('benchmark');
   });
 
-  it('assigns rank 0,1 for the two low-tier candidates', () => {
+  it('assigns rank 0,1 for the two implementation/code_generation candidates', () => {
     const { candidateRows } = routingTableToRows(sampleTable, '2026-06-01T11:00:00.000Z');
-    const lowRows = candidateRows.filter(r => r.tier === 'low').sort((a, b) => a.rank - b.rank);
-    expect(lowRows).toHaveLength(2);
-    expect(lowRows[0].model).toBe('model-a');
-    expect(lowRows[0].rank).toBe(0);
-    expect(lowRows[1].model).toBe('model-b');
-    expect(lowRows[1].rank).toBe(1);
+    const routeRows = candidateRows
+      .filter(r => r.route_key === 'implementation/code_generation')
+      .sort((a, b) => a.rank - b.rank);
+    expect(routeRows).toHaveLength(2);
+    expect(routeRows[0].model).toBe('model-a');
+    expect(routeRows[0].rank).toBe(0);
+    expect(routeRows[1].model).toBe('model-b');
+    expect(routeRows[1].rank).toBe(1);
   });
 });
 
@@ -188,12 +189,12 @@ describe('rowsToRoutingTable', () => {
     expect(RoutingTableSchema.parse(reassembled)).toEqual(sampleTable);
   });
 
-  it('preserves candidate order within each tier', () => {
+  it('preserves candidate order within each route', () => {
     const { tableRow, candidateRows } = routingTableToRows(sampleTable, '2026-06-01T11:00:00.000Z');
     // Shuffle candidateRows to verify rank-based sorting.
     const shuffled = [...candidateRows].reverse();
     const reassembled = rowsToRoutingTable(tableRow, shuffled);
-    expect(reassembled.tiers.low[0].model).toBe('model-a');
-    expect(reassembled.tiers.low[1].model).toBe('model-b');
+    expect(reassembled.routes['implementation/code_generation']?.[0]?.model).toBe('model-a');
+    expect(reassembled.routes['implementation/code_generation']?.[1]?.model).toBe('model-b');
   });
 });

@@ -8,7 +8,13 @@ import { zodJsonValidator } from '@kilocode/worker-utils';
 import type { Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
-import { fetchBenchmarkUserToken, RunAlreadyActiveError, startRun, sweepStaleRuns } from './run';
+import {
+  BenchmarkRunConfigError,
+  fetchBenchmarkUserToken,
+  RunAlreadyActiveError,
+  startRun,
+  sweepStaleRuns,
+} from './run';
 import { getClassifierWinner, getLatestRoutingTable, listRuns } from './db';
 import type { HonoEnv } from './hono-env';
 
@@ -58,6 +64,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         // callers don't treat it as a transient 5xx and retry.
         if (error instanceof RunAlreadyActiveError) {
           return c.json({ error: error.message }, 409);
+        }
+        if (error instanceof BenchmarkRunConfigError) {
+          return c.json({ error: error.message }, 400);
         }
         throw error;
       }

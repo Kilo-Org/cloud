@@ -1185,11 +1185,14 @@ export async function handleKiloClawSubscriptionCreated(params: {
     });
   }
 
-  logInfo('KiloClaw subscription.created processed', {
-    stripe_event_id: eventId,
-    user_id: kiloUserId,
-    plan,
-  });
+  if (didProcess) {
+    logInfo('KiloClaw subscription.created processed', {
+      stripe_event_id: eventId,
+      user_id: kiloUserId,
+      plan,
+      outcome: 'local_mutation_applied',
+    });
+  }
 }
 
 /**

@@ -126,7 +126,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
       deciderModels: [],
       minAccuracy: 0.7,
       switchCostFactor: 3,
-      maxConcurrency: 4,
+      maxConcurrency: 100,
       benchmarkUserId: '',
       classifierRepetitions: 1,
       deciderRepetitions: 1,
@@ -407,13 +407,13 @@ function BenchmarkConfigEditor({
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-max-concurrency" className="text-sm font-medium">
-              Max concurrency (1–16)
+              Max concurrency (1–100)
             </Label>
             <Input
               id="benchmark-max-concurrency"
               type="number"
               min={1}
-              max={16}
+              max={100}
               step={1}
               value={form.maxConcurrency}
               onChange={e =>
@@ -539,17 +539,13 @@ function BenchmarkConfigEditor({
 // Run summaries expandable table
 // ---------------------------------------------------------------------------
 
-const TIER_ORDER = { low: 0, medium: 1, high: 2, '*': 3 } as const;
-
 function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
   const isDecider = run.kind === 'decider';
 
   const sortedSummaries: BenchmarkModelSummary[] = isDecider
     ? [...run.summaries].sort((a, b) => {
-        const tierDiff =
-          (TIER_ORDER[a.tier as keyof typeof TIER_ORDER] ?? 3) -
-          (TIER_ORDER[b.tier as keyof typeof TIER_ORDER] ?? 3);
-        if (tierDiff !== 0) return tierDiff;
+        const routeDiff = a.routeKey.localeCompare(b.routeKey);
+        if (routeDiff !== 0) return routeDiff;
         return b.accuracy - a.accuracy;
       })
     : run.summaries;
@@ -571,7 +567,7 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">Model</TableHead>
-                  {isDecider ? <TableHead className="text-xs">Tier</TableHead> : null}
+                  {isDecider ? <TableHead className="text-xs">Route</TableHead> : null}
                   <TableHead className="text-right text-xs">Accuracy</TableHead>
                   <TableHead className="text-right text-xs">Avg cost</TableHead>
                   <TableHead className="text-right text-xs">Avg latency</TableHead>
@@ -584,10 +580,10 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
               </TableHeader>
               <TableBody>
                 {sortedSummaries.map((s, i) => (
-                  <TableRow key={`${s.model}-${s.tier}-${i}`}>
+                  <TableRow key={`${s.model}-${s.routeKey}-${i}`}>
                     <TableCell className="max-w-56 truncate font-mono text-xs">{s.model}</TableCell>
                     {isDecider ? (
-                      <TableCell className="text-xs capitalize">{s.tier}</TableCell>
+                      <TableCell className="font-mono text-xs">{s.routeKey}</TableCell>
                     ) : null}
                     <TableCell className="text-right tabular-nums text-xs">
                       {formatAccuracy(s.accuracy)}
@@ -717,11 +713,7 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
   }
 
   const { table } = data;
-  const tierEntries = [
-    { tier: 'low', candidates: table.tiers.low },
-    { tier: 'medium', candidates: table.tiers.medium },
-    { tier: 'high', candidates: table.tiers.high },
-  ] as const;
+  const routeEntries = Object.entries(table.routes).sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <div className="flex flex-col gap-3">
@@ -736,9 +728,9 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
         </span>
       </div>
 
-      {tierEntries.map(({ tier, candidates }) => (
-        <div key={tier}>
-          <p className="text-sm font-medium capitalize mb-1.5">{tier} tier</p>
+      {routeEntries.map(([routeKey, candidates]) => (
+        <div key={routeKey}>
+          <p className="mb-1.5 font-mono text-sm font-medium">{routeKey}</p>
           <div className="overflow-x-auto rounded-md border">
             <Table className="min-w-max">
               <TableHeader>
@@ -751,7 +743,7 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
               </TableHeader>
               <TableBody>
                 {candidates.map((c, i) => (
-                  <TableRow key={`${tier}-${c.model}-${i}`}>
+                  <TableRow key={`${routeKey}-${c.model}-${i}`}>
                     <TableCell className="max-w-56 truncate font-mono text-xs">{c.model}</TableCell>
                     <TableCell className="text-right tabular-nums text-xs">
                       {formatAccuracy(c.accuracy)}

@@ -12,9 +12,9 @@ design, invariants, and rollout/rollback.
   OpenRouter using the exact production classifier code
   (`@kilocode/auto-routing-contracts/classifier`), grades per-field, and derives
   the cheapest above-threshold model as the classifier winner.
-- **Decider benchmark** — runs 76 golden tasks per candidate through the real
+- **Decider benchmark** — runs 180 golden tasks per candidate through the real
   `kilo` CLI inside a Cloudflare Container, grades mechanically, and publishes a
-  per-difficulty-tier routing table.
+  per-taxonomy-route routing table.
 - Normalized results live in D1 (`BENCH_DB`); published artifacts are cached in
   the shared `AUTO_ROUTING_CONFIG` KV namespace (publish = delete the keys so the
   next read repopulates from D1).
@@ -92,10 +92,12 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 
 ## Debugging container (decider) failures
 
-- Each (model, 10-case chunk) gets its own container instance
-  (`runId:model:chunk`); CLI runs are serialized per instance (its sqlite state
-  is not safe under concurrent first runs). A `/warmup` call absorbs the one-time
-  sqlite migration before the case loop.
+- Each decider run seeds bounded shard lanes across the configured models and
+  repetitions. A lane uses one stable container instance
+  (`runId:model:rep:shard`) and processes chunk `N`, then `N+shardCount`, and
+  so on. CLI runs are serialized per instance because its sqlite state is not
+  safe under concurrent first runs. A `/warmup` call absorbs the one-time sqlite
+  migration before the case loop.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an
   event tail — start there for a failing case.
 - `POST /admin/debug-cli {model, prompt}` runs one prompt through the container
@@ -109,16 +111,16 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
 ## Debugging the DLQ
 
 Failed queue messages land in `auto-routing-benchmark-dlq` after `max_retries`
-(2) on `auto-routing-benchmark-jobs`. A message is one (model, chunk) job, so a
-DLQ'd message means that chunk never produced results; its model's summaries for
-the affected tier(s) will be missing or incomplete and `finalizeRunIfComplete`
-will mark the run accordingly.
+(6) on `auto-routing-benchmark-jobs`. A decider message is one
+(model, repetition, shard, chunk) job, so a DLQ'd message means that chunk never
+produced results; its model's summaries for the affected route(s) will be
+missing or incomplete and `finalizeRunIfComplete` will mark the run accordingly.
 
 To inspect / handle:
 
 - **Prod**: read the DLQ from the Cloudflare dashboard (Workers → Queues →
   `auto-routing-benchmark-dlq`) or `wrangler queues` tooling; the message body is
-  the JSON job (`runId`, `model`, `chunk`, case ids).
+  the JSON job (`runId`, `model`, `rep`, `shard`, `shardCount`, `chunk`, case ids).
 - **Replay**: re-run the affected model with the admin `force` toggle once the
   underlying cause (OpenRouter outage, container image, bad case) is fixed —
   carried summaries mean only the re-triggered model is re-benchmarked.

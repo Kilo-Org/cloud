@@ -1,9 +1,10 @@
 import * as z from 'zod';
 import { RoutingTableSchema } from './routing-table';
-import { DifficultyTierSchema, ReasoningEffortSchema } from './tiers';
+import { ReasoningEffortSchema } from './reasoning';
+import { TaxonomyRouteKeySchema } from './taxonomy';
 
-export { ReasoningEffortSchema } from './tiers';
-export type { ReasoningEffort } from './tiers';
+export { ReasoningEffortSchema } from './reasoning';
+export type { ReasoningEffort } from './reasoning';
 
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
 export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
@@ -39,15 +40,16 @@ export const BenchmarkConfigSchema = z
   .object({
     classifierModels: z.array(z.string().trim().min(1)).min(1),
     deciderModels: z.array(BenchmarkDeciderModelSchema).min(1),
-    // Accuracy threshold for "gets the job done" (per tier).
+    // Accuracy threshold for "gets the job done" (per taxonomy route).
     minAccuracy: z.number().min(0).max(1),
-    // Parallel OpenRouter calls per queue message.
-    maxConcurrency: z.number().int().min(1).max(16),
+    // Benchmark-wide parallelism budget. Decider runs use it as a live
+    // container budget; classifier runs use it for parallel OpenRouter calls.
+    maxConcurrency: z.number().int().min(1).max(100),
     // The Kilo user whose identity/billing the decider CLI runs execute under.
     // Null until an admin configures it; decider runs fail fast while null.
     benchmarkUserId: z.string().trim().min(1).nullable(),
     // Session stickiness knob carried into published routing tables: a session
-    // stays on its incumbent model while it meets the tier's accuracy
+    // stays on its incumbent model while it meets the route's accuracy
     // threshold, unless the fresh pick is cheaper by more than this factor.
     // Model switches discard provider prompt caches (cache reads are far
     // cheaper than fresh input tokens), so switching only pays off when the
@@ -79,8 +81,8 @@ export type BenchmarkRunStatus = z.infer<typeof BenchmarkRunStatusSchema>;
 
 export const BenchmarkModelSummarySchema = z.object({
   model: z.string(),
-  // '*' for classifier runs (no tiering), otherwise the difficulty tier.
-  tier: z.union([DifficultyTierSchema, z.literal('*')]),
+  // '*' for classifier runs, otherwise "<taskType>/<subtaskType>".
+  routeKey: z.union([TaxonomyRouteKeySchema, z.literal('*')]),
   accuracy: z.number(),
   avgCostUsd: z.number().nullable(),
   avgLatencyMs: z.number(),

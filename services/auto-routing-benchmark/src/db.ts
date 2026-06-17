@@ -34,6 +34,11 @@ type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 // ceiling while still batching the delete plus inserts together.
 const MODEL_SUMMARY_INSERT_BATCH_SIZE = 8;
 
+// Routing table candidates bind 8 values per row. Keep each INSERT comfortably
+// under D1's 100-variable ceiling; publishing is infrequent, so smaller
+// statements are preferable to risking a skipped routing-table update.
+const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
+
 // ---------------------------------------------------------------------------
 // Row mapping helpers
 // ---------------------------------------------------------------------------
@@ -41,7 +46,7 @@ const MODEL_SUMMARY_INSERT_BATCH_SIZE = 8;
 export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
   return {
     model: row.model,
-    tier: row.tier as BenchmarkModelSummary['tier'],
+    routeKey: row.route_key as BenchmarkModelSummary['routeKey'],
     accuracy: row.accuracy,
     avgCostUsd: row.avg_cost_usd,
     avgLatencyMs: row.avg_latency_ms,
@@ -179,7 +184,7 @@ export async function insertRun(
         carriedSummaries.map(s => ({
           run_id: run.id,
           model: s.model,
-          tier: s.tier,
+          route_key: s.routeKey,
           accuracy: s.accuracy,
           avg_cost_usd: s.avgCostUsd,
           avg_latency_ms: s.avgLatencyMs,
@@ -221,7 +226,7 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
     .onConflictDoUpdate({
       target: [caseResults.run_id, caseResults.model, caseResults.case_id, caseResults.rep],
       set: {
-        tier: row.tier,
+        route_key: row.route_key,
         score: row.score,
         latency_ms: row.latency_ms,
         cost_usd: row.cost_usd,
@@ -249,6 +254,25 @@ export async function countCaseResults(db: D1Database, runId: string): Promise<n
 
 export async function getCaseResults(db: D1Database, runId: string): Promise<CaseResultRow[]> {
   return drizzle(db).select().from(caseResults).where(eq(caseResults.run_id, runId));
+}
+
+export async function getExistingCaseResultIds(
+  db: D1Database,
+  params: { runId: string; model: string; rep: number; caseIds: string[] }
+): Promise<Set<string>> {
+  if (params.caseIds.length === 0) return new Set();
+  const rows = await drizzle(db)
+    .select({ case_id: caseResults.case_id })
+    .from(caseResults)
+    .where(
+      and(
+        eq(caseResults.run_id, params.runId),
+        eq(caseResults.model, params.model),
+        eq(caseResults.rep, params.rep),
+        inArray(caseResults.case_id, params.caseIds)
+      )
+    );
+  return new Set(rows.map(row => row.case_id));
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +303,7 @@ export async function replaceModelSummaries(
         summaryChunk.map(s => ({
           run_id: runId,
           model: s.model,
-          tier: s.tier,
+          route_key: s.routeKey,
           accuracy: s.accuracy,
           avg_cost_usd: s.avgCostUsd,
           avg_latency_ms: s.avgLatencyMs,
@@ -415,8 +439,8 @@ export type PriorModelResult = {
   summaries: BenchmarkModelSummary[];
 };
 
-// Latest summaries per model for a benchmark kind: for each model, all tiers
-// from the most recent COMPLETED run that included it (mixing tiers across
+// Latest summaries per model for a benchmark kind: for each model, all routes
+// from the most recent COMPLETED run that included it (mixing routes across
 // runs would pair incomparable numbers).
 export async function getLatestSummariesByModel(
   db: D1Database,
@@ -426,7 +450,7 @@ export async function getLatestSummariesByModel(
     .select({
       run_id: modelSummaries.run_id,
       model: modelSummaries.model,
-      tier: modelSummaries.tier,
+      route_key: modelSummaries.route_key,
       accuracy: modelSummaries.accuracy,
       avg_cost_usd: modelSummaries.avg_cost_usd,
       avg_latency_ms: modelSummaries.avg_latency_ms,
@@ -492,11 +516,11 @@ export function routingTableToRows(
   };
 
   const candidateRows: RoutingTableCandidateRow[] = [];
-  for (const [tier, candidates] of Object.entries(table.tiers)) {
+  for (const [routeKey, candidates] of Object.entries(table.routes)) {
     candidates.forEach((c, rank) => {
       candidateRows.push({
         run_id: table.version,
-        tier,
+        route_key: routeKey,
         rank,
         model: c.model,
         accuracy: c.accuracy,
@@ -514,14 +538,14 @@ export function rowsToRoutingTable(
   tableRow: RoutingTableRow,
   candidateRows: RoutingTableCandidateRow[]
 ): RoutingTable {
-  const tierMap: Record<string, RankedCandidate[]> = { low: [], medium: [], high: [] };
+  const routeMap: Record<string, RankedCandidate[]> = {};
   const sorted = [...candidateRows].sort((a, b) => {
-    if (a.tier !== b.tier) return a.tier.localeCompare(b.tier);
+    if (a.route_key !== b.route_key) return a.route_key.localeCompare(b.route_key);
     return a.rank - b.rank;
   });
   for (const row of sorted) {
-    if (!(row.tier in tierMap)) tierMap[row.tier] = [];
-    tierMap[row.tier].push({
+    routeMap[row.route_key] ??= [];
+    routeMap[row.route_key].push({
       model: row.model,
       accuracy: row.accuracy,
       avgCostUsd: row.avg_cost_usd,
@@ -535,11 +559,7 @@ export function rowsToRoutingTable(
     minAccuracy: tableRow.min_accuracy,
     switchCostFactor: tableRow.switch_cost_factor,
     source: tableRow.source as RoutingTable['source'],
-    tiers: {
-      low: tierMap.low ?? [],
-      medium: tierMap.medium ?? [],
-      high: tierMap.high ?? [],
-    },
+    routes: routeMap,
   };
 }
 
@@ -568,8 +588,12 @@ export async function saveRoutingTable(
       }),
   ];
 
-  if (candidateRows.length > 0) {
-    stmts.push(orm.insert(routingTableCandidates).values(candidateRows));
+  for (let i = 0; i < candidateRows.length; i += ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE) {
+    stmts.push(
+      orm
+        .insert(routingTableCandidates)
+        .values(candidateRows.slice(i, i + ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE))
+    );
   }
 
   await orm.batch(stmts);
@@ -592,7 +616,7 @@ export async function getLatestRoutingTable(
     .select()
     .from(routingTableCandidates)
     .where(eq(routingTableCandidates.run_id, tableRow.run_id))
-    .orderBy(routingTableCandidates.tier, routingTableCandidates.rank);
+    .orderBy(routingTableCandidates.route_key, routingTableCandidates.rank);
 
   const assembled = rowsToRoutingTable(tableRow, candidateRows);
   const parsed = RoutingTableSchema.safeParse(assembled);
@@ -627,11 +651,11 @@ export async function getClassifierWinner(db: D1Database): Promise<ClassifierWin
 
   if (!runRow) return null;
 
-  // Get the tier='*' summaries for this run (classifier uses '*' tier).
+  // Get the routeKey='*' summaries for this run (classifier has no taxonomy route).
   const summaryRows = await orm
     .select()
     .from(modelSummaries)
-    .where(and(eq(modelSummaries.run_id, runRow.id), eq(modelSummaries.tier, '*')));
+    .where(and(eq(modelSummaries.run_id, runRow.id), eq(modelSummaries.route_key, '*')));
 
   const summaries = summaryRows.map(mapSummaryRow);
   const winner = pickClassifierWinner(

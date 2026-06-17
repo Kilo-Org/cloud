@@ -29,9 +29,11 @@ import {
   isDeadFreeModel,
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
-  isKiloExclusiveModelRequiringDataCollection,
 } from '@/lib/ai-gateway/models';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import {
+  hasBestEffortGuessDataCollectionRequirement,
+  isFreeModel,
+} from '@/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -595,8 +597,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // intent. Refuse here regardless of org settings, anon/BYOK status,
   // or the org-level check below.
   if (
-    (effectiveProviderContext.experiment ||
-      isKiloExclusiveModelRequiringDataCollection(effectiveModelIdLowerCased)) &&
+    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();

@@ -9,12 +9,16 @@ const candidate = (model: string, accuracy: number, avgCostUsd: number) => ({
 });
 
 describe('rankCandidates', () => {
-  it('puts the cheapest above-threshold candidate first', () => {
+  it('puts the lowest cost-per-accuracy above-threshold candidate first', () => {
     const ranked = rankCandidates(
-      [candidate('expensive', 0.95, 10), candidate('cheap', 0.8, 1), candidate('weak', 0.5, 0.1)],
+      [
+        candidate('lower-raw-cost', 0.7, 0.007),
+        candidate('better-value', 0.9, 0.008),
+        candidate('weak', 0.5, 0.001),
+      ],
       0.7
     );
-    expect(ranked.map(c => c.model)).toEqual(['cheap', 'expensive', 'weak']);
+    expect(ranked.map(c => c.model)).toEqual(['better-value', 'lower-raw-cost', 'weak']);
     expect(ranked[0].meetsThreshold).toBe(true);
     expect(ranked[2].meetsThreshold).toBe(false);
   });
@@ -29,15 +33,35 @@ describe('rankCandidates', () => {
 });
 
 describe('RoutingTableSchema', () => {
-  it('requires at least one candidate per tier', () => {
+  it('requires at least one candidate per taxonomy route', () => {
     expect(
       RoutingTableSchema.safeParse({
         version: 'v',
         generatedAt: new Date(0).toISOString(),
         minAccuracy: 0.7,
+        switchCostFactor: 3,
         source: 'benchmark',
-        tiers: { low: [], medium: [candidate('m', 1, 1)], high: [candidate('h', 1, 1)] },
+        routes: {
+          'implementation/code_generation': [],
+          'debugging/bug_fixing': [candidate('m', 1, 1)],
+        },
       }).success
     ).toBe(false);
+  });
+
+  it('accepts a table routed by classifier taxonomy pair', () => {
+    const parsed = RoutingTableSchema.parse({
+      version: 'v',
+      generatedAt: new Date(0).toISOString(),
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      source: 'benchmark',
+      routes: {
+        'implementation/code_generation': [candidate('impl', 0.9, 1)],
+        'debugging/bug_fixing': [candidate('debug', 0.9, 1)],
+      },
+    });
+
+    expect(parsed.routes['implementation/code_generation']?.[0]?.model).toBe('impl');
   });
 });

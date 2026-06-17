@@ -32,7 +32,7 @@ CREATE TABLE `case_results` (
 	`run_id` text NOT NULL,
 	`model` text NOT NULL,
 	`case_id` text NOT NULL,
-	`tier` text,
+	`route_key` text,
 	`score` real NOT NULL,
 	`latency_ms` integer NOT NULL,
 	`cost_usd` real,
@@ -60,7 +60,7 @@ CREATE TABLE `config_decider_models` (
 CREATE TABLE `model_summaries` (
 	`run_id` text NOT NULL,
 	`model` text NOT NULL,
-	`tier` text NOT NULL,
+	`route_key` text NOT NULL,
 	`accuracy` real NOT NULL,
 	`avg_cost_usd` real,
 	`avg_latency_ms` real NOT NULL,
@@ -70,19 +70,19 @@ CREATE TABLE `model_summaries` (
 	`p95_latency_ms` real,
 	`timeouts` integer DEFAULT 0 NOT NULL,
 	`carried` integer DEFAULT false NOT NULL,
-	PRIMARY KEY(`run_id`, `model`, `tier`)
+	PRIMARY KEY(`run_id`, `model`, `route_key`)
 );
 --> statement-breakpoint
 CREATE TABLE `routing_table_candidates` (
 	`run_id` text NOT NULL,
-	`tier` text NOT NULL,
+	`route_key` text NOT NULL,
 	`rank` integer NOT NULL,
 	`model` text NOT NULL,
 	`accuracy` real NOT NULL,
 	`avg_cost_usd` real NOT NULL,
 	`meets_threshold` integer NOT NULL,
 	`reasoning_effort` text,
-	PRIMARY KEY(`run_id`, `tier`, `rank`)
+	PRIMARY KEY(`run_id`, `route_key`, `rank`)
 );
 --> statement-breakpoint
 CREATE TABLE `routing_tables` (

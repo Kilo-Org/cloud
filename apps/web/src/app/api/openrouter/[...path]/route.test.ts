@@ -496,7 +496,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
-        tier: 'low',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'v1',
         sticky: false,
@@ -530,7 +531,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
-        tier: 'low',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark' as const,
         tableVersion: 'v1',
         sticky: false,
@@ -559,7 +561,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
-        tier: 'low',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'v1',
         sticky: false,
@@ -609,7 +612,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
-        tier: 'low',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'v1',
         sticky: false,

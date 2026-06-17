@@ -12,6 +12,7 @@ import { LoadingCard } from '@/components/LoadingCard';
 import { ErrorCard } from '@/components/ErrorCard';
 import { toast } from 'sonner';
 import { DEFAULT_MODES } from './default-modes';
+import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 
 type EditModeFormProps = {
   organizationId: string;
@@ -85,6 +86,8 @@ export function EditModeForm({
     : data?.mode
       ? organizationData?.settings.org_auto_model?.routes[data.mode.slug]
       : undefined;
+  const isOrganizationAutoDefaultActive =
+    organizationData?.settings.default_model === ORG_AUTO_MODEL.id;
 
   const handleSubmit = async (formData: ModeFormData) => {
     try {
@@ -152,6 +155,7 @@ export function EditModeForm({
       isSubmitting={isOrganizationLoading || updateMutation.isPending || deleteMutation.isPending}
       isEditingBuiltIn={!!defaultModeSlug}
       isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+      isOrganizationAutoDefaultActive={isOrganizationAutoDefaultActive}
       canSetDefaultModel={canSetDefaultModel}
       disableSlug={!!currentRouteModel && !canMaintainRoutedMode}
       existingModes={modesData?.modes || []}

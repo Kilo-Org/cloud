@@ -251,6 +251,12 @@ const SetOrganizationAutoFallbackInputSchema = OrganizationIdInputSchema.extend(
   model_id: z.string().min(1).max(200),
 });
 
+const ConfigureOrganizationDefaultBehaviorInputSchema = OrganizationIdInputSchema.extend({
+  behavior: z.enum(['auto', 'specific', 'global']),
+  fallback_model: z.string().min(1).max(200).optional(),
+  specific_model: z.string().min(1).max(200).optional(),
+});
+
 const UpdateDataCollectionInputSchema = OrganizationIdInputSchema.extend({
   dataCollection: z.enum(['allow', 'deny']).nullable(),
 });
@@ -768,6 +774,113 @@ export const organizationsSettingsRouter = createTRPCRouter({
             tx,
           });
         }
+        return settings;
+      });
+
+      return { settings: updatedSettings };
+    }),
+
+  configureOrganizationDefaultBehavior: organizationBillingMutationProcedure
+    .input(ConfigureOrganizationDefaultBehaviorInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, behavior, fallback_model, specific_model } = input;
+      if (behavior === 'auto') {
+        await assertOrganizationAutoWriteEnabled(ctx.user.id);
+      }
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      assertOrganizationAutoEligible(existingOrg);
+
+      const updatedSettings = await db.transaction(async tx => {
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          async organization => {
+            assertOrganizationAutoEligible(organization);
+            if (behavior === 'global') {
+              return { ...organization.settings, default_model: undefined };
+            }
+
+            if (behavior === 'specific') {
+              if (!specific_model) {
+                throw new TRPCError({
+                  code: 'BAD_REQUEST',
+                  message: 'Specific model is required.',
+                });
+              }
+              const modelId =
+                organization.settings.default_model === ORG_AUTO_MODEL.id
+                  ? await validateOrganizationDefaultReplacement(organization, specific_model)
+                  : await validateOrganizationDefaultModel(organization, specific_model);
+              return { ...organization.settings, default_model: modelId };
+            }
+
+            const orgAutoModel =
+              organization.settings.org_auto_model ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
+            const isEnablingOrganizationAuto =
+              organization.settings.default_model !== ORG_AUTO_MODEL.id;
+            const routes = { ...orgAutoModel.routes };
+
+            if (isEnablingOrganizationAuto) {
+              assertOrganizationAutoRouteCount(routes);
+              for (const [slug, targetModelId] of Object.entries(routes)) {
+                const routeValidation = await validateOrganizationAutoTarget(
+                  organization,
+                  targetModelId,
+                  { dbClient: tx }
+                );
+                if (routeValidation.kind === 'error') {
+                  throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: `Cannot enable Organization Auto because route "${slug}" is invalid: ${routeValidation.message}`,
+                  });
+                }
+                routes[slug] = routeValidation.modelId;
+              }
+            }
+
+            const requestedFallback = fallback_model ?? orgAutoModel.fallback_model;
+            const validation = await validateOrganizationAutoTarget(
+              organization,
+              requestedFallback,
+              {
+                dbClient: tx,
+              }
+            );
+            if (validation.kind === 'error') {
+              throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
+            }
+            return {
+              ...organization.settings,
+              default_model: ORG_AUTO_MODEL.id,
+              org_auto_model: {
+                ...orgAutoModel,
+                routes,
+                fallback_model: validation.modelId,
+              },
+            };
+          },
+          tx
+        );
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message:
+            behavior === 'auto'
+              ? 'Configured Organization Auto default behavior.'
+              : behavior === 'specific'
+                ? `Configured specific organization default model: ${settings.default_model}`
+                : existingOrg.settings.default_model === ORG_AUTO_MODEL.id
+                  ? 'Disabled Organization Auto and reset organization default model to global default.'
+                  : 'Reset organization default model to global default.',
+          organization_id: organizationId,
+          tx,
+        });
         return settings;
       });
 

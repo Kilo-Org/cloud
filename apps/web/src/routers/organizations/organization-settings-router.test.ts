@@ -545,6 +545,77 @@ describe('organizations settings trpc router', () => {
       });
     });
 
+    it('resets an active Organization Auto default to the global default', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const autoOrg = await createTestOrganization('Active Auto Org', owner.id, 0, {}, false);
+
+      await caller.organizations.settings.configureOrganizationDefaultBehavior({
+        organizationId: autoOrg.id,
+        behavior: 'auto',
+        fallback_model: 'kilo-auto/balanced',
+      });
+      await caller.organizations.settings.setOrganizationAutoRoute({
+        organizationId: autoOrg.id,
+        mode_slug: 'code',
+        model_id: 'kilo-auto/frontier',
+      });
+
+      const result = await caller.organizations.settings.configureOrganizationDefaultBehavior({
+        organizationId: autoOrg.id,
+        behavior: 'global',
+      });
+
+      expect(result.settings.default_model).toBeUndefined();
+      expect(result.settings.org_auto_model).toEqual({
+        routes: { code: 'kilo-auto/frontier' },
+        fallback_model: 'kilo-auto/balanced',
+      });
+    });
+
+    it('validates stored routes before enabling Organization Auto', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const autoOrg = await createTestOrganization(
+        'Invalid Auto Route Org',
+        owner.id,
+        0,
+        {
+          default_model: 'gpt-4',
+          org_auto_model: {
+            routes: { code: 'custom-llm/stale-model' },
+            fallback_model: 'kilo-auto/balanced',
+          },
+        },
+        false
+      );
+
+      await expect(
+        caller.organizations.settings.configureOrganizationDefaultBehavior({
+          organizationId: autoOrg.id,
+          behavior: 'auto',
+          fallback_model: 'kilo-auto/balanced',
+        })
+      ).rejects.toThrow('Cannot enable Organization Auto because route "code" is invalid');
+    });
+
+    it('preserves non-auto specific default semantics when configuring a specific model', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const specificOrg = await createTestOrganization(
+        'Specific Default Org',
+        owner.id,
+        0,
+        {},
+        false
+      );
+
+      const result = await caller.organizations.settings.configureOrganizationDefaultBehavior({
+        organizationId: specificOrg.id,
+        behavior: 'specific',
+        specific_model: 'any-model',
+      });
+
+      expect(result.settings.default_model).toBe('any-model');
+    });
+
     it('sets and clears Organization Auto routes', async () => {
       const caller = await createCallerForUser(owner.id);
 

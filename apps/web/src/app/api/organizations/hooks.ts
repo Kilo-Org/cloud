@@ -224,6 +224,16 @@ export function useDisableOrganizationAuto() {
   );
 }
 
+export function useConfigureOrganizationDefaultBehavior() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
+  return useMutation(
+    trpc.organizations.settings.configureOrganizationDefaultBehavior.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
 export function useSetOrganizationAutoFallback() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

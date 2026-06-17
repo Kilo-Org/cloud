@@ -61,6 +61,7 @@ type ModeFormProps = {
   isSubmitting: boolean;
   isEditingBuiltIn?: boolean;
   isDefaultModelConfigEnabled?: boolean;
+  isOrganizationAutoDefaultActive?: boolean;
   canSetDefaultModel?: boolean;
   disableSlug?: boolean;
   existingModes?: OrganizationMode[];
@@ -109,6 +110,7 @@ export function ModeForm({
   isSubmitting,
   isEditingBuiltIn = false,
   isDefaultModelConfigEnabled = false,
+  isOrganizationAutoDefaultActive = false,
   canSetDefaultModel = true,
   disableSlug = false,
   existingModes = [],
@@ -184,6 +186,15 @@ export function ModeForm({
   const shouldShowDefaultModelControl =
     isDefaultModelConfigEnabled && (canSetDefaultModel || !!formData.defaultModel);
   const defaultModelChanged = formData.defaultModel !== initialFormData.defaultModel;
+  const hasStoredInactiveRoute = !isOrganizationAutoDefaultActive && !!formData.defaultModel;
+  const routeLabel = isOrganizationAutoDefaultActive
+    ? 'Route Organization Auto to'
+    : hasStoredInactiveRoute
+      ? 'Saved Organization Auto route'
+      : 'Organization Auto route';
+  const routeFallbackLabel = isOrganizationAutoDefaultActive
+    ? 'Use Organization Auto fallback'
+    : 'Use Organization Auto fallback when enabled';
 
   // Re-seed the full form only when switching modes, not when settings refetch.
   useEffect(() => {
@@ -487,7 +498,7 @@ export function ModeForm({
 
           {shouldShowDefaultModelControl && (
             <div className="space-y-2">
-              <Label htmlFor="defaultModel">Route Organization Auto to</Label>
+              <Label htmlFor="defaultModel">{routeLabel}</Label>
               <Select
                 value={formData.defaultModel || noDefaultModelValue}
                 onValueChange={value =>
@@ -511,15 +522,11 @@ export function ModeForm({
                   aria-invalid={Boolean(errors.defaultModel)}
                 >
                   <SelectValue
-                    placeholder={
-                      modelsLoading ? 'Loading models...' : 'Use Organization Auto fallback'
-                    }
+                    placeholder={modelsLoading ? 'Loading models...' : routeFallbackLabel}
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={noDefaultModelValue}>
-                    Use Organization Auto fallback
-                  </SelectItem>
+                  <SelectItem value={noDefaultModelValue}>{routeFallbackLabel}</SelectItem>
                   {shouldRenderCurrentDefaultModel && (
                     <SelectItem value={formData.defaultModel} disabled>
                       <div className="flex flex-col">
@@ -552,13 +559,17 @@ export function ModeForm({
               <p id="defaultModel-help" className="text-muted-foreground text-xs">
                 {!canSetDefaultModel
                   ? 'Organization Auto routes are read-only for your role or plan.'
-                  : modelsLoading
-                    ? 'Loading organization-allowed models...'
-                    : modelsError
-                      ? 'Unable to load organization models.'
-                      : modelOptions.length === 0
-                        ? 'No organization-allowed models are available.'
-                        : 'Members can still override Organization Auto locally in Kilo Code.'}
+                  : !isOrganizationAutoDefaultActive
+                    ? hasStoredInactiveRoute
+                      ? 'Organization Auto is off. This saved route will apply if you enable it.'
+                      : 'Organization Auto is off. Select a route now to use it when enabled.'
+                    : modelsLoading
+                      ? 'Loading organization-allowed models...'
+                      : modelsError
+                        ? 'Unable to load organization models.'
+                        : modelOptions.length === 0
+                          ? 'No organization-allowed models are available.'
+                          : 'Members can still override Organization Auto locally in Kilo Code.'}
               </p>
               {hasUnavailableDefaultModel && (
                 <p id="defaultModel-warning" className="text-sm text-amber-600">

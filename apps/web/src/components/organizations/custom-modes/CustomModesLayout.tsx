@@ -36,6 +36,7 @@ import {
   getOrganizationAutoRoute,
   ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@/lib/organizations/organization-auto-model-shared';
+import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 
 type CustomModesLayoutProps = {
@@ -58,6 +59,7 @@ type ModesListProps = {
   onDeleteClick: (mode: DisplayMode) => void;
   onEditClick: (mode: DisplayMode) => void;
   isDefaultModelConfigEnabled: boolean;
+  isOrganizationAutoDefaultActive: boolean;
 };
 
 function ModesList({
@@ -67,6 +69,7 @@ function ModesList({
   onDeleteClick,
   onEditClick,
   isDefaultModelConfigEnabled,
+  isOrganizationAutoDefaultActive,
 }: ModesListProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -139,7 +142,9 @@ function ModesList({
                   {isDefaultModelConfigEnabled && mode.routeModel && (
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-muted-foreground text-xs font-medium">
-                        Organization Auto route
+                        {isOrganizationAutoDefaultActive
+                          ? 'Organization Auto route'
+                          : 'Saved Organization Auto route (inactive)'}
                       </span>
                       <Badge variant="secondary" className="max-w-full font-mono text-xs">
                         <span className="break-all">{mode.routeModel}</span>
@@ -207,6 +212,8 @@ export function CustomModesLayout({ organizationId, role, isGlobalAdmin }: Custo
   const canMaintainRoutedMode = role === 'owner' || role === 'billing_manager' || isGlobalAdmin;
   const canSetDefaultModel =
     organizationData?.plan === 'enterprise' && isDefaultModelConfigEnabled && canMaintainRoutedMode;
+  const isOrganizationAutoDefaultActive =
+    organizationData?.settings.default_model === ORG_AUTO_MODEL.id;
   const readonly = isReadOnly;
 
   // Separate built-in modes and custom modes
@@ -362,6 +369,7 @@ export function CustomModesLayout({ organizationId, role, isGlobalAdmin }: Custo
               onDeleteClick={openDeleteDialog}
               onEditClick={handleEditMode}
               isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+              isOrganizationAutoDefaultActive={isOrganizationAutoDefaultActive}
             />
           </div>
 
@@ -377,6 +385,7 @@ export function CustomModesLayout({ organizationId, role, isGlobalAdmin }: Custo
                 onDeleteClick={openDeleteDialog}
                 onEditClick={handleEditMode}
                 isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+                isOrganizationAutoDefaultActive={isOrganizationAutoDefaultActive}
               />
             </div>
           )}

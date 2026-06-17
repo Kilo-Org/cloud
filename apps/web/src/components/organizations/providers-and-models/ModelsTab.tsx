@@ -132,7 +132,7 @@ export function ModelsTab({
 
           {!canEdit ? (
             <div className="text-muted-foreground text-sm">
-              Only organization owners can edit model access.
+              Only organization owners and billing managers can edit model access.
             </div>
           ) : null}
         </LockableContainer>

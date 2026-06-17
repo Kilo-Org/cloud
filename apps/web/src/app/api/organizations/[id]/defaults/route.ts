@@ -72,6 +72,7 @@ export async function GET(
   // Organization Auto is a virtual organization-only default, so its eligibility
   // is validated from persisted organization settings rather than provider policy.
   if (defaultModel === ORG_AUTO_MODEL.id && !isOrganizationAutoConfigured(organization)) {
+    console.warn('organization_auto_invalid_default', { organizationId: organization.id });
     defaultModel = undefined;
   } else if (
     defaultModel &&

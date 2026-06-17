@@ -232,7 +232,7 @@ export function ProvidersTab({
 
           {!canEdit ? (
             <div className="text-muted-foreground text-sm">
-              Only organization owners can edit provider access.
+              Only organization owners and billing managers can edit provider access.
             </div>
           ) : null}
         </LockableContainer>

@@ -97,7 +97,7 @@ export function CondensedProviderAndModelsList({
             <TooltipContent className="max-w-xs">
               <p>
                 You don't have permission to change the default model. Contact your organization
-                owner to update this setting.
+                owner or billing manager to update this setting.
               </p>
             </TooltipContent>
           </Tooltip>

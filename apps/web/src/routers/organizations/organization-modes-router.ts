@@ -25,12 +25,21 @@ import { getOrganizationById, mutateOrganizationSettings } from '@/lib/organizat
 import { successResult } from '@/lib/maybe-result';
 import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
 import { db } from '@/lib/drizzle';
+import type { Organization } from '@kilocode/db/schema';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   ORGANIZATION_AUTO_MODEL_FLAG,
+  MAX_ORGANIZATION_AUTO_ROUTES,
+  validateOrganizationAutoTarget,
 } from '@/lib/organizations/organization-auto-model';
 
 const ModeConfigInputSchema = OrganizationModeConfigSchema.partial();
+const RouteModelInputSchema = z
+  .string()
+  .trim()
+  .nullable()
+  .transform(value => (value === '' ? null : value))
+  .optional();
 
 const CreateModeInputSchema = OrganizationIdInputSchema.extend({
   name: z
@@ -43,6 +52,7 @@ const CreateModeInputSchema = OrganizationIdInputSchema.extend({
     .max(50, 'Mode slug must be less than 50 characters')
     .regex(/^[a-z0-9-]+$/, 'Mode slug must contain only lowercase letters, numbers, and hyphens'),
   config: ModeConfigInputSchema.optional(),
+  route_model: RouteModelInputSchema,
 });
 
 const UpdateModeInputSchema = OrganizationIdInputSchema.extend({
@@ -55,15 +65,20 @@ const UpdateModeInputSchema = OrganizationIdInputSchema.extend({
     .regex(/^[a-z0-9-]+$/)
     .optional(),
   config: ModeConfigInputSchema.optional(),
+  route_model: RouteModelInputSchema,
 });
 
 const DeleteModeInputSchema = OrganizationIdInputSchema.extend({
   modeId: z.uuid(),
+  preserve_route: z.boolean().optional(),
+  route_model: RouteModelInputSchema,
 });
 
 const ModeIdInputSchema = OrganizationIdInputSchema.extend({
   modeId: z.uuid(),
 });
+
+const BUILT_IN_MODE_SLUGS = new Set(['architect', 'code', 'ask', 'debug', 'orchestrator']);
 
 function hasRoute(routes: Record<string, string>, slug: string): boolean {
   return Object.prototype.hasOwnProperty.call(routes, slug);
@@ -85,6 +100,59 @@ function getOrganizationAutoSettings(
   settings: OrganizationSettings
 ): typeof DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS {
   return settings.org_auto_model ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
+}
+
+function assertOrganizationAutoEligible(organization: Pick<Organization, 'plan'>): void {
+  if (organization.plan !== 'enterprise') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Organization Auto is only available for Enterprise organizations.',
+    });
+  }
+}
+
+type OrganizationAccessContext = Parameters<typeof ensureOrganizationAccess>[0];
+
+async function applyOrganizationAutoRouteChange(
+  organization: Pick<Organization, 'id' | 'settings' | 'plan'>,
+  modeSlug: string,
+  routeModel: string | null,
+  ctx: OrganizationAccessContext
+): Promise<OrganizationSettings> {
+  await assertOrganizationAutoWriteEnabled(ctx.user.id);
+  assertOrganizationAutoEligible(organization);
+  await ensureOrganizationAccess(ctx, organization.id, ['owner', 'billing_manager']);
+  const orgAutoModel = getOrganizationAutoSettings(organization.settings);
+  const currentRoute = orgAutoModel.routes[modeSlug];
+  if (routeModel === null && !currentRoute) {
+    return organization.settings;
+  }
+
+  const routes = { ...orgAutoModel.routes };
+  if (routeModel === null) {
+    delete routes[modeSlug];
+  } else {
+    const validation = await validateOrganizationAutoTarget(organization, routeModel);
+    if (validation.kind === 'error') {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
+    }
+    if (currentRoute === validation.modelId) {
+      return organization.settings;
+    }
+    routes[modeSlug] = validation.modelId;
+  }
+
+  if (Object.keys(routes).length > MAX_ORGANIZATION_AUTO_ROUTES) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Organization Auto supports at most ${MAX_ORGANIZATION_AUTO_ROUTES} routes.`,
+    });
+  }
+
+  return {
+    ...organization.settings,
+    org_auto_model: { ...orgAutoModel, routes },
+  };
 }
 
 function createModeUpdateAuditMessage(
@@ -165,7 +233,7 @@ export const organizationModesRouter = createTRPCRouter({
   create: organizationMemberMutationProcedure
     .input(CreateModeInputSchema)
     .mutation(async ({ input, ctx }) => {
-      const { organizationId, name, slug, config } = input;
+      const { organizationId, name, slug, config, route_model } = input;
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
         throw new TRPCError({
@@ -174,7 +242,14 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
+      if (route_model !== undefined) {
+        await assertOrganizationAutoWriteEnabled(ctx.user.id);
+        assertOrganizationAutoEligible(organization);
+        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+      }
+
       let createdMode: OrganizationMode | null | undefined;
+      let routeAuditMessage: string | undefined;
       await db.transaction(async tx => {
         await mutateOrganizationSettings(
           organizationId,
@@ -195,7 +270,25 @@ export const organizationModesRouter = createTRPCRouter({
               });
             }
 
-            return lockedOrganization.settings;
+            if (route_model === undefined) {
+              return lockedOrganization.settings;
+            }
+            const previousRoute =
+              lockedOrganization.settings.org_auto_model?.routes[createdMode.slug];
+            const nextSettings = await applyOrganizationAutoRouteChange(
+              lockedOrganization,
+              createdMode.slug,
+              route_model,
+              ctx
+            );
+            const nextRoute = nextSettings.org_auto_model?.routes[createdMode.slug];
+            if (previousRoute !== nextRoute) {
+              routeAuditMessage = nextRoute
+                ? `Organization Auto route set: "${createdMode.slug}" → "${nextRoute}"`
+                : `Organization Auto route cleared: "${createdMode.slug}"${previousRoute ? ` (was "${previousRoute}")` : ''}`;
+            }
+
+            return nextSettings;
           },
           tx
         );
@@ -209,7 +302,7 @@ export const organizationModesRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
-          message: `Created mode "${name}" with slug "${slug}": ${JSON.stringify(config)}`,
+          message: `Created mode "${name}" with slug "${slug}": ${JSON.stringify(config)}${routeAuditMessage ? `, ${routeAuditMessage}` : ''}`,
           organization_id: organizationId,
           tx,
         });
@@ -225,36 +318,28 @@ export const organizationModesRouter = createTRPCRouter({
   list: organizationMemberProcedure.input(OrganizationIdInputSchema).query(async ({ input }) => {
     const { organizationId } = input;
 
-    return await db.transaction(
-      async tx => ({ modes: await getAllOrganizationModes(organizationId, tx) }),
-      { isolationLevel: 'repeatable read', accessMode: 'read only' }
-    );
+    return { modes: await getAllOrganizationModes(organizationId) };
   }),
 
   getById: organizationMemberProcedure.input(ModeIdInputSchema).query(async ({ input }) => {
     const { modeId, organizationId } = input;
 
-    return await db.transaction(
-      async tx => {
-        const mode = await getOrganizationModeById(organizationId, modeId, tx);
+    const mode = await getOrganizationModeById(organizationId, modeId);
 
-        if (!mode) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Mode not found',
-          });
-        }
+    if (!mode) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Mode not found',
+      });
+    }
 
-        return { mode };
-      },
-      { isolationLevel: 'repeatable read', accessMode: 'read only' }
-    );
+    return { mode };
   }),
 
   update: organizationMemberMutationProcedure
     .input(UpdateModeInputSchema)
     .mutation(async ({ input, ctx }) => {
-      const { modeId, organizationId, ...updates } = input;
+      const { modeId, organizationId, route_model, ...updates } = input;
 
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
@@ -264,8 +349,17 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
+      if (route_model !== undefined) {
+        await assertOrganizationAutoWriteEnabled(ctx.user.id);
+        assertOrganizationAutoEligible(organization);
+        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+      }
+
+      const hasModeUpdates =
+        updates.name !== undefined || updates.slug !== undefined || updates.config !== undefined;
       let existingMode: OrganizationMode | undefined;
       let updatedMode: OrganizationMode | null | undefined;
+      const routeAuditChanges: string[] = [];
       await db.transaction(async tx => {
         await mutateOrganizationSettings(
           organizationId,
@@ -284,11 +378,11 @@ export const organizationModesRouter = createTRPCRouter({
             const nextSlug = updates.slug ?? lockedMode.slug;
             const slugChanged = nextSlug !== lockedMode.slug;
             const sourceHasRoute = hasRoute(routes, lockedMode.slug);
+            const initialRoute = routes[lockedMode.slug];
 
             let nextSettings = lockedOrganization.settings;
 
             if (sourceHasRoute && slugChanged) {
-              await assertOrganizationAutoWriteEnabled(ctx.user.id);
               await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
               if (hasRoute(routes, nextSlug)) {
                 throw new TRPCError({
@@ -300,6 +394,10 @@ export const organizationModesRouter = createTRPCRouter({
               const targetModelId = routes[lockedMode.slug];
               delete routes[lockedMode.slug];
               routes[nextSlug] = targetModelId;
+              routeAuditChanges.push(
+                `Organization Auto route migrated: "${lockedMode.slug}" → "${nextSlug}" (${targetModelId})`
+              );
+
               nextSettings = {
                 ...lockedOrganization.settings,
                 org_auto_model: {
@@ -309,13 +407,46 @@ export const organizationModesRouter = createTRPCRouter({
               };
             }
 
-            updatedMode = await updateOrganizationMode(organizationId, modeId, updates, tx);
+            if (hasModeUpdates) {
+              updatedMode = await updateOrganizationMode(organizationId, modeId, updates, tx);
 
-            if (!updatedMode) {
-              throw new TRPCError({
-                code: 'CONFLICT',
-                message: `A mode with slug "${updates.slug}" already exists in this organization`,
-              });
+              if (!updatedMode) {
+                throw new TRPCError({
+                  code: 'CONFLICT',
+                  message: `A mode with slug "${updates.slug}" already exists in this organization`,
+                });
+              }
+            } else if (route_model !== undefined) {
+              updatedMode = lockedMode;
+            } else {
+              throw new TRPCError({ code: 'BAD_REQUEST', message: 'No mode updates provided' });
+            }
+
+            if (route_model !== undefined) {
+              const previousRoute = nextSettings.org_auto_model?.routes[nextSlug];
+              nextSettings = await applyOrganizationAutoRouteChange(
+                { ...lockedOrganization, settings: nextSettings },
+                nextSlug,
+                route_model,
+                ctx
+              );
+              const nextRoute = nextSettings.org_auto_model?.routes[nextSlug];
+              if (previousRoute !== nextRoute) {
+                if (slugChanged) {
+                  routeAuditChanges.length = 0;
+                  routeAuditChanges.push(
+                    nextRoute
+                      ? `Organization Auto route: "${lockedMode.slug}"${initialRoute ? ` "${initialRoute}"` : ''} → "${nextSlug}" "${nextRoute}"`
+                      : `Organization Auto route removed: "${lockedMode.slug}"${initialRoute ? ` (was "${initialRoute}")` : ''}`
+                  );
+                } else {
+                  routeAuditChanges.push(
+                    nextRoute
+                      ? `Organization Auto route: "${nextSlug}" ${previousRoute ? `"${previousRoute}" → ` : 'set to '}"${nextRoute}"`
+                      : `Organization Auto route cleared: "${nextSlug}"${previousRoute ? ` (was "${previousRoute}")` : ''}`
+                  );
+                }
+              }
             }
 
             return nextSettings;
@@ -327,15 +458,17 @@ export const organizationModesRouter = createTRPCRouter({
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Mode update failed' });
         }
 
-        await createAuditLog({
-          action: 'organization.mode.update',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: createModeUpdateAuditMessage(existingMode, updates),
-          organization_id: existingMode.organization_id,
-          tx,
-        });
+        if (hasModeUpdates || routeAuditChanges.length > 0) {
+          await createAuditLog({
+            action: 'organization.mode.update',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: `${createModeUpdateAuditMessage(existingMode, updates)}${routeAuditChanges.length > 0 ? `, ${routeAuditChanges.join(', ')}` : ''}`,
+            organization_id: existingMode.organization_id,
+            tx,
+          });
+        }
       });
 
       if (!updatedMode) {
@@ -348,7 +481,7 @@ export const organizationModesRouter = createTRPCRouter({
   delete: organizationMemberMutationProcedure
     .input(DeleteModeInputSchema)
     .mutation(async ({ input, ctx }) => {
-      const { modeId, organizationId } = input;
+      const { modeId, organizationId, preserve_route = false, route_model } = input;
 
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
@@ -358,6 +491,13 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
+      if (route_model !== undefined) {
+        await assertOrganizationAutoWriteEnabled(ctx.user.id);
+        assertOrganizationAutoEligible(organization);
+        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+      }
+
+      const routeAuditChanges: string[] = [];
       await db.transaction(async tx => {
         const settings = await mutateOrganizationSettings(
           organizationId,
@@ -371,28 +511,56 @@ export const organizationModesRouter = createTRPCRouter({
             }
 
             const orgAutoModel = getOrganizationAutoSettings(lockedOrganization.settings);
-            if (hasRoute(orgAutoModel.routes, lockedMode.slug)) {
-              await assertOrganizationAutoWriteEnabled(ctx.user.id);
-              await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
-              const routes = { ...orgAutoModel.routes };
-              delete routes[lockedMode.slug];
-              await deleteOrganizationMode(modeId, tx);
-              await createAuditLog({
-                action: 'organization.mode.delete',
-                actor_email: ctx.user.google_user_email,
-                actor_id: ctx.user.id,
-                actor_name: ctx.user.google_user_name,
-                message: `Deleted mode "${lockedMode.name}" (slug: "${lockedMode.slug}")`,
-                organization_id: lockedMode.organization_id,
-                tx,
+            let nextSettings = lockedOrganization.settings;
+
+            const preserveBuiltInRoute = preserve_route && BUILT_IN_MODE_SLUGS.has(lockedMode.slug);
+            const hasExistingRoute = hasRoute(orgAutoModel.routes, lockedMode.slug);
+
+            if (route_model !== undefined && !preserveBuiltInRoute) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Route updates can only be preserved when reverting a built-in mode.',
               });
-              return {
-                ...lockedOrganization.settings,
-                org_auto_model: {
-                  ...orgAutoModel,
-                  routes,
-                },
-              };
+            }
+
+            if (route_model !== undefined) {
+              const previousRoute =
+                lockedOrganization.settings.org_auto_model?.routes[lockedMode.slug];
+              nextSettings = await applyOrganizationAutoRouteChange(
+                lockedOrganization,
+                lockedMode.slug,
+                route_model,
+                ctx
+              );
+              const nextRoute = nextSettings.org_auto_model?.routes[lockedMode.slug];
+              if (previousRoute !== nextRoute) {
+                routeAuditChanges.push(
+                  nextRoute
+                    ? `Organization Auto route: "${lockedMode.slug}" ${previousRoute ? `"${previousRoute}" → ` : 'set to '}"${nextRoute}"`
+                    : `Organization Auto route cleared: "${lockedMode.slug}"${previousRoute ? ` (was "${previousRoute}")` : ''}`
+                );
+              }
+            } else if (hasExistingRoute) {
+              await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+
+              if (!preserveBuiltInRoute) {
+                routeAuditChanges.push(
+                  `Organization Auto route removed: "${lockedMode.slug}" (was "${orgAutoModel.routes[lockedMode.slug]}")`
+                );
+                const routes = { ...orgAutoModel.routes };
+                delete routes[lockedMode.slug];
+                nextSettings = {
+                  ...lockedOrganization.settings,
+                  org_auto_model: {
+                    ...orgAutoModel,
+                    routes,
+                  },
+                };
+              } else {
+                routeAuditChanges.push(
+                  `Organization Auto route preserved: "${lockedMode.slug}" (${orgAutoModel.routes[lockedMode.slug]})`
+                );
+              }
             }
 
             await deleteOrganizationMode(modeId, tx);
@@ -401,11 +569,12 @@ export const organizationModesRouter = createTRPCRouter({
               actor_email: ctx.user.google_user_email,
               actor_id: ctx.user.id,
               actor_name: ctx.user.google_user_name,
-              message: `Deleted mode "${lockedMode.name}" (slug: "${lockedMode.slug}")`,
+              message: `Deleted mode "${lockedMode.name}" (slug: "${lockedMode.slug}")${routeAuditChanges.length > 0 ? `, ${routeAuditChanges.join(', ')}` : ''}`,
+
               organization_id: lockedMode.organization_id,
               tx,
             });
-            return lockedOrganization.settings;
+            return nextSettings;
           },
           tx
         );

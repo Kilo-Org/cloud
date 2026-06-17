@@ -44,6 +44,19 @@ jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
+function makeTestOpenRouterModel(id: string): OpenRouterModel {
+  return {
+    id,
+    name: id,
+    created: 0,
+    description: '',
+    architecture: { input_modalities: [], output_modalities: [], tokenizer: 'test' },
+    top_provider: { is_moderated: false },
+    pricing: { prompt: '0', completion: '0' },
+    context_length: 8192,
+  };
+}
+
 let owner: User;
 let member: User;
 let testOrganization: Organization;
@@ -59,6 +72,15 @@ describe('organizations settings trpc router', () => {
   beforeEach(() => {
     mockedGetProviderSlugsForModel.mockReset();
     mockedGetEnhancedOpenRouterModels.mockReset();
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+      data: [
+        makeTestOpenRouterModel('gpt-4'),
+        makeTestOpenRouterModel('gpt-3.5-turbo'),
+        makeTestOpenRouterModel('openai/gpt-4o'),
+        makeTestOpenRouterModel('kilo-auto/balanced'),
+        makeTestOpenRouterModel('kilo-auto/frontier'),
+      ],
+    } satisfies OpenRouterModelsResponse);
   });
 
   beforeAll(async () => {
@@ -448,6 +470,24 @@ describe('organizations settings trpc router', () => {
 
       const updatedOrg = await getOrganizationById(orgWithSettings.id);
       expect(updatedOrg?.settings?.default_model).toBe('gpt-4');
+    });
+
+    it('preserves an exact catalog variant when setting the default model', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const freshOrg = await createTestOrganization('Variant Default Org', owner.id, 0, {}, false);
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+        data: [
+          makeTestOpenRouterModel('openai/gpt-4o'),
+          makeTestOpenRouterModel('openai/gpt-4o:free'),
+        ],
+      } satisfies OpenRouterModelsResponse);
+
+      const result = await caller.organizations.settings.updateDefaultModel({
+        organizationId: freshOrg.id,
+        default_model: 'openai/gpt-4o:free',
+      });
+
+      expect(result.settings.default_model).toBe('openai/gpt-4o:free');
     });
 
     it('should reject default_model if it is in the deny list', async () => {

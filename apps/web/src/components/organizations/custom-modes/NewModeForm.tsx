@@ -5,6 +5,7 @@ import {
   useClearOrganizationAutoRoute,
   useCreateOrganizationMode,
   useOrganizationModes,
+  useOrganizationWithMembers,
   useSetOrganizationAutoRoute,
 } from '@/app/api/organizations/hooks';
 import { ModeForm, type ModeFormData } from './ModeForm';
@@ -12,13 +13,11 @@ import { matchesBuiltInModeState } from './EditModeForm';
 import { toast } from 'sonner';
 import { DEFAULT_MODES } from './default-modes';
 import { useMemo } from 'react';
-import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { getOrganizationAutoRoute } from '@/lib/organizations/organization-auto-model';
+import { getOrganizationAutoRoute } from '@/lib/organizations/organization-auto-model-shared';
 
 type NewModeFormProps = {
   organizationId: string;
   defaultModeSlug?: string;
-  routeModel?: string;
   isDefaultModelConfigEnabled?: boolean;
   canSetDefaultModel?: boolean;
   onSuccess?: () => void;
@@ -28,7 +27,6 @@ type NewModeFormProps = {
 export function NewModeForm({
   organizationId,
   defaultModeSlug: propDefaultModeSlug,
-  routeModel: propRouteModel,
   isDefaultModelConfigEnabled = false,
   canSetDefaultModel = true,
   onSuccess,
@@ -47,11 +45,9 @@ export function NewModeForm({
     if (!defaultModeSlug) return undefined;
     return DEFAULT_MODES.find(m => m.slug === defaultModeSlug);
   }, [defaultModeSlug]);
-  const routeModel =
-    propRouteModel ??
-    (defaultModeSlug
-      ? getOrganizationAutoRoute(organizationData?.settings, defaultModeSlug)
-      : undefined);
+  const routeModel = defaultModeSlug
+    ? getOrganizationAutoRoute(organizationData?.settings, defaultModeSlug)
+    : undefined;
 
   // Convert default mode to the format expected by ModeForm
   const initialMode = useMemo(() => {
@@ -89,7 +85,8 @@ export function NewModeForm({
         return;
       }
 
-      const created = await createMutation.mutateAsync({
+      const nextRouteModel = data.defaultModel || undefined;
+      await createMutation.mutateAsync({
         organizationId,
         name: data.name,
         slug: data.slug,
@@ -100,8 +97,8 @@ export function NewModeForm({
           groups: data.groups as ('read' | 'edit' | 'browser' | 'command' | 'mcp')[],
           customInstructions: data.customInstructions,
         },
+        ...(nextRouteModel === routeModel ? {} : { route_model: nextRouteModel ?? null }),
       });
-      await persistRoute(created.mode.slug, data.defaultModel);
       toast.success(`Mode "${data.name}" created successfully`);
       onSuccess?.();
     } catch (error) {
@@ -125,7 +122,6 @@ export function NewModeForm({
       canSetDefaultModel={canSetDefaultModel}
       existingModes={modesData?.modes || []}
       onCancel={onCancel}
-      renderButtons={() => null}
     />
   );
 }

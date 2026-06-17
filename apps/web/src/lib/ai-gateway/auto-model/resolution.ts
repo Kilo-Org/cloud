@@ -118,6 +118,10 @@ function resolveOrganizationAutoRouteTarget(
   const mode = modeHeader?.trim() ?? '';
   const normalizedMode = mode.toLowerCase();
 
+  if (normalizedMode && hasOrganizationAutoRoute(routes, normalizedMode)) {
+    return routes[normalizedMode];
+  }
+
   if (normalizedMode === 'code' || normalizedMode === 'build') {
     if (hasOrganizationAutoRoute(routes, 'code')) return routes.code;
     if (hasOrganizationAutoRoute(routes, 'build')) return routes.build;
@@ -125,13 +129,9 @@ function resolveOrganizationAutoRouteTarget(
   }
 
   if (normalizedMode === 'plan' || normalizedMode === 'architect') {
-    if (hasOrganizationAutoRoute(routes, 'plan')) return routes.plan;
     if (hasOrganizationAutoRoute(routes, 'architect')) return routes.architect;
+    if (hasOrganizationAutoRoute(routes, 'plan')) return routes.plan;
     return settings.org_auto_model?.fallback_model;
-  }
-
-  if (normalizedMode && hasOrganizationAutoRoute(routes, normalizedMode)) {
-    return routes[normalizedMode];
   }
 
   return settings.org_auto_model?.fallback_model;
@@ -206,6 +206,13 @@ async function resolveOrganizationAutoModel(
   }
   if (validation.kind === 'error') {
     return { kind: 'organization_auto_configuration_error', message: validation.message };
+  }
+
+  if (validation.modelId === ORG_AUTO_MODEL.id) {
+    return {
+      kind: 'organization_auto_configuration_error',
+      message: 'Organization Auto cannot target itself.',
+    };
   }
 
   if (isSupportedNestedAutoTarget(validation.modelId)) {

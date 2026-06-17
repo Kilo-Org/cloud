@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { LockableContainer } from '../LockableContainer';
 import {
   useDisableOrganizationAuto,
@@ -30,9 +29,13 @@ import type { OrganizationSettings } from '@/lib/organizations/organization-type
 import { toast } from 'sonner';
 import { Settings2 } from 'lucide-react';
 import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
-import { isOrganizationAutoTargetModel } from '@/lib/organizations/organization-auto-model';
+import {
+  isOrganizationAutoTargetModel,
+  ORGANIZATION_AUTO_MODEL_FLAG,
+} from '@/lib/organizations/organization-auto-model-shared';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import Link from 'next/link';
 
 type DefaultModelDialogProps = {
   open: boolean;
@@ -51,7 +54,6 @@ export function DefaultModelDialog({
   currentDefaultModel,
   organizationPlan,
 }: DefaultModelDialogProps) {
-  const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [selectedFallbackModel, setSelectedFallbackModel] = useState<string>('');
 
@@ -64,7 +66,7 @@ export function DefaultModelDialog({
   const organizationDefaultModel = organizationSettings?.default_model;
   const organizationAutoFallbackModel = organizationSettings?.org_auto_model?.fallback_model;
   const organizationAutoEnabled = organizationDefaultModel === ORG_AUTO_MODEL.id;
-  const organizationAutoFeatureEnabled = useFeatureFlagEnabled('organization-auto-model-routing');
+  const organizationAutoFeatureEnabled = useFeatureFlagEnabled(ORGANIZATION_AUTO_MODEL_FLAG);
   const isDevelopment = process.env.NODE_ENV === 'development';
   const canConfigureOrganizationAuto =
     organizationPlan === 'enterprise' && (isDevelopment || organizationAutoFeatureEnabled === true);
@@ -72,6 +74,13 @@ export function DefaultModelDialog({
   const availableModels = (openRouterModels?.data ?? []).filter(
     model => model.id !== ORG_AUTO_MODEL.id
   );
+  useEffect(() => {
+    if (!open) {
+      setSelectedModel('');
+      setSelectedFallbackModel('');
+    }
+  }, [open]);
+
   const organizationAutoTargetModels = availableModels.filter(model => {
     if (model.id.startsWith(CUSTOM_LLM_PREFIX)) {
       return false;
@@ -81,6 +90,9 @@ export function DefaultModelDialog({
     }
     return true;
   });
+  const organizationAutoFallbackUnavailable =
+    !!organizationAutoFallbackModel &&
+    !organizationAutoTargetModels.some(model => model.id === organizationAutoFallbackModel);
 
   const handleUpdateDefaultModel = async () => {
     if (!selectedModel) return;
@@ -89,11 +101,6 @@ export function DefaultModelDialog({
       await updateDefaultModelMutation.mutateAsync({
         organizationId,
         default_model: selectedModel,
-      });
-
-      // Invalidate the defaults query to refresh the display
-      await queryClient.invalidateQueries({
-        queryKey: ['organization-defaults', organizationId],
       });
 
       setSelectedModel('');
@@ -113,10 +120,6 @@ export function DefaultModelDialog({
         default_model: null,
       });
 
-      await queryClient.invalidateQueries({
-        queryKey: ['organization-defaults', organizationId],
-      });
-
       setSelectedModel('');
       onOpenChange(false);
       toast.success('Default model cleared - will use global default');
@@ -129,7 +132,6 @@ export function DefaultModelDialog({
   const handleEnableOrganizationAuto = async () => {
     try {
       await enableOrganizationAutoMutation.mutateAsync({ organizationId });
-      await queryClient.invalidateQueries({ queryKey: ['organization-defaults', organizationId] });
       setSelectedModel('');
       onOpenChange(false);
       toast.success('Organization Auto enabled');
@@ -147,7 +149,6 @@ export function DefaultModelDialog({
         organizationId,
         replacement_model: selectedModel,
       });
-      await queryClient.invalidateQueries({ queryKey: ['organization-defaults', organizationId] });
       setSelectedModel('');
       onOpenChange(false);
       toast.success('Organization Auto disabled');
@@ -221,12 +222,13 @@ export function DefaultModelDialog({
                     it.
                   </p>
                   {canConfigureOrganizationAuto && (
-                    <a
+                    <Link
                       className="text-xs text-primary underline underline-offset-4"
                       href={`/organizations/${organizationId}/custom-modes`}
+                      onClick={() => onOpenChange(false)}
                     >
                       Configure mode routes
-                    </a>
+                    </Link>
                   )}
                 </div>
                 {organizationAutoEnabled ? (
@@ -260,6 +262,18 @@ export function DefaultModelDialog({
                           <SelectValue placeholder="Choose fallback model..." />
                         </SelectTrigger>
                         <SelectContent>
+                          {organizationAutoFallbackUnavailable && organizationAutoFallbackModel && (
+                            <SelectItem value={organizationAutoFallbackModel}>
+                              <div className="flex flex-col">
+                                <span className="font-mono text-sm">
+                                  {organizationAutoFallbackModel}
+                                </span>
+                                <span className="text-destructive text-xs">
+                                  Unavailable current fallback
+                                </span>
+                              </div>
+                            </SelectItem>
+                          )}
                           {organizationAutoTargetModels.map(model => (
                             <SelectItem key={model.id} value={model.id}>
                               <div className="flex flex-col">
@@ -287,13 +301,21 @@ export function DefaultModelDialog({
                         {setOrganizationAutoFallbackMutation.isPending ? 'Saving...' : 'Save'}
                       </Button>
                     </div>
+                    {organizationAutoFallbackUnavailable && (
+                      <p className="text-destructive text-xs">
+                        This fallback is no longer available. Modes without explicit routes will
+                        fail until you replace it.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
             <div>
-              <label className="text-muted-foreground text-sm font-medium">New Default Model</label>
+              <label className="text-muted-foreground text-sm font-medium">
+                {organizationAutoEnabled ? 'Replacement Default Model' : 'New Default Model'}
+              </label>
               <Select
                 value={selectedModel}
                 onValueChange={setSelectedModel}

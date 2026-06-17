@@ -11,7 +11,7 @@ jest.mock('@/lib/kiloclaw/setup-promo', () => ({
 import { resolveAutoModel } from './resolution';
 import {
   BALANCED_QWEN_MODEL,
-  FRONTIER_CODE_MODEL,
+  FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
@@ -147,7 +147,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
 });
 
 describe('resolveAutoModel — Organization Auto branch', () => {
-  it('uses canonical built-in routes before legacy aliases', async () => {
+  it('uses exact built-in alias routes before canonical fallback routes', async () => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -173,9 +173,41 @@ describe('resolveAutoModel — Organization Auto branch', () => {
       zeroBalancePromise
     );
 
+    expect(result).toMatchObject({
+      kind: 'ok',
+      routingTarget: 'kilo-auto/small',
+    });
+  });
+
+  it('uses exact plan routes before architect fallback routes', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'plan',
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: {
+              routes: {
+                architect: 'kilo-auto/balanced',
+                plan: 'kilo-auto/frontier',
+              },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
     expect(result).toEqual({
       kind: 'ok',
-      resolved: FRONTIER_CODE_MODEL,
+      resolved: FRONTIER_MODE_TO_MODEL.plan,
       routingTarget: 'kilo-auto/frontier',
     });
   });

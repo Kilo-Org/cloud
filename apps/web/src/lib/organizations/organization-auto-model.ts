@@ -9,15 +9,16 @@ import {
 } from '@/lib/ai-gateway/providers/direct-byok';
 import { getBYOKforOrganization } from '@/lib/ai-gateway/byok';
 import { db } from '@/lib/drizzle';
-import {
-  KILO_AUTO_BALANCED_MODEL,
-  ORGANIZATION_AUTO_TARGET_MODELS,
-  ORG_AUTO_MODEL,
-} from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+export {
+  getOrganizationAutoRoute,
+  isOrganizationAutoTargetModel,
+  MAX_ORGANIZATION_AUTO_ROUTES,
+  ORGANIZATION_AUTO_MODEL_FLAG,
+} from '@/lib/organizations/organization-auto-model-shared';
+import { isOrganizationAutoTargetModel } from '@/lib/organizations/organization-auto-model-shared';
 
 type OrganizationAutoPolicyOrganization = Pick<Organization, 'id' | 'plan' | 'settings'>;
-
-export const ORGANIZATION_AUTO_MODEL_FLAG = 'organization-auto-model-routing';
 
 export const DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS: OrganizationAutoModelSettings = {
   routes: {},
@@ -43,23 +44,6 @@ export function getOrganizationAutoSettings(
   organization: Organization
 ): OrganizationAutoModelSettings | undefined {
   return organization.settings.org_auto_model;
-}
-
-export function getOrganizationAutoRoute(
-  settings: Organization['settings'] | undefined,
-  slug: string
-): string | undefined {
-  if (!settings?.org_auto_model) {
-    return undefined;
-  }
-  if (!Object.prototype.hasOwnProperty.call(settings.org_auto_model.routes, slug)) {
-    return undefined;
-  }
-  return settings.org_auto_model.routes[slug];
-}
-
-export function isOrganizationAutoTargetModel(modelId: string): boolean {
-  return (ORGANIZATION_AUTO_TARGET_MODELS as readonly string[]).includes(modelId);
 }
 
 export type OrganizationAutoTargetValidationResult =
@@ -141,7 +125,8 @@ export async function validateOrganizationAutoTarget(
         'Organization Auto could not validate this route target against the current model catalog.',
     };
   }
-  if (!models.data.some(model => normalizeModelId(model.id) === normalizedModelId)) {
+  const catalogModel = models.data.find(model => model.id.toLowerCase() === rawModelId);
+  if (!catalogModel) {
     return {
       kind: 'error',
       message: `Organization Auto route target '${targetModelId}' is unavailable.`,
@@ -161,5 +146,5 @@ export async function validateOrganizationAutoTarget(
     };
   }
 
-  return { kind: 'ok', modelId: normalizedModelId };
+  return { kind: 'ok', modelId: catalogModel.id };
 }

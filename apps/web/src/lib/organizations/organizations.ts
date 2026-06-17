@@ -6,6 +6,7 @@ import {
   type AcceptInviteResult,
   type OrganizationSettings,
   OrganizationSSODomainSchema,
+  OrganizationSettingsSchema,
 } from '@/lib/organizations/organization-types';
 import {
   kilocode_users,
@@ -720,7 +721,12 @@ export async function mutateOrganizationSettings(
     if (!organization) {
       throw new Error(`Organization ${organizationId} not found`);
     }
-    const settings = await mutate(organization);
+    const nextSettings = await mutate(organization);
+    // Returning the locked settings object is the explicit no-op signal.
+    if (nextSettings === organization.settings) {
+      return organization.settings;
+    }
+    const settings = OrganizationSettingsSchema.parse(nextSettings);
     await tx.update(organizations).set({ settings }).where(eq(organizations.id, organizationId));
     return settings;
   };

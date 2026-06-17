@@ -1,7 +1,7 @@
 'use client';
 
 import type { FormEvent } from 'react';
-import { useMemo, useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ import type { EditGroupConfig } from '@/lib/organizations/organization-types';
 import { Save, FileText } from 'lucide-react';
 import { useModeTemplates } from './useModeTemplates';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
-import { isOrganizationAutoTargetModel } from '@/lib/organizations/organization-auto-model';
+import { isOrganizationAutoTargetModel } from '@/lib/organizations/organization-auto-model-shared';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 
 const availableGroups = [
@@ -62,6 +62,7 @@ type ModeFormProps = {
   isEditingBuiltIn?: boolean;
   isDefaultModelConfigEnabled?: boolean;
   canSetDefaultModel?: boolean;
+  disableSlug?: boolean;
   existingModes?: OrganizationMode[];
   onCancel?: () => void;
   renderButtons?: (props: { isDirty: boolean; isSubmitting: boolean }) => React.ReactNode;
@@ -109,6 +110,7 @@ export function ModeForm({
   isEditingBuiltIn = false,
   isDefaultModelConfigEnabled = false,
   canSetDefaultModel = true,
+  disableSlug = false,
   existingModes = [],
   onCancel,
   renderButtons,
@@ -149,6 +151,8 @@ export function ModeForm({
     return editConfig || { fileRegex: '', description: '' };
   });
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const routeFieldDirtyRef = useRef(false);
+  routeFieldDirtyRef.current = formData.defaultModel !== initialFormData.defaultModel;
 
   // Fetch mode templates
   const { data: templates, isLoading: templatesLoading } = useModeTemplates();
@@ -181,7 +185,7 @@ export function ModeForm({
     isDefaultModelConfigEnabled && (canSetDefaultModel || !!formData.defaultModel);
   const defaultModelChanged = formData.defaultModel !== initialFormData.defaultModel;
 
-  // Update form data when mode prop changes
+  // Re-seed the full form only when switching modes, not when settings refetch.
   useEffect(() => {
     if (mode) {
       const newFormData = {
@@ -203,7 +207,16 @@ export function ModeForm({
       setInitialGroups(simpleGroups);
       setInitialEditConfig(newEditConfig);
     }
-  }, [mode, routeModel]);
+  }, [mode?.id]);
+
+  useEffect(() => {
+    if (routeFieldDirtyRef.current) {
+      return;
+    }
+    const nextRouteModel = routeModel || '';
+    setFormData(previous => ({ ...previous, defaultModel: nextRouteModel }));
+    setInitialFormData(previous => ({ ...previous, defaultModel: nextRouteModel }));
+  }, [routeModel]);
 
   // Check if form is dirty (has changes)
   const isDirty =
@@ -394,12 +407,14 @@ export function ModeForm({
               value={formData.slug}
               onChange={e => setFormData(prev => ({ ...prev, slug: e.target.value }))}
               placeholder="e.g., code"
-              disabled={isSubmitting || isEditingBuiltIn}
+              disabled={isSubmitting || isEditingBuiltIn || disableSlug}
             />
             <p className="text-muted-foreground text-xs">
               {isEditingBuiltIn
                 ? 'Built-in mode slugs cannot be changed'
-                : 'Unique identifier for this mode.'}
+                : disableSlug
+                  ? 'Route managers must rename routed modes.'
+                  : 'Unique identifier for this mode.'}
             </p>
             {errors.slug && <p className="text-sm text-red-600">{errors.slug}</p>}
           </div>
@@ -481,7 +496,7 @@ export function ModeForm({
                     defaultModel: value === noDefaultModelValue ? '' : value,
                   }))
                 }
-                disabled={isSubmitting || modelsLoading}
+                disabled={isSubmitting || modelsLoading || !canSetDefaultModel}
               >
                 <SelectTrigger
                   id="defaultModel"
@@ -511,7 +526,7 @@ export function ModeForm({
                         <span className="font-mono text-sm">{formData.defaultModel}</span>
                         <span className="text-muted-foreground text-xs">
                           {!canSetDefaultModel
-                            ? 'Existing route; clear only while on Enterprise'
+                            ? 'Existing route; read-only for your role or plan'
                             : modelsLoading
                               ? 'Checking organization policy...'
                               : modelsError
@@ -536,7 +551,7 @@ export function ModeForm({
               </Select>
               <p id="defaultModel-help" className="text-muted-foreground text-xs">
                 {!canSetDefaultModel
-                  ? 'This organization must be on Enterprise to configure Organization Auto routes. Existing routes can still be cleared.'
+                  ? 'Organization Auto routes are read-only for your role or plan.'
                   : modelsLoading
                     ? 'Loading organization-allowed models...'
                     : modelsError

@@ -23,6 +23,7 @@ import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   ORGANIZATION_AUTO_MODEL_FLAG,
+  MAX_ORGANIZATION_AUTO_ROUTES,
   isOrganizationAutoEligible,
   validateOrganizationAutoTarget,
 } from '@/lib/organizations/organization-auto-model';
@@ -100,8 +101,6 @@ function createDefaultModelDiffMessage(
   return 'Updated default model';
 }
 
-const MAX_ORGANIZATION_AUTO_ROUTES = 100;
-
 function assertOrganizationAutoRouteCount(routes: Record<string, string>): void {
   if (Object.keys(routes).length > MAX_ORGANIZATION_AUTO_ROUTES) {
     throw new TRPCError({
@@ -124,6 +123,8 @@ function dedupeStrings(values: string[]): string[] {
   return [...new Set(values)];
 }
 
+// Organization Auto rollout is intentionally actor-scoped so flagged admins can
+// configure eligible organizations before the broader rollout is enabled.
 async function assertOrganizationAutoWriteEnabled(userId: string): Promise<void> {
   if (
     process.env.NODE_ENV !== 'development' &&
@@ -147,18 +148,44 @@ function assertOrganizationAutoEligible(
   }
 }
 
+async function validateOrganizationDefaultModel(
+  organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>,
+  defaultModel: string
+): Promise<string> {
+  const requestedDefaultModel = defaultModel.trim().toLowerCase();
+  const normalizedDefaultModel = normalizeModelId(requestedDefaultModel);
+  if (!normalizedDefaultModel || normalizedDefaultModel.endsWith('/*')) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Default model '${defaultModel}' is not a concrete model identifier`,
+    });
+  }
+
+  if (normalizedDefaultModel === ORG_AUTO_MODEL.id) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Enable Organization Auto through its dedicated controls.',
+    });
+  }
+
+  const isAllowed = createAllowPredicateFromRestrictions(
+    getEffectiveModelRestrictions(organization)
+  );
+  if (!(await isAllowed(requestedDefaultModel))) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Default model '${defaultModel}' is not in the organization's allowed models list`,
+    });
+  }
+
+  return defaultModel.trim();
+}
+
 async function validateOrganizationDefaultReplacement(
   organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>,
   replacementModel: string
 ): Promise<string> {
-  const normalizedReplacementModel = normalizeModelId(replacementModel);
-  if (!normalizedReplacementModel || normalizedReplacementModel.endsWith('/*')) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: `Default model '${replacementModel}' is not a concrete model identifier`,
-    });
-  }
-
+  const normalizedReplacementModel = normalizeModelId(replacementModel.trim().toLowerCase());
   if (normalizedReplacementModel === ORG_AUTO_MODEL.id) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -166,12 +193,31 @@ async function validateOrganizationDefaultReplacement(
     });
   }
 
-  const validation = await validateOrganizationAutoTarget(organization, replacementModel);
-  if (validation.kind === 'error') {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
+  const validatedReplacementModel = await validateOrganizationDefaultModel(
+    organization,
+    replacementModel
+  );
+  let availableModels: Awaited<ReturnType<typeof getAvailableModelsForOrganization>>;
+  try {
+    availableModels = await getAvailableModelsForOrganization(organization.id);
+  } catch {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        'Replacement default model could not be validated against the current model catalog.',
+    });
+  }
+  const availableModel = availableModels?.data.find(
+    model => model.id.trim().toLowerCase() === validatedReplacementModel.toLowerCase()
+  );
+  if (!availableModel) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Default model '${replacementModel}' is unavailable for this organization.`,
+    });
   }
 
-  return validation.modelId;
+  return availableModel.id;
 }
 
 const UpdateDefaultModelInputSchema = OrganizationIdInputSchema.extend({
@@ -264,16 +310,10 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, provider_allow_list, model_deny_list } = input;
-
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
-
-      // enterprise only feature
       if (existingOrg.plan !== 'enterprise') {
         throw new TRPCError({
           code: 'FORBIDDEN',
@@ -286,20 +326,21 @@ export const organizationsSettingsRouter = createTRPCRouter({
         const settings = await mutateOrganizationSettings(
           organizationId,
           async organization => {
+            if (organization.plan !== 'enterprise') {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'Model access configuration is not available for this organization.',
+              });
+            }
             previousSettings = organization.settings;
             const currentSettings = organization.settings || {};
-            const settingsUpdate: OrganizationSettings = {
-              ...currentSettings,
-            };
-
+            const settingsUpdate: OrganizationSettings = { ...currentSettings };
             if (provider_allow_list !== undefined) {
               settingsUpdate.provider_allow_list = dedupeStrings(provider_allow_list);
             }
-
             if (model_deny_list !== undefined) {
               settingsUpdate.model_deny_list = dedupeModels(model_deny_list);
             }
-
             if (
               (provider_allow_list !== undefined || model_deny_list !== undefined) &&
               currentSettings.default_model &&
@@ -309,17 +350,14 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 providerAllowList: settingsUpdate.provider_allow_list,
                 modelDenyList: settingsUpdate.model_deny_list ?? [],
               });
-
               if (!(await isAllowed(currentSettings.default_model))) {
                 settingsUpdate.default_model = undefined;
               }
             }
-
             return settingsUpdate;
           },
           tx
         );
-
         await createAuditLog({
           action: 'organization.settings.change',
           actor_email: ctx.user.google_user_email,
@@ -331,7 +369,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
         return settings;
       });
-
       return { settings: updatedSettings };
     }),
 
@@ -340,23 +377,16 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, default_model } = input;
-
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
-
-      // enterprise only feature
       if (existingOrg.plan !== 'enterprise') {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'Model access configuration is not available for this organization.',
         });
       }
-
       if (existingOrg.settings.default_model === ORG_AUTO_MODEL.id) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -364,39 +394,36 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      if (default_model === ORG_AUTO_MODEL.id) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Enable Organization Auto through its dedicated controls.',
-        });
-      }
-
-      const isAllowed = createAllowPredicateFromRestrictions(
-        getEffectiveModelRestrictions(existingOrg)
-      );
-
-      if (default_model && !(await isAllowed(default_model))) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Default model '${default_model}' is not in the organization's allowed models list`,
-        });
-      }
-
+      let validatedDefaultModel: string | undefined;
       let previousSettings: OrganizationSettings | undefined;
       const updatedSettings = await db.transaction(async tx => {
         const settings = await mutateOrganizationSettings(
           organizationId,
-          organization => {
+          async organization => {
+            if (organization.plan !== 'enterprise') {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'Model access configuration is not available for this organization.',
+              });
+            }
             if (organization.settings.default_model === ORG_AUTO_MODEL.id) {
               throw new TRPCError({
                 code: 'BAD_REQUEST',
                 message: 'Disable Organization Auto through its dedicated controls.',
               });
             }
+            if (default_model) {
+              validatedDefaultModel = await validateOrganizationDefaultModel(
+                organization,
+                default_model
+              );
+            } else {
+              validatedDefaultModel = undefined;
+            }
             previousSettings = organization.settings;
             return {
               ...organization.settings,
-              default_model: default_model ? default_model : undefined,
+              default_model: validatedDefaultModel || undefined,
             };
           },
           tx
@@ -412,7 +439,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
         return settings;
       });
-
       return { settings: updatedSettings };
     }),
 
@@ -429,10 +455,18 @@ export const organizationsSettingsRouter = createTRPCRouter({
       }
       assertOrganizationAutoEligible(existingOrg);
 
+      let didEnableChange = false;
       const updatedSettings = await db.transaction(async tx => {
         const settings = await mutateOrganizationSettings(
           organizationId,
           async organization => {
+            assertOrganizationAutoEligible(organization);
+            if (
+              organization.settings.default_model === ORG_AUTO_MODEL.id &&
+              organization.settings.org_auto_model
+            ) {
+              return organization.settings;
+            }
             const existingOrgAutoModel = organization.settings.org_auto_model;
             const freshOrgAutoModel =
               existingOrgAutoModel ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
@@ -460,7 +494,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
               });
             }
 
-            return {
+            const nextSettings = {
               ...organization.settings,
               default_model: ORG_AUTO_MODEL.id,
               org_auto_model: {
@@ -469,18 +503,29 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 fallback_model: fallbackValidation.modelId,
               },
             };
+            if (
+              organization.settings.default_model === ORG_AUTO_MODEL.id &&
+              JSON.stringify(organization.settings.org_auto_model) ===
+                JSON.stringify(nextSettings.org_auto_model)
+            ) {
+              return organization.settings;
+            }
+            didEnableChange = true;
+            return nextSettings;
           },
           tx
         );
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: 'Enabled Organization Auto and set it as the organization default model.',
-          organization_id: organizationId,
-          tx,
-        });
+        if (didEnableChange) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: 'Enabled Organization Auto and set it as the organization default model.',
+            organization_id: organizationId,
+            tx,
+          });
+        }
         return settings;
       });
 
@@ -510,6 +555,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         const settings = await mutateOrganizationSettings(
           organizationId,
           async organization => {
+            assertOrganizationAutoEligible(organization);
             if (organization.settings.default_model !== ORG_AUTO_MODEL.id) {
               throw new TRPCError({
                 code: 'BAD_REQUEST',
@@ -556,10 +602,12 @@ export const organizationsSettingsRouter = createTRPCRouter({
       assertOrganizationAutoEligible(existingOrg);
 
       let validatedModelId: string | undefined;
+      let previousRoute: string | undefined;
       const updatedSettings = await db.transaction(async tx => {
         const settings = await mutateOrganizationSettings(
           organizationId,
           async organization => {
+            assertOrganizationAutoEligible(organization);
             const validation = await validateOrganizationAutoTarget(organization, model_id);
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
@@ -567,6 +615,10 @@ export const organizationsSettingsRouter = createTRPCRouter({
             validatedModelId = validation.modelId;
             const orgAutoModel =
               organization.settings.org_auto_model ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
+            previousRoute = orgAutoModel.routes[mode_slug];
+            if (previousRoute === validation.modelId) {
+              return organization.settings;
+            }
             const routes = {
               ...orgAutoModel.routes,
               [mode_slug]: validation.modelId,
@@ -582,15 +634,20 @@ export const organizationsSettingsRouter = createTRPCRouter({
           },
           tx
         );
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: `Set Organization Auto route for mode "${mode_slug}" to ${validatedModelId}`,
-          organization_id: organizationId,
-          tx,
-        });
+        if (previousRoute !== validatedModelId) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message:
+              previousRoute === undefined
+                ? `Set Organization Auto route for mode "${mode_slug}" to "${validatedModelId}"`
+                : `Updated Organization Auto route for mode "${mode_slug}": "${previousRoute}" → "${validatedModelId}"`,
+            organization_id: organizationId,
+            tx,
+          });
+        }
         return settings;
       });
 
@@ -610,15 +667,19 @@ export const organizationsSettingsRouter = createTRPCRouter({
       }
       assertOrganizationAutoEligible(existingOrg);
 
+      let removedRoute: string | undefined;
       const updatedSettings = await db.transaction(async tx => {
-        let removedRoute: string | undefined;
         const settings = await mutateOrganizationSettings(
           organizationId,
           organization => {
+            assertOrganizationAutoEligible(organization);
             const orgAutoModel =
               organization.settings.org_auto_model ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
+            removedRoute = orgAutoModel.routes[mode_slug];
+            if (removedRoute === undefined) {
+              return organization.settings;
+            }
             const routes = { ...orgAutoModel.routes };
-            removedRoute = routes[mode_slug];
             delete routes[mode_slug];
             return {
               ...organization.settings,
@@ -630,13 +691,13 @@ export const organizationsSettingsRouter = createTRPCRouter({
           },
           tx
         );
-        if (removedRoute) {
+        if (removedRoute !== undefined) {
           await createAuditLog({
             action: 'organization.settings.change',
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
-            message: `Cleared Organization Auto route for mode "${mode_slug}"`,
+            message: `Cleared Organization Auto route for mode "${mode_slug}" (was "${removedRoute}")`,
             organization_id: organizationId,
             tx,
           });
@@ -661,10 +722,12 @@ export const organizationsSettingsRouter = createTRPCRouter({
       assertOrganizationAutoEligible(existingOrg);
 
       let validatedModelId: string | undefined;
+      let previousFallback: string | undefined;
       const updatedSettings = await db.transaction(async tx => {
         const settings = await mutateOrganizationSettings(
           organizationId,
           async organization => {
+            assertOrganizationAutoEligible(organization);
             const validation = await validateOrganizationAutoTarget(organization, model_id);
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
@@ -672,6 +735,10 @@ export const organizationsSettingsRouter = createTRPCRouter({
             validatedModelId = validation.modelId;
             const orgAutoModel =
               organization.settings.org_auto_model ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
+            previousFallback = orgAutoModel.fallback_model;
+            if (previousFallback === validation.modelId) {
+              return organization.settings;
+            }
             return {
               ...organization.settings,
               org_auto_model: {
@@ -682,15 +749,17 @@ export const organizationsSettingsRouter = createTRPCRouter({
           },
           tx
         );
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: `Set Organization Auto fallback model to ${validatedModelId}`,
-          organization_id: organizationId,
-          tx,
-        });
+        if (previousFallback !== validatedModelId) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: `Updated Organization Auto fallback model: "${previousFallback}" → "${validatedModelId}"`,
+            organization_id: organizationId,
+            tx,
+          });
+        }
         return settings;
       });
 

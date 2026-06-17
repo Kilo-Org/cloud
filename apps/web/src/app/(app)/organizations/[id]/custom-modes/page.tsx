@@ -9,7 +9,13 @@ export default async function OrganizationCustomModesPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => <CustomModesLayout organizationId={organization.id} />}
+      render={({ organization, role, isGlobalAdmin }) => (
+        <CustomModesLayout
+          organizationId={organization.id}
+          role={role}
+          isGlobalAdmin={isGlobalAdmin}
+        />
+      )}
     />
   );
 }

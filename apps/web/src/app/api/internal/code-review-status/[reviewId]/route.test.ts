@@ -793,6 +793,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     it.each([
       'No allowed providers are specified.',
       'No allowed providers are available for the selected model.',
+      'Not Found: {"error":"No eligible provider can serve the selected model.","error_type":"provider_not_allowed","message":"No eligible provider can serve the selected model. Select another model or update the provider routing settings."}',
       'No endpoints found matching your data policy (Free model training). Configure: https://openrouter.ai/settings/privacy',
     ])(
       'infers provider-policy callbacks as selected-model action-required failures',

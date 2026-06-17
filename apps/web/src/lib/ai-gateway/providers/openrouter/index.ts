@@ -28,6 +28,7 @@ import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/t
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { addMonths } from 'date-fns';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -88,12 +89,15 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
   if (isNew) return model.name + ' (new)';
   if (model.expiration_date) {
-    const suffix = new Date(model.expiration_date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    });
-    return model.name + ' (retires ' + suffix + ')';
+    const expirationDate = new Date(model.expiration_date);
+    if (expirationDate <= addMonths(new Date(), 1)) {
+      const suffix = expirationDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      });
+      return model.name + ' (retires ' + suffix + ')';
+    }
   }
   return model.name;
 }

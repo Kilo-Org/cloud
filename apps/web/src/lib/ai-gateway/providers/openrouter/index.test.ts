@@ -59,6 +59,14 @@ function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
 describe('formatName', () => {
   const NOT_PREFERRED = -1;
 
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-17T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('appends ($$$$) for expensive models', () => {
     const model = buildModel({ pricing: { prompt: '0.00001', completion: '0' } });
     expect(formatName(model, NOT_PREFERRED)).toBe('Test Model ($$$$)');
@@ -98,14 +106,19 @@ describe('formatName', () => {
     expect(formatName(model, 0)).toBe('Test Model');
   });
 
-  it('appends the retirement date in UTC when an expiration date is set', () => {
-    const model = buildModel({ expiration_date: '2026-12-01' });
-    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (retires Dec 1)');
+  it('appends the retirement date in UTC when it is within one month', () => {
+    const model = buildModel({ expiration_date: '2026-07-01' });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (retires Jul 1)');
+  });
+
+  it('does not append the retirement date when it is more than one month away', () => {
+    const model = buildModel({ expiration_date: '2026-07-18' });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
   });
 
   it('prefers the (new) marker over the retirement marker', () => {
     const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
-    const model = buildModel({ created: recentlyCreated, expiration_date: '2026-12-01' });
+    const model = buildModel({ created: recentlyCreated, expiration_date: '2026-07-01' });
     expect(formatName(model, 0)).toBe('Test Model (new)');
   });
 

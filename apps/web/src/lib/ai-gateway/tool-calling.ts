@@ -217,6 +217,44 @@ function sanitizeResponsesToolResults(body: GatewayResponsesRequest): void {
   }
 }
 
+export function repairMessagesTools(body: GatewayMessagesRequest): void {
+  for (const msg of body.messages) {
+    if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;
+    const toolUseIds = new Set<string>();
+    msg.content = msg.content.filter(block => {
+      if (typeof block !== 'object' || block.type !== 'tool_use') return true;
+      if (toolUseIds.has(block.id)) {
+        console.warn(`[repairMessagesTools] removing duplicate tool_use block with id ${block.id}`);
+        return false;
+      }
+      toolUseIds.add(block.id);
+      return true;
+    });
+  }
+
+  const allToolUseIds = new Set<string>();
+  for (const msg of body.messages) {
+    if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;
+    for (const block of msg.content) {
+      if (typeof block === 'object' && block.type === 'tool_use') {
+        allToolUseIds.add(block.id);
+      }
+    }
+  }
+
+  for (const msg of body.messages) {
+    if (msg.role !== 'user' || !Array.isArray(msg.content)) continue;
+    msg.content = msg.content.filter(block => {
+      if (typeof block !== 'object' || block.type !== 'tool_result') return true;
+      if (allToolUseIds.has(block.tool_use_id)) return true;
+      console.warn(
+        `[repairMessagesTools] removing orphan tool_result for tool_use_id ${block.tool_use_id}`
+      );
+      return false;
+    });
+  }
+}
+
 function sanitizeMessagesToolResults(body: GatewayMessagesRequest): void {
   const toolNameById = new Map<string, string>();
   for (const msg of body.messages) {

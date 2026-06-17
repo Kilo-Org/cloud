@@ -143,8 +143,10 @@ export function getAiSdkProvider(
   if (isOpenCodeGoAnthropicMessagesModel(model)) {
     return 'anthropic';
   }
-  if (isClaudeModel(model)) {
-    // on Vercel AI Gateway, this is necessary to support document attachments
+  if (
+    isClaudeModel(model) || // on Vercel AI Gateway, this is necessary to support document attachments
+    isMinimaxModel(model) // on Vercel AI Gateway, this is necessary for reasoning to show
+  ) {
     return 'anthropic';
   }
   if (isOpenAiModel(model) || isGrokModel(model)) {

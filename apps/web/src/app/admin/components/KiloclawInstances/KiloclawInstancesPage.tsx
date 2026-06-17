@@ -166,6 +166,9 @@ type CustomTooltipProps = {
 function DailyChart({ data }: { data: DailyChartData[] }) {
   const [showCreated, setShowCreated] = useState(true);
   const [showDestroyed, setShowDestroyed] = useState(true);
+  // Default to log scale: least lossy, absorbs future spikes without re-tuning,
+  // and the toggle lets you read absolute magnitudes on a linear axis when needed.
+  const [logScale, setLogScale] = useState(true);
 
   const chartData = data.map(item => ({
     date: format(parseISO(item.date), 'MM/dd'),
@@ -211,6 +214,9 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
     1
   );
   const yAxisMax = Math.ceil(maxVal * 1.1) || 10;
+  // Log scale can't include 0, so floor the domain at a small positive value;
+  // bars of value 1 still render with visible height above the 0.5 baseline.
+  const yAxisDomain: [number, number] = logScale ? [0.5, yAxisMax] : [0, yAxisMax];
 
   return (
     <Card>
@@ -250,6 +256,32 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
               Destroyed
             </span>
           </button>
+          <div className="bg-muted/50 flex items-center rounded-md p-0.5">
+            <button
+              type="button"
+              aria-pressed={!logScale}
+              className={`cursor-pointer rounded px-1.5 py-0.5 transition-colors ${
+                !logScale
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setLogScale(false)}
+            >
+              Linear
+            </button>
+            <button
+              type="button"
+              aria-pressed={logScale}
+              className={`cursor-pointer rounded px-1.5 py-0.5 transition-colors ${
+                logScale
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setLogScale(true)}
+            >
+              Log
+            </button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pb-3">
@@ -263,7 +295,13 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
                 minTickGap={24}
                 tick={{ fontSize: 10 }}
               />
-              <YAxis domain={[0, yAxisMax]} width={28} tick={{ fontSize: 10 }} />
+              <YAxis
+                scale={logScale ? 'log' : 'linear'}
+                domain={yAxisDomain}
+                allowDataOverflow={logScale}
+                width={28}
+                tick={{ fontSize: 10 }}
+              />
               <Tooltip content={<CustomTooltip />} />
               {showCreated && <Bar dataKey="created" fill="#22c55e" name="Created" />}
               {showDestroyed && <Bar dataKey="destroyed" fill="#ef4444" name="Destroyed" />}

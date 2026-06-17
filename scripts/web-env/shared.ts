@@ -13,9 +13,7 @@ export type Environment = (typeof ENVIRONMENTS)[number];
 export type Values = Record<Environment, string>;
 export type VercelContext = {
   project: Project;
-  projectId: string;
   orgId: string;
-  stagingId: string;
   cwd: string;
 };
 
@@ -70,11 +68,7 @@ export function run(
   return result.stdout;
 }
 
-function vercel(
-  context: Pick<VercelContext, 'cwd' | 'orgId' | 'projectId'> | undefined,
-  args: string[],
-  input?: string
-): string {
+function vercel(context: VercelContext | undefined, args: string[], input?: string): string {
   return run(
     'pnpm',
     [
@@ -93,7 +87,7 @@ function vercel(
         ? {
             ...process.env,
             VERCEL_ORG_ID: context.orgId,
-            VERCEL_PROJECT_ID: context.projectId,
+            VERCEL_PROJECT_ID: context.project,
           }
         : process.env,
       input,
@@ -109,26 +103,7 @@ export function resolveVercelContexts(tempDirectory: string): VercelContext[] {
     throw new Error('Sign in to the kilocode Vercel team with `vercel login`.');
   }
 
-  return PROJECTS.map(project => {
-    const projectList = parseJson(
-      vercel(undefined, ['project', 'list', '--filter', project, '--format=json']),
-      `Resolve ${project}`
-    );
-    const match = records(projectList.projects).find(candidate => candidate.name === project);
-    const projectId = match ? stringValue(match, 'id') : undefined;
-    if (!projectId) throw new Error(`Could not resolve Vercel project ${project}.`);
-
-    const base = { project, projectId, orgId, cwd: tempDirectory };
-    const targetList = parseJson(vercel(base, ['target', 'list', '--format=json']), 'List targets');
-    const staging = records(targetList.targets).find(candidate => candidate.slug === 'staging');
-    const stagingId = staging ? stringValue(staging, 'id') : undefined;
-    if (!stagingId) throw new Error(`${project} does not have a custom staging environment.`);
-    return { ...base, stagingId };
-  });
-}
-
-function target(context: VercelContext, environment: Environment): string {
-  return environment === 'staging' ? context.stagingId : environment;
+  return PROJECTS.map(project => ({ project, orgId, cwd: tempDirectory }));
 }
 
 export function listVariables(
@@ -136,7 +111,7 @@ export function listVariables(
   environment: Environment
 ): Map<string, string> {
   const response = parseJson(
-    vercel(context, ['env', 'list', target(context, environment), '--format=json']),
+    vercel(context, ['env', 'list', environment, '--format=json']),
     `List ${context.project}/${environment}`
   );
   return new Map(
@@ -160,20 +135,13 @@ export function setVariable(
       'env',
       'add',
       name,
-      target(context, environment),
+      environment,
       '--force',
       shouldBeSensitive ? '--sensitive' : '--no-sensitive',
       '--yes',
     ],
     value
   );
-  const type = listVariables(context, environment).get(name);
-  const expected = shouldBeSensitive ? 'sensitive' : 'encrypted';
-  if (type !== expected) {
-    throw new Error(
-      `${context.project}/${environment} has type ${type ?? 'missing'}, expected ${expected}.`
-    );
-  }
 }
 
 export function pullValue(
@@ -181,7 +149,7 @@ export function pullValue(
   environment: Environment,
   name: string
 ): string | undefined {
-  const endpoint = `/v3/env/pull/${encodeURIComponent(context.projectId)}/${encodeURIComponent(target(context, environment))}?source=vercel-cli%3Aenv%3Apull`;
+  const endpoint = `/v3/env/pull/${encodeURIComponent(context.project)}/${encodeURIComponent(environment)}?source=vercel-cli%3Aenv%3Apull`;
   const response = parseJson(vercel(context, ['api', endpoint, '--raw']), 'Pull Vercel values');
   const values = isRecord(response.env) ? response.env : undefined;
   return values && typeof values[name] === 'string' ? values[name] : undefined;

@@ -18,18 +18,18 @@ describe('DECIDER_CASES', () => {
     expect(TAXONOMY_PAIRS.length).toBe(18);
   });
 
-  it('has exactly 112 cases with unique ids', () => {
-    expect(DECIDER_CASES.length).toBe(112);
+  it('has exactly 180 cases with unique ids', () => {
+    expect(DECIDER_CASES.length).toBe(180);
     const ids = new Set(DECIDER_CASES.map(c => c.id));
     expect(ids.size).toBe(DECIDER_CASES.length);
   });
 
-  it('has at least 6 cases per (taskType, subtaskType) pair', () => {
+  it('has at least 10 cases per (taskType, subtaskType) pair', () => {
     for (const pair of TAXONOMY_PAIRS) {
       const count = DECIDER_CASES.filter(
         c => c.taskType === pair.taskType && c.subtaskType === pair.subtaskType
       ).length;
-      expect(count, `${pair.taskType}/${pair.subtaskType}`).toBeGreaterThanOrEqual(6);
+      expect(count, `${pair.taskType}/${pair.subtaskType}`).toBeGreaterThanOrEqual(10);
     }
   });
 

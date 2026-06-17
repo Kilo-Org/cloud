@@ -8,7 +8,7 @@ import {
 function row(
   openrouterId: string,
   avgAttemptCostUsd: number,
-  overrides: { active?: boolean } = {}
+  overrides: { active?: boolean; nAttempts?: number } = {}
 ) {
   return {
     openrouterId,
@@ -27,7 +27,7 @@ function row(
             avgCacheReadTokens: 1,
             avgExecutionMs: 1,
             nTotalTrials: 6,
-            nAttempts: 6,
+            nAttempts: overrides.nAttempts ?? 6,
             avgAttemptCostUsd,
             avgAttemptInputTokens: 1,
             avgAttemptOutputTokens: 1,
@@ -47,6 +47,7 @@ describe('summarizeAutoRoutingDeciderCandidates', () => {
       [
         row('model/too-cheap', AUTO_DECIDER_MIN_COST_USD - 0.01),
         row('model/minimum', AUTO_DECIDER_MIN_COST_USD),
+        row('model/one-attempt', AUTO_DECIDER_MIN_COST_USD + 1, { nAttempts: 1 }),
         row('model/floored-maximum', AUTO_DECIDER_MAX_COST_USD + 0.99),
         row('model/too-expensive', AUTO_DECIDER_MAX_COST_USD + 1),
         row('model/inactive', 20, { active: false }),
@@ -57,6 +58,7 @@ describe('summarizeAutoRoutingDeciderCandidates', () => {
 
     expect(candidates).toEqual([
       { id: 'model/floored-maximum', avgAttemptCostUsd: 25.99 },
+      { id: 'model/one-attempt', avgAttemptCostUsd: 16 },
       { id: 'model/minimum', avgAttemptCostUsd: 15 },
     ]);
   });

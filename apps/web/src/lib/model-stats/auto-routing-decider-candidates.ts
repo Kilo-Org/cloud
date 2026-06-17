@@ -55,7 +55,6 @@ export function summarizeAutoRoutingDeciderCandidates(
     const bench = result.data?.kiloBench?.evals['terminal-bench'];
     if (
       !bench ||
-      (bench.nAttempts ?? 0) < 5 ||
       bench.avgAttemptCostUsd === null ||
       bench.avgAttemptCostUsd === undefined ||
       !isInAutoCostBand(bench.avgAttemptCostUsd, costBounds)

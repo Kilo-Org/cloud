@@ -161,3 +161,88 @@ assert_kilo_chat_smoke() {
   assert_kilo_chat_plugin_loaded "$cid"
   assert_kilo_chat_webhook_route "$port" "$token"
 }
+
+# Verifies the cloud app's config-write path survives the packaged OpenClaw
+# version. The Kilo app (apps/web kiloclaw-internal-client) writes agent/model
+# settings by POSTing a deep-merge patch to `/_kilo/config/patch`. That route
+# merges and writes openclaw.json and relies on the gateway's file-watch reload —
+# it does NOT run `openclaw config validate` inline. So a config shape that a
+# newer OpenClaw rejects (e.g. the model-override / agent-selector tightening in
+# 2026.6.8) would still return HTTP 200 here and only fail later at reload, which
+# the per-version boot asserts cannot catch.
+#
+# This assertion closes that seam: it replays the documented app patch shape and
+# then re-runs THIS image's own validator against the freshly app-written config.
+# To stay order-safe and catalog-independent it re-writes `agents.defaults.model
+# .primary` to its current value — a behavior-preserving no-op that still drives
+# the full deep-merge + atomic-write + validate path. A stronger follow-up could
+# create/delete an agent via `POST /_kilo/config/agents` to also exercise the
+# `openclaw agents` selector validation 2026.6.8 changed.
+assert_app_config_patch() {
+  local cid="$1"
+  local port="$2"
+  local token="$3"
+  local current
+  local body
+  local code
+  local validate_result
+  local readback
+
+  echo
+  echo "--- app config write (/_kilo/config/patch) ---"
+
+  # Snapshot the configured model primary so the patch is a no-op: a later
+  # assertion (and the live turn) still observe the same configured model.
+  current=$(docker exec -i "$cid" python3 - <<'PY' 2>/dev/null
+import json
+from pathlib import Path
+
+doc = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
+print(doc.get('agents', {}).get('defaults', {}).get('model', {}).get('primary', ''))
+PY
+  )
+  if [ -z "$current" ]; then
+    check "app config patch accepted -> 200" "200" "no configured model to patch"
+    return
+  fi
+
+  # Build the documented app patch shape with a JSON-safe encoder.
+  body=$(python3 -c 'import json,sys; print(json.dumps({"agents":{"defaults":{"model":{"primary":sys.argv[1]}}}}))' "$current")
+
+  code=$(curl -sS -o /dev/null -w "%{http_code}" \
+    -X POST \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    --data "$body" \
+    "http://127.0.0.1:${port}/_kilo/config/patch" 2>/dev/null || true)
+  check "app config patch accepted -> 200" "200" "$code"
+
+  # The patch route never validates inline — prove the NEW OpenClaw still accepts
+  # the app-written config. This is the assertion the per-version boot lacks.
+  validate_result="invalid"
+  if output=$(docker exec "$cid" openclaw config validate --json 2>/dev/null); then
+    validate_result=$(python3 -c '
+import json
+import sys
+
+try:
+    doc = json.load(sys.stdin)
+except json.JSONDecodeError:
+    print("invalid")
+    raise SystemExit(0)
+print("valid" if doc.get("valid") is True else "invalid")
+' <<< "$output")
+  fi
+  check "app-written config still validates" "valid" "$validate_result"
+
+  # Deep-merge integrity: the value we wrote is the value on disk.
+  readback=$(docker exec -i "$cid" python3 - <<'PY' 2>/dev/null
+import json
+from pathlib import Path
+
+doc = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
+print(doc.get('agents', {}).get('defaults', {}).get('model', {}).get('primary', ''))
+PY
+  )
+  check "app config patch persisted" "$current" "$readback"
+}

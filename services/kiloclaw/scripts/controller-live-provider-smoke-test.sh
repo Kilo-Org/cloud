@@ -329,6 +329,7 @@ run_phase() {
   assert_control_ui_proxy
   assert_configured_model
   assert_kilo_chat_smoke "$CID" "$PORT" "$TOKEN"
+  assert_app_config_patch "$CID" "$PORT" "$TOKEN"
   echo
   echo "--- live Auto Free agent turn ---"
   assert_live_agent_turn

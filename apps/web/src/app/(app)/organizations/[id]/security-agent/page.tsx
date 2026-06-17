@@ -7,10 +7,13 @@ import { useSecurityAgent } from '@/components/security-agent/SecurityAgentConte
 import { SecurityDashboard } from '@/components/security-agent/SecurityDashboard';
 
 export default function OrgSecurityAgentDashboardPage() {
-  const { hasIntegration, isEnabled, isLoadingConfig, organizationId } = useSecurityAgent();
+  const { hasIntegration, isEnabled, isLoadingConfig, isLoadingPermission, organizationId } =
+    useSecurityAgent();
   const router = useRouter();
 
-  const shouldRedirectToConfig = hasIntegration && isEnabled === false && !!organizationId;
+  const shouldRedirectToConfig =
+    !!organizationId &&
+    ((!isLoadingPermission && !hasIntegration) || (hasIntegration && isEnabled === false));
 
   useEffect(() => {
     if (shouldRedirectToConfig) {
@@ -26,7 +29,7 @@ export default function OrgSecurityAgentDashboardPage() {
     );
   }
 
-  if (hasIntegration && isLoadingConfig) {
+  if (isLoadingPermission || (hasIntegration && isLoadingConfig)) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
         <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />

@@ -64,7 +64,7 @@ function SectionHeader({
         )}
       >
         <div className={cn('flex gap-3', hasContent ? 'items-start' : 'items-center')}>
-          <div className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
+          <div className="bg-surface-overlay text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
             <Icon className="size-5" aria-hidden="true" />
           </div>
           <div className="space-y-1">

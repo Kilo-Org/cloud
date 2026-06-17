@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { ClearFindingsCard } from './ClearFindingsCard';
 import { SecurityConfigForm } from './SecurityConfigForm';
 import { useSecurityAgent } from './SecurityAgentContext';
+import { SecurityAgentGitHubInstallCta } from './SecurityAgentGitHubInstallCta';
 import {
   DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
   DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
@@ -14,6 +15,9 @@ import type { SecurityConfigFormState } from './security-config-types';
 export function SecurityConfigPage() {
   const {
     organizationId,
+    isOrg,
+    hasIntegration,
+    isLoadingPermission,
     isEnabled,
     configData,
     allRepositories,
@@ -27,13 +31,21 @@ export function SecurityConfigPage() {
     orphanedRepositories,
   } = useSecurityAgent();
 
-  if (isLoadingConfig) {
+  if (isLoadingPermission || isLoadingConfig) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
         <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         Loading settings...
       </div>
     );
+  }
+
+  if (!hasIntegration) {
+    const installUrl =
+      isOrg && organizationId
+        ? `/organizations/${organizationId}/integrations`
+        : '/integrations/github';
+    return <SecurityAgentGitHubInstallCta installUrl={installUrl} />;
   }
 
   const initialConfig = {

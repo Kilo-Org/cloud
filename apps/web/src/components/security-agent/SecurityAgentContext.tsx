@@ -11,8 +11,11 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
+import type { SecurityRemediationAdmissionRejectionReason } from '@kilocode/worker-utils/security-remediation-policy';
+import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
+import { getRemediationUnavailableCopy } from './remediation-unavailable-copy';
 import type { SlaConfig } from './security-config-types';
 import {
   getSecurityAgentCommandFailureTitle,
@@ -36,8 +39,10 @@ type SecurityAgentContextValue = {
   isLoadingConfig: boolean;
   reauthorizeUrl: string | undefined;
   isEnabled: boolean | undefined;
+  hasConfig: boolean;
   configData:
     | {
+        hasConfig: boolean;
         isEnabled: boolean;
         slaCriticalDays: number;
         slaHighDays: number;
@@ -74,6 +79,7 @@ type SecurityAgentContextValue = {
   filteredRepositories: Array<{ id: number; fullName: string; name: string; private: boolean }>;
 
   // Mutation handlers
+  trackUiInteraction: (interaction: SecurityAgentUiInteraction) => void;
   handleSync: (repoFullName?: string) => void;
   handleDismiss: (
     finding: SecurityFinding,
@@ -116,7 +122,7 @@ type SecurityAgentContextValue = {
   ) => void;
   handleStartAnalysis: (
     findingId: string,
-    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean }
+    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean; restartActive?: boolean }
   ) => void;
   handleStartRemediation: (findingId: string) => void;
   handleRetryRemediation: (findingId: string) => void;
@@ -187,7 +193,12 @@ export function mergeSecurityAgentActiveCommands(
     if (isActiveSecurityAgentCommand(command)) activeCommands.set(command.id, command);
   }
   for (const command of polledCommands) {
-    if (command && isActiveSecurityAgentCommand(command)) activeCommands.set(command.id, command);
+    if (!command) continue;
+    if (isActiveSecurityAgentCommand(command)) {
+      activeCommands.set(command.id, command);
+    } else {
+      activeCommands.delete(command.id);
+    }
   }
   return [...activeCommands.values()];
 }
@@ -577,6 +588,31 @@ function useSecurityAgentProviderValue(
     );
   }
 
+  function settleRemediationAdmission(
+    result:
+      | { queued: true }
+      | { queued: false; reason: SecurityRemediationAdmissionRejectionReason },
+    findingId: string,
+    messages: { queued: string; unavailable: string }
+  ) {
+    if (result.queued) {
+      toast.success(messages.queued);
+    } else {
+      toast.error(messages.unavailable, {
+        description: getRemediationUnavailableCopy(result.reason),
+        duration: 8000,
+      });
+    }
+    dispatchProviderState({ type: 'remove-optimistic-remediation', findingId });
+    invalidateRemediationQueries();
+  }
+
+  function settleRemediationError(error: { message: string }, findingId: string, title: string) {
+    toast.error(title, { description: error.message, duration: 8000 });
+    dispatchProviderState({ type: 'remove-optimistic-remediation', findingId });
+    invalidateRemediationQueries();
+  }
+
   // Permission status query
   const { data: permissionData, isLoading: isLoadingPermission } = useQuery(
     isOrg
@@ -711,6 +747,9 @@ function useSecurityAgentProviderValue(
   ]);
 
   // ---- Mutations (org) ----
+  const { mutate: orgTrackUiInteractionMutate } = useMutation(
+    trpc.organizations.securityAgent.trackUiInteraction.mutationOptions()
+  );
   const { mutate: orgSyncMutate, isPending: isOrgSyncPending } = useMutation(
     trpc.organizations.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
@@ -807,20 +846,28 @@ function useSecurityAgentProviderValue(
 
   const { mutate: orgStartAnalysisMutate } = useMutation(
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async data => {
+      onSuccess: async (data, variables) => {
         dispatchProviderState({ type: 'set-github-error', error: null });
-        toast.success(securityAgentCommandAdmissionCopy.start_analysis.successTitle);
+        toast.success(
+          variables.restartActive
+            ? 'Analysis restart queued'
+            : securityAgentCommandAdmissionCopy.start_analysis.successTitle
+        );
         trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
+        const isRestart = variables.restartActive === true;
+        const failureTitle = isRestart
+          ? 'Failed to restart analysis'
+          : securityAgentCommandAdmissionCopy.start_analysis.failureTitle;
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
-          toast.error('GitHub integration error', {
+          toast.error(isRestart ? failureTitle : 'GitHub integration error', {
             description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
-          toast.error(securityAgentCommandAdmissionCopy.start_analysis.failureTitle, {
+          toast.error(failureTitle, {
             description: message,
             duration: 8000,
           });
@@ -838,40 +885,28 @@ function useSecurityAgentProviderValue(
 
   const { mutate: orgStartRemediationMutate } = useMutation(
     trpc.organizations.securityAgent.startRemediation.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        toast.success('Remediation queued');
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
+      onSuccess: (data, variables) => {
+        settleRemediationAdmission(data, variables.findingId, {
+          queued: 'Remediation queued',
+          unavailable: 'Remediation unavailable',
         });
-        invalidateRemediationQueries();
       },
       onError: (error, variables) => {
-        toast.error('Failed to queue remediation', { description: error.message, duration: 8000 });
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
-        });
+        settleRemediationError(error, variables.findingId, 'Failed to queue remediation');
       },
     })
   );
 
   const { mutate: orgRetryRemediationMutate } = useMutation(
     trpc.organizations.securityAgent.retryRemediation.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        toast.success('Remediation retry queued');
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
+      onSuccess: (data, variables) => {
+        settleRemediationAdmission(data, variables.findingId, {
+          queued: 'Remediation retry queued',
+          unavailable: 'Remediation retry unavailable',
         });
-        invalidateRemediationQueries();
       },
       onError: (error, variables) => {
-        toast.error('Failed to retry remediation', { description: error.message, duration: 8000 });
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
-        });
+        settleRemediationError(error, variables.findingId, 'Failed to retry remediation');
       },
     })
   );
@@ -911,6 +946,9 @@ function useSecurityAgentProviderValue(
   );
 
   // ---- Mutations (personal) ----
+  const { mutate: personalTrackUiInteractionMutate } = useMutation(
+    trpc.securityAgent.trackUiInteraction.mutationOptions()
+  );
   const { mutate: personalSyncMutate, isPending: isPersonalSyncPending } = useMutation(
     trpc.securityAgent.triggerSync.mutationOptions({
       onSuccess: data => {
@@ -1007,20 +1045,28 @@ function useSecurityAgentProviderValue(
 
   const { mutate: personalStartAnalysisMutate } = useMutation(
     trpc.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async data => {
+      onSuccess: async (data, variables) => {
         dispatchProviderState({ type: 'set-github-error', error: null });
-        toast.success(securityAgentCommandAdmissionCopy.start_analysis.successTitle);
+        toast.success(
+          variables.restartActive
+            ? 'Analysis restart queued'
+            : securityAgentCommandAdmissionCopy.start_analysis.successTitle
+        );
         trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
+        const isRestart = variables.restartActive === true;
+        const failureTitle = isRestart
+          ? 'Failed to restart analysis'
+          : securityAgentCommandAdmissionCopy.start_analysis.failureTitle;
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
-          toast.error('GitHub integration error', {
+          toast.error(isRestart ? failureTitle : 'GitHub integration error', {
             description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
-          toast.error(securityAgentCommandAdmissionCopy.start_analysis.failureTitle, {
+          toast.error(failureTitle, {
             description: message,
             duration: 8000,
           });
@@ -1038,40 +1084,28 @@ function useSecurityAgentProviderValue(
 
   const { mutate: personalStartRemediationMutate } = useMutation(
     trpc.securityAgent.startRemediation.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        toast.success('Remediation queued');
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
+      onSuccess: (data, variables) => {
+        settleRemediationAdmission(data, variables.findingId, {
+          queued: 'Remediation queued',
+          unavailable: 'Remediation unavailable',
         });
-        invalidateRemediationQueries();
       },
       onError: (error, variables) => {
-        toast.error('Failed to queue remediation', { description: error.message, duration: 8000 });
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
-        });
+        settleRemediationError(error, variables.findingId, 'Failed to queue remediation');
       },
     })
   );
 
   const { mutate: personalRetryRemediationMutate } = useMutation(
     trpc.securityAgent.retryRemediation.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        toast.success('Remediation retry queued');
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
+      onSuccess: (data, variables) => {
+        settleRemediationAdmission(data, variables.findingId, {
+          queued: 'Remediation retry queued',
+          unavailable: 'Remediation retry unavailable',
         });
-        invalidateRemediationQueries();
       },
       onError: (error, variables) => {
-        toast.error('Failed to retry remediation', { description: error.message, duration: 8000 });
-        dispatchProviderState({
-          type: 'remove-optimistic-remediation',
-          findingId: variables.findingId,
-        });
+        settleRemediationError(error, variables.findingId, 'Failed to retry remediation');
       },
     })
   );
@@ -1264,13 +1298,24 @@ function useSecurityAgentProviderValue(
       {
         forceSandbox,
         retrySandboxOnly,
-      }: { forceSandbox?: boolean; retrySandboxOnly?: boolean } = {}
+        restartActive,
+      }: {
+        forceSandbox?: boolean;
+        retrySandboxOnly?: boolean;
+        restartActive?: boolean;
+      } = {}
     ) => {
       dispatchProviderState({ type: 'add-optimistic-analysis', findingId });
       if (isOrg && organizationId) {
-        orgStartAnalysisMutate({ organizationId, findingId, forceSandbox, retrySandboxOnly });
+        orgStartAnalysisMutate({
+          organizationId,
+          findingId,
+          forceSandbox,
+          retrySandboxOnly,
+          restartActive,
+        });
       } else {
-        personalStartAnalysisMutate({ findingId, forceSandbox, retrySandboxOnly });
+        personalStartAnalysisMutate({ findingId, forceSandbox, retrySandboxOnly, restartActive });
       }
     },
     [isOrg, organizationId, orgStartAnalysisMutate, personalStartAnalysisMutate]
@@ -1333,6 +1378,7 @@ function useSecurityAgentProviderValue(
   const hasPermission = permissionData?.hasPermissions ?? false;
   const reauthorizeUrl = permissionData?.reauthorizeUrl ?? undefined;
   const isEnabled = configData ? configData.isEnabled : undefined;
+  const hasConfig = configData?.hasConfig ?? false;
   const allRepositories = reposData ?? EMPTY_REPOSITORIES;
   const repositorySelectionMode = configData?.repositorySelectionMode ?? 'selected';
   const selectedRepositoryIds = configData?.selectedRepositoryIds ?? EMPTY_REPOSITORY_IDS;
@@ -1359,6 +1405,7 @@ function useSecurityAgentProviderValue(
       isLoadingConfig,
       reauthorizeUrl,
       isEnabled,
+      hasConfig,
       configData: configData
         ? {
             ...configData,
@@ -1383,6 +1430,13 @@ function useSecurityAgentProviderValue(
       refetchConfig,
       allRepositories,
       filteredRepositories,
+      trackUiInteraction: interaction => {
+        if (isOrg && organizationId) {
+          orgTrackUiInteractionMutate({ organizationId, interaction });
+        } else {
+          personalTrackUiInteractionMutate({ interaction });
+        }
+      },
       handleSync,
       handleDismiss,
       handleSaveConfig,
@@ -1413,10 +1467,13 @@ function useSecurityAgentProviderValue(
       isLoadingConfig,
       reauthorizeUrl,
       isEnabled,
+      hasConfig,
       configData,
       refetchConfig,
       allRepositories,
       filteredRepositories,
+      orgTrackUiInteractionMutate,
+      personalTrackUiInteractionMutate,
       handleSync,
       handleDismiss,
       handleSaveConfig,

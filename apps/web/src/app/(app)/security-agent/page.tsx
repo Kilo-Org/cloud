@@ -7,15 +7,16 @@ import { useSecurityAgent } from '@/components/security-agent/SecurityAgentConte
 import { SecurityDashboard } from '@/components/security-agent/SecurityDashboard';
 
 export default function SecurityAgentDashboardPage() {
-  const { hasIntegration, isEnabled, isLoadingConfig } = useSecurityAgent();
+  const { hasIntegration, isEnabled, isLoadingConfig, isLoadingPermission } = useSecurityAgent();
   const router = useRouter();
 
   // Redirect per truth table:
-  // No integration -> show dashboard with install CTA (handled by SecurityDashboard)
+  // No integration -> redirect to settings with install CTA
   // Installed + disabled -> redirect to config
   // Installed + enabled -> show dashboard
   // isEnabled is undefined while config is loading — wait before deciding
-  const shouldRedirectToConfig = hasIntegration && isEnabled === false;
+  const shouldRedirectToConfig =
+    (!isLoadingPermission && !hasIntegration) || (hasIntegration && isEnabled === false);
 
   useEffect(() => {
     if (shouldRedirectToConfig) {
@@ -31,7 +32,7 @@ export default function SecurityAgentDashboardPage() {
     );
   }
 
-  if (hasIntegration && isLoadingConfig) {
+  if (isLoadingPermission || (hasIntegration && isLoadingConfig)) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
         <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />

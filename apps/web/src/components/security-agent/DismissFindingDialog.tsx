@@ -16,42 +16,17 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertTriangle } from 'lucide-react';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { securityAgentCommandAdmissionCopy } from './security-agent-command-copy';
+import {
+  DISMISS_REASONS,
+  getDismissFindingFormDefaults,
+  MAX_DISMISS_COMMENT_LENGTH,
+  type DismissReason,
+} from './dismiss-finding-form';
 
-// GitHub Dependabot dismiss reasons
-const DISMISS_REASONS = [
-  {
-    value: 'fix_started',
-    label: 'Fix started',
-    description: 'A fix for this vulnerability has been started',
-  },
-  {
-    value: 'no_bandwidth',
-    label: 'No bandwidth',
-    description: 'No bandwidth to fix this vulnerability at this time',
-  },
-  {
-    value: 'tolerable_risk',
-    label: 'Tolerable risk',
-    description: 'The risk is tolerable for this project',
-  },
-  {
-    value: 'inaccurate',
-    label: 'Inaccurate',
-    description: 'This alert is inaccurate or incorrect',
-  },
-  {
-    value: 'not_used',
-    label: 'Not used',
-    description: 'This vulnerable code is not actually used',
-  },
-] as const;
-
-type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
-
-const DISMISS_REASON_VALUES = DISMISS_REASONS.map(r => r.value);
+const DISMISS_REASON_VALUES = new Set<string>(DISMISS_REASONS.map(reason => reason.value));
 
 function isDismissReason(value: string): value is DismissReason {
-  return DISMISS_REASON_VALUES.includes(value as DismissReason);
+  return DISMISS_REASON_VALUES.has(value);
 }
 
 type DismissFindingDialogProps = {
@@ -69,8 +44,9 @@ export function DismissFindingDialog({
   onDismiss,
   isLoading,
 }: DismissFindingDialogProps) {
-  const [reason, setReason] = useState<DismissReason>('not_used');
-  const [comment, setComment] = useState('');
+  const formDefaults = getDismissFindingFormDefaults(finding?.analysis);
+  const [reason, setReason] = useState<DismissReason>(formDefaults.reason);
+  const [comment, setComment] = useState(formDefaults.comment);
 
   const handleSubmit = () => {
     onDismiss(reason, comment || undefined);
@@ -78,9 +54,8 @@ export function DismissFindingDialog({
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      // Reset form when closing
-      setReason('not_used');
-      setComment('');
+      setReason(formDefaults.reason);
+      setComment(formDefaults.comment);
     }
     onOpenChange(newOpen);
   };
@@ -144,6 +119,7 @@ export function DismissFindingDialog({
               placeholder="Add context for this dismissal"
               value={comment}
               onChange={e => setComment(e.target.value)}
+              maxLength={MAX_DISMISS_COMMENT_LENGTH}
               rows={3}
             />
           </div>

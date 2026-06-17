@@ -61,24 +61,37 @@ function parseOptions(args: string[]): Options {
 }
 
 async function askSensitivity(name: string): Promise<boolean> {
-  const answer = (await question(`Is ${name} sensitive? [Y/n] `)).trim().toLowerCase();
-  if (!['', 'y', 'yes', 'n', 'no'].includes(answer)) throw new Error('Answer yes or no.');
-  const sensitive = !['n', 'no'].includes(answer);
-  if (sensitive && name.startsWith('NEXT_PUBLIC_')) {
-    throw new Error('NEXT_PUBLIC_* values are browser-visible; answer no.');
+  while (true) {
+    const answer = (await question(`Is ${name} sensitive? [Y/n] `)).trim().toLowerCase();
+    if (!['', 'y', 'yes', 'n', 'no'].includes(answer)) {
+      console.warn('Please answer yes or no.');
+      continue;
+    }
+    const sensitive = !['n', 'no'].includes(answer);
+    if (sensitive && name.startsWith('NEXT_PUBLIC_')) {
+      console.warn('NEXT_PUBLIC_* values are browser-visible; answer no.');
+      continue;
+    }
+    return sensitive;
   }
-  return sensitive;
 }
 
 async function collectValues(options: Options): Promise<Values> {
   const values: Partial<Values> = {};
   for (const environment of ENVIRONMENTS) {
     const file = options.valueFiles[environment];
-    const value = file
-      ? readFileSync(path.resolve(file), 'utf8')
-      : await readSecret(`${environment} value: `);
-    if (!value) throw new Error(`${environment} value cannot be empty.`);
-    values[environment] = value;
+    if (file) {
+      const value = readFileSync(path.resolve(file), 'utf8');
+      if (!value) throw new Error(`${environment} value file cannot be empty.`);
+      values[environment] = value;
+      continue;
+    }
+
+    while (!values[environment]) {
+      const value = await readSecret(`${environment} value: `);
+      if (value) values[environment] = value;
+      else console.warn(`${environment} value cannot be empty. Please try again.`);
+    }
   }
   return values as Values;
 }
@@ -86,15 +99,10 @@ async function collectValues(options: Options): Promise<Values> {
 async function collectDefaults(repoRoot: string, name: string): Promise<Map<string, string>> {
   const defaults = new Map<string, string>();
   for (const relativeFile of trackedEnvFiles(repoRoot)) {
-    const decision = (await question(`${relativeFile}: set a safe default or skip? [set/Skip] `))
-      .trim()
-      .toLowerCase();
-    if (!decision || decision === 'skip') continue;
-    if (decision !== 'set') throw new Error('Answer set or skip.');
-
-    const suggested = relativeFile === 'apps/web/.env' ? '' : `invalid-${name.toLowerCase()}`;
-    const answer = await question(`Safe default for ${relativeFile} [${suggested}] `);
-    const value = answer || suggested;
+    const value = await question(
+      `${relativeFile}: default value for ${name} (press Return to skip): `
+    );
+    if (!value) continue;
     defaults.set(relativeFile, value);
   }
   return defaults;

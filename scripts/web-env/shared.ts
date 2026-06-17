@@ -301,7 +301,12 @@ export function question(prompt: string): Promise<string> {
 }
 
 export async function confirm(prompt: string): Promise<boolean> {
-  return ['y', 'yes'].includes((await question(`${prompt} [y/N] `)).trim().toLowerCase());
+  while (true) {
+    const answer = (await question(`${prompt} [y/N] `)).trim().toLowerCase();
+    if (!answer || answer === 'n' || answer === 'no') return false;
+    if (answer === 'y' || answer === 'yes') return true;
+    console.warn('Please answer yes or no.');
+  }
 }
 
 export function readSecret(prompt: string): Promise<string> {

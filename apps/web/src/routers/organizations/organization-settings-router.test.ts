@@ -389,10 +389,7 @@ describe('organizations settings trpc router', () => {
 
     it('should exclude data-collection-required models for teams orgs that deny collection', async () => {
       const openRouterModelsResponse = {
-        data: [
-          makeOpenRouterModel('openai/gpt-4o'),
-          makeOpenRouterModel('openai/gpt-4o:free'),
-        ],
+        data: [makeOpenRouterModel('openai/gpt-4o'), makeOpenRouterModel('openai/gpt-4o:free')],
       } satisfies OpenRouterModelsResponse;
 
       mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);

@@ -738,10 +738,10 @@ describe('makeErrorReadable', () => {
 
     expect(result?.status).toBe(404);
     await expect(result?.json()).resolves.toEqual({
-      error: 'No provider allowed by your team can serve the selected model.',
+      error: 'No eligible provider can serve the selected model.',
       error_type: 'provider_not_allowed',
       message:
-        'No provider allowed by your team can serve the selected model. Select another model or ask a team administrator to update the allowed providers.',
+        'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
     });
   });
 

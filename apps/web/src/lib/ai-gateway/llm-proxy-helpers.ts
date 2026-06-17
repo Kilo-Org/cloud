@@ -210,12 +210,12 @@ async function providerNotAllowedResponse(providerId: ProviderId, response: Resp
   const upstreamError = parsedBody.data.error ?? parsedBody.data;
   if (!noAllowedProvidersErrorSchema.safeParse(upstreamError).success) return undefined;
 
-  const error = 'No provider allowed by your team can serve the selected model.';
+  const error = 'No eligible provider can serve the selected model.';
   return NextResponse.json(
     {
       error,
       error_type: ProxyErrorType.provider_not_allowed,
-      message: `${error} Select another model or ask a team administrator to update the allowed providers.`,
+      message: `${error} Select another model or update the provider routing settings.`,
     },
     { status: response.status }
   );

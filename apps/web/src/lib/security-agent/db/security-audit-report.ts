@@ -141,21 +141,21 @@ type SecurityAgentAuditReportFailureStage =
   | 'request';
 
 const ACTION_LABELS: Partial<Record<SecurityAuditLogAction, string>> = {
-  [SecurityAuditLogAction.FindingCreated]: 'Finding imported',
+  [SecurityAuditLogAction.FindingCreated]: 'Imported',
   [SecurityAuditLogAction.FindingSeverityChanged]: 'Severity changed',
   [SecurityAuditLogAction.FindingStatusChange]: 'Status changed',
-  [SecurityAuditLogAction.FindingDismissed]: 'Finding dismissed',
-  [SecurityAuditLogAction.FindingAutoDismissed]: 'Finding automatically dismissed',
-  [SecurityAuditLogAction.FindingSuperseded]: 'Finding superseded',
+  [SecurityAuditLogAction.FindingDismissed]: 'Dismissed',
+  [SecurityAuditLogAction.FindingAutoDismissed]: 'Auto dismissed',
+  [SecurityAuditLogAction.FindingSuperseded]: 'Superseded',
   [SecurityAuditLogAction.FindingAnalysisCompleted]: 'Analysis completed',
   [SecurityAuditLogAction.FindingAnalysisFailed]: 'Analysis failed',
   [SecurityAuditLogAction.RemediationQueued]: 'Remediation requested',
-  [SecurityAuditLogAction.RemediationPrOpened]: 'Remediation PR opened',
+  [SecurityAuditLogAction.RemediationPrOpened]: 'PR opened',
   [SecurityAuditLogAction.RemediationFailed]: 'Remediation failed',
   [SecurityAuditLogAction.RemediationBlocked]: 'Remediation blocked',
   [SecurityAuditLogAction.RemediationNoChangesNeeded]: 'No changes needed',
-  [SecurityAuditLogAction.RemediationCancelled]: 'Remediation cancelled',
-  [SecurityAuditLogAction.FindingDeleted]: 'Finding deleted',
+  [SecurityAuditLogAction.RemediationCancelled]: 'Cancelled',
+  [SecurityAuditLogAction.FindingDeleted]: 'Deleted',
 };
 
 const EMPTY_SEVERITY_COUNTS = {
@@ -276,7 +276,7 @@ export class SecurityAgentAuditReportQueryError extends Error {
 export function defaultSecurityAgentAuditReportInput(
   now = new Date()
 ): Required<SecurityAgentAuditReportInput> {
-  const endDate = formatUtcDate(addUtcDays(startOfUtcDay(now), -1));
+  const endDate = formatUtcDate(startOfUtcDay(now));
   const startDate = formatUtcDate(addUtcDays(parseUtcDateOnly(endDate), -89));
   return { startDate, endDate };
 }

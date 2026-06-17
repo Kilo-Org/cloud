@@ -1251,14 +1251,22 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Check concurrency limit
-        const concurrencyCheck = await canStartAnalysis(securityOwner);
-
-        if (!concurrencyCheck.allowed) {
+        if (input.restartActive && finding.analysis_status !== 'running') {
           throw new TRPCError({
-            code: 'TOO_MANY_REQUESTS',
-            message: `Maximum concurrent analyses reached (${concurrencyCheck.currentCount}/${concurrencyCheck.limit}). Please wait for existing analyses to complete.`,
+            code: 'PRECONDITION_FAILED',
+            message: 'Only a running Sandbox Analysis can be restarted',
           });
+        }
+
+        if (!input.restartActive) {
+          const concurrencyCheck = await canStartAnalysis(securityOwner);
+
+          if (!concurrencyCheck.allowed) {
+            throw new TRPCError({
+              code: 'TOO_MANY_REQUESTS',
+              message: `Maximum concurrent analyses reached (${concurrencyCheck.currentCount}/${concurrencyCheck.limit}). Please wait for existing analyses to complete.`,
+            });
+          }
         }
 
         const queued = await submitManualAnalysisStart({
@@ -1272,6 +1280,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           },
           forceSandbox: input.forceSandbox,
           retrySandboxOnly: input.retrySandboxOnly,
+          restartActive: input.restartActive,
         });
 
         return { success: true, ...queued };
@@ -1451,6 +1460,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
 
         return {
+          findingState: {
+            status: finding.status,
+            ignoredReason: finding.ignored_reason,
+            ignoredBy: finding.ignored_by,
+            fixedAt: finding.fixed_at,
+            updatedAt: finding.updated_at,
+          },
           status: finding.analysis_status,
           startedAt: finding.analysis_started_at,
           completedAt: finding.analysis_completed_at,
@@ -1638,6 +1654,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         return getDashboardStats({
           owner: securityOwner,
           repoFullName: input.repoFullName,
+          slaEnabled: config?.config.sla_enabled ?? true,
           slaConfig,
         });
       },

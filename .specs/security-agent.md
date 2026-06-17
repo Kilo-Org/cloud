@@ -457,7 +457,7 @@ Security Agent Audit Reports MUST NOT include reads, page views, unchanged sync 
 
 ### Periods and ordering
 
-Reports MUST use UTC calendar-day boundaries. The default period SHOULD be the previous 90 calendar days in UTC.
+Reports MUST use UTC calendar-day boundaries. The default period SHOULD end on the current UTC calendar day and include the preceding 89 calendar days.
 
 Report ranges MUST be valid, non-future, non-reversed, and no longer than 90 inclusive calendar days. Period inclusion MUST use when Kilo recorded or applied the event. External source timestamps MAY be shown as supporting evidence but MUST NOT determine report inclusion.
 

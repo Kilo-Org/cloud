@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducer } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -16,10 +16,11 @@ import {
 import { DismissFindingDialog, type DismissReason } from './DismissFindingDialog';
 import { FindingDetailDialog } from './FindingDetailDialog';
 import { SecurityFindingsCard } from './SecurityFindingsCard';
-import type { SecurityFindingWithRemediation } from './SecurityFindingRow';
+import type { SecurityFindingWithRemediation } from '@/lib/security-agent/db/security-remediation';
 import { useSecurityAgent } from './SecurityAgentContext';
+import { tryReserveManualAnalysisCapacity } from './manual-analysis-admission-copy';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 const EMPTY_FINDINGS: SecurityFindingWithRemediation[] = [];
 
 type Filters = {
@@ -47,6 +48,7 @@ type PageAction =
   | { type: 'set-filters'; filters: Filters }
   | { type: 'set-sort'; sortBy: SortBy }
   | { type: 'open-detail'; finding: SecurityFindingWithRemediation }
+  | { type: 'open-deep-link' }
   | { type: 'set-detail-open'; open: boolean }
   | { type: 'open-dismiss'; finding: SecurityFindingWithRemediation }
   | { type: 'set-dismiss-open'; open: boolean }
@@ -90,6 +92,13 @@ function pageReducer(state: PageState, action: PageAction): PageState {
       return { ...state, sortBy: action.sortBy, page: 1 };
     case 'open-detail':
       return { ...state, selectedFinding: action.finding, detailDialogOpen: true };
+    case 'open-deep-link':
+      return {
+        ...state,
+        selectedFinding: null,
+        detailDialogOpen: false,
+        closedDeepLinkId: null,
+      };
     case 'set-detail-open':
       return {
         ...state,
@@ -147,6 +156,7 @@ export function SecurityFindingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [state, dispatch] = useReducer(pageReducer, searchParams, createInitialPageState);
+  const localAnalysisReservationIdsRef = useRef<Set<string> | null>(null);
   const findingsEnabled = isEnabled === true;
   const slaEnabled = configData?.slaEnabled ?? true;
   const effectiveSortBy = slaEnabled ? state.sortBy : 'severity_desc';
@@ -233,6 +243,33 @@ export function SecurityFindingsPage() {
     }
   }
   const runningCount = serverRunningCount + optimisticAdditional;
+  const concurrencyLimit = findingsData?.concurrencyLimit ?? 3;
+  const analysisAtCapacity = runningCount >= concurrencyLimit;
+
+  useEffect(() => {
+    const localAnalysisReservationIds = localAnalysisReservationIdsRef.current;
+    if (!localAnalysisReservationIds) return;
+    for (const findingId of startingAnalysisIds) {
+      localAnalysisReservationIds.delete(findingId);
+    }
+  }, [startingAnalysisIds]);
+
+  const handleStartAnalysisWithinCapacity = (
+    findingId: string,
+    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean }
+  ) => {
+    const localAnalysisReservationIds = localAnalysisReservationIdsRef.current ?? new Set<string>();
+    localAnalysisReservationIdsRef.current = localAnalysisReservationIds;
+    const reserved = tryReserveManualAnalysisCapacity({
+      findingId,
+      runningCount,
+      concurrencyLimit,
+      startingAnalysisIds,
+      localReservationIds: localAnalysisReservationIds,
+    });
+    if (!reserved) return;
+    handleStartAnalysis(findingId, options);
+  };
 
   const deepLinkIsOpen = Boolean(
     deepLinkedFinding && !state.selectedFinding && state.closedDeepLinkId !== deepLinkedFinding.id
@@ -265,6 +302,12 @@ export function SecurityFindingsPage() {
   };
 
   const basePath = isOrg ? `/organizations/${organizationId}/security-agent` : '/security-agent';
+  const handleOpenFinding = (findingId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('findingId', findingId);
+    dispatch({ type: 'open-deep-link' });
+    router.replace(`${basePath}/findings?${params.toString()}`);
+  };
   const installUrl = isOrg
     ? `/organizations/${organizationId}/integrations`
     : '/integrations/github';
@@ -339,7 +382,7 @@ export function SecurityFindingsPage() {
         installUrl={installUrl}
         onEnableClick={() => router.push(`${basePath}/config`)}
         lastSyncTime={lastSyncData?.lastSyncTime}
-        onStartAnalysis={handleStartAnalysis}
+        onStartAnalysis={handleStartAnalysisWithinCapacity}
         startingAnalysisIds={startingAnalysisIds}
         onStartRemediation={handleStartRemediation}
         onRetryRemediation={handleRetryRemediation}
@@ -350,12 +393,14 @@ export function SecurityFindingsPage() {
         onSortByChange={handleSortByChange}
         showSla={slaEnabled}
         runningCount={runningCount}
-        concurrencyLimit={findingsData?.concurrencyLimit ?? 3}
+        concurrencyLimit={concurrencyLimit}
       />
 
       <FindingDetailDialog
         finding={activeFinding}
         open={detailDialogOpen}
+        onStartAnalysis={handleStartAnalysisWithinCapacity}
+        analysisAtCapacity={analysisAtCapacity}
         onOpenChange={handleDetailOpenChange}
         onDismiss={analysis => {
           if (activeFinding) {
@@ -363,6 +408,7 @@ export function SecurityFindingsPage() {
           }
         }}
         canDismiss={activeFinding?.status === 'open'}
+        onOpenFinding={handleOpenFinding}
         organizationId={organizationId}
         showSla={slaEnabled}
       />

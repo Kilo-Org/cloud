@@ -9,6 +9,7 @@ import {
   formatAuditEventTime,
   formatDateTime24Hour,
   getAuditEventDetails,
+  getDefaultAuditReportDateRange,
   getAuditReportRepositoryHref,
   getAuditReportRepositoryOptions,
   parseAuditReportFilters,
@@ -85,6 +86,15 @@ function report(findings: SecurityFindingAuditSection[]): SecurityAgentAuditRepo
   };
 }
 
+describe('audit report date range', () => {
+  it('defaults to 90 UTC calendar days ending on the current day', () => {
+    expect(getDefaultAuditReportDateRange(new Date('2026-06-16T21:08:07+02:00'))).toEqual({
+      startDate: '2026-03-19',
+      endDate: '2026-06-16',
+    });
+  });
+});
+
 describe('audit report filters', () => {
   it('parses supported URL filters and defaults unsupported values to all', () => {
     expect(
@@ -97,6 +107,11 @@ describe('audit report filters', () => {
       repository: 'kilo/web',
     });
     expect(parseAuditReportFilters(new URLSearchParams('severity=unknown&state=deleted'))).toEqual({
+      severity: 'all',
+      state: 'deleted',
+      repository: null,
+    });
+    expect(parseAuditReportFilters(new URLSearchParams('state=closed'))).toEqual({
       severity: 'all',
       state: 'all',
       repository: null,
@@ -177,6 +192,46 @@ describe('audit report filters', () => {
       },
     });
     expect(filtered.hasLegacySupplementalActivity).toBe(true);
+  });
+
+  it('filters deleted and superseded finding evidence by displayed state', () => {
+    const input = report([
+      finding({
+        findingId: 'deleted',
+        severity: 'low',
+        status: 'ignored',
+        deleted: true,
+      }),
+      finding({
+        findingId: 'superseded',
+        severity: 'high',
+        status: 'ignored',
+        canonicalFindingId: 'current-finding',
+      }),
+      finding({ findingId: 'dismissed', severity: 'high', status: 'ignored' }),
+    ]);
+
+    expect(
+      filterSecurityAgentAuditReport(input, {
+        severity: 'all',
+        state: 'deleted',
+        repository: null,
+      }).findings.map(item => item.findingId)
+    ).toEqual(['deleted']);
+    expect(
+      filterSecurityAgentAuditReport(input, {
+        severity: 'all',
+        state: 'superseded',
+        repository: null,
+      }).findings.map(item => item.findingId)
+    ).toEqual(['superseded']);
+    expect(
+      filterSecurityAgentAuditReport(input, {
+        severity: 'all',
+        state: 'ignored',
+        repository: null,
+      }).findings.map(item => item.findingId)
+    ).toEqual(['dismissed']);
   });
 
   it('keeps report unchanged when all values are selected', () => {

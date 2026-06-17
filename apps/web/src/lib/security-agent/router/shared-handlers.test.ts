@@ -25,9 +25,12 @@ const mockSubmitRemediationCancellation = jest.fn() as jest.MockedFunction<
   typeof manualRemediationClientModule.submitRemediationCancellation
 >;
 const mockGetSecurityFindingById = jest.fn<() => Promise<unknown>>();
-const mockCanStartAnalysis = jest.fn<() => Promise<unknown>>();
+const mockCanStartAnalysis = jest.fn<(owner: unknown) => Promise<unknown>>();
 const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
 const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
+const mockDecorateFindingWithRemediation = jest.fn<() => Promise<unknown>>();
+const mockDecorateFindingsWithRemediation = jest.fn<() => Promise<unknown>>();
+const mockGetRemediationAttemptHistory = jest.fn<() => Promise<unknown>>();
 const mockTrackSecurityAgentSync = jest.fn();
 const mockTrackSecurityAgentUiInteraction = jest.fn();
 const mockTrackSecurityAgentRemediationAction = jest.fn();
@@ -93,6 +96,11 @@ jest.mock('../db/security-findings', () => ({
   getOrphanedRepositoriesWithFindingCounts: jest.fn(),
   deleteFindingsByRepository: jest.fn(),
 }));
+jest.mock('../db/security-remediation', () => ({
+  decorateFindingWithRemediation: mockDecorateFindingWithRemediation,
+  decorateFindingsWithRemediation: mockDecorateFindingsWithRemediation,
+  getRemediationAttemptHistory: mockGetRemediationAttemptHistory,
+}));
 jest.mock('../db/security-commands', () => ({
   getSecurityAgentCommandStatus: jest.fn(),
   listActiveSecurityAgentCommands: jest.fn(),
@@ -122,6 +130,7 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   mockGetSecurityAgentConfigWithStatus.mockResolvedValue(null);
+  mockGetRemediationAttemptHistory.mockResolvedValue([]);
   mockEnqueueBacklogFindings.mockResolvedValue(0);
 });
 
@@ -390,6 +399,53 @@ describe('autoDismissEligible', () => {
   });
 });
 
+describe('getAnalysis', () => {
+  it('returns current finding state with analysis and remediation data', async () => {
+    const findingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const finding = {
+      id: findingId,
+      status: 'ignored',
+      ignored_reason: 'not_used',
+      ignored_by: 'auto-sandbox',
+      updated_at: '2026-06-17T11:45:00.000Z',
+      analysis_status: 'completed',
+      analysis_started_at: '2026-06-17T11:40:00.000Z',
+      analysis_completed_at: '2026-06-17T11:44:59.000Z',
+      analysis_error: null,
+      analysis: { analyzedAt: '2026-06-17T11:44:59.000Z' },
+      session_id: 'session-123',
+      cli_session_id: 'cli-session-123',
+    };
+    const decoratedFinding = {
+      ...finding,
+      remediationSummary: null,
+      remediationCapability: {
+        canStart: false,
+        startReason: 'finding_not_open',
+        canRetry: false,
+        retryReason: 'finding_not_open',
+        canCancel: false,
+        cancelAttemptId: null,
+      },
+    };
+    mockGetSecurityFindingById.mockResolvedValue(finding);
+    mockDecorateFindingWithRemediation.mockResolvedValue(decoratedFinding);
+
+    await expect(
+      createHandlers().getAnalysis.handler({ ctx: context, input: { findingId } })
+    ).resolves.toMatchObject({
+      findingState: {
+        status: 'ignored',
+        ignoredReason: 'not_used',
+        ignoredBy: 'auto-sandbox',
+        updatedAt: '2026-06-17T11:45:00.000Z',
+      },
+      status: 'completed',
+      remediationCapability: { startReason: 'finding_not_open' },
+    });
+  });
+});
+
 describe('queue-backed handlers', () => {
   it('returns sync command correlation', async () => {
     mockSubmitManualSecuritySync.mockResolvedValue({
@@ -435,6 +491,57 @@ describe('queue-backed handlers', () => {
         input: { findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
       })
     ).resolves.toEqual({ success: true, queued: true, commandId });
+
+    expect(mockCanStartAnalysis).toHaveBeenCalledWith({
+      organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    });
+  });
+
+  it('bypasses owner capacity only for a validated active restart', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: 'finding-id',
+      analysis_status: 'running',
+    });
+    mockCanStartAnalysis.mockResolvedValue({ allowed: false, currentCount: 3, limit: 3 });
+    mockSubmitManualAnalysisStart.mockResolvedValue({ queued: true, commandId });
+
+    await expect(
+      createHandlers().startAnalysis.handler({
+        ctx: context,
+        input: {
+          findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          restartActive: true,
+        },
+      })
+    ).resolves.toEqual({ success: true, queued: true, commandId });
+
+    expect(mockCanStartAnalysis).not.toHaveBeenCalled();
+    expect(mockSubmitManualAnalysisStart).toHaveBeenCalledWith(
+      expect.objectContaining({ restartActive: true })
+    );
+  });
+
+  it('rejects active restart requests after finding is no longer running', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: 'finding-id',
+      analysis_status: 'completed',
+    });
+
+    await expect(
+      createHandlers().startAnalysis.handler({
+        ctx: context,
+        input: {
+          findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          restartActive: true,
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Only a running Sandbox Analysis can be restarted',
+    });
+
+    expect(mockCanStartAnalysis).not.toHaveBeenCalled();
+    expect(mockSubmitManualAnalysisStart).not.toHaveBeenCalled();
   });
 });
 

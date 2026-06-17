@@ -6,6 +6,7 @@ import {
   shouldRunSecurityAgentCommandSuccessCallback,
   type SecurityAgentCommand,
 } from './SecurityAgentContext';
+import { getSecurityAgentHelpContent } from './SecurityAgentLayout';
 
 function command(overrides: Partial<SecurityAgentCommand>): SecurityAgentCommand {
   return {
@@ -18,6 +19,41 @@ function command(overrides: Partial<SecurityAgentCommand>): SecurityAgentCommand
     ...overrides,
   };
 }
+
+describe('Security Agent help content', () => {
+  const personalBasePath = '/security-agent';
+  const organizationBasePath = '/organizations/org-1/security-agent';
+
+  it.each([
+    [personalBasePath, 'Dashboard help', '#use-the-dashboard'],
+    [`${personalBasePath}/findings`, 'Findings help', '#browse-findings'],
+    [`${personalBasePath}/audit-report`, 'Audit report help', '#audit-reports'],
+    [`${personalBasePath}/config`, 'Settings help', '#configure-security-agent'],
+  ])('matches personal route %s to its page help', (pathname, title, docsAnchor) => {
+    const content = getSecurityAgentHelpContent(pathname, personalBasePath);
+
+    expect(content.title).toBe(title);
+    expect(content.docsUrl).toContain(docsAnchor);
+  });
+
+  it.each([
+    [organizationBasePath, 'Dashboard help'],
+    [`${organizationBasePath}/findings`, 'Findings help'],
+    [`${organizationBasePath}/audit-report`, 'Audit report help'],
+    [`${organizationBasePath}/config`, 'Settings help'],
+  ])('matches organization route %s to its page help', (pathname, title) => {
+    expect(getSecurityAgentHelpContent(pathname, organizationBasePath).title).toBe(title);
+  });
+
+  it('uses overview help outside known Security Agent routes', () => {
+    expect(getSecurityAgentHelpContent('/security-agent/unknown', personalBasePath).title).toBe(
+      'Security Agent help'
+    );
+    expect(getSecurityAgentHelpContent('/another-page', personalBasePath).title).toBe(
+      'Security Agent help'
+    );
+  });
+});
 
 describe('SecurityAgentContext command helpers', () => {
   it('recovers active commands after reload and dedupes polled state', () => {

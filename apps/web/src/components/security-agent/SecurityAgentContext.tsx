@@ -122,7 +122,7 @@ type SecurityAgentContextValue = {
   ) => void;
   handleStartAnalysis: (
     findingId: string,
-    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean }
+    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean; restartActive?: boolean }
   ) => void;
   handleStartRemediation: (findingId: string) => void;
   handleRetryRemediation: (findingId: string) => void;
@@ -846,20 +846,28 @@ function useSecurityAgentProviderValue(
 
   const { mutate: orgStartAnalysisMutate } = useMutation(
     trpc.organizations.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async data => {
+      onSuccess: async (data, variables) => {
         dispatchProviderState({ type: 'set-github-error', error: null });
-        toast.success(securityAgentCommandAdmissionCopy.start_analysis.successTitle);
+        toast.success(
+          variables.restartActive
+            ? 'Analysis restart queued'
+            : securityAgentCommandAdmissionCopy.start_analysis.successTitle
+        );
         trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
+        const isRestart = variables.restartActive === true;
+        const failureTitle = isRestart
+          ? 'Failed to restart analysis'
+          : securityAgentCommandAdmissionCopy.start_analysis.failureTitle;
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
-          toast.error('GitHub integration error', {
+          toast.error(isRestart ? failureTitle : 'GitHub integration error', {
             description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
-          toast.error(securityAgentCommandAdmissionCopy.start_analysis.failureTitle, {
+          toast.error(failureTitle, {
             description: message,
             duration: 8000,
           });
@@ -1037,20 +1045,28 @@ function useSecurityAgentProviderValue(
 
   const { mutate: personalStartAnalysisMutate } = useMutation(
     trpc.securityAgent.startAnalysis.mutationOptions({
-      onSuccess: async data => {
+      onSuccess: async (data, variables) => {
         dispatchProviderState({ type: 'set-github-error', error: null });
-        toast.success(securityAgentCommandAdmissionCopy.start_analysis.successTitle);
+        toast.success(
+          variables.restartActive
+            ? 'Analysis restart queued'
+            : securityAgentCommandAdmissionCopy.start_analysis.successTitle
+        );
         trackCommand(data.commandId);
       },
       onError: (error, variables) => {
         const message = error instanceof Error ? error.message : String(error);
+        const isRestart = variables.restartActive === true;
+        const failureTitle = isRestart
+          ? 'Failed to restart analysis'
+          : securityAgentCommandAdmissionCopy.start_analysis.failureTitle;
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
-          toast.error('GitHub integration error', {
+          toast.error(isRestart ? failureTitle : 'GitHub integration error', {
             description: 'GitHub App may have been uninstalled. Check integrations, then retry.',
           });
         } else {
-          toast.error(securityAgentCommandAdmissionCopy.start_analysis.failureTitle, {
+          toast.error(failureTitle, {
             description: message,
             duration: 8000,
           });
@@ -1282,13 +1298,24 @@ function useSecurityAgentProviderValue(
       {
         forceSandbox,
         retrySandboxOnly,
-      }: { forceSandbox?: boolean; retrySandboxOnly?: boolean } = {}
+        restartActive,
+      }: {
+        forceSandbox?: boolean;
+        retrySandboxOnly?: boolean;
+        restartActive?: boolean;
+      } = {}
     ) => {
       dispatchProviderState({ type: 'add-optimistic-analysis', findingId });
       if (isOrg && organizationId) {
-        orgStartAnalysisMutate({ organizationId, findingId, forceSandbox, retrySandboxOnly });
+        orgStartAnalysisMutate({
+          organizationId,
+          findingId,
+          forceSandbox,
+          retrySandboxOnly,
+          restartActive,
+        });
       } else {
-        personalStartAnalysisMutate({ findingId, forceSandbox, retrySandboxOnly });
+        personalStartAnalysisMutate({ findingId, forceSandbox, retrySandboxOnly, restartActive });
       }
     },
     [isOrg, organizationId, orgStartAnalysisMutate, personalStartAnalysisMutate]

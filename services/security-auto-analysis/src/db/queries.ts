@@ -423,6 +423,110 @@ export async function ensureManualAnalysisQueueRow(
   return rows.length > 0;
 }
 
+export type ActiveAnalysisRestartPreparation =
+  | {
+      status: 'ready';
+      claimToken: string;
+      oldCloudAgentSessionId: string | null;
+    }
+  | { status: 'launch-started' | 'no-op' };
+
+export async function prepareActiveAnalysisRestart(
+  db: WorkerDb,
+  params: { findingId: string; owner: QueueOwner; commandId: string }
+): Promise<ActiveAnalysisRestartPreparation> {
+  const claimToken = `manual-restart:${params.commandId}`;
+  const jobId = `manual-restart:${params.commandId}`;
+
+  return db.transaction(async tx => {
+    const queueRows = await tx
+      .select({
+        id: security_analysis_queue.id,
+        status: security_analysis_queue.queue_status,
+        claimToken: security_analysis_queue.claim_token,
+        ownedByOrganizationId: security_analysis_queue.owned_by_organization_id,
+        ownedByUserId: security_analysis_queue.owned_by_user_id,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, params.findingId))
+      .for('update')
+      .limit(1);
+    const queue = queueRows[0];
+    if (!queue) return { status: 'no-op' };
+
+    const findingRows = await tx
+      .select({
+        id: security_findings.id,
+        status: security_findings.status,
+        analysisStatus: security_findings.analysis_status,
+        cloudAgentSessionId: security_findings.session_id,
+        ownedByOrganizationId: security_findings.owned_by_organization_id,
+        ownedByUserId: security_findings.owned_by_user_id,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, params.findingId))
+      .for('update')
+      .limit(1);
+    const finding = findingRows[0];
+    if (!finding || finding.status !== 'open') return { status: 'no-op' };
+
+    const expectedOrganizationId = params.owner.type === 'org' ? params.owner.id : null;
+    const expectedUserId = params.owner.type === 'user' ? params.owner.id : null;
+    const ownerMatches =
+      queue.ownedByOrganizationId === expectedOrganizationId &&
+      queue.ownedByUserId === expectedUserId &&
+      finding.ownedByOrganizationId === expectedOrganizationId &&
+      finding.ownedByUserId === expectedUserId;
+    if (!ownerMatches) return { status: 'no-op' };
+
+    if (queue.claimToken === claimToken) {
+      if (queue.status === 'running' || finding.analysisStatus === 'running') {
+        return { status: 'launch-started' };
+      }
+      if (
+        queue.status !== 'pending' ||
+        (finding.analysisStatus !== null && finding.analysisStatus !== 'pending')
+      ) {
+        return { status: 'no-op' };
+      }
+    } else if (queue.status !== 'running' || finding.analysisStatus !== 'running') {
+      return { status: 'no-op' };
+    }
+
+    const oldCloudAgentSessionId = finding.cloudAgentSessionId;
+    await tx
+      .update(security_analysis_queue)
+      .set({
+        queue_status: 'pending',
+        queued_at: sql`now()`.mapWith(String),
+        claimed_at: sql`now()`.mapWith(String),
+        claimed_by_job_id: jobId,
+        claim_token: claimToken,
+        attempt_count: 0,
+        reopen_requeue_count: 0,
+        next_retry_at: null,
+        failure_code: null,
+        last_error_redacted: null,
+        updated_at: sql`now()`.mapWith(String),
+      })
+      .where(eq(security_analysis_queue.id, queue.id));
+    await tx
+      .update(security_findings)
+      .set({
+        analysis_status: null,
+        analysis_error: null,
+        analysis_started_at: null,
+        analysis_completed_at: null,
+        session_id: null,
+        cli_session_id: null,
+        updated_at: sql`now()`.mapWith(String),
+      })
+      .where(eq(security_findings.id, finding.id));
+
+    return { status: 'ready', claimToken, oldCloudAgentSessionId };
+  });
+}
+
 export async function transitionManualAnalysisQueueFromStart(
   db: WorkerDb,
   params: {

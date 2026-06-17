@@ -38,6 +38,14 @@ function isRemediationAdmissionRejectionReason(
   return SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS.some(candidate => candidate === reason);
 }
 
+export function isCodebaseAnalysisRequiredReason(reason: string | null | undefined): boolean {
+  return (
+    reason === 'analysis_required' ||
+    reason === 'sandbox_analysis_required' ||
+    reason === 'triage_only'
+  );
+}
+
 export function getRemediationUnavailableCopy(reason: string | null | undefined): string | null {
   if (!reason || reason === 'eligible') return null;
   return isRemediationAdmissionRejectionReason(reason)

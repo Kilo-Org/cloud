@@ -3,6 +3,7 @@ import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import {
   assertSecurityAgentAuditReportSerializedByteBudget,
   buildSecurityAgentAuditReportFromRows,
+  defaultSecurityAgentAuditReportInput,
   normalizeSecurityAgentAuditReportPeriod,
   SECURITY_AGENT_AUDIT_REPORT_MAX_EVENTS,
   SECURITY_AGENT_AUDIT_REPORT_MAX_SERIALIZED_BYTES,
@@ -52,6 +53,15 @@ function row(overrides: Partial<AuditReportRow>): AuditReportRow {
     ...overrides,
   };
 }
+
+describe('defaultSecurityAgentAuditReportInput', () => {
+  it('defaults to 90 UTC calendar days ending on the current day', () => {
+    expect(defaultSecurityAgentAuditReportInput(new Date('2026-06-16T21:08:07+02:00'))).toEqual({
+      startDate: '2026-03-19',
+      endDate: '2026-06-16',
+    });
+  });
+});
 
 describe('normalizeSecurityAgentAuditReportPeriod', () => {
   it('uses inclusive UTC end date and exclusive next-day boundary', () => {

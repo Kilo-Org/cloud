@@ -171,6 +171,7 @@ export const StartAnalysisInputSchema = z.object({
   analysisModel: z.string().optional(),
   forceSandbox: z.boolean().optional(),
   retrySandboxOnly: z.boolean().optional(),
+  restartActive: z.boolean().optional(),
 });
 
 export const StartRemediationInputSchema = z.object({

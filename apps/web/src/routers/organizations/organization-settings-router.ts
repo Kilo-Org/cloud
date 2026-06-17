@@ -474,7 +474,9 @@ export const organizationsSettingsRouter = createTRPCRouter({
 
             assertOrganizationAutoRouteCount(seededRoutes);
             for (const [slug, targetModelId] of Object.entries(seededRoutes)) {
-              const validation = await validateOrganizationAutoTarget(organization, targetModelId);
+              const validation = await validateOrganizationAutoTarget(organization, targetModelId, {
+                dbClient: tx,
+              });
               if (validation.kind === 'error') {
                 throw new TRPCError({
                   code: 'BAD_REQUEST',
@@ -485,8 +487,10 @@ export const organizationsSettingsRouter = createTRPCRouter({
             }
             const fallbackValidation = await validateOrganizationAutoTarget(
               organization,
-              freshOrgAutoModel.fallback_model
+              freshOrgAutoModel.fallback_model,
+              { dbClient: tx }
             );
+
             if (fallbackValidation.kind === 'error') {
               throw new TRPCError({
                 code: 'BAD_REQUEST',
@@ -608,7 +612,9 @@ export const organizationsSettingsRouter = createTRPCRouter({
           organizationId,
           async organization => {
             assertOrganizationAutoEligible(organization);
-            const validation = await validateOrganizationAutoTarget(organization, model_id);
+            const validation = await validateOrganizationAutoTarget(organization, model_id, {
+              dbClient: tx,
+            });
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
             }
@@ -728,7 +734,9 @@ export const organizationsSettingsRouter = createTRPCRouter({
           organizationId,
           async organization => {
             assertOrganizationAutoEligible(organization);
-            const validation = await validateOrganizationAutoTarget(organization, model_id);
+            const validation = await validateOrganizationAutoTarget(organization, model_id, {
+              dbClient: tx,
+            });
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
             }

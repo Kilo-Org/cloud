@@ -24,7 +24,7 @@ import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getOrganizationById, mutateOrganizationSettings } from '@/lib/organizations/organizations';
 import { successResult } from '@/lib/maybe-result';
 import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
@@ -117,7 +117,8 @@ async function applyOrganizationAutoRouteChange(
   organization: Pick<Organization, 'id' | 'settings' | 'plan'>,
   modeSlug: string,
   routeModel: string | null,
-  ctx: OrganizationAccessContext
+  ctx: OrganizationAccessContext,
+  tx?: DrizzleTransaction
 ): Promise<OrganizationSettings> {
   await assertOrganizationAutoWriteEnabled(ctx.user.id);
   assertOrganizationAutoEligible(organization);
@@ -132,7 +133,10 @@ async function applyOrganizationAutoRouteChange(
   if (routeModel === null) {
     delete routes[modeSlug];
   } else {
-    const validation = await validateOrganizationAutoTarget(organization, routeModel);
+    const validation = await validateOrganizationAutoTarget(organization, routeModel, {
+      dbClient: tx,
+    });
+
     if (validation.kind === 'error') {
       throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
     }
@@ -279,8 +283,10 @@ export const organizationModesRouter = createTRPCRouter({
               lockedOrganization,
               createdMode.slug,
               route_model,
-              ctx
+              ctx,
+              tx
             );
+
             const nextRoute = nextSettings.org_auto_model?.routes[createdMode.slug];
             if (previousRoute !== nextRoute) {
               routeAuditMessage = nextRoute
@@ -428,7 +434,8 @@ export const organizationModesRouter = createTRPCRouter({
                 { ...lockedOrganization, settings: nextSettings },
                 nextSlug,
                 route_model,
-                ctx
+                ctx,
+                tx
               );
               const nextRoute = nextSettings.org_auto_model?.routes[nextSlug];
               if (previousRoute !== nextRoute) {
@@ -530,7 +537,8 @@ export const organizationModesRouter = createTRPCRouter({
                 lockedOrganization,
                 lockedMode.slug,
                 route_model,
-                ctx
+                ctx,
+                tx
               );
               const nextRoute = nextSettings.org_auto_model?.routes[lockedMode.slug];
               if (previousRoute !== nextRoute) {

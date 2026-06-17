@@ -187,7 +187,6 @@ export function pullValue(
 }
 
 export function resolveVault(): string {
-  run('op', ['whoami', '--format=json']);
   const vault = parseJson(run('op', ['vault', 'get', VAULT, '--format=json']), 'Resolve vault');
   const vaultId = stringValue(vault, 'id');
   if (!vaultId) throw new Error(`Could not resolve 1Password vault ${VAULT}.`);

@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Keyless CI verification for a KiloClaw OpenClaw bump.
+# Keyless local verification for a KiloClaw OpenClaw bump (developer tool).
 #
-# Runs every upgrade check that does NOT require a live Kilo API key, so it is
-# safe to run automatically on a public repo: it never loads a credential into
-# the (freshly released, untrusted) OpenClaw, so there is nothing to exfiltrate.
+# OpenClaw is deliberately never built or executed in CI: it is a freshly
+# released, security-sensitive upstream, so every path that runs it is human-
+# gated (see the dispatch-only deploy workflows). This is the fast pre-check a
+# developer runs locally before the credentialed smoke; it needs no Kilo API
+# key, so it can run anywhere.
+#
 # It builds the candidate production-pin image (which proves the Dockerfile
 # bundle-patch guards still match — they `exit 1` on mismatch), checks the
 # version, the applied patches, the bundled plugins, and runs `openclaw config
 # validate` against representative app-written config shapes (the validator runs
 # without starting the gateway, so no key is needed).
 #
-# The credentialed live smoke — controller-openclaw-upgrade-smoke-test.sh — is a
-# DEVELOPER step, not CI. This script prints exactly what still must be run with
-# credentials, so the PR records both what was automated and what is left.
+# Run the credentialed live smoke (controller-openclaw-upgrade-smoke-test.sh)
+# next; this script prints exactly what that still covers.
 #
 # Env:
 #   IMAGE   image tag to build/use (default kiloclaw:openclaw-upgrade-verify)
@@ -135,9 +137,9 @@ echo "=== Keyless verification: $PASS passed, $FAIL failed ==="
 cat <<EOF
 
 ----------------------------------------------------------------------
-This CI run covered only checks that need NO Kilo API key. Before merge,
-a developer MUST run the credentialed live smoke locally (it loads a real
-key into the container, so it is not run in CI):
+This run covered only the checks that need NO Kilo API key. Before merge,
+run the credentialed live smoke locally too (it loads a real key into the
+freshly released OpenClaw, which is why nothing here runs in CI):
 
   export KILOCODE_API_KEY=<dedicated free-model key>   # not your personal key
   bash services/kiloclaw/scripts/controller-openclaw-upgrade-smoke-test.sh

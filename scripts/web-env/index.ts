@@ -20,7 +20,6 @@ import {
 
 type Options = {
   name: string;
-  sensitive: boolean;
   dryRun: boolean;
   valueFiles: Partial<Record<Environment, string>>;
 };
@@ -28,7 +27,7 @@ type Options = {
 function usage(): never {
   throw new Error(
     [
-      'Usage: pnpm web:env set VARIABLE [--no-sensitive] [--dry-run]',
+      'Usage: pnpm web:env set VARIABLE [--dry-run]',
       '       [--development-file PATH] [--staging-file PATH] [--production-file PATH]',
     ].join('\n')
   );
@@ -38,13 +37,11 @@ function parseOptions(args: string[]): Options {
   if (args[0] !== 'set' || !args[1]) usage();
   const name = args[1];
   const valueFiles: Partial<Record<Environment, string>> = {};
-  let sensitive = true;
   let dryRun = false;
 
   for (let index = 2; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === '--no-sensitive') sensitive = false;
-    else if (argument === '--dry-run') dryRun = true;
+    if (argument === '--dry-run') dryRun = true;
     else {
       const match = argument?.match(/^--(development|staging|production)-file(?:=(.*))?$/);
       if (!match) usage();
@@ -60,10 +57,17 @@ function parseOptions(args: string[]): Options {
   if (!/^[A-Z_][A-Z0-9_]*$/.test(name)) {
     throw new Error('Variable names must contain only uppercase letters, digits, and underscores.');
   }
+  return { name, dryRun, valueFiles };
+}
+
+async function askSensitivity(name: string): Promise<boolean> {
+  const answer = (await question(`Is ${name} sensitive? [Y/n] `)).trim().toLowerCase();
+  if (!['', 'y', 'yes', 'n', 'no'].includes(answer)) throw new Error('Answer yes or no.');
+  const sensitive = !['n', 'no'].includes(answer);
   if (sensitive && name.startsWith('NEXT_PUBLIC_')) {
-    throw new Error('NEXT_PUBLIC_* values are browser-visible; pass --no-sensitive.');
+    throw new Error('NEXT_PUBLIC_* values are browser-visible; answer no.');
   }
-  return { name, sensitive, dryRun, valueFiles };
+  return sensitive;
 }
 
 async function collectValues(options: Options): Promise<Values> {
@@ -114,24 +118,25 @@ function assertSecretsAreNotTracked(repoRoot: string, values: Values): void {
 
 async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
+  const sensitive = await askSensitivity(options.name);
   const repoRoot = findRepoRoot();
   const tempDirectory = mkdtempSync(path.join(os.tmpdir(), 'kilo-web-env-'));
 
   try {
     console.log('Checking Vercel and 1Password access...');
     const contexts = resolveVercelContexts(tempDirectory);
-    const vaultId = options.sensitive ? resolveVault() : undefined;
+    const vaultId = sensitive ? resolveVault() : undefined;
     const values = await collectValues(options);
     const defaults = await collectDefaults(repoRoot, options.name, values);
 
     console.log('\nPlan');
     for (const environment of ENVIRONMENTS) {
-      const type = options.sensitive && environment !== 'development' ? 'sensitive' : 'encrypted';
+      const type = sensitive && environment !== 'development' ? 'sensitive' : 'encrypted';
       for (const project of PROJECTS) console.log(`- ${project}/${environment}: ${type}`);
     }
     for (const [file, value] of defaults)
       console.log(`- ${file}: ${options.name}=${JSON.stringify(value)}`);
-    console.log(`- 1Password: ${options.sensitive ? 'update Production copy' : 'skip'}`);
+    console.log(`- 1Password: ${sensitive ? 'update Production copy' : 'skip'}`);
     console.log('- Deployments: not triggered');
 
     if (options.dryRun) {
@@ -151,7 +156,7 @@ async function main(): Promise<void> {
     for (const environment of ENVIRONMENTS) {
       for (const context of contexts) {
         console.log(`Setting ${context.project}/${environment}...`);
-        setVariable(context, environment, options.name, values[environment], options.sensitive);
+        setVariable(context, environment, options.name, values[environment], sensitive);
       }
     }
     if (vaultId) {

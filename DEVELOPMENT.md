@@ -164,15 +164,9 @@ Prerequisites:
 - Sign in with `op signin` and have write access to the `Kilo Web ENV Production` vault.
 - Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
 
-Variables are sensitive by default. Production and Staging become Vercel-sensitive, while the separate Development value remains encrypted but exportable through `vercel env pull`. The Production value is also stored as a concealed, exact-name item in `Kilo Web ENV Production`.
+The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production value is also stored as a concealed, exact-name item in `Kilo Web ENV Production`.
 
-For public or otherwise non-secret configuration, opt out explicitly:
-
-```bash
-pnpm web:env set EXAMPLE_FEATURE_FLAG --no-sensitive
-```
-
-`NEXT_PUBLIC_*` variables require `--no-sensitive` because Next.js exposes them to browsers. Non-sensitive values are not copied to 1Password.
+Answer no for public or otherwise non-secret configuration. `NEXT_PUBLIC_*` variables must be non-sensitive because Next.js exposes them to browsers. Non-sensitive values are not copied to 1Password.
 
 The command prompts for single-line values without echoing them, then asks for a safe default or skip decision for each tracked root and `apps/web` dotenv file. For multiline values, use `--development-file`, `--staging-file`, and `--production-file`. Use `--dry-run` to preview the redacted plan.
 

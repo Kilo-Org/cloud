@@ -160,6 +160,9 @@ describe('analysis-service', () => {
 
     const mockFinding = {
       id: findingId,
+      source: 'dependabot',
+      source_id: '42',
+      status: 'open',
       analysis_status: 'new',
       repo_full_name: 'acme/repo',
       package_name: 'lodash',
@@ -173,6 +176,9 @@ describe('analysis-service', () => {
       vulnerable_version_range: '< 4.17.21',
       patched_version: '4.17.21',
       manifest_path: 'package.json',
+      cwe_ids: ['CWE-1321'],
+      cvss_score: '7.5',
+      raw_data: { updated_at: '2026-01-15T00:00:00.000Z' },
     };
 
     mockGetSecurityFindingById.mockResolvedValue(
@@ -230,6 +236,20 @@ describe('analysis-service', () => {
     );
     expect(mockTriageSecurityFinding).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'anthropic/claude-sonnet-4' })
+    );
+    expect(mockUpdateAnalysisStatus).toHaveBeenCalledWith(
+      findingId,
+      'pending',
+      expect.objectContaining({
+        analysis: expect.objectContaining({
+          findingDataSnapshot: expect.objectContaining({
+            schemaVersion: 1,
+            sourceId: '42',
+            sourceUpdatedAt: '2026-01-15T00:00:00.000Z',
+            packageName: 'lodash',
+          }),
+        }),
+      })
     );
     expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
       cloudAgentSessionId: 'ses-agent-123',

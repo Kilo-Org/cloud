@@ -7,7 +7,16 @@ const EXTRACTION_SERVICE_VERSION = '5.0.0';
 const EXTRACTION_SERVICE_USER_AGENT = `Kilo-Security-Extraction/${EXTRACTION_SERVICE_VERSION}`;
 
 const ExtractionResultSchema = z.object({
-  isExploitable: z.union([z.boolean(), z.literal('unknown')]),
+  isExploitable: z.preprocess(
+    value => {
+      if (typeof value !== 'string') return value;
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+      return normalized;
+    },
+    z.union([z.boolean(), z.literal('unknown')])
+  ),
   exploitabilityReasoning: z.string(),
   usageLocations: z.array(z.string()),
   suggestedFix: z.string(),
@@ -19,6 +28,7 @@ const ExtractionResponseSchema = z.object({
   choices: z.array(
     z.object({
       message: z.object({
+        content: z.string().nullable().optional(),
         tool_calls: z
           .array(
             z.object({
@@ -48,12 +58,22 @@ function buildExtractionPrompt(finding: SecurityFindingRecord, rawMarkdown: stri
 
 ${rawMarkdown}
 
-Please extract structured analysis and call submit_analysis_extraction.`;
+Please extract structured analysis and call submit_analysis_extraction. If tool calls are unavailable, return only a JSON object matching the tool parameters, without markdown or prose.`;
+}
+
+function extractJsonContent(content: string | null | undefined): string | null {
+  const trimmed = content?.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed;
+
+  const fencedJson = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
+  return fencedJson?.[1]?.trim() || null;
 }
 
 function fallbackExtraction(rawMarkdown: string, reason: string): SecurityFindingSandboxAnalysis {
   return {
     isExploitable: 'unknown',
+    extractionStatus: 'failed',
     exploitabilityReasoning: `Extraction failed: ${reason}. Please review the raw analysis.`,
     usageLocations: [],
     suggestedFix: 'Review the raw analysis for fix recommendations.',
@@ -79,6 +99,7 @@ function parseExtractionResult(
   if (!result.success) return null;
   return {
     ...result.data,
+    extractionStatus: 'succeeded',
     rawMarkdown,
     analysisAt: new Date().toISOString(),
     modelUsed: model,
@@ -148,7 +169,7 @@ export async function extractSandboxAnalysis(params: {
             },
           },
         ],
-        tool_choice: { type: 'function', function: { name: 'submit_analysis_extraction' } },
+        tool_choice: 'auto',
         stream: false,
       }),
       signal: AbortSignal.timeout(45_000),
@@ -161,15 +182,22 @@ export async function extractSandboxAnalysis(params: {
       return fallbackExtraction(params.rawMarkdown, `API error: ${response.status}`);
     }
     const parsedResponse = ExtractionResponseSchema.safeParse(await response.json());
-    const toolCall = parsedResponse.success
-      ? parsedResponse.data.choices[0]?.message.tool_calls?.[0]
-      : undefined;
-    if (!toolCall || toolCall.function.name !== 'submit_analysis_extraction') {
-      return fallbackExtraction(params.rawMarkdown, 'Tool call missing');
+    if (!parsedResponse.success) {
+      return fallbackExtraction(params.rawMarkdown, 'Invalid response shape');
     }
+
+    const message = parsedResponse.data.choices[0]?.message;
+    const toolCall = message?.tool_calls?.find(
+      candidate => candidate.function.name === 'submit_analysis_extraction'
+    );
+    const structuredJson = toolCall?.function.arguments ?? extractJsonContent(message?.content);
+    if (!structuredJson) {
+      return fallbackExtraction(params.rawMarkdown, 'Structured response missing');
+    }
+
     return (
-      parseExtractionResult(toolCall.function.arguments, params.rawMarkdown, params.model) ??
-      fallbackExtraction(params.rawMarkdown, 'Tool call arguments invalid')
+      parseExtractionResult(structuredJson, params.rawMarkdown, params.model) ??
+      fallbackExtraction(params.rawMarkdown, 'Structured response invalid')
     );
   } catch (error) {
     logger.error('Extraction call threw', {

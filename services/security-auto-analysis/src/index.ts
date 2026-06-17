@@ -149,7 +149,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     if (!result.admitted) {
       return Response.json(
         { success: false, accepted: false, admitted: false, reason: result.reason },
-        { status: 409 }
+        { status: result.reason === 'finding_not_found' ? 404 : 409 }
       );
     }
     return Response.json(

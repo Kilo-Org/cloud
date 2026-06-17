@@ -40,6 +40,8 @@ import {
   FeedbackSource,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
+  SecurityFindingAuditSourceContext,
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
   KiloClawPlan,
@@ -189,6 +191,8 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
+  SecurityFindingAuditSourceContext,
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
@@ -5573,12 +5577,20 @@ export const security_audit_log = pgTable(
     actor_id: text(),
     actor_email: text(),
     actor_name: text(),
+    actor_type: text().$type<SecurityAuditLogActorType>(),
     action: text().$type<SecurityAuditLogAction>().notNull(),
     resource_type: text().notNull(),
     resource_id: text().notNull(),
     before_state: jsonb().$type<Record<string, unknown>>(),
     after_state: jsonb().$type<Record<string, unknown>>(),
     metadata: jsonb().$type<Record<string, unknown>>(),
+    finding_id: uuid(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }),
+    source_occurred_at: timestamp({ withTimezone: true, mode: 'string' }),
+    event_key: text(),
+    schema_version: smallint(),
+    finding_snapshot: jsonb().$type<Record<string, unknown>>(),
+    source_context: text().$type<SecurityFindingAuditSourceContext>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -5587,6 +5599,12 @@ export const security_audit_log = pgTable(
       sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
     ),
     enumCheck('security_audit_log_action_check', table.action, SecurityAuditLogAction),
+    enumCheck('security_audit_log_actor_type_check', table.actor_type, SecurityAuditLogActorType),
+    enumCheck(
+      'security_audit_log_source_context_check',
+      table.source_context,
+      SecurityFindingAuditSourceContext
+    ),
     index('IDX_security_audit_log_org_created').on(
       table.owned_by_organization_id,
       table.created_at
@@ -5595,6 +5613,20 @@ export const security_audit_log = pgTable(
     index('IDX_security_audit_log_resource').on(table.resource_type, table.resource_id),
     index('IDX_security_audit_log_actor').on(table.actor_id, table.created_at),
     index('IDX_security_audit_log_action').on(table.action, table.created_at),
+    uniqueIndex('UQ_security_audit_log_org_event_key')
+      .on(table.owned_by_organization_id, table.event_key)
+      .where(sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.event_key} IS NOT NULL`),
+    uniqueIndex('UQ_security_audit_log_user_event_key')
+      .on(table.owned_by_user_id, table.event_key)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.event_key} IS NOT NULL`),
+    index('IDX_security_audit_log_org_occurred')
+      .on(table.owned_by_organization_id, table.occurred_at, table.id)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.occurred_at} IS NOT NULL`
+      ),
+    index('IDX_security_audit_log_user_occurred')
+      .on(table.owned_by_user_id, table.occurred_at, table.id)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.occurred_at} IS NOT NULL`),
   ]
 );
 

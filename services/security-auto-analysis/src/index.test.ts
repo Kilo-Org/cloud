@@ -5,6 +5,8 @@ import {
 import { getWorkerDb } from '@kilocode/db/client';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as RemediationModule from './remediation.js';
+import { startManualRemediation } from './remediation.js';
 import worker from './index.js';
 
 vi.mock('@kilocode/db', () => ({
@@ -12,6 +14,10 @@ vi.mock('@kilocode/db', () => ({
   markSecurityAgentCommandQueueAdmissionFailed: vi.fn(),
 }));
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
+vi.mock('./remediation.js', async importOriginal => ({
+  ...(await importOriginal<typeof RemediationModule>()),
+  startManualRemediation: vi.fn(),
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -65,6 +71,83 @@ async function remediationCallbackTokenFor(
     resourceParts: [attemptId, attemptToken],
   });
 }
+
+function manualRemediationRequest(): Request {
+  return new Request('https://security-auto-analysis/internal/remediation/start', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-internal-api-key': 'worker-secret',
+    },
+    body: JSON.stringify({
+      schemaVersion: 1,
+      findingId: FINDING_ID,
+      owner: { userId: 'user-123' },
+      actorUserId: 'user-123',
+    }),
+  });
+}
+
+describe('manual remediation ingress', () => {
+  it('returns HTTP 409 with analysis_required for a policy rejection', async () => {
+    vi.mocked(startManualRemediation).mockResolvedValue({
+      admitted: false,
+      reason: 'analysis_required',
+    });
+
+    const response = await worker.fetch(manualRemediationRequest(), {
+      INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+    } as CloudflareEnv);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      accepted: false,
+      admitted: false,
+      reason: 'analysis_required',
+    });
+  });
+
+  it('returns HTTP 404 when the finding no longer exists', async () => {
+    vi.mocked(startManualRemediation).mockResolvedValue({
+      admitted: false,
+      reason: 'finding_not_found',
+    });
+
+    const response = await worker.fetch(manualRemediationRequest(), {
+      INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+    } as CloudflareEnv);
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      admitted: false,
+      reason: 'finding_not_found',
+    });
+  });
+
+  it('returns HTTP 202 with attempt correlation after accepted admission', async () => {
+    vi.mocked(startManualRemediation).mockResolvedValue({
+      admitted: true,
+      remediationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      attemptId: REMEDIATION_ATTEMPT_ID,
+      attemptNumber: 1,
+    });
+
+    const response = await worker.fetch(manualRemediationRequest(), {
+      INTERNAL_API_SECRET: { get: async () => 'worker-secret' },
+    } as CloudflareEnv);
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      accepted: true,
+      admitted: true,
+      remediationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      attemptId: REMEDIATION_ATTEMPT_ID,
+      attemptNumber: 1,
+    });
+  });
+});
 
 describe('security analysis callback ingress', () => {
   it('rejects callback traffic without a scoped callback token', async () => {

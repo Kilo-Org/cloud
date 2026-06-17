@@ -1,6 +1,4 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { security_audit_log } from '@kilocode/db/schema';
-import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import {
   CloudAgentCallbackFailureSchema,
   type CloudAgentSafeFailure,
@@ -299,24 +297,6 @@ export async function finalizeCompletedAnalysisCallback(params: {
   });
   if (lifecycleTransition.status === 'superseded') return { status: 'superseded' };
   if (lifecycleTransition.status === 'stale-attempt') return { status: 'stale-attempt' };
-  await params.db.insert(security_audit_log).values({
-    owned_by_organization_id: finding.owned_by_organization_id,
-    owned_by_user_id: finding.owned_by_user_id,
-    actor_id: null,
-    actor_email: null,
-    actor_name: null,
-    action: SecurityAuditLogAction.FindingAnalysisCompleted,
-    resource_type: 'security_finding',
-    resource_id: params.findingId,
-    metadata: {
-      source: 'system',
-      model: completedAnalysis.modelUsed,
-      triageModel: completedAnalysis.triageModel,
-      analysisModel: completedAnalysis.analysisModel,
-      correlationId: completedAnalysis.correlationId,
-      triggeredByUserId: completedAnalysis.triggeredByUserId,
-    },
-  });
   await params.maybeAutoDismissAnalysis?.({
     findingId: params.findingId,
     analysis: completedAnalysis,

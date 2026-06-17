@@ -1,5 +1,10 @@
 import 'server-only';
 import { INTERNAL_API_SECRET, SECURITY_AUTO_ANALYSIS_WORKER_URL } from '@/lib/config.server';
+import {
+  SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS,
+  type SecurityRemediationAdmissionRejectionReason,
+} from '@kilocode/worker-utils/security-remediation-policy';
+import { z } from 'zod';
 
 type RemediationOwner =
   | { organizationId: string; userId?: never }
@@ -24,16 +29,36 @@ type ApplyAutoRemediationParams = {
   actorUserId: string;
 };
 
-type ManualRemediationStartResponse = {
-  success?: boolean;
-  accepted?: boolean;
-  admitted?: boolean;
-  remediationId?: string;
-  attemptId?: string;
-  attemptNumber?: number;
-  reason?: string;
-  error?: string;
-};
+const ManualRemediationStartResponseSchema = z.discriminatedUnion('admitted', [
+  z.object({
+    success: z.literal(true),
+    accepted: z.literal(true),
+    admitted: z.literal(true),
+    remediationId: z.string(),
+    attemptId: z.string(),
+    attemptNumber: z.number(),
+  }),
+  z.object({
+    success: z.literal(false),
+    accepted: z.literal(false),
+    admitted: z.literal(false),
+    reason: z.enum(SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS),
+  }),
+]);
+
+const WorkerErrorResponseSchema = z.object({ error: z.string() });
+
+export type ManualRemediationStartResult =
+  | {
+      queued: true;
+      remediationId: string;
+      attemptId: string;
+      attemptNumber: number;
+    }
+  | {
+      queued: false;
+      reason: SecurityRemediationAdmissionRejectionReason;
+    };
 
 type RemediationCancellationResponse = {
   success?: boolean;
@@ -61,12 +86,9 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function submitManualRemediationStart(params: ManualRemediationStartParams): Promise<{
-  queued: true;
-  remediationId: string;
-  attemptId: string;
-  attemptNumber: number;
-}> {
+export async function submitManualRemediationStart(
+  params: ManualRemediationStartParams
+): Promise<ManualRemediationStartResult> {
   requireWorkerConfig();
 
   const response = await fetch(`${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/remediation/start`, {
@@ -83,27 +105,30 @@ export async function submitManualRemediationStart(params: ManualRemediationStar
       retry: params.retry,
     }),
   });
-  const body = await parseJsonResponse<ManualRemediationStartResponse>(response);
+  const body: unknown = await response.json();
+  const parsedBody = ManualRemediationStartResponseSchema.safeParse(body);
   if (!response.ok) {
+    if (parsedBody.success && !parsedBody.data.admitted) {
+      const expectedStatus = parsedBody.data.reason === 'finding_not_found' ? 404 : 409;
+      if (response.status === expectedStatus) {
+        return { queued: false, reason: parsedBody.data.reason };
+      }
+    }
+    const parsedError = WorkerErrorResponseSchema.safeParse(body);
     throw new Error(
-      body.reason ?? body.error ?? `Remediation request failed with ${response.status}`
+      parsedError.success
+        ? parsedError.data.error
+        : `Remediation request failed with ${response.status}`
     );
   }
-  if (
-    body.success !== true ||
-    body.accepted !== true ||
-    body.admitted !== true ||
-    typeof body.remediationId !== 'string' ||
-    typeof body.attemptId !== 'string' ||
-    typeof body.attemptNumber !== 'number'
-  ) {
+  if (!parsedBody.success || !parsedBody.data.admitted) {
     throw new Error('Security remediation Worker returned an invalid accepted response');
   }
   return {
     queued: true,
-    remediationId: body.remediationId,
-    attemptId: body.attemptId,
-    attemptNumber: body.attemptNumber,
+    remediationId: parsedBody.data.remediationId,
+    attemptId: parsedBody.data.attemptId,
+    attemptNumber: parsedBody.data.attemptNumber,
   };
 }
 

@@ -126,7 +126,16 @@ function buildTriagePrompt(finding: SecurityFinding): string {
 
 ${rawData ? `**Additional Context**: ${JSON.stringify(rawData, null, 2).slice(0, 1000)}` : ''}
 
-Please analyze this vulnerability and call the submit_triage_result tool with your assessment.`;
+Please analyze this vulnerability and call the submit_triage_result tool with your assessment. If tool calls are unavailable, return only a JSON object matching the tool parameters, without markdown or prose.`;
+}
+
+function extractJsonContent(content: string | null): string | null {
+  const trimmed = content?.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed;
+
+  const fencedJson = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
+  return fencedJson?.[1]?.trim() || null;
 }
 
 /**
@@ -243,10 +252,7 @@ export async function triageSecurityFinding(options: {
             model,
             messages,
             tools: [SUBMIT_TRIAGE_TOOL],
-            tool_choice: {
-              type: 'function',
-              function: { name: 'submit_triage_result' },
-            },
+            tool_choice: 'auto',
           },
           organizationId,
           feature: 'security-agent',
@@ -371,25 +377,26 @@ export async function triageSecurityFinding(options: {
         }
 
         const message = choice.message;
-        const toolCall = message.tool_calls?.[0];
+        const toolCall = message.tool_calls?.find(
+          candidate =>
+            candidate.type === 'function' && candidate.function.name === 'submit_triage_result'
+        );
+        const toolArguments =
+          toolCall?.type === 'function' ? toolCall.function.arguments : undefined;
+        const structuredJson =
+          toolArguments ??
+          extractJsonContent(typeof message.content === 'string' ? message.content : null);
 
-        if (!toolCall || toolCall.type !== 'function') {
-          logError('No tool call in response', { correlationId, findingId: finding.id });
-          span.setAttribute('security_agent.is_fallback', true);
-          return createFallbackTriage('LLM did not call the triage tool');
-        }
-
-        if (toolCall.function.name !== 'submit_triage_result') {
-          logError('Unexpected tool call', {
+        if (!structuredJson) {
+          logError('No structured result in response', {
             correlationId,
             findingId: finding.id,
-            tool: toolCall.function.name,
           });
           span.setAttribute('security_agent.is_fallback', true);
-          return createFallbackTriage(`Unexpected tool: ${toolCall.function.name}`);
+          return createFallbackTriage('LLM did not return a structured triage result');
         }
 
-        const parsed = parseTriageResult(toolCall.function.arguments);
+        const parsed = parseTriageResult(structuredJson);
         if (!parsed) {
           span.setAttribute('security_agent.is_fallback', true);
           return createFallbackTriage('Failed to parse triage result');

@@ -1,3 +1,5 @@
+import type { SecurityFindingAnalysisInput } from '@kilocode/db/schema-types';
+
 export type SecurityRemediationOrigin = 'auto_policy' | 'bulk_existing' | 'manual';
 export type SecurityRemediationMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 export type SecurityRemediationSeverityRank = 0 | 1 | 2 | 3;
@@ -23,6 +25,7 @@ export type SecurityRemediationSandboxAnalysis = {
 
 export type SecurityRemediationAnalysis = {
   sandboxAnalysis?: SecurityRemediationSandboxAnalysis;
+  findingDataSnapshot?: SecurityFindingAnalysisInput;
   analyzedAt?: string | null;
   modelUsed?: string | null;
   analysisModel?: string | null;
@@ -30,19 +33,33 @@ export type SecurityRemediationAnalysis = {
   correlationId?: string | null;
 };
 
-export type SecurityRemediationFinding = {
-  id: string;
+export type SecurityFindingAnalysisInputSource = {
+  source: string;
+  source_id: string;
   status: string;
   severity: string | null;
   repo_full_name: string;
   package_name: string;
   package_ecosystem: string;
-  patched_version?: string | null;
-  manifest_path?: string | null;
-  last_synced_at?: string | null;
-  analysis_status?: string | null;
-  analysis_completed_at?: string | null;
-  analysis?: SecurityRemediationAnalysis | null;
+  dependency_scope: string | null;
+  cve_id: string | null;
+  ghsa_id: string | null;
+  cwe_ids: string[] | null;
+  cvss_score: string | number | null;
+  title: string;
+  description: string | null;
+  vulnerable_version_range: string | null;
+  patched_version: string | null;
+  manifest_path: string | null;
+  raw_data: { updated_at?: string | null } | null;
+};
+
+export type SecurityRemediationFinding = SecurityFindingAnalysisInputSource & {
+  id: string;
+  last_synced_at: string | null;
+  analysis_status: string | null;
+  analysis_completed_at: string | null;
+  analysis: SecurityRemediationAnalysis | null;
 };
 
 export type SecurityRemediationBlockState = {
@@ -52,28 +69,40 @@ export type SecurityRemediationBlockState = {
   hasRetryableTerminalForFinding?: boolean;
 };
 
-export type SecurityRemediationCapabilityReason =
-  | 'eligible'
-  | 'finding_not_open'
-  | 'repo_not_in_scope'
-  | 'analysis_required'
-  | 'sandbox_analysis_required'
-  | 'stale_analysis'
-  | 'not_exploitable'
-  | 'exploitability_unknown'
-  | 'manual_review_required'
-  | 'monitor_required'
-  | 'triage_only'
-  | 'action_not_concrete'
-  | 'remediation_active'
-  | 'pr_already_opened'
-  | 'duplicate_analysis_result'
-  | 'retry_not_allowed'
-  | 'security_agent_disabled'
-  | 'auto_remediation_disabled'
-  | 'include_existing_disabled'
-  | 'below_threshold'
-  | 'before_enablement';
+export const SECURITY_REMEDIATION_REJECTION_REASONS = [
+  'finding_not_open',
+  'repo_not_in_scope',
+  'analysis_required',
+  'sandbox_analysis_required',
+  'stale_analysis',
+  'not_exploitable',
+  'exploitability_unknown',
+  'manual_review_required',
+  'monitor_required',
+  'triage_only',
+  'action_not_concrete',
+  'remediation_active',
+  'pr_already_opened',
+  'duplicate_analysis_result',
+  'retry_not_allowed',
+  'security_agent_disabled',
+  'auto_remediation_disabled',
+  'include_existing_disabled',
+  'below_threshold',
+  'before_enablement',
+] as const;
+
+export type SecurityRemediationRejectionReason =
+  (typeof SECURITY_REMEDIATION_REJECTION_REASONS)[number];
+export type SecurityRemediationCapabilityReason = 'eligible' | SecurityRemediationRejectionReason;
+
+export const SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS = [
+  ...SECURITY_REMEDIATION_REJECTION_REASONS,
+  'finding_not_found',
+] as const;
+
+export type SecurityRemediationAdmissionRejectionReason =
+  (typeof SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS)[number];
 
 export type SecurityRemediationEligibilityParams = {
   finding: SecurityRemediationFinding;
@@ -131,6 +160,71 @@ function normalizeTimestamp(value: string | null | undefined): string | null {
   if (!value) return null;
   const time = Date.parse(value);
   return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
+
+export function buildSecurityFindingAnalysisInput(
+  finding: SecurityFindingAnalysisInputSource
+): SecurityFindingAnalysisInput {
+  return {
+    schemaVersion: 1,
+    source: finding.source,
+    sourceId: finding.source_id,
+    sourceUpdatedAt: normalizeTimestamp(finding.raw_data?.updated_at),
+    repoFullName: finding.repo_full_name,
+    status: finding.status,
+    severity: finding.severity,
+    packageName: finding.package_name,
+    packageEcosystem: finding.package_ecosystem,
+    dependencyScope: finding.dependency_scope,
+    cveId: finding.cve_id,
+    ghsaId: finding.ghsa_id,
+    cweIds: [...new Set(finding.cwe_ids ?? [])].sort(),
+    cvssScore: finding.cvss_score === null ? null : String(finding.cvss_score),
+    title: finding.title,
+    description: finding.description,
+    vulnerableVersionRange: finding.vulnerable_version_range,
+    patchedVersion: finding.patched_version,
+    manifestPath: finding.manifest_path,
+  };
+}
+
+function serializeSecurityFindingAnalysisInput(
+  input: SecurityFindingAnalysisInput | undefined
+): string | null {
+  if (!input || input.schemaVersion !== 1 || !Array.isArray(input.cweIds)) return null;
+  return JSON.stringify([
+    input.schemaVersion,
+    input.source,
+    input.sourceId,
+    input.sourceUpdatedAt,
+    input.repoFullName,
+    input.status,
+    input.severity,
+    input.packageName,
+    input.packageEcosystem,
+    input.dependencyScope,
+    input.cveId,
+    input.ghsaId,
+    input.cweIds,
+    input.cvssScore,
+    input.title,
+    input.description,
+    input.vulnerableVersionRange,
+    input.patchedVersion,
+    input.manifestPath,
+  ]);
+}
+
+function securityFindingAnalysisInputMatches(
+  analyzedInput: SecurityFindingAnalysisInput,
+  finding: SecurityFindingAnalysisInputSource
+): boolean {
+  const serializedAnalyzedInput = serializeSecurityFindingAnalysisInput(analyzedInput);
+  if (!serializedAnalyzedInput) return false;
+  return (
+    serializedAnalyzedInput ===
+    serializeSecurityFindingAnalysisInput(buildSecurityFindingAnalysisInput(finding))
+  );
 }
 
 export function getSecurityRemediationAnalysisCompletedAt(
@@ -207,9 +301,14 @@ function hasConcreteRemediationPath(finding: SecurityRemediationFinding): boolea
 }
 
 function isAnalysisFresh(finding: SecurityRemediationFinding, completedAt: string): boolean {
-  const lastSyncedAt = normalizeTimestamp(finding.last_synced_at);
-  if (!lastSyncedAt) return true;
-  return Date.parse(completedAt) >= Date.parse(lastSyncedAt);
+  const analyzedInput = finding.analysis?.findingDataSnapshot;
+  if (analyzedInput !== undefined) {
+    return securityFindingAnalysisInputMatches(analyzedInput, finding);
+  }
+
+  const sourceUpdatedAt = normalizeTimestamp(finding.raw_data?.updated_at);
+  if (!sourceUpdatedAt) return false;
+  return Date.parse(completedAt) >= Date.parse(sourceUpdatedAt);
 }
 
 function isRepoInScope(params: {

@@ -126,6 +126,7 @@ import {
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 import {
+  SecurityAuditLogActorType,
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
 } from '@kilocode/db/schema-types';
@@ -1632,6 +1633,7 @@ describe('User', () => {
         actor_id: user.id,
         actor_email: user.google_user_email,
         actor_name: user.google_user_name,
+        actor_type: SecurityAuditLogActorType.CustomerUser,
         action: SecurityAuditLogAction.FindingDismissed,
         resource_type: 'security_finding',
         resource_id: randomUUID(),
@@ -1647,6 +1649,7 @@ describe('User', () => {
       expect(logs[0].actor_email).toBeNull();
       expect(logs[0].actor_name).toBeNull();
       expect(logs[0].actor_id).toBe(user.id); // actor_id preserved
+      expect(logs[0].actor_type).toBe(SecurityAuditLogActorType.CustomerUser);
       expect(logs[0].action).toBe(SecurityAuditLogAction.FindingDismissed); // action preserved
     });
 

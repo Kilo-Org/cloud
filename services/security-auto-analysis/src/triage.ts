@@ -48,6 +48,7 @@ const TriageResponseSchema = z.object({
   choices: z.array(
     z.object({
       message: z.object({
+        content: z.string().nullable().optional(),
         tool_calls: z
           .array(
             z.object({
@@ -88,7 +89,16 @@ function buildTriagePrompt(finding: SecurityFindingRecord): string {
 **Patched Version**: ${finding.patched_version ?? 'No patch available'}
 **Manifest Path**: ${finding.manifest_path ?? 'Unknown'}${cweContext}
 
-Please analyze this vulnerability and call the submit_triage_result tool with your assessment.`;
+Please analyze this vulnerability and call the submit_triage_result tool with your assessment. If tool calls are unavailable, return only a JSON object matching the tool parameters, without markdown or prose.`;
+}
+
+function extractJsonContent(content: string | null | undefined): string | null {
+  const trimmed = content?.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed;
+
+  const fencedJson = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
+  return fencedJson?.[1]?.trim() || null;
 }
 
 function createFallbackTriage(reason: string): SecurityFindingTriage {
@@ -148,10 +158,7 @@ export async function triageSecurityFinding(params: {
         },
       },
     ],
-    tool_choice: {
-      type: 'function',
-      function: { name: 'submit_triage_result' },
-    },
+    tool_choice: 'auto',
     stream: false,
   };
 
@@ -192,21 +199,24 @@ export async function triageSecurityFinding(params: {
       return createFallbackTriage('Invalid response shape');
     }
 
-    const firstChoice = parsedResponse.data.choices[0];
-    const firstToolCall = firstChoice?.message.tool_calls?.[0];
-    if (!firstToolCall || firstToolCall.function.name !== 'submit_triage_result') {
-      return createFallbackTriage('Tool call missing');
+    const message = parsedResponse.data.choices[0]?.message;
+    const toolCall = message?.tool_calls?.find(
+      candidate => candidate.function.name === 'submit_triage_result'
+    );
+    const structuredJson = toolCall?.function.arguments ?? extractJsonContent(message?.content);
+    if (!structuredJson) {
+      return createFallbackTriage('Structured response missing');
     }
 
     let args: unknown;
     try {
-      args = JSON.parse(firstToolCall.function.arguments);
+      args = JSON.parse(structuredJson);
     } catch {
-      return createFallbackTriage('Tool call arguments not valid JSON');
+      return createFallbackTriage('Structured response not valid JSON');
     }
     const parsedArgs = TriagedResultSchema.safeParse(args);
     if (!parsedArgs.success) {
-      return createFallbackTriage('Tool call arguments invalid');
+      return createFallbackTriage('Structured response invalid');
     }
 
     return {

@@ -21,6 +21,7 @@ import type { AnalysisErrorCode } from '../core/error-classification';
 import { classifyAnalysisError, isUserActionableError } from '../core/error-classification';
 import type { User, SecurityFinding } from '@kilocode/db/schema';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import { buildSecurityFindingAnalysisInput } from '@kilocode/worker-utils/security-remediation-policy';
 import {
   trackSecurityAgentAnalysisStarted,
   trackSecurityAgentAnalysisCompleted,
@@ -169,6 +170,7 @@ export async function finalizeAnalysis(
   const analysis: SecurityFindingAnalysis = {
     triage: existingAnalysis?.triage,
     sandboxAnalysis,
+    findingDataSnapshot: existingAnalysis?.findingDataSnapshot,
     rawMarkdown: existingAnalysis?.rawMarkdown,
     analyzedAt: new Date().toISOString(),
     modelUsed: model,
@@ -251,6 +253,7 @@ export async function startSecurityAnalysis(params: {
   if (!finding) {
     return { started: false, error: `Finding not found: ${findingId}` };
   }
+  const findingDataSnapshot = buildSecurityFindingAnalysisInput(finding);
 
   const leaseAcquired = await tryAcquireAnalysisStartLease(findingId);
   if (!leaseAcquired) {
@@ -370,6 +373,7 @@ export async function startSecurityAnalysis(params: {
 
       const analysis: SecurityFindingAnalysis = {
         triage,
+        findingDataSnapshot,
         analyzedAt: new Date().toISOString(),
         modelUsed: triageModel,
         triageModel,
@@ -423,6 +427,7 @@ export async function startSecurityAnalysis(params: {
 
     const partialAnalysis: SecurityFindingAnalysis = {
       triage,
+      findingDataSnapshot,
       analyzedAt: new Date().toISOString(),
       modelUsed: analysisModel,
       triageModel,

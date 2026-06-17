@@ -27,7 +27,13 @@ export type ClaimedQueueRow = {
 
 export type ActorUser = {
   id: string;
+  email?: string;
+  name?: string;
   api_token_pepper: string | null;
+};
+
+export type AuthoritativeActorUser = ActorUser & {
+  is_admin: boolean;
 };
 
 type ClaimRowsForOwnerResult = {
@@ -421,6 +427,110 @@ export async function ensureManualAnalysisQueueRow(
   return rows.length > 0;
 }
 
+export type ActiveAnalysisRestartPreparation =
+  | {
+      status: 'ready';
+      claimToken: string;
+      oldCloudAgentSessionId: string | null;
+    }
+  | { status: 'launch-started' | 'no-op' };
+
+export async function prepareActiveAnalysisRestart(
+  db: WorkerDb,
+  params: { findingId: string; owner: QueueOwner; commandId: string }
+): Promise<ActiveAnalysisRestartPreparation> {
+  const claimToken = `manual-restart:${params.commandId}`;
+  const jobId = `manual-restart:${params.commandId}`;
+
+  return db.transaction(async tx => {
+    const queueRows = await tx
+      .select({
+        id: security_analysis_queue.id,
+        status: security_analysis_queue.queue_status,
+        claimToken: security_analysis_queue.claim_token,
+        ownedByOrganizationId: security_analysis_queue.owned_by_organization_id,
+        ownedByUserId: security_analysis_queue.owned_by_user_id,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, params.findingId))
+      .for('update')
+      .limit(1);
+    const queue = queueRows[0];
+    if (!queue) return { status: 'no-op' };
+
+    const findingRows = await tx
+      .select({
+        id: security_findings.id,
+        status: security_findings.status,
+        analysisStatus: security_findings.analysis_status,
+        cloudAgentSessionId: security_findings.session_id,
+        ownedByOrganizationId: security_findings.owned_by_organization_id,
+        ownedByUserId: security_findings.owned_by_user_id,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, params.findingId))
+      .for('update')
+      .limit(1);
+    const finding = findingRows[0];
+    if (!finding || finding.status !== 'open') return { status: 'no-op' };
+
+    const expectedOrganizationId = params.owner.type === 'org' ? params.owner.id : null;
+    const expectedUserId = params.owner.type === 'user' ? params.owner.id : null;
+    const ownerMatches =
+      queue.ownedByOrganizationId === expectedOrganizationId &&
+      queue.ownedByUserId === expectedUserId &&
+      finding.ownedByOrganizationId === expectedOrganizationId &&
+      finding.ownedByUserId === expectedUserId;
+    if (!ownerMatches) return { status: 'no-op' };
+
+    if (queue.claimToken === claimToken) {
+      if (queue.status === 'running' || finding.analysisStatus === 'running') {
+        return { status: 'launch-started' };
+      }
+      if (
+        queue.status !== 'pending' ||
+        (finding.analysisStatus !== null && finding.analysisStatus !== 'pending')
+      ) {
+        return { status: 'no-op' };
+      }
+    } else if (queue.status !== 'running' || finding.analysisStatus !== 'running') {
+      return { status: 'no-op' };
+    }
+
+    const oldCloudAgentSessionId = finding.cloudAgentSessionId;
+    await tx
+      .update(security_analysis_queue)
+      .set({
+        queue_status: 'pending',
+        queued_at: sql`now()`.mapWith(String),
+        claimed_at: sql`now()`.mapWith(String),
+        claimed_by_job_id: jobId,
+        claim_token: claimToken,
+        attempt_count: 0,
+        reopen_requeue_count: 0,
+        next_retry_at: null,
+        failure_code: null,
+        last_error_redacted: null,
+        updated_at: sql`now()`.mapWith(String),
+      })
+      .where(eq(security_analysis_queue.id, queue.id));
+    await tx
+      .update(security_findings)
+      .set({
+        analysis_status: null,
+        analysis_error: null,
+        analysis_started_at: null,
+        analysis_completed_at: null,
+        session_id: null,
+        cli_session_id: null,
+        updated_at: sql`now()`.mapWith(String),
+      })
+      .where(eq(security_findings.id, finding.id));
+
+    return { status: 'ready', claimToken, oldCloudAgentSessionId };
+  });
+}
+
 export async function transitionManualAnalysisQueueFromStart(
   db: WorkerDb,
   params: {
@@ -447,9 +557,15 @@ export async function transitionManualAnalysisQueueFromStart(
 export async function getAnalysisActorById(
   db: WorkerDb,
   userId: string
-): Promise<ActorUser | null> {
+): Promise<AuthoritativeActorUser | null> {
   const rows = await db
-    .select({ id: kilocode_users.id, api_token_pepper: kilocode_users.api_token_pepper })
+    .select({
+      id: kilocode_users.id,
+      email: kilocode_users.google_user_email,
+      name: kilocode_users.google_user_name,
+      api_token_pepper: kilocode_users.api_token_pepper,
+      is_admin: kilocode_users.is_admin,
+    })
     .from(kilocode_users)
     .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.blocked_reason)))
     .limit(1);
@@ -464,6 +580,8 @@ export async function resolveAutoAnalysisActor(
     const rows = await db
       .select({
         id: kilocode_users.id,
+        email: kilocode_users.google_user_email,
+        name: kilocode_users.google_user_name,
         api_token_pepper: kilocode_users.api_token_pepper,
       })
       .from(kilocode_users)
@@ -582,15 +700,23 @@ export async function getSecurityFindingById(db: WorkerDb, findingId: string) {
       dependency_scope: security_findings.dependency_scope,
       cve_id: security_findings.cve_id,
       ghsa_id: security_findings.ghsa_id,
+      cwe_ids: security_findings.cwe_ids,
+      cvss_score: security_findings.cvss_score,
+      dependabot_html_url: security_findings.dependabot_html_url,
       title: security_findings.title,
       description: security_findings.description,
       vulnerable_version_range: security_findings.vulnerable_version_range,
       patched_version: security_findings.patched_version,
       manifest_path: security_findings.manifest_path,
+      first_detected_at: security_findings.first_detected_at,
+      fixed_at: security_findings.fixed_at,
+      sla_due_at: security_findings.sla_due_at,
       raw_data: security_findings.raw_data,
+      last_synced_at: security_findings.last_synced_at,
       analysis_status: security_findings.analysis_status,
       analysis: security_findings.analysis,
       analysis_started_at: security_findings.analysis_started_at,
+      analysis_completed_at: security_findings.analysis_completed_at,
       session_id: security_findings.session_id,
       cli_session_id: security_findings.cli_session_id,
       ignored_reason: security_findings.ignored_reason,

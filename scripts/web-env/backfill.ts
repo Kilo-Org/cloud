@@ -35,9 +35,7 @@ async function main(): Promise<void> {
     const contexts = resolveVercelContexts(tempDirectory);
     const vaultId = apply ? resolveVault() : undefined;
     const production = contexts.map(context => listVariables(context, 'production'));
-    const staging = contexts.map(context => listVariables(context, 'staging'));
     const productionValues = contexts.map(context => pullValues(context, 'production'));
-    const stagingValues = contexts.map(context => pullValues(context, 'staging'));
     const names = [...new Set(production.flatMap(variables => [...variables.keys()]))].sort();
 
     for (const name of names) {
@@ -61,38 +59,21 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const stagingTypes = staging.map(variables => variables.get(name));
-      let stagingValue: string | undefined;
-      if (stagingTypes.every(type => type === 'sensitive')) {
-        stagingValue = undefined;
-      } else {
-        const projectStagingValues = stagingValues.map(values => values.get(name));
-        if (
-          !projectStagingValues[0] ||
-          projectStagingValues.some(value => value !== projectStagingValues[0])
-        ) {
-          unresolved.push(`${name} (Staging values differ or are unavailable)`);
-          continue;
-        }
-        stagingValue = projectStagingValues[0];
-      }
-
-      console.log(`${apply ? 'Migrating' : 'Would migrate'} ${name}...`);
+      console.log(
+        `${apply ? 'Adding' : 'Would add'} ${name} to 1Password and mark Production sensitive...`
+      );
       if (apply) {
         if (!vaultId) throw new Error('Could not resolve the 1Password vault.');
         setVaultValue(vaultId, name, projectProductionValues[0]);
         for (const context of contexts) {
           setVariable(context, 'production', name, projectProductionValues[0], true);
         }
-        if (stagingValue) {
-          for (const context of contexts) setVariable(context, 'staging', name, stagingValue, true);
-        }
       }
       migrated.push(name);
     }
   } finally {
     rmSync(tempDirectory, { recursive: true, force: true });
-    console.log(`\n${apply ? 'Migrated' : 'Would migrate'}:`);
+    console.log(`\n${apply ? 'Migrated' : 'Would migrate'} Production secrets:`);
     console.log(migrated.length ? migrated.map(name => `- ${name}`).join('\n') : '- None');
     console.log('\nUnresolved:');
     console.log(unresolved.length ? unresolved.map(name => `- ${name}`).join('\n') : '- None');

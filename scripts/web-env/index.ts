@@ -100,6 +100,19 @@ async function collectDefaults(repoRoot: string, name: string): Promise<Map<stri
   return defaults;
 }
 
+function warnAboutMissingTrackedDefault(name: string): void {
+  const border = '='.repeat(78);
+  console.warn(`
+\x1b[1;33m${border}
+NO TRACKED ENV DEFAULT WILL BE ADDED
+
+Make sure the application can start and run without ${name}. If the code requires
+this variable, external contributors without access to shared secrets will run
+into setup, test, or build failures.
+${border}\x1b[0m
+`);
+}
+
 function warnAboutMatchingTrackedValues(
   repoRoot: string,
   values: Values,
@@ -131,6 +144,7 @@ async function main(): Promise<void> {
     const vaultId = sensitive ? resolveVault() : undefined;
     const values = await collectValues(options);
     const defaults = await collectDefaults(repoRoot, options.name);
+    if (defaults.size === 0) warnAboutMissingTrackedDefault(options.name);
     warnAboutMatchingTrackedValues(repoRoot, values, defaults);
 
     console.log('\nPlan');

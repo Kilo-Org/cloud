@@ -18,7 +18,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 ### Configuration & Constant URLs
 
-- `APP_URL_OVERRIDE` - Override for the base application URL; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. [SERVER]
+- `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
 - `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `apps/web/src/lib/config.server.ts`. [SERVER]
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption; used across many auth-related files. `[SECRET]`
@@ -46,6 +46,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 ### Vercel & Build Info
 
 - `VERCEL_ENV` - Vercel environment (`development`, `preview`, `production`); used in `apps/web/next.config.mjs`, `apps/web/src/lib/constants.ts`, and `apps/web/.env.test`. [SERVER]
+- `VERCEL_TARGET_ENV` - Vercel system or custom target environment; `apps/web/src/lib/constants.ts` uses the `staging` target to select `https://staging-app.kilo.ai`. [SERVER]
 - `VERCEL_URL` - Auto-injected by Vercel; current deployment URL. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `VERCEL_GIT_COMMIT_SHA` - Auto-injected by Vercel; Git commit SHA of the current deployment. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `NEXT_PUBLIC_VERCEL_URL` - Client-exposed Vercel deployment URL from build info. [PUBLIC]

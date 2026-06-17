@@ -83,11 +83,7 @@ async function collectValues(options: Options): Promise<Values> {
   return values as Values;
 }
 
-async function collectDefaults(
-  repoRoot: string,
-  name: string,
-  values: Values
-): Promise<Map<string, string>> {
+async function collectDefaults(repoRoot: string, name: string): Promise<Map<string, string>> {
   const defaults = new Map<string, string>();
   for (const relativeFile of trackedEnvFiles(repoRoot)) {
     const decision = (
@@ -99,19 +95,26 @@ async function collectDefaults(
     const suggested = relativeFile === 'apps/web/.env' ? '' : `invalid-${name.toLowerCase()}`;
     const answer = await question(`Safe default for ${relativeFile} [${suggested}] `);
     const value = answer || suggested;
-    if (Object.values(values).includes(value)) {
-      throw new Error(`The default for ${relativeFile} matches a real environment value.`);
-    }
     defaults.set(relativeFile, value);
   }
   return defaults;
 }
 
-function assertSecretsAreNotTracked(repoRoot: string, values: Values): void {
+function warnAboutMatchingTrackedValues(
+  repoRoot: string,
+  values: Values,
+  defaults: Map<string, string>
+): void {
   for (const relativeFile of trackedEnvFiles(repoRoot)) {
     const content = readFileSync(path.join(repoRoot, relativeFile), 'utf8');
-    if (Object.values(values).some(value => content.includes(value))) {
-      throw new Error(`A real environment value appears in tracked file ${relativeFile}.`);
+    const defaultValue = defaults.get(relativeFile);
+    const matchesRemoteValue = Object.values(values).some(
+      value => content.includes(value) || defaultValue === value
+    );
+    if (matchesRemoteValue) {
+      console.warn(
+        `\x1b[1;33mWARNING:\x1b[0m ${relativeFile} contains or will contain a value also used in a remote environment. This may be intentional.`
+      );
     }
   }
 }
@@ -127,7 +130,8 @@ async function main(): Promise<void> {
     const contexts = resolveVercelContexts(tempDirectory);
     const vaultId = sensitive ? resolveVault() : undefined;
     const values = await collectValues(options);
-    const defaults = await collectDefaults(repoRoot, options.name, values);
+    const defaults = await collectDefaults(repoRoot, options.name);
+    warnAboutMatchingTrackedValues(repoRoot, values, defaults);
 
     console.log('\nPlan');
     for (const environment of ENVIRONMENTS) {
@@ -151,7 +155,6 @@ async function main(): Promise<void> {
     for (const [relativeFile, value] of defaults) {
       setEnvDefault(path.join(repoRoot, relativeFile), options.name, value);
     }
-    assertSecretsAreNotTracked(repoRoot, values);
 
     for (const environment of ENVIRONMENTS) {
       for (const context of contexts) {

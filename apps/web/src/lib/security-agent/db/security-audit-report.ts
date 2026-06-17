@@ -19,6 +19,22 @@ export const SECURITY_AGENT_AUDIT_REPORT_REQUEST_TIMEOUT_MS = 25_000;
 export const SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS = 8_000;
 
 const DateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+type SecurityAgentAuditReportFailureStage =
+  | 'data_through'
+  | 'count'
+  | 'budget'
+  | 'scan'
+  | 'request';
+
+export class SecurityAgentAuditReportQueryError extends Error {
+  constructor(
+    message = 'Report query did not finish',
+    readonly stage: SecurityAgentAuditReportFailureStage = 'request'
+  ) {
+    super(message);
+    this.name = 'SecurityAgentAuditReportQueryError';
+  }
+}
 
 export const SecurityAgentAuditReportInputSchema = z.object({
   startDate: DateOnlySchema.optional(),
@@ -31,12 +47,18 @@ export function resolveSecurityAgentAuditReliableCoverageStart(
   value = process.env.SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START
 ): string {
   if (!value) {
-    throw new Error('SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START is required');
+    throw new SecurityAgentAuditReportQueryError(
+      'SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START is required',
+      'request'
+    );
   }
 
   const parsed = ReliableCoverageStartSchema.safeParse(value);
   if (!parsed.success) {
-    throw new Error('SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START must be an ISO timestamp');
+    throw new SecurityAgentAuditReportQueryError(
+      'SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START must be an ISO timestamp',
+      'request'
+    );
   }
 
   return new Date(parsed.data).toISOString();
@@ -133,7 +155,6 @@ type AuditReportRow = {
   id: string;
   action: SecurityAuditLogAction;
   actor_id: string | null;
-  actor_email: string | null;
   actor_name: string | null;
   actor_type: SecurityAuditLogActorType | null;
   before_state: Record<string, unknown> | null;
@@ -153,13 +174,6 @@ type AuditReportCursor = {
   effectiveAt: string;
   id: string;
 };
-
-type SecurityAgentAuditReportFailureStage =
-  | 'data_through'
-  | 'count'
-  | 'budget'
-  | 'scan'
-  | 'request';
 
 const ACTION_LABELS: Partial<Record<SecurityAuditLogAction, string>> = {
   [SecurityAuditLogAction.FindingCreated]: 'Imported',
@@ -283,16 +297,6 @@ const EMPTY_EVIDENCE_FIELDS = {
 } satisfies AuditEventEvidenceFields;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-export class SecurityAgentAuditReportQueryError extends Error {
-  constructor(
-    message = 'Report query did not finish',
-    readonly stage: SecurityAgentAuditReportFailureStage = 'request'
-  ) {
-    super(message);
-    this.name = 'SecurityAgentAuditReportQueryError';
-  }
-}
 
 export function defaultSecurityAgentAuditReportInput(
   now = new Date()
@@ -587,7 +591,6 @@ async function scanReportPage(
           id: security_audit_log.id,
           action: security_audit_log.action,
           actor_id: security_audit_log.actor_id,
-          actor_email: security_audit_log.actor_email,
           actor_name: security_audit_log.actor_name,
           actor_type: security_audit_log.actor_type,
           before_state: security_audit_log.before_state,

@@ -263,28 +263,28 @@ export function buildSecurityFindingAuditSnapshot(
 ): SecurityFindingAuditSnapshot {
   const snapshot = {
     finding_id: finding.id,
-    source: finding.source,
-    source_id: finding.source_id,
-    repo_full_name: finding.repo_full_name,
-    title: finding.title,
+    source: auditText(finding.source),
+    source_id: auditText(finding.source_id),
+    repo_full_name: auditText(finding.repo_full_name),
+    title: auditText(finding.title),
     severity: finding.severity,
-    status: finding.status,
+    status: auditText(finding.status),
     first_detected_at: normalizeAuditTimestamp(finding.first_detected_at),
     fixed_at: normalizeAuditTimestamp(finding.fixed_at) ?? null,
     sla_due_at: normalizeAuditTimestamp(finding.sla_due_at) ?? null,
     ...pickPresent({
-      package_name: finding.package_name,
-      package_ecosystem: finding.package_ecosystem,
-      manifest_path: finding.manifest_path,
-      patched_version: finding.patched_version,
-      ghsa_id: finding.ghsa_id,
-      cve_id: finding.cve_id,
-      cwe_ids: finding.cwe_ids,
-      cvss_score: finding.cvss_score,
-      dependabot_html_url: finding.dependabot_html_url,
+      package_name: optionalAuditText(finding.package_name),
+      package_ecosystem: optionalAuditText(finding.package_ecosystem),
+      manifest_path: optionalAuditText(finding.manifest_path),
+      patched_version: optionalAuditText(finding.patched_version),
+      ghsa_id: optionalAuditText(finding.ghsa_id),
+      cve_id: optionalAuditText(finding.cve_id),
+      cwe_ids: finding.cwe_ids?.map(auditText),
+      cvss_score: auditCvssScore(finding.cvss_score),
+      dependabot_html_url: auditUrl(finding.dependabot_html_url),
       canonical_finding_id: extras.canonical_finding_id,
       remediation_attempt_id: extras.remediation_attempt_id,
-      session_id: extras.session_id ?? finding.session_id,
+      session_id: optionalAuditText(extras.session_id ?? finding.session_id),
       notification_id: extras.notification_id,
     }),
   };
@@ -423,6 +423,32 @@ function pickPresent<T extends Record<string, unknown>>(values: T): Partial<T> {
 const DISALLOWED_AUDIT_JSON_KEY_PATTERN =
   /(^|_)(actor|recipient|email|prompt|rawmarkdown|raw_markdown|transcript|assistant|provider_response|authorization|auth_header|cookie|token|secret|password|credential|headers|raw_error)(_|$)/i;
 const EMAIL_VALUE_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
+
+function auditText(value: string): string {
+  return value.replace(EMAIL_VALUE_PATTERN, '[redacted-email]');
+}
+
+function optionalAuditText(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  return auditText(value);
+}
+
+function auditCvssScore(value: string | number | null | undefined): string | number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  return auditText(value);
+}
+
+function auditUrl(value: string | null | undefined): string | undefined {
+  if (!value || EMAIL_VALUE_PATTERN.test(value)) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
 
 function validateSafeAuditJson(
   value: unknown,

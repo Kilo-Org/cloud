@@ -87,7 +87,6 @@ function row(overrides: Partial<AuditReportRow>): AuditReportRow {
     id: '00000000-0000-4000-8000-000000000001',
     action: SecurityAuditLogAction.FindingCreated,
     actor_id: null,
-    actor_email: null,
     actor_name: null,
     actor_type: SecurityAuditLogActorType.System,
     before_state: null,
@@ -125,8 +124,14 @@ describe('resolveSecurityAgentAuditReliableCoverageStart', () => {
     expect(() => resolveSecurityAgentAuditReliableCoverageStart('')).toThrow(
       'SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START is required'
     );
+    expect(() => resolveSecurityAgentAuditReliableCoverageStart('')).toThrow(
+      SecurityAgentAuditReportQueryError
+    );
     expect(() => resolveSecurityAgentAuditReliableCoverageStart('2026-06-17')).toThrow(
       'SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START must be an ISO timestamp'
+    );
+    expect(() => resolveSecurityAgentAuditReliableCoverageStart('2026-06-17')).toThrow(
+      SecurityAgentAuditReportQueryError
     );
   });
 });
@@ -360,7 +365,6 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
           id: '00000000-0000-4000-8000-000000000003',
           action: SecurityAuditLogAction.FindingDismissed,
           actor_id: 'admin-user',
-          actor_email: 'ops@kilocode.ai',
           actor_name: 'Ops User',
           actor_type: SecurityAuditLogActorType.KiloAdmin,
           after_state: { status: 'ignored', token: 'secret-token' },
@@ -423,26 +427,23 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
     expect(report.hasLegacySupplementalActivity).toBe(true);
   });
 
-  it('masks actors from persisted classification without inferring from email', () => {
+  it('masks actors from persisted classification', () => {
     const rows = [
       row({
         id: '00000000-0000-4000-8000-000000000011',
         actor_id: 'admin-user',
-        actor_email: 'operator@example.com',
         actor_name: 'Internal Operator',
         actor_type: SecurityAuditLogActorType.KiloAdmin,
       }),
       row({
         id: '00000000-0000-4000-8000-000000000012',
         actor_id: 'customer-user',
-        actor_email: 'customer@kilocode.ai',
         actor_name: 'Customer User',
         actor_type: SecurityAuditLogActorType.CustomerUser,
       }),
       row({
         id: '00000000-0000-4000-8000-000000000013',
         actor_id: 'legacy-user',
-        actor_email: 'legacy@example.com',
         actor_name: 'Legacy User',
         actor_type: null,
       }),

@@ -604,3 +604,40 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(stats.cost_mUsd).toBe(1000); // toMicrodollars(0.001)
   });
 });
+
+describe('auto-routing shadow classifier', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
+    mockedRedisGet.mockResolvedValue(null);
+    mockedRedisSet.mockResolvedValue('OK');
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedUpstreamRequest.mockResolvedValue(
+      upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] })
+    );
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedApplyResolvedAutoModel.mockImplementation(async (_opts, request) => {
+      request.body.model = 'openai/gpt-4o';
+      return { kind: 'ok', resolved: { model: 'openai/gpt-4o' } };
+    });
+  });
+
+  it('does not schedule a background classifier request for non-efficient auto models', async () => {
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedAfter).not.toHaveBeenCalled();
+  });
+});

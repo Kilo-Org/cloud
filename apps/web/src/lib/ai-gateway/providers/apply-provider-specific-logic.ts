@@ -22,15 +22,24 @@ import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
-import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
+import {
+  repairTools,
+  repairMessagesTools,
+  sanitizeBinaryToolResults,
+} from '@/lib/ai-gateway/tool-calling';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import {
   addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
+  isReasoningExplicitlyEnabled,
   scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
+import {
+  rewriteChatCompletionsOneOfAsAnyOf,
+  isFriendliChatCompletionsRequest,
+} from '@/lib/ai-gateway/schema-rewrite';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -131,6 +140,10 @@ export function applyProviderSpecificLogic(
     }
   }
 
+  if (requestToMutate.kind === 'messages') {
+    repairMessagesTools(requestToMutate.body);
+  }
+
   if (requestToMutate.kind === 'responses') {
     fixResponsesRequest(requestToMutate.body);
   }
@@ -150,6 +163,12 @@ export function applyProviderSpecificLogic(
     applyPreferredProvider(requestedModel, requestToMutate.body);
   }
 
+  // Friendli does not support JSON Schema `oneOf`, so downgrade every `oneOf`
+  // to `anyOf` for any chat completions request routed through it.
+  if (isFriendliChatCompletionsRequest(requestToMutate)) {
+    rewriteChatCompletionsOneOfAsAnyOf(requestToMutate.body);
+  }
+
   if (isKimiModel(requestedModel)) {
     applyMoonshotModelSettings(requestToMutate);
   }
@@ -160,6 +179,17 @@ export function applyProviderSpecificLogic(
 
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
+  }
+
+  if (
+    isMinimaxModel(requestedModel) &&
+    requestedModel.includes('m3') &&
+    !isReasoningExplicitlyEnabled(requestToMutate) &&
+    requestToMutate.kind === 'messages'
+  ) {
+    // MiniMax defaults to thinking, but the Anthropic provider does not include thinking:disabled in the request, creating a mismatch.
+    // https://github.com/vercel/ai/blob/4a441d8fb584b231f771348de3e7f383ab7aa95b/packages/anthropic/src/anthropic-language-model.ts#L421-L453
+    requestToMutate.body.thinking = { type: 'disabled' };
   }
 
   provider.transformRequest({

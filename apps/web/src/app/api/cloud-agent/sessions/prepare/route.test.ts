@@ -70,6 +70,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     is_admin: false,
+    can_manage_credits: false,
     blocked_reason: null,
     blocked_at: null,
     blocked_by_kilo_user_id: null,

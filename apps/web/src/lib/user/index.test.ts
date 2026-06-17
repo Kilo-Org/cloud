@@ -714,6 +714,7 @@ describe('User', () => {
         blocked_at: '2026-01-15T12:00:00.000Z',
         blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
+        can_manage_credits: true,
       });
 
       await softDeleteUser(user.id);
@@ -748,6 +749,7 @@ describe('User', () => {
       expect(softDeleted!.auto_top_up_enabled).toBe(false);
       expect(softDeleted!.completed_welcome_form).toBe(false);
       expect(softDeleted!.is_admin).toBe(false);
+      expect(softDeleted!.can_manage_credits).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
     });
@@ -2769,24 +2771,40 @@ describe('User', () => {
       expect(scans[0].findings_critical).toBe(1);
     });
 
-    it('should preserve credit transactions', async () => {
-      const user = await insertTestUser();
-      await db.insert(credit_transactions).values({
-        kilo_user_id: user.id,
-        amount_microdollars: 5_000_000,
-        is_free: false,
-        description: 'Test credits',
+    it('should preserve credit transactions and creator attribution', async () => {
+      const creator = await insertTestUser({ is_admin: true, can_manage_credits: true });
+      const recipient = await insertTestUser();
+      const [transaction] = await db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: recipient.id,
+          created_by_kilo_user_id: creator.id,
+          amount_microdollars: 5_000_000,
+          is_free: false,
+          description: 'Test credits',
+        })
+        .returning({ id: credit_transactions.id });
+      if (!transaction) throw new Error('Failed to create credit transaction');
+
+      await softDeleteUser(creator.id);
+
+      const [preservedTransaction] = await db
+        .select({
+          kilo_user_id: credit_transactions.kilo_user_id,
+          created_by_kilo_user_id: credit_transactions.created_by_kilo_user_id,
+        })
+        .from(credit_transactions)
+        .where(eq(credit_transactions.id, transaction.id));
+      const softDeletedCreator = await findUserById(creator.id);
+
+      expect(preservedTransaction).toEqual({
+        kilo_user_id: recipient.id,
+        created_by_kilo_user_id: creator.id,
       });
-
-      await softDeleteUser(user.id);
-
-      expect(
-        await db
-          .select({ count: count() })
-          .from(credit_transactions)
-          .where(eq(credit_transactions.kilo_user_id, user.id))
-          .then(r => r[0].count)
-      ).toBe(1);
+      expect(softDeletedCreator?.id).toBe(creator.id);
+      expect(softDeletedCreator?.google_user_name).toBe('Deleted User');
+      expect(softDeletedCreator?.is_admin).toBe(false);
+      expect(softDeletedCreator?.can_manage_credits).toBe(false);
     });
 
     it('should preserve model experiment attribution and prompt hashes', async () => {

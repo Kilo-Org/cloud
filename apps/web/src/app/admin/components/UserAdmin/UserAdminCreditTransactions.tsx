@@ -4,21 +4,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { BooleanBadge } from '@/components/ui/boolean-badge';
 import { useQuery } from '@tanstack/react-query';
-import type { UserDetailProps } from '@/types/admin';
-import type { credit_transactions } from '@kilocode/db/schema';
+import type { AdminCreditTransaction, UserDetailProps } from '@/types/admin';
 import { ExternalLinkIcon } from 'lucide-react';
-
-type CreditTransaction = typeof credit_transactions.$inferSelect;
 
 export function UserAdminCreditTransactions({ id }: UserDetailProps) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-user-credit-transactions', id],
-    queryFn: async (): Promise<{ credit_transactions: CreditTransaction[] }> => {
-      const response = await fetch(`/admin/api/users/credit-transactions?kilo_user_id=${id}`);
+    queryFn: async (): Promise<{ credit_transactions: AdminCreditTransaction[] }> => {
+      const response = await fetch(
+        `/admin/api/users/credit-transactions?kilo_user_id=${encodeURIComponent(id)}`
+      );
       if (!response.ok) {
         throw new Error('Failed to fetch credit transactions');
       }
-      return response.json() as Promise<{ credit_transactions: CreditTransaction[] }>;
+      return response.json() as Promise<{ credit_transactions: AdminCreditTransaction[] }>;
     },
   });
 
@@ -93,7 +92,18 @@ export function UserAdminCreditTransactions({ id }: UserDetailProps) {
                             {transaction.description}
                           </p>
                         )}
-                        <div className="text-muted-foreground flex items-center gap-4 text-xs">
+                        <p className="text-muted-foreground mb-1 text-xs">
+                          Created by:{' '}
+                          {transaction.created_by_kilo_user_id
+                            ? transaction.created_by_user_name ||
+                              transaction.created_by_user_email ||
+                              transaction.created_by_kilo_user_id
+                            : 'Creator not recorded'}
+                          {transaction.created_by_user_name && transaction.created_by_user_email
+                            ? ` (${transaction.created_by_user_email})`
+                            : ''}
+                        </p>
+                        <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-xs">
                           <span>{formatDate(transaction.created_at)}</span>
                           {transaction.expiry_date && (
                             <span className="text-foreground">

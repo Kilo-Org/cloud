@@ -10,13 +10,14 @@ import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openro
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
-import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import {
   findKiloExclusiveModel,
   isDeadFreeModel,
   kiloExclusiveModels,
 } from '@/lib/ai-gateway/models';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadata: jest.fn(() => Promise.resolve({})),
@@ -58,6 +59,14 @@ function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
 describe('formatName', () => {
   const NOT_PREFERRED = -1;
 
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-17T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('appends ($$$$) for expensive models', () => {
     const model = buildModel({ pricing: { prompt: '0.00001', completion: '0' } });
     expect(formatName(model, NOT_PREFERRED)).toBe('Test Model ($$$$)');
@@ -97,14 +106,19 @@ describe('formatName', () => {
     expect(formatName(model, 0)).toBe('Test Model');
   });
 
-  it('appends the retirement date in UTC when an expiration date is set', () => {
-    const model = buildModel({ expiration_date: '2026-12-01' });
-    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (retires Dec 1)');
+  it('appends the retirement date in UTC when it is within one month', () => {
+    const model = buildModel({ expiration_date: '2026-07-01' });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model (retires Jul 1)');
+  });
+
+  it('does not append the retirement date when it is more than one month away', () => {
+    const model = buildModel({ expiration_date: '2026-07-18' });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
   });
 
   it('prefers the (new) marker over the retirement marker', () => {
     const recentlyCreated = Math.floor(Date.now() / 1000) - 24 * 3600;
-    const model = buildModel({ created: recentlyCreated, expiration_date: '2026-12-01' });
+    const model = buildModel({ created: recentlyCreated, expiration_date: '2026-07-01' });
     expect(formatName(model, 0)).toBe('Test Model (new)');
   });
 
@@ -166,8 +180,15 @@ describe('shouldSuppressOpenRouterModel', () => {
   });
 
   it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {
-    expect(morph_warp_grep_free_model.status).toBe('hidden');
-    expect(shouldSuppressOpenRouterModel(morph_warp_grep_free_model)).toBe(true);
+    expect(gemma_4_26b_a4b_it_free_model.status).toBe('hidden');
+    expect(shouldSuppressOpenRouterModel(gemma_4_26b_a4b_it_free_model)).toBe(true);
+  });
+});
+
+describe('isFableModel', () => {
+  it('only matches Claude Fable model IDs', () => {
+    expect(isFableModel('anthropic/claude-fable-5')).toBe(true);
+    expect(isFableModel('vendor/fable-model')).toBe(false);
   });
 });
 

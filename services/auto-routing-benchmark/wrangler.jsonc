@@ -1,0 +1,81 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "name": "auto-routing-benchmark",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "auto-routing-benchmark.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "dev": { "port": 8814, "local_protocol": "http", "ip": "0.0.0.0" },
+  "observability": { "enabled": true },
+  "vars": {
+    // Base URL for reaching apps/web's /api/internal/* routes. Other workers
+    // that call apps/web internal endpoints use app.kilo.ai.
+    "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
+    // Gateway base URL injected into the benchmark container as the kilo
+    // CLI's KILO_API_URL. Local dev overrides both vars via .dev.vars (see
+    // .dev.vars.example) so the decider benchmark runs fully locally.
+    "KILO_CLI_API_URL": "https://api.kilo.ai",
+  },
+  "containers": [
+    {
+      "name": "auto-routing-benchmark-runner",
+      "class_name": "BenchRunnerContainer",
+      "image": "./container/Dockerfile",
+      "instance_type": "standard-2",
+      "max_instances": 100,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "BENCH_RUNNER", "class_name": "BenchRunnerContainer" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BenchRunnerContainer"] }],
+  "d1_databases": [
+    {
+      "binding": "BENCH_DB",
+      "database_name": "auto-routing-benchmark",
+      "database_id": "92f2c88a-5ee6-4fd0-b118-75bd141b5cac",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "queues": {
+    "producers": [{ "binding": "BENCH_QUEUE", "queue": "auto-routing-benchmark-jobs" }],
+    "consumers": [
+      {
+        "queue": "auto-routing-benchmark-jobs",
+        "max_batch_size": 1,
+        "max_retries": 6,
+        "retry_delay": 180,
+        "max_concurrency": 100,
+        "dead_letter_queue": "auto-routing-benchmark-dlq",
+      },
+    ],
+  },
+  "kv_namespaces": [
+    // Shared with the auto-routing worker, which uses it as a read-through
+    // cache over this worker's D1. On publish we only DELETE the cached keys
+    // (routing table + classifier winner) so the next read repopulates.
+    { "binding": "AUTO_ROUTING_CONFIG", "id": "4316b8db31e347e19cfadad1b6386ad5" },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "INTERNAL_API_SECRET_PROD",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+    {
+      "binding": "OPENROUTER_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "OPENROUTER_API_KEY",
+    },
+  ],
+}

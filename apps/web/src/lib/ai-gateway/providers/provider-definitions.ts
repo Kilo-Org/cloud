@@ -60,13 +60,6 @@ export default {
     supportedChatApis: [],
     transformRequest() {},
   },
-  MORPH: {
-    id: 'morph',
-    apiUrl: 'https://api.morphllm.com/v1',
-    apiKey: getEnvVariable('MORPH_API_KEY'),
-    supportedChatApis: ['chat_completions'],
-    transformRequest() {},
-  },
   VERCEL_AI_GATEWAY: {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',

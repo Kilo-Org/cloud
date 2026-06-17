@@ -405,6 +405,9 @@ async function main() {
               errorSource: failure.errorSource,
               fatal: true,
               ...(failure.code ? { failureCode: failure.code } : {}),
+              ...(failure.modelNotFoundRuntimeDiagnostics
+                ? { modelNotFoundRuntimeDiagnostics: failure.modelNotFoundRuntimeDiagnostics }
+                : {}),
             },
             timestamp: new Date().toISOString(),
           });

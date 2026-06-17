@@ -2,11 +2,13 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AgentConfigError,
   AgentDefaultsPatchBodySchema,
   AgentSettingsPatchBodySchema,
+  normalizeAgentId,
   readAgentConfigSnapshot,
   readAgentSummary,
   serializeAgentConfigMutation,
@@ -14,6 +16,36 @@ import {
   updateAgentDefaults,
   updateAgentSettings,
 } from './openclaw-agent-config';
+
+// PARITY CORPUS — the web app re-declares normalizeAgentId in
+// apps/web/src/lib/kiloclaw/agent-id.ts (the architecture wall blocks importing
+// this controller code into apps/web). Both sides must agree, because the web
+// create-timeout reconcile predicts the id from the typed name. Rather than two
+// hand-maintained corpora that can silently drift, both suites load THIS shared
+// file (agent-id.test.ts reads the same JSON), so a single source of truth
+// drives both implementations' assertions.
+const NORMALIZE_AGENT_ID_CORPUS = (
+  JSON.parse(
+    fs.readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'agent-id-corpus.json'),
+      'utf8'
+    )
+  ) as { cases: ReadonlyArray<{ input: string; expected: string }> }
+).cases;
+
+describe('normalizeAgentId (parity with web agent-id.test.ts)', () => {
+  it.each(NORMALIZE_AGENT_ID_CORPUS)('normalizes $input -> $expected', ({ input, expected }) => {
+    expect(normalizeAgentId(input)).toBe(expected);
+  });
+
+  it('keeps underscore and hyphen names distinct', () => {
+    expect(normalizeAgentId('foo_bar')).not.toBe(normalizeAgentId('foo-bar'));
+  });
+
+  it('caps at 64 chars', () => {
+    expect(normalizeAgentId('a'.repeat(100))).toHaveLength(64);
+  });
+});
 
 const tempDirs: string[] = [];
 

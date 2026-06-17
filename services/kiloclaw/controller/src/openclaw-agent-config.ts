@@ -211,6 +211,12 @@ export function computeConfigEtag(raw: string): string {
   return crypto.createHash('md5').update(raw).digest('hex');
 }
 
+// AUTHORITATIVE agent-id normalization. The web app re-declares this (the
+// architecture wall blocks importing controller code into apps/web) in
+// apps/web/src/lib/kiloclaw/agent-id.ts, where the create-timeout reconcile
+// predicts the assigned id from the typed name. If you change the rule here,
+// update that mirror + its agent-id.test.ts in the same change, or a timed-out
+// create can report a false success/failure.
 export function normalizeAgentId(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {

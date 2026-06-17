@@ -1,6 +1,6 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { organizations } from '@kilocode/db/schema';
+import { credit_transactions, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
@@ -425,6 +425,35 @@ describe('organizations trpc router', () => {
       const [row] = await db.select().from(organizations).where(eq(organizations.id, org.id));
 
       expect(row.company_domain).toBeNull();
+    });
+  });
+
+  describe('creditTransactions procedure', () => {
+    it('does not expose internal creator attribution to organization members', async () => {
+      const [transaction] = await db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: regularUser.id,
+          created_by_kilo_user_id: adminUser.id,
+          organization_id: testOrganization.id,
+          amount_microdollars: 1_000_000,
+          is_free: true,
+        })
+        .returning({ id: credit_transactions.id });
+      if (!transaction) throw new Error('Failed to create organization credit transaction');
+
+      const caller = await createCallerForUser(memberUser.id);
+      const result = await caller.organizations.creditTransactions({
+        organizationId: testOrganization.id,
+      });
+      const returnedTransaction = result.find(row => row.id === transaction.id);
+
+      expect(returnedTransaction).toBeDefined();
+      expect(returnedTransaction).not.toHaveProperty('created_by_kilo_user_id');
+      expect(returnedTransaction).not.toHaveProperty('created_by_user_name');
+      expect(returnedTransaction).not.toHaveProperty('created_by_user_email');
+
+      await db.delete(credit_transactions).where(eq(credit_transactions.id, transaction.id));
     });
   });
 

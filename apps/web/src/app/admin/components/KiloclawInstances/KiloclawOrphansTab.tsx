@@ -153,7 +153,9 @@ type OrphanVolumeRow = {
   sandbox_id: string;
   organization_id: string | null;
   destroyed_at: string;
+  latest_sandbox_destroyed_at: string | null;
   subscription_status: string | null;
+  subscription_ended_at: string | null;
   fly_app: string;
   volume_id: string;
   volume_name: string;
@@ -664,8 +666,15 @@ function OrphanVolumesSection() {
                     <TableHead>Region / Size</TableHead>
                     <TableHead>Volume State</TableHead>
                     <TableHead>DO Status</TableHead>
-                    <TableHead>Destroyed</TableHead>
-                    <TableHead>Subscription</TableHead>
+                    <TableHead title="Most recent destruction across this sandbox's entire provision history — the date the 7-day orphan grace clock actually runs from. A reprovisioned sandbox can have an older row that matched the scan window; that windowed date is shown beneath when it differs.">
+                      Destroyed
+                    </TableHead>
+                    <TableHead title="Subscription attached to the provision that matched the scan window — for a reprovisioned sandbox this can be an older, already-transferred row, not the lineage's current subscription. The access check (Classification) uses the current successor subscription, not this column.">
+                      Subscription
+                    </TableHead>
+                    <TableHead title="End of the matched provision's paid or trial period — a proxy for when access ended, NOT an authoritative cancellation timestamp. For a reprovisioned sandbox this reflects the windowed provision's subscription, which may differ from the lineage's true end.">
+                      Period End
+                    </TableHead>
                     <TableHead>Classification</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -721,9 +730,31 @@ function OrphanVolumesSection() {
                         )}
                       </TableCell>
                       <TableCell className="text-xs">{volume.do_status ?? 'finalized'}</TableCell>
-                      <TableCell title={new Date(volume.destroyed_at).toLocaleString()}>
-                        {formatRelativeTime(volume.destroyed_at)}
-                      </TableCell>
+                      {(() => {
+                        // The grace clock runs from the lineage's most recent
+                        // destruction. Show that as the primary date so the
+                        // table never appears to predate a subscription that
+                        // lived on a later provision of the same sandbox.
+                        const graceDate = volume.latest_sandbox_destroyed_at ?? volume.destroyed_at;
+                        const windowDiffers =
+                          volume.latest_sandbox_destroyed_at !== null &&
+                          volume.latest_sandbox_destroyed_at !== volume.destroyed_at;
+                        return (
+                          <TableCell title={new Date(graceDate).toLocaleString()}>
+                            {formatRelativeTime(graceDate)}
+                            {windowDiffers && (
+                              <div
+                                className="text-muted-foreground text-xs"
+                                title={`This older provision (destroyed ${new Date(
+                                  volume.destroyed_at
+                                ).toLocaleString()}) matched the scan window; the sandbox was later reprovisioned and destroyed again.`}
+                              >
+                                scan match: {formatRelativeTime(volume.destroyed_at)}
+                              </div>
+                            )}
+                          </TableCell>
+                        );
+                      })()}
                       <TableCell>
                         {volume.subscription_status ? (
                           <Badge
@@ -740,6 +771,20 @@ function OrphanVolumesSection() {
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell
+                        className="text-xs"
+                        title={
+                          volume.subscription_ended_at
+                            ? new Date(volume.subscription_ended_at).toLocaleString()
+                            : undefined
+                        }
+                      >
+                        {volume.subscription_ended_at ? (
+                          formatRelativeTime(volume.subscription_ended_at)
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell>

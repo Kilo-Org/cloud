@@ -1,7 +1,9 @@
 import type { PlatformIntegration } from '@kilocode/db/schema';
 
 import {
+  getCollaboratorPermissionLevel,
   getGitHubReviewComment,
+  type CollaboratorPermission,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
 import type { PullRequestReviewCommentPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
@@ -18,8 +20,16 @@ export const KILO_GITHUB_BOT_LOGINS: ReadonlySet<string> = new Set([
   'kilocode[bot]',
 ]);
 
-const MAINTAINER_AUTHOR_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 export const REVIEW_MEMORY_FEEDBACK_EXCERPT_MAX_LENGTH = 2_000;
+const REVIEW_MEMORY_PERMISSION_CACHE_TTL_MS = 30 * 60_000;
+
+type RepositoryPermissionCacheEntry = {
+  value: CollaboratorPermission;
+  expiresAtMs: number;
+};
+
+const repositoryPermissionCache = new Map<string, RepositoryPermissionCacheEntry>();
+const repositoryPermissionInFlight = new Map<string, Promise<CollaboratorPermission | null>>();
 
 export function isLikelyKiloBotActor(login: string | undefined): boolean {
   return KILO_GITHUB_BOT_LOGINS.has(login?.toLowerCase() ?? '');
@@ -33,11 +43,20 @@ export type FetchParentReviewComment = (input: {
   commentId: number;
 }) => Promise<{ id: number; body: string; userLogin: string | null } | null>;
 
+export type FetchRepositoryPermission = (input: {
+  installationId: string;
+  appType: GitHubAppType;
+  owner: string;
+  repo: string;
+  username: string;
+}) => Promise<CollaboratorPermission | null>;
+
 export async function handleGitHubReviewCommentReply(input: {
   payload: PullRequestReviewCommentPayload;
   integration: PlatformIntegration;
   deliveryId: string;
   fetchParentComment?: FetchParentReviewComment;
+  fetchRepositoryPermission?: FetchRepositoryPermission;
 }): Promise<{ recorded: boolean; reason?: string; eventId?: string }> {
   if (input.payload.action !== 'created') return { recorded: false, reason: 'comment-not-created' };
 
@@ -46,10 +65,6 @@ export async function handleGitHubReviewCommentReply(input: {
 
   if (isLikelyKiloBotActor(input.payload.comment.user.login)) {
     return { recorded: false, reason: 'bot-authored-comment' };
-  }
-
-  if (!MAINTAINER_AUTHOR_ASSOCIATIONS.has(input.payload.comment.author_association)) {
-    return { recorded: false, reason: 'not-maintainer-reply' };
   }
 
   const owner = ownerFromIntegration(input.integration);
@@ -65,6 +80,8 @@ export async function handleGitHubReviewCommentReply(input: {
   const installationId = input.payload.installation.id.toString();
   const appType = input.integration.github_app_type ?? 'standard';
   const fetchParentComment = input.fetchParentComment ?? defaultFetchParentComment;
+  const fetchRepositoryPermission =
+    input.fetchRepositoryPermission ?? defaultFetchRepositoryPermission;
   const parent = await fetchParentComment({
     installationId,
     appType,
@@ -76,6 +93,22 @@ export async function handleGitHubReviewCommentReply(input: {
   if (!parent) return { recorded: false, reason: 'parent-comment-not-found' };
   if (!isLikelyKiloBotActor(parent.userLogin ?? undefined)) {
     return { recorded: false, reason: 'not-kilo-comment' };
+  }
+
+  const repositoryPermission = await fetchRepositoryPermissionWithCache(fetchRepositoryPermission, {
+    installationId,
+    appType,
+    owner: repoOwner,
+    repo,
+    username: input.payload.comment.user.login,
+  });
+
+  if (repositoryPermission === null) {
+    return { recorded: false, reason: 'repository-permission-unavailable' };
+  }
+
+  if (!isTrustedRepositoryPermission(repositoryPermission)) {
+    return { recorded: false, reason: 'insufficient-repository-permission' };
   }
 
   const result = await recordReplyFeedbackEvent({
@@ -106,6 +139,63 @@ function truncateReviewMemoryFeedbackExcerpt(value: string): string {
   return value.slice(0, REVIEW_MEMORY_FEEDBACK_EXCERPT_MAX_LENGTH);
 }
 
+function isTrustedRepositoryPermission(permission: CollaboratorPermission): boolean {
+  return permission === 'admin' || permission === 'write';
+}
+
+async function fetchRepositoryPermissionWithCache(
+  fetchRepositoryPermission: FetchRepositoryPermission,
+  input: Parameters<FetchRepositoryPermission>[0]
+): Promise<CollaboratorPermission | null> {
+  const cacheKey = repositoryPermissionCacheKey(input);
+  const now = Date.now();
+  const cached = repositoryPermissionCache.get(cacheKey);
+  if (cached) {
+    if (cached.expiresAtMs > now) {
+      return cached.value;
+    }
+    repositoryPermissionCache.delete(cacheKey);
+  }
+
+  const inFlight = repositoryPermissionInFlight.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const promise = (async () => {
+    const permission = await fetchRepositoryPermission(input);
+    if (permission !== null) {
+      repositoryPermissionCache.set(cacheKey, {
+        value: permission,
+        expiresAtMs: Date.now() + REVIEW_MEMORY_PERMISSION_CACHE_TTL_MS,
+      });
+    }
+    return permission;
+  })();
+
+  repositoryPermissionInFlight.set(cacheKey, promise);
+
+  try {
+    return await promise;
+  } finally {
+    repositoryPermissionInFlight.delete(cacheKey);
+  }
+}
+
+function repositoryPermissionCacheKey(input: Parameters<FetchRepositoryPermission>[0]): string {
+  return JSON.stringify([
+    normalizeCacheKeyComponent(input.installationId),
+    normalizeCacheKeyComponent(input.appType),
+    normalizeCacheKeyComponent(input.owner),
+    normalizeCacheKeyComponent(input.repo),
+    normalizeCacheKeyComponent(input.username),
+  ]);
+}
+
+function normalizeCacheKeyComponent(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 const defaultFetchParentComment: FetchParentReviewComment = async input => {
   const comment = await getGitHubReviewComment(
     input.installationId,
@@ -116,4 +206,14 @@ const defaultFetchParentComment: FetchParentReviewComment = async input => {
   );
   if (!comment) return null;
   return { id: comment.id, body: comment.body, userLogin: comment.userLogin };
+};
+
+const defaultFetchRepositoryPermission: FetchRepositoryPermission = async input => {
+  return getCollaboratorPermissionLevel(
+    input.installationId,
+    input.owner,
+    input.repo,
+    input.username,
+    input.appType
+  );
 };

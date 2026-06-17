@@ -5,7 +5,9 @@ import {
   deriveBannerState,
   deriveLockReason,
   formatKiloClawPlanPrice,
+  getKiloClawFundingChoiceCopy,
   getKiloClawRetirementDisplay,
+  getKiloPassHostingRecoveryCopy,
   type ClawBillingStatus,
   type KiloPassUpsellActivationPreview,
 } from './billing-types';
@@ -163,6 +165,42 @@ describe('KiloClaw billing display helpers', () => {
     expect(formatKiloClawPlanPrice({ plan: 'commit', priceVersion: '2026-05-10' })).toBe(
       '$306/6-month commit'
     );
+  });
+});
+
+describe('KiloClaw funding and recovery copy', () => {
+  it.each([
+    ['credits_not_settled', true, null, null],
+    ['enrollment_failed', true, '/claw/subscription', 'Choose hosting plan'],
+    ['requires_reprovision', false, null, null],
+    ['missing_instance', false, null, null],
+    ['destroyed_instance', false, null, null],
+    ['stale_intent', false, '/claw/subscription', 'Choose hosting plan'],
+    ['invalid_intent', false, '/claw/subscription', 'Choose hosting plan'],
+    ['insufficient_credits', false, '/claw/subscription', 'Review hosting options'],
+    ['expired_commit', false, '/claw/subscription', 'Choose Standard hosting'],
+    ['unexpected_error', false, null, null],
+  ] as const)(
+    'maps %s to the correct recovery policy',
+    (reason, canRetry, destination, destinationLabel) => {
+      expect(getKiloPassHostingRecoveryCopy(reason)).toEqual(
+        expect.objectContaining({ canRetry, destination, destinationLabel })
+      );
+    }
+  );
+
+  it('distinguishes credit-funded hosting from a separate recurring Stripe subscription', () => {
+    expect(
+      getKiloClawFundingChoiceCopy({ plan: 'standard', costMicrodollars: 55_000_000 })
+    ).toEqual({
+      creditHeading: 'Credit-funded hosting',
+      creditDescription:
+        'Standard first charge: $55/month. Future hosting charges use your credit balance.',
+      creditButtonLabel: 'Activate Standard with credits',
+      stripeDividerLabel: 'or start a separate Stripe subscription',
+      stripeButtonLabel: 'Subscribe with Stripe, $55/month',
+      stripeDescription: 'Creates a separate recurring Stripe charge for hosting.',
+    });
   });
 });
 

@@ -469,7 +469,7 @@ function ModelMetadataBadges({ model }: { model: ModelOption }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-1">
       {free && (
-        <span className="inline-flex shrink-0 items-center rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-green-500/20 px-1.5 py-0.5 text-[10px] font-medium text-green-400 ring-1 ring-green-500/20">
           {FREE_MODEL_FREE_LABEL}
         </span>
       )}

@@ -5,7 +5,6 @@ import { redirect } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { fetchCreditTransactionIdForStripeSession, getPaymentReturnUrl } from './actions';
 import BigLoader from '@/components/BigLoader';
-import { captureMessage } from '@sentry/nextjs';
 import { fromMicrodollars } from '@/lib/utils';
 import { TOPUP_AMOUNT_QUERY_STRING_KEY } from '@/lib/organizations/constants';
 import { PageContainer } from '@/components/layouts/PageContainer';
@@ -38,14 +37,6 @@ export default function TopUpSuccessPage() {
     // we intententionally listen to tries because we want to set a timeout after each try
     if (tries > 14) {
       setHasExceededMaxTries(true);
-      void (async function () {
-        captureMessage('Exceeded max tries to fetch credit transaction ID', {
-          extra: {
-            sessionId: sessionId,
-          },
-        });
-      })();
-
       return;
     }
 

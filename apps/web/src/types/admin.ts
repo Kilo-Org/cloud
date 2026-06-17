@@ -71,7 +71,24 @@ export const OrganizationsApiGetResponseSchema = z.object({
 
 export type NoteWithAdminUser = UserAdminNote & { admin_kilo_user: User | null };
 
-export interface AddCreditRequest {
+export const AdminCreditTransactionSchema = z.object({
+  id: z.string(),
+  amount_microdollars: z.number(),
+  expiration_baseline_microdollars_used: z.number().nullable(),
+  is_free: z.boolean(),
+  description: z.string().nullable(),
+  stripe_payment_id: z.string().nullable(),
+  credit_category: z.string().nullable(),
+  expiry_date: z.string().datetime().nullable(),
+  created_at: z.string().datetime(),
+  created_by_kilo_user_id: z.string().nullable(),
+  created_by_user_name: z.string().nullable(),
+  created_by_user_email: z.string().nullable(),
+});
+
+export type AdminCreditTransaction = z.infer<typeof AdminCreditTransactionSchema>;
+
+export type AddCreditRequest = {
   email: string;
   // Conventional names (preferred)
   amount_usd?: number | null;
@@ -86,7 +103,7 @@ export interface AddCreditRequest {
   idempotencyKey?: string;
   creditExpiryDate?: string;
   creditExpiryHours?: number | null;
-}
+};
 
 export const sortableFields = [
   'google_user_email',

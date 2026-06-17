@@ -15,21 +15,21 @@ import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import { getVercelModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
-  if (isCodestralModel(modelId)) {
-    return ['codestral'];
-  }
   const vercelModelMetadata = await getVercelModelsMetadata();
   if (Object.keys(vercelModelMetadata).length === 0) {
     console.error('[getModelUserByokProviders] no Vercel model metadata in the database');
     return [];
   }
-  const providers =
+  const providers: UserByokProviderId[] =
     vercelModelMetadata[mapModelIdToVercel(modelId, false)]?.endpoints
       .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.provider_name ?? ep.tag).data)
       .filter(providerId => providerId !== undefined) ?? [];
   if (providers.length === 0) {
     console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
     return [];
+  }
+  if (isCodestralModel(modelId)) {
+    providers.unshift('codestral');
   }
   console.debug('[getModelUserByokProviders] found user byok providers for %s', modelId, providers);
   return providers;

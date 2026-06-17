@@ -133,5 +133,5 @@ export function isOpusModel(requestedModel: string) {
 }
 
 export function isFableModel(requestedModel: string) {
-  return requestedModel.includes('fable');
+  return requestedModel.includes('claude-fable');
 }

@@ -9,19 +9,19 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 import type { User } from '@kilocode/db';
+import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import {
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
   KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
   BALANCED_QWEN_MODEL,
-  BALANCED_RESPONSES_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
-  BALANCED_MESSAGES_FALLBACK_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -41,6 +41,9 @@ type ResolveAutoModelParams = {
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
+  // Lazily fetches the auto-routing worker's decision; only set for
+  // kilo-auto/efficient requests (route.ts owns the request-body capture).
+  efficientDecision?: () => Promise<AutoRoutingDecision | null>;
 };
 
 function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
@@ -117,6 +120,25 @@ export async function resolveAutoModel(
       },
     };
   }
+  if (model === KILO_AUTO_EFFICIENT_MODEL.id) {
+    const decision = params.efficientDecision ? await params.efficientDecision() : null;
+    if (decision) {
+      // Apply the candidate's pinned reasoning effort so the model runs under
+      // the same conditions the benchmark measured it at.
+      return {
+        kind: 'ok',
+        resolved: {
+          model: decision.model,
+          ...(decision.reasoningEffort
+            ? { reasoning: { enabled: true, effort: decision.reasoningEffort } }
+            : {}),
+        },
+      };
+    }
+    // Static fallback when the worker is slow/unavailable: same model as
+    // balanced so an efficient request never degrades below balanced.
+    return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
+  }
   const mode = resolveMode(modeHeader, featureHeader);
   if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
     if (mode === 'claw' && featureHeader === 'kiloclaw') {
@@ -126,17 +148,7 @@ export async function resolveAutoModel(
       }
     }
 
-    // Alibaba doesn't expose a messages endpoint
-    // and does not support prompt caching on the responses endpoint
-    // so we use a fallback in those cases.
-    // This should be rare, both CLI and KiloClaw default to chat completions.
-    if (apiKind === 'responses') {
-      return { kind: 'ok', resolved: BALANCED_RESPONSES_FALLBACK_MODEL };
-    } else if (apiKind === 'messages') {
-      return { kind: 'ok', resolved: BALANCED_MESSAGES_FALLBACK_MODEL };
-    } else {
-      return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
-    }
+    return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
   }
   return {
     kind: 'ok',

@@ -1,0 +1,14 @@
+# Base URL the worker uses for apps/web's /api/internal/* routes (decider
+# benchmark token mint). The worker process runs on the host, so localhost
+# reaches the local apps/web dev server directly.
+# @url nextjs
+KILO_WEB_API_BASE_URL=http://localhost:3000
+
+# Gateway base URL for the kilo CLI inside the benchmark container (injected
+# as KILO_API_URL). Containers cannot use localhost (that resolves to the
+# container itself). host.docker.internal works under OrbStack; on Docker
+# Desktop the wrangler container network may not get that mapping — use the
+# Docker Desktop host gateway IP http://192.168.65.254:3000 instead (same
+# convention as services/wasteland).
+# @url nextjs
+KILO_CLI_API_URL=http://host.docker.internal:3000

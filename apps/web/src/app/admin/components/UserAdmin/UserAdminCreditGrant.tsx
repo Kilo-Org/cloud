@@ -13,17 +13,18 @@ import {
 import { Label } from '@/components/ui/label';
 import { DollarSign } from 'lucide-react';
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AddCreditRequest, UserDetailProps } from '@/types/admin';
 import type { GuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
 import { formatCategoryAsMarkdown } from '@/lib/PromoCreditCategoryConfig';
 import ReactMarkdown from 'react-markdown';
+import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
+import { CreditManagementAccessOverlay } from '@/app/admin/components/CreditManagementAccessOverlay';
 
-interface CreditMessage {
+type CreditMessage = {
   type: 'success' | 'error';
   text: string;
-}
+};
 
 type UserAdminCreditGrantProps = UserDetailProps & {
   promoCreditCategories: readonly GuiCreditCategory[];
@@ -34,8 +35,8 @@ export function UserAdminCreditGrant({
   google_user_email,
   promoCreditCategories,
 }: UserAdminCreditGrantProps) {
-  const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const { canManageCredits } = useAdminCreditManagementPermission();
 
   // Credit form state
   const [selectedCredit, setSelectedCredit] = useState<string>('custom');
@@ -80,6 +81,8 @@ export function UserAdminCreditGrant({
   };
 
   const handleGrantCredit = async () => {
+    if (!canManageCredits) return;
+
     const parsedAmount = customAmount ? parseFloat(customAmount) : undefined;
     const isValidAmount =
       parsedAmount === undefined ||
@@ -95,9 +98,7 @@ export function UserAdminCreditGrant({
       const requestBody: AddCreditRequest = {
         email: google_user_email,
         amount_usd: customAmount ? parseFloat(customAmount) : undefined,
-        description: customDescription.trim()
-          ? `${customDescription} (${session?.user?.name || session?.user?.email || 'Admin'})`
-          : undefined,
+        description: customDescription.trim() || undefined,
         credit_category: selectedCredit,
         credit_expiry_date: expirationDate,
         expiry_hours: expiryHours ? parseFloat(expiryHours) : undefined,
@@ -140,9 +141,12 @@ export function UserAdminCreditGrant({
   };
 
   return (
-    <Card className="text-muted-foreground p-6 lg:col-span-2">
+    <Card className="text-muted-foreground relative p-6 lg:col-span-2">
+      {!canManageCredits && (
+        <CreditManagementAccessOverlay message="You don't have access to grant credits. File an access request before handing out credits." />
+      )}
       <form
-        className="space-y-4"
+        className={`space-y-4 ${canManageCredits ? '' : 'pointer-events-none select-none opacity-35'}`}
         onSubmit={async e => {
           e.preventDefault();
           await handleGrantCredit();
@@ -160,6 +164,7 @@ export function UserAdminCreditGrant({
                   type="checkbox"
                   checked={showSelfServe}
                   onChange={e => setShowSelfServe(e.target.checked)}
+                  disabled={!canManageCredits}
                 />
                 Show self-serve categories
               </Label>
@@ -168,13 +173,18 @@ export function UserAdminCreditGrant({
                   type="checkbox"
                   checked={includeNonSupport}
                   onChange={e => setIncludeNonSupport(e.target.checked)}
+                  disabled={!canManageCredits}
                 />
                 Include other, non-support categories
               </Label>
             </div>
             <Label className="flex flex-col items-start gap-2 text-sm font-medium">
               Credit Category
-              <Select value={selectedCredit} onValueChange={handleCreditTypeChange}>
+              <Select
+                value={selectedCredit}
+                onValueChange={handleCreditTypeChange}
+                disabled={!canManageCredits}
+              >
                 <SelectTrigger id="credit-type-select">
                   <SelectValue placeholder="Select category.." />
                 </SelectTrigger>
@@ -226,7 +236,7 @@ export function UserAdminCreditGrant({
               min={expectNegative ? undefined : '0.01'}
               step="0.01"
               id="amount"
-              disabled={!selectedCredit}
+              disabled={!canManageCredits || !selectedCredit}
             />
           </div>
           {!expectNegative && (
@@ -243,7 +253,7 @@ export function UserAdminCreditGrant({
                   min="0"
                   step="0.01"
                   id="expiry-hours"
-                  disabled={!selectedCredit || neverExpire}
+                  disabled={!canManageCredits || !selectedCredit || neverExpire}
                 />
               </div>
               <div>
@@ -257,7 +267,7 @@ export function UserAdminCreditGrant({
                   }
                   onChange={e => setExpirationDate(e.target.value)}
                   id="date"
-                  disabled={!selectedCredit || neverExpire}
+                  disabled={!canManageCredits || !selectedCredit || neverExpire}
                 />
               </div>
               <div className="flex items-end">
@@ -272,7 +282,7 @@ export function UserAdminCreditGrant({
                         setExpiryHours('');
                       }
                     }}
-                    disabled={!selectedCredit}
+                    disabled={!canManageCredits || !selectedCredit}
                   />
                   Never expire
                 </Label>
@@ -281,7 +291,7 @@ export function UserAdminCreditGrant({
           )}
         </div>
 
-        {!expectNegative && selectedCredit && !isExpirationValid && (
+        {canManageCredits && !expectNegative && selectedCredit && !isExpirationValid && (
           <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
             Please specify an expiration date or expiry hours, or check &quot;Never expire&quot; to
             grant credits without expiration.
@@ -299,12 +309,12 @@ export function UserAdminCreditGrant({
               value={customDescription}
               onChange={e => setCustomDescription(e.target.value)}
               id="description"
-              disabled={!selectedCredit}
+              disabled={!canManageCredits || !selectedCredit}
               required={expectNegative}
             />
           </div>
           <Button
-            disabled={!isFormValid || isGrantingCredit}
+            disabled={!canManageCredits || !isFormValid || isGrantingCredit}
             className="ml-auto self-end sm:w-auto"
             type="submit"
           >

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ClassifierOutput } from './classifier-output';
-import { AutoRoutingDecisionCacheDO } from './decision-cache';
+import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
+import { AutoRoutingDecisionCacheDO, getStickyDecision, putStickyDecision } from './decision-cache';
 
 const classification = {
   taskType: 'implementation',
@@ -102,5 +102,50 @@ describe('AutoRoutingDecisionCacheDO', () => {
 
     expect(storage.entries.size).toBe(0);
     await expect(storage.getAlarm()).resolves.toBeNull();
+  });
+});
+
+describe('sticky decision storage', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-11T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function createStickyEnv() {
+    const { cacheDO, storage } = createCacheDO();
+    const env = {
+      AUTO_ROUTING_DECISION_CACHE: {
+        idFromName: (name: string) => name,
+        get: () => cacheDO,
+      },
+    } as unknown as Pick<Env, 'AUTO_ROUTING_DECISION_CACHE'>;
+    return { env, cacheDO, storage };
+  }
+
+  it('round-trips the sticky model for a conversation', async () => {
+    const { env } = createStickyEnv();
+    await expect(getStickyDecision(env, 'conversation-1')).resolves.toBeNull();
+
+    await putStickyDecision(env, 'conversation-1', 'mid/chat');
+    await expect(getStickyDecision(env, 'conversation-1')).resolves.toBe('mid/chat');
+  });
+
+  it('expires sticky entries after the TTL', async () => {
+    const { env } = createStickyEnv();
+    await putStickyDecision(env, 'conversation-1', 'mid/chat');
+
+    vi.advanceTimersByTime(31 * 60 * 1000);
+    await expect(getStickyDecision(env, 'conversation-1')).resolves.toBeNull();
+  });
+
+  it('returns null for invalid stored shapes', async () => {
+    const { env, cacheDO } = createStickyEnv();
+    await cacheDO.putEntry('sticky', { nope: true } as unknown as ClassifierOutput);
+
+    await expect(getStickyDecision(env, 'conversation-1')).resolves.toBeNull();
   });
 });

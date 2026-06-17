@@ -1,11 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
-import {
-  autoFreeModels,
-  findKiloExclusiveModel,
-  kiloExclusiveModels,
-  isKiloExclusiveModelRequiringDataCollection,
-} from './models';
-import { isFreeModel } from './is-free-model';
+import { autoFreeModels, findKiloExclusiveModel, kiloExclusiveModels } from './models';
+import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
 import {
   claude_opus_4_7_stealth_model,
@@ -73,18 +68,6 @@ describe('isFreeModel', () => {
       expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
       expect(getInferenceProvider(claude_opus_4_6_stealth_model)).toBe('stealth');
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
-    });
-
-    test('requires data collection for paid training-enabled offerings', () => {
-      expect(
-        isKiloExclusiveModelRequiringDataCollection(claude_opus_4_7_stealth_model.public_id)
-      ).toBe(true);
-      expect(
-        isKiloExclusiveModelRequiringDataCollection(claude_sonnet_4_6_stealth_model.public_id)
-      ).toBe(true);
-      expect(
-        isKiloExclusiveModelRequiringDataCollection(claude_opus_4_6_stealth_model.public_id)
-      ).toBe(true);
     });
 
     test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
@@ -184,5 +167,29 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('openrouter/free ')).toBe(false);
       expect(await isFreeModel('openrouter/model-alpha ')).toBe(false);
     });
+  });
+});
+
+describe('hasBestEffortGuessDataCollectionRequirement', () => {
+  test('requires data collection for paid training-enabled offerings', async () => {
+    expect(
+      await hasBestEffortGuessDataCollectionRequirement(claude_opus_4_7_stealth_model.public_id)
+    ).toBe(true);
+    expect(
+      await hasBestEffortGuessDataCollectionRequirement(claude_sonnet_4_6_stealth_model.public_id)
+    ).toBe(true);
+    expect(
+      await hasBestEffortGuessDataCollectionRequirement(claude_opus_4_6_stealth_model.public_id)
+    ).toBe(true);
+  });
+
+  test('requires data collection for free models', async () => {
+    expect(await hasBestEffortGuessDataCollectionRequirement('openrouter/free')).toBe(true);
+  });
+
+  test('does not require data collection for regular paid models', async () => {
+    expect(await hasBestEffortGuessDataCollectionRequirement('anthropic/claude-sonnet-4')).toBe(
+      false
+    );
   });
 });

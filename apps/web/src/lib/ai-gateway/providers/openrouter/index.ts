@@ -73,7 +73,7 @@ export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterModel {
 }
 
 function buildAutoModels(): OpenRouterModel[] {
-  return AUTO_MODELS.filter(m => m.status === 'public').map(buildAutoModelCatalogEntry);
+  return AUTO_MODELS.map(buildAutoModelCatalogEntry);
 }
 
 export function formatName(model: OpenRouterModel, preferredIndex: number) {

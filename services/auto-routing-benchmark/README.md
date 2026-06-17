@@ -26,7 +26,7 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 
 | Endpoint | Purpose |
 |---|---|
-| `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`) |
+| `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`) |
 | `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
 | `POST /admin/runs` | Start a run (`{kind, force}`); returns 409 if one of that kind is already running |
 | `GET /admin/routing-table` | Latest published routing table |
@@ -62,8 +62,9 @@ SECRET=$(grep '^INTERNAL_API_SECRET=' ../../.env.local | cut -d= -f2- | tr -d '"
 curl -s http://localhost:8814/admin/config -H "Authorization: Bearer $SECRET"
 ```
 
-Decider runs need a `benchmarkUserId` that exists locally with credits — the dev
-seed provides `auto-routing-cli-local`.
+Decider runs need a `benchmarkUserId` that exists locally with credits. When
+`benchmarkOrgId` is set, the benchmark user must belong to that org and usage
+bills org credits. The dev seed provides `auto-routing-cli-local`.
 
 > Local KV/D1 writes from a *second* `wrangler` process are not seen by the
 > running dev process (miniflare holds its own view). After writing state out of

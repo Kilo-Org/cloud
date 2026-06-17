@@ -11,6 +11,7 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   switch_cost_factor: real('switch_cost_factor').notNull(),
   max_concurrency: integer('max_concurrency').notNull(),
   benchmark_user_id: text('benchmark_user_id'),
+  benchmark_org_id: text('benchmark_org_id'),
   classifier_repetitions: integer('classifier_repetitions').notNull().default(1),
   decider_repetitions: integer('decider_repetitions').notNull().default(1),
   classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
@@ -41,6 +42,7 @@ export const benchmarkRuns = sqliteTable(
     switch_cost_factor: real('switch_cost_factor').notNull(),
     max_concurrency: integer('max_concurrency').notNull(),
     benchmark_user_id: text('benchmark_user_id'),
+    benchmark_org_id: text('benchmark_org_id'),
     repetitions: integer('repetitions').notNull().default(1),
     classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
     // Benchmark-identity snapshot: dataset content hash + engine version. A prior

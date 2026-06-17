@@ -40,7 +40,7 @@ function runCaseSerialized(params) {
   return next;
 }
 
-function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
+function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, variant }) {
   return new Promise(resolve => {
     void (async () => {
       const dir = await mkdtemp(join(tmpdir(), 'kilo-bench-'));
@@ -50,6 +50,7 @@ function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
       let stdout = '';
       let stdoutTruncated = false;
       let stderrTail = '';
+      const resolvedOrgId = typeof orgId === 'string' && orgId.length > 0 ? orgId : null;
 
       const args = ['run', '--format', 'json', '--auto', '-m', `kilo/${model}`];
       // Reasoning effort: forwarded as the CLI's provider-specific variant.
@@ -64,7 +65,15 @@ function runCase({ model, prompt, kiloToken, timeoutMs, variant }) {
         cwd: dir,
         env: {
           ...process.env,
-          KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kiloToken } }),
+          KILO_AUTH_CONTENT: JSON.stringify({
+            kilo: {
+              type: 'api',
+              key: kiloToken,
+              ...(resolvedOrgId ? { organizationId: resolvedOrgId } : {}),
+            },
+          }),
+          KILO_API_URL: kiloApiUrl,
+          ...(resolvedOrgId ? { KILO_ORG_ID: resolvedOrgId } : {}),
           NO_COLOR: '1',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -154,15 +163,25 @@ const server = createServer((req, res) => {
         sendJson(res, 400, { error: 'invalid JSON body' });
         return;
       }
-      const { model, kiloToken } = parsed ?? {};
-      if (typeof model !== 'string' || typeof kiloToken !== 'string') {
-        sendJson(res, 400, { error: 'model and kiloToken are required strings' });
+      const { model, kiloToken, kiloApiUrl, orgId } = parsed ?? {};
+      if (
+        typeof model !== 'string' ||
+        typeof kiloToken !== 'string' ||
+        typeof kiloApiUrl !== 'string'
+      ) {
+        sendJson(res, 400, { error: 'model, kiloToken and kiloApiUrl are required strings' });
+        return;
+      }
+      if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
+        sendJson(res, 400, { error: 'orgId must be a string when provided' });
         return;
       }
       const result = await runCaseSerialized({
         model,
         prompt: 'Reply with exactly: ok',
         kiloToken,
+        kiloApiUrl,
+        orgId,
         timeoutMs: DEFAULT_TIMEOUT_MS,
       });
       sendJson(res, 200, { exitCode: result.exitCode, durationMs: result.durationMs });
@@ -178,7 +197,7 @@ const server = createServer((req, res) => {
         return;
       }
 
-      const { model, prompt, kiloToken, variant } = parsed ?? {};
+      const { model, prompt, kiloToken, kiloApiUrl, orgId, variant } = parsed ?? {};
       const timeoutMs =
         typeof parsed?.timeoutMs === 'number' && parsed.timeoutMs > 0
           ? parsed.timeoutMs
@@ -187,9 +206,16 @@ const server = createServer((req, res) => {
       if (
         typeof model !== 'string' ||
         typeof prompt !== 'string' ||
-        typeof kiloToken !== 'string'
+        typeof kiloToken !== 'string' ||
+        typeof kiloApiUrl !== 'string'
       ) {
-        sendJson(res, 400, { error: 'model, prompt and kiloToken are required strings' });
+        sendJson(res, 400, {
+          error: 'model, prompt, kiloToken and kiloApiUrl are required strings',
+        });
+        return;
+      }
+      if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
+        sendJson(res, 400, { error: 'orgId must be a string when provided' });
         return;
       }
 
@@ -198,7 +224,15 @@ const server = createServer((req, res) => {
           sendJson(res, 400, { error: 'variant must be a string when provided' });
           return;
         }
-        const result = await runCaseSerialized({ model, prompt, kiloToken, timeoutMs, variant });
+        const result = await runCaseSerialized({
+          model,
+          prompt,
+          kiloToken,
+          kiloApiUrl,
+          orgId,
+          timeoutMs,
+          variant,
+        });
         sendJson(res, 200, result);
       } catch (err) {
         sendJson(res, 500, { error: err instanceof Error ? err.message : 'run failed' });

@@ -48,6 +48,10 @@ export const BenchmarkConfigSchema = z
     // The Kilo user whose identity/billing the decider CLI runs execute under.
     // Null until an admin configures it; decider runs fail fast while null.
     benchmarkUserId: z.string().trim().min(1).nullable(),
+    // Optional organization context for the benchmark user. When present, the
+    // CLI token and container run execute in org context so usage bills org
+    // credits instead of personal credits.
+    benchmarkOrgId: z.string().trim().min(1).nullable().default(null),
     // Session stickiness knob carried into published routing tables: a session
     // stays on its incumbent model while it meets the route's accuracy
     // threshold, unless the fresh pick is cheaper by more than this factor.

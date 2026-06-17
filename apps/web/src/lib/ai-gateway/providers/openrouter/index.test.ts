@@ -18,6 +18,7 @@ import {
 } from '@/lib/ai-gateway/models';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadata: jest.fn(() => Promise.resolve({})),
@@ -189,6 +190,28 @@ describe('isFableModel', () => {
   it('only matches Claude Fable model IDs', () => {
     expect(isFableModel('anthropic/claude-fable-5')).toBe(true);
     expect(isFableModel('vendor/fable-model')).toBe(false);
+  });
+});
+
+describe('auto models', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: { data: [] },
+        })
+      )
+    ) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('includes kilo-auto/efficient in the public model list', async () => {
+    const models = await getEnhancedOpenRouterModels();
+
+    expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
   });
 });
 

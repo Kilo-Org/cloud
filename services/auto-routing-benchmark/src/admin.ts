@@ -96,8 +96,17 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       if (!config?.benchmarkUserId) {
         return c.json({ error: 'benchmarkUserId is not configured' }, 400);
       }
-      const kiloToken = await fetchBenchmarkUserToken(c.env, config.benchmarkUserId);
-      const result = await debugRunCli(c.env, { ...c.req.valid('json'), kiloToken });
+      const kiloToken = await fetchBenchmarkUserToken(
+        c.env,
+        config.benchmarkUserId,
+        config.benchmarkOrgId
+      );
+      const result = await debugRunCli(c.env, {
+        ...c.req.valid('json'),
+        kiloToken,
+        kiloApiUrl: c.env.KILO_CLI_API_URL,
+        orgId: config.benchmarkOrgId,
+      });
       return c.json(result);
     }
   );

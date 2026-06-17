@@ -80,12 +80,14 @@ jobs:
   stage-app:
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
+      target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
     secrets: inherit
 
   stage-global-app:
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
+      target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
     secrets: inherit
 

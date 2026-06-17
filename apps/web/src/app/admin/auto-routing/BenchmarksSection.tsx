@@ -10,6 +10,7 @@ import {
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
   type BenchmarkModelSummary,
+  type RankedCandidate,
   type ReasoningEffort,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -56,6 +57,17 @@ export function formatUsd(n: number | null): string {
   // Trim trailing zeros after decimal, but leave at least one digit after dot
   const trimmed = fixed.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '.0');
   return `$${trimmed}`;
+}
+
+export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
+  return candidate.accuracy > 0
+    ? candidate.avgCostUsd / candidate.accuracy
+    : Number.POSITIVE_INFINITY;
+}
+
+export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
+  const value = costPerAccuracy(candidate);
+  return Number.isFinite(value) ? formatUsd(value) : '—';
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +119,9 @@ type DeciderModelRow = {
   reasoningEffort: ReasoningEffort | null;
 };
 
+const DEFAULT_BENCHMARK_USER_ID = 'ce12ef3d-ae95-4d77-b4f0-23735f0a0591';
+const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+
 export function configToFormState(config: BenchmarkConfig | null): {
   classifierModels: string;
   deciderModels: DeciderModelRow[];
@@ -114,6 +129,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
   switchCostFactor: number;
   maxConcurrency: number;
   benchmarkUserId: string;
+  benchmarkOrgId: string;
   classifierRepetitions: number;
   deciderRepetitions: number;
   classifierMaxP95LatencyMs: string;
@@ -127,7 +143,8 @@ export function configToFormState(config: BenchmarkConfig | null): {
       minAccuracy: 0.7,
       switchCostFactor: 3,
       maxConcurrency: 100,
-      benchmarkUserId: '',
+      benchmarkUserId: DEFAULT_BENCHMARK_USER_ID,
+      benchmarkOrgId: DEFAULT_BENCHMARK_ORG_ID,
       classifierRepetitions: 1,
       deciderRepetitions: 1,
       classifierMaxP95LatencyMs: '1000',
@@ -143,6 +160,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
     switchCostFactor: config.switchCostFactor,
     maxConcurrency: config.maxConcurrency,
     benchmarkUserId: config.benchmarkUserId ?? '',
+    benchmarkOrgId: config.benchmarkOrgId ?? '',
     classifierRepetitions: config.classifierRepetitions,
     deciderRepetitions: config.deciderRepetitions,
     classifierMaxP95LatencyMs:
@@ -165,6 +183,7 @@ export function formStateToConfig(
       reasoningEffort: row.reasoningEffort ?? null,
     }));
   const benchmarkUserId = state.benchmarkUserId.trim();
+  const benchmarkOrgId = state.benchmarkOrgId.trim();
   const rawLatency = state.classifierMaxP95LatencyMs.trim();
   const classifierMaxP95LatencyMs = rawLatency.length > 0 ? parseInt(rawLatency, 10) || null : null;
   return {
@@ -174,6 +193,7 @@ export function formStateToConfig(
     switchCostFactor: state.switchCostFactor,
     maxConcurrency: state.maxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
+    benchmarkOrgId: benchmarkOrgId.length > 0 ? benchmarkOrgId : null,
     classifierRepetitions: state.classifierRepetitions,
     deciderRepetitions: state.deciderRepetitions,
     classifierMaxP95LatencyMs,
@@ -464,21 +484,40 @@ function BenchmarkConfigEditor({
           </div>
         </div>
 
-        {/* Benchmark user id */}
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="benchmark-user-id" className="text-sm font-medium">
-            Benchmark user id
-          </Label>
-          <Input
-            id="benchmark-user-id"
-            value={form.benchmarkUserId}
-            onChange={e => updateForm(prev => ({ ...prev, benchmarkUserId: e.target.value }))}
-            className="h-8 font-mono text-xs"
-            placeholder="(unset)"
-          />
-          <p className="text-muted-foreground text-xs">
-            Kilo user the decider CLI runs bill to; decider runs fail until set.
-          </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Benchmark user id */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-user-id" className="text-sm font-medium">
+              Benchmark user id
+            </Label>
+            <Input
+              id="benchmark-user-id"
+              value={form.benchmarkUserId}
+              onChange={e => updateForm(prev => ({ ...prev, benchmarkUserId: e.target.value }))}
+              className="h-8 font-mono text-xs"
+              placeholder="(unset)"
+            />
+            <p className="text-muted-foreground text-xs">
+              Kilo user the decider CLI authenticates as.
+            </p>
+          </div>
+
+          {/* Benchmark org id */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-org-id" className="text-sm font-medium">
+              Benchmark org id
+            </Label>
+            <Input
+              id="benchmark-org-id"
+              value={form.benchmarkOrgId}
+              onChange={e => updateForm(prev => ({ ...prev, benchmarkOrgId: e.target.value }))}
+              className="h-8 font-mono text-xs"
+              placeholder="(personal credits)"
+            />
+            <p className="text-muted-foreground text-xs">
+              Optional org context; when set, decider runs bill org credits.
+            </p>
+          </div>
         </div>
 
         {/* Classifier max p95 latency */}
@@ -707,7 +746,7 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
 // Routing table view
 // ---------------------------------------------------------------------------
 
-function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
+export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
   if (!data.table) {
     return <p className="text-muted-foreground text-sm">No routing table published yet.</p>;
   }
@@ -728,41 +767,49 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
         </span>
       </div>
 
-      {routeEntries.map(([routeKey, candidates]) => (
-        <div key={routeKey}>
-          <p className="mb-1.5 font-mono text-sm font-medium">{routeKey}</p>
-          <div className="overflow-x-auto rounded-md border">
-            <Table className="min-w-max">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Model</TableHead>
-                  <TableHead className="text-right">Accuracy</TableHead>
-                  <TableHead className="text-right">Avg cost</TableHead>
-                  <TableHead>Threshold</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {candidates.map((c, i) => (
-                  <TableRow key={`${routeKey}-${c.model}-${i}`}>
-                    <TableCell className="max-w-56 truncate font-mono text-xs">{c.model}</TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatAccuracy(c.accuracy)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatUsd(c.avgCostUsd)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={c.meetsThreshold ? 'default' : 'secondary'}>
-                        {c.meetsThreshold ? 'meets' : 'below'}
-                      </Badge>
-                    </TableCell>
+      {routeEntries.map(([routeKey, candidates]) => {
+        return (
+          <div key={routeKey}>
+            <p className="mb-1.5 font-mono text-sm font-medium">{routeKey}</p>
+            <div className="overflow-x-auto rounded-md border">
+              <Table className="min-w-max">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Model</TableHead>
+                    <TableHead className="text-right">Accuracy</TableHead>
+                    <TableHead className="text-right">Avg cost</TableHead>
+                    <TableHead className="text-right">Cost / accuracy</TableHead>
+                    <TableHead>Threshold</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {candidates.map((c, i) => (
+                    <TableRow key={`${routeKey}-${c.model}-${i}`}>
+                      <TableCell className="max-w-56 truncate font-mono text-xs">
+                        {c.model}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatAccuracy(c.accuracy)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatUsd(c.avgCostUsd)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatCostPerAccuracy(c)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={c.meetsThreshold ? 'default' : 'secondary'}>
+                          {c.meetsThreshold ? 'meets' : 'below'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

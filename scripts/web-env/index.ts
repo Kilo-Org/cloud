@@ -86,11 +86,11 @@ async function collectValues(options: Options): Promise<Values> {
 async function collectDefaults(repoRoot: string, name: string): Promise<Map<string, string>> {
   const defaults = new Map<string, string>();
   for (const relativeFile of trackedEnvFiles(repoRoot)) {
-    const decision = (
-      await question(`${relativeFile}: set a safe default or skip? [set/skip] `)
-    ).trim();
-    if (decision === 'skip') continue;
-    if (decision && decision !== 'set') throw new Error('Answer set or skip.');
+    const decision = (await question(`${relativeFile}: set a safe default or skip? [set/Skip] `))
+      .trim()
+      .toLowerCase();
+    if (!decision || decision === 'skip') continue;
+    if (decision !== 'set') throw new Error('Answer set or skip.');
 
     const suggested = relativeFile === 'apps/web/.env' ? '' : `invalid-${name.toLowerCase()}`;
     const answer = await question(`Safe default for ${relativeFile} [${suggested}] `);

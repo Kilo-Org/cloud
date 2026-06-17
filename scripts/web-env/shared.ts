@@ -209,9 +209,25 @@ export function setVaultValue(vaultId: string, name: string, value: string): voi
     const item = {
       title: name,
       category: 'PASSWORD',
-      fields: [{ id: 'password', label: 'password', type: 'CONCEALED', value }],
+      fields: [
+        {
+          id: 'password',
+          label: 'password',
+          type: 'CONCEALED',
+          purpose: 'PASSWORD',
+          value,
+        },
+        {
+          id: 'notesPlain',
+          label: 'notesPlain',
+          type: 'STRING',
+          purpose: 'NOTES',
+          value: '',
+        },
+      ],
+      sections: [],
     };
-    run('op', ['item', 'create', '--vault', vaultId, '--format=json', '-'], {
+    run('op', ['item', 'create', '--template=/dev/stdin', '--vault', vaultId, '--format=json'], {
       input: JSON.stringify(item),
     });
     return;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { Settings2 } from 'lucide-react';
@@ -33,6 +33,7 @@ import {
   ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@/lib/organizations/organization-auto-model-shared';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { cn } from '@/lib/utils';
 
 type DefaultModelDialogProps = {
   open: boolean;
@@ -44,6 +45,108 @@ type DefaultModelDialogProps = {
 };
 
 type DefaultBehavior = 'auto' | 'specific';
+
+const BEHAVIOR_OPTIONS: {
+  value: DefaultBehavior;
+  title: string;
+  description: string;
+  recommended?: boolean;
+}[] = [
+  {
+    value: 'auto',
+    title: 'Organization Auto',
+    description: 'Route each mode to the right model, with one fallback.',
+    recommended: true,
+  },
+  {
+    value: 'specific',
+    title: 'Specific model',
+    description: 'Pin a single model as the organization default.',
+  },
+];
+
+const BEHAVIOR_ORDER = BEHAVIOR_OPTIONS.map(option => option.value);
+
+function BehaviorChooser({
+  value,
+  onChange,
+}: {
+  value: DefaultBehavior;
+  onChange: (value: DefaultBehavior) => void;
+}) {
+  const itemRefs = useRef<Partial<Record<DefaultBehavior, HTMLButtonElement | null>>>({});
+
+  const moveTo = (next: DefaultBehavior) => {
+    onChange(next);
+    itemRefs.current[next]?.focus();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent, current: DefaultBehavior) => {
+    const index = BEHAVIOR_ORDER.indexOf(current);
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveTo(BEHAVIOR_ORDER[(index + 1) % BEHAVIOR_ORDER.length]);
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveTo(BEHAVIOR_ORDER[(index - 1 + BEHAVIOR_ORDER.length) % BEHAVIOR_ORDER.length]);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      moveTo(BEHAVIOR_ORDER[0]);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      moveTo(BEHAVIOR_ORDER[BEHAVIOR_ORDER.length - 1]);
+    }
+  };
+
+  return (
+    <div role="radiogroup" aria-label="Default model behavior" className="grid gap-2">
+      {BEHAVIOR_OPTIONS.map(option => {
+        const selected = value === option.value;
+        return (
+          <button
+            key={option.value}
+            ref={node => {
+              itemRefs.current[option.value] = node;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(option.value)}
+            onKeyDown={event => handleKeyDown(event, option.value)}
+            className={cn(
+              'flex cursor-pointer flex-col gap-1 rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+              selected
+                ? 'border-primary bg-secondary'
+                : 'border-input hover:border-muted-foreground hover:bg-accent/40'
+            )}
+          >
+            <span className="flex w-full items-center gap-2">
+              <span
+                aria-hidden
+                className={cn(
+                  'flex size-4 shrink-0 items-center justify-center rounded-full border',
+                  selected ? 'border-primary' : 'border-muted-foreground'
+                )}
+              >
+                {selected && <span className="bg-primary size-2 rounded-full" />}
+              </span>
+              <span className="text-sm font-medium">{option.title}</span>
+              {option.recommended && (
+                <Badge variant="default" className="ml-auto shrink-0">
+                  Recommended
+                </Badge>
+              )}
+            </span>
+            <span className="text-muted-foreground pl-6 text-xs font-normal">
+              {option.description}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function DefaultModelDialog({
   open,
@@ -165,36 +268,7 @@ export function DefaultModelDialog({
             </div>
 
             {showOrganizationAutoBehavior && (
-              <div
-                className="grid grid-cols-2 gap-2"
-                role="group"
-                aria-label="Default model behavior"
-              >
-                <Button
-                  type="button"
-                  variant={behavior === 'auto' ? 'secondary' : 'outline'}
-                  aria-pressed={behavior === 'auto'}
-                  onClick={() => setBehavior('auto')}
-                  className="h-auto min-h-20 flex-col items-start gap-1 p-3 text-left"
-                >
-                  <span>Organization Auto</span>
-                  <span className="text-muted-foreground text-xs font-normal">
-                    Route by mode and fallback.
-                  </span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={behavior === 'specific' ? 'secondary' : 'outline'}
-                  aria-pressed={behavior === 'specific'}
-                  onClick={() => setBehavior('specific')}
-                  className="h-auto min-h-20 flex-col items-start gap-1 p-3 text-left"
-                >
-                  <span>Specific model</span>
-                  <span className="text-muted-foreground text-xs font-normal">
-                    Pin one organization default.
-                  </span>
-                </Button>
-              </div>
+              <BehaviorChooser value={behavior} onChange={setBehavior} />
             )}
 
             {behavior === 'auto' ? (

@@ -1,9 +1,12 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   configToFormState,
+  costPerAccuracy,
+  formatCostPerAccuracy,
   formatAccuracy,
   formatUsd,
   formStateToConfig,
+  sortCandidatesByCostPerAccuracy,
 } from './BenchmarksSection';
 
 describe('formatAccuracy', () => {
@@ -52,6 +55,45 @@ describe('formatUsd', () => {
 
   it('formats a cost that fits exactly at 6dp', () => {
     expect(formatUsd(0.000001)).toBe('$0.000001');
+  });
+});
+
+describe('costPerAccuracy', () => {
+  it('divides average cost by accuracy', () => {
+    expect(costPerAccuracy({ avgCostUsd: 0.006, accuracy: 0.75 })).toBeCloseTo(0.008);
+  });
+
+  it('formats the value as USD', () => {
+    expect(formatCostPerAccuracy({ avgCostUsd: 0.006, accuracy: 0.75 })).toBe('$0.008');
+  });
+
+  it('uses an em dash when accuracy is zero', () => {
+    expect(formatCostPerAccuracy({ avgCostUsd: 0.001, accuracy: 0 })).toBe('—');
+  });
+});
+
+describe('sortCandidatesByCostPerAccuracy', () => {
+  it('sorts candidates by lowest cost per accuracy', () => {
+    const sorted = sortCandidatesByCostPerAccuracy([
+      { model: 'higher-cost-per-accuracy', avgCostUsd: 0.006, accuracy: 0.75 },
+      { model: 'zero-accuracy', avgCostUsd: 0, accuracy: 0 },
+      { model: 'best-value', avgCostUsd: 0.004, accuracy: 0.8 },
+    ]);
+
+    expect(sorted.map(candidate => candidate.model)).toEqual([
+      'best-value',
+      'higher-cost-per-accuracy',
+      'zero-accuracy',
+    ]);
+  });
+
+  it('breaks cost-per-accuracy ties by higher accuracy', () => {
+    const sorted = sortCandidatesByCostPerAccuracy([
+      { model: 'less-accurate', avgCostUsd: 0.004, accuracy: 0.5 },
+      { model: 'more-accurate', avgCostUsd: 0.008, accuracy: 1 },
+    ]);
+
+    expect(sorted.map(candidate => candidate.model)).toEqual(['more-accurate', 'less-accurate']);
   });
 });
 

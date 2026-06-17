@@ -10,6 +10,7 @@ import {
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
   type BenchmarkModelSummary,
+  type RankedCandidate,
   type ReasoningEffort,
 } from '@kilocode/auto-routing-contracts';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -56,6 +57,25 @@ export function formatUsd(n: number | null): string {
   // Trim trailing zeros after decimal, but leave at least one digit after dot
   const trimmed = fixed.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '.0');
   return `$${trimmed}`;
+}
+
+export function costPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
+  return candidate.accuracy > 0
+    ? candidate.avgCostUsd / candidate.accuracy
+    : Number.POSITIVE_INFINITY;
+}
+
+export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>) {
+  const value = costPerAccuracy(candidate);
+  return Number.isFinite(value) ? formatUsd(value) : '—';
+}
+
+export function sortCandidatesByCostPerAccuracy<
+  T extends Pick<RankedCandidate, 'accuracy' | 'avgCostUsd'>,
+>(candidates: readonly T[]): T[] {
+  return [...candidates].sort(
+    (a, b) => costPerAccuracy(a) - costPerAccuracy(b) || b.accuracy - a.accuracy
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -755,41 +775,50 @@ function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
         </span>
       </div>
 
-      {routeEntries.map(([routeKey, candidates]) => (
-        <div key={routeKey}>
-          <p className="mb-1.5 font-mono text-sm font-medium">{routeKey}</p>
-          <div className="overflow-x-auto rounded-md border">
-            <Table className="min-w-max">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Model</TableHead>
-                  <TableHead className="text-right">Accuracy</TableHead>
-                  <TableHead className="text-right">Avg cost</TableHead>
-                  <TableHead>Threshold</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {candidates.map((c, i) => (
-                  <TableRow key={`${routeKey}-${c.model}-${i}`}>
-                    <TableCell className="max-w-56 truncate font-mono text-xs">{c.model}</TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatAccuracy(c.accuracy)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-xs">
-                      {formatUsd(c.avgCostUsd)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={c.meetsThreshold ? 'default' : 'secondary'}>
-                        {c.meetsThreshold ? 'meets' : 'below'}
-                      </Badge>
-                    </TableCell>
+      {routeEntries.map(([routeKey, candidates]) => {
+        const sortedCandidates = sortCandidatesByCostPerAccuracy(candidates);
+        return (
+          <div key={routeKey}>
+            <p className="mb-1.5 font-mono text-sm font-medium">{routeKey}</p>
+            <div className="overflow-x-auto rounded-md border">
+              <Table className="min-w-max">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Model</TableHead>
+                    <TableHead className="text-right">Accuracy</TableHead>
+                    <TableHead className="text-right">Avg cost</TableHead>
+                    <TableHead className="text-right">Cost / accuracy</TableHead>
+                    <TableHead>Threshold</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {sortedCandidates.map((c, i) => (
+                    <TableRow key={`${routeKey}-${c.model}-${i}`}>
+                      <TableCell className="max-w-56 truncate font-mono text-xs">
+                        {c.model}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatAccuracy(c.accuracy)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatUsd(c.avgCostUsd)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {formatCostPerAccuracy(c)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={c.meetsThreshold ? 'default' : 'secondary'}>
+                          {c.meetsThreshold ? 'meets' : 'below'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -200,7 +200,7 @@ export function setVaultValue(vaultId: string, name: string, value: string): voi
       sections: [],
     };
     const created = parseJson(
-      run('op', ['item', 'create', '--template=/dev/stdin', '--vault', vaultId, '--format=json'], {
+      run('op', ['item', 'create', '-', '--vault', vaultId, '--format=json'], {
         input: JSON.stringify(item),
       }),
       `Create ${name}`
@@ -230,7 +230,7 @@ export function setVaultValue(vaultId: string, name: string, value: string): voi
     'value'
   );
   const updated = parseJson(
-    run('op', ['item', 'edit', id, '--template=/dev/stdin', '--vault', vaultId, '--format=json'], {
+    run('op', ['item', 'edit', id, '--vault', vaultId, '--format=json'], {
       input: JSON.stringify(item),
     }),
     `Update ${name}`

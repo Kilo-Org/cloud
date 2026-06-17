@@ -76,12 +76,19 @@ async function askSensitivity(name: string): Promise<boolean> {
   }
 }
 
+function normalizeFileValue(value: string): string {
+  const trailingNewlineLength = value.endsWith('\r\n') ? 2 : value.endsWith('\n') ? 1 : 0;
+  if (trailingNewlineLength === 0) return value;
+  const valueWithoutTrailingNewline = value.slice(0, -trailingNewlineLength);
+  return /[\r\n]/.test(valueWithoutTrailingNewline) ? value : valueWithoutTrailingNewline;
+}
+
 async function collectValues(options: Options): Promise<Values> {
   const values: Partial<Values> = {};
   for (const environment of ENVIRONMENTS) {
     const file = options.valueFiles[environment];
     if (file) {
-      const value = readFileSync(path.resolve(file), 'utf8');
+      const value = normalizeFileValue(readFileSync(path.resolve(file), 'utf8'));
       if (!value) throw new Error(`${environment} value file cannot be empty.`);
       values[environment] = value;
       continue;
@@ -121,20 +128,31 @@ ${border}\x1b[0m
 `);
 }
 
-function warnAboutMatchingTrackedValues(
+function assignmentValue(content: string, name: string): string | undefined {
+  const assignment = content.split('\n').find(line => line.startsWith(`${name}=`));
+  if (!assignment) return undefined;
+  const value = assignment.slice(name.length + 1);
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return typeof parsed === 'string' ? parsed : value;
+  } catch {
+    return value;
+  }
+}
+
+function rejectMatchingTrackedValues(
   repoRoot: string,
+  name: string,
   values: Values,
   defaults: Map<string, string>
 ): void {
   for (const relativeFile of trackedEnvFiles(repoRoot)) {
     const content = readFileSync(path.join(repoRoot, relativeFile), 'utf8');
-    const defaultValue = defaults.get(relativeFile);
-    const matchesRemoteValue = Object.values(values).some(
-      value => content.includes(value) || defaultValue === value
-    );
+    const trackedValue = defaults.get(relativeFile) ?? assignmentValue(content, name);
+    const matchesRemoteValue = Object.values(values).some(value => trackedValue === value);
     if (matchesRemoteValue) {
-      console.warn(
-        `\x1b[1;33mWARNING:\x1b[0m ${relativeFile} contains or will contain a value also used in a remote environment. This may be intentional.`
+      throw new Error(
+        `${relativeFile} contains or would contain a remote environment value. Use a non-secret local default instead.`
       );
     }
   }
@@ -153,7 +171,7 @@ async function main(): Promise<void> {
     const values = await collectValues(options);
     const defaults = await collectDefaults(repoRoot, options.name);
     if (defaults.size === 0) warnAboutMissingTrackedDefault(options.name);
-    warnAboutMatchingTrackedValues(repoRoot, values, defaults);
+    rejectMatchingTrackedValues(repoRoot, options.name, values, defaults);
 
     console.log('\nPlan');
     for (const environment of ENVIRONMENTS) {

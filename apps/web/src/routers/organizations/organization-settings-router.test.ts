@@ -10,7 +10,12 @@ import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
 } from '@/lib/organizations/organization-types';
-import { type User, type Organization, organizations } from '@kilocode/db/schema';
+import {
+  type User,
+  type Organization,
+  organization_audit_logs,
+  organizations,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '@/lib/drizzle';
@@ -570,6 +575,17 @@ describe('organizations settings trpc router', () => {
         routes: { code: 'kilo-auto/frontier' },
         fallback_model: 'kilo-auto/balanced',
       });
+      const auditLogs = await db.query.organization_audit_logs.findMany({
+        where: eq(organization_audit_logs.organization_id, autoOrg.id),
+      });
+      expect(auditLogs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            message:
+              'Disabled Organization Auto and reset organization default model to global default.',
+          }),
+        ])
+      );
     });
 
     it('validates stored routes before enabling Organization Auto', async () => {

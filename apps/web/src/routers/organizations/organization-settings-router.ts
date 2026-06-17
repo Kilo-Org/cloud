@@ -795,10 +795,12 @@ export const organizationsSettingsRouter = createTRPCRouter({
       }
       assertOrganizationAutoEligible(existingOrg);
 
+      let previousDefaultModel: string | undefined;
       const updatedSettings = await db.transaction(async tx => {
         const settings = await mutateOrganizationSettings(
           organizationId,
           async organization => {
+            previousDefaultModel = organization.settings.default_model;
             assertOrganizationAutoEligible(organization);
             if (behavior === 'global') {
               return { ...organization.settings, default_model: undefined };
@@ -875,7 +877,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
               ? 'Configured Organization Auto default behavior.'
               : behavior === 'specific'
                 ? `Configured specific organization default model: ${settings.default_model}`
-                : existingOrg.settings.default_model === ORG_AUTO_MODEL.id
+                : previousDefaultModel === ORG_AUTO_MODEL.id
                   ? 'Disabled Organization Auto and reset organization default model to global default.'
                   : 'Reset organization default model to global default.',
           organization_id: organizationId,

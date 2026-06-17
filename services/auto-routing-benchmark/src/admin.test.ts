@@ -62,6 +62,8 @@ const TEST_CONFIG_ROWS = {
     model: m.id,
     reasoning_effort: m.reasoningEffort ?? null,
   })),
+  autoDeciderModels: [],
+  excludedAutoDeciderModels: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -153,6 +155,8 @@ beforeEach(() => {
     config: null,
     classifierModels: [],
     deciderModels: [],
+    autoDeciderModels: [],
+    excludedAutoDeciderModels: [],
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
@@ -219,6 +223,8 @@ describe('GET /admin/config', () => {
       },
       classifierModels,
       deciderModels,
+      autoDeciderModels: [],
+      excludedAutoDeciderModels: [],
     });
 
     const res = await authedGet('/admin/config');
@@ -278,6 +284,13 @@ describe('PUT /admin/config', () => {
     const validConfig = {
       ...TEST_CONFIG,
       minAccuracy: 0.85,
+      deciderModels: [
+        { id: 'manual/model', reasoningEffort: 'low' },
+        { id: 'auto/model', reasoningEffort: null },
+      ],
+      manualDeciderModels: [{ id: 'manual/model', reasoningEffort: 'low' }],
+      autoDeciderModels: [{ id: 'auto/model', reasoningEffort: null, avgAttemptCostUsd: 20 }],
+      excludedAutoDeciderModels: ['auto/excluded'],
       updatedAt: null,
       updatedBy: null,
     };
@@ -295,10 +308,13 @@ describe('PUT /admin/config', () => {
     expect(typeof body.config.updatedAt).toBe('string');
 
     expect(replaceConfig).toHaveBeenCalledOnce();
-    const [, configArg] = vi.mocked(replaceConfig).mock.calls[0];
+    const [, configArg, , deciderModelRows, excludedAutoDeciderModels] =
+      vi.mocked(replaceConfig).mock.calls[0];
     expect(configArg.min_accuracy).toBe(0.85);
     expect(typeof configArg.updated_at).toBe('string');
     expect(configArg.updated_by).toBe('igor@kilocode.ai');
+    expect(deciderModelRows).toEqual([{ model: 'manual/model', reasoning_effort: 'low' }]);
+    expect(excludedAutoDeciderModels).toEqual(['auto/excluded']);
   });
 });
 

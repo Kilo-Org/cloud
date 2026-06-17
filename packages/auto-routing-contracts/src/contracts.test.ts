@@ -163,6 +163,29 @@ describe('BenchmarkConfigSchema defaults', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it('accepts explicit manual and excluded auto decider model lists', () => {
+    const result = BenchmarkConfigSchema.parse({
+      classifierModels: ['model/a'],
+      deciderModels: [{ id: 'model/b' }],
+      manualDeciderModels: [{ id: 'model/c', reasoningEffort: 'high' }],
+      autoDeciderModels: [{ id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 }],
+      excludedAutoDeciderModels: ['model/d'],
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      maxConcurrency: 10,
+      benchmarkUserId: null,
+      benchmarkOrgId: null,
+      updatedAt: null,
+      updatedBy: null,
+    });
+
+    expect(result.manualDeciderModels).toEqual([{ id: 'model/c', reasoningEffort: 'high' }]);
+    expect(result.autoDeciderModels).toEqual([
+      { id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 },
+    ]);
+    expect(result.excludedAutoDeciderModels).toEqual(['model/d']);
+  });
 });
 
 describe('BenchmarkConfigSchema duplicate model ids', () => {

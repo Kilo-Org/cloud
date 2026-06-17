@@ -28,6 +28,17 @@ export const configDeciderModels = sqliteTable('config_decider_models', {
   reasoning_effort: text('reasoning_effort'),
 });
 
+export const configAutoDeciderModels = sqliteTable('config_auto_decider_models', {
+  model: text('model').primaryKey(),
+  reasoning_effort: text('reasoning_effort'),
+  avg_attempt_cost_usd: real('avg_attempt_cost_usd').notNull(),
+  synced_at: text('synced_at').notNull(),
+});
+
+export const configAutoDeciderExclusions = sqliteTable('config_auto_decider_exclusions', {
+  model: text('model').primaryKey(),
+});
+
 export const benchmarkRuns = sqliteTable(
   'benchmark_runs',
   {

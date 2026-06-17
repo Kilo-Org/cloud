@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import * as readline from 'node:readline';
 
@@ -202,7 +203,37 @@ function findVaultItem(vaultId: string, name: string): JsonRecord | undefined {
   return matches[0];
 }
 
+const AUDIT_NOTE_PREFIX = 'Managed by pnpm web:env. Last updated by ';
+
+function auditNote(): string {
+  return `${AUDIT_NOTE_PREFIX}${os.userInfo().username} on ${os.hostname()} at ${new Date().toISOString()}.`;
+}
+
+function setAuditNote(item: JsonRecord, note: string): void {
+  const fields = item.fields;
+  if (!Array.isArray(fields)) throw new Error('1Password item does not have editable fields.');
+  const notes = records(fields).find(field => field.id === 'notesPlain');
+  if (!notes) {
+    fields.push({
+      id: 'notesPlain',
+      label: 'notesPlain',
+      type: 'STRING',
+      purpose: 'NOTES',
+      value: note,
+    });
+    return;
+  }
+  const existing = stringValue(notes, 'value') ?? '';
+  const preserved = existing
+    .split('\n')
+    .filter(line => !line.startsWith(AUDIT_NOTE_PREFIX))
+    .join('\n')
+    .trimEnd();
+  notes.value = preserved ? `${preserved}\n${note}` : note;
+}
+
 export function setVaultValue(vaultId: string, name: string, value: string): void {
+  const note = auditNote();
   const existing = findVaultItem(vaultId, name);
   if (!existing) {
     const item = {
@@ -221,7 +252,7 @@ export function setVaultValue(vaultId: string, name: string, value: string): voi
           label: 'notesPlain',
           type: 'STRING',
           purpose: 'NOTES',
-          value: '',
+          value: note,
         },
       ],
       sections: [],
@@ -243,6 +274,7 @@ export function setVaultValue(vaultId: string, name: string, value: string): voi
     throw new Error(`1Password item ${name} does not have a concealed password field.`);
   }
   password.value = value;
+  setAuditNote(item, note);
   run('op', ['item', 'edit', id, '--vault', vaultId, '--format=json'], {
     input: JSON.stringify(item),
   });

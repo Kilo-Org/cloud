@@ -164,7 +164,7 @@ Prerequisites:
 - Install the 1Password CLI and have write access to the `Kilo Web ENV Production` vault. If needed, the CLI prompts you to sign in with Touch ID.
 - Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
 
-The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production value is also stored as a concealed, exact-name item in `Kilo Web ENV Production`.
+The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production value is also stored as a concealed, exact-name item in `Kilo Web ENV Production`; its notes identify the local user and computer that last updated it.
 
 Answer no for public or otherwise non-secret configuration. `NEXT_PUBLIC_*` variables must be non-sensitive because Next.js exposes them to browsers. Non-sensitive values are not copied to 1Password.
 

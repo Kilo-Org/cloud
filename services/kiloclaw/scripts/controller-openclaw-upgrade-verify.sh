@@ -11,9 +11,10 @@ set -euo pipefail
 #
 # It builds the candidate production-pin image (which proves the Dockerfile
 # bundle-patch guards still match — they `exit 1` on mismatch), checks the
-# version, the applied patches, the bundled plugins, and runs `openclaw config
+# version, the applied patches, the bundled plugins, runs `openclaw config
 # validate` against representative app-written config shapes (the validator runs
-# without starting the gateway, so no key is needed).
+# without starting the gateway, so no key is needed), and runs a full grype CVE
+# scan of the image (base OS + Go + npm, unfiltered).
 #
 # Run the credentialed live smoke (controller-openclaw-upgrade-smoke-test.sh)
 # next; this script prints exactly what that still covers.
@@ -27,9 +28,14 @@ KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"
 IMAGE="${IMAGE:-kiloclaw:openclaw-upgrade-verify}"
 BUILD="${BUILD:-true}"
+# Empty = report the CVE scan but do not change the exit code. Set to
+# critical|high to also fail the run when findings at/above that severity exist.
+GRYPE_FAIL_ON="${GRYPE_FAIL_ON:-}"
+CVE_REPORT="${TMPDIR:-/tmp}/openclaw-cve-report.txt"
 BUILD_LOG="$(mktemp)"
 PASS=0
 FAIL=0
+CVE_GATE_FAILED=0
 
 cleanup() { rm -f "$BUILD_LOG"; }
 trap cleanup EXIT
@@ -66,6 +72,84 @@ except Exception:
     print("error")
 ')
   check "$label" "$expect" "$res"
+}
+
+# Full CVE scan of the built image with grype. Nothing is filtered or scoped:
+# base-OS, Go, and npm findings are all shown, because a vulnerable base image or
+# bundled tool is itself the signal (often "bump the base image / tooling"). The
+# digest prints real, unfiltered severity counts and where they live; the full
+# per-finding report is written to a file. Informational by default; set
+# GRYPE_FAIL_ON=critical|high to also gate the run.
+scan_image_cves() {
+  echo
+  echo "--- image CVE scan (grype, full image — base OS + Go + npm) ---"
+  if ! command -v grype >/dev/null 2>&1; then
+    echo "SKIP: grype not installed — https://github.com/anchore/grype (e.g. brew install grype)"
+    return 0
+  fi
+
+  local json
+  json="$(mktemp)"
+  echo "Scanning $IMAGE ... (grype may refresh its vulnerability DB on first run)"
+  if ! grype "$IMAGE" -o "table=$CVE_REPORT" -o "json=$json" -q >/dev/null 2>&1; then
+    echo "WARN: grype scan did not complete; skipping CVE report"
+    rm -f "$json"
+    return 0
+  fi
+
+  # Print the honest, unfiltered digest. Exit non-zero only if a gate is set and
+  # breached, so the scan can fail the run on demand without hiding anything.
+  if python3 - "$json" "$GRYPE_FAIL_ON" <<'PY'
+import json
+import sys
+from collections import Counter
+
+doc = json.load(open(sys.argv[1]))
+gate = (sys.argv[2] or "").strip().lower()
+sev = Counter()
+by_type = Counter()
+by_pkg = Counter()
+for m in doc.get("matches", []):
+    s = m.get("vulnerability", {}).get("severity") or "Unknown"
+    a = m.get("artifact", {})
+    sev[s] += 1
+    if s in ("Critical", "High"):
+        by_type[a.get("type", "?")] += 1
+        by_pkg[f'{a.get("name", "?")} {a.get("version", "?")}'] += 1
+
+order = ["Critical", "High", "Medium", "Low", "Negligible", "Unknown"]
+print("  severity:  " + "   ".join(f"{k}={sev.get(k, 0)}" for k in order)
+      + f"   total={sum(sev.values())}")
+if by_type:
+    print("  Critical+High by package type: "
+          + ", ".join(f"{t}={n}" for t, n in sorted(by_type.items(), key=lambda x: -x[1])))
+    print("  top Critical/High packages (a base-image/tooling bump may clear many at once):")
+    for pkg, n in by_pkg.most_common(12):
+        print(f"    {n:>3}  {pkg}")
+
+crit = sev.get("Critical", 0)
+high = sev.get("High", 0)
+fail = (gate == "critical" and crit > 0) or (gate == "high" and (crit > 0 or high > 0))
+sys.exit(1 if fail else 0)
+PY
+  then
+    gate_breached=0
+  else
+    gate_breached=1
+  fi
+
+  echo "  full findings (all severities): $CVE_REPORT"
+  if [ -n "$GRYPE_FAIL_ON" ]; then
+    if [ "$gate_breached" -eq 1 ]; then
+      echo "  CVE gate: FAIL (GRYPE_FAIL_ON=$GRYPE_FAIL_ON)"
+      CVE_GATE_FAILED=1
+    else
+      echo "  CVE gate: ok (GRYPE_FAIL_ON=$GRYPE_FAIL_ON)"
+    fi
+  else
+    echo "  (informational — review the findings above; set GRYPE_FAIL_ON=critical|high to gate)"
+  fi
+  rm -f "$json"
 }
 
 EXPECTED_VERSION="$(extract_pinned_version)"
@@ -131,6 +215,9 @@ validate_fixture "validator still rejects a malformed config (self-check)" \
   '{"agents":{"defaults":{"model":{"primary":123}}}}' \
   "invalid"
 
+# ── Image CVE scan (grype) ───────────────────────────────────────────────────
+scan_image_cves
+
 echo
 echo "=== Keyless verification: $PASS passed, $FAIL failed ==="
 
@@ -154,5 +241,7 @@ That covers what CI cannot without a credential:
 ----------------------------------------------------------------------
 EOF
 
-[ "$FAIL" -gt 0 ] && exit 1
+if [ "$FAIL" -gt 0 ] || [ "$CVE_GATE_FAILED" -gt 0 ]; then
+  exit 1
+fi
 exit 0

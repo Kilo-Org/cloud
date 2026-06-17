@@ -42,8 +42,9 @@ export const BenchmarkConfigSchema = z
     deciderModels: z.array(BenchmarkDeciderModelSchema).min(1),
     // Accuracy threshold for "gets the job done" (per taxonomy route).
     minAccuracy: z.number().min(0).max(1),
-    // Parallel OpenRouter calls per queue message.
-    maxConcurrency: z.number().int().min(1).max(16),
+    // Benchmark-wide parallelism budget. Decider runs use it as a live
+    // container budget; classifier runs use it for parallel OpenRouter calls.
+    maxConcurrency: z.number().int().min(1).max(100),
     // The Kilo user whose identity/billing the decider CLI runs execute under.
     // Null until an admin configures it; decider runs fail fast while null.
     benchmarkUserId: z.string().trim().min(1).nullable(),

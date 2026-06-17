@@ -48,9 +48,11 @@ export type BenchmarkJobMessage = {
   kind: BenchmarkKind;
   model: string;
   // The case ids this message is responsible for, plus the chunk index. Decider
-  // chunks also use this index to key their container instance.
+  // chunks are split across shard lanes; each lane has one stable container.
   caseIds?: string[];
   chunk?: number;
+  shard?: number;
+  shardCount?: number;
   // Repetition index (0-based).
   rep?: number;
 };
@@ -61,6 +63,8 @@ export const BenchmarkJobMessageSchema = z.object({
   model: z.string().min(1),
   caseIds: z.array(z.string().min(1)).optional(),
   chunk: z.number().int().min(0).optional(),
+  shard: z.number().int().min(0).optional(),
+  shardCount: z.number().int().min(1).optional(),
   rep: z.number().int().min(0).optional(),
 });
 
@@ -74,9 +78,13 @@ const DECIDER_CHUNK_SIZE = 5;
 // keep it below Cloudflare Queues' 15-minute wall-clock limit.
 const CLASSIFIER_CHUNK_SIZE = 1;
 
-// Cloudflare Queues caps a single sendBatch at 100 messages. A decider fan-out
-// is models × reps × ceil(76 / 5) messages, which clears 100 with as few as two
-// models, so the dispatch must be sliced.
+// Cloudflare Containers cap for the benchmark runner. Sharded decider fan-out
+// uses this as the live-container budget.
+export const DECIDER_CONTAINER_INSTANCE_CAP = 100;
+
+// Cloudflare Queues caps a single sendBatch at 100 messages. Classifier fan-out
+// can exceed that because each classifier case is its own message, so dispatch
+// must be sliced.
 const QUEUE_SEND_BATCH_LIMIT = 100;
 
 export function chunkArray<T>(items: readonly T[], size: number): T[][] {
@@ -85,6 +93,24 @@ export function chunkArray<T>(items: readonly T[], size: number): T[][] {
     chunks.push(items.slice(i, i + size));
   }
   return chunks;
+}
+
+export function computeDeciderShardCount({
+  modelCount,
+  repetitions,
+  chunkCount,
+  maxLiveContainers = DECIDER_CONTAINER_INSTANCE_CAP,
+}: {
+  modelCount: number;
+  repetitions: number;
+  chunkCount: number;
+  maxLiveContainers?: number;
+}): number {
+  if (modelCount <= 0 || repetitions <= 0 || chunkCount <= 0) return 0;
+  const modelRepetitions = modelCount * repetitions;
+  const shardsPerModelRepetition = Math.floor(maxLiveContainers / modelRepetitions);
+  if (shardsPerModelRepetition <= 0) return 0;
+  return Math.min(chunkCount, shardsPerModelRepetition);
 }
 
 // Enqueues messages in sendBatch-sized slices. A mid-dispatch failure leaves a
@@ -163,28 +189,44 @@ export function buildDeciderMessages(
   kind: BenchmarkKind,
   modelIds: string[],
   repetitions: number,
-  chunks: readonly (readonly { id: string }[])[]
+  chunks: readonly (readonly { id: string }[])[],
+  maxLiveContainers: number = DECIDER_CONTAINER_INSTANCE_CAP
 ): { body: BenchmarkJobMessage }[] {
-  const [firstChunk] = chunks;
-  if (!firstChunk) return [];
+  const shardCount = computeDeciderShardCount({
+    modelCount: modelIds.length,
+    repetitions,
+    chunkCount: chunks.length,
+    maxLiveContainers,
+  });
+  if (shardCount === 0) return [];
   return modelIds.flatMap(model =>
-    Array.from({ length: repetitions }, (_, rep) => ({
-      body: {
-        runId,
-        kind,
-        model,
-        chunk: 0,
-        rep,
-        caseIds: firstChunk.map(c => c.id),
-      } satisfies BenchmarkJobMessage,
-    }))
+    Array.from({ length: repetitions }, (_, rep) =>
+      Array.from({ length: shardCount }, (_, shard) => {
+        const chunkCases = chunks[shard];
+        if (!chunkCases) return [];
+        return [
+          {
+            body: {
+              runId,
+              kind,
+              model,
+              chunk: shard,
+              shard,
+              shardCount,
+              rep,
+              caseIds: chunkCases.map(c => c.id),
+            } satisfies BenchmarkJobMessage,
+          },
+        ];
+      }).flat()
+    ).flat()
   );
 }
 
 export function getDeciderContainerInstanceName(
-  message: Pick<BenchmarkJobMessage, 'runId' | 'model' | 'rep' | 'chunk'>
+  message: Pick<BenchmarkJobMessage, 'runId' | 'model' | 'rep' | 'chunk' | 'shard'>
 ): string {
-  return `${message.runId}:${message.model}:${message.rep ?? 0}`;
+  return `${message.runId}:${message.model}:${message.rep ?? 0}:${message.shard ?? 0}`;
 }
 
 export function buildClassifierMessages(
@@ -219,6 +261,33 @@ export class RunAlreadyActiveError extends Error {
     super(`a ${kind} benchmark run is already in progress (${activeRunId})`);
     this.name = 'RunAlreadyActiveError';
   }
+}
+
+// Thrown when the saved benchmark config would exceed a hard runtime limit.
+// The admin route maps it to HTTP 400 so operators can fix config instead of
+// starting a run that will immediately hit platform capacity.
+export class BenchmarkRunConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BenchmarkRunConfigError';
+  }
+}
+
+function validateDeciderContainerBudget({
+  modelCount,
+  repetitions,
+  maxLiveContainers,
+}: {
+  modelCount: number;
+  repetitions: number;
+  maxLiveContainers: number;
+}): void {
+  const modelRepetitions = modelCount * repetitions;
+  if (modelRepetitions <= maxLiveContainers) return;
+
+  throw new BenchmarkRunConfigError(
+    `decider benchmark requires at least one live container lane per model repetition (${modelRepetitions}), but maxConcurrency is ${maxLiveContainers}; reduce decider models/repetitions before starting`
+  );
 }
 
 export async function startRun(
@@ -282,6 +351,14 @@ export async function startRun(
     throw new Error(
       'benchmark user not configured: set benchmarkUserId before running the decider benchmark'
     );
+  }
+  const maxLiveDeciderContainers = Math.min(config.maxConcurrency, DECIDER_CONTAINER_INSTANCE_CAP);
+  if (kind === 'decider') {
+    validateDeciderContainerBudget({
+      modelCount: enqueuedModelIds.length,
+      repetitions,
+      maxLiveContainers: maxLiveDeciderContainers,
+    });
   }
 
   const startedAt = new Date().toISOString();
@@ -360,11 +437,18 @@ export async function startRun(
     return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
   }
 
-  // Decider: seed one chunk per (model, rep). Each completed chunk enqueues
-  // the next chunk for the same (model, rep), keeping queue invocations bounded
-  // without creating one live container per chunk.
+  // Decider: seed as many shard lanes as fit under the live-container cap. Each
+  // completed chunk enqueues the next chunk for the same lane, so one stable
+  // container handles chunk N, N+shardCount, N+(2*shardCount), ...
   const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
-  const messages = buildDeciderMessages(runId, kind, enqueuedModelIds, repetitions, chunks);
+  const messages = buildDeciderMessages(
+    runId,
+    kind,
+    enqueuedModelIds,
+    repetitions,
+    chunks,
+    maxLiveDeciderContainers
+  );
   await enqueueRunMessages(env, runId, messages);
   return { runId, enqueuedModels: enqueuedModelIds.length, skippedModels };
 }
@@ -514,6 +598,8 @@ async function processDeciderJob(
 
   const rep = message.rep ?? 0;
   const chunk = message.chunk ?? 0;
+  const shard = message.shard ?? 0;
+  const shardCount = message.shardCount ?? 1;
   const instanceName = getDeciderContainerInstanceName(message);
 
   const existingCaseIds = await getExistingCaseResultIds(env.BENCH_DB, {
@@ -608,7 +694,14 @@ async function processDeciderJob(
     });
   }
 
-  const hasNextChunk = await enqueueNextDeciderChunkIfNeeded(env, message, rep, chunk);
+  const hasNextChunk = await enqueueNextDeciderChunkIfNeeded(
+    env,
+    message,
+    rep,
+    chunk,
+    shard,
+    shardCount
+  );
   if (!hasNextChunk) {
     await destroyDeciderCliContainer(env, { instanceName });
   }
@@ -619,10 +712,13 @@ async function enqueueNextDeciderChunkIfNeeded(
   env: Env,
   message: BenchmarkJobMessage,
   rep: number,
-  chunk: number
+  chunk: number,
+  shard: number,
+  shardCount: number
 ): Promise<boolean> {
   const chunks = chunkArray(DECIDER_CASES, DECIDER_CHUNK_SIZE);
-  const nextChunk = chunks[chunk + 1];
+  const nextChunkIndex = chunk + shardCount;
+  const nextChunk = chunks[nextChunkIndex];
   if (!nextChunk) return false;
 
   const nextCaseIds = nextChunk.map(c => c.id);
@@ -640,7 +736,9 @@ async function enqueueNextDeciderChunkIfNeeded(
         runId: message.runId,
         kind: 'decider',
         model: message.model,
-        chunk: chunk + 1,
+        chunk: nextChunkIndex,
+        shard,
+        shardCount,
         rep,
         caseIds: nextCaseIds,
       } satisfies BenchmarkJobMessage,

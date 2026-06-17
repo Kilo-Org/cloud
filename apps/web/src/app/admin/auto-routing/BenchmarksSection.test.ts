@@ -63,6 +63,7 @@ describe('configToFormState', () => {
     expect(state.classifierMaxP95LatencyMs).toBe('1000');
     expect(state.classifierModels).toBe('');
     expect(state.deciderModels).toEqual([]);
+    expect(state.maxConcurrency).toBe(100);
   });
 });
 

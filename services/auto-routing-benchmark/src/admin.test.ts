@@ -32,7 +32,7 @@ const TEST_CONFIG: BenchmarkConfig = {
   ],
   minAccuracy: 0.7,
   switchCostFactor: 3,
-  maxConcurrency: 4,
+  maxConcurrency: 100,
   benchmarkUserId: null,
   classifierRepetitions: 1,
   deciderRepetitions: 1,
@@ -471,10 +471,10 @@ describe('POST /admin/runs', () => {
     expect(body.enqueuedModels).toBe(1);
   });
 
-  it('seeds one decider chunk per model repetition', async () => {
-    // Later chunks are chained by processJob after each chunk completes. Start
-    // only seeds one message per model/repetition so live container cardinality
-    // is bounded by models × repetitions, not models × repetitions × chunks.
+  it('seeds sharded decider lanes bounded by the container cap', async () => {
+    // Later chunks are chained by processJob within each shard lane. Start
+    // seeds as many lanes as fit under the 100-container cap so the benchmark
+    // runs much faster without creating one live container per chunk.
     const manyModels = Array.from({ length: 7 }, (_, i) => ({
       id: `vendor/model-${i}`,
       reasoningEffort: null,
@@ -490,8 +490,72 @@ describe('POST /admin/runs', () => {
 
     expect(queueSendBatch).toHaveBeenCalledTimes(1);
     const batchSizes = queueSendBatch.mock.calls.map(([batch]) => (batch as unknown[]).length);
-    expect(batchSizes).toEqual([manyModels.length]);
+    expect(batchSizes).toEqual([98]);
     for (const size of batchSizes) expect(size).toBeLessThanOrEqual(100);
+    const queuedMessages = queueSendBatch.mock.calls.flatMap(([batch]) => batch as unknown[]);
+    for (const message of queuedMessages) {
+      expect(message).toMatchObject({
+        body: {
+          kind: 'decider',
+          shardCount: 14,
+        },
+      });
+    }
+  });
+
+  it('keeps 10 decider models with 3 repetitions under the 100-container cap', async () => {
+    const manyModels = Array.from({ length: 10 }, (_, i) => ({
+      id: `vendor/model-${i}`,
+      reasoningEffort: null,
+    }));
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        benchmark_user_id: 'user-123',
+        decider_repetitions: 3,
+      },
+      deciderModels: manyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+
+    expect(queueSendBatch).toHaveBeenCalledTimes(1);
+    const queuedMessages = queueSendBatch.mock.calls.flatMap(([batch]) => batch as unknown[]);
+    expect(queuedMessages).toHaveLength(90);
+    for (const message of queuedMessages) {
+      expect(message).toMatchObject({
+        body: {
+          kind: 'decider',
+          shardCount: 3,
+        },
+      });
+    }
+  });
+
+  it('rejects decider starts when model repetitions alone exceed the container cap', async () => {
+    const tooManyModels = Array.from({ length: 21 }, (_, i) => ({
+      id: `vendor/model-${i}`,
+      reasoningEffort: null,
+    }));
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        benchmark_user_id: 'user-123',
+        decider_repetitions: 5,
+      },
+      deciderModels: tooManyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('requires at least one live container lane'),
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 });
 

@@ -126,7 +126,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
       deciderModels: [],
       minAccuracy: 0.7,
       switchCostFactor: 3,
-      maxConcurrency: 4,
+      maxConcurrency: 100,
       benchmarkUserId: '',
       classifierRepetitions: 1,
       deciderRepetitions: 1,
@@ -407,13 +407,13 @@ function BenchmarkConfigEditor({
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-max-concurrency" className="text-sm font-medium">
-              Max concurrency (1–16)
+              Max concurrency (1–100)
             </Label>
             <Input
               id="benchmark-max-concurrency"
               type="number"
               min={1}
-              max={16}
+              max={100}
               step={1}
               value={form.maxConcurrency}
               onChange={e =>

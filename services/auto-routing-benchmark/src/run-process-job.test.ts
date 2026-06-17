@@ -144,7 +144,7 @@ describe('processJob — decider container availability failures', () => {
 });
 
 describe('processJob — decider chunk chaining', () => {
-  it('runs a chunk on the model-repetition container and enqueues the next chunk', async () => {
+  it('runs a chunk on the model-repetition shard container and enqueues the next chunk', async () => {
     const message = {
       ...deciderMessage(),
       caseIds: DECIDER_CASES.slice(0, 5).map(c => c.id),
@@ -154,11 +154,11 @@ describe('processJob — decider chunk chaining', () => {
 
     expect(warmUpCliContainer).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ instanceName: `${runId}:${model}:0` })
+      expect.objectContaining({ instanceName: `${runId}:${model}:0:0` })
     );
     expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ instanceName: `${runId}:${model}:0` })
+      expect.objectContaining({ instanceName: `${runId}:${model}:0:0` })
     );
     expect(queueSendBatch).toHaveBeenCalledWith([
       {
@@ -167,8 +167,47 @@ describe('processJob — decider chunk chaining', () => {
           kind: 'decider',
           model,
           chunk: 1,
+          shard: 0,
+          shardCount: 1,
           rep: 0,
           caseIds: DECIDER_CASES.slice(5, 10).map(c => c.id),
+        },
+      },
+    ]);
+    expect(countCaseResults).not.toHaveBeenCalled();
+  });
+
+  it('enqueues the next chunk assigned to the same shard lane', async () => {
+    const chunk = 2;
+    const shard = 2;
+    const shardCount = 8;
+    const currentCaseIds = DECIDER_CASES.slice(chunk * 5, chunk * 5 + 5).map(c => c.id);
+    const nextChunk = chunk + shardCount;
+    const nextCaseIds = DECIDER_CASES.slice(nextChunk * 5, nextChunk * 5 + 5).map(c => c.id);
+
+    await processJob(env, {
+      ...deciderMessage(),
+      chunk,
+      shard,
+      shardCount,
+      caseIds: currentCaseIds,
+    });
+
+    expect(warmUpCliContainer).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ instanceName: `${runId}:${model}:0:2` })
+    );
+    expect(queueSendBatch).toHaveBeenCalledWith([
+      {
+        body: {
+          runId,
+          kind: 'decider',
+          model,
+          chunk: nextChunk,
+          shard,
+          shardCount,
+          rep: 0,
+          caseIds: nextCaseIds,
         },
       },
     ]);
@@ -190,15 +229,21 @@ describe('processJob — decider chunk chaining', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
-  it('destroys the model-repetition container after the terminal chunk', async () => {
+  it('destroys the model-repetition shard container after the terminal chunk', async () => {
     const terminalChunk = Math.floor((DECIDER_CASES.length - 1) / 5);
     const terminalCaseIds = DECIDER_CASES.slice(terminalChunk * 5).map(c => c.id);
 
-    await processJob(env, { ...deciderMessage(), chunk: terminalChunk, caseIds: terminalCaseIds });
+    await processJob(env, {
+      ...deciderMessage(),
+      chunk: terminalChunk,
+      shard: 3,
+      shardCount: 4,
+      caseIds: terminalCaseIds,
+    });
 
     expect(queueSendBatch).not.toHaveBeenCalled();
     expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
-      instanceName: `${runId}:${model}:0`,
+      instanceName: `${runId}:${model}:0:3`,
     });
     expect(countCaseResults).toHaveBeenCalled();
   });

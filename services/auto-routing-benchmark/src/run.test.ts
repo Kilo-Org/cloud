@@ -5,6 +5,7 @@ import {
   buildClassifierMessages,
   buildDeciderMessages,
   chunkArray,
+  computeDeciderShardCount,
   computeEngineIdentity,
   getDeciderContainerInstanceName,
   runCasesWithConcurrency,
@@ -444,8 +445,7 @@ describe('summarize — p95 and timeouts', () => {
 });
 
 describe('decider message fan-out', () => {
-  it('DECIDER_CHUNK_SIZE is 5 (chunk count for 76 cases)', () => {
-    // DECIDER_CASES = 76, chunk size 5 → ceil(76/5) = 16 chunks
+  it('DECIDER_CHUNK_SIZE is 5', () => {
     const chunks = chunkArray(
       Array.from({ length: 76 }, (_, i) => String(i)),
       5
@@ -461,45 +461,94 @@ describe('decider message fan-out', () => {
       kind: 'decider',
       model: 'm1',
       rep: 2,
+      shard: 1,
+      shardCount: 4,
       caseIds: ['a'],
       chunk: 0,
     });
     expect(withRep.rep).toBe(2);
+    expect(withRep.shard).toBe(1);
+    expect(withRep.shardCount).toBe(4);
   });
 
-  it('buildDeciderMessages: seeds one chunk per model repetition', () => {
-    // 76 cases, chunk size 5 → 16 chunks
-    const cases76 = Array.from({ length: 76 }, (_, i) => ({ id: `case-${i}` }));
-    const chunks = chunkArray(cases76, 5);
-    expect(chunks).toHaveLength(16);
+  it('computeDeciderShardCount maximizes shard lanes under the live container cap', () => {
+    expect(computeDeciderShardCount({ modelCount: 2, repetitions: 3, chunkCount: 36 })).toBe(16);
+    expect(
+      computeDeciderShardCount({
+        modelCount: 7,
+        repetitions: 1,
+        chunkCount: 36,
+        maxLiveContainers: 100,
+      })
+    ).toBe(14);
+    expect(
+      computeDeciderShardCount({
+        modelCount: 25,
+        repetitions: 1,
+        chunkCount: 36,
+        maxLiveContainers: 100,
+      })
+    ).toBe(4);
+    expect(
+      computeDeciderShardCount({
+        modelCount: 10,
+        repetitions: 3,
+        chunkCount: 36,
+        maxLiveContainers: 100,
+      })
+    ).toBe(3);
+    expect(
+      computeDeciderShardCount({
+        modelCount: 101,
+        repetitions: 1,
+        chunkCount: 36,
+        maxLiveContainers: 100,
+      })
+    ).toBe(0);
+  });
+
+  it('buildDeciderMessages: seeds sharded chunk lanes under the container cap', () => {
+    const cases180 = Array.from({ length: 180 }, (_, i) => ({ id: `case-${i}` }));
+    const chunks = chunkArray(cases180, 5);
+    expect(chunks).toHaveLength(36);
 
     const models = ['model/a', 'model/b'];
     const repetitions = 3;
     const messages = buildDeciderMessages('run-test', 'decider', models, repetitions, chunks);
+    const expectedShardCount = 16;
 
-    // Initial fan-out is bounded to one active chunk per model/repetition.
-    expect(messages).toHaveLength(models.length * repetitions);
+    // Initial fan-out is bounded by the 100-container budget while running
+    // multiple independent chunk lanes per model/repetition.
+    expect(messages).toHaveLength(models.length * repetitions * expectedShardCount);
+    expect(messages.length).toBeLessThanOrEqual(100);
 
     for (let rep = 0; rep < repetitions; rep++) {
       const forRep = messages.filter(m => m.body.rep === rep);
-      expect(forRep).toHaveLength(models.length);
+      expect(forRep).toHaveLength(models.length * expectedShardCount);
     }
 
     for (const { body } of messages) {
       expect(typeof body.rep).toBe('number');
       expect(body.rep).toBeGreaterThanOrEqual(0);
       expect(body.rep).toBeLessThan(repetitions);
-      expect(body.chunk).toBe(0);
-      expect(body.caseIds).toEqual(chunks[0].map(c => c.id));
+      expect(body.shardCount).toBe(expectedShardCount);
+      expect(body.shard).toBeGreaterThanOrEqual(0);
+      expect(body.shard).toBeLessThan(expectedShardCount);
+      expect(body.chunk).toBe(body.shard);
+      expect(body.caseIds).toEqual(chunks[body.shard!]?.map(c => c.id));
     }
   });
 
-  it('getDeciderContainerInstanceName reuses one container per model repetition', () => {
+  it('getDeciderContainerInstanceName reuses one container per model repetition shard', () => {
     const base = { runId: 'run-test', kind: 'decider' as const, model: 'model/a', rep: 2 };
-    expect(getDeciderContainerInstanceName({ ...base, chunk: 0 })).toBe('run-test:model/a:2');
-    expect(getDeciderContainerInstanceName({ ...base, chunk: 15 })).toBe('run-test:model/a:2');
-    expect(getDeciderContainerInstanceName({ ...base, rep: 3, chunk: 0 })).toBe(
-      'run-test:model/a:3'
+    expect(getDeciderContainerInstanceName({ ...base, chunk: 0, shard: 0 })).toBe(
+      'run-test:model/a:2:0'
+    );
+    expect(getDeciderContainerInstanceName({ ...base, chunk: 16, shard: 0 })).toBe(
+      'run-test:model/a:2:0'
+    );
+    expect(getDeciderContainerInstanceName({ ...base, chunk: 1, shard: 1 })).toBe(
+      'run-test:model/a:2:1'
     );
   });
 });

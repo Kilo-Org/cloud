@@ -23,10 +23,11 @@ const AGENTCARD_SECRET_KEY = 'AGENTCARD_API_KEY';
 const OrganizationIdSchema = z.string().uuid();
 
 function buildDisconnectPath(organizationId: string | undefined, queryParam: string): string {
+  const query = `${queryParam}&provider=agentcard`;
   if (organizationId) {
-    return `/organizations/${organizationId}/claw/settings?${queryParam}`;
+    return `/organizations/${organizationId}/claw/settings?${query}`;
   }
-  return `/claw/settings?${queryParam}`;
+  return `/claw/settings?${query}`;
 }
 
 function isSameOriginMutation(request: NextRequest): boolean {
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
 
   try {
     if (!isSameOriginMutation(request)) {
-      return NextResponse.redirect(new URL('/claw/settings?error=invalid_origin', APP_URL), 303);
+      return NextResponse.redirect(new URL(buildDisconnectPath(undefined, 'error=invalid_origin'), APP_URL), 303);
     }
 
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       const parsedOrgId = OrganizationIdSchema.safeParse(organizationIdParam);
       if (!parsedOrgId.success) {
         return NextResponse.redirect(
-          new URL('/claw/settings?error=invalid_organization', APP_URL),
+          new URL(buildDisconnectPath(undefined, 'error=invalid_organization'), APP_URL),
           303
         );
       }
@@ -135,5 +136,5 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.redirect(new URL('/claw/settings?error=method_not_allowed', APP_URL));
+  return NextResponse.redirect(new URL(buildDisconnectPath(undefined, 'error=method_not_allowed'), APP_URL));
 }

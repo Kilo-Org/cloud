@@ -29,14 +29,17 @@ function buildRedirectPath(
   state: { owner: VerifiedAgentCardOAuthState['owner']; returnTo?: string } | null | undefined,
   preEncodedQueryFragment: string
 ): string {
+  // Tag every redirect so the settings page shows AgentCard copy (not Google)
+  // for the otherwise-shared error/success codes.
+  const fragment = `${preEncodedQueryFragment}&provider=agentcard`;
   if (state?.returnTo) {
     const separator = state.returnTo.includes('?') ? '&' : '?';
-    return `${state.returnTo}${separator}${preEncodedQueryFragment}`;
+    return `${state.returnTo}${separator}${fragment}`;
   }
   if (state?.owner?.type === 'org') {
-    return `/organizations/${state.owner.id}/claw/settings?${preEncodedQueryFragment}`;
+    return `/organizations/${state.owner.id}/claw/settings?${fragment}`;
   }
-  return `/claw/settings?${preEncodedQueryFragment}`;
+  return `/claw/settings?${fragment}`;
 }
 
 function sanitizeOAuthProviderError(
@@ -98,7 +101,7 @@ export async function GET(request: NextRequest) {
         tags: { endpoint: 'agentcard/callback', source: 'agentcard_oauth' },
         extra: oauthSentryContext(searchParams),
       });
-      return NextResponse.redirect(new URL('/claw/settings?error=invalid_state', APP_URL));
+      return NextResponse.redirect(new URL(buildRedirectPath(null, 'error=invalid_state'), APP_URL));
     }
 
     if (verifiedState.userId !== user.id) {
@@ -107,13 +110,13 @@ export async function GET(request: NextRequest) {
         tags: { endpoint: 'agentcard/callback', source: 'agentcard_oauth' },
         extra: { stateUserId: verifiedState.userId, sessionUserId: user.id },
       });
-      return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
+      return NextResponse.redirect(new URL(buildRedirectPath(null, 'error=unauthorized'), APP_URL));
     }
 
     if (verifiedState.owner.type === 'org') {
       await ensureOrganizationAccess({ user }, verifiedState.owner.id);
     } else if (verifiedState.owner.id !== user.id) {
-      return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
+      return NextResponse.redirect(new URL(buildRedirectPath(null, 'error=unauthorized'), APP_URL));
     }
 
     const oauthErrorCode = sanitizeOAuthProviderError(error, errorDescription);
@@ -160,7 +163,7 @@ export async function GET(request: NextRequest) {
           userId: user.id,
         },
       });
-      return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
+      return NextResponse.redirect(new URL(buildRedirectPath(null, 'error=unauthorized'), APP_URL));
     }
 
     if (verifiedState.owner.type === 'org') {

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Settings } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { resolveGoogleOAuthFeedback } from './google-oauth-feedback';
+import { resolveAgentCardOAuthFeedback } from './agentcard-oauth-feedback';
 import { TRPCClientError } from '@trpc/client';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawStatus, useKiloClawMutations, useKiloClawMyPin } from '@/hooks/useKiloClaw';
@@ -183,10 +184,13 @@ function ClawSettingsWithStatus({
   // bounces to onboarding. Wait for status so `shouldRedirect` is meaningful.
   useEffect(() => {
     if (oauthFeedbackHandledRef.current || isLoading) return;
-    const feedback = resolveGoogleOAuthFeedback(
-      searchParams.get('success'),
-      searchParams.get('error')
-    );
+    // AgentCard routes tag their redirects with provider=agentcard; everything
+    // else (Google) keeps the existing behavior. The codes overlap, so the
+    // marker is what disambiguates which copy to show.
+    const feedback =
+      searchParams.get('provider') === 'agentcard'
+        ? resolveAgentCardOAuthFeedback(searchParams.get('success'), searchParams.get('error'))
+        : resolveGoogleOAuthFeedback(searchParams.get('success'), searchParams.get('error'));
     if (!feedback) return;
     oauthFeedbackHandledRef.current = true;
 
@@ -203,6 +207,7 @@ function ClawSettingsWithStatus({
       const next = new URLSearchParams(searchParams);
       next.delete('success');
       next.delete('error');
+      next.delete('provider');
       const query = next.toString();
       router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     }

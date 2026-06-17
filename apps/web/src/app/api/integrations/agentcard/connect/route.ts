@@ -23,10 +23,11 @@ import type { Owner } from '@/lib/integrations/core/types';
 const OrganizationIdSchema = z.string().uuid();
 
 function buildConnectErrorPath(organizationId: string | undefined, errorCode: string): string {
+  const query = `error=${encodeURIComponent(errorCode)}&provider=agentcard`;
   if (organizationId) {
-    return `/organizations/${organizationId}/claw/settings?error=${encodeURIComponent(errorCode)}`;
+    return `/organizations/${organizationId}/claw/settings?${query}`;
   }
-  return `/claw/settings?error=${encodeURIComponent(errorCode)}`;
+  return `/claw/settings?${query}`;
 }
 
 /**
@@ -48,7 +49,9 @@ export async function GET(request: NextRequest) {
     if (organizationIdParam) {
       const parsedOrgId = OrganizationIdSchema.safeParse(organizationIdParam);
       if (!parsedOrgId.success) {
-        return NextResponse.redirect(new URL('/claw/settings?error=invalid_organization', APP_URL));
+        return NextResponse.redirect(
+          new URL(buildConnectErrorPath(undefined, 'invalid_organization'), APP_URL)
+        );
       }
       organizationId = parsedOrgId.data;
       await ensureOrganizationAccess({ user }, organizationId);

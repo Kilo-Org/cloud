@@ -24,6 +24,7 @@ import {
   runModels,
 } from './db-schema';
 import { pickClassifierWinner } from './winner';
+import { parsePersistedReasoningEffort } from './reasoning-effort';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -589,7 +590,7 @@ export function rowsToRoutingTable(
       accuracy: row.accuracy,
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
-      reasoningEffort: row.reasoning_effort as RankedCandidate['reasoningEffort'],
+      reasoningEffort: parsePersistedReasoningEffort(row.reasoning_effort),
     });
   }
   return {

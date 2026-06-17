@@ -87,4 +87,30 @@ describe('mapConfigRows', () => {
     expect(result?.deciderModels).toEqual([{ id: 'auto/model', reasoningEffort: 'medium' }]);
     expect(result?.excludedAutoDeciderModels).toEqual(['auto/model']);
   });
+
+  it('normalizes unsupported persisted reasoning effort values to null', () => {
+    const result = mapConfigRows(
+      configRow,
+      ['some/model'],
+      [{ model: 'manual/thinking', reasoning_effort: 'thinking' }],
+      [
+        {
+          model: 'auto/none',
+          reasoning_effort: 'none',
+          avg_attempt_cost_usd: 20,
+          synced_at: '2026-06-01T01:00:00.000Z',
+        },
+      ],
+      []
+    );
+
+    expect(result?.manualDeciderModels).toEqual([{ id: 'manual/thinking', reasoningEffort: null }]);
+    expect(result?.autoDeciderModels).toEqual([
+      { id: 'auto/none', reasoningEffort: null, avgAttemptCostUsd: 20 },
+    ]);
+    expect(result?.deciderModels).toEqual([
+      { id: 'manual/thinking', reasoningEffort: null },
+      { id: 'auto/none', reasoningEffort: null },
+    ]);
+  });
 });

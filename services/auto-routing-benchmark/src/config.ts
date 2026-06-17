@@ -5,6 +5,7 @@ import {
   type ConfigAutoDeciderModelRow,
   type ConfigDeciderModelRow,
 } from './db';
+import { parsePersistedReasoningEffort } from './reasoning-effort';
 
 // Maps the three normalized config tables to the BenchmarkConfig contract.
 // Null when no admin has saved a config yet — the worker never fabricates
@@ -32,14 +33,12 @@ export function mapConfigRows(
   const excludedAuto = new Set(excludedAutoDeciderModels);
   const manualDeciderModels = deciderModelRows.map(r => ({
     id: r.model,
-    reasoningEffort:
-      r.reasoning_effort as BenchmarkConfig['deciderModels'][number]['reasoningEffort'],
+    reasoningEffort: parsePersistedReasoningEffort(r.reasoning_effort),
   }));
   const manualIds = new Set(manualDeciderModels.map(model => model.id));
   const autoDeciderModels = autoDeciderModelRows.map(r => ({
     id: r.model,
-    reasoningEffort:
-      r.reasoning_effort as BenchmarkConfig['deciderModels'][number]['reasoningEffort'],
+    reasoningEffort: parsePersistedReasoningEffort(r.reasoning_effort),
     avgAttemptCostUsd: r.avg_attempt_cost_usd,
   }));
   const effectiveAutoDeciderModels = autoDeciderModels

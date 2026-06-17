@@ -41,6 +41,7 @@ import {
   runDeciderCaseViaCli,
   warmUpCliContainer,
 } from './cli-runner';
+import { parsePersistedReasoningEffort } from './reasoning-effort';
 import { pickClassifierWinner } from './winner';
 
 export type BenchmarkJobMessage = {
@@ -910,7 +911,7 @@ async function finalizeRunIfComplete(
       // admin edit can't skew the published table.
       const deciderModels: BenchmarkDeciderModel[] = state.models.map(m => ({
         id: m.model,
-        reasoningEffort: m.reasoning_effort as BenchmarkDeciderModel['reasoningEffort'],
+        reasoningEffort: parsePersistedReasoningEffort(m.reasoning_effort),
       }));
       const table = buildRoutingTable({
         runId,

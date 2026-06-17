@@ -1565,7 +1565,15 @@ export async function tryDeleteMachine(
  * actual Fly state before acting.
  */
 const MAX_DESTROY_VOLUME_ATTEMPTS = 100;
-const DESTROY_VOLUME_ESCALATION_ATTEMPTS = 10;
+/**
+ * Attempt at which to emit `destroy_volume_retry_escalated` as an early signal.
+ * The retry backoff reaches its daily tier when scheduling after attempt 6
+ * (~7h of accumulated retries), which is the point a short outage becomes a
+ * long-lived provider failure worth alerting on. Firing later (e.g. at attempt
+ * 10, ~4 days in) would just trail the daily-tier transition instead of
+ * surfacing it while still actionable.
+ */
+const DESTROY_VOLUME_ESCALATION_ATTEMPTS = 6;
 
 export async function tryDeleteVolume(
   flyConfig: FlyClientConfig,

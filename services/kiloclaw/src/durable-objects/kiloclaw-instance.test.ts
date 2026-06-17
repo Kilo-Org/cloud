@@ -1462,7 +1462,7 @@ describe('destroy volume: retry backoff and abandon', () => {
       flyVolumeId: 'vol-1',
       pendingDestroyMachineId: null,
       pendingDestroyVolumeId: 'vol-1',
-      destroyVolumeAttempts: 9,
+      destroyVolumeAttempts: 5,
     });
     (flyClient.getVolume as Mock).mockResolvedValue({
       id: 'vol-1',
@@ -1476,7 +1476,7 @@ describe('destroy volume: retry backoff and abandon', () => {
     const { instance } = createInstance(storage, env);
     await instance.alarm();
 
-    expect(storage._store.get('destroyVolumeAttempts')).toBe(10);
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(6);
     expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-1');
     expect(analyticsEventsByName(env, 'reconcile.destroy_volume_retry_escalated')).toHaveLength(1);
   });

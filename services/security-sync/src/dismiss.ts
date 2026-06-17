@@ -1,13 +1,15 @@
 import type { WorkerDb } from '@kilocode/db/client';
-import { security_findings } from '@kilocode/db/schema';
+import { kilocode_users, security_findings } from '@kilocode/db/schema';
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
 } from '@kilocode/db/schema-types';
 import { parseDependabotDismissalTarget } from '@kilocode/worker-utils/dependabot-dismissal-target';
 import {
+  buildSecurityFindingAuditHumanActor,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditHumanActor,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
 import { eq, sql } from 'drizzle-orm';
@@ -55,6 +57,24 @@ function dismissalEventKey(params: {
     SecurityAuditLogAction.FindingDismissed,
     params.commandId,
   ]);
+}
+
+async function getDismissalAuditActor(
+  db: WorkerDb,
+  actorUserId: string
+): Promise<SecurityFindingAuditHumanActor> {
+  const [actor] = await db
+    .select({
+      id: kilocode_users.id,
+      email: kilocode_users.google_user_email,
+      name: kilocode_users.google_user_name,
+      isAdmin: kilocode_users.is_admin,
+    })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, actorUserId))
+    .limit(1);
+  if (!actor) throw new Error('Security Finding dismissal actor unavailable');
+  return buildSecurityFindingAuditHumanActor(actor);
 }
 
 export async function processSecurityFindingDismissal(params: {
@@ -161,13 +181,15 @@ export async function processSecurityFindingDismissal(params: {
     }
   }
 
+  const actor = await getDismissalAuditActor(params.db, params.message.actor.id);
+
   await params.db.transaction(async tx => {
     await tx
       .update(security_findings)
       .set({
         status: 'ignored',
         ignored_reason: params.message.reason,
-        ignored_by: params.message.actor.email ?? params.message.actor.id,
+        ignored_by: actor.email ?? actor.id,
         updated_at: sql`now()`,
       })
       .where(eq(security_findings.id, finding.id));
@@ -175,11 +197,7 @@ export async function processSecurityFindingDismissal(params: {
     await insertSecurityFindingAuditEvent(tx, {
       owner: toAuditOwner(params.message.owner),
       finding: { ...finding, status: 'ignored' },
-      actor: {
-        id: params.message.actor.id,
-        email: params.message.actor.email ?? null,
-        name: params.message.actor.name ?? null,
-      },
+      actor,
       action: SecurityAuditLogAction.FindingDismissed,
       occurredAt: new Date(),
       eventKey: dismissalEventKey({

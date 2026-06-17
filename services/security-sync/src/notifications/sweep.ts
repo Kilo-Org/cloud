@@ -9,6 +9,7 @@ import {
   SecurityFindingAuditSourceContext,
 } from '@kilocode/db/schema-types';
 import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
   type SecurityFindingAuditEventFinding,
@@ -519,6 +520,7 @@ async function supersedeDuplicateFindings(
       await insertSecurityFindingAuditEvent(tx, {
         owner: toSecurityFindingAuditOwner(owner),
         finding: toAuditEventFinding(finding),
+        actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
         action: SecurityAuditLogAction.FindingSuperseded,
         occurredAt,
         eventKey: deriveSecurityFindingAuditEventKey([

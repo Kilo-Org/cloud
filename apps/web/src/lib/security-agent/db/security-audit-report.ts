@@ -1,11 +1,15 @@
 import 'server-only';
 import { captureException, startSpan } from '@sentry/nextjs';
 import { security_audit_log } from '@kilocode/db/schema';
-import { SecurityAuditLogAction, SecuritySeverity } from '@kilocode/db/schema-types';
+import {
+  SecurityAuditLogAction,
+  SecurityAuditLogActorType,
+  SecuritySeverity,
+} from '@kilocode/db/schema-types';
 import { REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS } from '@kilocode/worker-utils/security-finding-audit';
 import { and, asc, count, eq, gt, gte, inArray, isNotNull, lt, lte, or, sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
 export const SECURITY_AGENT_AUDIT_REPORT_VERSION = 1;
 export const SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START = '2026-06-12T00:00:00.000Z';
@@ -115,6 +119,7 @@ type AuditReportRow = {
   actor_id: string | null;
   actor_email: string | null;
   actor_name: string | null;
+  actor_type: SecurityAuditLogActorType | null;
   before_state: Record<string, unknown> | null;
   after_state: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
@@ -390,18 +395,32 @@ async function assembleSecurityAgentAuditReport(params: {
   isRequestingUserKiloAdmin: boolean;
   onEventCount: (eventCount: number) => void;
 }): Promise<SecurityAgentAuditReport> {
-  const dataThrough = await getDatabaseNow();
-  const eventCount = await countReportEvents(params.owner, params.period, dataThrough);
-  params.onEventCount(eventCount);
+  const { dataThrough, rows } = await db.transaction(
+    async tx => {
+      const dataThrough = await getDatabaseNow(tx);
+      const eventCount = await countReportEvents(tx, params.owner, params.period, dataThrough);
+      params.onEventCount(eventCount);
 
-  if (eventCount > SECURITY_AGENT_AUDIT_REPORT_MAX_EVENTS) {
-    throw new SecurityAgentAuditReportQueryError(
-      'Report event count exceeds v1 tested budget',
-      'budget'
-    );
-  }
+      if (eventCount > SECURITY_AGENT_AUDIT_REPORT_MAX_EVENTS) {
+        throw new SecurityAgentAuditReportQueryError(
+          'Report event count exceeds v1 tested budget',
+          'budget'
+        );
+      }
 
-  const rows = await scanReportRows(params.owner, params.period, dataThrough);
+      const rows = await scanReportRows(tx, params.owner, params.period, dataThrough);
+      if (rows.length !== eventCount) {
+        throw new SecurityAgentAuditReportQueryError(
+          'Report scan row count does not match counted events',
+          'scan'
+        );
+      }
+
+      return { dataThrough, rows };
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' }
+  );
+
   const report = buildSecurityAgentAuditReportFromRows({
     owner: params.owner,
     period: params.period,
@@ -475,9 +494,9 @@ export function buildSecurityAgentAuditReportFromRows(params: {
   };
 }
 
-async function getDatabaseNow(): Promise<string> {
+async function getDatabaseNow(tx: DrizzleTransaction): Promise<string> {
   const { rows } = await withSecurityAgentAuditReportTimeout(
-    db.execute<{ data_through: string }>(sql`SELECT now() AS data_through`),
+    tx.execute<{ data_through: string }>(sql`SELECT now() AS data_through`),
     SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
     'data_through'
   );
@@ -485,13 +504,14 @@ async function getDatabaseNow(): Promise<string> {
 }
 
 async function countReportEvents(
+  tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
   period: NormalizedAuditReportPeriod,
   dataThrough: string
 ): Promise<number> {
   try {
     const [row] = await withSecurityAgentAuditReportTimeout(
-      db
+      tx
         .select({ eventCount: count(security_audit_log.id) })
         .from(security_audit_log)
         .where(and(...baseReportConditions(owner, period, dataThrough))),
@@ -509,6 +529,7 @@ async function countReportEvents(
 }
 
 async function scanReportRows(
+  tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
   period: NormalizedAuditReportPeriod,
   dataThrough: string
@@ -517,7 +538,7 @@ async function scanReportRows(
   let cursor: AuditReportCursor | null = null;
 
   while (true) {
-    const page = await scanReportPage(owner, period, dataThrough, cursor);
+    const page = await scanReportPage(tx, owner, period, dataThrough, cursor);
     rows.push(...page);
 
     if (page.length < SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE) return rows;
@@ -527,6 +548,7 @@ async function scanReportRows(
 }
 
 async function scanReportPage(
+  tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
   period: NormalizedAuditReportPeriod,
   dataThrough: string,
@@ -544,13 +566,14 @@ async function scanReportPage(
 
   try {
     return await withSecurityAgentAuditReportTimeout(
-      db
+      tx
         .select({
           id: security_audit_log.id,
           action: security_audit_log.action,
           actor_id: security_audit_log.actor_id,
           actor_email: security_audit_log.actor_email,
           actor_name: security_audit_log.actor_name,
+          actor_type: security_audit_log.actor_type,
           before_state: security_audit_log.before_state,
           after_state: security_audit_log.after_state,
           metadata: security_audit_log.metadata,
@@ -728,19 +751,27 @@ function buildReportEvent(
 }
 
 function buildReportActor(
-  row: Pick<AuditReportRow, 'actor_id' | 'actor_email' | 'actor_name'>,
+  row: Pick<AuditReportRow, 'actor_id' | 'actor_name' | 'actor_type'>,
   isRequestingUserKiloAdmin: boolean
 ): SecurityAgentAuditReportActor {
-  if (!row.actor_id && !row.actor_email && !row.actor_name) {
+  if (row.actor_type === SecurityAuditLogActorType.System) {
     return { type: 'system', displayName: 'Kilo system', masked: false };
   }
 
-  const isInternalKiloActor = row.actor_email?.endsWith('@kilocode.ai') ?? false;
-  if (isInternalKiloActor && !isRequestingUserKiloAdmin) {
+  const hasPersistedIdentity = Boolean(row.actor_id || row.actor_name);
+  if (row.actor_type === null && !hasPersistedIdentity) {
+    return { type: 'system', displayName: 'Kilo system', masked: false };
+  }
+
+  if (
+    !isRequestingUserKiloAdmin &&
+    (row.actor_type === SecurityAuditLogActorType.KiloAdmin || row.actor_type === null)
+  ) {
     return {
       type: 'user',
       id: '00000000-0000-0000-0000-000000000000',
-      displayName: 'Kilo Admin',
+      displayName:
+        row.actor_type === SecurityAuditLogActorType.KiloAdmin ? 'Kilo Admin' : 'Masked user',
       masked: true,
     };
   }

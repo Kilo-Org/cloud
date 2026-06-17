@@ -9,6 +9,7 @@ import {
   SecurityFindingAuditSourceContext,
 } from '@kilocode/db/schema-types';
 import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
   type SecurityFindingAuditOwner,
@@ -131,6 +132,7 @@ async function insertTerminalAnalysisAuditEvent(
   await insertSecurityFindingAuditEvent(db, {
     owner: toAnalysisAuditOwner(finding),
     finding,
+    actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
     action,
     occurredAt,
     eventKey: deriveSecurityFindingAuditEventKey([

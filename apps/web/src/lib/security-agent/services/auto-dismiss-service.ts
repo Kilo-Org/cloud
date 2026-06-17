@@ -27,9 +27,12 @@ import {
   SecurityFindingAuditSourceContext,
 } from '@kilocode/db/schema-types';
 import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditActor,
   type SecurityFindingAuditEventFinding,
+  type SecurityFindingAuditHumanActor,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
 import { parseDependabotDismissalTarget } from '@kilocode/worker-utils/dependabot-dismissal-target';
@@ -111,11 +114,7 @@ async function dismissFindingWithAuditEvent(
     dismissSource: AutoDismissSource | 'bulk';
     confidence?: string | null;
     correlationId?: string;
-    actor?: {
-      id: string;
-      email: string | null;
-      name: string | null;
-    };
+    actor: SecurityFindingAuditActor;
   }
 ): Promise<boolean> {
   const occurredAt = new Date().toISOString();
@@ -160,13 +159,7 @@ async function dismissFindingWithAuditEvent(
     await insertSecurityFindingAuditEvent(tx, {
       owner: toAuditOwner(params.owner),
       finding: toAuditFinding(updatedFinding),
-      actor: params.actor
-        ? {
-            id: params.actor.id,
-            email: params.actor.email,
-            name: params.actor.name,
-          }
-        : null,
+      actor: params.actor,
       action: SecurityAuditLogAction.FindingAutoDismissed,
       occurredAt,
       eventKey: deriveSecurityFindingAuditEventKey([
@@ -301,6 +294,7 @@ export async function maybeAutoDismissAnalysis(options: {
       dismissedBy: 'auto-sandbox',
       dismissSource: 'sandbox',
       correlationId,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
     });
     if (!dismissed) return { dismissed: false };
 
@@ -346,6 +340,7 @@ export async function maybeAutoDismissAnalysis(options: {
         dismissSource: 'triage',
         confidence: triage.confidence,
         correlationId,
+        actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
       });
       if (!dismissed) return { dismissed: false };
 
@@ -398,11 +393,7 @@ export type AutoDismissResult = {
  */
 export async function autoDismissEligibleFindings(
   owner: SecurityReviewOwner,
-  actor: {
-    id: string;
-    email: string | null;
-    name: string | null;
-  }
+  actor: SecurityFindingAuditHumanActor
 ): Promise<AutoDismissResult> {
   const userId = actor.id;
   const ownerConverted = toOwner(owner, userId);

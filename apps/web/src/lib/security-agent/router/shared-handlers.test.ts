@@ -31,6 +31,8 @@ const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
 const mockDecorateFindingWithRemediation = jest.fn<() => Promise<unknown>>();
 const mockDecorateFindingsWithRemediation = jest.fn<() => Promise<unknown>>();
 const mockGetRemediationAttemptHistory = jest.fn<() => Promise<unknown>>();
+const mockDeleteFindingsByRepository =
+  jest.fn<(params: unknown) => Promise<{ deletedCount: number }>>();
 const mockTrackSecurityAgentSync = jest.fn();
 const mockTrackSecurityAgentUiInteraction = jest.fn();
 const mockTrackSecurityAgentRemediationAction = jest.fn();
@@ -94,7 +96,7 @@ jest.mock('../db/security-findings', () => ({
   getSecurityFindingsSummary: jest.fn(),
   getLastSyncTime: jest.fn(),
   getOrphanedRepositoriesWithFindingCounts: jest.fn(),
-  deleteFindingsByRepository: jest.fn(),
+  deleteFindingsByRepository: mockDeleteFindingsByRepository,
 }));
 jest.mock('../db/security-remediation', () => ({
   decorateFindingWithRemediation: mockDecorateFindingWithRemediation,
@@ -199,6 +201,7 @@ const context = {
     id: 'user-123',
     google_user_email: 'owner@example.com',
     google_user_name: 'Owner Example',
+    is_admin: false,
   },
 } as never;
 
@@ -390,12 +393,45 @@ describe('autoDismissEligible', () => {
     expect(mockAutoDismissEligibleFindings).toHaveBeenCalledWith(
       { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
       {
+        type: 'customer_user',
         id: 'user-123',
         email: 'owner@example.com',
         name: 'Owner Example',
       }
     );
     expect(mockLogSecurityAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe('deleteFindingsByRepository', () => {
+  it('propagates authoritative admin classification to deletion events', async () => {
+    mockDeleteFindingsByRepository.mockResolvedValue({ deletedCount: 2 });
+    const adminContext = {
+      user: {
+        id: 'user-123',
+        google_user_email: 'operator@example.com',
+        google_user_name: 'Owner Example',
+        is_admin: true,
+      },
+    } as never;
+
+    await expect(
+      createHandlers().deleteFindingsByRepository.handler({
+        ctx: adminContext,
+        input: { repoFullName: 'kilo/repo' },
+      })
+    ).resolves.toEqual({ success: true, deletedCount: 2 });
+
+    expect(mockDeleteFindingsByRepository).toHaveBeenCalledWith({
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      repoFullName: 'kilo/repo',
+      actor: {
+        type: 'kilo_admin',
+        id: 'user-123',
+        email: 'operator@example.com',
+        name: 'Owner Example',
+      },
+    });
   });
 });
 
@@ -478,6 +514,9 @@ describe('queue-backed handlers', () => {
         },
       })
     ).resolves.toMatchObject({ success: true, accepted: true, commandId });
+    expect(mockSubmitManualFindingDismissal).toHaveBeenCalledWith(
+      expect.objectContaining({ actor: { id: 'user-123' } })
+    );
   });
 
   it('returns manual analysis command correlation', async () => {

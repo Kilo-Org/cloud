@@ -32,6 +32,7 @@ import {
   type AutoAnalysisMinSeverity,
 } from '@kilocode/worker-utils/security-auto-analysis-policy';
 import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
   type SecurityFindingAuditEventFinding,
@@ -936,6 +937,7 @@ async function writeSyncFindingAuditEvents(
     await insertSecurityFindingAuditEvent(db, {
       owner: auditOwner,
       finding: auditFinding,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
       action: SecurityAuditLogAction.FindingCreated,
       occurredAt,
       sourceOccurredAt: finding.first_detected_at,
@@ -961,6 +963,7 @@ async function writeSyncFindingAuditEvents(
     await insertSecurityFindingAuditEvent(db, {
       owner: auditOwner,
       finding: auditFinding,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
       action: SecurityAuditLogAction.FindingSeverityChanged,
       occurredAt,
       sourceOccurredAt: finding.raw_data.updated_at,
@@ -984,6 +987,7 @@ async function writeSyncFindingAuditEvents(
     await insertSecurityFindingAuditEvent(db, {
       owner: auditOwner,
       finding: auditFinding,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
       action,
       occurredAt,
       sourceOccurredAt,
@@ -1348,6 +1352,7 @@ async function writeSupersededFindingAuditEvent(
   await insertSecurityFindingAuditEvent(db, {
     owner: toSecurityFindingAuditOwner(owner),
     finding: toAuditEventFinding(finding),
+    actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
     action: SecurityAuditLogAction.FindingSuperseded,
     occurredAt,
     eventKey: deriveSecurityFindingAuditEventKey([

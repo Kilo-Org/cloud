@@ -11,6 +11,7 @@ import type {
   countEligibleForAutoDismiss as countEligibleForAutoDismissType,
 } from './auto-dismiss-service';
 import type { SecurityFinding } from '@kilocode/db/schema';
+import { SecurityAuditLogActorType } from '@kilocode/db/schema-types';
 import type { SecurityFindingAnalysis } from '../core/types';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -454,6 +455,7 @@ describe('maybeAutoDismissAnalysis', () => {
     expect(mockUpdatedRows).toHaveLength(1);
     expect(mockUpdatedRows[0]).toMatchObject({ status: 'ignored', ignored_reason: 'not_used' });
     expect(mockAuditRows[0]).toMatchObject({
+      actor_type: 'system',
       action: 'security.finding.auto_dismissed',
       finding_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       source_context: 'web',
@@ -484,7 +486,12 @@ describe('maybeAutoDismissAnalysis', () => {
       await expect(
         autoDismissEligibleFindings(
           { userId: 'user-1' },
-          { id: 'user-1', email: 'owner@example.com', name: 'Owner Example' }
+          {
+            type: SecurityAuditLogActorType.CustomerUser,
+            id: 'user-1',
+            email: 'owner@example.com',
+            name: 'Owner Example',
+          }
         )
       ).resolves.toEqual({ dismissed: 1, skipped: 0, errors: 0 });
 
@@ -493,6 +500,7 @@ describe('maybeAutoDismissAnalysis', () => {
         actor_id: 'user-1',
         actor_email: 'owner@example.com',
         actor_name: 'Owner Example',
+        actor_type: 'customer_user',
         action: 'security.finding.auto_dismissed',
         finding_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
         source_context: 'web',
@@ -526,7 +534,12 @@ describe('maybeAutoDismissAnalysis', () => {
       await expect(
         autoDismissEligibleFindings(
           { userId: 'user-1' },
-          { id: 'user-1', email: 'owner@example.com', name: 'Owner Example' }
+          {
+            type: SecurityAuditLogActorType.CustomerUser,
+            id: 'user-1',
+            email: 'owner@example.com',
+            name: 'Owner Example',
+          }
         )
       ).resolves.toEqual({ dismissed: 0, skipped: 1, errors: 0 });
 

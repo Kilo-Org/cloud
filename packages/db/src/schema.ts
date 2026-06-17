@@ -40,6 +40,7 @@ import {
   FeedbackSource,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
@@ -180,6 +181,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
   KiloClawPlan,
   KiloClawScheduledPlan,
@@ -5432,6 +5434,7 @@ export const security_audit_log = pgTable(
     actor_id: text(),
     actor_email: text(),
     actor_name: text(),
+    actor_type: text().$type<SecurityAuditLogActorType>(),
     action: text().$type<SecurityAuditLogAction>().notNull(),
     resource_type: text().notNull(),
     resource_id: text().notNull(),
@@ -5453,6 +5456,7 @@ export const security_audit_log = pgTable(
       sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
     ),
     enumCheck('security_audit_log_action_check', table.action, SecurityAuditLogAction),
+    enumCheck('security_audit_log_actor_type_check', table.actor_type, SecurityAuditLogActorType),
     enumCheck(
       'security_audit_log_source_context_check',
       table.source_context,

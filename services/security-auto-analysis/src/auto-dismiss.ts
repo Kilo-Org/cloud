@@ -10,6 +10,7 @@ import {
 } from '@kilocode/db/schema-types';
 import { parseDependabotDismissalTarget } from '@kilocode/worker-utils/dependabot-dismissal-target';
 import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
   type SecurityFindingAuditOwner,
@@ -127,6 +128,9 @@ async function dismissFindingWithAuditEvent(params: {
     params.analysis.sandboxAnalysis?.analysisAt ??
     params.analysis.triage?.triageAt ??
     params.analysis.analyzedAt;
+  if (!analysisIdentity) {
+    throw new Error('Auto-dismiss audit event requires an analysis identity');
+  }
 
   return params.db.transaction(async tx => {
     const [finding] = await tx
@@ -158,6 +162,7 @@ async function dismissFindingWithAuditEvent(params: {
     await insertSecurityFindingAuditEvent(tx, {
       owner: toAuditOwner(params.owner),
       finding: updatedFinding,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
       action: SecurityAuditLogAction.FindingAutoDismissed,
       occurredAt,
       eventKey: deriveSecurityFindingAuditEventKey([

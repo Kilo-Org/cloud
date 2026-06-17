@@ -1,12 +1,19 @@
-import { describe, expect, it } from '@jest/globals';
-import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import { afterEach, describe, expect, it } from '@jest/globals';
+import { db, pool } from '@/lib/drizzle';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { kilocode_users, security_audit_log } from '@kilocode/db/schema';
+import { SecurityAuditLogAction, SecurityAuditLogActorType } from '@kilocode/db/schema-types';
+import { inArray } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import {
   assertSecurityAgentAuditReportSerializedByteBudget,
   buildSecurityAgentAuditReportFromRows,
   defaultSecurityAgentAuditReportInput,
+  getSecurityAgentAuditReport,
   normalizeSecurityAgentAuditReportPeriod,
   SECURITY_AGENT_AUDIT_REPORT_MAX_EVENTS,
   SECURITY_AGENT_AUDIT_REPORT_MAX_SERIALIZED_BYTES,
+  SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE,
   securityAgentAuditReportSerializedByteLength,
   securityAgentAuditReportEventCountBucket,
   SecurityAgentAuditReportQueryError,
@@ -19,6 +26,58 @@ const period = normalizeSecurityAgentAuditReportPeriod(
   { startDate: '2026-06-01', endDate: '2026-06-12' },
   new Date('2026-06-12T15:00:00.000Z')
 );
+const integrationOwnerIds: string[] = [];
+
+async function createIntegrationOwner() {
+  const user = await insertTestUser();
+  integrationOwnerIds.push(user.id);
+  return {
+    type: 'user' as const,
+    id: user.id,
+    displayName: user.google_user_name ?? 'Test User',
+  };
+}
+
+function dateOnly(value: string): string {
+  return value.slice(0, 10);
+}
+
+function findingSnapshot(findingId: string): Record<string, unknown> {
+  return {
+    finding_id: findingId,
+    source: 'dependabot',
+    source_id: '42',
+    repo_full_name: 'kilo/snapshot-report-test',
+    title: 'Snapshot report pagination test',
+    severity: 'high',
+    status: 'open',
+  };
+}
+
+async function waitForAuditReportReadBlockedBy(lockingPid: number): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const result = await pool.query<{ waiting: boolean }>(
+      `SELECT EXISTS (
+        SELECT 1
+        FROM pg_locks
+        WHERE relation = 'security_audit_log'::regclass
+          AND NOT granted
+          AND $1::integer = ANY(pg_blocking_pids(pid))
+      ) AS waiting`,
+      [lockingPid]
+    );
+    if (result.rows[0]?.waiting) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error('Audit report read did not block on expected table lock');
+}
+
+afterEach(async () => {
+  if (integrationOwnerIds.length === 0) return;
+  await db.delete(kilocode_users).where(inArray(kilocode_users.id, integrationOwnerIds));
+  integrationOwnerIds.length = 0;
+});
 
 function row(overrides: Partial<AuditReportRow>): AuditReportRow {
   return {
@@ -27,6 +86,7 @@ function row(overrides: Partial<AuditReportRow>): AuditReportRow {
     actor_id: null,
     actor_email: null,
     actor_name: null,
+    actor_type: SecurityAuditLogActorType.System,
     before_state: null,
     after_state: null,
     metadata: null,
@@ -118,6 +178,126 @@ describe('normalizeSecurityAgentAuditReportPeriod', () => {
   });
 });
 
+describe('getSecurityAgentAuditReport', () => {
+  it('scans more than one page of same-timestamp events without gaps or duplicates', async () => {
+    const owner = await createIntegrationOwner();
+    const findingId = randomUUID();
+    const occurredAt = new Date(Date.now() - 1_000).toISOString();
+    const eventIds = Array.from({ length: SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE + 1 }, () =>
+      randomUUID()
+    );
+
+    await db.insert(security_audit_log).values(
+      eventIds.map(id => ({
+        id,
+        owned_by_user_id: owner.id,
+        actor_type: SecurityAuditLogActorType.System,
+        action: SecurityAuditLogAction.FindingCreated,
+        resource_type: 'security_finding',
+        resource_id: findingId,
+        finding_id: findingId,
+        occurred_at: occurredAt,
+        finding_snapshot: findingSnapshot(findingId),
+      }))
+    );
+
+    const report = await getSecurityAgentAuditReport({
+      owner,
+      input: { startDate: dateOnly(occurredAt), endDate: dateOnly(occurredAt) },
+      isRequestingUserKiloAdmin: false,
+    });
+    const scannedEventIds = report.findings.flatMap(finding =>
+      finding.events.map(event => event.id)
+    );
+
+    expect(report.summary.activityCount).toBe(SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE + 1);
+    expect(scannedEventIds).toEqual([...eventIds].sort());
+    expect(new Set(scannedEventIds).size).toBe(SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE + 1);
+  }, 20_000);
+
+  it('excludes an event committed after its snapshot and includes it in a fresh report', async () => {
+    const owner = await createIntegrationOwner();
+    const findingId = randomUUID();
+    const initialEventId = randomUUID();
+    const lateEventId = randomUUID();
+    const occurredAt = new Date(Date.now() - 1_000).toISOString();
+    const input = { startDate: dateOnly(occurredAt), endDate: dateOnly(occurredAt) };
+
+    await db.insert(security_audit_log).values({
+      id: initialEventId,
+      owned_by_user_id: owner.id,
+      actor_type: SecurityAuditLogActorType.System,
+      action: SecurityAuditLogAction.FindingCreated,
+      resource_type: 'security_finding',
+      resource_id: findingId,
+      finding_id: findingId,
+      occurred_at: occurredAt,
+      finding_snapshot: findingSnapshot(findingId),
+    });
+
+    const lockClient = await pool.connect();
+    let firstReportPromise: ReturnType<typeof getSecurityAgentAuditReport> | null = null;
+    try {
+      await lockClient.query('BEGIN');
+      await lockClient.query('LOCK TABLE security_audit_log IN ACCESS EXCLUSIVE MODE');
+      const pidResult = await lockClient.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+      const lockingPid = pidResult.rows[0]?.pid;
+      if (lockingPid === undefined) throw new Error('Could not determine locking database process');
+
+      await lockClient.query(
+        `INSERT INTO security_audit_log (
+          id,
+          owned_by_user_id,
+          actor_type,
+          action,
+          resource_type,
+          resource_id,
+          finding_id,
+          occurred_at,
+          finding_snapshot
+        ) VALUES ($1, $2, $3, $4, 'security_finding', $5::text, $5::uuid, $6, $7::jsonb)`,
+        [
+          lateEventId,
+          owner.id,
+          SecurityAuditLogActorType.System,
+          SecurityAuditLogAction.FindingCreated,
+          findingId,
+          occurredAt,
+          JSON.stringify(findingSnapshot(findingId)),
+        ]
+      );
+
+      firstReportPromise = getSecurityAgentAuditReport({
+        owner,
+        input,
+        isRequestingUserKiloAdmin: false,
+      });
+      await waitForAuditReportReadBlockedBy(lockingPid);
+      await lockClient.query('COMMIT');
+
+      const firstReport = await firstReportPromise;
+      const freshReport = await getSecurityAgentAuditReport({
+        owner,
+        input,
+        isRequestingUserKiloAdmin: false,
+      });
+      const firstEventIds = firstReport.findings.flatMap(finding =>
+        finding.events.map(event => event.id)
+      );
+      const freshEventIds = freshReport.findings.flatMap(finding =>
+        finding.events.map(event => event.id)
+      );
+
+      expect(firstEventIds).toEqual([initialEventId]);
+      expect(freshEventIds).toEqual([initialEventId, lateEventId].sort());
+    } finally {
+      await lockClient.query('ROLLBACK').catch(() => undefined);
+      lockClient.release();
+      if (firstReportPromise) await firstReportPromise.catch(() => undefined);
+    }
+  }, 20_000);
+});
+
 describe('buildSecurityAgentAuditReportFromRows', () => {
   it('builds an empty report when no reportable activity exists', () => {
     const report = buildSecurityAgentAuditReportFromRows({
@@ -165,6 +345,7 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
           actor_id: 'admin-user',
           actor_email: 'ops@kilocode.ai',
           actor_name: 'Ops User',
+          actor_type: SecurityAuditLogActorType.KiloAdmin,
           after_state: { status: 'ignored', token: 'secret-token' },
           metadata: { reason_code: 'not_used', actor_email: 'ops@kilocode.ai' },
           occurred_at: '2026-06-02T10:00:00.000Z',
@@ -223,6 +404,85 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
       hasLegacySupplementalActivity: true,
     });
     expect(report.hasLegacySupplementalActivity).toBe(true);
+  });
+
+  it('masks actors from persisted classification without inferring from email', () => {
+    const rows = [
+      row({
+        id: '00000000-0000-4000-8000-000000000011',
+        actor_id: 'admin-user',
+        actor_email: 'operator@example.com',
+        actor_name: 'Internal Operator',
+        actor_type: SecurityAuditLogActorType.KiloAdmin,
+      }),
+      row({
+        id: '00000000-0000-4000-8000-000000000012',
+        actor_id: 'customer-user',
+        actor_email: 'customer@kilocode.ai',
+        actor_name: 'Customer User',
+        actor_type: SecurityAuditLogActorType.CustomerUser,
+      }),
+      row({
+        id: '00000000-0000-4000-8000-000000000013',
+        actor_id: 'legacy-user',
+        actor_email: 'legacy@example.com',
+        actor_name: 'Legacy User',
+        actor_type: null,
+      }),
+    ];
+    const baseParams = {
+      owner: {
+        type: 'organization' as const,
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Acme',
+      },
+      period,
+      generatedAt: '2026-06-12T15:00:00.000Z',
+      dataThrough: '2026-06-12T15:00:00.000Z',
+      rows,
+    };
+
+    const customerReport = buildSecurityAgentAuditReportFromRows({
+      ...baseParams,
+      isRequestingUserKiloAdmin: false,
+    });
+    expect(customerReport.findings[0].events.map(event => event.actor)).toEqual([
+      {
+        type: 'user',
+        id: '00000000-0000-0000-0000-000000000000',
+        displayName: 'Kilo Admin',
+        masked: true,
+      },
+      {
+        type: 'user',
+        id: 'customer-user',
+        displayName: 'Customer User',
+        masked: false,
+      },
+      {
+        type: 'user',
+        id: '00000000-0000-0000-0000-000000000000',
+        displayName: 'Masked user',
+        masked: true,
+      },
+    ]);
+
+    const adminReport = buildSecurityAgentAuditReportFromRows({
+      ...baseParams,
+      isRequestingUserKiloAdmin: true,
+    });
+    expect(adminReport.findings[0].events[0].actor).toEqual({
+      type: 'user',
+      id: 'admin-user',
+      displayName: 'Internal Operator',
+      masked: false,
+    });
+    expect(adminReport.findings[0].events[2].actor).toEqual({
+      type: 'user',
+      id: 'legacy-user',
+      displayName: 'Legacy User',
+      masked: false,
+    });
   });
 
   it('uses earlier recorded timeline evidence when a later legacy snapshot is sparse', () => {
@@ -358,6 +618,7 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
         row({
           action: SecurityAuditLogAction.RemediationQueued,
           actor_id: '4d857fd4-70b3-48a2-9130-45873d3051c4',
+          actor_type: SecurityAuditLogActorType.CustomerUser,
           after_state: {
             remediation_status: 'queued',
             attempt_number: 1,

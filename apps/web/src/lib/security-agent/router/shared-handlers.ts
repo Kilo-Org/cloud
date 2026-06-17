@@ -59,6 +59,7 @@ import {
 } from '@/lib/security-agent/services/auto-dismiss-service';
 import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import { organizations, type SecurityFinding } from '@kilocode/db/schema';
+import { buildSecurityFindingAuditHumanActor } from '@kilocode/worker-utils/security-finding-audit';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import {
@@ -1194,11 +1195,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         const accepted = await submitManualFindingDismissal({
           owner: securityOwner,
-          actor: {
-            id: ctx.user.id,
-            email: ctx.user.google_user_email,
-            name: ctx.user.google_user_name,
-          },
+          actor: { id: ctx.user.id },
           findingId: input.findingId,
           installationId,
           reason: input.reason,
@@ -1559,11 +1556,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const result = await deleteFindingsByRepositoryDb({
           owner: securityOwner,
           repoFullName: input.repoFullName,
-          actor: {
+          actor: buildSecurityFindingAuditHumanActor({
             id: ctx.user.id,
             email: ctx.user.google_user_email,
             name: ctx.user.google_user_name,
-          },
+            isAdmin: ctx.user.is_admin,
+          }),
         });
 
         return {
@@ -1593,11 +1591,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     autoDismissEligible: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
-      const result = await autoDismissEligibleFindings(securityOwner, {
-        id: ctx.user.id,
-        email: ctx.user.google_user_email,
-        name: ctx.user.google_user_name,
-      });
+      const result = await autoDismissEligibleFindings(
+        securityOwner,
+        buildSecurityFindingAuditHumanActor({
+          id: ctx.user.id,
+          email: ctx.user.google_user_email,
+          name: ctx.user.google_user_name,
+          isAdmin: ctx.user.is_admin,
+        })
+      );
 
       return {
         dismissed: result.dismissed,

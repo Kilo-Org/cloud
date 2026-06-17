@@ -11,6 +11,7 @@ import {
 import {
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditHumanActor,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
 import type {
@@ -931,11 +932,7 @@ export async function getOrphanedRepositoriesWithFindingCounts(params: {
 export async function deleteFindingsByRepository(params: {
   owner: SecurityReviewOwner;
   repoFullName: string;
-  actor?: {
-    id: string | null;
-    email: string | null;
-    name: string | null;
-  } | null;
+  actor: SecurityFindingAuditHumanActor;
 }): Promise<{ deletedCount: number }> {
   try {
     const { owner, repoFullName } = params;
@@ -967,7 +964,7 @@ export async function deleteFindingsByRepository(params: {
         await insertSecurityFindingAuditEvent(tx, {
           owner: ownerForAudit,
           finding,
-          actor: params.actor ?? null,
+          actor: params.actor,
           action: SecurityAuditLogAction.FindingDeleted,
           occurredAt,
           eventKey: deriveSecurityFindingAuditEventKey([

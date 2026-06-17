@@ -134,6 +134,14 @@ describe('security remediation admission persistence', () => {
       findingId,
       origin: 'manual',
       owner: { type: 'user', id: testUserId },
+      requestedByUserId: testUserId,
+      requestedByActor: {
+        id: testUserId,
+        email: `${testUserId}@example.com`,
+        name: 'Security Remediation Admission Test',
+        api_token_pepper: null,
+        is_admin: false,
+      },
       runtimeConfig: {
         config: DEFAULT_SECURITY_AGENT_CONFIG,
         isAgentEnabled: true,

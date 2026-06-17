@@ -445,4 +445,37 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
     expect(state.auditRows).toEqual([]);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it('fails before dismissing when audit identity is missing from malformed analysis', async () => {
+    const { db, state } = createDbHarness();
+    const fetchSpy = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      maybeAutoDismissCompletedAnalysis({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
+        } as unknown as CloudflareEnv,
+        findingId: FINDING_ID,
+        finding: makeFinding() as never,
+        analysis: {
+          sandboxAnalysis: {
+            isExploitable: false,
+            exploitabilityReasoning: 'No reachable vulnerable code path.',
+            usageLocations: [],
+            suggestedFix: 'No fix required.',
+            suggestedAction: 'dismiss',
+            summary: 'Not exploitable.',
+            rawMarkdown: '# Not exploitable',
+          },
+        } as unknown as SecurityFindingAnalysis,
+      })
+    ).rejects.toThrow('Auto-dismiss audit event requires an analysis identity');
+
+    expect(state.transactionCalls).toBe(0);
+    expect(state.finding.status).toBe('open');
+    expect(state.auditRows).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });

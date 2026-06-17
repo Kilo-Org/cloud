@@ -27,9 +27,22 @@ const finding = {
   owned_by_user_id: null,
 };
 
-function createDb(selectedFinding = finding, options: { failAuditInsert?: boolean } = {}) {
+function createDb(
+  selectedFinding = finding,
+  options: {
+    failAuditInsert?: boolean;
+    actor?: { id: string; email: string; name: string; isAdmin: boolean };
+  } = {}
+) {
   const updates: unknown[] = [];
   const auditRows: unknown[] = [];
+  let selectCount = 0;
+  const actor = options.actor ?? {
+    id: 'user-123',
+    email: 'owner@example.com',
+    name: 'Owner Example',
+    isAdmin: false,
+  };
   function createOperations(targetUpdates: unknown[], targetAuditRows: unknown[]) {
     return {
       update: () => ({
@@ -58,7 +71,7 @@ function createDb(selectedFinding = finding, options: { failAuditInsert?: boolea
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: async () => [selectedFinding],
+          limit: async () => [selectCount++ === 0 ? selectedFinding : actor],
         }),
       }),
     }),
@@ -85,7 +98,7 @@ function createMessage(): SecurityDismissMessage {
     messageId: 'dismiss-message-123',
     dispatchedAt: '2026-05-18T08:30:00.000Z',
     owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-    actor: { id: 'user-123', email: 'owner@example.com', name: 'Owner Example' },
+    actor: { id: 'user-123' },
     findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     installationId: 'installation-123',
     reason: 'not_used',
@@ -122,6 +135,7 @@ describe('processSecurityFindingDismissal', () => {
     });
     expect(auditRows[0]).toMatchObject({
       actor_id: 'user-123',
+      actor_type: 'customer_user',
       action: 'security.finding.dismissed',
       resource_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       finding_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -139,6 +153,30 @@ describe('processSecurityFindingDismissal', () => {
         status: 'ignored',
         first_detected_at: '2026-05-17T08:30:00.000Z',
       },
+    });
+  });
+
+  it('classifies the actor from authoritative user state at event-write time', async () => {
+    const { db, auditRows } = createDb(finding, {
+      actor: {
+        id: 'user-123',
+        email: 'customer-domain@example.com',
+        name: 'Kilo Operator',
+        isAdmin: true,
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    await processSecurityFindingDismissal({
+      db,
+      gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+      message: createMessage(),
+    });
+
+    expect(auditRows[0]).toMatchObject({
+      actor_id: 'user-123',
+      actor_email: 'customer-domain@example.com',
+      actor_type: 'kilo_admin',
     });
   });
 

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
 } from '@kilocode/db/schema-types';
 import {
   SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  buildSecurityFindingAuditHumanActor,
   buildSecurityFindingAuditLogValues,
   buildSecurityFindingAuditSnapshot,
   deriveSecurityFindingAuditEventKey,
@@ -42,7 +45,12 @@ const finding = {
 const baseInput = {
   owner: { type: 'user' as const, userId: 'user_123' },
   finding,
-  actor: { id: 'user_123', email: 'owner@example.com', name: 'Owner User' },
+  actor: buildSecurityFindingAuditHumanActor({
+    id: 'user_123',
+    email: 'owner@example.com',
+    name: 'Owner User',
+    isAdmin: false,
+  }),
   action: SecurityAuditLogAction.FindingCreated,
   occurredAt: '2026-06-12T10:00:00.000Z',
   eventKey: deriveSecurityFindingAuditEventKey([
@@ -83,6 +91,7 @@ describe('security finding audit contract', () => {
       actor_id: 'user_123',
       actor_email: 'owner@example.com',
       actor_name: 'Owner User',
+      actor_type: SecurityAuditLogActorType.CustomerUser,
       action: SecurityAuditLogAction.FindingCreated,
       resource_type: 'security_finding',
       resource_id: finding.id,
@@ -92,6 +101,64 @@ describe('security finding audit contract', () => {
       schema_version: SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
       source_context: SecurityFindingAuditSourceContext.SecuritySync,
     });
+  });
+
+  it('persists authoritative admin and system actor classifications', () => {
+    const adminValues = buildSecurityFindingAuditLogValues({
+      ...baseInput,
+      actor: buildSecurityFindingAuditHumanActor({
+        id: 'admin_123',
+        email: 'operator@example.com',
+        name: 'Operator',
+        isAdmin: true,
+      }),
+    });
+    expect(adminValues).toMatchObject({
+      actor_id: 'admin_123',
+      actor_email: 'operator@example.com',
+      actor_name: 'Operator',
+      actor_type: SecurityAuditLogActorType.KiloAdmin,
+    });
+
+    const systemValues = buildSecurityFindingAuditLogValues({
+      ...baseInput,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+    });
+    expect(systemValues).toMatchObject({
+      actor_id: null,
+      actor_email: null,
+      actor_name: null,
+      actor_type: SecurityAuditLogActorType.System,
+    });
+  });
+
+  it('requires a typed actor with stable identity for human events', () => {
+    expect(() =>
+      buildSecurityFindingAuditLogValues({
+        ...baseInput,
+        actor: undefined,
+      } as never)
+    ).toThrow();
+    expect(() =>
+      buildSecurityFindingAuditLogValues({
+        ...baseInput,
+        actor: {
+          type: SecurityAuditLogActorType.CustomerUser,
+          id: '',
+          email: null,
+          name: null,
+        },
+      })
+    ).toThrow();
+    expect(() =>
+      buildSecurityFindingAuditLogValues({
+        ...baseInput,
+        actor: {
+          type: SecurityAuditLogActorType.System,
+          id: 'unexpected-human-id',
+        },
+      } as never)
+    ).toThrow();
   });
 
   it('rejects owner mismatch before insert', () => {

@@ -32,6 +32,10 @@ export type ActorUser = {
   api_token_pepper: string | null;
 };
 
+export type AuthoritativeActorUser = ActorUser & {
+  is_admin: boolean;
+};
+
 type ClaimRowsForOwnerResult = {
   rows: ClaimedQueueRow[];
   config: SecurityAgentConfig;
@@ -553,13 +557,14 @@ export async function transitionManualAnalysisQueueFromStart(
 export async function getAnalysisActorById(
   db: WorkerDb,
   userId: string
-): Promise<ActorUser | null> {
+): Promise<AuthoritativeActorUser | null> {
   const rows = await db
     .select({
       id: kilocode_users.id,
       email: kilocode_users.google_user_email,
       name: kilocode_users.google_user_name,
       api_token_pepper: kilocode_users.api_token_pepper,
+      is_admin: kilocode_users.is_admin,
     })
     .from(kilocode_users)
     .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.blocked_reason)))

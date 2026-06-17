@@ -165,6 +165,12 @@ export enum SecurityFindingAuditSourceContext {
   RolloutBaseline = 'rollout_baseline',
 }
 
+export enum SecurityAuditLogActorType {
+  CustomerUser = 'customer_user',
+  KiloAdmin = 'kilo_admin',
+  System = 'system',
+}
+
 // --- KiloClaw enums ---
 
 export const KiloClawPlan = {

@@ -2,6 +2,7 @@ import { security_audit_log } from '@kilocode/db/schema';
 import type { SecurityAuditLogEntry } from '@kilocode/db/schema';
 import {
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
   SecuritySeverity,
 } from '@kilocode/db/schema-types';
@@ -48,6 +49,62 @@ export const SecurityFindingAuditOwnerSchema = z.discriminatedUnion('type', [
 ]);
 
 export type SecurityFindingAuditOwner = z.infer<typeof SecurityFindingAuditOwnerSchema>;
+
+const SecurityFindingAuditCustomerActorSchema = z
+  .object({
+    type: z.literal(SecurityAuditLogActorType.CustomerUser),
+    id: NonEmptyStringSchema,
+    email: z.string().email().nullable(),
+    name: NonEmptyStringSchema.nullable(),
+  })
+  .strict();
+
+const SecurityFindingAuditAdminActorSchema = z
+  .object({
+    type: z.literal(SecurityAuditLogActorType.KiloAdmin),
+    id: NonEmptyStringSchema,
+    email: z.string().email().nullable(),
+    name: NonEmptyStringSchema.nullable(),
+  })
+  .strict();
+
+const SecurityFindingAuditSystemActorSchema = z
+  .object({ type: z.literal(SecurityAuditLogActorType.System) })
+  .strict();
+
+export const SecurityFindingAuditHumanActorSchema = z.discriminatedUnion('type', [
+  SecurityFindingAuditCustomerActorSchema,
+  SecurityFindingAuditAdminActorSchema,
+]);
+
+export const SecurityFindingAuditActorSchema = z.discriminatedUnion('type', [
+  SecurityFindingAuditCustomerActorSchema,
+  SecurityFindingAuditAdminActorSchema,
+  SecurityFindingAuditSystemActorSchema,
+]);
+
+export type SecurityFindingAuditActor = z.infer<typeof SecurityFindingAuditActorSchema>;
+export type SecurityFindingAuditHumanActor = z.infer<typeof SecurityFindingAuditHumanActorSchema>;
+
+export const SECURITY_FINDING_AUDIT_SYSTEM_ACTOR = {
+  type: SecurityAuditLogActorType.System,
+} satisfies SecurityFindingAuditActor;
+
+export function buildSecurityFindingAuditHumanActor(params: {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  isAdmin: boolean;
+}): SecurityFindingAuditHumanActor {
+  return SecurityFindingAuditHumanActorSchema.parse({
+    type: params.isAdmin
+      ? SecurityAuditLogActorType.KiloAdmin
+      : SecurityAuditLogActorType.CustomerUser,
+    id: params.id,
+    email: params.email ?? null,
+    name: params.name ?? null,
+  });
+}
 
 type SanitizedJsonValue =
   | string
@@ -154,14 +211,7 @@ export const SecurityFindingAuditEventSchema = z.object({
     owned_by_user_id: z.string().min(1).nullable(),
     owned_by_organization_id: UuidSchema.nullable(),
   }),
-  actor: z
-    .object({
-      id: z.string().min(1).nullable(),
-      email: z.string().email().nullable(),
-      name: z.string().min(1).nullable(),
-    })
-    .nullable()
-    .optional(),
+  actor: SecurityFindingAuditActorSchema,
   action: ReportableSecurityFindingAuditActionSchema,
   occurredAt: IsoTimestampSchema,
   sourceOccurredAt: IsoTimestampSchema.nullable().optional(),
@@ -176,11 +226,7 @@ export const SecurityFindingAuditEventSchema = z.object({
 export type SecurityFindingAuditEventInput = {
   owner: SecurityFindingAuditOwner;
   finding: SecurityFindingAuditEventFinding;
-  actor?: {
-    id: string | null;
-    email: string | null;
-    name: string | null;
-  } | null;
+  actor: SecurityFindingAuditActor;
   action: SecurityAuditLogAction;
   occurredAt: string | Date;
   sourceOccurredAt?: string | Date | null;
@@ -280,12 +326,14 @@ export function buildSecurityFindingAuditLogValues(
   }
 
   const ownerColumns = getAuditOwnerColumns(parsed.owner);
+  const humanActor = parsed.actor.type === SecurityAuditLogActorType.System ? null : parsed.actor;
 
   return {
     ...ownerColumns,
-    actor_id: parsed.actor?.id ?? null,
-    actor_email: parsed.actor?.email ?? null,
-    actor_name: parsed.actor?.name ?? null,
+    actor_id: humanActor?.id ?? null,
+    actor_email: humanActor?.email ?? null,
+    actor_name: humanActor?.name ?? null,
+    actor_type: parsed.actor.type,
     action: parsed.action,
     resource_type: 'security_finding',
     resource_id: input.finding.id,

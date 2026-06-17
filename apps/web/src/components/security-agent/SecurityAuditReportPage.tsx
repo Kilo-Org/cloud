@@ -1,8 +1,7 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import type { FormEvent, ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import React, { type FormEvent, type ReactNode, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { differenceInCalendarDays, format as formatCalendarDateLabel } from 'date-fns';
 import {
@@ -155,12 +154,17 @@ const AUDIT_EVENT_TIME_FORMATTER = new Intl.DateTimeFormat('en-GB', {
   timeZoneName: 'short',
 });
 
+export function hasSecurityAgentAuditReportOwnerContext(
+  isOrg: boolean,
+  organizationId: string | undefined
+): boolean {
+  return !isOrg || Boolean(organizationId);
+}
+
 export function SecurityAuditReportPage() {
   const trpc = useTRPC();
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { isOrg, organizationId, hasIntegration, isLoadingPermission, isLoadingConfig, hasConfig } =
-    useSecurityAgent();
+  const { isOrg, organizationId } = useSecurityAgent();
   const requestedRange = {
     startDate: searchParams.get('startDate') ?? '',
     endDate: searchParams.get('endDate') ?? '',
@@ -178,7 +182,7 @@ export function SecurityAuditReportPage() {
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
   const completeDraftRange = toAuditReportDateRange(draftRange);
   const latestSelectableDate = utcDateAsLocalCalendarDate(new Date());
-  const hasOwnerContext = !isOrg || Boolean(organizationId);
+  const hasOwnerContext = hasSecurityAgentAuditReportOwnerContext(isOrg, organizationId);
 
   const queryOptions = isOrg
     ? trpc.organizations.securityAgent.getAuditReport.queryOptions({
@@ -194,37 +198,27 @@ export function SecurityAuditReportPage() {
     isError: isReportError,
   } = useQuery({
     ...queryOptions,
-    enabled: hasOwnerContext && hasIntegration && hasConfig,
+    enabled: hasOwnerContext,
   });
 
   const unfilteredReport = reportQueryData?.status === 'ok' ? reportQueryData.report : null;
+  const repositoryOptions = getAuditReportRepositoryOptions(unfilteredReport?.findings ?? []);
+  const effectiveDraftFilters = unfilteredReport
+    ? normalizeAuditReportRepositoryFilter(draftFilters, repositoryOptions)
+    : draftFilters;
+  const effectiveSubmittedFilters = unfilteredReport
+    ? normalizeAuditReportRepositoryFilter(submittedFilters, repositoryOptions)
+    : submittedFilters;
   const report = unfilteredReport
-    ? filterSecurityAgentAuditReport(unfilteredReport, submittedFilters)
+    ? filterSecurityAgentAuditReport(unfilteredReport, effectiveSubmittedFilters)
     : null;
-  const repositoryOptions = getAuditReportRepositoryOptions(
-    unfilteredReport?.findings ?? [],
-    draftFilters.repository
-  );
-  const configHref =
-    isOrg && organizationId
-      ? `/organizations/${organizationId}/security-agent/config`
-      : '/security-agent/config';
-  const isSetupStateLoading = !hasOwnerContext || isLoadingPermission || isLoadingConfig;
-  const shouldRedirectToConfig =
-    hasOwnerContext &&
-    ((!isLoadingPermission && !hasIntegration) || (!isLoadingConfig && !hasConfig));
-
-  useEffect(() => {
-    if (shouldRedirectToConfig) {
-      router.replace(configHref);
-    }
-  }, [configHref, router, shouldRedirectToConfig]);
 
   function handleGenerateReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!completeDraftRange) return;
     setSubmittedRange(completeDraftRange);
-    setSubmittedFilters(draftFilters);
+    setDraftFilters(effectiveDraftFilters);
+    setSubmittedFilters(effectiveDraftFilters);
   }
 
   function handleDateRangeSelect(nextRange: DayPickerDateRange | undefined) {
@@ -240,20 +234,14 @@ export function SecurityAuditReportPage() {
 
   return (
     <div className="space-y-6">
-      {shouldRedirectToConfig && (
-        <div className="text-muted-foreground type-body block py-16 text-center">
-          Opening settings...
-        </div>
-      )}
-
-      {!shouldRedirectToConfig && isSetupStateLoading && (
+      {!hasOwnerContext && (
         <div className="text-muted-foreground type-body flex items-center justify-center gap-2 py-16">
           <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />
           Loading audit report...
         </div>
       )}
 
-      {!shouldRedirectToConfig && !isSetupStateLoading && (
+      {hasOwnerContext && (
         <>
           <SecurityAgentActionBar label="Audit report filters" asChild>
             <form onSubmit={handleGenerateReport}>
@@ -351,7 +339,7 @@ export function SecurityAuditReportPage() {
 
                 <SecurityAgentActionBarField id="audit-report-repository" label="Repository">
                   <Select
-                    value={draftFilters.repository ?? 'all'}
+                    value={effectiveDraftFilters.repository ?? 'all'}
                     onValueChange={repository =>
                       setDraftFilters(current => ({
                         ...current,
@@ -393,11 +381,9 @@ export function SecurityAuditReportPage() {
         </>
       )}
 
-      {!shouldRedirectToConfig && !isSetupStateLoading && isReportLoading && (
-        <AuditReportSkeleton />
-      )}
+      {hasOwnerContext && isReportLoading && <AuditReportSkeleton />}
 
-      {!shouldRedirectToConfig && !isSetupStateLoading && isReportError && (
+      {hasOwnerContext && isReportError && (
         <Alert variant="destructive">
           <TriangleAlert aria-hidden="true" />
           <AlertTitle>Audit report could not be loaded</AlertTitle>
@@ -408,24 +394,23 @@ export function SecurityAuditReportPage() {
         </Alert>
       )}
 
-      {!shouldRedirectToConfig &&
-        !isSetupStateLoading &&
-        reportQueryData?.status === 'query_failed' && (
-          <Alert variant="warning">
-            <TriangleAlert aria-hidden="true" />
-            <AlertTitle>Report query did not finish</AlertTitle>
-            <AlertDescription>
-              Kilo did not return partial report content. Choose a shorter UTC period and generate
-              the report again.
-            </AlertDescription>
-          </Alert>
-        )}
+      {hasOwnerContext && reportQueryData?.status === 'query_failed' && (
+        <Alert variant="warning">
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>Report query did not finish</AlertTitle>
+          <AlertDescription>
+            Kilo did not return partial report content. Choose a shorter UTC period and generate the
+            report again.
+          </AlertDescription>
+        </Alert>
+      )}
 
-      {!shouldRedirectToConfig && !isSetupStateLoading && report && unfilteredReport && (
+      {hasOwnerContext && report && unfilteredReport && (
         <AuditReportView
           report={report}
+          provenanceReport={unfilteredReport}
           totalFindingCount={unfilteredReport.summary.findingCount}
-          hasActiveFilters={hasActiveAuditReportFilters(submittedFilters)}
+          hasActiveFilters={hasActiveAuditReportFilters(effectiveSubmittedFilters)}
           onClearFilters={handleClearFilters}
         />
       )}
@@ -435,17 +420,20 @@ export function SecurityAuditReportPage() {
 
 function AuditReportView({
   report,
+  provenanceReport,
   totalFindingCount,
   hasActiveFilters,
   onClearFilters,
 }: {
   report: SecurityAgentAuditReport;
+  provenanceReport: SecurityAgentAuditReport;
   totalFindingCount: number;
   hasActiveFilters: boolean;
   onClearFilters: () => void;
 }) {
   return (
     <div className="space-y-6">
+      <AuditReportProvenance report={provenanceReport} />
       <ReportSummary report={report} />
 
       {report.findings.length === 0 ? (
@@ -459,6 +447,73 @@ function AuditReportView({
         <FindingTimelineList findings={report.findings} totalFindingCount={totalFindingCount} />
       )}
     </div>
+  );
+}
+
+export function getAuditReportProvenance(report: SecurityAgentAuditReport) {
+  const startsBeforeReliableCoverage =
+    Date.parse(report.period.start) < Date.parse(report.reliableCoverageStart);
+  let warning: string | null = null;
+
+  if (startsBeforeReliableCoverage && report.hasLegacySupplementalActivity) {
+    warning =
+      'This period starts before reliable event coverage, and supplemental legacy activity may be incomplete.';
+  } else if (startsBeforeReliableCoverage) {
+    warning = 'Activity before reliable event coverage may be incomplete.';
+  } else if (report.hasLegacySupplementalActivity) {
+    warning = 'Supplemental legacy activity may be incomplete.';
+  }
+
+  return {
+    evidence: {
+      recorded_by_kilo: 'Security Finding activity recorded by Kilo.',
+    }[report.evidenceBasis],
+    dataThrough: formatReportDateTime(report.dataThrough),
+    reliableCoverageStart: formatReportDateTime(report.reliableCoverageStart),
+    warning,
+  };
+}
+
+export function AuditReportProvenance({ report }: { report: SecurityAgentAuditReport }) {
+  const provenance = getAuditReportProvenance(report);
+
+  return (
+    <section
+      className="border-border bg-surface-inset rounded-lg border px-4 py-3"
+      aria-labelledby="report-provenance-title"
+    >
+      <div className="flex items-start gap-3">
+        <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <h2 id="report-provenance-title" className="type-label text-foreground">
+            Report provenance
+          </h2>
+          <p className="text-muted-foreground type-body mt-0.5">{provenance.evidence}</p>
+          <dl className="text-muted-foreground type-label mt-2 flex flex-wrap gap-x-5 gap-y-1">
+            <div className="flex flex-wrap gap-x-1.5">
+              <dt>Data cutoff</dt>
+              <dd className="text-foreground tabular-nums">
+                <time dateTime={report.dataThrough}>{provenance.dataThrough}</time>
+              </dd>
+            </div>
+            <div className="flex flex-wrap gap-x-1.5">
+              <dt>Reliable coverage starts</dt>
+              <dd className="text-foreground tabular-nums">
+                <time dateTime={report.reliableCoverageStart}>
+                  {provenance.reliableCoverageStart}
+                </time>
+              </dd>
+            </div>
+          </dl>
+          {provenance.warning && (
+            <p className="text-status-warning type-label mt-2 flex items-start gap-1.5">
+              <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+              <span>{provenance.warning}</span>
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1136,17 +1191,22 @@ function hasActiveAuditReportFilters(filters: AuditReportFilters): boolean {
   return filters.severity !== 'all' || filters.state !== 'all' || filters.repository !== null;
 }
 
-export function getAuditReportRepositoryOptions(
-  findings: SecurityFindingAuditSection[],
-  selectedRepository: string | null
-): string[] {
-  const repositories = new Set(
-    findings
-      .map(finding => finding.repository)
-      .filter((repository): repository is string => Boolean(repository))
-  );
-  if (selectedRepository) repositories.add(selectedRepository);
-  return [...repositories].toSorted((left, right) => left.localeCompare(right));
+export function getAuditReportRepositoryOptions(findings: SecurityFindingAuditSection[]): string[] {
+  return [
+    ...new Set(
+      findings
+        .map(finding => finding.repository)
+        .filter((repository): repository is string => Boolean(repository))
+    ),
+  ].toSorted((left, right) => left.localeCompare(right));
+}
+
+export function normalizeAuditReportRepositoryFilter(
+  filters: AuditReportFilters,
+  repositoryOptions: readonly string[]
+): AuditReportFilters {
+  if (filters.repository === null || repositoryOptions.includes(filters.repository)) return filters;
+  return { ...filters, repository: null };
 }
 
 export function filterSecurityAgentAuditReport(

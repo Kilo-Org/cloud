@@ -6,7 +6,7 @@ import {
   shouldRunSecurityAgentCommandSuccessCallback,
   type SecurityAgentCommand,
 } from './SecurityAgentContext';
-import { getSecurityAgentHelpContent } from './SecurityAgentLayout';
+import { getSecurityAgentHelpContent, getSecurityAgentNavItems } from './SecurityAgentLayout';
 
 function command(overrides: Partial<SecurityAgentCommand>): SecurityAgentCommand {
   return {
@@ -52,6 +52,31 @@ describe('Security Agent help content', () => {
     expect(getSecurityAgentHelpContent('/another-page', personalBasePath).title).toBe(
       'Security Agent help'
     );
+  });
+});
+
+describe('Security Agent navigation', () => {
+  const basePath = '/security-agent';
+
+  it('keeps historical reports available during setup', () => {
+    expect(
+      getSecurityAgentNavItems({ basePath, showSetupOnly: true, isEnabled: undefined }).map(
+        item => item.label
+      )
+    ).toEqual(['Audit report', 'Settings']);
+  });
+
+  it('preserves configured navigation', () => {
+    expect(
+      getSecurityAgentNavItems({ basePath, showSetupOnly: false, isEnabled: true }).map(
+        item => item.label
+      )
+    ).toEqual(['Dashboard', 'Findings', 'Audit report', 'Settings']);
+    expect(
+      getSecurityAgentNavItems({ basePath, showSetupOnly: false, isEnabled: false }).map(
+        item => item.label
+      )
+    ).toEqual(['Dashboard', 'Audit report', 'Settings']);
   });
 });
 

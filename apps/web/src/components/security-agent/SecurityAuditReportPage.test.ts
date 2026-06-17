@@ -1,17 +1,23 @@
 import { describe, expect, it } from '@jest/globals';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import type {
   SecurityAgentAuditReport,
   SecurityAgentAuditReportEvent,
   SecurityFindingAuditSection,
 } from '@/lib/security-agent/db/security-audit-report';
 import {
+  AuditReportProvenance,
   filterSecurityAgentAuditReport,
   formatAuditEventTime,
   formatDateTime24Hour,
   getAuditEventDetails,
   getDefaultAuditReportDateRange,
+  getAuditReportProvenance,
   getAuditReportRepositoryHref,
   getAuditReportRepositoryOptions,
+  hasSecurityAgentAuditReportOwnerContext,
+  normalizeAuditReportRepositoryFilter,
   parseAuditReportFilters,
 } from './SecurityAuditReportPage';
 
@@ -92,6 +98,14 @@ describe('audit report date range', () => {
       startDate: '2026-03-19',
       endDate: '2026-06-16',
     });
+  });
+});
+
+describe('audit report owner context', () => {
+  it('allows personal reports and gates organization reports only on organization context', () => {
+    expect(hasSecurityAgentAuditReportOwnerContext(false, undefined)).toBe(true);
+    expect(hasSecurityAgentAuditReportOwnerContext(true, 'org-1')).toBe(true);
+    expect(hasSecurityAgentAuditReportOwnerContext(true, undefined)).toBe(false);
   });
 });
 
@@ -254,7 +268,7 @@ describe('audit report filters', () => {
     expect(getAuditReportRepositoryHref(null)).toBeNull();
   });
 
-  it('builds sorted repository options from report evidence', () => {
+  it('builds sorted repository options only from report evidence', () => {
     const findings = [
       finding({ findingId: '2', severity: 'high', status: 'open', repository: 'kilo/web' }),
       finding({ findingId: '1', severity: 'low', status: 'fixed', repository: 'kilo/api' }),
@@ -262,11 +276,64 @@ describe('audit report filters', () => {
       finding({ findingId: '4', severity: 'low', status: null, repository: null }),
     ];
 
-    expect(getAuditReportRepositoryOptions(findings, 'legacy/renamed')).toEqual([
-      'kilo/api',
-      'kilo/web',
-      'legacy/renamed',
-    ]);
+    expect(getAuditReportRepositoryOptions(findings)).toEqual(['kilo/api', 'kilo/web']);
+  });
+
+  it('normalizes stale repository filters once report evidence is available', () => {
+    const staleFilters = {
+      severity: 'high',
+      state: 'open',
+      repository: 'legacy/renamed',
+    } as const;
+    const validFilters = { ...staleFilters, repository: 'kilo/web' };
+
+    expect(normalizeAuditReportRepositoryFilter(staleFilters, ['kilo/api', 'kilo/web'])).toEqual({
+      severity: 'high',
+      state: 'open',
+      repository: null,
+    });
+    expect(normalizeAuditReportRepositoryFilter(validFilters, ['kilo/api', 'kilo/web'])).toBe(
+      validFilters
+    );
+  });
+});
+
+describe('audit report provenance', () => {
+  it('renders provenance and coverage warning for a successful empty report', () => {
+    const html = renderToStaticMarkup(createElement(AuditReportProvenance, { report: report([]) }));
+
+    expect(html).toContain('Security Finding activity recorded by Kilo.');
+    expect(html).toContain('Data cutoff');
+    expect(html).toContain('Jun 16, 2026 at 00:00 UTC');
+    expect(html).toContain('Reliable coverage starts');
+    expect(html).toContain('Jun 12, 2026 at 00:00 UTC');
+    expect(html).toContain(
+      'This period starts before reliable event coverage, and supplemental legacy activity may be incomplete.'
+    );
+  });
+
+  it('warns independently for pre-coverage periods and supplemental legacy activity', () => {
+    const baseReport = report([]);
+    const preCoverage = {
+      ...baseReport,
+      hasLegacySupplementalActivity: false,
+    };
+    const legacySupplemental = {
+      ...baseReport,
+      period: { ...baseReport.period, start: baseReport.reliableCoverageStart },
+    };
+    const completeCoverage = {
+      ...legacySupplemental,
+      hasLegacySupplementalActivity: false,
+    };
+
+    expect(getAuditReportProvenance(preCoverage).warning).toBe(
+      'Activity before reliable event coverage may be incomplete.'
+    );
+    expect(getAuditReportProvenance(legacySupplemental).warning).toBe(
+      'Supplemental legacy activity may be incomplete.'
+    );
+    expect(getAuditReportProvenance(completeCoverage).warning).toBeNull();
   });
 });
 

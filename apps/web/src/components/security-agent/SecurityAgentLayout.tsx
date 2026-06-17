@@ -24,6 +24,7 @@ import {
   ListChecks,
   RefreshCw,
   Settings2,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -189,6 +190,42 @@ type SecurityAgentLayoutProps = {
   children: React.ReactNode;
 };
 
+type SecurityAgentNavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+export function getSecurityAgentNavItems({
+  basePath,
+  showSetupOnly,
+  isEnabled,
+}: {
+  basePath: string;
+  showSetupOnly: boolean;
+  isEnabled: boolean | undefined;
+}): SecurityAgentNavItem[] {
+  const auditReport = {
+    label: 'Audit report',
+    href: `${basePath}/audit-report`,
+    icon: FileClock,
+  } satisfies SecurityAgentNavItem;
+  const settings = {
+    label: 'Settings',
+    href: `${basePath}/config`,
+    icon: Settings2,
+  } satisfies SecurityAgentNavItem;
+
+  if (showSetupOnly) return [auditReport, settings];
+
+  return [
+    { label: 'Dashboard', href: basePath, icon: LayoutDashboard },
+    ...(isEnabled ? [{ label: 'Findings', href: `${basePath}/findings`, icon: ListChecks }] : []),
+    auditReport,
+    settings,
+  ];
+}
+
 type SecurityAgentHelpProps = {
   pathname: string;
   basePath: string;
@@ -275,16 +312,7 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
   const showSetupOnly =
     (!isLoadingPermission && !hasIntegration) || (!isLoadingConfig && !hasConfig);
 
-  const navItems = showSetupOnly
-    ? [{ label: 'Settings', href: `${basePath}/config`, icon: Settings2 }]
-    : [
-        { label: 'Dashboard', href: basePath, icon: LayoutDashboard },
-        ...(isEnabled
-          ? [{ label: 'Findings', href: `${basePath}/findings`, icon: ListChecks }]
-          : []),
-        { label: 'Audit report', href: `${basePath}/audit-report`, icon: FileClock },
-        { label: 'Settings', href: `${basePath}/config`, icon: Settings2 },
-      ];
+  const navItems = getSecurityAgentNavItems({ basePath, showSetupOnly, isEnabled });
 
   // Refresh installation mutation (only used in layout for permission alert)
   const { mutate: refreshMutate, isPending: isRefreshing } = useMutation(

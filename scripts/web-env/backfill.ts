@@ -5,7 +5,7 @@ import {
   PROJECTS,
   confirm,
   listVariables,
-  pullValue,
+  pullValues,
   resolveVault,
   resolveVercelContexts,
   setVariable,
@@ -29,6 +29,9 @@ async function main(): Promise<void> {
     const contexts = resolveVercelContexts(tempDirectory);
     const vaultId = resolveVault();
     const production = contexts.map(context => listVariables(context, 'production'));
+    const staging = contexts.map(context => listVariables(context, 'staging'));
+    const productionValues = contexts.map(context => pullValues(context, 'production'));
+    const stagingValues = contexts.map(context => pullValues(context, 'staging'));
     const names = [...new Set(production.flatMap(variables => [...variables.keys()]))].sort();
 
     for (const name of names) {
@@ -43,29 +46,35 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const productionValues = contexts.map(context => pullValue(context, 'production', name));
-      if (!productionValues[0] || productionValues.some(value => value !== productionValues[0])) {
+      const projectProductionValues = productionValues.map(values => values.get(name));
+      if (
+        !projectProductionValues[0] ||
+        projectProductionValues.some(value => value !== projectProductionValues[0])
+      ) {
         unresolved.push(`${name} (Production values differ)`);
         continue;
       }
 
-      const stagingTypes = contexts.map(context => listVariables(context, 'staging').get(name));
+      const stagingTypes = staging.map(variables => variables.get(name));
       let stagingValue: string | undefined;
       if (stagingTypes.every(type => type === 'sensitive')) {
         stagingValue = undefined;
       } else {
-        const stagingValues = contexts.map(context => pullValue(context, 'staging', name));
-        if (!stagingValues[0] || stagingValues.some(value => value !== stagingValues[0])) {
+        const projectStagingValues = stagingValues.map(values => values.get(name));
+        if (
+          !projectStagingValues[0] ||
+          projectStagingValues.some(value => value !== projectStagingValues[0])
+        ) {
           unresolved.push(`${name} (Staging values differ or are unavailable)`);
           continue;
         }
-        stagingValue = stagingValues[0];
+        stagingValue = projectStagingValues[0];
       }
 
       console.log(`Migrating ${name}...`);
-      setVaultValue(vaultId, name, productionValues[0]);
+      setVaultValue(vaultId, name, projectProductionValues[0]);
       for (const context of contexts) {
-        setVariable(context, 'production', name, productionValues[0], true);
+        setVariable(context, 'production', name, projectProductionValues[0], true);
       }
       if (stagingValue) {
         for (const context of contexts) setVariable(context, 'staging', name, stagingValue, true);

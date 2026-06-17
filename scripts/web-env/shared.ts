@@ -144,15 +144,16 @@ export function setVariable(
   );
 }
 
-export function pullValue(
-  context: VercelContext,
-  environment: Environment,
-  name: string
-): string | undefined {
+export function pullValues(context: VercelContext, environment: Environment): Map<string, string> {
   const endpoint = `/v3/env/pull/${encodeURIComponent(context.project)}/${encodeURIComponent(environment)}?source=vercel-cli%3Aenv%3Apull`;
   const response = parseJson(vercel(context, ['api', endpoint, '--raw']), 'Pull Vercel values');
   const values = isRecord(response.env) ? response.env : undefined;
-  return values && typeof values[name] === 'string' ? values[name] : undefined;
+  if (!values) throw new Error(`Could not pull ${context.project}/${environment} values.`);
+  return new Map(
+    Object.entries(values).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string'
+    )
+  );
 }
 
 export function resolveVault(): string {

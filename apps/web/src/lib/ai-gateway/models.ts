@@ -37,6 +37,7 @@ import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { deepseekDiscountedModels } from '@/lib/ai-gateway/providers/deepseek';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
@@ -93,12 +94,15 @@ export const kiloExclusiveModels = [
   stepfun_37_flash_free_model,
 ] as KiloExclusiveModel[];
 
-export function isKiloExclusiveModelRequiringDataCollection(model: string): boolean {
-  return kiloExclusiveModels.some(
-    m =>
-      m.public_id === model &&
-      m.status !== 'disabled' &&
-      (!m.pricing || m.flags.includes('requires-data-collection'))
+export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
+  return (
+    (await isFreeModel(model)) ||
+    kiloExclusiveModels.some(
+      m =>
+        m.public_id === model &&
+        m.status !== 'disabled' &&
+        m.flags.includes('requires-data-collection')
+    )
   );
 }
 

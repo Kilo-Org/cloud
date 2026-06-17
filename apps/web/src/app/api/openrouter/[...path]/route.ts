@@ -28,7 +28,7 @@ import {
   isDeadFreeModel,
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
-  isKiloExclusiveModelRequiringDataCollection,
+  hasBestEffortGuessDataCollectionRequirement,
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
@@ -554,17 +554,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   let effectiveProviderContext = initialProviderResultForAbuseService;
 
-  // Request-level data-collection opt-out: a caller can set
-  // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
-  // request to opt that single request out of training/data-retention.
-  // Direct experiment upstreams ignore those OpenRouter/Vercel flags
-  // (we never reach OpenRouter), but we still capture the prompt to R2
-  // for partner evaluation — which violates the caller's stated
-  // intent. Refuse here regardless of org settings, anon/BYOK status,
-  // or the org-level check below.
   if (
-    (effectiveProviderContext.experiment ||
-      isKiloExclusiveModelRequiringDataCollection(effectiveModelIdLowerCased)) &&
+    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();

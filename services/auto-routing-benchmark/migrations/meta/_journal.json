@@ -8,6 +8,13 @@
       "when": 1781688875647,
       "tag": "0000_absent_wallow",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1781696079415,
+      "tag": "0001_special_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

@@ -64,6 +64,8 @@ describe('configToFormState', () => {
     expect(state.classifierModels).toBe('');
     expect(state.deciderModels).toEqual([]);
     expect(state.maxConcurrency).toBe(100);
+    expect(state.benchmarkUserId).toBe('ce12ef3d-ae95-4d77-b4f0-23735f0a0591');
+    expect(state.benchmarkOrgId).toBe('9d278969-5453-4ae3-a51f-a8d2274a7b56');
   });
 });
 
@@ -75,6 +77,7 @@ describe('formStateToConfig round-trip', () => {
     switchCostFactor: 3,
     maxConcurrency: 4,
     benchmarkUserId: 'user-123',
+    benchmarkOrgId: 'org-123',
     classifierRepetitions: 3,
     deciderRepetitions: 2,
     classifierMaxP95LatencyMs: 500,
@@ -87,11 +90,13 @@ describe('formStateToConfig round-trip', () => {
     expect(state.classifierRepetitions).toBe(3);
     expect(state.deciderRepetitions).toBe(2);
     expect(state.classifierMaxP95LatencyMs).toBe('500');
+    expect(state.benchmarkOrgId).toBe('org-123');
 
     const result = formStateToConfig(state, baseConfig);
     expect(result.classifierRepetitions).toBe(3);
     expect(result.deciderRepetitions).toBe(2);
     expect(result.classifierMaxP95LatencyMs).toBe(500);
+    expect(result.benchmarkOrgId).toBe('org-123');
   });
 
   it('converts empty-string classifierMaxP95LatencyMs form value to null in config', () => {

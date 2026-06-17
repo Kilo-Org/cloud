@@ -10,6 +10,7 @@ export function mapConfigRows(
     switch_cost_factor: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
+    benchmark_org_id: string | null;
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
@@ -34,6 +35,7 @@ export function mapConfigRows(
     switchCostFactor: configRow.switch_cost_factor,
     maxConcurrency: configRow.max_concurrency,
     benchmarkUserId: configRow.benchmark_user_id,
+    benchmarkOrgId: configRow.benchmark_org_id,
     classifierRepetitions: configRow.classifier_repetitions,
     deciderRepetitions: configRow.decider_repetitions,
     classifierMaxP95LatencyMs: configRow.classifier_max_p95_latency_ms,
@@ -67,6 +69,7 @@ export async function saveBenchmarkConfig(
       switch_cost_factor: config.switchCostFactor,
       max_concurrency: config.maxConcurrency,
       benchmark_user_id: config.benchmarkUserId,
+      benchmark_org_id: config.benchmarkOrgId,
       classifier_repetitions: config.classifierRepetitions,
       decider_repetitions: config.deciderRepetitions,
       classifier_max_p95_latency_ms: config.classifierMaxP95LatencyMs,

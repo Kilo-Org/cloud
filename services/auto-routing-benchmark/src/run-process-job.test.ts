@@ -75,6 +75,7 @@ function mockRunSnapshot(): void {
       min_accuracy: 0.7,
       switch_cost_factor: 3,
       benchmark_user_id: 'benchmark-user',
+      benchmark_org_id: 'benchmark-org',
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       started_at: '2026-06-16T00:00:00.000Z',
@@ -154,11 +155,11 @@ describe('processJob — decider chunk chaining', () => {
 
     expect(warmUpCliContainer).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ instanceName: `${runId}:${model}:0:0` })
+      expect.objectContaining({ instanceName: `${runId}:${model}:0:0`, orgId: 'benchmark-org' })
     );
     expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ instanceName: `${runId}:${model}:0:0` })
+      expect.objectContaining({ instanceName: `${runId}:${model}:0:0`, orgId: 'benchmark-org' })
     );
     expect(queueSendBatch).toHaveBeenCalledWith([
       {

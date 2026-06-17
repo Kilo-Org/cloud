@@ -83,29 +83,38 @@ export async function POST(request: NextRequest) {
 
     const existing = await getKiloClawAgentCardOAuthConnection(instance.id);
 
-    // Remove the worker secret FIRST — this is what actually cuts off the
-    // agent's access. Do it before deleting the DB row so that if it throws we
-    // bail to the catch with the row still present and the user can retry,
-    // rather than orphaning a live token on the worker with no row to retry
-    // from.
-    const kiloclawClient = new KiloClawInternalClient();
-    await kiloclawClient.patchSecrets(
-      user.id,
-      { secrets: { [AGENTCARD_SECRET_KEY]: null } },
-      workerInstanceId(instance)
-    );
-
-    // Worker secret is gone; now drop the stored connection.
-    await clearKiloClawAgentCardOAuthConnection(instance.id);
-
-    // Best-effort revocation of the OAuth grant at AgentCard — revoke both the
-    // refresh token and the (still ~1h-valid) access token.
+    // Revoke the OAuth grant at AgentCard first — this is the authoritative
+    // "cut off access": it invalidates both the refresh token (no new tokens)
+    // and the (still ~1h-valid) access token, so even the copy already pushed to
+    // the worker stops working. revokeAgentCardToken is best-effort (never throws).
     if (existing) {
       const refreshToken = decryptRefreshToken(existing);
       if (refreshToken) {
         await revokeAgentCardToken(refreshToken);
       }
       await revokeAgentCardToken(decryptAccessToken(existing));
+    }
+
+    // Drop the stored connection so the refresh cron stops touching it.
+    await clearKiloClawAgentCardOAuthConnection(instance.id);
+
+    // Best-effort: remove the worker secret so the `agentcard` MCP server is
+    // dropped from the gateway config on next sync. The grant is already revoked
+    // above, so a failure here (e.g. worker unreachable) leaves only an
+    // already-dead token behind — it must not fail the whole disconnect.
+    try {
+      const kiloclawClient = new KiloClawInternalClient();
+      await kiloclawClient.patchSecrets(
+        user.id,
+        { secrets: { [AGENTCARD_SECRET_KEY]: null } },
+        workerInstanceId(instance)
+      );
+    } catch (secretError) {
+      console.error('AgentCard worker secret removal failed (disconnect kept):', secretError);
+      captureException(secretError, {
+        tags: { endpoint: 'agentcard/disconnect', source: 'agentcard_oauth_secret_clear' },
+        extra: { organizationId },
+      });
     }
 
     return NextResponse.redirect(

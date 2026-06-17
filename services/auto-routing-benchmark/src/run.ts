@@ -703,7 +703,15 @@ async function processDeciderJob(
     shardCount
   );
   if (!hasNextChunk) {
-    await destroyDeciderCliContainer(env, { instanceName });
+    await destroyDeciderCliContainer(env, { instanceName }).catch(error => {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_container_destroy_failed',
+          instanceName,
+          ...formatError(error),
+        })
+      );
+    });
   }
   return { shouldFinalize: !hasNextChunk };
 }
@@ -728,7 +736,7 @@ async function enqueueNextDeciderChunkIfNeeded(
     rep,
     caseIds: nextCaseIds,
   });
-  if (existingNextCaseIds.size > 0) return true;
+  if (existingNextCaseIds.size >= nextCaseIds.length) return true;
 
   await env.BENCH_QUEUE.sendBatch([
     {

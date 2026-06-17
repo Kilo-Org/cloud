@@ -214,7 +214,22 @@ describe('processJob — decider chunk chaining', () => {
     expect(countCaseResults).not.toHaveBeenCalled();
   });
 
-  it('does not rerun completed chunk cases or enqueue a next chunk that already started', async () => {
+  it('does not rerun completed chunk cases or enqueue a fully completed next chunk', async () => {
+    const currentCaseIds = DECIDER_CASES.slice(0, 5).map(c => c.id);
+    const nextCaseIds = DECIDER_CASES.slice(5, 10).map(c => c.id);
+    vi.mocked(getExistingCaseResultIds)
+      .mockResolvedValueOnce(new Set(currentCaseIds))
+      .mockResolvedValueOnce(new Set(nextCaseIds));
+
+    await processJob(env, { ...deciderMessage(), caseIds: currentCaseIds });
+
+    expect(warmUpCliContainer).not.toHaveBeenCalled();
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
+  it('re-enqueues a partially completed next chunk so DLQ leftovers cannot strand a run', async () => {
     const currentCaseIds = DECIDER_CASES.slice(0, 5).map(c => c.id);
     const nextCaseIds = DECIDER_CASES.slice(5, 10).map(c => c.id);
     vi.mocked(getExistingCaseResultIds)
@@ -226,7 +241,20 @@ describe('processJob — decider chunk chaining', () => {
     expect(warmUpCliContainer).not.toHaveBeenCalled();
     expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
     expect(upsertCaseResult).not.toHaveBeenCalled();
-    expect(queueSendBatch).not.toHaveBeenCalled();
+    expect(queueSendBatch).toHaveBeenCalledWith([
+      {
+        body: {
+          runId,
+          kind: 'decider',
+          model,
+          chunk: 1,
+          shard: 0,
+          shardCount: 1,
+          rep: 0,
+          caseIds: nextCaseIds,
+        },
+      },
+    ]);
   });
 
   it('destroys the model-repetition shard container after the terminal chunk', async () => {
@@ -246,5 +274,29 @@ describe('processJob — decider chunk chaining', () => {
       instanceName: `${runId}:${model}:0:3`,
     });
     expect(countCaseResults).toHaveBeenCalled();
+  });
+
+  it('finalizes terminal chunks even when best-effort container destroy fails', async () => {
+    const terminalChunk = Math.floor((DECIDER_CASES.length - 1) / 5);
+    const terminalCaseIds = DECIDER_CASES.slice(terminalChunk * 5).map(c => c.id);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(destroyDeciderCliContainer).mockRejectedValueOnce(new Error('already stopped'));
+
+    await processJob(env, {
+      ...deciderMessage(),
+      chunk: terminalChunk,
+      shard: 3,
+      shardCount: 4,
+      caseIds: terminalCaseIds,
+    });
+
+    expect(destroyDeciderCliContainer).toHaveBeenCalledWith(env, {
+      instanceName: `${runId}:${model}:0:3`,
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('benchmark_container_destroy_failed')
+    );
+    expect(countCaseResults).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

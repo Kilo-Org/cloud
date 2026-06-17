@@ -56,9 +56,15 @@ export function run(
     maxBuffer: 10 * 1024 * 1024,
   });
   if (result.status !== 0) {
-    throw new Error(
-      `${command} ${args.slice(0, 3).join(' ')} failed; provider output was redacted.`
-    );
+    const operation = `${command} ${args.slice(0, 3).join(' ')}`;
+    if (command === 'op') {
+      const output = [result.stderr, result.stdout, result.error?.message]
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+      throw new Error(`${operation} failed${output ? `:\n${output}` : '.'}`);
+    }
+    throw new Error(`${operation} failed; provider output was redacted.`);
   }
   return result.stdout;
 }

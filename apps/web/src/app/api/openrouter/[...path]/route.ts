@@ -28,9 +28,11 @@ import {
   isDeadFreeModel,
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
-  hasBestEffortGuessDataCollectionRequirement,
 } from '@/lib/ai-gateway/models';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import {
+  hasBestEffortGuessDataCollectionRequirement,
+  isFreeModel,
+} from '@/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
   captureProxyError,

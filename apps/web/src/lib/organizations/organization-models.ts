@@ -48,21 +48,11 @@ export async function getAvailableModelsForOrganization(
   );
 
   if (organization.plan !== 'enterprise' && organization.settings.data_collection !== 'deny') {
-    filteredModels.push(
-      ...(await listAvailableExperimentModels()).map(model => ({
-        ...model,
-        hasUserByokAvailable: false,
-      }))
-    );
+    filteredModels.push(...(await listAvailableExperimentModels()));
   }
 
   filteredModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
-  filteredModels.push(
-    ...(await listAvailableCustomLlms(organizationId)).map(model => ({
-      ...model,
-      hasUserByokAvailable: false,
-    }))
-  );
+  filteredModels.push(...(await listAvailableCustomLlms(organizationId)));
 
   return {
     ...responseData,

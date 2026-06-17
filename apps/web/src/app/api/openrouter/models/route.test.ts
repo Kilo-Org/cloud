@@ -82,7 +82,7 @@ describe('GET /api/openrouter/models', () => {
     expect(mockedAddUserByokAvailability).not.toHaveBeenCalled();
   });
 
-  test('returns BYOK availability for every authenticated model', async () => {
+  test('returns BYOK availability for regular and direct authenticated models', async () => {
     const publicModel = makeModel('public/model');
     const directModel = { ...makeModel('direct/model'), hasUserByokAvailable: true };
     const experimentModel = makeModel('experiment/model');
@@ -102,11 +102,7 @@ describe('GET /api/openrouter/models', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: [
-        { ...publicModel, hasUserByokAvailable: true },
-        directModel,
-        { ...experimentModel, hasUserByokAvailable: false },
-      ],
+      data: [{ ...publicModel, hasUserByokAvailable: true }, directModel, experimentModel],
     });
   });
 });

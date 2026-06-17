@@ -63,10 +63,7 @@ export async function GET(
     );
     return NextResponse.json({
       data: filterByFeature(
-        modelsWithByokAvailability.concat(
-          byokModels,
-          experimentModels.map(model => ({ ...model, hasUserByokAvailable: false }))
-        ),
+        modelsWithByokAvailability.concat(byokModels, experimentModels),
         feature
       ),
     });

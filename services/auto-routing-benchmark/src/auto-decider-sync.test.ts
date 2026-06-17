@@ -47,6 +47,8 @@ const config = {
   classifier_repetitions: 1,
   decider_repetitions: 1,
   classifier_max_p95_latency_ms: 1000,
+  auto_decider_min_cost_usd: 12,
+  auto_decider_max_cost_usd: 24,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: null,
 };
@@ -92,7 +94,7 @@ describe('syncAutoDeciderModels', () => {
     const result = await syncAutoDeciderModels(env, { fetchImpl });
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://app.test/api/internal/auto-routing-benchmark/decider-candidates',
+      'https://app.test/api/internal/auto-routing-benchmark/decider-candidates?minCostUsd=12&maxCostUsd=24',
       expect.objectContaining({
         headers: expect.objectContaining({ authorization: 'Bearer secret' }),
       })

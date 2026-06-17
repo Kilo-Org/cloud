@@ -15,6 +15,8 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   classifier_repetitions: integer('classifier_repetitions').notNull().default(1),
   decider_repetitions: integer('decider_repetitions').notNull().default(1),
   classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
+  auto_decider_min_cost_usd: real('auto_decider_min_cost_usd').notNull().default(15),
+  auto_decider_max_cost_usd: real('auto_decider_max_cost_usd').notNull().default(25),
   updated_at: text('updated_at').notNull(),
   updated_by: text('updated_by'),
 });

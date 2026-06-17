@@ -1,5 +1,9 @@
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import { readDb } from '@/lib/drizzle';
+import {
+  AUTO_DECIDER_DEFAULT_MAX_COST_USD,
+  AUTO_DECIDER_DEFAULT_MIN_COST_USD,
+} from '@kilocode/auto-routing-contracts';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
 import { and, eq, notLike } from 'drizzle-orm';
 
@@ -7,12 +11,17 @@ const TerminalBenchSchema = ModelStatsBenchmarksSchema.unwrap()
   .pick({ kiloBench: true })
   .optional();
 
-export const AUTO_DECIDER_MIN_COST_USD = 15;
-export const AUTO_DECIDER_MAX_COST_USD = 25;
+export const AUTO_DECIDER_MIN_COST_USD = AUTO_DECIDER_DEFAULT_MIN_COST_USD;
+export const AUTO_DECIDER_MAX_COST_USD = AUTO_DECIDER_DEFAULT_MAX_COST_USD;
 
 export type AutoRoutingDeciderCandidate = {
   id: string;
   avgAttemptCostUsd: number;
+};
+
+export type AutoRoutingDeciderCandidateOptions = {
+  minCostUsd?: number;
+  maxCostUsd?: number;
 };
 
 type Row = {
@@ -21,15 +30,23 @@ type Row = {
   benchmarks: unknown;
 };
 
-function isInAutoCostBand(avgAttemptCostUsd: number): boolean {
+function isInAutoCostBand(
+  avgAttemptCostUsd: number,
+  { minCostUsd, maxCostUsd }: Required<AutoRoutingDeciderCandidateOptions>
+): boolean {
   const floored = Math.floor(avgAttemptCostUsd);
-  return floored >= AUTO_DECIDER_MIN_COST_USD && floored <= AUTO_DECIDER_MAX_COST_USD;
+  return floored >= minCostUsd && floored <= maxCostUsd;
 }
 
 export function summarizeAutoRoutingDeciderCandidates(
-  rows: readonly Row[]
+  rows: readonly Row[],
+  options: AutoRoutingDeciderCandidateOptions = {}
 ): AutoRoutingDeciderCandidate[] {
   const candidates: AutoRoutingDeciderCandidate[] = [];
+  const costBounds = {
+    minCostUsd: options.minCostUsd ?? AUTO_DECIDER_MIN_COST_USD,
+    maxCostUsd: options.maxCostUsd ?? AUTO_DECIDER_MAX_COST_USD,
+  };
 
   for (const row of rows) {
     if (!row.isActive || row.openrouterId.startsWith(CUSTOM_LLM_PREFIX)) continue;
@@ -41,7 +58,7 @@ export function summarizeAutoRoutingDeciderCandidates(
       (bench.nAttempts ?? 0) < 5 ||
       bench.avgAttemptCostUsd === null ||
       bench.avgAttemptCostUsd === undefined ||
-      !isInAutoCostBand(bench.avgAttemptCostUsd)
+      !isInAutoCostBand(bench.avgAttemptCostUsd, costBounds)
     ) {
       continue;
     }
@@ -54,7 +71,9 @@ export function summarizeAutoRoutingDeciderCandidates(
   });
 }
 
-export async function listAutoRoutingDeciderCandidates(): Promise<AutoRoutingDeciderCandidate[]> {
+export async function listAutoRoutingDeciderCandidates(
+  options: AutoRoutingDeciderCandidateOptions = {}
+): Promise<AutoRoutingDeciderCandidate[]> {
   const rows = await readDb
     .select({
       openrouterId: modelStats.openrouterId,
@@ -65,5 +84,5 @@ export async function listAutoRoutingDeciderCandidates(): Promise<AutoRoutingDec
     .where(
       and(eq(modelStats.isActive, true), notLike(modelStats.openrouterId, `${CUSTOM_LLM_PREFIX}%`))
     );
-  return summarizeAutoRoutingDeciderCandidates(rows);
+  return summarizeAutoRoutingDeciderCandidates(rows, options);
 }

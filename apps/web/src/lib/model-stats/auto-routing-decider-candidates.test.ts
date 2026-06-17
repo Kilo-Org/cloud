@@ -43,18 +43,33 @@ function row(
 
 describe('summarizeAutoRoutingDeciderCandidates', () => {
   it('keeps active terminal-bench models whose floored average attempt cost is in the auto range', () => {
-    const candidates = summarizeAutoRoutingDeciderCandidates([
-      row('model/too-cheap', AUTO_DECIDER_MIN_COST_USD - 0.01),
-      row('model/minimum', AUTO_DECIDER_MIN_COST_USD),
-      row('model/floored-maximum', AUTO_DECIDER_MAX_COST_USD + 0.99),
-      row('model/too-expensive', AUTO_DECIDER_MAX_COST_USD + 1),
-      row('model/inactive', 20, { active: false }),
-      row('kilo-internal/custom', 20),
-    ]);
+    const candidates = summarizeAutoRoutingDeciderCandidates(
+      [
+        row('model/too-cheap', AUTO_DECIDER_MIN_COST_USD - 0.01),
+        row('model/minimum', AUTO_DECIDER_MIN_COST_USD),
+        row('model/floored-maximum', AUTO_DECIDER_MAX_COST_USD + 0.99),
+        row('model/too-expensive', AUTO_DECIDER_MAX_COST_USD + 1),
+        row('model/inactive', 20, { active: false }),
+        row('kilo-internal/custom', 20),
+      ],
+      { minCostUsd: AUTO_DECIDER_MIN_COST_USD, maxCostUsd: AUTO_DECIDER_MAX_COST_USD }
+    );
 
     expect(candidates).toEqual([
       { id: 'model/floored-maximum', avgAttemptCostUsd: 25.99 },
       { id: 'model/minimum', avgAttemptCostUsd: 15 },
+    ]);
+  });
+
+  it('uses caller-provided cost bounds', () => {
+    const candidates = summarizeAutoRoutingDeciderCandidates(
+      [row('model/low', 12.1), row('model/in-band', 13.9), row('model/high', 15)],
+      { minCostUsd: 12, maxCostUsd: 13 }
+    );
+
+    expect(candidates).toEqual([
+      { id: 'model/in-band', avgAttemptCostUsd: 13.9 },
+      { id: 'model/low', avgAttemptCostUsd: 12.1 },
     ]);
   });
 });

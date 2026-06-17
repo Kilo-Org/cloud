@@ -131,7 +131,7 @@ describe('auto routing contracts', () => {
 });
 
 describe('BenchmarkConfigSchema defaults', () => {
-  it('applies defaults of 1/1/1000 for classifierRepetitions, deciderRepetitions, classifierMaxP95LatencyMs', () => {
+  it('applies config defaults for repetitions, classifier latency, and auto decider cost bounds', () => {
     const result = BenchmarkConfigSchema.parse({
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
@@ -147,6 +147,8 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(result.classifierRepetitions).toBe(1);
     expect(result.deciderRepetitions).toBe(1);
     expect(result.classifierMaxP95LatencyMs).toBe(1000);
+    expect(result.autoDeciderMinCostUsd).toBe(15);
+    expect(result.autoDeciderMaxCostUsd).toBe(25);
   });
 
   it('accepts the benchmark maximum concurrency cap of 100', () => {
@@ -185,6 +187,29 @@ describe('BenchmarkConfigSchema defaults', () => {
       { id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 },
     ]);
     expect(result.excludedAutoDeciderModels).toEqual(['model/d']);
+  });
+
+  it('rejects auto decider cost bounds where min is greater than max', () => {
+    const result = BenchmarkConfigSchema.safeParse({
+      classifierModels: ['model/a'],
+      deciderModels: [{ id: 'model/b' }],
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      maxConcurrency: 10,
+      benchmarkUserId: null,
+      benchmarkOrgId: null,
+      autoDeciderMinCostUsd: 30,
+      autoDeciderMaxCostUsd: 20,
+      updatedAt: null,
+      updatedBy: null,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some(issue => issue.path[0] === 'autoDeciderMaxCostUsd')).toBe(
+        true
+      );
+    }
   });
 });
 

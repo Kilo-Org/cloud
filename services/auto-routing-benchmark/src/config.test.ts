@@ -12,6 +12,8 @@ const configRow = {
   classifier_repetitions: 1,
   decider_repetitions: 1,
   classifier_max_p95_latency_ms: null,
+  auto_decider_min_cost_usd: 12,
+  auto_decider_max_cost_usd: 24,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: 'admin@example.com',
 };
@@ -69,6 +71,8 @@ describe('mapConfigRows', () => {
     expect(result?.classifierRepetitions).toBe(1);
     expect(result?.deciderRepetitions).toBe(1);
     expect(result?.classifierMaxP95LatencyMs).toBeNull();
+    expect(result?.autoDeciderMinCostUsd).toBe(12);
+    expect(result?.autoDeciderMaxCostUsd).toBe(24);
   });
 
   it('excludes only auto decider models, leaving a manual model with the same id included', () => {

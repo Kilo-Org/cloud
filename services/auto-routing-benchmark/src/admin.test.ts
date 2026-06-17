@@ -38,6 +38,8 @@ const TEST_CONFIG: BenchmarkConfig = {
   classifierRepetitions: 1,
   deciderRepetitions: 1,
   classifierMaxP95LatencyMs: 1000,
+  autoDeciderMinCostUsd: 15,
+  autoDeciderMaxCostUsd: 25,
   updatedAt: null,
   updatedBy: null,
 };
@@ -54,6 +56,8 @@ const TEST_CONFIG_ROWS = {
     classifier_repetitions: TEST_CONFIG.classifierRepetitions,
     decider_repetitions: TEST_CONFIG.deciderRepetitions,
     classifier_max_p95_latency_ms: TEST_CONFIG.classifierMaxP95LatencyMs,
+    auto_decider_min_cost_usd: TEST_CONFIG.autoDeciderMinCostUsd,
+    auto_decider_max_cost_usd: TEST_CONFIG.autoDeciderMaxCostUsd,
     updated_at: '2026-06-01T00:00:00.000Z',
     updated_by: null,
   },
@@ -218,6 +222,8 @@ describe('GET /admin/config', () => {
         classifier_repetitions: 1,
         decider_repetitions: 1,
         classifier_max_p95_latency_ms: null,
+        auto_decider_min_cost_usd: 12,
+        auto_decider_max_cost_usd: 24,
         updated_at: '2026-06-01T00:00:00.000Z',
         updated_by: 'admin@example.com',
       },
@@ -311,6 +317,8 @@ describe('PUT /admin/config', () => {
     const [, configArg, , deciderModelRows, excludedAutoDeciderModels] =
       vi.mocked(replaceConfig).mock.calls[0];
     expect(configArg.min_accuracy).toBe(0.85);
+    expect(configArg.auto_decider_min_cost_usd).toBe(15);
+    expect(configArg.auto_decider_max_cost_usd).toBe(25);
     expect(typeof configArg.updated_at).toBe('string');
     expect(configArg.updated_by).toBe('igor@kilocode.ai');
     expect(deciderModelRows).toEqual([{ model: 'manual/model', reasoning_effort: 'low' }]);

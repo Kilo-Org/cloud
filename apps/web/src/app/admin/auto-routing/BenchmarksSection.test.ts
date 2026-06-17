@@ -121,6 +121,8 @@ describe('configToFormState', () => {
     expect(state.classifierRepetitions).toBe(1);
     expect(state.deciderRepetitions).toBe(1);
     expect(state.classifierMaxP95LatencyMs).toBe('1000');
+    expect(state.autoDeciderMinCostUsd).toBe(15);
+    expect(state.autoDeciderMaxCostUsd).toBe(25);
     expect(state.classifierModels).toBe('');
     expect(state.deciderModels).toEqual([]);
     expect(state.autoDeciderModels).toEqual([]);
@@ -149,15 +151,19 @@ describe('formStateToConfig round-trip', () => {
     classifierRepetitions: 3,
     deciderRepetitions: 2,
     classifierMaxP95LatencyMs: 500,
+    autoDeciderMinCostUsd: 12,
+    autoDeciderMaxCostUsd: 24,
     updatedAt: null,
     updatedBy: null,
   };
 
-  it('preserves classifierRepetitions, deciderRepetitions, and classifierMaxP95LatencyMs', () => {
+  it('preserves repetitions, classifierMaxP95LatencyMs, and auto decider cost bounds', () => {
     const state = configToFormState(baseConfig);
     expect(state.classifierRepetitions).toBe(3);
     expect(state.deciderRepetitions).toBe(2);
     expect(state.classifierMaxP95LatencyMs).toBe('500');
+    expect(state.autoDeciderMinCostUsd).toBe(12);
+    expect(state.autoDeciderMaxCostUsd).toBe(24);
     expect(state.benchmarkOrgId).toBe('org-123');
     expect(state.deciderModels).toEqual([{ id: 'manual-model', reasoningEffort: 'low' }]);
     expect(state.autoDeciderModels).toEqual(baseConfig.autoDeciderModels);
@@ -167,6 +173,8 @@ describe('formStateToConfig round-trip', () => {
     expect(result.classifierRepetitions).toBe(3);
     expect(result.deciderRepetitions).toBe(2);
     expect(result.classifierMaxP95LatencyMs).toBe(500);
+    expect(result.autoDeciderMinCostUsd).toBe(12);
+    expect(result.autoDeciderMaxCostUsd).toBe(24);
     expect(result.benchmarkOrgId).toBe('org-123');
     expect(result.manualDeciderModels).toEqual([{ id: 'manual-model', reasoningEffort: 'low' }]);
     expect(result.excludedAutoDeciderModels).toEqual(['excluded-auto-model']);

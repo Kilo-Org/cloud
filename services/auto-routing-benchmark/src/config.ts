@@ -19,6 +19,8 @@ export function mapConfigRows(
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
+    auto_decider_min_cost_usd: number;
+    auto_decider_max_cost_usd: number;
     updated_at: string;
     updated_by: string | null;
   } | null,
@@ -64,6 +66,8 @@ export function mapConfigRows(
     classifierRepetitions: configRow.classifier_repetitions,
     deciderRepetitions: configRow.decider_repetitions,
     classifierMaxP95LatencyMs: configRow.classifier_max_p95_latency_ms,
+    autoDeciderMinCostUsd: configRow.auto_decider_min_cost_usd,
+    autoDeciderMaxCostUsd: configRow.auto_decider_max_cost_usd,
     updatedAt: configRow.updated_at,
     updatedBy: configRow.updated_by,
   };
@@ -106,6 +110,8 @@ export async function saveBenchmarkConfig(
       classifier_repetitions: config.classifierRepetitions,
       decider_repetitions: config.deciderRepetitions,
       classifier_max_p95_latency_ms: config.classifierMaxP95LatencyMs,
+      auto_decider_min_cost_usd: config.autoDeciderMinCostUsd,
+      auto_decider_max_cost_usd: config.autoDeciderMaxCostUsd,
       updated_at: updatedAt,
       updated_by: updatedBy,
     },

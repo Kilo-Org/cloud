@@ -22,6 +22,13 @@ function createRequest(headers: Record<string, string> = {}) {
   );
 }
 
+function createRequestWithBounds(headers: Record<string, string> = {}) {
+  return new NextRequest(
+    'http://localhost:3000/api/internal/auto-routing-benchmark/decider-candidates?minCostUsd=12&maxCostUsd=24',
+    { headers }
+  );
+}
+
 describe('GET /api/internal/auto-routing-benchmark/decider-candidates', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -45,6 +52,20 @@ describe('GET /api/internal/auto-routing-benchmark/decider-candidates', () => {
       candidates: [{ id: 'model/a', avgAttemptCostUsd: 20.5 }],
       minCostUsd: 15,
       maxCostUsd: 25,
+    });
+  });
+
+  it('uses requested cost bounds for authenticated worker callers', async () => {
+    const res = await GET(createRequestWithBounds({ authorization: 'Bearer internal-secret' }));
+
+    expect(res.status).toBe(200);
+    expect(mockListAutoRoutingDeciderCandidates).toHaveBeenCalledWith({
+      minCostUsd: 12,
+      maxCostUsd: 24,
+    });
+    await expect(res.json()).resolves.toMatchObject({
+      minCostUsd: 12,
+      maxCostUsd: 24,
     });
   });
 });

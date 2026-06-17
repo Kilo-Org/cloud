@@ -18,6 +18,9 @@ export const BenchmarkDeciderModelSchema = z.object({
 });
 export type BenchmarkDeciderModel = z.infer<typeof BenchmarkDeciderModelSchema>;
 
+export const AUTO_DECIDER_DEFAULT_MIN_COST_USD = 15;
+export const AUTO_DECIDER_DEFAULT_MAX_COST_USD = 25;
+
 export const AutoBenchmarkDeciderModelSchema = BenchmarkDeciderModelSchema.extend({
   avgAttemptCostUsd: z.number().nonnegative(),
 });
@@ -80,6 +83,10 @@ export const BenchmarkConfigSchema = z
     // Maximum acceptable p95 latency for the classifier winner; null means no
     // constraint (cost-only selection).
     classifierMaxP95LatencyMs: z.number().int().positive().nullable().default(1000),
+    // Auto decider model selection includes terminal-bench models whose
+    // floored average run cost falls within this inclusive range.
+    autoDeciderMinCostUsd: z.number().nonnegative().default(AUTO_DECIDER_DEFAULT_MIN_COST_USD),
+    autoDeciderMaxCostUsd: z.number().nonnegative().default(AUTO_DECIDER_DEFAULT_MAX_COST_USD),
     updatedAt: z.string().nullable(),
     updatedBy: z.string().nullable(),
   })
@@ -105,6 +112,13 @@ export const BenchmarkConfigSchema = z
       'excludedAutoDeciderModels',
       ctx
     );
+    if (config.autoDeciderMinCostUsd > config.autoDeciderMaxCostUsd) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['autoDeciderMaxCostUsd'],
+        message: 'Auto decider max cost must be greater than or equal to min cost',
+      });
+    }
   });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
 

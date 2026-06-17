@@ -15,17 +15,35 @@ function extractBearerToken(authHeader: string | null): string | null {
   return trimmed.slice(7).trim() || null;
 }
 
+function parseCostBound(value: string | null, fallback: number): number {
+  if (value === null) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 export async function GET(req: NextRequest) {
   const token = extractBearerToken(req.headers.get('authorization'));
   if (!INTERNAL_API_SECRET || !token || !timingSafeEqual(token, INTERNAL_API_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const candidates = await listAutoRoutingDeciderCandidates();
+  const minCostUsd = parseCostBound(
+    req.nextUrl.searchParams.get('minCostUsd'),
+    AUTO_DECIDER_MIN_COST_USD
+  );
+  const maxCostUsd = parseCostBound(
+    req.nextUrl.searchParams.get('maxCostUsd'),
+    AUTO_DECIDER_MAX_COST_USD
+  );
+  if (minCostUsd > maxCostUsd) {
+    return NextResponse.json({ error: 'Invalid cost bounds' }, { status: 400 });
+  }
+
+  const candidates = await listAutoRoutingDeciderCandidates({ minCostUsd, maxCostUsd });
   return NextResponse.json({
     candidates,
-    minCostUsd: AUTO_DECIDER_MIN_COST_USD,
-    maxCostUsd: AUTO_DECIDER_MAX_COST_USD,
+    minCostUsd,
+    maxCostUsd,
     generatedAt: new Date().toISOString(),
   });
 }

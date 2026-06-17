@@ -113,6 +113,8 @@ export async function replaceConfig(
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
+    auto_decider_min_cost_usd: number;
+    auto_decider_max_cost_usd: number;
     updated_at: string;
     updated_by: string | null;
   },
@@ -214,10 +216,11 @@ export async function insertRun(
     stmts.push(orm.insert(runModels).values(models));
   }
 
-  if (carriedSummaries.length > 0) {
+  for (let i = 0; i < carriedSummaries.length; i += MODEL_SUMMARY_INSERT_BATCH_SIZE) {
+    const summaryChunk = carriedSummaries.slice(i, i + MODEL_SUMMARY_INSERT_BATCH_SIZE);
     stmts.push(
       orm.insert(modelSummaries).values(
-        carriedSummaries.map(s => ({
+        summaryChunk.map(s => ({
           run_id: run.id,
           model: s.model,
           route_key: s.routeKey,

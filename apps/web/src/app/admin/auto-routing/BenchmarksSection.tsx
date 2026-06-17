@@ -1,6 +1,8 @@
 'use client';
 
 import {
+  AUTO_DECIDER_DEFAULT_MAX_COST_USD,
+  AUTO_DECIDER_DEFAULT_MIN_COST_USD,
   BenchmarkConfigResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   BenchmarkRunsResponseSchema,
@@ -138,6 +140,8 @@ export function configToFormState(config: BenchmarkConfig | null): {
   classifierRepetitions: number;
   deciderRepetitions: number;
   classifierMaxP95LatencyMs: string;
+  autoDeciderMinCostUsd: number;
+  autoDeciderMaxCostUsd: number;
 } {
   if (config === null) {
     // No config saved yet: the worker fabricates nothing, so the form starts
@@ -155,6 +159,8 @@ export function configToFormState(config: BenchmarkConfig | null): {
       classifierRepetitions: 1,
       deciderRepetitions: 1,
       classifierMaxP95LatencyMs: '1000',
+      autoDeciderMinCostUsd: AUTO_DECIDER_DEFAULT_MIN_COST_USD,
+      autoDeciderMaxCostUsd: AUTO_DECIDER_DEFAULT_MAX_COST_USD,
     };
   }
   return {
@@ -174,6 +180,8 @@ export function configToFormState(config: BenchmarkConfig | null): {
     deciderRepetitions: config.deciderRepetitions,
     classifierMaxP95LatencyMs:
       config.classifierMaxP95LatencyMs !== null ? String(config.classifierMaxP95LatencyMs) : '',
+    autoDeciderMinCostUsd: config.autoDeciderMinCostUsd,
+    autoDeciderMaxCostUsd: config.autoDeciderMaxCostUsd,
   };
 }
 
@@ -245,6 +253,8 @@ export function formStateToConfig(
     classifierRepetitions: state.classifierRepetitions,
     deciderRepetitions: state.deciderRepetitions,
     classifierMaxP95LatencyMs,
+    autoDeciderMinCostUsd: state.autoDeciderMinCostUsd,
+    autoDeciderMaxCostUsd: state.autoDeciderMaxCostUsd,
     updatedAt: base?.updatedAt ?? null,
     updatedBy: base?.updatedBy ?? null,
   };
@@ -557,6 +567,44 @@ function BenchmarkConfigEditor({
               value={form.maxConcurrency}
               onChange={e =>
                 updateForm(prev => ({ ...prev, maxConcurrency: parseInt(e.target.value, 10) || 1 }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-auto-decider-min-cost" className="text-sm font-medium">
+              Auto min run cost
+            </Label>
+            <Input
+              id="benchmark-auto-decider-min-cost"
+              type="number"
+              min={0}
+              step={1}
+              value={form.autoDeciderMinCostUsd}
+              onChange={e =>
+                updateForm(prev => ({
+                  ...prev,
+                  autoDeciderMinCostUsd: parseFloat(e.target.value) || 0,
+                }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-auto-decider-max-cost" className="text-sm font-medium">
+              Auto max run cost
+            </Label>
+            <Input
+              id="benchmark-auto-decider-max-cost"
+              type="number"
+              min={0}
+              step={1}
+              value={form.autoDeciderMaxCostUsd}
+              onChange={e =>
+                updateForm(prev => ({
+                  ...prev,
+                  autoDeciderMaxCostUsd: parseFloat(e.target.value) || 0,
+                }))
               }
               className="h-8 w-40 tabular-nums"
             />

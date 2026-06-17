@@ -1,7 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { redirect } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useSecurityAgent } from '@/components/security-agent/SecurityAgentContext';
 import { SecurityDashboard } from '@/components/security-agent/SecurityDashboard';
@@ -9,24 +8,13 @@ import { SecurityDashboard } from '@/components/security-agent/SecurityDashboard
 export default function OrgSecurityAgentDashboardPage() {
   const { hasIntegration, isEnabled, isLoadingConfig, isLoadingPermission, organizationId } =
     useSecurityAgent();
-  const router = useRouter();
 
   const shouldRedirectToConfig =
     !!organizationId &&
     ((!isLoadingPermission && !hasIntegration) || (hasIntegration && isEnabled === false));
 
-  useEffect(() => {
-    if (shouldRedirectToConfig) {
-      router.replace(`/organizations/${organizationId}/security-agent/config`);
-    }
-  }, [shouldRedirectToConfig, organizationId, router]);
-
   if (shouldRedirectToConfig) {
-    return (
-      <div className="text-muted-foreground block py-16 text-center text-sm">
-        Opening settings...
-      </div>
-    );
+    redirect(`/organizations/${organizationId}/security-agent/config`);
   }
 
   if (isLoadingPermission || (hasIntegration && isLoadingConfig)) {

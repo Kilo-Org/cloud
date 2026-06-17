@@ -133,15 +133,20 @@ function SectionToggle({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-3">
-      <span className="text-muted-foreground text-xs font-medium" aria-hidden="true">
-        {checked ? 'On' : 'Off'}
-      </span>
+      <div className="space-y-0.5 text-right">
+        <Label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </Label>
+        <div id={`${id}-state`} className="text-muted-foreground text-xs font-medium">
+          {checked ? 'On' : 'Off'}
+        </div>
+      </div>
       <Switch
         id={id}
         checked={checked}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
-        aria-label={label}
+        aria-describedby={`${id}-state`}
       />
     </div>
   );

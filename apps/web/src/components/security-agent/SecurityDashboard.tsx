@@ -564,7 +564,7 @@ function AttentionCard({
       aria-labelledby="attention-heading"
     >
       <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
-        <div className="p-5 sm:p-6 lg:p-8">
+        <div className="p-5 sm:p-6">
           <div className="text-status-destructive flex items-center gap-2 text-sm font-medium">
             <ShieldAlert className="size-4" aria-hidden="true" />
             Act first

@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import React, { type FormEvent, type ReactNode, useState } from 'react';
+import React, { type FormEvent, type ReactNode, useReducer } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { differenceInCalendarDays, format as formatCalendarDateLabel } from 'date-fns';
 import {
@@ -69,6 +69,42 @@ export type AuditReportFilters = {
   state: AuditReportStateFilter;
   repository: string | null;
 };
+
+export type AuditReportControlsState = {
+  draftRange: DayPickerDateRange | undefined;
+  submittedRange: DateRange;
+  draftFilters: AuditReportFilters;
+  submittedFilters: AuditReportFilters;
+  isRangePickerOpen: boolean;
+};
+
+type AuditReportControlsStateInput = {
+  initialRange: DateRange;
+  initialFilters: AuditReportFilters;
+};
+
+type AuditReportControlsAction =
+  | {
+      type: 'set-range-picker-open';
+      open: boolean;
+    }
+  | {
+      type: 'select-draft-range';
+      range: DayPickerDateRange | undefined;
+      closePicker: boolean;
+    }
+  | {
+      type: 'set-draft-filter';
+      filter: Partial<AuditReportFilters>;
+    }
+  | {
+      type: 'submit-report';
+      range: DateRange;
+      filters: AuditReportFilters;
+    }
+  | {
+      type: 'clear-filters';
+    };
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
 const FINDING_SUPERSEDED_ACTION = 'security.finding.superseded';
@@ -161,6 +197,53 @@ export function hasSecurityAgentAuditReportOwnerContext(
   return !isOrg || Boolean(organizationId);
 }
 
+export function createAuditReportControlsState({
+  initialRange,
+  initialFilters,
+}: AuditReportControlsStateInput): AuditReportControlsState {
+  return {
+    draftRange: toDayPickerDateRange(initialRange),
+    submittedRange: initialRange,
+    draftFilters: initialFilters,
+    submittedFilters: initialFilters,
+    isRangePickerOpen: false,
+  };
+}
+
+export function auditReportControlsReducer(
+  state: AuditReportControlsState,
+  action: AuditReportControlsAction
+): AuditReportControlsState {
+  switch (action.type) {
+    case 'set-range-picker-open':
+      return { ...state, isRangePickerOpen: action.open };
+    case 'select-draft-range':
+      return {
+        ...state,
+        draftRange: action.range,
+        isRangePickerOpen: action.closePicker ? false : state.isRangePickerOpen,
+      };
+    case 'set-draft-filter':
+      return {
+        ...state,
+        draftFilters: { ...state.draftFilters, ...action.filter },
+      };
+    case 'submit-report':
+      return {
+        ...state,
+        submittedRange: action.range,
+        draftFilters: action.filters,
+        submittedFilters: action.filters,
+      };
+    case 'clear-filters':
+      return {
+        ...state,
+        draftFilters: ALL_AUDIT_REPORT_FILTERS,
+        submittedFilters: ALL_AUDIT_REPORT_FILTERS,
+      };
+  }
+}
+
 export function SecurityAuditReportPage() {
   const trpc = useTRPC();
   const searchParams = useSearchParams();
@@ -173,13 +256,13 @@ export function SecurityAuditReportPage() {
     ? requestedRange
     : getDefaultAuditReportDateRange();
   const initialFilters = parseAuditReportFilters(searchParams);
-  const [draftRange, setDraftRange] = useState<DayPickerDateRange | undefined>(() =>
-    toDayPickerDateRange(initialRange)
+  const [controlsState, dispatchControlsState] = useReducer(
+    auditReportControlsReducer,
+    { initialRange, initialFilters },
+    createAuditReportControlsState
   );
-  const [submittedRange, setSubmittedRange] = useState<DateRange>(initialRange);
-  const [draftFilters, setDraftFilters] = useState<AuditReportFilters>(initialFilters);
-  const [submittedFilters, setSubmittedFilters] = useState<AuditReportFilters>(initialFilters);
-  const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
+  const { draftRange, submittedRange, draftFilters, submittedFilters, isRangePickerOpen } =
+    controlsState;
   const completeDraftRange = toAuditReportDateRange(draftRange);
   const latestSelectableDate = utcDateAsLocalCalendarDate(new Date());
   const hasOwnerContext = hasSecurityAgentAuditReportOwnerContext(isOrg, organizationId);
@@ -216,20 +299,24 @@ export function SecurityAuditReportPage() {
   function handleGenerateReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!completeDraftRange) return;
-    setSubmittedRange(completeDraftRange);
-    setDraftFilters(effectiveDraftFilters);
-    setSubmittedFilters(effectiveDraftFilters);
+    dispatchControlsState({
+      type: 'submit-report',
+      range: completeDraftRange,
+      filters: effectiveDraftFilters,
+    });
   }
 
   function handleDateRangeSelect(nextRange: DayPickerDateRange | undefined) {
     if (nextRange?.from && nextRange.to && !isWithinAuditReportRangeLimit(nextRange)) return;
-    setDraftRange(nextRange);
-    if (nextRange?.from && nextRange.to) setIsRangePickerOpen(false);
+    dispatchControlsState({
+      type: 'select-draft-range',
+      range: nextRange,
+      closePicker: Boolean(nextRange?.from && nextRange.to),
+    });
   }
 
   function handleClearFilters() {
-    setDraftFilters(ALL_AUDIT_REPORT_FILTERS);
-    setSubmittedFilters(ALL_AUDIT_REPORT_FILTERS);
+    dispatchControlsState({ type: 'clear-filters' });
   }
 
   return (
@@ -251,7 +338,12 @@ export function SecurityAuditReportPage() {
                   label="Report period"
                   className="md:col-span-2 xl:col-span-1"
                 >
-                  <Popover open={isRangePickerOpen} onOpenChange={setIsRangePickerOpen}>
+                  <Popover
+                    open={isRangePickerOpen}
+                    onOpenChange={open =>
+                      dispatchControlsState({ type: 'set-range-picker-open', open })
+                    }
+                  >
                     <PopoverTrigger asChild>
                       <Button
                         id="audit-report-date-range"
@@ -291,10 +383,12 @@ export function SecurityAuditReportPage() {
                   <Select
                     value={draftFilters.severity}
                     onValueChange={severity =>
-                      setDraftFilters(current => ({
-                        ...current,
-                        severity: parseAuditReportSeverityFilter(severity),
-                      }))
+                      dispatchControlsState({
+                        type: 'set-draft-filter',
+                        filter: {
+                          severity: parseAuditReportSeverityFilter(severity),
+                        },
+                      })
                     }
                   >
                     <SelectTrigger
@@ -317,10 +411,12 @@ export function SecurityAuditReportPage() {
                   <Select
                     value={draftFilters.state}
                     onValueChange={state =>
-                      setDraftFilters(current => ({
-                        ...current,
-                        state: parseAuditReportStateFilter(state),
-                      }))
+                      dispatchControlsState({
+                        type: 'set-draft-filter',
+                        filter: {
+                          state: parseAuditReportStateFilter(state),
+                        },
+                      })
                     }
                   >
                     <SelectTrigger id="audit-report-state" className="min-h-11 w-full sm:min-h-9">
@@ -341,10 +437,12 @@ export function SecurityAuditReportPage() {
                   <Select
                     value={effectiveDraftFilters.repository ?? 'all'}
                     onValueChange={repository =>
-                      setDraftFilters(current => ({
-                        ...current,
-                        repository: parseAuditReportRepositoryFilter(repository),
-                      }))
+                      dispatchControlsState({
+                        type: 'set-draft-filter',
+                        filter: {
+                          repository: parseAuditReportRepositoryFilter(repository),
+                        },
+                      })
                     }
                   >
                     <SelectTrigger

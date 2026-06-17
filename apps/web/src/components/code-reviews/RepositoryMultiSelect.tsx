@@ -137,7 +137,7 @@ export function RepositoryMultiSelect({
     <div className="space-y-3">
       {/* Search Input */}
       <div className="relative">
-        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
         <Input
           type="text"
           placeholder="Search repositories..."
@@ -146,7 +146,7 @@ export function RepositoryMultiSelect({
           className="pl-9"
         />
         {isSearching && (
-          <Loader2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400" />
+          <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
         )}
       </div>
 
@@ -175,11 +175,11 @@ export function RepositoryMultiSelect({
       </div>
 
       {/* Repository List */}
-      <div className="h-64 overflow-y-auto rounded-md border">
+      <div className="border-border bg-background h-64 overflow-y-auto rounded-md border">
         <div className="space-y-3 p-4">
           {/* Local Results */}
           {filteredLocalRepositories.length === 0 && !showApiSection ? (
-            <div className="py-8 text-center text-sm text-gray-400">
+            <div className="text-muted-foreground py-8 text-center text-sm">
               {searchQuery ? 'No repositories match your search' : 'No repositories available'}
             </div>
           ) : (
@@ -191,8 +191,8 @@ export function RepositoryMultiSelect({
                   <div
                     key={repo.id}
                     className={cn(
-                      'flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-gray-800/50',
-                      isChecked && 'bg-gray-800/30'
+                      'hover:bg-accent flex items-center gap-3 rounded-md p-2 transition-colors',
+                      isChecked && 'bg-accent text-accent-foreground'
                     )}
                   >
                     <Checkbox
@@ -205,9 +205,9 @@ export function RepositoryMultiSelect({
                       className="flex flex-1 cursor-pointer items-center gap-2 text-sm"
                     >
                       {repo.private ? (
-                        <Lock className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+                        <Lock className="text-primary h-3.5 w-3.5 shrink-0" />
                       ) : (
-                        <Unlock className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+                        <Unlock className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                       )}
                       <span className="truncate font-mono">{repo.full_name}</span>
                     </label>
@@ -218,8 +218,8 @@ export function RepositoryMultiSelect({
               {/* API Search Results Section */}
               {showApiSection && (
                 <>
-                  <div className="my-3 flex items-center gap-2 border-t border-gray-700 pt-3">
-                    <span className="text-xs text-gray-400">
+                  <div className="border-border my-3 flex items-center gap-2 border-t pt-3">
+                    <span className="text-muted-foreground text-xs">
                       {isSearching ? (
                         <span className="flex items-center gap-1">
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -240,8 +240,8 @@ export function RepositoryMultiSelect({
                       <div
                         key={`api-${repo.id}`}
                         className={cn(
-                          'flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-gray-800/50',
-                          isChecked && 'bg-gray-800/30'
+                          'hover:bg-accent flex items-center gap-3 rounded-md p-2 transition-colors',
+                          isChecked && 'bg-accent text-accent-foreground'
                         )}
                       >
                         <Checkbox
@@ -254,9 +254,9 @@ export function RepositoryMultiSelect({
                           className="flex flex-1 cursor-pointer items-center gap-2 text-sm"
                         >
                           {repo.private ? (
-                            <Lock className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+                            <Lock className="text-primary h-3.5 w-3.5 shrink-0" />
                           ) : (
-                            <Unlock className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+                            <Unlock className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                           )}
                           <span className="truncate font-mono">{repo.full_name}</span>
                         </label>
@@ -271,7 +271,7 @@ export function RepositoryMultiSelect({
       </div>
 
       {/* Selection Count */}
-      <div className="text-xs text-gray-400">
+      <div className="text-muted-foreground text-xs">
         {selectedIds.length} of {repositories.length} repositories selected
       </div>
     </div>

@@ -6,7 +6,13 @@ import { DayPicker, getDefaultClassNames } from 'react-day-picker';
 import type { DayButton } from 'react-day-picker';
 
 import { cn } from '@/lib/utils';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
+
+const rtlChevronClassNames = [
+  'rtl:**:[.rdp-button\\_next>svg]:rotate-180',
+  'rtl:**:[.rdp-button\\_previous>svg]:rotate-180',
+] as const;
 
 function Calendar({
   className,
@@ -27,8 +33,7 @@ function Calendar({
       showOutsideDays={showOutsideDays}
       className={cn(
         'bg-background group/calendar p-3 [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent',
-        String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
-        String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
+        rtlChevronClassNames,
         className
       )}
       captionLayout={captionLayout}

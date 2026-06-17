@@ -2966,7 +2966,7 @@ export function FindingDetailDialog({
     return false as const;
   };
 
-  const orgAnalysisQuery = useQuery({
+  const { data: orgAnalysisData, refetch: refetchOrgAnalysis } = useQuery({
     ...trpc.organizations.securityAgent.getAnalysis.queryOptions({
       organizationId: organizationId ?? '',
       findingId: findingId ?? '',
@@ -2974,15 +2974,15 @@ export function FindingDetailDialog({
     enabled: open && Boolean(initialFinding) && isOrg,
     refetchInterval: pollWhileActive,
   });
-  const personalAnalysisQuery = useQuery({
+  const { data: personalAnalysisData, refetch: refetchPersonalAnalysis } = useQuery({
     ...trpc.securityAgent.getAnalysis.queryOptions({
       findingId: findingId ?? '',
     }),
     enabled: open && Boolean(initialFinding) && !isOrg,
     refetchInterval: pollWhileActive,
   });
-  const analysisData = isOrg ? orgAnalysisQuery.data : personalAnalysisQuery.data;
-  const refetchAnalysis = isOrg ? orgAnalysisQuery.refetch : personalAnalysisQuery.refetch;
+  const analysisData = isOrg ? orgAnalysisData : personalAnalysisData;
+  const refetchAnalysis = isOrg ? refetchOrgAnalysis : refetchPersonalAnalysis;
   const analysisSettlementKey =
     findingId && analysisData?.completedAt ? `${findingId}:${analysisData.completedAt}` : null;
 

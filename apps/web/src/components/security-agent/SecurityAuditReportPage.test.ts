@@ -8,6 +8,8 @@ import type {
 } from '@/lib/security-agent/db/security-audit-report';
 import {
   AuditReportProvenance,
+  auditReportControlsReducer,
+  createAuditReportControlsState,
   filterSecurityAgentAuditReport,
   formatAuditEventTime,
   formatDateTime24Hour,
@@ -106,6 +108,33 @@ describe('audit report owner context', () => {
     expect(hasSecurityAgentAuditReportOwnerContext(false, undefined)).toBe(true);
     expect(hasSecurityAgentAuditReportOwnerContext(true, 'org-1')).toBe(true);
     expect(hasSecurityAgentAuditReportOwnerContext(true, undefined)).toBe(false);
+  });
+});
+
+describe('audit report control state', () => {
+  it('submits a complete draft range and normalized filters in one transition', () => {
+    const state = createAuditReportControlsState({
+      initialRange: { startDate: '2026-03-19', endDate: '2026-06-16' },
+      initialFilters: { severity: 'all', state: 'all', repository: null },
+    });
+    const submittedRange = { startDate: '2026-05-01', endDate: '2026-05-31' };
+    const submittedFilters = {
+      severity: 'high',
+      state: 'ignored',
+      repository: 'kilo/web',
+    } as const;
+
+    const nextState = auditReportControlsReducer(state, {
+      type: 'submit-report',
+      range: submittedRange,
+      filters: submittedFilters,
+    });
+
+    expect(nextState.submittedRange).toBe(submittedRange);
+    expect(nextState.draftFilters).toBe(submittedFilters);
+    expect(nextState.submittedFilters).toBe(submittedFilters);
+    expect(nextState.draftRange).toBe(state.draftRange);
+    expect(nextState.isRangePickerOpen).toBe(false);
   });
 });
 

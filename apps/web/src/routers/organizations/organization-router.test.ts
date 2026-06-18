@@ -339,19 +339,32 @@ describe('organizations trpc router', () => {
         })
       ).rejects.toThrow('Organization name must be less than 100 characters');
 
+      const safeName = "O'Reilly R&D Team-2 (EU)";
+      const result = await caller.organizations.update({
+        organizationId: testOrganization.id,
+        name: safeName,
+      });
+
+      expect(result.organization.name).toBe(safeName);
+
+      await db
+        .update(organizations)
+        .set({ name: 'Test Organization' })
+        .where(eq(organizations.id, testOrganization.id));
+
       await expect(
         caller.organizations.update({
           organizationId: testOrganization.id,
           name: 'https://evil.example',
         })
-      ).rejects.toThrow('Organization name cannot contain a URL');
+      ).rejects.toThrow('Organization name can only contain');
 
       await expect(
         caller.organizations.create({
           name: 'www.evil.example',
           autoAddCreator: true,
         })
-      ).rejects.toThrow('Organization name cannot contain a URL');
+      ).rejects.toThrow('Organization name can only contain');
     });
 
     it('should trim whitespace from organization name', async () => {

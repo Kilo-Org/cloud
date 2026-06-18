@@ -46,8 +46,9 @@ export const OrganizationNameSchema = z
   .trim()
   .min(1, 'Organization name is required')
   .max(100, 'Organization name must be less than 100 characters')
-  .refine(name => !/\b(?:https?:\/\/|www\.)\S+/i.test(name), {
-    message: 'Organization name cannot contain a URL',
+  .regex(/^[\p{L}\p{N}][\p{L}\p{N} '&()-]*$/u, {
+    message:
+      'Organization name can only contain letters, numbers, spaces, apostrophes, ampersands, parentheses, and hyphens',
   });
 
 export const OrganizationCreateRequestSchema = z.object({

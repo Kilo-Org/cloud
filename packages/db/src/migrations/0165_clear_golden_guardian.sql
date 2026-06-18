@@ -1,0 +1,4 @@
+ALTER TABLE "credit_transactions" ADD COLUMN "created_by_kilo_user_id" text;--> statement-breakpoint
+ALTER TABLE "kilocode_users" ADD COLUMN "can_manage_credits" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "credit_transactions" ADD CONSTRAINT "credit_transactions_created_by_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("created_by_kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kilocode_users" ADD CONSTRAINT "kilocode_users_can_manage_credits_requires_admin_check" CHECK (NOT "kilocode_users"."can_manage_credits" OR "kilocode_users"."is_admin");

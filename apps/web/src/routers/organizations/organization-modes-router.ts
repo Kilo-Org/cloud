@@ -13,10 +13,30 @@ import {
   updateOrganizationMode,
   deleteOrganizationMode,
 } from '@/lib/organizations/organization-modes';
-import { OrganizationModeConfigSchema } from '@/lib/organizations/organization-types';
+import {
+  OrganizationModeConfigSchema,
+  type OrganizationModeConfig,
+} from '@/lib/organizations/organization-types';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { successResult } from '@/lib/maybe-result';
+import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
+import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
+
+const ORGANIZATION_MODE_DEFAULT_MODEL_FLAG = 'org-default-model-config';
+
+const ModeConfigInputSchema = OrganizationModeConfigSchema.partial();
+
+const ModeUpdateConfigInputSchema = ModeConfigInputSchema.extend({
+  defaultModel: z.string().min(1, 'Default model cannot be empty').nullable().optional(),
+});
+
+type ModeUpdateConfigInput = z.infer<typeof ModeUpdateConfigInputSchema>;
+type DefaultModelConfig = {
+  defaultModel?: string | null;
+};
 
 const CreateModeInputSchema = OrganizationIdInputSchema.extend({
   name: z
@@ -28,7 +48,7 @@ const CreateModeInputSchema = OrganizationIdInputSchema.extend({
     .min(1, 'Mode slug is required')
     .max(50, 'Mode slug must be less than 50 characters')
     .regex(/^[a-z0-9-]+$/, 'Mode slug must contain only lowercase letters, numbers, and hyphens'),
-  config: OrganizationModeConfigSchema.partial().optional(),
+  config: ModeConfigInputSchema.optional(),
 });
 
 const UpdateModeInputSchema = OrganizationIdInputSchema.extend({
@@ -40,7 +60,7 @@ const UpdateModeInputSchema = OrganizationIdInputSchema.extend({
     .max(50)
     .regex(/^[a-z0-9-]+$/)
     .optional(),
-  config: OrganizationModeConfigSchema.partial().optional(),
+  config: ModeUpdateConfigInputSchema.optional(),
 });
 
 const DeleteModeInputSchema = OrganizationIdInputSchema.extend({
@@ -50,6 +70,104 @@ const DeleteModeInputSchema = OrganizationIdInputSchema.extend({
 const ModeIdInputSchema = OrganizationIdInputSchema.extend({
   modeId: z.uuid(),
 });
+
+type DefaultModelChange =
+  | { kind: 'none' }
+  | { kind: 'clear' }
+  | { kind: 'set'; defaultModel: string };
+
+function getDefaultModelChange(config: DefaultModelConfig | undefined): DefaultModelChange {
+  if (!config || !Object.prototype.hasOwnProperty.call(config, 'defaultModel')) {
+    return { kind: 'none' };
+  }
+
+  if (config.defaultModel === null) {
+    return { kind: 'clear' };
+  }
+
+  if (typeof config.defaultModel === 'string') {
+    return { kind: 'set', defaultModel: config.defaultModel };
+  }
+
+  return { kind: 'none' };
+}
+
+function assertDefaultModelCanBeSet(
+  organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>,
+  change: DefaultModelChange
+): void {
+  if (change.kind !== 'set') {
+    return;
+  }
+
+  if (organization.plan !== 'enterprise') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Model access configuration is not available for this organization.',
+    });
+  }
+}
+
+async function assertDefaultModelConfigEnabled(
+  userId: string,
+  change: DefaultModelChange
+): Promise<void> {
+  if (change.kind === 'none') {
+    return;
+  }
+
+  if (
+    process.env.NODE_ENV !== 'development' &&
+    !(await isReleaseToggleEnabled(ORGANIZATION_MODE_DEFAULT_MODEL_FLAG, userId))
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Mode default model configuration is not available',
+    });
+  }
+}
+
+function normalizeModeConfig(
+  config: ModeUpdateConfigInput | undefined
+): Partial<OrganizationModeConfig> | undefined {
+  if (!config) {
+    return undefined;
+  }
+
+  const { defaultModel, ...rest } = config;
+  if (defaultModel === null) {
+    return { ...rest, defaultModel: undefined };
+  }
+  if (defaultModel === undefined) {
+    return rest;
+  }
+
+  return { ...rest, defaultModel };
+}
+
+async function validateDefaultModel(
+  organization: NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>,
+  defaultModel: string
+): Promise<void> {
+  const normalizedDefaultModel = normalizeModelId(defaultModel);
+  if (normalizedDefaultModel.endsWith('/*')) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Default model '${defaultModel}' is not a concrete model identifier`,
+    });
+  }
+
+  const isAllowed = createAllowPredicateFromRestrictions(
+    getEffectiveModelRestrictions(organization)
+  );
+
+  if (!(await isAllowed(normalizedDefaultModel))) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Default model '${defaultModel}' is not in the organization's allowed models list`,
+    });
+  }
+}
 
 export const organizationModesRouter = createTRPCRouter({
   create: organizationMemberMutationProcedure
@@ -65,7 +183,20 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
-      const mode = await createOrganizationMode(organizationId, ctx.user.id, name, slug, config);
+      const defaultModelChange = getDefaultModelChange(config);
+      assertDefaultModelCanBeSet(organization, defaultModelChange);
+      await assertDefaultModelConfigEnabled(ctx.user.id, defaultModelChange);
+      if (defaultModelChange.kind === 'set') {
+        await validateDefaultModel(organization, defaultModelChange.defaultModel);
+      }
+
+      const mode = await createOrganizationMode(
+        organizationId,
+        ctx.user.id,
+        name,
+        slug,
+        normalizeModeConfig(config)
+      );
 
       if (!mode) {
         throw new TRPCError({
@@ -123,7 +254,26 @@ export const organizationModesRouter = createTRPCRouter({
         });
       }
 
-      const mode = await updateOrganizationMode(modeId, updates);
+      const organization = await getOrganizationById(organizationId);
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      const defaultModelChange = getDefaultModelChange(updates.config);
+      assertDefaultModelCanBeSet(organization, defaultModelChange);
+      await assertDefaultModelConfigEnabled(ctx.user.id, defaultModelChange);
+      if (defaultModelChange.kind === 'set') {
+        await validateDefaultModel(organization, defaultModelChange.defaultModel);
+      }
+      const normalizedConfig = normalizeModeConfig(updates.config);
+
+      const mode = await updateOrganizationMode(organizationId, modeId, {
+        ...updates,
+        config: normalizedConfig,
+      });
 
       if (!mode) {
         throw new TRPCError({
@@ -140,43 +290,67 @@ export const organizationModesRouter = createTRPCRouter({
         changes.push(`slug: "${existingMode.slug}" → "${updates.slug}"`);
       }
       if (updates.config) {
+        const auditConfig = normalizedConfig ?? updates.config;
         const configChanges: string[] = [];
 
-        if (updates.config.roleDefinition !== existingMode.config.roleDefinition) {
+        if (
+          'roleDefinition' in auditConfig &&
+          auditConfig.roleDefinition !== existingMode.config.roleDefinition
+        ) {
           const oldValue = existingMode.config.roleDefinition || '(empty)';
-          const newValue = updates.config.roleDefinition || '(empty)';
+          const newValue = auditConfig.roleDefinition || '(empty)';
           configChanges.push(
             `roleDefinition: "${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''}" → "${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}"`
           );
         }
-        if (updates.config.whenToUse !== existingMode.config.whenToUse) {
+        if ('whenToUse' in auditConfig && auditConfig.whenToUse !== existingMode.config.whenToUse) {
           const oldValue = existingMode.config.whenToUse || '(empty)';
-          const newValue = updates.config.whenToUse || '(empty)';
+          const newValue = auditConfig.whenToUse || '(empty)';
           configChanges.push(
             `whenToUse: "${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''}" → "${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}"`
           );
         }
-        if (updates.config.description !== existingMode.config.description) {
+        if (
+          'description' in auditConfig &&
+          auditConfig.description !== existingMode.config.description
+        ) {
           const oldValue = existingMode.config.description || '(empty)';
-          const newValue = updates.config.description || '(empty)';
+          const newValue = auditConfig.description || '(empty)';
           configChanges.push(
             `description: "${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''}" → "${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}"`
           );
         }
-        if (updates.config.customInstructions !== existingMode.config.customInstructions) {
+        if (
+          'customInstructions' in auditConfig &&
+          auditConfig.customInstructions !== existingMode.config.customInstructions
+        ) {
           const oldValue = existingMode.config.customInstructions || '(empty)';
-          const newValue = updates.config.customInstructions || '(empty)';
+          const newValue = auditConfig.customInstructions || '(empty)';
           configChanges.push(
             `customInstructions: "${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''}" → "${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}"`
           );
         }
         if (
-          updates.config.groups !== undefined &&
+          'defaultModel' in auditConfig &&
+          auditConfig.defaultModel !== existingMode.config.defaultModel
+        ) {
+          if (existingMode.config.defaultModel && auditConfig.defaultModel) {
+            configChanges.push(
+              `defaultModel: "${existingMode.config.defaultModel}" → "${auditConfig.defaultModel}"`
+            );
+          } else if (auditConfig.defaultModel) {
+            configChanges.push(`defaultModel: set to "${auditConfig.defaultModel}"`);
+          } else if (existingMode.config.defaultModel) {
+            configChanges.push(`defaultModel: cleared "${existingMode.config.defaultModel}"`);
+          }
+        }
+        if (
+          auditConfig.groups !== undefined &&
           existingMode.config.groups !== undefined &&
-          JSON.stringify(updates.config.groups) !== JSON.stringify(existingMode.config.groups)
+          JSON.stringify(auditConfig.groups) !== JSON.stringify(existingMode.config.groups)
         ) {
           const oldValue = JSON.stringify(existingMode.config.groups);
-          const newValue = JSON.stringify(updates.config.groups);
+          const newValue = JSON.stringify(auditConfig.groups);
           configChanges.push(
             `groups: ${oldValue.substring(0, 50)}${oldValue.length > 50 ? '...' : ''} → ${newValue.substring(0, 50)}${newValue.length > 50 ? '...' : ''}`
           );

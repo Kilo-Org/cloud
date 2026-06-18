@@ -3,6 +3,10 @@ name: Stage Vercel Deployment
 on:
   workflow_call:
     inputs:
+      target_environment:
+        description: 'GitHub and Vercel environment to deploy to'
+        required: true
+        type: string
       vercel_project_id_var:
         description: 'Name of the GitHub variable containing the Vercel project ID to deploy'
         required: true
@@ -19,12 +23,13 @@ jobs:
   stage:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
-    environment: production
+    environment: ${{ inputs.target_environment }}
 
     outputs:
       deployment_url: ${{ steps.deploy.outputs.deployment_url }}
 
     env:
+      TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
       VERCEL_VERSION: '53.3.1'
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars[inputs.vercel_project_id_var] }}
@@ -41,7 +46,12 @@ jobs:
       - name: Stage Vercel deployment
         id: deploy
         run: |
-          deployment_output=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_TOKEN }})
+          if [ "$TARGET_ENVIRONMENT" = "production" ]; then
+            deployment_output=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_TOKEN }})
+          else
+            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --token=${{ secrets.VERCEL_TOKEN }})
+          fi
+
           deployment_url=$(printf '%s\n' "$deployment_output" | tail -n 1)
           if [[ ! "$deployment_url" =~ ^https:// ]]; then
             echo "Vercel deploy did not print a deployment URL" >&2

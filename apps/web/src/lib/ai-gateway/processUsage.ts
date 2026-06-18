@@ -1029,6 +1029,7 @@ export async function processTokenData(
 
   const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
   if (kiloExclusiveModel?.pricing) {
+    usageStats.market_cost = usageStats.cost_mUsd;
     usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
 
@@ -1041,7 +1042,7 @@ export async function processTokenData(
   });
 
   // Preserve the real cost before zeroing for free/BYOK
-  usageStats.market_cost = usageStats.cost_mUsd;
+  usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
   if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {

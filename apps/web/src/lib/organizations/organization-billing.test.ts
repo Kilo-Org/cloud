@@ -38,6 +38,7 @@ const mockResolveStripeReceiptUrl = jest.fn<
 >(async () => null);
 
 jest.mock('@/lib/email-mailgun', () => ({
+  getEmailVerificationRecipient: (email: string) => email,
   sendViaMailgun: (params: SendViaMailgunParams) => sendViaMailgunMock(params),
 }));
 

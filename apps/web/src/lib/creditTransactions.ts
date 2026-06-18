@@ -1,7 +1,7 @@
 import { eq, desc, and, isNull, gt, notExists } from 'drizzle-orm';
 import { db, readDb, sql } from './drizzle';
 import type { Organization } from '@kilocode/db/schema';
-import { credit_transactions, kilo_pass_issuance_items } from '@kilocode/db/schema';
+import { credit_transactions, kilo_pass_issuance_items, kilocode_users } from '@kilocode/db/schema';
 
 type CreditSummary = {
   total_promotional_musd: number;
@@ -67,12 +67,61 @@ export async function summarizeUserPayments(kiloUserId: string, fromDb: typeof d
 }
 
 export async function getCreditTransactionsForOrganization(organizationId: Organization['id']) {
-  const res = await db.query.credit_transactions.findMany({
-    where: eq(credit_transactions.organization_id, organizationId),
-    orderBy: desc(credit_transactions.created_at),
-    limit: 100,
-  });
-  return res;
+  return db
+    .select({
+      id: credit_transactions.id,
+      kilo_user_id: credit_transactions.kilo_user_id,
+      amount_microdollars: credit_transactions.amount_microdollars,
+      expiration_baseline_microdollars_used:
+        credit_transactions.expiration_baseline_microdollars_used,
+      original_baseline_microdollars_used: credit_transactions.original_baseline_microdollars_used,
+      is_free: credit_transactions.is_free,
+      description: credit_transactions.description,
+      original_transaction_id: credit_transactions.original_transaction_id,
+      stripe_payment_id: credit_transactions.stripe_payment_id,
+      coinbase_credit_block_id: credit_transactions.coinbase_credit_block_id,
+      credit_category: credit_transactions.credit_category,
+      expiry_date: credit_transactions.expiry_date,
+      created_at: credit_transactions.created_at,
+      organization_id: credit_transactions.organization_id,
+      check_category_uniqueness: credit_transactions.check_category_uniqueness,
+    })
+    .from(credit_transactions)
+    .where(eq(credit_transactions.organization_id, organizationId))
+    .orderBy(desc(credit_transactions.created_at))
+    .limit(100);
+}
+
+export async function getAdminCreditTransactionsForOrganization(
+  organizationId: Organization['id']
+) {
+  const transactions = await db
+    .select({
+      id: credit_transactions.id,
+      amount_microdollars: credit_transactions.amount_microdollars,
+      expiration_baseline_microdollars_used:
+        credit_transactions.expiration_baseline_microdollars_used,
+      is_free: credit_transactions.is_free,
+      description: credit_transactions.description,
+      stripe_payment_id: credit_transactions.stripe_payment_id,
+      credit_category: credit_transactions.credit_category,
+      expiry_date: credit_transactions.expiry_date,
+      created_at: credit_transactions.created_at,
+      created_by_kilo_user_id: credit_transactions.created_by_kilo_user_id,
+      created_by_user_name: kilocode_users.google_user_name,
+      created_by_user_email: kilocode_users.google_user_email,
+    })
+    .from(credit_transactions)
+    .leftJoin(kilocode_users, eq(credit_transactions.created_by_kilo_user_id, kilocode_users.id))
+    .where(eq(credit_transactions.organization_id, organizationId))
+    .orderBy(desc(credit_transactions.created_at))
+    .limit(100);
+
+  return transactions.map(transaction => ({
+    ...transaction,
+    created_at: new Date(transaction.created_at).toISOString(),
+    expiry_date: transaction.expiry_date ? new Date(transaction.expiry_date).toISOString() : null,
+  }));
 }
 
 export async function hasUserEverPaid(kiloUserId: string): Promise<boolean> {

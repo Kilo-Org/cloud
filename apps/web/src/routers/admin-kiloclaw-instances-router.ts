@@ -4024,6 +4024,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       sandbox_id: string;
       organization_id: string | null;
       destroyed_at: string;
+      // Lineage truth: the most recent destruction across ALL provisions of
+      // this (user, sandbox), not just the row that matched the scan window.
+      // This is the date the 7-day orphan grace clock actually runs from. For a
+      // reprovisioned sandbox it can be far more recent than `destroyed_at`
+      // (the windowed row), so surfacing it stops the table from appearing to
+      // contradict the user's subscription timeline.
+      latest_sandbox_destroyed_at: string | null;
       subscription_status: string | null;
       subscription_ended_at: string | null;
       fly_app: string;
@@ -4165,6 +4172,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             sandbox_id: instance.sandbox_id,
             organization_id: instance.organization_id,
             destroyed_at: destroyedAt,
+            latest_sandbox_destroyed_at: instance.latest_sandbox_destroyed_at,
             subscription_status: instance.subscription_status,
             subscription_ended_at: instance.subscription_ended_at,
             fly_app: scan.flyApp,

@@ -3,20 +3,23 @@ import {
   type AutoRoutingClassifierModelResponse,
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
-import { DEFAULT_CLASSIFIER_MODEL } from './classifier-prompt';
-import { getClassifierModel, setClassifierModel } from './classifier-config';
+import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/classifier';
+import { getClassifierModelInfo, setClassifierModel } from './classifier-config';
+import type { ClassifierModelInfo } from './classifier-config';
 import type { HonoEnv } from './hono-env';
 
-function classifierModelResponse(model: string): AutoRoutingClassifierModelResponse {
+function classifierModelResponse(info: ClassifierModelInfo): AutoRoutingClassifierModelResponse {
   return {
-    model,
+    model: info.model,
+    override: info.override,
+    benchmarkWinner: info.benchmarkWinner,
     defaultModel: DEFAULT_CLASSIFIER_MODEL,
   };
 }
 
 export const getClassifierModelHandler: Handler<HonoEnv> = async c => {
-  const model = await getClassifierModel(c.env);
-  return c.json(classifierModelResponse(model));
+  const info = await getClassifierModelInfo(c.env);
+  return c.json(classifierModelResponse(info));
 };
 
 export const putClassifierModelHandler: Handler<HonoEnv> = async c => {
@@ -32,10 +35,10 @@ export const putClassifierModelHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid classifier model' }, 400);
   }
 
-  const model = await setClassifierModel(c.env, parsed.data.model);
-  if (!model) {
+  const info = await setClassifierModel(c.env, parsed.data.model);
+  if (!info) {
     return c.json({ error: 'Invalid classifier model' }, 400);
   }
 
-  return c.json(classifierModelResponse(model));
+  return c.json(classifierModelResponse(info));
 };

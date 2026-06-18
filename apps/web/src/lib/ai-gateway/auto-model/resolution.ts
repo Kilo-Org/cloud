@@ -9,10 +9,12 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 import type { User } from '@kilocode/db';
+import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import {
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
   KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
   BALANCED_QWEN_MODEL,
@@ -39,6 +41,9 @@ type ResolveAutoModelParams = {
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
+  // Lazily fetches the auto-routing worker's decision; only set for
+  // kilo-auto/efficient requests (route.ts owns the request-body capture).
+  efficientDecision?: () => Promise<AutoRoutingDecision | null>;
 };
 
 function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
@@ -114,6 +119,25 @@ export async function resolveAutoModel(
             : gemma_4_26b_a4b_it_free_model.public_id,
       },
     };
+  }
+  if (model === KILO_AUTO_EFFICIENT_MODEL.id) {
+    const decision = params.efficientDecision ? await params.efficientDecision() : null;
+    if (decision) {
+      // Apply the candidate's pinned reasoning effort so the model runs under
+      // the same conditions the benchmark measured it at.
+      return {
+        kind: 'ok',
+        resolved: {
+          model: decision.model,
+          ...(decision.reasoningEffort
+            ? { reasoning: { enabled: true, effort: decision.reasoningEffort } }
+            : {}),
+        },
+      };
+    }
+    // Static fallback when the worker is slow/unavailable: same model as
+    // balanced so an efficient request never degrades below balanced.
+    return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
   }
   const mode = resolveMode(modeHeader, featureHeader);
   if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {

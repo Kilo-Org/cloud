@@ -1,14 +1,14 @@
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
+import { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import {
   calculateCost_mUsd,
   type Pricing,
   type PricingTiers,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
-export const QWEN37_MAX_MODEL_ID = 'qwen/qwen3.7-max';
-export const QWEN37_PLUS_MODEL_ID = 'qwen/qwen3.7-plus';
+export { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID };
 
 // Qwen long-context pricing starts at exactly 256 Ki tokens (262,144 tokens).
 const TOKENS_256K = 256 * 1024;

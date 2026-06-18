@@ -1,12 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { AnimatedDots } from './AnimatedDots';
-import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -29,10 +27,8 @@ import {
   VERBOSE_OPTIONS,
   type AgentUpdateInput,
 } from '@/lib/kiloclaw/agent-schemas';
-import type { AgentSummary } from '@/lib/kiloclaw/types';
-import { useClawAgentMutations } from '../hooks/useClawHooks';
-import { useClawModelOptions } from '../hooks/useClawModelOptions';
-import { addKilocodeModelPrefix, stripKilocodeModelPrefix } from './modelSupport';
+import type { AgentSettingsSummary, AgentSummary } from '@/lib/kiloclaw/types';
+import { reconcileAmbiguousMutation, useClawAgentMutations } from '../hooks/useClawHooks';
 
 const INHERIT = 'inherit';
 
@@ -48,23 +44,15 @@ function toOption<T extends string>(raw: string | null, options: readonly T[]): 
   return options.find(opt => opt === raw) ?? INHERIT;
 }
 
-// The agent's OWN model (not the inherited/effective one): primary + fallbacks.
-function ownModel(agent: AgentSummary): { primary: string; fallbacks: string[] } {
-  const raw = agent.rawModel;
-  if (typeof raw === 'string') return { primary: raw, fallbacks: [] };
-  if (raw && typeof raw === 'object') {
-    return { primary: raw.primary ?? '', fallbacks: raw.fallbacks ?? [] };
-  }
-  return { primary: '', fallbacks: [] };
-}
-
 function LabeledSelect<T extends string>({
   label,
+  hint,
   value,
   options,
   onChange,
 }: {
   label: string;
+  hint: string;
   value: T;
   options: readonly T[];
   onChange: (value: T) => void;
@@ -73,16 +61,24 @@ function LabeledSelect<T extends string>({
   // (INHERIT, which is always rendered, or one of the options) before calling
   // onChange instead of casting, so an unexpected value can't reach the patch.
   const isValue = (v: string): v is T => v === INHERIT || options.some(opt => opt === v);
+  // Visible helper text wired via aria-describedby — the documented forms
+  // convention (interaction-design.md), not a hover-only tooltip.
+  const baseId = useId();
+  const triggerId = `${baseId}-trigger`;
+  const hintId = `${baseId}-hint`;
   return (
     <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
+      <Label htmlFor={triggerId}>{label}</Label>
+      <p id={hintId} className="text-muted-foreground text-xs">
+        {hint}
+      </p>
       <Select
         value={value}
         onValueChange={v => {
           if (isValue(v)) onChange(v);
         }}
       >
-        <SelectTrigger>
+        <SelectTrigger id={triggerId} aria-describedby={hintId}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -98,26 +94,40 @@ function LabeledSelect<T extends string>({
   );
 }
 
+// Plain-language explanations of the OpenClaw per-agent behavior knobs. These map
+// to config that isn't surfaced on the main Settings page.
+const HINTS = {
+  thinking:
+    'Reasoning effort before replying — higher helps on hard tasks but is slower. adaptive varies per task; max is the most.',
+  reasoning:
+    'Whether the model’s thinking is shown (separate from how much it thinks). on = a separate “Reasoning:” message; stream = Telegram only.',
+  verbose:
+    'Whether the agent posts its tool activity to the channel. on = a note when each tool starts; full = also its output.',
+  fastMode: 'Optimizes for responsiveness. Separate knob from Thinking.',
+} as const;
+
+/**
+ * Advanced per-agent behavior overrides (thinking / reasoning / verbose / fast
+ * mode). Model and channels are edited inline on the agent row, so this dialog
+ * holds only the rarely-touched advanced knobs.
+ */
 export function AgentEditDialog({
   open,
   onOpenChange,
   agent,
   etag,
+  onApplied,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agent: AgentSummary;
   etag: string;
+  // Called after a successful save — settings edits don't hot-reload, so the
+  // caller tracks a pending-restart count.
+  onApplied: () => void;
 }) {
-  const { updateAgent } = useClawAgentMutations();
-  const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
+  const { updateAgent, refetchAgents } = useClawAgentMutations();
 
-  // Work in bare (un-prefixed) model-id space so the combobox value matches the
-  // catalog options; the kilocode/ prefix is re-added when writing.
-  const initial = useMemo(() => {
-    const own = ownModel(agent);
-    return { primary: stripKilocodeModelPrefix(own.primary), fallbacks: own.fallbacks };
-  }, [agent]);
   // Initial select values. toOption maps null OR an unknown (forward-compat)
   // value to INHERIT; we diff against THESE rather than the raw settings so an
   // unknown value left untouched is never mistaken for an explicit unset and
@@ -142,39 +152,17 @@ export function AgentEditDialog({
     [agent.settings]
   );
 
-  // An agent owns a model when rawModel is set — including a fallback-only model
-  // (no primary). The inherit toggle is the only way to clear such a model.
-  const hadOwnModel = agent.rawModel != null;
-  const [inheritModel, setInheritModel] = useState(!hadOwnModel);
-  const [primary, setPrimary] = useState(initial.primary);
   const [thinking, setThinking] = useState<ThinkingOpt>(initialSettings.thinking);
   const [verbose, setVerbose] = useState<VerboseOpt>(initialSettings.verbose);
   const [reasoning, setReasoning] = useState<ReasoningOpt>(initialSettings.reasoning);
   const [fastMode, setFastMode] = useState<FastModeOpt>(initialSettings.fastMode);
 
-  // Diff the form against the initial values into a controller patch.
+  // Diff the form against the initial values into a controller patch. Only emit a
+  // change when it differs from its initial select value, so an untouched (incl.
+  // unknown forward-compat) value never produces a spurious unset.
   const patch = useMemo(() => {
     const set: AgentUpdateInput['set'] = {};
     const unset: AgentUpdateInput['unset'] = [];
-
-    if (inheritModel) {
-      // Clear the agent's own model (primary-only OR fallback-only) so it falls
-      // back to the fleet default.
-      if (hadOwnModel) unset.push('model');
-    } else {
-      const newPrimary = primary.trim();
-      const fallbacks = initial.fallbacks; // preserved; not edited here
-      const changed = !hadOwnModel || newPrimary !== initial.primary;
-      if (changed && (newPrimary !== '' || fallbacks.length > 0)) {
-        set.model = {
-          ...(newPrimary !== '' ? { primary: addKilocodeModelPrefix(newPrimary) } : {}),
-          ...(fallbacks.length > 0 ? { fallbacks } : {}),
-        };
-      }
-    }
-
-    // Only emit a setting change when it differs from its initial select value,
-    // so an untouched (incl. unknown) value never produces a spurious unset.
     if (thinking !== initialSettings.thinking) {
       if (thinking === INHERIT) unset.push('thinkingDefault');
       else set.thinkingDefault = thinking;
@@ -191,32 +179,51 @@ export function AgentEditDialog({
       if (fastMode === INHERIT) unset.push('fastModeDefault');
       else set.fastModeDefault = fastMode === 'on';
     }
-
     return { set, unset };
-  }, [
-    inheritModel,
-    hadOwnModel,
-    primary,
-    thinking,
-    verbose,
-    reasoning,
-    fastMode,
-    initial,
-    initialSettings,
-  ]);
+  }, [thinking, verbose, reasoning, fastMode, initialSettings]);
 
-  // Not inheriting but no primary and no fallbacks = no model to write.
-  const modelInvalid = !inheritModel && primary.trim() === '' && initial.fallbacks.length === 0;
   const hasChanges = Object.keys(patch.set).length > 0 || patch.unset.length > 0;
-  const canSubmit = hasChanges && !modelInvalid && !updateAgent.isPending;
+  const canSubmit = hasChanges && !updateAgent.isPending;
+
+  // Does a refetched settings snapshot reflect the patch we tried to write?
+  const settingsApplied = (s: AgentSettingsSummary): boolean => {
+    const { set, unset } = patch;
+    if (set.thinkingDefault !== undefined && s.thinkingDefault !== set.thinkingDefault)
+      return false;
+    if (set.verboseDefault !== undefined && s.verboseDefault !== set.verboseDefault) return false;
+    if (set.reasoningDefault !== undefined && s.reasoningDefault !== set.reasoningDefault)
+      return false;
+    if (set.fastModeDefault !== undefined && s.fastModeDefault !== set.fastModeDefault)
+      return false;
+    for (const k of unset) {
+      if (k === 'thinkingDefault' && s.thinkingDefault != null) return false;
+      if (k === 'verboseDefault' && s.verboseDefault != null) return false;
+      if (k === 'reasoningDefault' && s.reasoningDefault != null) return false;
+      if (k === 'fastModeDefault' && s.fastModeDefault != null) return false;
+    }
+    return true;
+  };
 
   const onSubmit = async () => {
     if (!canSubmit) return;
     try {
       await updateAgent.mutateAsync(agent.id, { etag, set: patch.set, unset: patch.unset });
+      onApplied();
       toast.success(`Updated ${agent.name ?? agent.id}`);
       onOpenChange(false);
     } catch (err) {
+      // The update can time out AFTER the controller committed it; reconcile
+      // against the intended settings before reporting failure.
+      const applied = await reconcileAmbiguousMutation(err, refetchAgents, list => {
+        const a = list.agents.find(x => x.id === agent.id);
+        return a !== undefined && settingsApplied(a.settings);
+      });
+      if (applied) {
+        onApplied();
+        toast.success(`Updated ${agent.name ?? agent.id}`);
+        onOpenChange(false);
+        return;
+      }
       toast.error(err instanceof Error ? err.message : 'Failed to update agent', {
         duration: 10000,
       });
@@ -225,78 +232,42 @@ export function AgentEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={updateAgent.isPending ? undefined : onOpenChange}>
-      <DialogContent className="max-w-md">
+      {/* Cap height and scroll the body so the always-visible helper text can't
+          push the footer off-screen on short viewports / large text settings. */}
+      <DialogContent className="grid max-h-[85vh] max-w-md grid-rows-[auto_minmax(0,1fr)_auto]">
         <DialogHeader>
-          <DialogTitle>Edit {agent.name ?? agent.id}</DialogTitle>
+          <DialogTitle>Advanced settings · {agent.name ?? agent.id}</DialogTitle>
           <DialogDescription>
-            Model and behavior for this agent. Leave a field on “Inherit default” to use the
-            fleet-wide setting.
+            Behavior overrides for this agent. Leave a field on “Inherit default” to use the
+            inherited default. Model and channels are edited on the agent’s row.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label>Model</Label>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="agent-edit-inherit-model"
-                checked={inheritModel}
-                onCheckedChange={checked => setInheritModel(checked === true)}
-              />
-              <Label
-                htmlFor="agent-edit-inherit-model"
-                className="text-muted-foreground font-normal"
-              >
-                Use the default model
-              </Label>
-            </div>
-            {!inheritModel && (
-              <>
-                <ModelCombobox
-                  label=""
-                  models={modelOptions}
-                  value={primary}
-                  onValueChange={setPrimary}
-                  isLoading={isLoadingModels}
-                  error={modelError}
-                  placeholder="Select a model"
-                  modal
-                  className="w-full"
-                />
-                {initial.fallbacks.length > 0 && (
-                  <p className="text-muted-foreground text-xs">
-                    Fallbacks preserved: {initial.fallbacks.join(', ')}
-                  </p>
-                )}
-                {modelInvalid && (
-                  <p className="text-destructive text-xs">
-                    Enter a model id, or use the default model.
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
           <LabeledSelect
             label="Thinking"
+            hint={HINTS.thinking}
             value={thinking}
             options={THINKING_OPTIONS}
             onChange={setThinking}
           />
           <LabeledSelect
-            label="Verbose"
-            value={verbose}
-            options={VERBOSE_OPTIONS}
-            onChange={setVerbose}
-          />
-          <LabeledSelect
             label="Reasoning"
+            hint={HINTS.reasoning}
             value={reasoning}
             options={REASONING_OPTIONS}
             onChange={setReasoning}
           />
           <LabeledSelect
+            label="Verbose"
+            hint={HINTS.verbose}
+            value={verbose}
+            options={VERBOSE_OPTIONS}
+            onChange={setVerbose}
+          />
+          <LabeledSelect
             label="Fast mode"
+            hint={HINTS.fastMode}
             value={fastMode}
             options={['on', 'off'] as const}
             onChange={setFastMode}

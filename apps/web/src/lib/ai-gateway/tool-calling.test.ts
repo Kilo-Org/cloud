@@ -4,7 +4,7 @@ import type {
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { repairTools, sanitizeBinaryToolResults } from './tool-calling';
+import { repairTools, repairMessagesTools, sanitizeBinaryToolResults } from './tool-calling';
 
 function createRequest(
   overrides: Partial<OpenRouterChatCompletionRequest> = {}
@@ -964,6 +964,130 @@ describe('sanitizeBinaryToolResults', () => {
           }
         }
       }
+    });
+  });
+
+  describe('repairMessagesTools (Anthropic messages format)', () => {
+    it('should remove duplicate tool_use blocks within an assistant message', () => {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'test-model',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'user',
+              content: 'Hello',
+            },
+            {
+              role: 'assistant',
+              content: [
+                { type: 'text', text: 'Let me help' },
+                { type: 'tool_use', id: 'tu_1', name: 'read', input: { path: 'a' } },
+                { type: 'tool_use', id: 'tu_2', name: 'read', input: { path: 'b' } },
+                { type: 'text', text: 'another call' },
+                { type: 'tool_use', id: 'tu_1', name: 'read', input: { path: 'a' } },
+              ],
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'tool_result', tool_use_id: 'tu_1', content: 'result a' },
+                { type: 'tool_result', tool_use_id: 'tu_2', content: 'result b' },
+              ],
+            },
+          ],
+        } as GatewayMessagesRequest,
+      };
+
+      repairMessagesTools(request.body);
+
+      if (request.kind !== 'messages') throw new Error('expected messages');
+      const assist = request.body.messages[1];
+      if (assist.role !== 'assistant') throw new Error('expected assistant');
+      expect(assist.content).toEqual([
+        { type: 'text', text: 'Let me help' },
+        { type: 'tool_use', id: 'tu_1', name: 'read', input: { path: 'a' } },
+        { type: 'tool_use', id: 'tu_2', name: 'read', input: { path: 'b' } },
+        { type: 'text', text: 'another call' },
+      ]);
+    });
+
+    it('should remove tool_results without a matching tool_use block', () => {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'test-model',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'assistant',
+              content: [{ type: 'tool_use', id: 'tu_1', name: 'read', input: {} }],
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'tool_result', tool_use_id: 'tu_1', content: 'ok' },
+                { type: 'tool_result', tool_use_id: 'orphan', content: 'orphan' },
+              ],
+            },
+          ],
+        } as GatewayMessagesRequest,
+      };
+
+      repairMessagesTools(request.body);
+
+      if (request.kind !== 'messages') throw new Error('expected messages');
+      const user = request.body.messages[1];
+      if (user.role !== 'user') throw new Error('expected user');
+      expect(user.content).toEqual([{ type: 'tool_result', tool_use_id: 'tu_1', content: 'ok' }]);
+    });
+
+    it('should preserve content arrays with no duplicates', () => {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'test-model',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'assistant',
+              content: [
+                { type: 'text', text: 'hi' },
+                { type: 'tool_use', id: 'tu_1', name: 'read', input: {} },
+              ],
+            },
+            {
+              role: 'user',
+              content: [{ type: 'tool_result', tool_use_id: 'tu_1', content: 'ok' }],
+            },
+          ],
+        } as GatewayMessagesRequest,
+      };
+
+      repairMessagesTools(request.body);
+
+      if (request.kind !== 'messages') throw new Error('expected messages');
+      expect(request.body.messages[0]).toEqual({
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'hi' },
+          { type: 'tool_use', id: 'tu_1', name: 'read', input: {} },
+        ],
+      });
+    });
+
+    it('should handle string content assistant messages (no content array)', () => {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'test-model',
+          max_tokens: 1024,
+          messages: [{ role: 'assistant', content: 'just text' }],
+        } as GatewayMessagesRequest,
+      };
+
+      expect(() => repairMessagesTools(request.body)).not.toThrow();
     });
   });
 });

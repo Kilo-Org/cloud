@@ -3043,6 +3043,108 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
     });
   });
 
+  it('surfaces the lineage latest destruction for a reprovisioned sandbox windowed on an older provision', async () => {
+    // Regression: a reprovisioned sandbox has several destroyed instance rows
+    // sharing one Fly volume. Scanning a window that only matches the OLDER
+    // provision must still report `latest_sandbox_destroyed_at` (the date the
+    // grace clock runs from) so the table never appears to predate a
+    // subscription that lived on a later provision. The windowed row's own
+    // `destroyed_at` and its (older, already-transferred) subscription remain
+    // available for context, but they are NOT the lineage's current state.
+    const oldDestroyedAt = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const newDestroyedAt = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+
+    const [oldInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: oldDestroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    const [newInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: sandboxId,
+        destroyed_at: newDestroyedAt,
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    // Current (head) subscription lives on the newer provision; the older
+    // provision's subscription was transferred to it. Both canceled, so
+    // neither grants access and the volume classifies as a true orphan.
+    const [headSub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: regularUser.id,
+        instance_id: newInstance.id,
+        plan: 'trial',
+        status: 'canceled',
+        trial_ends_at: '2026-05-31T03:58:11.084Z',
+      })
+      .returning({ id: kiloclaw_subscriptions.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: oldInstance.id,
+      plan: 'trial',
+      status: 'canceled',
+      trial_ends_at: '2026-03-05T20:56:33.061Z',
+      transferred_to_subscription_id: headSub.id,
+    });
+
+    mockScanOrphanVolumes.mockResolvedValue({
+      flyApp: 'inst-reprovision',
+      appExists: true,
+      expectedVolumeName: 'kiloclaw_reprovision',
+      doStatus: null,
+      doStatusError: null,
+      scanError: null,
+      volumes: [
+        {
+          id: 'vol_reprovision00000',
+          name: 'kiloclaw_reprovision',
+          state: 'created',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: '2026-04-01T00:00:00.000Z',
+          nameMatchesInstance: true,
+          trackedByLiveDo: false,
+        },
+      ],
+    });
+
+    // Window matches only the OLDER provision's destruction.
+    const oldMs = Date.parse(oldDestroyedAt);
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
+      destroyedAfter: new Date(oldMs - 60_000).toISOString(),
+      destroyedBefore: new Date(oldMs + 60_000).toISOString(),
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.volumes).toHaveLength(1);
+    // Only the windowed (older) provision was scanned by the worker.
+    expect(mockScanOrphanVolumes).toHaveBeenCalledTimes(1);
+    expect(mockScanOrphanVolumes.mock.calls[0][1]).toBe(oldInstance.id);
+    expect(result.volumes[0]).toMatchObject({
+      instance_id: oldInstance.id,
+      volume_id: 'vol_reprovision00000',
+      // The matched row is the old March-style provision...
+      destroyed_at: oldDestroyedAt,
+      // ...but the grace clock (and the new column) tracks the lineage's true
+      // latest destruction, which is far more recent.
+      latest_sandbox_destroyed_at: newDestroyedAt,
+      // Period End still reflects the windowed (older, transferred) sub.
+      subscription_ended_at: '2026-03-05T20:56:33.061Z',
+      classification: 'safe_destroy',
+    });
+  });
+
   it('scans production-shaped timestamp rows inside a narrow same-day ISO window', async () => {
     const destroyedAt = '2026-05-15 10:06:30.976+00';
     const sandboxId = `ki_${crypto.randomUUID().replace(/-/g, '')}`;

@@ -25,6 +25,28 @@ const txInsertValues: Array<Record<string, unknown>> = [];
 const deleteWhereCalls: unknown[] = [];
 const startAsyncMock = jest.fn();
 
+function sqlParamValues(condition: unknown): unknown[] {
+  const values: unknown[] = [];
+  const visited = new WeakSet<object>();
+
+  const visit = (value: unknown) => {
+    if (!value || typeof value !== 'object' || visited.has(value)) return;
+    visited.add(value);
+
+    if (value.constructor.name === 'Param' && 'value' in value) {
+      values.push(value.value);
+      return;
+    }
+
+    for (const child of Object.values(value)) {
+      visit(child);
+    }
+  };
+
+  visit(condition);
+  return values;
+}
+
 function createSelectResult<T>(rows: T[]) {
   const promise = Promise.resolve(rows);
   const result: {
@@ -208,7 +230,7 @@ describe('instance lifecycle async resume', () => {
     );
   });
 
-  it('completes async auto-resume for an active subscription and clears retry state', async () => {
+  it('completes async auto-resume and resets warning dedupe for a later suspension lifecycle', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     selectResultsQueue.push(
@@ -243,6 +265,16 @@ describe('instance lifecycle async resume', () => {
     expect(result).toEqual({ instanceId, resumeCompleted: true });
     expect(mockDb.transaction).toHaveBeenCalledTimes(1);
     expect(deleteWhereCalls).toHaveLength(1);
+    expect(sqlParamValues(deleteWhereCalls[0])).toEqual(
+      expect.arrayContaining([
+        'claw_suspended_trial',
+        'claw_suspended_subscription',
+        'claw_suspended_payment',
+        'claw_destruction_warning',
+        'claw_instance_destroyed',
+        'claw_credit_renewal_failed',
+      ])
+    );
     expect(txUpdateSetCalls).toHaveLength(1);
     expect(txUpdateSetCalls[0]).toEqual({
       suspended_at: null,
@@ -257,6 +289,17 @@ describe('instance lifecycle async resume', () => {
         actor_id: 'web-instance-lifecycle',
         action: 'reactivated',
         reason: 'auto_resume_completed',
+        before_state: expect.objectContaining({
+          suspended_at: '2026-04-07T20:00:00.000Z',
+          destruction_deadline: '2026-04-14T20:00:00.000Z',
+        }),
+        after_state: expect.objectContaining({
+          suspended_at: null,
+          destruction_deadline: null,
+          auto_resume_requested_at: null,
+          auto_resume_retry_after: null,
+          auto_resume_attempt_count: 0,
+        }),
       })
     );
   });

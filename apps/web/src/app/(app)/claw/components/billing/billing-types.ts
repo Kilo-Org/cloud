@@ -262,6 +262,157 @@ export function formatKiloClawFirstChargeLabel(params: {
   return `${price}/month`;
 }
 
+export function getKiloClawFundingChoiceCopy(params: {
+  plan: ClawPlan;
+  costMicrodollars: number;
+}): {
+  creditHeading: string;
+  creditDescription: string;
+  creditButtonLabel: string;
+  stripeDividerLabel: string;
+  stripeButtonLabel: string;
+  stripeDescription: string;
+} {
+  const planLabel = params.plan === 'commit' ? 'Commit' : 'Standard';
+  const priceLabel = formatKiloClawFirstChargeLabel(params);
+
+  return {
+    creditHeading: 'Credit-funded hosting',
+    creditDescription: `${planLabel} first charge: ${priceLabel}. Future hosting charges use your credit balance.`,
+    creditButtonLabel: `Activate ${planLabel} with credits`,
+    stripeDividerLabel: 'or start a separate Stripe subscription',
+    stripeButtonLabel: `Subscribe with Stripe, ${priceLabel}`,
+    stripeDescription:
+      params.plan === 'standard'
+        ? 'Creates a separate recurring Stripe charge for hosting.'
+        : 'Creates separate Stripe billing for hosting.',
+  };
+}
+
+export type KiloPassHostingRecoveryReason =
+  | 'credits_not_settled'
+  | 'enrollment_failed'
+  | 'requires_reprovision'
+  | 'missing_instance'
+  | 'destroyed_instance'
+  | 'stale_intent'
+  | 'invalid_intent'
+  | 'insufficient_credits'
+  | 'expired_commit'
+  | 'unexpected_error';
+
+export function getKiloPassHostingRecoveryCopy(reason: KiloPassHostingRecoveryReason): {
+  title: string;
+  description: string;
+  destination: string | null;
+  destinationLabel: string | null;
+  canRetry: boolean;
+  showSupport: boolean;
+} {
+  switch (reason) {
+    case 'credits_not_settled':
+      return {
+        title: 'Hosting credits are still processing',
+        description:
+          'Your Kilo Pass payment is complete, but hosting credits are not ready yet. Retry credit-funded activation shortly.',
+        destination: null,
+        destinationLabel: null,
+        canRetry: true,
+        showSupport: false,
+      };
+    case 'enrollment_failed':
+      return {
+        title: 'Credit-funded hosting needs attention',
+        description:
+          'Your credits are ready, but hosting activation did not finish. Retry credit-funded activation or choose a hosting plan.',
+        destination: '/claw/subscription',
+        destinationLabel: 'Choose hosting plan',
+        canRetry: true,
+        showSupport: true,
+      };
+    case 'requires_reprovision':
+      return {
+        title: 'Reprovision before activating hosting',
+        description:
+          'Your Kilo Pass credits are ready. Your previous KiloClaw billing history must remain unchanged, so support must help provision a fresh KiloClaw before hosting can use those credits.',
+        destination: null,
+        destinationLabel: null,
+        canRetry: false,
+        showSupport: true,
+      };
+    case 'missing_instance':
+      return {
+        title: 'Provision KiloClaw before activating hosting',
+        description:
+          'Your Kilo Pass credits are ready, but no KiloClaw instance is available for hosting. Contact support to provision one without risking billing history.',
+        destination: null,
+        destinationLabel: null,
+        canRetry: false,
+        showSupport: true,
+      };
+    case 'destroyed_instance':
+      return {
+        title: 'Reprovision before activating hosting',
+        description:
+          'Your Kilo Pass credits are ready, but the selected KiloClaw was destroyed. Contact support to provision a fresh KiloClaw before hosting uses those credits.',
+        destination: null,
+        destinationLabel: null,
+        canRetry: false,
+        showSupport: true,
+      };
+    case 'stale_intent':
+      return {
+        title: 'Choose hosting again',
+        description:
+          'Your Kilo Pass credits are ready, but the saved hosting selection no longer matches current billing state. Start a fresh credit-funded selection.',
+        destination: '/claw/subscription',
+        destinationLabel: 'Choose hosting plan',
+        canRetry: false,
+        showSupport: true,
+      };
+    case 'invalid_intent':
+      return {
+        title: 'Choose hosting manually',
+        description:
+          'Your Kilo Pass credits are ready, but the saved hosting selection cannot be used. Choose a hosting plan from KiloClaw.',
+        destination: '/claw/subscription',
+        destinationLabel: 'Choose hosting plan',
+        canRetry: false,
+        showSupport: true,
+      };
+    case 'insufficient_credits':
+      return {
+        title: 'Review hosting options',
+        description:
+          'Your current credit balance no longer covers the selected hosting plan. Review available credit-funded hosting options.',
+        destination: '/claw/subscription',
+        destinationLabel: 'Review hosting options',
+        canRetry: false,
+        showSupport: true,
+      };
+    case 'expired_commit':
+      return {
+        title: 'Kilo Pass credits are ready',
+        description:
+          'Commit hosting is no longer available. Choose Standard and fund hosting from your credit balance.',
+        destination: '/claw/subscription',
+        destinationLabel: 'Choose Standard hosting',
+        canRetry: false,
+        showSupport: false,
+      };
+    case 'unexpected_error':
+      return {
+        title: 'Hosting activation needs support',
+        description:
+          'Your Kilo Pass credits are ready, but hosting activation could not be confirmed. Your credits remain available.',
+        destination: null,
+        destinationLabel: null,
+        canRetry: false,
+        showSupport: true,
+      };
+  }
+}
+
 /** e.g. "Commit ($51/mo)" or "Standard ($55/mo)" */
 export function planLabel(plan: ClawPlan, priceVersion?: string): string {
   if (plan === 'commit') {

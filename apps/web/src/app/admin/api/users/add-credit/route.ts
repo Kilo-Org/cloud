@@ -6,12 +6,17 @@ import type { AddCreditRequest } from '@/types/admin';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { kilocode_users } from '@kilocode/db/schema';
+import { userCanManageCredits } from '@/lib/admin/credit-management';
 
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<{ error: string } | { message: string }>> {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
+  if (!operator || !userCanManageCredits(operator)) {
+    return NextResponse.json({ error: 'Credit management access required' }, { status: 403 });
+  }
+
   const requestData = (await request.json()) as AddCreditRequest;
   const force200 = request.nextUrl.searchParams.get('force_200_response') === 'true';
   function warnAndCreateErrorResponse(message: string) {
@@ -42,6 +47,7 @@ export async function POST(
     expiry_hours: requestData.expiry_hours ?? requestData.creditExpiryHours ?? undefined,
     credit_category: credit_category,
     counts_as_selfservice: false,
+    created_by_kilo_user_id: operator.id,
   };
   const result = await grantCreditForCategory(user, options);
 

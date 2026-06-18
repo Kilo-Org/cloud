@@ -275,7 +275,15 @@ function SessionRow({
   );
 }
 
-const PLATFORM_FILTERS = ['cloud-agent', 'extension', 'cli', 'slack', 'other'] as const;
+const PLATFORM_FILTERS = [
+  'cloud-agent',
+  'extension',
+  'cli',
+  'slack',
+  'github',
+  'linear',
+  'other',
+] as const;
 
 function platformFilterLabel(p: string): string {
   switch (p) {
@@ -287,6 +295,10 @@ function platformFilterLabel(p: string): string {
       return 'CLI';
     case 'slack':
       return 'Slack';
+    case 'github':
+      return 'GitHub';
+    case 'linear':
+      return 'Linear';
     case 'other':
       return 'Other';
     default:

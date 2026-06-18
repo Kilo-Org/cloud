@@ -6,7 +6,7 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
 type AutoModel = {
@@ -154,9 +154,18 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   opencode_settings: undefined,
 };
 
+export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
+  ...KILO_AUTO_BALANCED_MODEL,
+  id: 'kilo-auto/efficient',
+  name: 'Auto Efficient',
+  description:
+    'Routes each request to the cheapest model that gets the job done, based on continuously benchmarked accuracy and cost.',
+};
+
 export const AUTO_MODELS = [
   KILO_AUTO_FRONTIER_MODEL,
   KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
 ];

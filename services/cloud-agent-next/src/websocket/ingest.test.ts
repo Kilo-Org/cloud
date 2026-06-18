@@ -1356,6 +1356,112 @@ describe('createIngestHandler', () => {
       });
     });
 
+    it('keeps model diagnostics private while forwarding them to the supervisor', async () => {
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      const diagnostics = {
+        requestedModel: 'kilo/retired-model',
+        availableModelCount: 2,
+        availableModels: ['vendor/alpha-model', 'vendor/beta-model'],
+        suggestedModels: ['vendor/alpha-model'],
+        suggestionSource: 'fuzzy' as const,
+      };
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', {
+          fatal: true,
+          error: 'Model not found: kilo/retired-model',
+          errorSource: 'assistant',
+          modelNotFoundRuntimeDiagnostics: diagnostics,
+        })
+      );
+
+      const safeMessage = 'Assistant request failed: model not found';
+      const safePayload = JSON.stringify({
+        fatal: true,
+        errorSource: 'assistant',
+        error: safeMessage,
+        message: safeMessage,
+      });
+      expect(eventQueries.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: safePayload })
+      );
+      expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ payload: safePayload }));
+      expect(broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stream_event_type: 'cloud.status',
+          payload: JSON.stringify({ cloudStatus: { type: 'error', message: safeMessage } }),
+        })
+      );
+      const publicCalls = JSON.stringify({
+        persisted: vi.mocked(eventQueries.insert).mock.calls,
+        broadcast: vi.mocked(broadcast).mock.calls,
+      });
+      expect(publicCalls).not.toContain('retired-model');
+      expect(publicCalls).not.toContain('vendor/alpha-model');
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        error: 'Model not found: kilo/retired-model',
+        errorSource: 'assistant',
+        modelNotFoundRuntimeDiagnostics: diagnostics,
+      });
+    });
+
+    it('drops model diagnostics attached to non-model-not-found fatal events', async () => {
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      const diagnostics = {
+        requestedModel: 'kilo/retired-model',
+        availableModelCount: 2,
+        availableModels: ['vendor/alpha-model', 'vendor/beta-model'],
+        suggestedModels: ['vendor/alpha-model'],
+        suggestionSource: 'fuzzy' as const,
+      };
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', {
+          fatal: true,
+          error: 'Rate limit exceeded for provider request',
+          errorSource: 'assistant',
+          modelNotFoundRuntimeDiagnostics: diagnostics,
+        })
+      );
+
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        error: 'Rate limit exceeded for provider request',
+        errorSource: 'assistant',
+      });
+      const publicCalls = JSON.stringify({
+        persisted: vi.mocked(eventQueries.insert).mock.calls,
+        broadcast: vi.mocked(broadcast).mock.calls,
+      });
+      expect(publicCalls).not.toContain('retired-model');
+      expect(publicCalls).not.toContain('vendor/alpha-model');
+    });
+
     it('keeps unclassified fatal events as wrapper failures', async () => {
       const doContext = createNewPathDOContext();
       const handler = createIngestHandler(

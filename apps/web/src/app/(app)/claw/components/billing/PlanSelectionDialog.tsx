@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   createKiloClawSignupDisplay,
-  formatKiloClawFirstChargeLabel,
   formatMicrodollars,
+  getKiloClawFundingChoiceCopy,
   isKiloClawStandardIntroCost,
   PLAN_COST_MICRODOLLARS,
   type ClawPlan,
@@ -345,7 +345,7 @@ function CreditEnrollmentSection({
   onEnroll: () => void;
   isPending: boolean;
 }) {
-  const priceLabel = formatKiloClawFirstChargeLabel({ plan: selectedPlan, costMicrodollars });
+  const fundingCopy = getKiloClawFundingChoiceCopy({ plan: selectedPlan, costMicrodollars });
   const isIntro = selectedPlan === 'standard' && isKiloClawStandardIntroCost({ costMicrodollars });
   const hasProjectedBonus = projectedKiloPassBonusMicrodollars > 0;
   const hasSufficientBalance = effectiveBalanceMicrodollars >= costMicrodollars;
@@ -357,11 +357,11 @@ function CreditEnrollmentSection({
       <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
         <div className="mb-3 flex items-center gap-2">
           <Wallet className="h-4 w-4 text-emerald-400" />
-          <span className="text-sm font-semibold text-emerald-300">Pay with credits</span>
+          <span className="text-sm font-semibold text-emerald-300">
+            {fundingCopy.creditHeading}
+          </span>
         </div>
-        <p className="text-muted-foreground mb-1 text-sm">
-          {planLabel} Plan — {priceLabel} from your credit balance
-        </p>
+        <p className="text-muted-foreground mb-1 text-sm">{fundingCopy.creditDescription}</p>
         {hasProjectedBonus ? (
           <div className="mb-3 space-y-1 text-xs text-emerald-400/80">
             <p>Current balance: {formatMicrodollars(rawCreditBalanceMicrodollars)}</p>
@@ -382,7 +382,7 @@ function CreditEnrollmentSection({
           variant="default"
           className="w-full py-3 font-semibold"
         >
-          {isPending ? 'Activating…' : `Pay ${formatMicrodollars(costMicrodollars)} with Credits`}
+          {isPending ? 'Activating…' : fundingCopy.creditButtonLabel}
         </Button>
       </div>
     );
@@ -672,10 +672,14 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   const hostingOnlyCostMicrodollars = hostingOnlyPlan
     ? (selectedCreditEnrollmentPreview?.costMicrodollars ?? PLAN_COST_MICRODOLLARS[hostingOnlyPlan])
     : null;
-  const hostingOnlyLabel =
+  const hostingFundingCopy =
     hostingOnlyPlan && hostingOnlyCostMicrodollars !== null
-      ? `Subscribe to ${hostingOnlyPlan === 'commit' ? 'Commit' : 'Standard'} plan, ${formatKiloClawFirstChargeLabel({ plan: hostingOnlyPlan, costMicrodollars: hostingOnlyCostMicrodollars })}`
-      : 'Select a plan above';
+      ? getKiloClawFundingChoiceCopy({
+          plan: hostingOnlyPlan,
+          costMicrodollars: hostingOnlyCostMicrodollars,
+        })
+      : null;
+  const hostingOnlyLabel = hostingFundingCopy?.stripeButtonLabel ?? 'Select a plan above';
   const hostingSectionTitle = hasActiveKiloPass ? 'Choose a hosting plan' : 'Hosting only';
   const hostingSectionDescription = hasActiveKiloPass
     ? 'You already have Kilo Pass. Choose a hosting plan and fund it from your credit balance or pay directly via Stripe.'
@@ -835,7 +839,9 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
                 />
                 <div className="my-3 flex items-center gap-3">
                   <div className="bg-border h-px flex-1" />
-                  <span className="text-muted-foreground text-xs">or pay with Stripe</span>
+                  <span className="text-muted-foreground text-xs">
+                    {hostingFundingCopy?.stripeDividerLabel}
+                  </span>
                   <div className="bg-border h-px flex-1" />
                 </div>
               </>
@@ -850,7 +856,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
               {checkout.isPending ? 'Redirecting to Stripe…' : hostingOnlyLabel}
             </Button>
             <p className="text-muted-foreground mt-2 text-center text-xs">
-              You&apos;ll be redirected to Stripe to pay
+              {hostingFundingCopy?.stripeDescription ?? "You'll be redirected to Stripe to pay."}
             </p>
           </div>
         </div>

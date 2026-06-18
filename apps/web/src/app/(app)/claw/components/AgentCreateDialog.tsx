@@ -16,43 +16,23 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useClawAgentMutations } from '../hooks/useClawHooks';
+import { workspaceFromName } from '@/lib/kiloclaw/agent-id';
+import { reconcileAmbiguousMutation, useClawAgentMutations } from '../hooks/useClawHooks';
 import { useClawModelOptions } from '../hooks/useClawModelOptions';
 import { addKilocodeModelPrefix } from './modelSupport';
-
-// Mirror of the controller's normalizeAgentId (openclaw-agent-config.ts) so the
-// derived workspace is 1:1 with the agent id the controller will assign. Using
-// the controller's exact charset (underscores preserved, not collapsed to '-')
-// is what keeps distinct agents like `foo_bar` and `foo-bar` from sharing a
-// workspace directory.
-function normalizeAgentId(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return 'main';
-  const lower = trimmed.toLowerCase();
-  if (/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(trimmed)) return lower;
-  return (
-    lower
-      .replace(/[^a-z0-9_-]+/g, '-')
-      .replace(/^-+/, '')
-      .replace(/-+$/, '')
-      .slice(0, 64) || 'main'
-  );
-}
-
-// Derive a stable, unix-safe workspace path from the agent name so users never
-// have to type a machine path. Keyed on the normalized agent id for uniqueness.
-function workspaceFromName(name: string): string {
-  return `/root/.openclaw/workspace-${normalizeAgentId(name)}`;
-}
 
 export function AgentCreateDialog({
   open,
   onOpenChange,
+  existingIds,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Agent ids that exist BEFORE this create, so the timeout-reconcile can't
+  // mistake a pre-existing agent (name conflict, reserved `main`) for success.
+  existingIds: string[];
 }) {
-  const { createAgent } = useClawAgentMutations();
+  const { createAgent, refetchAgents } = useClawAgentMutations();
   const { modelOptions, isLoading: isLoadingModels, error: modelError } = useClawModelOptions();
   const [name, setName] = useState('');
   const [model, setModel] = useState('');
@@ -86,6 +66,28 @@ export function AgentCreateDialog({
       reset();
       onOpenChange(false);
     } catch (err) {
+      // Create can time out at the gateway after the controller already made the
+      // agent (fire-and-forget). Reconcile by matching the agent's VERBATIM name
+      // (the controller stores the submitted name as agents.list[].name) among
+      // agents that did NOT exist before submit — so we don't have to predict the
+      // normalized id and the reconcile doesn't depend on the id-normalization
+      // mirror staying in lockstep with the controller. A deterministic conflict
+      // (`agent_exists`) or reserved `main` won't match (no new id) and surfaces
+      // as the real error.
+      //
+      // Residual race we accept: if THIS request is lost before reaching the
+      // controller while a concurrent writer creates an agent with the same name,
+      // the refetch can match it. Narrow (same name, simultaneous, request lost
+      // pre-controller) and self-correcting on the next list view.
+      const applied = await reconcileAmbiguousMutation(err, refetchAgents, list =>
+        list.agents.some(a => a.name === trimmedName && !existingIds.includes(a.id))
+      );
+      if (applied) {
+        toast.success(`Created agent ${trimmedName} (took a moment)`);
+        reset();
+        onOpenChange(false);
+        return;
+      }
       toast.error(err instanceof Error ? err.message : 'Failed to create agent', {
         duration: 10000,
       });
@@ -94,15 +96,17 @@ export function AgentCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-w-md">
+      {/* Cap height and scroll the body so the footer stays on-screen on short
+          viewports / large text settings. */}
+      <DialogContent className="grid max-h-[85vh] max-w-md grid-rows-[auto_minmax(0,1fr)_auto]">
         <DialogHeader>
-          <DialogTitle>New agent</DialogTitle>
+          <DialogTitle>Create agent</DialogTitle>
           <DialogDescription>
             Stands up a new agent on your machine. You can route channels to it after it is created.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="agent-name">Name</Label>
             <Input
@@ -115,7 +119,7 @@ export function AgentCreateDialog({
             />
             {trimmedName.length > 0 && (
               <p className="text-muted-foreground text-xs">
-                Workspace: {workspaceFromName(trimmedName)}
+                Workspace: <span className="font-mono">{workspaceFromName(trimmedName)}</span>
               </p>
             )}
           </div>
@@ -134,6 +138,10 @@ export function AgentCreateDialog({
               className="w-full"
             />
           </div>
+
+          <p className="text-muted-foreground text-xs">
+            Creating an agent can take up to a minute.
+          </p>
         </div>
 
         <DialogFooter>

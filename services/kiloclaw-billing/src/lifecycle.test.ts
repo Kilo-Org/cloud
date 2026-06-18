@@ -398,6 +398,31 @@ function organizationDestructionWarningRow(overrides: Partial<Record<string, unk
   };
 }
 
+function personalDestructionCandidateRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: '55555555-5555-4555-8555-555555555555',
+    user_id: 'user-1',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    sandbox_id: 'ki_22222222222242228222222222222222',
+    instance_name: 'Research Claw',
+    instance_destroyed_at: null,
+    organization_id: null,
+    organization_name: null,
+    organization_created_at: null,
+    organization_free_trial_end_at: null,
+    organization_require_seats: null,
+    organization_settings: null,
+    latest_seat_purchase_status: null,
+    plan: 'standard',
+    status: 'past_due',
+    email: 'user-1@example.com',
+    credit_renewal_at: null,
+    suspended_at: '2026-05-11T00:00:00.000Z',
+    destruction_deadline: '2026-05-18T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 function organizationDestructionCandidateRow(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: '55555555-5555-4555-8555-555555555555',
@@ -1414,6 +1439,97 @@ describe('credit renewal fanout queue processing', () => {
     expect(staleResult.errors).toBe(0);
   });
 
+  it('reconciles a duplicate suspended past-due renewal by clearing its deadline and requesting resume', async () => {
+    const renewalBoundary = '2026-06-01T00:00:00.000Z';
+    const instanceId = '22222222-2222-4222-8222-222222222222';
+    const row = creditRenewalRow({
+      status: 'past_due',
+      past_due_since: '2026-05-01T00:00:00.000Z',
+      suspended_at: '2026-05-15T00:00:00.000Z',
+      destruction_deadline: '2026-06-02T00:00:00.000Z',
+      auto_resume_attempt_count: 2,
+    });
+    const after = {
+      ...row,
+      status: 'active',
+      past_due_since: null,
+      current_period_start: renewalBoundary,
+      current_period_end: '2026-07-01T00:00:00.000Z',
+      credit_renewal_at: '2026-07-01T00:00:00.000Z',
+      destruction_deadline: null,
+    };
+    const { db, deletes, txInserts, txUpdates, updates } = createMockDb(
+      [
+        [row],
+        [row],
+        [row],
+        [{ id: instanceId, sandbox_id: 'ki_22222222222242228222222222222222' }],
+      ],
+      {
+        txInsertRowCounts: [0],
+        txUpdateReturningRows: [[after]],
+      }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        affiliateSaleEnqueued: false,
+        winningTouchType: 'none',
+        conversionId: null,
+        disqualificationReason: 'no_touch',
+      })
+    );
+    const kiloclawFetch = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+
+    const summary = await processCreditRenewalItem(
+      createEnv(kiloclawFetch),
+      creditRenewalItemMessage({ renewalBoundary, subscriptionId: row.id }),
+      2
+    );
+
+    expect(summary.credit_renewals_skipped_duplicate).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(kiloclawFetch).toHaveBeenCalledTimes(1);
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: 'active',
+          past_due_since: null,
+          destruction_deadline: null,
+        }),
+      ])
+    );
+    const renewalUpdate = txUpdates.find(update => update.status === 'active');
+    expect(renewalUpdate).not.toHaveProperty('suspended_at');
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          auto_resume_attempt_count: 3,
+          auto_resume_requested_at: expect.any(String),
+          auto_resume_retry_after: expect.any(String),
+        }),
+      ])
+    );
+    expect(deletes).toHaveLength(0);
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: 'credit_renewal_duplicate_idempotency_reconciled',
+          before_state: expect.objectContaining({
+            status: 'past_due',
+            suspended_at: '2026-05-15T00:00:00.000Z',
+            destruction_deadline: '2026-06-02T00:00:00.000Z',
+          }),
+          after_state: expect.objectContaining({
+            status: 'active',
+            suspended_at: '2026-05-15T00:00:00.000Z',
+            destruction_deadline: null,
+          }),
+        }),
+      ])
+    );
+  });
+
   it('re-reads an item when the diagnostic userId does not match the current subscription owner', async () => {
     const row = creditRenewalRow({ user_id: 'actual-user' });
     const { db, txInserts, txUpdates, updates, selectBuilders } = createMockDb([[row]]);
@@ -1502,32 +1618,23 @@ describe('credit renewal fanout queue processing', () => {
     );
   });
 
-  it('resolves a terminal failure when an operator retry finalizes a duplicate boundary', async () => {
+  it('skips duplicate side effects when guarded reconciliation loses the current boundary', async () => {
     const row = creditRenewalRow({
+      status: 'past_due',
+      suspended_at: '2026-05-15T00:00:00.000Z',
       credit_renewal_at: '2026-06-01T00:00:00.000Z',
     });
-    const { db, updates } = createMockDb([[row], [row], []], {
+    const { db, inserts, txInserts, updates } = createMockDb([[row], [row], [row]], {
       txInsertRowCounts: [0],
       txUpdateReturningRows: [[]],
     });
     mockGetWorkerDb.mockReturnValue(db);
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_request, init) => {
-      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
-        action?: string;
-      };
-      if (body.action === 'process_paid_conversion') {
-        return Response.json({
-          affiliateSaleEnqueued: false,
-          winningTouchType: null,
-          conversionId: null,
-          disqualificationReason: 'no_touch',
-        });
-      }
-      return Response.json({ ok: true });
-    });
+    const sideEffectFetch = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(sideEffectFetch);
+    const platformFetch = vi.fn();
 
     const summary = await processCreditRenewalItem(
-      createEnvWithQueueMocks(vi.fn()).env,
+      createEnvWithQueueMocks(platformFetch).env,
       {
         kind: 'credit_renewal_item',
         runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -1540,15 +1647,18 @@ describe('credit renewal fanout queue processing', () => {
       1
     );
 
-    expect(summary.credit_renewals_skipped_duplicate).toBe(1);
-    expect(updates).toContainEqual(
+    expect(summary.credit_renewals_skipped_duplicate).toBe(0);
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(sideEffectFetch).not.toHaveBeenCalled();
+    expect(platformFetch).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(txInserts).toEqual([
       expect.objectContaining({
-        status: 'resolved',
-        resolution_actor_type: 'system',
-        resolution_actor_id: 'billing-lifecycle-job',
-        resolution_reason: 'credit_renewal_duplicate_idempotency_reconciled',
-      })
-    );
+        credit_category: 'kiloclaw-subscription:22222222-2222-4222-8222-222222222222:2026-06',
+      }),
+    ]);
   });
 
   it('serializes same-user item decisions against the current locked credit balance', async () => {
@@ -1741,7 +1851,7 @@ describe('interrupted auto-resume sweep', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('requests async start and records retry metadata on acceptance', async () => {
+  it('retries suspended active rows after renewal cleared their destruction deadline', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     const { db, updates } = createMockDb([
@@ -1749,7 +1859,8 @@ describe('interrupted auto-resume sweep', () => {
         {
           user_id: 'user-1',
           instance_id: instanceId,
-          suspended_at: null,
+          suspended_at: '2026-04-20T10:00:00.000Z',
+          destruction_deadline: null,
           auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
           auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
           auto_resume_attempt_count: 0,
@@ -2706,6 +2817,48 @@ describe('destruction warning sweep', () => {
     });
   });
 
+  it('does not warn after a selected personal candidate renews and clears its deadline', async () => {
+    const row = {
+      id: 'renewed-warning-sub',
+      user_id: 'renewed-warning-user',
+      email: 'renewed-warning-user@example.com',
+      destruction_deadline: '2099-04-15T10:00:00.000Z',
+      instance_id: '12121212-1212-4212-8212-121212121212',
+      instance_name: 'Recovered Claw',
+      instance_destroyed_at: null,
+      organization_id: null,
+      plan: 'standard',
+      status: 'past_due',
+      credit_renewal_at: '2099-04-01T10:00:00.000Z',
+    };
+    const { db, inserts } = createMockDb([[row], []]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '14141414-1414-4414-8414-141414141414',
+        sweep: 'destruction_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.destruction_warnings).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(inserts).toHaveLength(0);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping personal destruction warning because candidate is no longer eligible',
+          reason: 'candidate_no_longer_eligible',
+          subscriptionId: row.id,
+        }),
+      ])
+    );
+  });
+
   it('does not send destruction warning when joined instance is destroyed', async () => {
     const { db, inserts } = createMockDb([
       [
@@ -3346,6 +3499,46 @@ describe('instance destruction sweep', () => {
     );
   });
 
+  it('revalidates a selected personal candidate and skips destroy after concurrent renewal', async () => {
+    const staleCandidate = personalDestructionCandidateRow({
+      id: 'concurrent-renewal-sub',
+      instance_id: '13131313-1313-4313-8313-131313131313',
+      sandbox_id: 'ki_13131313131343138313131313131313',
+      status: 'past_due',
+      credit_renewal_at: '2026-05-01T00:00:00.000Z',
+    });
+    const { db, deletes, inserts, txUpdates, updates } = createMockDb([[staleCandidate], []]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const platformFetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(platformFetch),
+      {
+        runId: 'bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbcbc',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(platformFetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping personal instance destruction because candidate is no longer eligible',
+          reason: 'candidate_no_longer_eligible',
+          subscriptionId: staleCandidate.id,
+        }),
+      ])
+    );
+  });
+
   it('clears destruction_deadline on a detached subscription row instead of starving the queue', async () => {
     // Regression: a subscription with `destruction_deadline < now()` but
     // `instance_id IS NULL` (its instance was already destroyed via some
@@ -3519,17 +3712,15 @@ describe('instance destruction sweep', () => {
 
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
+    const candidate = personalDestructionCandidateRow({
+      id: 'sub-1',
+      instance_id: instanceId,
+      sandbox_id: 'ki_11111111111141118111111111111111',
+      status: 'canceled',
+    });
     const { db, updates, txUpdates, inserts, deletes, selectBuilders } = createMockDb([
-      [
-        {
-          id: 'sub-1',
-          user_id: 'user-1',
-          instance_id: instanceId,
-          sandbox_id: 'ki_11111111111141118111111111111111',
-          status: 'canceled',
-          email: 'user-1@example.com',
-        },
-      ],
+      [candidate],
+      [candidate],
       [
         {
           id: instanceId,
@@ -3604,25 +3795,23 @@ describe('instance destruction sweep', () => {
   it('treats platform destroy 404 as already gone and continues with later rows', async () => {
     const firstInstanceId = '11111111-1111-4111-8111-111111111111';
     const secondInstanceId = '22222222-2222-4222-8222-222222222222';
+    const firstCandidate = personalDestructionCandidateRow({
+      id: 'sub-1',
+      instance_id: firstInstanceId,
+      sandbox_id: 'ki_11111111111141118111111111111111',
+      status: 'canceled',
+    });
+    const secondCandidate = personalDestructionCandidateRow({
+      id: 'sub-2',
+      user_id: 'user-2',
+      instance_id: secondInstanceId,
+      sandbox_id: 'ki_22222222222242228222222222222222',
+      status: 'canceled',
+      email: 'user-2@example.com',
+    });
     const { db, updates, txUpdates, inserts, deletes } = createMockDb([
-      [
-        {
-          id: 'sub-1',
-          user_id: 'user-1',
-          instance_id: firstInstanceId,
-          sandbox_id: 'ki_11111111111141118111111111111111',
-          status: 'canceled',
-          email: 'user-1@example.com',
-        },
-        {
-          id: 'sub-2',
-          user_id: 'user-2',
-          instance_id: secondInstanceId,
-          sandbox_id: 'ki_22222222222242228222222222222222',
-          status: 'canceled',
-          email: 'user-2@example.com',
-        },
-      ],
+      [firstCandidate, secondCandidate],
+      [firstCandidate],
       [
         {
           id: firstInstanceId,
@@ -3636,6 +3825,7 @@ describe('instance destruction sweep', () => {
       ],
       [],
       [{ id: 'sub-1', user_id: 'user-1', instance_id: firstInstanceId }],
+      [secondCandidate],
       [
         {
           id: secondInstanceId,
@@ -3715,17 +3905,15 @@ describe('instance destruction sweep', () => {
 
   it('logs pending platform cleanup and still preserves billing state transition', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
+    const candidate = personalDestructionCandidateRow({
+      id: 'sub-1',
+      instance_id: instanceId,
+      sandbox_id: 'ki_11111111111141118111111111111111',
+      status: 'canceled',
+    });
     const { db, updates, txUpdates, inserts, deletes } = createMockDb([
-      [
-        {
-          id: 'sub-1',
-          user_id: 'user-1',
-          instance_id: instanceId,
-          sandbox_id: 'ki_11111111111141118111111111111111',
-          status: 'canceled',
-          email: 'user-1@example.com',
-        },
-      ],
+      [candidate],
+      [candidate],
       [
         {
           id: instanceId,
@@ -3800,17 +3988,15 @@ describe('instance destruction sweep', () => {
 
   it('logs non-404 platform destroy failures and preserves billing state transition', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
+    const candidate = personalDestructionCandidateRow({
+      id: 'sub-1',
+      instance_id: instanceId,
+      sandbox_id: 'ki_11111111111141118111111111111111',
+      status: 'canceled',
+    });
     const { db, updates, txUpdates, inserts, deletes } = createMockDb([
-      [
-        {
-          id: 'sub-1',
-          user_id: 'user-1',
-          instance_id: instanceId,
-          sandbox_id: 'ki_11111111111141118111111111111111',
-          status: 'canceled',
-          email: 'user-1@example.com',
-        },
-      ],
+      [candidate],
+      [candidate],
       [
         {
           id: instanceId,
@@ -5248,6 +5434,56 @@ describe('credit renewal sweep affiliate tracking', () => {
     expect(typeof bonusCall?.input.nowIso).toBe('string');
   });
 
+  it('clears an unexpectedly stale destruction deadline on an active renewal', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const before = creditRenewalRow({
+      id: 'active-stale-deadline-sub',
+      instance_id: 'active-stale-deadline-instance',
+      instance_row_id: 'active-stale-deadline-instance',
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      destruction_deadline: '2026-04-10T10:00:00.000Z',
+    });
+    const after = {
+      ...before,
+      current_period_start: renewalAt,
+      current_period_end: '2026-05-09T10:00:00.000Z',
+      credit_renewal_at: '2026-05-09T10:00:00.000Z',
+      destruction_deadline: null,
+    };
+    const { db, txInserts, txUpdates } = createMockDb([[before], [before], [before]], {
+      txUpdateReturningRows: [[], [after]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ ok: true }));
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({
+        subscriptionId: before.id,
+        renewalBoundary: renewalAt,
+      })
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ destruction_deadline: null })])
+    );
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: before.id,
+          reason: 'credit_renewal',
+          before_state: expect.objectContaining({
+            destruction_deadline: '2026-04-10T10:00:00.000Z',
+          }),
+          after_state: expect.objectContaining({ destruction_deadline: null }),
+        }),
+      ])
+    );
+  });
+
   it('sends insufficient-credit email without charging when balance and auto top-up are unavailable', async () => {
     const renewalAt = '2026-04-09T10:00:00.000Z';
     const { db, inserts, updates, txInserts } = createMockDb(
@@ -5359,10 +5595,11 @@ describe('credit renewal sweep affiliate tracking', () => {
     ]);
   });
 
-  it('requests auto-resume when suspended past-due rows recover through credit renewal', async () => {
+  it('clears destruction scheduling and requests auto-resume when suspended past-due rows renew', async () => {
     const renewalAt = '2026-04-09T10:00:00.000Z';
     const instanceId = '77777777-7777-4777-8777-777777777777';
-    const { db, updates, txUpdates } = createMockDb(
+    const suspendedAt = '2026-04-08T10:00:00.000Z';
+    const { db, deletes, updates, txUpdates } = createMockDb(
       [
         [
           {
@@ -5382,7 +5619,8 @@ describe('credit renewal sweep affiliate tracking', () => {
             scheduled_plan: null,
             commit_ends_at: null,
             past_due_since: '2026-03-20T10:00:00.000Z',
-            suspended_at: '2026-04-08T10:00:00.000Z',
+            suspended_at: suspendedAt,
+            destruction_deadline: '2026-04-15T10:00:00.000Z',
             auto_resume_attempt_count: 2,
             auto_top_up_triggered_for_period: null,
             total_microdollars_acquired: 100_000_000,
@@ -5459,12 +5697,23 @@ describe('credit renewal sweep affiliate tracking', () => {
     expect(summary.errors).toBe(0);
     expect(kiloclawFetch).toHaveBeenCalledTimes(1);
     expect(txUpdates).toEqual(
-      expect.arrayContaining([expect.objectContaining({ status: 'active', past_due_since: null })])
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: 'active',
+          past_due_since: null,
+          destruction_deadline: null,
+        }),
+      ])
     );
+    const renewalUpdate = txUpdates.find(update => update.status === 'active');
+    expect(renewalUpdate).not.toHaveProperty('suspended_at');
     const autoResumeUpdate = updates.find(update => update.auto_resume_attempt_count === 3);
     expect(autoResumeUpdate).toMatchObject({ auto_resume_attempt_count: 3 });
     expect(typeof autoResumeUpdate?.auto_resume_requested_at).toBe('string');
     expect(typeof autoResumeUpdate?.auto_resume_retry_after).toBe('string');
+    expect(autoResumeUpdate).not.toHaveProperty('suspended_at');
+    expect(autoResumeUpdate).not.toHaveProperty('destruction_deadline');
+    expect(deletes).toHaveLength(0);
   });
 
   it('normalizes Postgres renewal timestamps before paid-conversion side effects', async () => {

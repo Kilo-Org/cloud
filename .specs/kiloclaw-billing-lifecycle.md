@@ -157,6 +157,11 @@ downstream enforcement can proceed.
 9. Processing MUST preserve the period-scoped idempotency behavior
    defined in `.specs/kiloclaw-billing.md` so duplicate delivery cannot
    double-charge or double-advance a subscription.
+10. Every successful renewal or duplicate-boundary reconciliation that
+    leaves or transitions the subscription to active MUST clear any prior
+    destruction deadline in the successful renewal transaction. This
+    invalidation MUST NOT wait for instance start, readiness, or auto-resume
+    completion, and MUST NOT clear the suspension timestamp.
 
 ### Shared Credit Balance Safety
 
@@ -266,6 +271,11 @@ downstream enforcement can proceed.
    false suspension or destruction, the system SHOULD add a stronger
    protection mechanism before continuing rollout.
 7. Commit retirement MUST NOT add a durable review lifecycle or operator-resolution barrier. Each renewal and enforcement attempt MUST recompute from existing subscription and change-log state; ambiguous Commit renewal fails closed and is retried after logging and Sentry reporting.
+8. Immediately before requesting personal instance destruction, downstream
+   enforcement MUST re-read and revalidate the current subscription and
+   instance. Destruction MUST be skipped unless the row remains current,
+   suspended, destruction-eligible, past its deadline, attached to the same
+   live personal instance, and the instance is not already destroyed.
 
 ### Observability and Operator Control
 

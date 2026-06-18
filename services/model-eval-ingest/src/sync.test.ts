@@ -34,6 +34,28 @@ class MemoryPromotionStore implements PromotionStore {
     return latest;
   }
 
+  async listOrphanedTerminalBenchModels(): Promise<string[]> {
+    return [
+      ...new Set(
+        [...this.rows.values()]
+          .filter(
+            row => row.promotion.task_source === 'terminal-bench' && row.modelStatsId === null
+          )
+          .map(row => row.promotion.model)
+      ),
+    ];
+  }
+
+  async ensureModelStatsTargets(models: string[]): Promise<void> {
+    const existing = await this.findModelStatsTargets(models);
+    for (const model of models) {
+      if (existing.has(model)) continue;
+      const canonical = unprefixKiloGatewayModelId(model) ?? model;
+      if (this.modelStats.has(canonical)) continue;
+      this.modelStats.set(canonical, { id: `created:${canonical}`, model: canonical });
+    }
+  }
+
   async findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>> {
     return new Map(
       models.flatMap(model => {
@@ -45,6 +67,26 @@ class MemoryPromotionStore implements PromotionStore {
         return target ? [[model, target]] : [];
       })
     );
+  }
+
+  async linkOrphanedTerminalBenchPromotions(
+    targets: Map<string, ModelStatsTarget>
+  ): Promise<PromotionTuple[]> {
+    const tuples = new Map<string, PromotionTuple>();
+    for (const row of this.rows.values()) {
+      if (row.promotion.task_source !== 'terminal-bench' || row.modelStatsId !== null) continue;
+      const target = targets.get(row.promotion.model);
+      if (!target) continue;
+      row.modelStatsId = target.id;
+      const tuple = {
+        provider: row.promotion.provider,
+        model: row.promotion.model,
+        variant: row.promotion.variant,
+        modelStatsId: target.id,
+      };
+      tuples.set(JSON.stringify(tuple), tuple);
+    }
+    return [...tuples.values()];
   }
 
   async insertPromotions(
@@ -211,6 +253,23 @@ describe('syncPromotionsFromBench', () => {
     expect(store.cache.get('model-stats-kilo-provider')?.evals['terminal-bench']).toBeDefined();
   });
 
+  it('creates a canonical model stats target for an unknown terminal-bench model', async () => {
+    const store = new MemoryPromotionStore([]);
+    const bench = new MemoryBenchDashboard([
+      promotion({ bench_eval_name: 'new-model', model: 'kilo/moonshotai/kimi-k2.7-code' }),
+    ]);
+
+    const result = await syncPromotionsFromBench(bench, store);
+
+    expect(result).toEqual({ inserted: 1, alreadyHad: 0, cacheRecomputes: 1, fetched: 1 });
+    expect(store.modelStats.has('moonshotai/kimi-k2.7-code')).toBe(true);
+    expect(store.modelStats.has('kilo/moonshotai/kimi-k2.7-code')).toBe(false);
+    expect(store.rows.get('new-model')?.modelStatsId).toBe('created:moonshotai/kimi-k2.7-code');
+    expect(
+      store.cache.get('created:moonshotai/kimi-k2.7-code')?.evals['terminal-bench']
+    ).toBeDefined();
+  });
+
   it('does not strip a single Kilo provider prefix into a bare model id', async () => {
     const store = new MemoryPromotionStore([{ id: 'model-stats-bare', model: 'special-model' }]);
     const bench = new MemoryBenchDashboard([
@@ -219,9 +278,48 @@ describe('syncPromotionsFromBench', () => {
 
     const result = await syncPromotionsFromBench(bench, store);
 
+    expect(result).toEqual({ inserted: 1, alreadyHad: 0, cacheRecomputes: 1, fetched: 1 });
+    expect(store.modelStats.has('kilo/special-model')).toBe(true);
+    expect(store.rows.get('single-kilo-provider-model')?.modelStatsId).toBe(
+      'created:kilo/special-model'
+    );
+    expect(store.cache.has('created:kilo/special-model')).toBe(true);
+  });
+
+  it('does not create a model stats target for other benchmark tasks', async () => {
+    const store = new MemoryPromotionStore([]);
+    const bench = new MemoryBenchDashboard([
+      promotion({
+        bench_eval_name: 'unknown-swebench-model',
+        model: 'kilo/openai/unknown-model',
+        task_source: 'swebench-verified',
+      }),
+    ]);
+
+    const result = await syncPromotionsFromBench(bench, store);
+
     expect(result).toEqual({ inserted: 1, alreadyHad: 0, cacheRecomputes: 0, fetched: 1 });
-    expect(store.rows.get('single-kilo-provider-model')?.modelStatsId).toBeNull();
-    expect(store.cache.size).toBe(0);
+    expect(store.modelStats.size).toBe(0);
+    expect(store.rows.get('unknown-swebench-model')?.modelStatsId).toBeNull();
+  });
+
+  it('repairs an orphaned terminal-bench promotion on a later sync', async () => {
+    const store = new MemoryPromotionStore([]);
+    const orphan = promotion({
+      bench_eval_name: 'orphaned-model',
+      model: 'kilo/moonshotai/kimi-k2.7-code',
+    });
+    store.rows.set(orphan.bench_eval_name, { promotion: orphan, modelStatsId: null });
+
+    const result = await syncPromotionsFromBench(new MemoryBenchDashboard([]), store);
+
+    expect(result).toEqual({ inserted: 0, alreadyHad: 0, cacheRecomputes: 1, fetched: 0 });
+    expect(store.rows.get('orphaned-model')?.modelStatsId).toBe(
+      'created:moonshotai/kimi-k2.7-code'
+    );
+    expect(
+      store.cache.get('created:moonshotai/kimi-k2.7-code')?.evals['terminal-bench']
+    ).toBeDefined();
   });
 
   it('does not duplicate rows on an idempotent rerun', async () => {

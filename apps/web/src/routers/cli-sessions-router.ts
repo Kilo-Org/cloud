@@ -49,6 +49,8 @@ export const KNOWN_PLATFORMS = [
   'agent-manager',
   'app-builder',
   'slack',
+  'github',
+  'linear',
   'gastown',
 ] as const;
 

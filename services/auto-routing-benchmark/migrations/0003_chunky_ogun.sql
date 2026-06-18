@@ -1,0 +1,2 @@
+ALTER TABLE `benchmark_config` ADD `auto_decider_min_cost_usd` real DEFAULT 15 NOT NULL;--> statement-breakpoint
+ALTER TABLE `benchmark_config` ADD `auto_decider_max_cost_usd` real DEFAULT 25 NOT NULL;

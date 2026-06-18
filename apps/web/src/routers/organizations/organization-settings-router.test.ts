@@ -386,6 +386,36 @@ describe('organizations settings trpc router', () => {
         'anthropic/claude-3-opus',
       ]);
     });
+
+    it('should exclude data-collection-required models for teams orgs that deny collection', async () => {
+      const openRouterModelsResponse = {
+        data: [
+          makeOpenRouterModel('openai/gpt-4o'),
+          {
+            ...makeOpenRouterModel('openai/gpt-4o:free'),
+            mayTrainOnYourPrompts: true,
+          },
+        ],
+      } satisfies OpenRouterModelsResponse;
+
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
+
+      const teamsOrg = await createTestOrganization(
+        'Teams Org Denying Data Collection',
+        owner.id,
+        0,
+        { data_collection: 'deny' },
+        true
+      );
+      await addUserToOrganization(teamsOrg.id, member.id, 'member');
+
+      const caller = await createCallerForUser(member.id);
+      const result = await caller.organizations.settings.listAvailableModels({
+        organizationId: teamsOrg.id,
+      });
+
+      expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o']);
+    });
   });
 
   describe('updateDefaultModel procedure', () => {

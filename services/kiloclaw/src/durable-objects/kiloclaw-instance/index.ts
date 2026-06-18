@@ -401,7 +401,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async scheduleAlarm(): Promise<void> {
     if (!this.s.status) return;
-    await this.ctx.storage.setAlarm(nextAlarmTime(this.s.status));
+    await this.ctx.storage.setAlarm(nextAlarmTime(this.s.status, this.s.destroyVolumeAttempts));
   }
 
   private recoveryRuntime(): RecoveryRuntime {

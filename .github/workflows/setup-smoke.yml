@@ -85,7 +85,7 @@ jobs:
 
       - name: Wait for web app
         run: |
-          for i in {1..60}; do
+          for _ in {1..60}; do
             if curl -fsSL http://localhost:3000/users/sign_in >/dev/null; then
               exit 0
             fi
@@ -100,13 +100,44 @@ jobs:
       - name: Run setup smoke tests
         run: pnpm test:setup-smoke
 
+      - name: Summarize setup smoke tests
+        if: always()
+        run: |
+          report='apps/web/test-results/setup-smoke-results.json'
+
+          echo '## Setup smoke test results' >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ ! -f "$report" ]]; then
+            echo 'Playwright did not produce a JSON report.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          clean=$(jq -r '.stats.expected // 0' "$report")
+          flaky=$(jq -r '.stats.flaky // 0' "$report")
+          failed=$(jq -r '.stats.unexpected // 0' "$report")
+          skipped=$(jq -r '.stats.skipped // 0' "$report")
+
+          {
+            echo '| Outcome | Tests |'
+            echo '|---|---:|'
+            echo "| Passed without retries | $clean |"
+            echo "| Passed after retry | $flaky |"
+            echo "| Failed | $failed |"
+            echo "| Skipped | $skipped |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( flaky > 0 )); then
+            echo "::warning::$flaky setup smoke test(s) passed only after retry"
+          fi
+
       - name: Stop dev stack
         if: always()
         run: pnpm dev:stop --force
 
       - name: Upload setup smoke artifacts
         if: always()
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: setup-smoke-artifacts
           path: |

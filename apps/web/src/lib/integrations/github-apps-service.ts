@@ -16,6 +16,12 @@ import {
   fetchGitHubBranches,
   fetchGitHubRepositories,
 } from '@/lib/integrations/platforms/github/adapter';
+import { getOrganizationById } from '@/lib/organizations/organizations';
+import {
+  createAllowPredicateFromRestrictions,
+  hasActiveModelRestrictions,
+} from '@/lib/model-allow.server';
+import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 /**
  * List all integrations for an owner
@@ -285,4 +291,48 @@ export async function listBranches(
   );
 
   return { branches };
+}
+
+/**
+ * Update the model for a GitHub App integration.
+ * For organization-owned integrations, validates the model against org access policy.
+ */
+export async function updateModel(
+  owner: Owner,
+  modelSlug: string
+): Promise<{ success: boolean; error?: string }> {
+  const integration = await getInstallation(owner);
+
+  if (!integration) {
+    return { success: false, error: 'No GitHub App installation found' };
+  }
+
+  // For org integrations, validate the model against org access policy.
+  if (owner.type === 'org') {
+    const organization = await getOrganizationById(owner.id);
+    if (organization) {
+      const restrictions = getEffectiveModelRestrictions(organization);
+      if (hasActiveModelRestrictions(restrictions)) {
+        const isAllowed = createAllowPredicateFromRestrictions(restrictions);
+        if (!(await isAllowed(modelSlug))) {
+          return { success: false, error: 'Model is not allowed by organization policy' };
+        }
+      }
+    }
+  }
+
+  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
+
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: {
+        ...existingMetadata,
+        model_slug: modelSlug,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integration.id));
+
+  return { success: true };
 }

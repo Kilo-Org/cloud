@@ -41,7 +41,7 @@ export function UserProfileCard({
 
   return (
     <>
-      <div className="flex items-start justify-between gap-2">
+      <section aria-label="User profile" className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center space-x-4">
           <Avatar className="h-14 w-14 shrink-0">
             {imageUrl ? <AvatarImage src={imageUrl} alt={name} /> : null}
@@ -83,7 +83,7 @@ export function UserProfileCard({
         >
           <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
         </button>
-      </div>
+      </section>
 
       <EditProfileDialog
         open={editDialogOpen}

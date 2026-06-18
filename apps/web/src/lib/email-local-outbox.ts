@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { access, chmod, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { OutboundEmailParams } from '@/lib/email-delivery-policy';
+
+type LocalOutboxEmail = {
+  to: string;
+  subject: string;
+  html: string;
+  replyTo?: string;
+};
 
 function escapeHtml(value: string): string {
   return value
@@ -27,7 +33,7 @@ async function findWorkspaceRoot(startDirectory: string): Promise<string> {
   }
 }
 
-function developmentBanner(params: OutboundEmailParams): string {
+function developmentBanner(params: LocalOutboxEmail): string {
   const replyTo = params.replyTo ?? 'hi@kilocode.ai';
   return `<section style="margin:0;padding:16px;border-bottom:2px solid #d97706;background:#fffbeb;color:#451a03;font:14px/1.5 monospace"><strong>Local email capture</strong><br>Intended recipient: ${escapeHtml(params.to)}<br>Subject: ${escapeHtml(params.subject)}<br>Reply-To: ${escapeHtml(replyTo)}</section>`;
 }
@@ -40,7 +46,7 @@ function addDevelopmentBanner(html: string, banner: string): string {
 }
 
 export async function writeEmailToLocalOutbox(
-  params: OutboundEmailParams,
+  params: LocalOutboxEmail,
   outboxDirectory?: string
 ): Promise<string> {
   const workspaceRoot = await findWorkspaceRoot(process.cwd());

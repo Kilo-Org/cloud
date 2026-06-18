@@ -1,8 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { NEXTAUTH_URL } from '@/lib/config.server';
-import { getEmailVerificationRecipient } from '@/lib/email-delivery-policy';
-import { sendViaMailgun } from '@/lib/email-mailgun';
+import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
 import { verifyEmail } from '@/lib/email-neverbounce';
 import {
   subjects,

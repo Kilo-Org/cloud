@@ -3,8 +3,7 @@ import path from 'path';
 import type { Organization } from '@kilocode/db/schema';
 import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
 import { NEXTAUTH_URL } from '@/lib/config.server';
-import { getEmailVerificationRecipient } from '@/lib/email-delivery-policy';
-import { sendViaMailgun } from '@/lib/email-mailgun';
+import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
 import { verifyEmail } from '@/lib/email-neverbounce';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 

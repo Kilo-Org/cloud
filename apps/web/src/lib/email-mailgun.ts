@@ -1,68 +1,89 @@
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
+import * as z from 'zod';
 import { MAILGUN_API_KEY, MAILGUN_DOMAIN } from '@/lib/config.server';
-import {
-  routeOutboundEmail,
-  type OutboundEmailParams,
-  type OutboundEmailRoute,
-} from '@/lib/email-delivery-policy';
 import { writeEmailToLocalOutbox } from '@/lib/email-local-outbox';
 import { captureMessage } from '@sentry/nextjs';
 
 const mailgun = new Mailgun(FormData);
 
-type EmailRoutingLog = {
-  mode: 'redirect' | 'local_outbox' | 'suppressed' | 'configuration_error';
-  targetEnvironment: string | null;
-  category: string;
-  outcome: 'delivered' | 'captured' | 'suppressed' | 'failed';
-  outboxFile?: string;
+const stagingSinkSchema = z
+  .email()
+  .refine(email => email.slice(email.lastIndexOf('@') + 1).toLowerCase() === 'kilocode.ai');
+
+type OutboundEmailParams = {
+  to: string;
+  subject: string;
+  html: string;
+  replyTo?: string;
+  category?: string;
 };
 
-function logEmailRouting(route: EmailRoutingLog): void {
-  console.info('[email_service] Routed outbound email', route);
+function isAutomatedTest(): boolean {
+  return process.env.NODE_ENV === 'test' || !!process.env.IS_IN_AUTOMATED_TEST;
 }
 
-async function handleNonMailgunRoute(
-  route: Exclude<OutboundEmailRoute, { kind: 'mailgun' }>,
-  category: string
-): Promise<boolean> {
-  if (route.kind === 'local_outbox') {
-    const outboxFile = await writeEmailToLocalOutbox(route.params);
-    logEmailRouting({
-      mode: 'local_outbox',
-      targetEnvironment: null,
-      category,
-      outcome: 'captured',
-      outboxFile,
-    });
-    return true;
+function getStagingSink(): string {
+  const result = stagingSinkSchema.safeParse(process.env.STAGING_EMAIL_REDIRECT_TO?.trim());
+  if (!result.success) {
+    throw new Error(
+      'STAGING_EMAIL_REDIRECT_TO must contain exactly one valid @kilocode.ai email address'
+    );
   }
-  if (route.kind === 'configuration_error') {
-    const message = 'VERCEL_TARGET_ENV is required for production email delivery';
-    logEmailRouting({
-      mode: 'configuration_error',
-      targetEnvironment: null,
-      category,
-      outcome: 'failed',
-    });
-    captureMessage(message, { level: 'error', tags: { source: 'email_service' } });
-    return false;
-  }
+  return result.data;
+}
 
-  logEmailRouting({
-    mode: 'suppressed',
-    targetEnvironment: route.targetEnvironment,
-    category,
-    outcome: 'suppressed',
-  });
-  return true;
+export function getEmailVerificationRecipient(intendedRecipient: string): string | null {
+  if (isAutomatedTest() || process.env.VERCEL_TARGET_ENV === 'production') {
+    return intendedRecipient;
+  }
+  if (process.env.VERCEL_TARGET_ENV === 'staging') return getStagingSink();
+  return null;
 }
 
 export async function sendViaMailgun(params: OutboundEmailParams): Promise<boolean> {
-  const route = routeOutboundEmail(params);
   const category = params.category ?? 'uncategorized';
-  if (route.kind !== 'mailgun') return handleNonMailgunRoute(route, category);
+  const targetEnvironment = process.env.VERCEL_TARGET_ENV;
+
+  if (isAutomatedTest()) {
+    console.info('[email_service] Suppressed outbound email', {
+      targetEnvironment,
+      category,
+    });
+    return true;
+  }
+
+  if (!targetEnvironment) {
+    if (process.env.NODE_ENV === 'production') {
+      const message = 'VERCEL_TARGET_ENV is required for production email delivery';
+      console.error(message, { category });
+      captureMessage(message, { level: 'error', tags: { source: 'email_service' } });
+      return false;
+    }
+
+    const outboxFile = await writeEmailToLocalOutbox(params);
+    console.info('[email_service] Captured outbound email locally', { category, outboxFile });
+    return true;
+  }
+
+  if (targetEnvironment !== 'production' && targetEnvironment !== 'staging') {
+    console.info('[email_service] Suppressed outbound email', {
+      targetEnvironment,
+      category,
+    });
+    return true;
+  }
+
+  let to = params.to;
+  let subject = params.subject;
+  let replyTo = params.replyTo;
+
+  if (targetEnvironment === 'staging') {
+    const sink = getStagingSink();
+    to = sink;
+    subject = `[STAGING to: ${params.to.replace(/[\r\n]+/g, ' ')}] ${params.subject}`;
+    replyTo = sink;
+  }
 
   if (!MAILGUN_API_KEY || !MAILGUN_DOMAIN) {
     const message = 'MAILGUN_API_KEY/MAILGUN_DOMAIN not set — cannot send email via Mailgun';
@@ -74,19 +95,14 @@ export async function sendViaMailgun(params: OutboundEmailParams): Promise<boole
   const client = mailgun.client({ username: 'api', key: MAILGUN_API_KEY });
   await client.messages.create(MAILGUN_DOMAIN, {
     from: 'Kilo Code <hi@app.kilocode.ai>',
-    'h:Reply-To': route.params.replyTo ?? 'hi@kilocode.ai',
-    to: route.params.to,
-    subject: route.params.subject,
-    html: route.params.html,
+    'h:Reply-To': replyTo ?? 'hi@kilocode.ai',
+    to,
+    subject,
+    html: params.html,
   });
 
-  if (route.mode === 'redirect') {
-    logEmailRouting({
-      mode: 'redirect',
-      targetEnvironment: 'staging',
-      category,
-      outcome: 'delivered',
-    });
+  if (targetEnvironment === 'staging') {
+    console.info('[email_service] Redirected outbound email to staging sink', { category });
   }
   return true;
 }

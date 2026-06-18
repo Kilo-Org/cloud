@@ -23,7 +23,7 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 import Mailgun from 'mailgun.js';
-import { sendViaMailgun } from '@/lib/email-mailgun';
+import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
 
 const mailgunConstructorMock = jest.mocked(Mailgun);
 const mailgunInstance = mailgunConstructorMock.mock.results[0]?.value as {
@@ -79,6 +79,7 @@ describe('Mailgun email boundary', () => {
     restoreEnvironmentVariable('NODE_ENV', 'production');
     process.env.VERCEL_TARGET_ENV = 'production';
 
+    expect(getEmailVerificationRecipient(message.to)).toBe(message.to);
     await expect(sendViaMailgun(message)).resolves.toBe(true);
 
     expect(latestMessagesCreateMock()).toHaveBeenCalledWith('mail.example.test', {
@@ -95,6 +96,7 @@ describe('Mailgun email boundary', () => {
     process.env.VERCEL_TARGET_ENV = 'staging';
     process.env.STAGING_EMAIL_REDIRECT_TO = 'staging-email@kilocode.ai';
 
+    expect(getEmailVerificationRecipient(message.to)).toBe('staging-email@kilocode.ai');
     await expect(sendViaMailgun(message)).resolves.toBe(true);
 
     expect(latestMessagesCreateMock()).toHaveBeenCalledWith('mail.example.test', {
@@ -106,19 +108,45 @@ describe('Mailgun email boundary', () => {
     });
   });
 
-  it('fails closed before Mailgun when staging has no safe sink', async () => {
+  it.each([
+    undefined,
+    '',
+    'staging@example.com',
+    'staging@subdomain.kilocode.ai',
+    'staging@kilocode.ai.example.com',
+    'first@kilocode.ai,second@kilocode.ai',
+  ])('fails closed before Mailgun when the staging sink is unsafe: %s', async sink => {
     restoreEnvironmentVariable('NODE_ENV', 'production');
     process.env.VERCEL_TARGET_ENV = 'staging';
-    delete process.env.STAGING_EMAIL_REDIRECT_TO;
+    restoreEnvironmentVariable('STAGING_EMAIL_REDIRECT_TO', sink);
 
     await expect(sendViaMailgun(message)).rejects.toThrow('STAGING_EMAIL_REDIRECT_TO');
     expect(mailgunClientMock).not.toHaveBeenCalled();
+  });
+
+  it('removes line breaks from the intended recipient in the staging subject', async () => {
+    restoreEnvironmentVariable('NODE_ENV', 'production');
+    process.env.VERCEL_TARGET_ENV = 'staging';
+    process.env.STAGING_EMAIL_REDIRECT_TO = 'staging-email@kilocode.ai';
+
+    await sendViaMailgun({
+      ...message,
+      to: 'customer@example.com\r\nBcc: victim@example.com',
+    });
+
+    expect(latestMessagesCreateMock()).toHaveBeenCalledWith(
+      'mail.example.test',
+      expect.objectContaining({
+        subject: '[STAGING to: customer@example.com Bcc: victim@example.com] Transactional message',
+      })
+    );
   });
 
   it('captures local messages without constructing a Mailgun client', async () => {
     delete process.env.VERCEL_TARGET_ENV;
     restoreEnvironmentVariable('NODE_ENV', 'development');
 
+    expect(getEmailVerificationRecipient(message.to)).toBeNull();
     await expect(sendViaMailgun(message)).resolves.toBe(true);
 
     expect(writeEmailToLocalOutboxMock).toHaveBeenCalledWith(message);
@@ -129,6 +157,7 @@ describe('Mailgun email boundary', () => {
     restoreEnvironmentVariable('NODE_ENV', 'test');
     process.env.VERCEL_TARGET_ENV = 'production';
 
+    expect(getEmailVerificationRecipient(message.to)).toBe(message.to);
     await expect(sendViaMailgun(message)).resolves.toBe(true);
 
     expect(writeEmailToLocalOutboxMock).not.toHaveBeenCalled();
@@ -166,6 +195,7 @@ describe('Mailgun email boundary', () => {
       restoreEnvironmentVariable('NODE_ENV', 'production');
       process.env.VERCEL_TARGET_ENV = target;
 
+      expect(getEmailVerificationRecipient(message.to)).toBeNull();
       await expect(sendViaMailgun(message)).resolves.toBe(true);
 
       expect(writeEmailToLocalOutboxMock).not.toHaveBeenCalled();

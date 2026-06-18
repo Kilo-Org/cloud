@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { NEXTAUTH_URL } from '@/lib/config.server';
+import { getEmailVerificationRecipient } from '@/lib/email-delivery-policy';
 import { sendViaMailgun } from '@/lib/email-mailgun';
 import { verifyEmail } from '@/lib/email-neverbounce';
 import {
@@ -254,13 +255,16 @@ export const emailTestingRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      const isSafeToSend = await verifyEmail(input.recipient);
-      if (!isSafeToSend) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message:
-            'Email blocked by NeverBounce verification. This address is invalid or disposable.',
-        });
+      const verificationRecipient = getEmailVerificationRecipient(input.recipient);
+      if (verificationRecipient) {
+        const isSafeToSend = await verifyEmail(verificationRecipient);
+        if (!isSafeToSend) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              'Email blocked by NeverBounce verification. This address is invalid or disposable.',
+          });
+        }
       }
 
       const vars = fixtureTemplateVars(input.template);
@@ -269,7 +273,12 @@ export const emailTestingRouter = createTRPCRouter({
         ...vars,
         year: String(new Date().getFullYear()),
       });
-      const result = await sendViaMailgun({ to: input.recipient, subject, html });
+      const result = await sendViaMailgun({
+        to: input.recipient,
+        subject,
+        html,
+        category: input.template,
+      });
       if (!result) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

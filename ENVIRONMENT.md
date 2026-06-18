@@ -46,6 +46,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 ### Vercel & Build Info
 
 - `VERCEL_ENV` - Vercel environment (`development`, `preview`, `production`); used in `apps/web/next.config.mjs`, `apps/web/src/lib/constants.ts`, and `apps/web/.env.test`. [SERVER]
+- `VERCEL_TARGET_ENV` - Auto-injected Vercel system or custom target (`production`, `preview`, `development`, `staging`, or another custom target). Transactional email is live only for `production`, redirected for `staging`, and suppressed for every other non-empty target. [SERVER]
 - `VERCEL_URL` - Auto-injected by Vercel; current deployment URL. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `VERCEL_GIT_COMMIT_SHA` - Auto-injected by Vercel; Git commit SHA of the current deployment. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `NEXT_PUBLIC_VERCEL_URL` - Client-exposed Vercel deployment URL from build info. [PUBLIC]
@@ -233,9 +234,12 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 ### Email & Notifications
 
-- `MAILGUN_API_KEY` - Mailgun API key for transactional email. `[SECRET]`
-- `MAILGUN_DOMAIN` - Mailgun sending domain. [SERVER]
-- `NEVERBOUNCE_API_KEY` - NeverBounce API key for email verification. `[SECRET]`
+- `MAILGUN_API_KEY` - Mailgun API key for transactional email. Used only when `VERCEL_TARGET_ENV` is `production` or `staging`. `[SECRET]`
+- `MAILGUN_DOMAIN` - Mailgun sending domain. Used only when `VERCEL_TARGET_ENV` is `production` or `staging`. [SERVER]
+- `NEVERBOUNCE_API_KEY` - NeverBounce API key for email verification. In staging, only the effective internal sink is verified. `[SECRET]`
+- `STAGING_EMAIL_REDIRECT_TO` - Required when `VERCEL_TARGET_ENV=staging`. Must contain exactly one valid address in the `kilocode.ai` domain; every staging message is redirected there with a staging subject prefix and safe Reply-To. [SERVER]
+
+When `VERCEL_TARGET_ENV` is absent in local development or a script process, transactional messages are captured as owner-only clickable HTML under `dev/logs/emails/` instead of being sent. Automated tests (including `IS_IN_AUTOMATED_TEST`) and non-production Vercel targets suppress provider delivery and report successful no-op delivery. A production-mode process without `VERCEL_TARGET_ENV` fails delivery as a configuration error so retryable email markers are not consumed as successful sends.
 
 ### Slack
 

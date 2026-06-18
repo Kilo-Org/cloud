@@ -233,9 +233,9 @@ grants billing access without consuming a seat.
    plus qualifying pending invitations) and total seats purchased.
 7. The system MUST allow seat usage to exceed total purchased seats
    (no hard block on over-usage at the counting layer).
-8. For Teams-plan organizations, the system MUST disable the
-   invitation UI when seat usage equals or exceeds the purchased
-   seat count.
+8. For Teams-plan organizations with the require-seats flag enabled,
+   the system MUST disable the invitation UI when seat usage equals
+   or exceeds the purchased seat count.
 9. For Enterprise-plan organizations, the system MUST NOT restrict
    invitations based on seat usage.
 10. The server MUST NOT enforce seat limits when processing

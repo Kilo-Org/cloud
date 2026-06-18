@@ -374,6 +374,39 @@ describe('auto routing worker', () => {
     });
   });
 
+  it('falls back to benchmark routing when the coding-plan default model is denied', async () => {
+    configGet.mockImplementation(async (key: string) =>
+      key.startsWith('coding_plan_preference:')
+        ? JSON.stringify({
+            active: true,
+            planId: 'minimax-token-plan-plus',
+            providerId: 'minimax',
+            modelId: 'minimax/minimax-m3',
+          })
+        : null
+    );
+
+    const response = await decideRequest(
+      mirrorPayload({
+        routingPolicy: { deniedModelIds: ['minimax/minimax-m3'] },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: mockClassifierResult.cost,
+      decision: {
+        model: 'google/gemini-2.5-flash-lite',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
+        sticky: false,
+      },
+    });
+    expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+  });
+
   it('loads and caches a coding-plan preference on cache miss', async () => {
     dbExecute.mockResolvedValueOnce({
       rows: [{ plan_id: 'minimax-token-plan-plus', provider_id: 'minimax' }],

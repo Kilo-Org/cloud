@@ -281,8 +281,9 @@ export const decideHandler: Handler<HonoEnv> = async c => {
 
   const payload = parsed.data;
   const startedAt = performance.now();
+  const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
   const codingPlanPreference = await getCodingPlanPreference(c.env, payload.userId);
-  if (codingPlanPreference.active) {
+  if (codingPlanPreference.active && !deniedModelIds.has(codingPlanPreference.modelId)) {
     const decision = codingPlanDefaultDecision(codingPlanPreference);
     writeClassifierMetricsDataPoint(c.env, {
       status: 'coding_plan_default',
@@ -317,7 +318,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     getCachedClassification(c.env, ctx.conversationKey, hashes.exact, classifierModel),
     getStickyDecision(c.env, ctx.conversationKey),
   ]);
-  const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
   if (cached) {
     const decision = computeDecision(cached, routingTable, stickyModel, deniedModelIds);
     if (decision) {

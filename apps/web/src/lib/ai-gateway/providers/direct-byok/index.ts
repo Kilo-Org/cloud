@@ -59,7 +59,8 @@ function convertModel(
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
     opencode: {
-      ai_sdk_provider: getAiSdkProvider(id) ?? provider.default_ai_sdk_provider,
+      ai_sdk_provider:
+        provider.force_ai_sdk_provider ?? getAiSdkProvider(id) ?? provider.default_ai_sdk_provider,
       variants: getModelVariants(id),
     } satisfies OpenCodeSettings,
   };

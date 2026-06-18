@@ -31,7 +31,7 @@ export async function POST(
     return await approveRequest(request, parseScopedRouteParams(await params));
   } catch (error) {
     if (error instanceof OAuthAuthorizationRedirectError) {
-      return redirectOAuthError(error);
+      return redirectOAuthError(error, 303);
     }
     return gatewayErrorResponse(error);
   }

@@ -308,10 +308,22 @@ export function createAuthorizationService(params: {
     redirectErrors?: boolean;
   }) {
     const prepared = await prepareAuthorization(input);
+    const organization =
+      prepared.resolved.config.owner_scope === 'organization'
+        ? await params.repository.findOrganization(prepared.resolved.config.owner_id)
+        : null;
     return {
       clientId: prepared.client.client_id,
       clientName: prepared.client.client_name,
+      redirectUri: input.query.redirect_uri,
       resource: prepared.resolved.route.canonical_url,
+      connectionName: prepared.resolved.config.name,
+      endpointHost: new URL(prepared.resolved.config.remote_url).host,
+      ownerScope: prepared.resolved.config.owner_scope,
+      contextName:
+        prepared.resolved.config.owner_scope === 'organization'
+          ? (organization?.name ?? 'Organization')
+          : 'Personal',
       scopes: prepared.scopes,
       executionContext: prepared.executionContext,
     };

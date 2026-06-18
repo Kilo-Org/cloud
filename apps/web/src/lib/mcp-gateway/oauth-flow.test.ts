@@ -169,6 +169,51 @@ describe('MCP gateway app OAuth flow', () => {
     ).rejects.toMatchObject({ code: 'invalid_client_metadata' });
   });
 
+  it('previews truthful consent details for a personal connection', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'Production GitHub',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['https://client.example/callback'],
+        token_endpoint_auth_method: 'client_secret_basic',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        scope: 'profile',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.44' }),
+    });
+
+    await expect(
+      services.authorizationService.previewAuthorization({
+        query: OAuthAuthorizationQuerySchema.parse({
+          client_id: registration.clientId,
+          redirect_uri: 'https://client.example/callback',
+          response_type: 'code',
+          scope: 'profile',
+          resource: created.route.canonical_url,
+        }),
+        userId: user.id,
+        executionContext: { type: 'personal' },
+      })
+    ).resolves.toMatchObject({
+      clientId: registration.clientId,
+      redirectUri: 'https://client.example/callback',
+      connectionName: 'Production GitHub',
+      endpointHost: 'example.com',
+      ownerScope: 'personal',
+      contextName: 'Personal',
+      resource: created.route.canonical_url,
+      scopes: ['profile'],
+    });
+  });
+
   it('issues an authorization code and rotates refresh tokens', async () => {
     const config = await createTestConfig();
     const services = createGatewayServices({ config });

@@ -103,7 +103,7 @@ describe('OAuth client metadata', () => {
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code'],
       response_types: ['code'],
-      scope: 'profile',
+      scope: 'mcp:access',
       client_uri: 'https://client.example',
       logo_uri: 'https://client.example/logo.svg',
       software_id: 'codex',
@@ -115,7 +115,7 @@ describe('OAuth client metadata', () => {
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code'],
       response_types: ['code'],
-      scope: 'profile',
+      scope: 'mcp:access',
     });
   });
 
@@ -140,7 +140,7 @@ describe('OAuth redirect URI policy', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       }).success
     ).toBe(true);
     expect(
@@ -149,7 +149,7 @@ describe('OAuth redirect URI policy', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       }).success
     ).toBe(true);
     expect(

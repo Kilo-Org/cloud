@@ -24,7 +24,7 @@ import { revokeGatewayStateForOrganizationMember } from './lifecycle-service';
 import type { GatewayAppConfig } from './config';
 import { createHash, generateKeyPairSync, createPublicKey } from 'node:crypto';
 import { OAuthAuthorizationQuerySchema, parseScopedConnectPath } from '@kilocode/mcp-gateway';
-import { pkceChallenge } from './crypto';
+import { hashToken, pkceChallenge } from './crypto';
 import { eq } from 'drizzle-orm';
 
 function createTestConfig(): Promise<GatewayAppConfig> {
@@ -167,6 +167,18 @@ describe('MCP gateway app OAuth flow', () => {
         headers,
       })
     ).rejects.toMatchObject({ code: 'invalid_client_metadata' });
+    await expect(
+      services.clientService.registerClient({
+        metadata: {
+          redirect_uris: ['http://localhost:3000/callback'],
+          token_endpoint_auth_method: 'none',
+          grant_types: ['authorization_code'],
+          response_types: ['code'],
+          scope: 'profile',
+        },
+        headers,
+      })
+    ).rejects.toMatchObject({ code: 'invalid_client_metadata' });
   });
 
   it('previews truthful consent details for a personal connection', async () => {
@@ -185,7 +197,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'client_secret_basic',
         grant_types: ['authorization_code'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.44' }),
     });
@@ -196,7 +208,7 @@ describe('MCP gateway app OAuth flow', () => {
           client_id: registration.clientId,
           redirect_uri: 'https://client.example/callback',
           response_type: 'code',
-          scope: 'profile',
+          scope: 'mcp:access',
           resource: created.route.canonical_url,
         }),
         userId: user.id,
@@ -210,8 +222,62 @@ describe('MCP gateway app OAuth flow', () => {
       ownerScope: 'personal',
       contextName: 'Personal',
       resource: created.route.canonical_url,
-      scopes: ['profile'],
+      scopes: ['mcp:access'],
     });
+  });
+
+  it('rejects profile-only authorization for an MCP resource', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'Profile-only test MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['https://client.example/callback'],
+        token_endpoint_auth_method: 'client_secret_basic',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        scope: 'mcp:access profile',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.46' }),
+    });
+
+    await expect(
+      services.authorizationService.authorize({
+        query: OAuthAuthorizationQuerySchema.parse({
+          client_id: registration.clientId,
+          redirect_uri: 'https://client.example/callback',
+          response_type: 'code',
+          scope: 'profile',
+          resource: created.route.canonical_url,
+        }),
+        userId: user.id,
+        executionContext: { type: 'personal' },
+      })
+    ).rejects.toMatchObject({ code: 'invalid_scope' });
+
+    await db
+      .update(mcp_gateway_oauth_clients)
+      .set({ declared_scopes: ['profile'] })
+      .where(eq(mcp_gateway_oauth_clients.client_id, registration.clientId));
+    await expect(
+      services.authorizationService.authorize({
+        query: OAuthAuthorizationQuerySchema.parse({
+          client_id: registration.clientId,
+          redirect_uri: 'https://client.example/callback',
+          response_type: 'code',
+          scope: 'mcp:access',
+          resource: created.route.canonical_url,
+        }),
+        userId: user.id,
+        executionContext: { type: 'personal' },
+      })
+    ).rejects.toMatchObject({ code: 'unauthorized_client' });
   });
 
   it('issues an authorization code and rotates refresh tokens', async () => {
@@ -231,7 +297,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access profile',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.15' }),
     });
@@ -244,7 +310,7 @@ describe('MCP gateway app OAuth flow', () => {
       client_id: registration.clientId,
       redirect_uri: 'http://localhost:3000/callback',
       response_type: 'code',
-      scope: 'profile',
+      scope: 'mcp:access profile',
       state: 'client-state',
       resource: created.route.canonical_url,
       code_challenge: pkceChallenge(verifier),
@@ -276,6 +342,8 @@ describe('MCP gateway app OAuth flow', () => {
     const claims = await services.tokenService.verifyUserInfoToken(tokenResponse.access_token);
     expect(claims.sub).toBe(user.id);
     expect(claims.aud).toBe(created.route.canonical_url);
+    expect(claims.scope).toBe('mcp:access profile');
+    expect(tokenResponse.scope).toBe('mcp:access profile');
     await expect(services.tokenService.userInfo(tokenResponse.access_token)).resolves.toEqual({
       sub: user.id,
       name: user.google_user_name,
@@ -283,6 +351,16 @@ describe('MCP gateway app OAuth flow', () => {
       picture: user.google_user_image_url,
       updated_at: expect.any(String),
       email: user.google_user_email,
+    });
+    const derivedToken = await services.tokenService.mintDerivedConnectToken({
+      route,
+      userId: user.id,
+      executionContext: { type: 'personal' },
+    });
+    const derivedClaims = await services.tokenService.verifyUserInfoToken(derivedToken.token);
+    expect(derivedClaims.scope).toBe('mcp:access');
+    await expect(services.tokenService.userInfo(derivedToken.token)).rejects.toMatchObject({
+      code: 'invalid_scope',
     });
 
     const refreshed = await services.tokenService.exchangeToken({
@@ -304,6 +382,26 @@ describe('MCP gateway app OAuth flow', () => {
         headers: new Headers(),
       })
     ).rejects.toMatchObject({ code: 'invalid_grant' });
+
+    await db
+      .update(mcp_gateway_refresh_tokens)
+      .set({ granted_scopes: ['profile'] })
+      .where(eq(mcp_gateway_refresh_tokens.token_hash, hashToken(refreshed.refresh_token)));
+    await expect(
+      services.tokenService.exchangeToken({
+        request: {
+          grant_type: 'refresh_token',
+          refresh_token: refreshed.refresh_token,
+          client_id: registration.clientId,
+        },
+        headers: new Headers(),
+      })
+    ).rejects.toMatchObject({ code: 'invalid_grant' });
+    const [legacyRefreshToken] = await db
+      .select()
+      .from(mcp_gateway_refresh_tokens)
+      .where(eq(mcp_gateway_refresh_tokens.token_hash, hashToken(refreshed.refresh_token)));
+    expect(legacyRefreshToken?.consumed_at).toBeNull();
   });
 
   it('redeems client_secret_basic credentials with namespace client IDs', async () => {
@@ -322,7 +420,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'client_secret_basic',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.31' }),
     });
@@ -332,6 +430,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'https://client.example/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
       }),
       userId: user.id,
@@ -363,7 +462,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.32' }),
     });
@@ -376,7 +475,7 @@ describe('MCP gateway app OAuth flow', () => {
           token_endpoint_auth_method: 'client_secret_post',
           grant_types: ['authorization_code', 'refresh_token'],
           response_types: ['code'],
-          scope: 'profile',
+          scope: 'mcp:access',
         },
       })
     ).rejects.toMatchObject({ code: 'invalid_client_metadata' });
@@ -404,7 +503,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.29' }),
     });
@@ -415,6 +514,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(verifier),
         code_challenge_method: 'S256',
@@ -425,15 +525,36 @@ describe('MCP gateway app OAuth flow', () => {
     if (authorization.kind !== 'redirect') return;
     const code = new URL(authorization.redirectUrl).searchParams.get('code');
     if (!code) return;
+    const codeHash = createHash('sha256').update(code).digest('hex');
     await db
       .update(mcp_gateway_authorization_codes)
-      .set({ expires_at: new Date(Date.now() - 1_000).toISOString() })
-      .where(
-        eq(
-          mcp_gateway_authorization_codes.code_hash,
-          createHash('sha256').update(code).digest('hex')
-        )
-      );
+      .set({ granted_scopes: ['profile'] })
+      .where(eq(mcp_gateway_authorization_codes.code_hash, codeHash));
+    await expect(
+      services.tokenService.exchangeToken({
+        request: {
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: 'http://localhost:3000/callback',
+          client_id: registration.clientId,
+          code_verifier: verifier,
+        },
+        headers: new Headers(),
+      })
+    ).rejects.toMatchObject({ code: 'invalid_grant' });
+    const [legacyCode] = await db
+      .select()
+      .from(mcp_gateway_authorization_codes)
+      .where(eq(mcp_gateway_authorization_codes.code_hash, codeHash));
+    expect(legacyCode?.consumed_at).toBeNull();
+
+    await db
+      .update(mcp_gateway_authorization_codes)
+      .set({
+        expires_at: new Date(Date.now() - 1_000).toISOString(),
+        granted_scopes: ['mcp:access'],
+      })
+      .where(eq(mcp_gateway_authorization_codes.code_hash, codeHash));
     await expect(
       services.tokenService.exchangeToken({
         request: {
@@ -464,7 +585,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.19' }),
     });
@@ -475,6 +596,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(verifier),
         code_challenge_method: 'S256',
@@ -685,7 +807,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.32' }),
     });
@@ -696,6 +818,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(verifier),
         code_challenge_method: 'S256',
@@ -804,7 +927,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.17' }),
     });
@@ -815,7 +938,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
-        scope: 'profile',
+        scope: 'mcp:access',
         state: 'client-state',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(verifier),
@@ -896,7 +1019,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.30' }),
     });
@@ -905,6 +1028,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(
           'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
@@ -980,7 +1104,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.16' }),
     });
@@ -991,7 +1115,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
-        scope: 'profile',
+        scope: 'mcp:access',
         state: 'client-state',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(verifier),
@@ -1135,7 +1259,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.18' }),
     });
@@ -1144,6 +1268,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(
           'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
@@ -1214,7 +1339,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.17' }),
     });
@@ -1222,6 +1347,7 @@ describe('MCP gateway app OAuth flow', () => {
       client_id: registration.clientId,
       redirect_uri: 'http://localhost:3000/callback',
       response_type: 'code',
+      scope: 'mcp:access',
       resource: created.route.canonical_url,
       code_challenge: pkceChallenge(
         'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
@@ -1269,7 +1395,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.18' }),
     });
@@ -1277,6 +1403,7 @@ describe('MCP gateway app OAuth flow', () => {
       client_id: registration.clientId,
       redirect_uri: 'http://localhost:3000/callback',
       response_type: 'code',
+      scope: 'mcp:access',
       resource: created.route.canonical_url,
       code_challenge: pkceChallenge(
         'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
@@ -1325,7 +1452,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.22' }),
     });
@@ -1343,8 +1470,8 @@ describe('MCP gateway app OAuth flow', () => {
         route_key: created.route.route_key,
         canonical_resource_url: created.route.canonical_url,
         redirect_uri: 'http://localhost:3000/callback',
-        requested_scopes: ['profile'],
-        granted_scopes: ['profile'],
+        requested_scopes: ['mcp:access'],
+        granted_scopes: ['mcp:access'],
         execution_context: { type: 'organization', organizationId },
         kilo_user_id: user.id,
         instance_id: instance.instance_id,
@@ -1363,7 +1490,7 @@ describe('MCP gateway app OAuth flow', () => {
       route_key: created.route.route_key,
       canonical_resource_url: created.route.canonical_url,
       redirect_uri: 'http://localhost:3000/callback',
-      granted_scopes: ['profile'],
+      granted_scopes: ['mcp:access'],
       execution_context: { type: 'organization', organizationId },
       kilo_user_id: user.id,
       instance_id: instance.instance_id,
@@ -1378,7 +1505,7 @@ describe('MCP gateway app OAuth flow', () => {
       config_id: created.config.config_id,
       route_key: created.route.route_key,
       canonical_resource_url: created.route.canonical_url,
-      granted_scopes: ['profile'],
+      granted_scopes: ['mcp:access'],
       execution_context: { type: 'organization', organizationId },
       kilo_user_id: user.id,
       instance_id: instance.instance_id,

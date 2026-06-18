@@ -13,9 +13,9 @@ const publicRegistration: GatewayOAuthClientRegistration = {
     token_endpoint_auth_method: 'none',
     grant_types: ['authorization_code', 'refresh_token'],
     response_types: ['code'],
-    scope: 'profile',
+    scope: 'mcp:access',
   },
-  declaredScopes: ['profile'],
+  declaredScopes: ['mcp:access'],
 };
 
 describe('serializeRegistrationResponse', () => {
@@ -29,7 +29,7 @@ describe('serializeRegistrationResponse', () => {
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
-      scope: 'profile',
+      scope: 'mcp:access',
       registration_access_token: 'registration-token',
       registration_access_token_expires_at: '2026-06-04T20:00:00.000Z',
       registration_client_uri:

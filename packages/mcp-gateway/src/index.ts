@@ -10,6 +10,7 @@ export {
   GatewayAuthorizationRequestStatus,
   GatewayPendingProviderAuthorizationStatus,
   GatewaySecretKind,
+  GatewayMcpAccessScope,
   GatewaySupportedScopes,
   GatewayAuditOutcome,
   GatewayExecutionContextSchema,

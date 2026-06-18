@@ -4,6 +4,7 @@ import {
   GatewayAuthorizationRequestStatus,
   GatewayInstanceStatus,
   GatewayOAuthClientAuthMethod,
+  GatewayMcpAccessScope,
   createGatewayError,
   GatewayErrorCode,
   GatewayError,
@@ -97,6 +98,13 @@ export function createAuthorizationService(params: {
       throw createGatewayError(
         GatewayErrorCode.InvalidScope,
         'Scope is not declared by client',
+        400
+      );
+    }
+    if (!supportedScopes.includes(GatewayMcpAccessScope)) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidScope,
+        `${GatewayMcpAccessScope} scope is required`,
         400
       );
     }
@@ -251,6 +259,12 @@ export function createAuthorizationService(params: {
       if (!input.query.code_challenge || input.query.code_challenge_method !== 'S256') {
         redirectError(GatewayErrorCode.InvalidRequest, 'PKCE is required for public clients');
       }
+    }
+    if (!client.declared_scopes.includes(GatewayMcpAccessScope)) {
+      redirectError(
+        GatewayErrorCode.UnauthorizedClient,
+        `Client must register the ${GatewayMcpAccessScope} scope`
+      );
     }
     let route: ScopedConnectRoute;
     let resolved: ResolvedGatewayRoute;

@@ -1,13 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
+const { mockResolveActiveRoute, mockResolveRuntimeState, mockVerifyGatewayToken } = vi.hoisted(
+  () => ({
+    mockResolveActiveRoute: vi.fn(),
+    mockResolveRuntimeState: vi.fn(),
+    mockVerifyGatewayToken: vi.fn(),
+  })
+);
+
 vi.mock('./db/runtime-repository', () => ({
-  resolveActiveRoute: async ({ route }: { route: { routeKey: string } }) =>
-    route.routeKey === 'abcdefghijklmnopqrstuvwxyzABCDEF'
-      ? { route: { route_key: route.routeKey }, config: { enabled: true } }
-      : null,
-  resolveRuntimeState: async () => null,
+  resolveActiveRoute: mockResolveActiveRoute,
+  resolveRuntimeState: mockResolveRuntimeState,
   recordRuntimeAudit: async () => undefined,
+}));
+
+vi.mock('./lib/jwt', () => ({
+  verifyGatewayToken: mockVerifyGatewayToken,
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -27,11 +36,24 @@ const orgMetadataRoute = `/.well-known/oauth-protected-resource${orgRoute}`;
 const env = {
   APP_BASE_URL: 'https://app.kilo.ai',
   MCP_GATEWAY_BASE_URL: 'https://mcp.kilosessions.ai',
+  MCP_GATEWAY_JWT_ISSUER: 'https://app.kilo.ai',
+  MCP_GATEWAY_JWT_PUBLIC_KEYSET_JSON: '{"keys":[]}',
 } as Env;
 
 async function request(path: string, method = 'GET') {
   return app.request(`https://mcp.kilosessions.ai${path}`, { method }, env);
 }
+
+beforeEach(() => {
+  mockResolveActiveRoute.mockReset();
+  mockResolveActiveRoute.mockImplementation(({ route }: { route: { routeKey: string } }) =>
+    route.routeKey === 'abcdefghijklmnopqrstuvwxyzABCDEF'
+      ? { route: { route_key: route.routeKey }, config: { enabled: true } }
+      : null
+  );
+  mockResolveRuntimeState.mockReset();
+  mockVerifyGatewayToken.mockReset();
+});
 
 describe('MCP gateway route surface', () => {
   it('returns health independently of runtime behavior', async () => {
@@ -57,7 +79,7 @@ describe('MCP gateway route surface', () => {
       expect(challenge).toContain(
         `resource_metadata="https://mcp.kilosessions.ai/.well-known/oauth-protected-resource${expectedRoutes[index]}"`
       );
-      expect(challenge).toContain('scope="profile"');
+      expect(challenge).toContain('scope="mcp:access"');
     }
   });
 
@@ -74,6 +96,73 @@ describe('MCP gateway route surface', () => {
     }
   });
 
+  it('rejects a valid token without mcp:access before loading runtime state', async () => {
+    mockVerifyGatewayToken.mockResolvedValue({
+      iss: 'https://app.kilo.ai',
+      sub: 'user-123',
+      aud: `https://mcp.kilosessions.ai${userRoute}`,
+      exp: Math.floor(Date.now() / 1000) + 900,
+      iat: Math.floor(Date.now() / 1000),
+      scope: 'profile',
+      MCPID:
+        'personal:user-123:11111111-1111-4111-8111-111111111111:abcdefghijklmnopqrstuvwxyzABCDEF',
+      owner_scope: 'personal',
+      owner_id: 'user-123',
+      config_id: '11111111-1111-4111-8111-111111111111',
+      route_key: 'abcdefghijklmnopqrstuvwxyzABCDEF',
+      instance_id: '44444444-4444-4444-8444-444444444444',
+      execution_context: { type: 'personal' },
+      config_version: 1,
+    });
+
+    const response = await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer valid-profile-token' } },
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('www-authenticate')).toContain('error="insufficient_scope"');
+    expect(response.headers.get('www-authenticate')).toContain('scope="mcp:access"');
+    await expect(response.json()).resolves.toEqual({
+      error: 'insufficient_scope',
+      resource: `https://mcp.kilosessions.ai${userRoute}`,
+    });
+    expect(mockResolveActiveRoute).not.toHaveBeenCalled();
+    expect(mockResolveRuntimeState).not.toHaveBeenCalled();
+  });
+
+  it('loads runtime state for a valid token with mcp:access', async () => {
+    mockVerifyGatewayToken.mockResolvedValue({
+      iss: 'https://app.kilo.ai',
+      sub: 'user-123',
+      aud: `https://mcp.kilosessions.ai${userRoute}`,
+      exp: Math.floor(Date.now() / 1000) + 900,
+      iat: Math.floor(Date.now() / 1000),
+      scope: 'mcp:access',
+      MCPID:
+        'personal:user-123:11111111-1111-4111-8111-111111111111:abcdefghijklmnopqrstuvwxyzABCDEF',
+      owner_scope: 'personal',
+      owner_id: 'user-123',
+      config_id: '11111111-1111-4111-8111-111111111111',
+      route_key: 'abcdefghijklmnopqrstuvwxyzABCDEF',
+      instance_id: '44444444-4444-4444-8444-444444444444',
+      execution_context: { type: 'personal' },
+      config_version: 1,
+    });
+
+    const response = await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer valid-mcp-access-token' } },
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('www-authenticate')).toBeNull();
+    expect(mockResolveActiveRoute).toHaveBeenCalledOnce();
+    expect(mockResolveRuntimeState).toHaveBeenCalledOnce();
+  });
+
   it('returns generic and scoped protected-resource metadata', async () => {
     const responses = await Promise.all([
       request('/.well-known/oauth-protected-resource'),
@@ -85,7 +174,7 @@ describe('MCP gateway route surface', () => {
     await expect(responses[0].json()).resolves.toEqual({
       resource: 'https://mcp.kilosessions.ai/mcp-connect',
       authorization_servers: ['https://app.kilo.ai'],
-      scopes_supported: ['profile'],
+      scopes_supported: ['mcp:access'],
     });
     const metadataSchema = z.object({
       authorization_servers: z.array(z.string()),
@@ -95,7 +184,7 @@ describe('MCP gateway route surface', () => {
       expect(response.status).toBe(200);
       const body = metadataSchema.parse(await response.json());
       expect(body.authorization_servers).toEqual(['https://app.kilo.ai']);
-      expect(body.scopes_supported).toEqual(['profile']);
+      expect(body.scopes_supported).toEqual(['mcp:access']);
     }
   });
 

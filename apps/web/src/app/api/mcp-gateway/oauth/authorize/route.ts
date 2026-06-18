@@ -1,6 +1,10 @@
 import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
-import { OAuthAuthorizationQuerySchema, type OAuthAuthorizationQuery } from '@kilocode/mcp-gateway';
+import {
+  GatewayMcpAccessScope,
+  OAuthAuthorizationQuerySchema,
+  type OAuthAuthorizationQuery,
+} from '@kilocode/mcp-gateway';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { getUserFromAuth } from '@/lib/user/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
@@ -154,6 +158,12 @@ function clearConsentCookie(response: NextResponse, request: NextRequest, approv
   });
 }
 
+function consentScopeLabel(scope: string) {
+  if (scope === GatewayMcpAccessScope) return 'Use this MCP connection';
+  if (scope === 'profile') return 'View your Kilo profile';
+  return scope;
+}
+
 function consentDocument(params: {
   action: string;
   approvalState: string;
@@ -172,8 +182,10 @@ function consentDocument(params: {
   const callbackIsLoopback = ['127.0.0.1', '[::1]', 'localhost'].includes(callback.hostname);
   const scopes =
     params.scopes.length > 0
-      ? params.scopes.map(scope => `<span class="scope">${escapeHtml(scope)}</span>`).join('')
-      : '<span class="scope muted-scope">No additional OAuth scopes</span>';
+      ? params.scopes
+          .map(scope => `<span class="scope">${escapeHtml(consentScopeLabel(scope))}</span>`)
+          .join('')
+      : '<span class="scope muted-scope">No permissions requested</span>';
   const contextLabel = params.ownerScope === 'organization' ? 'Organization' : 'Context';
   const callbackExplanation = callbackIsLoopback
     ? 'Kilo will return the authorization result to an app running on this device.'
@@ -393,7 +405,7 @@ function consentDocument(params: {
                 <dd><span class="value-primary">${escapeHtml(callback.host)}</span><span class="value-secondary">${callbackExplanation}</span><code>${escapeHtml(params.redirectUri)}</code></dd>
               </div>
               <div class="detail">
-                <dt>OAuth scopes</dt>
+                <dt>Permissions</dt>
                 <dd><div class="scopes">${scopes}</div></dd>
               </div>
             </dl>

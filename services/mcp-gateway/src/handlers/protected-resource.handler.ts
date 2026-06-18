@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import {
   buildScopedConnectCanonicalUrl,
+  GatewayMcpAccessScope,
   parseScopedConnectPath,
   OrgConnectRouteParamsSchema,
   UserConnectRouteParamsSchema,
@@ -14,7 +15,7 @@ function metadata(c: Context<MCPGatewayEnv>, resource: string) {
   return c.json({
     resource,
     authorization_servers: [c.env.APP_BASE_URL],
-    scopes_supported: ['profile'],
+    scopes_supported: [GatewayMcpAccessScope],
   });
 }
 

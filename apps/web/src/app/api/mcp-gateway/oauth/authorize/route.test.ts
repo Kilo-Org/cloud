@@ -90,7 +90,7 @@ function organizationPreview() {
     endpointHost: 'mcp.github.example',
     contextName: 'Acme Engineering',
     ownerScope: 'organization' as const,
-    scopes: ['profile'],
+    scopes: ['mcp:access'],
     executionContext: {
       type: 'organization',
       organizationId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
@@ -115,7 +115,7 @@ function authorizationUrl(redirectUri = 'http://127.0.0.1:60424/callback') {
     response_type: 'code',
     resource:
       'http://localhost:8806/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
-    scope: 'profile',
+    scope: 'mcp:access',
     state: 'client-state',
   });
   return `http://localhost:3000/api/mcp-gateway/oauth/authorize?${query}`;
@@ -133,7 +133,7 @@ function approvalRequest(
     response_type: 'code',
     resource:
       'http://localhost:8806/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
-    scope: 'profile',
+    scope: 'mcp:access',
     state: 'client-state',
     approval_state: approvalState,
     decision,
@@ -254,6 +254,9 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
     expect(document).toContain('alice@example.com');
     expect(document).toContain('This grants broad MCP access');
     expect(document).toContain('all tools and data exposed by this MCP connection');
+    expect(document).toContain('Permissions');
+    expect(document).toContain('Use this MCP connection');
+    expect(document).not.toContain('<span class="scope">mcp:access</span>');
     expect(document).toContain('credentials configured for the connection');
     expect(document).toContain('https://client.example/callback?source=mcp&amp;mode=desktop');
     expect(document).toContain('Deny access');
@@ -441,7 +444,7 @@ describe('POST /api/mcp-gateway/oauth/authorize validation', () => {
       response_type: 'code',
       resource:
         'http://localhost:8806/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
-      scope: 'profile',
+      scope: 'mcp:access',
       state: 'client-state',
       approval_state: 'first-state',
     });
@@ -475,7 +478,7 @@ describe('scoped POST /api/mcp-gateway/oauth/authorize/...', () => {
       client_id: 'mcp:client',
       redirect_uri: 'http://127.0.0.1:60424/callback',
       response_type: 'code',
-      scope: 'profile',
+      scope: 'mcp:access',
       state: 'client-state',
       approval_state: 'approval-state',
       decision: 'allow',

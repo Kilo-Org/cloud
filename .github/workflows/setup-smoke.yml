@@ -4,6 +4,16 @@ on:
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.env.local.example'
+      - 'apps/web/.env'
+      - 'apps/web/.env.development.local.example'
+      - 'dev/local/setup-env.ts'
+      - 'dev/local/env-sync/**'
+      - 'scripts/dev.sh'
+      - '.github/workflows/setup-smoke.yml'
 
 permissions:
   contents: read
@@ -147,7 +157,7 @@ jobs:
           retention-days: 7
 
       - name: Notify setup smoke failure
-        if: failure()
+        if: failure() && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: '3791'

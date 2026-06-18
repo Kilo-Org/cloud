@@ -21,6 +21,11 @@ const PLACEHOLDER_DOMAINS = [
   'admin.example.com',
 ];
 const EXCLUDED_PATH_PARTS = new Set(['tests', 'scripts']);
+const MAILGUN_ACCESS_PATTERNS = [
+  /from ['"]mailgun\.js['"]/,
+  /api\.mailgun\.net/,
+  /messages\.create\s*\(/,
+];
 
 function listProductionSourceFiles(dir: string): string[] {
   const entries = readdirSync(dir);
@@ -33,6 +38,26 @@ function listProductionSourceFiles(dir: string): string[] {
       if (!EXCLUDED_PATH_PARTS.has(entry)) {
         files.push(...listProductionSourceFiles(path));
       }
+      continue;
+    }
+
+    if (!SOURCE_EXTENSIONS.has(extname(path))) continue;
+    if (path.endsWith('.test.ts') || path.endsWith('.test.tsx')) continue;
+    files.push(path);
+  }
+
+  return files;
+}
+
+function listNonTestSourceFiles(dir: string): string[] {
+  const entries = readdirSync(dir);
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const path = join(dir, entry);
+    const stats = statSync(path);
+    if (stats.isDirectory()) {
+      files.push(...listNonTestSourceFiles(path));
       continue;
     }
 
@@ -64,5 +89,17 @@ describe('email literal guardrail', () => {
     });
 
     expect(findings).toEqual([]);
+  });
+
+  it('keeps Mailgun provider access behind the environment-aware transport', () => {
+    const srcRoot = join(process.cwd(), 'src');
+    const providerFiles = listNonTestSourceFiles(srcRoot)
+      .filter(file => {
+        const content = readFileSync(file, 'utf8');
+        return MAILGUN_ACCESS_PATTERNS.some(pattern => pattern.test(content));
+      })
+      .map(file => relative(process.cwd(), file));
+
+    expect(providerFiles).toEqual(['src/lib/email-mailgun.ts']);
   });
 });

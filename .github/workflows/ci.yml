@@ -47,6 +47,10 @@ jobs:
           filters: |
             kilocode_backend:
               - 'apps/web/src/**'
+              - 'apps/web/.env'
+              - 'apps/web/.env.test'
+              - 'apps/web/.env.development.local.example'
+              - '.env.local.example'
               - 'apps/web/package.json'
               - 'apps/web/tsconfig.json'
               - 'apps/web/tsconfig.*.json'

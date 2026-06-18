@@ -1336,6 +1336,48 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
   });
 
+  it('maps provider-routing prepareSession failures to action-required terminal reason', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcError(
+          400,
+          'Not Found: {"error":"No eligible provider can serve the selected model.","error_type":"provider_not_allowed","message":"No eligible provider can serve the selected model. Select another model or update the provider routing settings."}',
+          'BAD_REQUEST'
+        );
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(lastStatusUpdateBody(fetchMock)).toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'failed',
+      terminalReason: 'selected_model_unavailable',
+    });
+  });
+
   it('maps model-not-allowed prepareSession 400 failures to action-required terminal reason', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {

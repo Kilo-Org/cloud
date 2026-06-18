@@ -113,9 +113,39 @@ export const githubAppsRouter = createTRPCRouter({
         suspendedBy: integration.suspended_by,
         installedAt: integration.installed_at,
         status,
+        modelSlug: (metadata?.model_slug as string) || null,
       },
     };
   }),
+
+  // Update the model for GitHub App integration
+  updateModel: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        modelSlug: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
+      const result = await githubAppsService.updateModel(owner, input.modelSlug);
+
+      if (input.organizationId && result.success) {
+        await createAuditLog({
+          organization_id: input.organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          message: `Updated GitHub App integration model to ${input.modelSlug}`,
+        });
+      }
+
+      return result;
+    }),
 
   // Check if current user has a pending installation.
   // Note: This is intentionally user-scoped (ctx.user.id) even when an organizationId is

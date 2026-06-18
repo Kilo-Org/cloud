@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  BenchmarkConfig,
-  BenchmarkModelSummary,
-  RoutingTable,
+import {
+  DEFAULT_BENCHMARK_ORG_ID,
+  DEFAULT_BENCHMARK_USER_ID,
+  type BenchmarkConfig,
+  type BenchmarkModelSummary,
+  type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import { computeEngineIdentity } from './run';
@@ -38,6 +40,8 @@ const TEST_CONFIG: BenchmarkConfig = {
   classifierRepetitions: 1,
   deciderRepetitions: 1,
   classifierMaxP95LatencyMs: 1000,
+  autoDeciderMinCostUsd: 15,
+  autoDeciderMaxCostUsd: 25,
   updatedAt: null,
   updatedBy: null,
 };
@@ -54,6 +58,8 @@ const TEST_CONFIG_ROWS = {
     classifier_repetitions: TEST_CONFIG.classifierRepetitions,
     decider_repetitions: TEST_CONFIG.deciderRepetitions,
     classifier_max_p95_latency_ms: TEST_CONFIG.classifierMaxP95LatencyMs,
+    auto_decider_min_cost_usd: TEST_CONFIG.autoDeciderMinCostUsd,
+    auto_decider_max_cost_usd: TEST_CONFIG.autoDeciderMaxCostUsd,
     updated_at: '2026-06-01T00:00:00.000Z',
     updated_by: null,
   },
@@ -62,6 +68,8 @@ const TEST_CONFIG_ROWS = {
     model: m.id,
     reasoning_effort: m.reasoningEffort ?? null,
   })),
+  autoDeciderModels: [],
+  excludedAutoDeciderModels: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -153,6 +161,8 @@ beforeEach(() => {
     config: null,
     classifierModels: [],
     deciderModels: [],
+    autoDeciderModels: [],
+    excludedAutoDeciderModels: [],
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
@@ -214,11 +224,15 @@ describe('GET /admin/config', () => {
         classifier_repetitions: 1,
         decider_repetitions: 1,
         classifier_max_p95_latency_ms: null,
+        auto_decider_min_cost_usd: 12,
+        auto_decider_max_cost_usd: 24,
         updated_at: '2026-06-01T00:00:00.000Z',
         updated_by: 'admin@example.com',
       },
       classifierModels,
       deciderModels,
+      autoDeciderModels: [],
+      excludedAutoDeciderModels: [],
     });
 
     const res = await authedGet('/admin/config');
@@ -278,6 +292,13 @@ describe('PUT /admin/config', () => {
     const validConfig = {
       ...TEST_CONFIG,
       minAccuracy: 0.85,
+      deciderModels: [
+        { id: 'manual/model', reasoningEffort: 'low' },
+        { id: 'auto/model', reasoningEffort: null },
+      ],
+      manualDeciderModels: [{ id: 'manual/model', reasoningEffort: 'low' }],
+      autoDeciderModels: [{ id: 'auto/model', reasoningEffort: null, avgAttemptCostUsd: 20 }],
+      excludedAutoDeciderModels: ['auto/excluded'],
       updatedAt: null,
       updatedBy: null,
     };
@@ -295,10 +316,15 @@ describe('PUT /admin/config', () => {
     expect(typeof body.config.updatedAt).toBe('string');
 
     expect(replaceConfig).toHaveBeenCalledOnce();
-    const [, configArg] = vi.mocked(replaceConfig).mock.calls[0];
+    const [, configArg, , deciderModelRows, excludedAutoDeciderModels] =
+      vi.mocked(replaceConfig).mock.calls[0];
     expect(configArg.min_accuracy).toBe(0.85);
+    expect(configArg.auto_decider_min_cost_usd).toBe(15);
+    expect(configArg.auto_decider_max_cost_usd).toBe(25);
     expect(typeof configArg.updated_at).toBe('string');
     expect(configArg.updated_by).toBe('igor@kilocode.ai');
+    expect(deciderModelRows).toEqual([{ model: 'manual/model', reasoning_effort: 'low' }]);
+    expect(excludedAutoDeciderModels).toEqual(['auto/excluded']);
   });
 });
 
@@ -399,6 +425,8 @@ describe('POST /admin/runs', () => {
     const [, runArg] = vi.mocked(insertRun).mock.calls[0];
     expect(runArg.min_accuracy).toBe(TEST_CONFIG.minAccuracy);
     expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
+    expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
+    expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
     const queuedMessages = queueSendBatch.mock.calls.flatMap(([messages]) => messages);
     expect(queueSendBatch).toHaveBeenCalledTimes(2);
     expect(queuedMessages).toHaveLength(
@@ -411,6 +439,25 @@ describe('POST /admin/runs', () => {
       caseIds: [CLASSIFIER_CASES[0].id],
       rep: 0,
     });
+  });
+
+  it('starts a decider run with default benchmark identity when overrides are null', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        benchmark_user_id: null,
+        benchmark_org_id: null,
+      },
+      deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+    expect(insertRun).toHaveBeenCalledOnce();
+    const [, runArg] = vi.mocked(insertRun).mock.calls[0];
+    expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
+    expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
   });
 
   it('carries a decider model only when its benchmark identity still matches', async () => {

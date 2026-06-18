@@ -150,6 +150,28 @@ The setup covers: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `POSTGRES_URL`, `CALLBACK_T
 
 These changes will allow you to do local testing with a fake account.
 
+#### c. Add or rotate shared web environment variables
+
+Use the repository workflow instead of editing Vercel projects independently. It updates `kilocode-app` and `kilocode-global-app` together for Development, Staging, and Production:
+
+```bash
+pnpm web:env set EXAMPLE_API_TOKEN
+```
+
+Prerequisites:
+
+- Sign in with `vercel login` and have access to both projects in the `kilocode` scope.
+- Install the 1Password CLI and have write access to the `Kilo Web ENV Production` vault. If needed, the CLI prompts you to sign in with Touch ID.
+- Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
+
+The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production value is also stored as a concealed, exact-name item in `Kilo Web ENV Production`; its notes identify the local user and computer that last updated it.
+
+Answer no for public or otherwise non-secret configuration. `NEXT_PUBLIC_*` variables must be non-sensitive because Next.js exposes them to browsers. Non-sensitive values are not copied to 1Password.
+
+The command prompts for single-line values without echoing them, then asks for a default value for each tracked root and `apps/web` dotenv file. Enter a value directly, or press Return to skip that file. If every file is skipped, the command warns that the application must work without the variable so external contributors can still run it. A tracked default cannot match a remote value; use a non-secret local default instead. Invalid yes/no answers and empty remote values are prompted again instead of terminating the command. For multiline values, use `--development-file`, `--staging-file`, and `--production-file`. Use `--dry-run` to preview the redacted plan.
+
+Remote updates are sequential rather than transactional. If a provider fails partway through, fix the problem and rerun the same command; it safely upserts every target. The workflow does not deploy, so trigger the appropriate deployment separately.
+
 ### 4. Start the database
 
 The project uses PostgreSQL 18 with pgvector, running via Docker. The compose file is at `dev/docker-compose.yml`:

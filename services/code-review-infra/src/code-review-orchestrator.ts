@@ -107,6 +107,8 @@ function isSelectedModelActionRequiredMessage(message: string): boolean {
   return (
     message.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
     message.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE) ||
+    message.includes('provider_not_allowed') ||
+    message.includes('no eligible provider can serve the selected model.') ||
     message.includes('no allowed providers are specified.') ||
     message.includes('no allowed providers are available for the selected model.') ||
     message.includes('no endpoints found matching your data policy')

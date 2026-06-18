@@ -11,6 +11,6 @@ export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
   delete requestToMutate.body.top_p;
 }
 
-export const KIMI_CURRENT_MODEL_ID = 'moonshotai/kimi-k2.6';
+export const KIMI_CURRENT_MODEL_ID = 'moonshotai/kimi-k2.7-code';
 
 export const KIMI_CURRENT_VERCEL_MODEL_ID = KIMI_CURRENT_MODEL_ID;

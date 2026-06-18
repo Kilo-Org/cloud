@@ -14,6 +14,8 @@ import {
   benchmarkConfig,
   benchmarkRuns,
   caseResults,
+  configAutoDeciderExclusions,
+  configAutoDeciderModels,
   configClassifierModels,
   configDeciderModels,
   modelSummaries,
@@ -22,11 +24,13 @@ import {
   runModels,
 } from './db-schema';
 import { pickClassifierWinner } from './winner';
+import { parsePersistedReasoningEffort } from './reasoning-effort';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
 export type RunModelRow = typeof runModels.$inferSelect;
 export type ConfigDeciderModelRow = typeof configDeciderModels.$inferSelect;
+export type ConfigAutoDeciderModelRow = typeof configAutoDeciderModels.$inferSelect;
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 
 // D1 rejects statements with too many bound variables. A model summary insert
@@ -78,17 +82,24 @@ export async function getConfigRows(db: D1Database): Promise<{
   config: typeof benchmarkConfig.$inferSelect | null;
   classifierModels: string[];
   deciderModels: ConfigDeciderModelRow[];
+  autoDeciderModels: ConfigAutoDeciderModelRow[];
+  excludedAutoDeciderModels: string[];
 }> {
   const orm = drizzle(db);
-  const [configRows, classifierRows, deciderRows] = await Promise.all([
-    orm.select().from(benchmarkConfig).where(eq(benchmarkConfig.id, 1)).limit(1),
-    orm.select().from(configClassifierModels),
-    orm.select().from(configDeciderModels),
-  ]);
+  const [configRows, classifierRows, deciderRows, autoDeciderRows, exclusionRows] =
+    await Promise.all([
+      orm.select().from(benchmarkConfig).where(eq(benchmarkConfig.id, 1)).limit(1),
+      orm.select().from(configClassifierModels),
+      orm.select().from(configDeciderModels),
+      orm.select().from(configAutoDeciderModels),
+      orm.select().from(configAutoDeciderExclusions),
+    ]);
   return {
     config: configRows[0] ?? null,
     classifierModels: classifierRows.map(r => r.model),
     deciderModels: deciderRows,
+    autoDeciderModels: autoDeciderRows,
+    excludedAutoDeciderModels: exclusionRows.map(r => r.model),
   };
 }
 
@@ -103,11 +114,14 @@ export async function replaceConfig(
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
+    auto_decider_min_cost_usd: number;
+    auto_decider_max_cost_usd: number;
     updated_at: string;
     updated_by: string | null;
   },
   classifierModels: string[],
-  deciderModels: ConfigDeciderModelRow[]
+  deciderModels: ConfigDeciderModelRow[],
+  excludedAutoDeciderModels: string[] = []
 ): Promise<void> {
   const orm = drizzle(db);
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
@@ -120,6 +134,7 @@ export async function replaceConfig(
       }),
     orm.delete(configClassifierModels),
     orm.delete(configDeciderModels),
+    orm.delete(configAutoDeciderExclusions),
   ];
   if (classifierModels.length > 0) {
     stmts.push(
@@ -128,6 +143,27 @@ export async function replaceConfig(
   }
   if (deciderModels.length > 0) {
     stmts.push(orm.insert(configDeciderModels).values(deciderModels));
+  }
+  if (excludedAutoDeciderModels.length > 0) {
+    stmts.push(
+      orm
+        .insert(configAutoDeciderExclusions)
+        .values(excludedAutoDeciderModels.map(model => ({ model })))
+    );
+  }
+  await orm.batch(stmts);
+}
+
+export async function replaceAutoDeciderModels(
+  db: D1Database,
+  autoDeciderModels: ConfigAutoDeciderModelRow[]
+): Promise<void> {
+  const orm = drizzle(db);
+  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
+    orm.delete(configAutoDeciderModels),
+  ];
+  if (autoDeciderModels.length > 0) {
+    stmts.push(orm.insert(configAutoDeciderModels).values(autoDeciderModels));
   }
   await orm.batch(stmts);
 }
@@ -181,10 +217,11 @@ export async function insertRun(
     stmts.push(orm.insert(runModels).values(models));
   }
 
-  if (carriedSummaries.length > 0) {
+  for (let i = 0; i < carriedSummaries.length; i += MODEL_SUMMARY_INSERT_BATCH_SIZE) {
+    const summaryChunk = carriedSummaries.slice(i, i + MODEL_SUMMARY_INSERT_BATCH_SIZE);
     stmts.push(
       orm.insert(modelSummaries).values(
-        carriedSummaries.map(s => ({
+        summaryChunk.map(s => ({
           run_id: run.id,
           model: s.model,
           route_key: s.routeKey,
@@ -553,7 +590,7 @@ export function rowsToRoutingTable(
       accuracy: row.accuracy,
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
-      reasoningEffort: row.reasoning_effort as RankedCandidate['reasoningEffort'],
+      reasoningEffort: parsePersistedReasoningEffort(row.reasoning_effort),
     });
   }
   return {

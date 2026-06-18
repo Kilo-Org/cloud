@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import {
   BenchmarkConfigSchema,
+  resolveBenchmarkIdentity,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
 } from '@kilocode/auto-routing-contracts';
@@ -93,19 +94,20 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     zodJsonValidator(DebugCliRequestSchema, { errorMessage: 'Invalid debug request' }),
     async c => {
       const config = await getBenchmarkConfig(c.env.BENCH_DB);
-      if (!config?.benchmarkUserId) {
-        return c.json({ error: 'benchmarkUserId is not configured' }, 400);
+      if (!config) {
+        return c.json({ error: 'benchmark config is not configured' }, 400);
       }
+      const benchmarkIdentity = resolveBenchmarkIdentity(config);
       const kiloToken = await fetchBenchmarkUserToken(
         c.env,
-        config.benchmarkUserId,
-        config.benchmarkOrgId
+        benchmarkIdentity.benchmarkUserId,
+        benchmarkIdentity.benchmarkOrgId
       );
       const result = await debugRunCli(c.env, {
         ...c.req.valid('json'),
         kiloToken,
         kiloApiUrl: c.env.KILO_CLI_API_URL,
-        orgId: config.benchmarkOrgId,
+        orgId: benchmarkIdentity.benchmarkOrgId,
       });
       return c.json(result);
     }

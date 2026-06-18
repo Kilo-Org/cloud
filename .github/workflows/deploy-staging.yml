@@ -1,6 +1,7 @@
 name: Deploy Web to Staging
 
 on:
+  pull_request:
   workflow_dispatch:
 
 permissions:

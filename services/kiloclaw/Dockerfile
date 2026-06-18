@@ -117,8 +117,10 @@ RUN cd /usr/local/lib/node_modules/openclaw \
     && rm -f /tmp/bundled-plugin-specs.raw /tmp/bundled-plugin-specs.txt \
     && rm -rf /root/.npm
 
-# Install Go (available at runtime for users to `go install` additional tools)
-ENV GO_VERSION=1.26.2
+# Install Go (available at runtime for users to `go install` additional tools).
+# Keep on the latest patch release so the toolchain and the tools built with it
+# below do not ship stale Go stdlib CVEs.
+ENV GO_VERSION=1.26.4
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz -o /tmp/go.tar.gz \
     && EXPECTED_SHA256="$(curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz.sha256)" \

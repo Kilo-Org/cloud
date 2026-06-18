@@ -161,6 +161,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
           : 'border-destructive/30 bg-destructive/10 text-destructive',
       }
     : null;
+  const inputTokenLabel = data.tokenUsage.cached == null ? 'Input (including cached)' : 'Input';
 
   return (
     <PageContainer>
@@ -279,7 +280,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
               <div>
                 <dt className="text-muted-foreground">Tokens</dt>
                 <dd className="tabular-nums">
-                  Input {formatAvailableTokenCount(data.tokenUsage.input)} / Output{' '}
+                  {inputTokenLabel} {formatAvailableTokenCount(data.tokenUsage.input)} / Output{' '}
                   {formatAvailableTokenCount(data.tokenUsage.output)} / Cached{' '}
                   {formatAvailableTokenCount(data.tokenUsage.cached)}
                 </dd>

@@ -1,5 +1,6 @@
-import { getWorkerDb, sql } from '@kilocode/db';
+import { byok_api_keys, coding_plan_subscriptions, getWorkerDb } from '@kilocode/db';
 import { formatError } from '@kilocode/worker-utils';
+import { and, eq, inArray } from 'drizzle-orm';
 import * as z from 'zod';
 import { hashIdentifierForTelemetry } from './conversation-identity';
 import { kvReadThrough } from './kv-read-through';
@@ -50,23 +51,25 @@ async function queryCodingPlanPreference(
   userId: string
 ): Promise<CodingPlanPreference> {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 2_000 });
-  const { rows } = await db.execute<{
-    plan_id: string;
-    provider_id: string;
-  }>(sql`
-    SELECT s.plan_id, s.provider_id
-    FROM coding_plan_subscriptions s
-    INNER JOIN byok_api_keys k ON k.id = s.installed_byok_key_id
-    WHERE s.user_id = ${userId}
-      AND s.status IN ('active', 'past_due')
-      AND k.kilo_user_id = s.user_id
-      AND k.provider_id = s.provider_id
-      AND k.management_source = 'coding_plan'
-      AND k.is_enabled = true
-    LIMIT 1
-  `);
-  const row = rows[0];
-  if (row?.plan_id === 'minimax-token-plan-plus' && row.provider_id === 'minimax') {
+  const [row] = await db
+    .select({
+      planId: coding_plan_subscriptions.plan_id,
+      providerId: coding_plan_subscriptions.provider_id,
+    })
+    .from(coding_plan_subscriptions)
+    .innerJoin(byok_api_keys, eq(byok_api_keys.id, coding_plan_subscriptions.installed_byok_key_id))
+    .where(
+      and(
+        eq(coding_plan_subscriptions.user_id, userId),
+        inArray(coding_plan_subscriptions.status, ['active', 'past_due']),
+        eq(byok_api_keys.kilo_user_id, coding_plan_subscriptions.user_id),
+        eq(byok_api_keys.provider_id, coding_plan_subscriptions.provider_id),
+        eq(byok_api_keys.management_source, 'coding_plan'),
+        eq(byok_api_keys.is_enabled, true)
+      )
+    )
+    .limit(1);
+  if (row?.planId === 'minimax-token-plan-plus' && row.providerId === 'minimax') {
     return {
       active: true,
       planId: 'minimax-token-plan-plus',

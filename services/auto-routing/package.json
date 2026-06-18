@@ -16,6 +16,7 @@
     "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@openrouter/sdk": "^0.12.79",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },

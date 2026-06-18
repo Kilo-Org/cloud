@@ -8,7 +8,11 @@ import type * as ModelClassifierModule from './model-classifier';
 
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const getWorkerDb = vi.hoisted(() => vi.fn());
-const dbExecute = vi.hoisted(() => vi.fn());
+const dbSelect = vi.hoisted(() => vi.fn());
+const dbFrom = vi.hoisted(() => vi.fn());
+const dbInnerJoin = vi.hoisted(() => vi.fn());
+const dbWhere = vi.hoisted(() => vi.fn());
+const dbLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('./model-classifier', async importOriginal => {
   const actual = await importOriginal<typeof ModelClassifierModule>();
@@ -184,9 +188,17 @@ describe('auto routing worker', () => {
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
     getWorkerDb.mockReset();
-    getWorkerDb.mockReturnValue({ execute: dbExecute });
-    dbExecute.mockReset();
-    dbExecute.mockResolvedValue({ rows: [] });
+    getWorkerDb.mockReturnValue({ select: dbSelect });
+    dbSelect.mockReset();
+    dbSelect.mockReturnValue({ from: dbFrom });
+    dbFrom.mockReset();
+    dbFrom.mockReturnValue({ innerJoin: dbInnerJoin });
+    dbInnerJoin.mockReset();
+    dbInnerJoin.mockReturnValue({ where: dbWhere });
+    dbWhere.mockReset();
+    dbWhere.mockReturnValue({ limit: dbLimit });
+    dbLimit.mockReset();
+    dbLimit.mockResolvedValue([]);
     writeDataPoint.mockReset();
     configGet.mockReset();
     // Real KV returns null for missing keys; an undefined here would send the
@@ -408,9 +420,7 @@ describe('auto routing worker', () => {
   });
 
   it('loads and caches a coding-plan preference on cache miss', async () => {
-    dbExecute.mockResolvedValueOnce({
-      rows: [{ plan_id: 'minimax-token-plan-plus', provider_id: 'minimax' }],
-    });
+    dbLimit.mockResolvedValueOnce([{ planId: 'minimax-token-plan-plus', providerId: 'minimax' }]);
 
     const response = await decideRequest(mirrorPayload());
 
@@ -426,6 +436,14 @@ describe('auto routing worker', () => {
     expect(getWorkerDb).toHaveBeenCalledWith('postgres://worker', {
       statement_timeout: 2_000,
     });
+    expect(dbSelect).toHaveBeenCalledWith({
+      planId: expect.any(Object),
+      providerId: expect.any(Object),
+    });
+    expect(dbFrom).toHaveBeenCalledTimes(1);
+    expect(dbInnerJoin).toHaveBeenCalledTimes(1);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+    expect(dbLimit).toHaveBeenCalledWith(1);
     expect(configPut).toHaveBeenCalledWith(
       expect.stringMatching(/^coding_plan_preference:[0-9a-f]{16}$/),
       JSON.stringify({

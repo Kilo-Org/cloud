@@ -943,6 +943,7 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
                 <TableHeader>
                   <TableRow>
                     <TableHead>Model</TableHead>
+                    <TableHead className="w-36">Reasoning effort</TableHead>
                     <TableHead className="text-right">Accuracy</TableHead>
                     <TableHead className="text-right">Avg cost</TableHead>
                     <TableHead className="text-right">Cost / accuracy</TableHead>
@@ -954,6 +955,9 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
                     <TableRow key={`${routeKey}-${c.model}-${i}`}>
                       <TableCell className="max-w-56 truncate font-mono text-xs">
                         {c.model}
+                      </TableCell>
+                      <TableCell className="capitalize text-xs">
+                        {c.reasoningEffort ?? 'default'}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-xs">
                         {formatAccuracy(c.accuracy)}

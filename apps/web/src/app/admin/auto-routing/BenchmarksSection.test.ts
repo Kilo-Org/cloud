@@ -113,6 +113,39 @@ describe('RoutingTableView', () => {
 
     expect(html.indexOf('threshold-meeting')).toBeLessThan(html.indexOf('below-threshold-cheaper'));
   });
+
+  it('renders reasoning effort next to the model name', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(RoutingTableView, {
+        data: {
+          publishedAt: '2026-06-17T00:00:00.000Z',
+          table: {
+            version: 'run-1',
+            generatedAt: '2026-06-17T00:00:00.000Z',
+            minAccuracy: 0.7,
+            switchCostFactor: 3,
+            source: 'benchmark',
+            routes: {
+              'implementation/code_generation': [
+                {
+                  model: 'openai/gpt-5',
+                  accuracy: 0.8,
+                  avgCostUsd: 0.006,
+                  meetsThreshold: true,
+                  reasoningEffort: 'high',
+                },
+              ],
+            },
+          },
+        },
+      })
+    );
+
+    expect(html.indexOf('Model')).toBeLessThan(html.indexOf('Reasoning effort'));
+    expect(html.indexOf('Reasoning effort')).toBeLessThan(html.indexOf('Accuracy'));
+    expect(html.indexOf('openai/gpt-5')).toBeLessThan(html.indexOf('high'));
+    expect(html.indexOf('high')).toBeLessThan(html.indexOf('80.0%'));
+  });
 });
 
 describe('configToFormState', () => {

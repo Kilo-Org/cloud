@@ -19,7 +19,7 @@ import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
   const vercelModelMetadata = await getVercelModelsMetadata();
   if (Object.keys(vercelModelMetadata).length === 0) {
-    console.error('[getModelUserByokProviders] no Vercel model metadata in the database');
+    console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
     return [];
   }
   const providers: UserByokProviderId[] =

@@ -337,7 +337,11 @@ export const codeReviewRouter = createTRPCRouter({
       const [attempts, billingUsage] = await Promise.all([
         listCodeReviewAttempts(input.reviewId),
         shouldLoadBillingUsage
-          ? getSessionUsageFromBilling(cliSessionId, review.created_at)
+          ? getSessionUsageFromBilling(
+              cliSessionId,
+              review.created_at,
+              review.completed_at ?? undefined
+            )
           : Promise.resolve(null),
       ]);
       const tokenUsage = billingUsage

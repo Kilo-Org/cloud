@@ -2778,10 +2778,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         model: 'anthropic/claude-sonnet-4.6',
         total_tokens_in: 1000,
         total_tokens_out: 200,
+        completed_at: '2025-01-01T00:10:00Z',
       });
       mockGetCodeReviewById.mockResolvedValue(review);
       mockGetSessionUsageFromBilling.mockResolvedValue({
-        model: 'anthropic/claude-sonnet-4.6',
+        model: 'openai/gpt-4o',
         totalTokensIn: 1000,
         totalTokensOut: 200,
         totalCachedTokens: 800,
@@ -2806,10 +2807,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
       expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
         'ses_review_with_cache',
-        '2025-01-01T00:00:00Z'
+        '2025-01-01T00:00:00Z',
+        '2025-01-01T00:10:00Z'
       );
       expect(mockUpdateCodeReviewUsage).toHaveBeenCalledWith(REVIEW_ID, {
-        model: 'anthropic/claude-sonnet-4.6',
         totalTokensIn: 1000,
         totalTokensOut: 200,
         totalCostMusd: 100,

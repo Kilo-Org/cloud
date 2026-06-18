@@ -593,10 +593,14 @@ async function getReviewUsageData(reviewId: string) {
   }
 
   if (review?.cli_session_id && review.created_at) {
-    const billing = await getSessionUsageFromBilling(review.cli_session_id, review.created_at);
+    const billing = await getSessionUsageFromBilling(
+      review.cli_session_id,
+      review.created_at,
+      review.completed_at ?? undefined
+    );
     if (billing) {
       updateCodeReviewUsage(reviewId, {
-        model: billing.model,
+        ...(review.model == null ? { model: billing.model } : {}),
         totalTokensIn: billing.totalTokensIn,
         totalTokensOut: billing.totalTokensOut,
         totalCostMusd: billing.totalCostMusd,
@@ -605,7 +609,7 @@ async function getReviewUsageData(reviewId: string) {
       });
 
       return {
-        model: billing.model,
+        model: review.model ?? billing.model,
         tokensIn: billing.totalUncachedTokens,
         tokensOut: billing.totalTokensOut,
         cachedTokens: billing.totalCachedTokens,

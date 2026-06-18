@@ -166,6 +166,9 @@ describe('POST /api/mcp-gateway/oauth/authorize', () => {
     expect(mockGetUserFromAuth).toHaveBeenCalledTimes(1);
     expect(mockPreviewAuthorization).toHaveBeenCalledTimes(1);
     expect(getResponse.status).toBe(200);
+    expect(getResponse.headers.get('content-security-policy')).toContain(
+      "form-action 'self' https:"
+    );
     const approvalState = document.match(/name="approval_state" value="([^"]+)"/)?.[1];
     const cookie = getResponse.headers.get('set-cookie')?.split(';')[0];
     expect(approvalState).toBeTruthy();
@@ -260,12 +263,8 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
     expect(document).not.toContain('These scope labels do not currently limit');
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
-    expect(response.headers.get('content-security-policy')).toContain(
-      "form-action 'self' https://client.example"
-    );
-    expect(response.headers.get('content-security-policy')).not.toContain(
-      'https://client.example/callback'
-    );
+    expect(response.headers.get('content-security-policy')).toContain("form-action 'self' https:");
+    expect(response.headers.get('content-security-policy')).not.toContain('https://client.example');
     expect(response.headers.get('x-frame-options')).toBe('DENY');
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
@@ -279,7 +278,7 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
     if (!response) throw new Error('Expected authorization response');
 
     expect(response.headers.get('content-security-policy')).toContain(
-      "form-action 'self' http://127.0.0.1:60424"
+      "form-action 'self' https: http://127.0.0.1:60424"
     );
   });
 

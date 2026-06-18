@@ -238,8 +238,9 @@ when they appear in all capitals.
    resource, scopes, OAuth state, PKCE challenge, and execution context, and MUST
    expire under server-side validation within 5 minutes.
 9. Consent responses MUST be non-cacheable, prevent framing, restrict form submission
-   and redirects to the app origin and validated callback origin, suppress referrer
-   disclosure, and avoid loading client-controlled remote assets.
+   and redirects to the app origin, HTTPS destinations, and the exact validated HTTP
+   loopback callback origin, suppress referrer disclosure, and avoid loading
+   client-controlled remote assets.
 10. Authorization requests expire within 30 minutes.
 11. Authorization codes expire within 10 minutes, are opaque, and MUST be consumed
     atomically with expiry enforced in the conditional update.

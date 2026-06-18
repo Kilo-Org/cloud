@@ -30,11 +30,12 @@ const consentDecisionValues = ['allow', 'deny'] as const;
 type ConsentDecision = (typeof consentDecisionValues)[number];
 
 function consentSecurityHeaders(redirectUri: string) {
-  const callbackOrigin = new URL(redirectUri).origin;
+  const callback = new URL(redirectUri);
+  const callbackSource = callback.protocol === 'http:' ? ` ${callback.origin}` : '';
   return {
     'Cache-Control': 'no-store',
     Pragma: 'no-cache',
-    'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${callbackOrigin}; frame-ancestors 'none'; base-uri 'none'; object-src 'none'`,
+    'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https:${callbackSource}; frame-ancestors 'none'; base-uri 'none'; object-src 'none'`,
     'X-Frame-Options': 'DENY',
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',

@@ -237,9 +237,9 @@ when they appear in all capitals.
 8. Browser approval MUST be bound to the granting user, exact redirect URI, client,
    resource, scopes, OAuth state, PKCE challenge, and execution context, and MUST
    expire under server-side validation within 5 minutes.
-9. Consent responses MUST be non-cacheable, prevent framing and cross-origin form
-   submission, suppress referrer disclosure, and avoid loading client-controlled
-   remote assets.
+9. Consent responses MUST be non-cacheable, prevent framing, restrict form submission
+   and redirects to the app origin and validated callback origin, suppress referrer
+   disclosure, and avoid loading client-controlled remote assets.
 10. Authorization requests expire within 30 minutes.
 11. Authorization codes expire within 10 minutes, are opaque, and MUST be consumed
     atomically with expiry enforced in the conditional update.

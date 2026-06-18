@@ -260,10 +260,27 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
     expect(document).not.toContain('These scope labels do not currently limit');
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
-    expect(response.headers.get('content-security-policy')).toContain("form-action 'self'");
+    expect(response.headers.get('content-security-policy')).toContain(
+      "form-action 'self' https://client.example"
+    );
+    expect(response.headers.get('content-security-policy')).not.toContain(
+      'https://client.example/callback'
+    );
     expect(response.headers.get('x-frame-options')).toBe('DENY');
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+
+  test('allows a validated loopback callback origin in form redirects', async () => {
+    mockGetUserFromAuth.mockResolvedValue({ user: mockUser, organizationId: undefined });
+    mockPreviewAuthorization.mockResolvedValue(organizationPreview());
+
+    const response = await loadedRoute().GET(new NextRequest(authorizationUrl()));
+    if (!response) throw new Error('Expected authorization response');
+
+    expect(response.headers.get('content-security-policy')).toContain(
+      "form-action 'self' http://127.0.0.1:60424"
+    );
   });
 
   test('uses independent cookies for simultaneous consent flows', async () => {

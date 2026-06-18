@@ -29,16 +29,18 @@ const authorizationSingletonParams = [
 const consentDecisionValues = ['allow', 'deny'] as const;
 type ConsentDecision = (typeof consentDecisionValues)[number];
 
-const consentSecurityHeaders = {
-  'Cache-Control': 'no-store',
-  Pragma: 'no-cache',
-  'Content-Security-Policy':
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'",
-  'X-Frame-Options': 'DENY',
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-} as const;
+function consentSecurityHeaders(redirectUri: string) {
+  const callbackOrigin = new URL(redirectUri).origin;
+  return {
+    'Cache-Control': 'no-store',
+    Pragma: 'no-cache',
+    'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${callbackOrigin}; frame-ancestors 'none'; base-uri 'none'; object-src 'none'`,
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  } as const;
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -472,7 +474,7 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        ...consentSecurityHeaders,
+        ...consentSecurityHeaders(preview.redirectUri),
       },
     }
   );

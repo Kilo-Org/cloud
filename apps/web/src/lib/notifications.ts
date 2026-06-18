@@ -37,6 +37,16 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
+    id: 'star-giveaway-june-2026',
+    title: 'GitHub Star Giveaway',
+    message:
+      "We're giving away $500 of AI Credits when we reach 25,000 stars on GitHub. Support us:",
+    action: {
+      actionText: 'github.com/Kilo-Org/kilocode',
+      actionURL: 'https://github.com/Kilo-Org/kilocode/',
+    },
+  },
+  {
     id: 'stealth-opus-discount-may-25',
     title: 'Claude Opus 4.7 at 20% Off — Only in Kilo Code!',
     message:

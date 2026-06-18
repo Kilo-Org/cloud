@@ -47,6 +47,13 @@ ask_continue_keyless_or_stop() {
 VERIFY_RESULT="not run"
 SMOKE_RESULT="not run"
 
+# Capture each phase's output (it still streams via tee) so the final summary can
+# echo the pass/fail counts and the grype CVE totals without scrolling back.
+PHASE1_LOG="$(mktemp)"
+PHASE2_LOG="$(mktemp)"
+cleanup() { rm -f "$PHASE1_LOG" "$PHASE2_LOG"; }
+trap cleanup EXIT
+
 section "OpenClaw upgrade — local validation"
 echo "Validates an OpenClaw version bump end to end. Follow the notes below."
 
@@ -180,7 +187,8 @@ fi
 
 # ── Phase 1: keyless verification ────────────────────────────────────────────
 section "Phase 1/2 — keyless verification (build, patches, config, CVE scan)"
-if bash "$SCRIPT_DIR/openclaw-upgrade-image-checks.sh"; then
+bash "$SCRIPT_DIR/openclaw-upgrade-image-checks.sh" 2>&1 | tee "$PHASE1_LOG"
+if [ "${PIPESTATUS[0]}" -eq 0 ]; then
   VERIFY_RESULT="passed"
   echo
   echo "✓ Phase 1 passed"
@@ -214,9 +222,10 @@ else
   # Build from committed HEAD via worktrees, so a dirty working tree (e.g.
   # untracked notes) is safe and does not enter the image. ALLOW_SAME lets the
   # smoke run when before/after pin the same version (mechanics mode).
-  if ALLOW_DIRTY_CHECKOUT="${ALLOW_DIRTY_CHECKOUT:-true}" \
-     ALLOW_SAME_OPENCLAW_VERSION="$SMOKE_SAME_VERSION" \
-     bash "$SCRIPT_DIR/openclaw-upgrade-smoke.sh"; then
+  ALLOW_DIRTY_CHECKOUT="${ALLOW_DIRTY_CHECKOUT:-true}" \
+    ALLOW_SAME_OPENCLAW_VERSION="$SMOKE_SAME_VERSION" \
+    bash "$SCRIPT_DIR/openclaw-upgrade-smoke.sh" 2>&1 | tee "$PHASE2_LOG"
+  if [ "${PIPESTATUS[0]}" -eq 0 ]; then
     if [ "$PHASE2_MODE" = "mechanics" ]; then
       SMOKE_RESULT="passed (mechanics only)"
     else
@@ -232,9 +241,16 @@ else
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
+# Pull the streamed-by details back out of the captured phase logs so the summary
+# stands on its own: pass/fail counts per phase + the grype CVE totals.
+P1_COUNTS=$(grep -oE '[0-9]+ passed, [0-9]+ failed' "$PHASE1_LOG" 2>/dev/null | tail -1)
+P2_COUNTS=$(grep -oE '[0-9]+ passed, [0-9]+ failed' "$PHASE2_LOG" 2>/dev/null | tail -1)
+CVE_SUMMARY=$(grep -E '^[[:space:]]*severity:' "$PHASE1_LOG" 2>/dev/null | tail -1 | sed 's/^[[:space:]]*severity:[[:space:]]*//')
+
 section "Summary"
-echo "  Phase 1 (keyless verification): $VERIFY_RESULT"
-echo "  Phase 2 (credentialed smoke):   $SMOKE_RESULT"
+echo "  Phase 1 (keyless verification): $VERIFY_RESULT${P1_COUNTS:+  (${P1_COUNTS})}"
+[ -n "$CVE_SUMMARY" ] && echo "    grype CVE scan: $CVE_SUMMARY"
+echo "  Phase 2 (credentialed smoke):   $SMOKE_RESULT${P2_COUNTS:+  (${P2_COUNTS})}"
 echo
 
 if [ "$VERIFY_RESULT" = "FAILED" ] || [ "$SMOKE_RESULT" = "FAILED" ]; then

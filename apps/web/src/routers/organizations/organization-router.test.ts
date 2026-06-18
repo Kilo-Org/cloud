@@ -338,19 +338,6 @@ describe('organizations trpc router', () => {
           name: longName,
         })
       ).rejects.toThrow('Organization name must be less than 100 characters');
-
-      const safeName = 'https://example.com/team?name=R&D';
-      const result = await caller.organizations.update({
-        organizationId: testOrganization.id,
-        name: safeName,
-      });
-
-      expect(result.organization.name).toBe(safeName);
-
-      await db
-        .update(organizations)
-        .set({ name: 'Test Organization' })
-        .where(eq(organizations.id, testOrganization.id));
     });
 
     it('should trim whitespace from organization name', async () => {

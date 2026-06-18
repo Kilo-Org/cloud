@@ -44,8 +44,9 @@ export function buildUsageFooter(
   cachedTokens: number | null
 ): string {
   const displayModel = formatModelName(model);
+  const inputLabel = cachedTokens == null ? 'Input (including cached)' : 'Input';
   const cached = cachedTokens == null ? '—' : formatTokenCount(cachedTokens);
-  return `${USAGE_FOOTER_MARKER}\n<sub>Reviewed by ${displayModel} · Input: ${formatTokenCount(tokensIn)} · Output: ${formatTokenCount(tokensOut)} · Cached: ${cached}</sub>`;
+  return `${USAGE_FOOTER_MARKER}\n<sub>Reviewed by ${displayModel} · ${inputLabel}: ${formatTokenCount(tokensIn)} · Output: ${formatTokenCount(tokensOut)} · Cached: ${cached}</sub>`;
 }
 
 export function buildReviewGuidanceFooter(guidance: ReviewGuidanceFooterData): string {

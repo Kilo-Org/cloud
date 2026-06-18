@@ -39,6 +39,14 @@ describe('buildUsageFooter', () => {
     );
   });
 
+  it('labels combined input when cached tokens are unavailable', () => {
+    const footer = buildUsageFooter('provider/minimax-m3', 1000, 200, null);
+
+    expect(footer).toBe(
+      '<!-- kilo-usage -->\n<sub>Reviewed by minimax-m3 · Input (including cached): 1K · Output: 200 · Cached: —</sub>'
+    );
+  });
+
   it('includes usage marker comment', () => {
     const footer = buildUsageFooter('model', 1, 2, 3);
     expect(footer).toContain('<!-- kilo-usage -->');
@@ -228,7 +236,7 @@ describe('appendUsageFooter', () => {
     const result = appendUsageFooter('body', 'provider/org/model-name', 100, 200);
 
     expect(result).toContain('org/model-name');
-    expect(result).toContain('Input: 100 · Output: 200 · Cached: —');
+    expect(result).toContain('Input (including cached): 100 · Output: 200 · Cached: —');
     expect(result).toContain('<!-- kilo-usage -->');
   });
 });

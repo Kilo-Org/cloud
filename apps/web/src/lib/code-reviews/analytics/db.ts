@@ -267,14 +267,13 @@ export type CodeReviewAnalyticsContributorRow = {
   displayName: string;
   limitedIdentity: boolean;
   limitedData: boolean;
-  rank: number | null;
   trackedPrs: number;
   estimatedImpactPoints: number;
   highImpactPrs: number;
   criticalFindings: number;
   warningFindings: number;
   suggestionFindings: number;
-  prsWithoutCriticalOrWarningFindings: number;
+  prsWithoutCriticalFindings: number;
 };
 
 export type CodeReviewAnalyticsDashboard = {
@@ -598,7 +597,7 @@ export async function getCodeReviewAnalyticsDashboard(
       critical_findings: number | string;
       warning_findings: number | string;
       suggestion_findings: number | string;
-      prs_without_critical_or_warning_findings: number | string;
+      prs_without_critical_findings: number | string;
     }>(sql`
       ${analyticsBaseCte(input, true)},
       logical_findings AS (
@@ -647,7 +646,7 @@ export async function getCodeReviewAnalyticsDashboard(
         COALESCE(SUM(critical_findings), 0) AS critical_findings,
         COALESCE(SUM(warning_findings), 0) AS warning_findings,
         COALESCE(SUM(suggestion_findings), 0) AS suggestion_findings,
-        COUNT(*) FILTER (WHERE critical_findings = 0 AND warning_findings = 0) AS prs_without_critical_or_warning_findings
+        COUNT(*) FILTER (WHERE critical_findings = 0) AS prs_without_critical_findings
       FROM contributor_prs
       GROUP BY contributor_key
       ORDER BY
@@ -659,26 +658,20 @@ export async function getCodeReviewAnalyticsDashboard(
       LIMIT 50
     `);
 
-    let rank = 0;
     contributorRows = contributorResult.rows.map(row => {
       const trackedPrs = numberValue(row.tracked_prs);
-      const limitedData = trackedPrs < 5;
-      if (!limitedData) rank += 1;
       return {
         contributorKey: row.contributor_key,
         displayName: row.display_name,
         limitedIdentity: row.limited_identity,
-        limitedData,
-        rank: limitedData ? null : rank,
+        limitedData: trackedPrs < 5,
         trackedPrs,
         estimatedImpactPoints: numberValue(row.estimated_impact_points),
         highImpactPrs: numberValue(row.high_impact_prs),
         criticalFindings: numberValue(row.critical_findings),
         warningFindings: numberValue(row.warning_findings),
         suggestionFindings: numberValue(row.suggestion_findings),
-        prsWithoutCriticalOrWarningFindings: numberValue(
-          row.prs_without_critical_or_warning_findings
-        ),
+        prsWithoutCriticalFindings: numberValue(row.prs_without_critical_findings),
       };
     });
   }

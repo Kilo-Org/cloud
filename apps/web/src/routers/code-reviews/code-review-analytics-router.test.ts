@@ -137,7 +137,11 @@ describe('Code Reviewer analytics router', () => {
       repository,
       prNumber: 2,
       headSha: crypto.randomUUID(),
-      analyticsManifest: manifest({ type: 'feature', impact: 'high' }),
+      analyticsManifest: manifest({
+        type: 'feature',
+        impact: 'high',
+        findings: [{ severity: 'suggestion', category: 'performance', securityClass: null }],
+      }),
     });
     await captureReview({
       repository,
@@ -187,7 +191,7 @@ describe('Code Reviewer analytics router', () => {
     expect(dashboard.summary).toEqual({
       trackedReviews: 6,
       trackedPrsOrMrs: 5,
-      totalFindings: 4,
+      totalFindings: 5,
       criticalFindings: 1,
       warningFindings: 2,
       highImpactChanges: 2,
@@ -207,18 +211,17 @@ describe('Code Reviewer analytics router', () => {
         estimatedImpactPoints: 9,
         criticalFindings: 1,
         warningFindings: 2,
-        suggestionFindings: 1,
+        suggestionFindings: 2,
       }),
     ]);
     expect(dashboard.contributors.capability).toBe('available');
     expect(dashboard.contributors.rows).toEqual([
       expect.objectContaining({
         contributorKey: 'github-id:1234',
-        rank: 1,
         limitedData: false,
         trackedPrs: 5,
         estimatedImpactPoints: 9,
-        prsWithoutCriticalOrWarningFindings: 3,
+        prsWithoutCriticalFindings: 4,
       }),
     ]);
   });

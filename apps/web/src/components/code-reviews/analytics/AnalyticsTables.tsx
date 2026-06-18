@@ -30,14 +30,13 @@ type ContributorRow = {
   displayName: string;
   limitedIdentity: boolean;
   limitedData: boolean;
-  rank: number | null;
   trackedPrs: number;
   estimatedImpactPoints: number;
   highImpactPrs: number;
   criticalFindings: number;
   warningFindings: number;
   suggestionFindings: number;
-  prsWithoutCriticalOrWarningFindings: number;
+  prsWithoutCriticalFindings: number;
 };
 
 type ContributorCapability = 'available' | 'stable_gitlab_author_attribution_unavailable';
@@ -62,13 +61,13 @@ type RepositorySortKey =
   | 'suggestionFindings';
 type ContributorSortKey =
   | 'displayName'
+  | 'prsWithoutCriticalFindings'
   | 'trackedPrs'
   | 'estimatedImpactPoints'
   | 'highImpactPrs'
   | 'criticalFindings'
   | 'warningFindings'
-  | 'suggestionFindings'
-  | 'prsWithoutCriticalOrWarningFindings';
+  | 'suggestionFindings';
 
 type SortableTableHeadProps = {
   label: string;
@@ -318,6 +317,13 @@ function ContributorLeaderboard({ rows }: { rows: ContributorRow[] }) {
         case 'displayName':
           result = compareText(left.displayName, right.displayName, sort.direction);
           break;
+        case 'prsWithoutCriticalFindings':
+          result = compareNumbers(
+            left.prsWithoutCriticalFindings,
+            right.prsWithoutCriticalFindings,
+            sort.direction
+          );
+          break;
         case 'trackedPrs':
           result = compareNumbers(left.trackedPrs, right.trackedPrs, sort.direction);
           break;
@@ -341,13 +347,6 @@ function ContributorLeaderboard({ rows }: { rows: ContributorRow[] }) {
           result = compareNumbers(
             left.suggestionFindings,
             right.suggestionFindings,
-            sort.direction
-          );
-          break;
-        case 'prsWithoutCriticalOrWarningFindings':
-          result = compareNumbers(
-            left.prsWithoutCriticalOrWarningFindings,
-            right.prsWithoutCriticalOrWarningFindings,
             sort.direction
           );
           break;
@@ -387,12 +386,19 @@ function ContributorLeaderboard({ rows }: { rows: ContributorRow[] }) {
           <Table className="min-w-[1120px]">
             <TableHeader>
               <TableRow>
-                <TableHead scope="col">Rank</TableHead>
                 <SortableTableHead
                   label="Author"
                   active={sort.key === 'displayName'}
                   direction={sort.direction}
                   onSort={() => selectSort('displayName')}
+                />
+                <SortableTableHead
+                  label="PRs without critical findings"
+                  sortLabel="pull requests without critical findings raised"
+                  active={sort.key === 'prsWithoutCriticalFindings'}
+                  direction={sort.direction}
+                  onSort={() => selectSort('prsWithoutCriticalFindings')}
+                  align="right"
                 />
                 <SortableTableHead
                   label="Tracked PRs"
@@ -437,34 +443,27 @@ function ContributorLeaderboard({ rows }: { rows: ContributorRow[] }) {
                   onSort={() => selectSort('suggestionFindings')}
                   align="right"
                 />
-                <SortableTableHead
-                  label="PRs without critical/warning findings"
-                  sortLabel="pull requests without critical or warning findings raised"
-                  active={sort.key === 'prsWithoutCriticalOrWarningFindings'}
-                  direction={sort.direction}
-                  onSort={() => selectSort('prsWithoutCriticalOrWarningFindings')}
-                  align="right"
-                />
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-muted-foreground h-20 text-center">
+                  <TableCell colSpan={8} className="text-muted-foreground h-20 text-center">
                     No contributor analytics for this selection.
                   </TableCell>
                 </TableRow>
               ) : (
                 sortedRows.map(row => (
                   <TableRow key={row.contributorKey}>
-                    <TableCell className="tabular-nums">
-                      {row.rank === null ? <Badge variant="outline">Limited data</Badge> : row.rank}
-                    </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{row.displayName || 'Unknown author'}</span>
+                        {row.limitedData && <Badge variant="outline">Limited data</Badge>}
                         {row.limitedIdentity && <Badge variant="outline">Limited identity</Badge>}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {row.prsWithoutCriticalFindings.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {row.trackedPrs.toLocaleString()}
@@ -483,9 +482,6 @@ function ContributorLeaderboard({ rows }: { rows: ContributorRow[] }) {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {row.suggestionFindings.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {row.prsWithoutCriticalOrWarningFindings.toLocaleString()}
                     </TableCell>
                   </TableRow>
                 ))

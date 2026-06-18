@@ -49,14 +49,19 @@ Do not introduce repeated writes between system layers when the integration clie
 
 ## Credential Architecture
 
-### Preferred order
+### Choose the credential model
 
-For integrations using OAuth or temporary credentials, prefer these designs in order:
+There is no universal preference between native MCP OAuth and an on demand broker. Choose the model based on credential ownership, runtime trust, revocation requirements, provider support, and operational complexity.
 
-1. **Native MCP OAuth.** The MCP client performs discovery and refresh and persists its own provider session in the instance. Initial authorization may still use the Kilo dashboard when a headless runtime cannot receive a browser callback.
-2. **Revocable integration credential.** The provider issues a stable, narrowly scoped credential that remains valid until disconnect or revocation.
-3. **On demand broker.** Kilo stores the provider grant centrally and refreshes only when a tool request needs a valid access token.
-4. **Global refresh scheduler.** Not accepted without prior architectural approval and a demonstrated reason the preceding models cannot work.
+| Model | Prefer when | Important tradeoffs |
+|---|---|---|
+| Native MCP OAuth | The provider and pinned MCP client support a reliable headless flow, safe token persistence, refresh token rotation, and concurrent requests | Keeps the integration self sufficient, but places provider grants and refresh behavior inside the hosted runtime and may reduce central visibility and control |
+| On demand broker | Kilo needs central grant storage, immediate revocation, consistent reconnect status, auditability, or protection of refresh tokens from the hosted runtime | Adds a Kilo runtime service path, but refresh occurs only when the integration is used and follows existing Google Workspace and MCP Gateway patterns |
+| Revocable integration credential | The provider can issue a stable, narrowly scoped credential that remains valid until disconnect or revocation | Simple and reliable, but the persistent credential is available to the hosted runtime |
+
+For sensitive integrations, including payments or tools that expose personal data, prefer the on demand broker unless native MCP OAuth provides equivalent controls and has been validated in the exact client version used by KiloClaw. For lower risk integrations with mature MCP OAuth support, native MCP OAuth may be the simpler design.
+
+A global refresh scheduler is not an accepted default. It requires prior architectural approval and a demonstrated reason that native client refresh, a revocable credential, and on demand refresh cannot work.
 
 KiloClaw currently installs `mcporter` for remote HTTP MCP servers. The installed version is pinned in `services/kiloclaw/Dockerfile`; verify the capabilities and production behavior of that exact version before relying on an OAuth feature. A normal interactive localhost callback is not sufficient in a headless hosted runtime.
 
@@ -71,7 +76,7 @@ Static credentials must:
 - Never be logged, included in error responses, or copied into documentation and screenshots.
 - Be removed from persistent configuration when disconnected.
 
-Prefer environment references in generated configuration instead of writing the credential value into a persistent JSON file when the client supports interpolation.
+Avoid copying credential values into generated configuration. Use the credential mechanism supported by the component that owns authentication, such as a native credential store, a secret reference, an environment reference for a static secret, or an on demand broker. Verify the storage, file permissions, rotation behavior, and cleanup behavior of the exact pinned component version. Do not assume that a file under the OpenClaw state directory is managed by OpenClaw or protected by its SQLite credential stores.
 
 ### OAuth credentials
 

@@ -796,14 +796,26 @@ export const organizationsSettingsRouter = createTRPCRouter({
       assertOrganizationAutoEligible(existingOrg);
 
       let previousDefaultModel: string | undefined;
+      let didChange = false;
       const updatedSettings = await db.transaction(async tx => {
         const settings = await mutateOrganizationSettings(
           organizationId,
           async organization => {
             previousDefaultModel = organization.settings.default_model;
+            const returnChangedSettings = (nextSettings: typeof organization.settings) => {
+              if (
+                organization.settings.default_model === nextSettings.default_model &&
+                JSON.stringify(organization.settings.org_auto_model) ===
+                  JSON.stringify(nextSettings.org_auto_model)
+              ) {
+                return organization.settings;
+              }
+              didChange = true;
+              return nextSettings;
+            };
             assertOrganizationAutoEligible(organization);
             if (behavior === 'global') {
-              return { ...organization.settings, default_model: undefined };
+              return returnChangedSettings({ ...organization.settings, default_model: undefined });
             }
 
             if (behavior === 'specific') {
@@ -817,7 +829,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 organization.settings.default_model === ORG_AUTO_MODEL.id
                   ? await validateOrganizationDefaultReplacement(organization, specific_model)
                   : await validateOrganizationDefaultModel(organization, specific_model);
-              return { ...organization.settings, default_model: modelId };
+              return returnChangedSettings({ ...organization.settings, default_model: modelId });
             }
 
             const orgAutoModel =
@@ -855,7 +867,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
             }
-            return {
+            return returnChangedSettings({
               ...organization.settings,
               default_model: ORG_AUTO_MODEL.id,
               org_auto_model: {
@@ -863,26 +875,28 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 routes,
                 fallback_model: validation.modelId,
               },
-            };
+            });
           },
           tx
         );
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message:
-            behavior === 'auto'
-              ? 'Configured Organization Auto default behavior.'
-              : behavior === 'specific'
-                ? `Configured specific organization default model: ${settings.default_model}`
-                : previousDefaultModel === ORG_AUTO_MODEL.id
-                  ? 'Disabled Organization Auto and reset organization default model to global default.'
-                  : 'Reset organization default model to global default.',
-          organization_id: organizationId,
-          tx,
-        });
+        if (didChange) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message:
+              behavior === 'auto'
+                ? 'Configured Organization Auto default behavior.'
+                : behavior === 'specific'
+                  ? `Configured specific organization default model: ${settings.default_model}`
+                  : previousDefaultModel === ORG_AUTO_MODEL.id
+                    ? 'Disabled Organization Auto and reset organization default model to global default.'
+                    : 'Reset organization default model to global default.',
+            organization_id: organizationId,
+            tx,
+          });
+        }
         return settings;
       });
 

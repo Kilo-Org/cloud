@@ -1,7 +1,10 @@
 import type { Organization } from '@kilocode/db/schema';
 import type { OrganizationAutoModelSettings } from '@/lib/organizations/organization-types';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
+import {
+  createAllowPredicateFromRestrictions,
+  hasActiveModelRestrictions,
+} from '@/lib/model-allow.server';
 import { CUSTOM_LLM_PREFIX, normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   formatDirectByokModelId,
@@ -109,11 +112,25 @@ export async function validateOrganizationAutoTarget(
     };
   }
 
+  const restrictions = {
+    providerAllowList:
+      organization.plan === 'enterprise' ? organization.settings.provider_allow_list : undefined,
+    modelDenyList:
+      organization.plan === 'enterprise' ? (organization.settings.model_deny_list ?? []) : [],
+  };
+
   if (normalizedModelId.startsWith('kilo-auto/')) {
     if (!isOrganizationAutoTargetModel(normalizedModelId)) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' is not a supported auto tier.`,
+      };
+    }
+
+    if (hasActiveModelRestrictions(restrictions)) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' cannot use an auto tier while the organization has an active model policy. Choose a concrete allowed model instead.`,
       };
     }
 
@@ -138,12 +155,7 @@ export async function validateOrganizationAutoTarget(
     };
   }
 
-  const isAllowed = createAllowPredicateFromRestrictions({
-    providerAllowList:
-      organization.plan === 'enterprise' ? organization.settings.provider_allow_list : undefined,
-    modelDenyList:
-      organization.plan === 'enterprise' ? (organization.settings.model_deny_list ?? []) : [],
-  });
+  const isAllowed = createAllowPredicateFromRestrictions(restrictions);
   if (!(await isAllowed(normalizedModelId))) {
     return {
       kind: 'error',

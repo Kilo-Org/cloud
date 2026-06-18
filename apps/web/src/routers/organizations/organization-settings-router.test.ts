@@ -618,6 +618,71 @@ describe('organizations settings trpc router', () => {
       );
     });
 
+    it('rejects auto tiers when the organization has an active model policy', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const restrictedOrg = await createTestOrganization(
+        'Restricted Auto Org',
+        owner.id,
+        0,
+        { provider_allow_list: ['openai'] },
+        false
+      );
+
+      await expect(
+        caller.organizations.settings.setOrganizationAutoRoute({
+          organizationId: restrictedOrg.id,
+          mode_slug: 'code',
+          model_id: 'kilo-auto/balanced',
+        })
+      ).rejects.toThrow(
+        'cannot use an auto tier while the organization has an active model policy'
+      );
+
+      await expect(
+        caller.organizations.settings.configureOrganizationDefaultBehavior({
+          organizationId: restrictedOrg.id,
+          behavior: 'auto',
+          fallback_model: 'kilo-auto/balanced',
+        })
+      ).rejects.toThrow(
+        'cannot use an auto tier while the organization has an active model policy'
+      );
+    });
+
+    it('does not create audit logs for no-op default behavior saves', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const noOpOrg = await createTestOrganization('No-op Auto Org', owner.id, 0, {}, false);
+
+      await caller.organizations.settings.configureOrganizationDefaultBehavior({
+        organizationId: noOpOrg.id,
+        behavior: 'global',
+      });
+      let auditLogs = await db.query.organization_audit_logs.findMany({
+        where: eq(organization_audit_logs.organization_id, noOpOrg.id),
+      });
+      expect(auditLogs).toHaveLength(0);
+
+      await caller.organizations.settings.configureOrganizationDefaultBehavior({
+        organizationId: noOpOrg.id,
+        behavior: 'auto',
+        fallback_model: 'kilo-auto/balanced',
+      });
+      auditLogs = await db.query.organization_audit_logs.findMany({
+        where: eq(organization_audit_logs.organization_id, noOpOrg.id),
+      });
+      expect(auditLogs).toHaveLength(1);
+
+      await caller.organizations.settings.configureOrganizationDefaultBehavior({
+        organizationId: noOpOrg.id,
+        behavior: 'auto',
+        fallback_model: 'kilo-auto/balanced',
+      });
+      auditLogs = await db.query.organization_audit_logs.findMany({
+        where: eq(organization_audit_logs.organization_id, noOpOrg.id),
+      });
+      expect(auditLogs).toHaveLength(1);
+    });
+
     it('validates stored routes before enabling Organization Auto', async () => {
       const caller = await createCallerForUser(owner.id);
       const autoOrg = await createTestOrganization(

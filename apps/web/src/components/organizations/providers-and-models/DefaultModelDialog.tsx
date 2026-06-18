@@ -172,8 +172,9 @@ export function DefaultModelDialog({
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedFallbackModel, setSelectedFallbackModel] = useState('');
 
-  const availableModels = (openRouterModels?.data ?? []).filter(
-    model => model.id !== ORG_AUTO_MODEL.id
+  const availableModels = useMemo(
+    () => (openRouterModels?.data ?? []).filter(model => model.id !== ORG_AUTO_MODEL.id),
+    [openRouterModels?.data]
   );
   const autoTargetModels = useMemo(
     () =>

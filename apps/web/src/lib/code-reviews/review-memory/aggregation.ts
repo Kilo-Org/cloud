@@ -1,4 +1,3 @@
-import { generateText } from 'ai';
 import * as z from 'zod';
 
 import type { CodeReviewFeedbackEvent } from '@kilocode/db/schema';
@@ -7,7 +6,7 @@ import type { ReviewMemoryOwner } from './db';
 import { listRecentFeedbackEvents, upsertScopeProposal } from './db';
 import {
   createReviewMemoryGatewayProvider,
-  extractReviewMemoryJsonObject,
+  generateReviewMemoryStructuredOutput,
   resolveReviewMemoryActor,
   resolveReviewMemoryModel,
 } from './llm';
@@ -16,7 +15,7 @@ import { reviewMemoryRetentionCutoff } from './retention';
 const REVIEW_MEMORY_FORBIDDEN_PROPOSAL_PATTERN =
   /\b(?:review\s+memory|kilo|feedback\s+systems?|this\s+analysis|llms?)\b/i;
 
-const ReviewMemoryProposalDraftSchema = z.discriminatedUnion('status', [
+export const ReviewMemoryProposalDraftSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('no_change') }),
   z.object({
     status: z.literal('propose'),
@@ -30,6 +29,17 @@ const ReviewMemoryProposalDraftSchema = z.discriminatedUnion('status', [
   }),
 ]);
 
+export const ReviewMemoryProposalWireSchema = z.object({
+  status: z.enum(['no_change', 'propose']),
+  title: z.string().nullable(),
+  rationale: z.string().nullable(),
+  proposedMarkdown: z.string().nullable(),
+  positiveCount: z.number().int(),
+  negativeCount: z.number().int(),
+  neutralCount: z.number().int(),
+  evidenceEventIds: z.array(z.string()),
+});
+
 export type ReviewMemoryProposalDraft = z.infer<typeof ReviewMemoryProposalDraftSchema>;
 
 export type GenerateReviewMemoryProposal = (input: {
@@ -37,6 +47,7 @@ export type GenerateReviewMemoryProposal = (input: {
   platform: ReviewMemoryPlatform;
   repoFullName: string;
   events: CodeReviewFeedbackEvent[];
+  requestCorrelationId: string;
 }) => Promise<{
   draft: ReviewMemoryProposalDraft;
   tokensIn?: number | null;
@@ -48,6 +59,7 @@ export async function generateReviewMemoryProposalWithGateway(input: {
   platform: ReviewMemoryPlatform;
   repoFullName: string;
   events: CodeReviewFeedbackEvent[];
+  requestCorrelationId: string;
 }): Promise<{
   draft: ReviewMemoryProposalDraft;
   tokensIn?: number | null;
@@ -63,18 +75,23 @@ export async function generateReviewMemoryProposalWithGateway(input: {
     actor,
     userAgent: 'Kilo Review Memory Analyzer',
   });
-  const result = await generateText({
+  const result = await generateReviewMemoryStructuredOutput({
     model: provider.chatModel(modelSlug),
+    modelSlug,
+    operation: 'proposal_analysis',
+    requestCorrelationId: input.requestCorrelationId,
     prompt: buildReviewMemoryAnalysisPrompt(input),
     maxOutputTokens: 4_000,
+    schemaName: 'review_memory_proposal',
+    schema: ReviewMemoryProposalDraftSchema,
+    wireSchema: ReviewMemoryProposalWireSchema,
+    validate: validateReviewMemoryProposalDraft,
   });
 
   return {
-    draft: validateReviewMemoryProposalDraft(
-      ReviewMemoryProposalDraftSchema.parse(extractReviewMemoryJsonObject(result.text))
-    ),
-    tokensIn: result.usage.inputTokens ?? null,
-    tokensOut: result.usage.outputTokens ?? null,
+    draft: result.output,
+    tokensIn: result.diagnostics.inputTokens,
+    tokensOut: result.diagnostics.outputTokens,
   };
 }
 
@@ -82,6 +99,7 @@ export async function runReviewMemoryAnalysis(input: {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
   repoFullName: string;
+  requestCorrelationId: string;
   generate?: GenerateReviewMemoryProposal;
   now?: Date;
 }): Promise<{ status: 'proposed' | 'no_change' | 'no_feedback'; proposalId?: string }> {
@@ -101,6 +119,7 @@ export async function runReviewMemoryAnalysis(input: {
     platform: input.platform,
     repoFullName: input.repoFullName,
     events,
+    requestCorrelationId: input.requestCorrelationId,
   });
 
   if (draft.status === 'no_change') return { status: 'no_change' };
@@ -144,7 +163,7 @@ function buildReviewMemoryAnalysisPrompt(input: {
   return `You analyze maintainer replies to Kilo's automated code-review comments for one repository.
 
 Return strict JSON in one of these shapes:
-{"status":"no_change"}
+{"status":"no_change","title":null,"rationale":null,"proposedMarkdown":null,"positiveCount":0,"negativeCount":0,"neutralCount":0,"evidenceEventIds":[]}
 {"status":"propose","title":"short proposal title","rationale":"why this guidance is justified","proposedMarkdown":"standalone REVIEW.md guidance","positiveCount":0,"negativeCount":0,"neutralCount":0,"evidenceEventIds":["event ids"]}
 
 Rules:
@@ -164,7 +183,7 @@ Feedback events:
 ${JSON.stringify(events, null, 2)}`;
 }
 
-function validateReviewMemoryProposalDraft(
+export function validateReviewMemoryProposalDraft(
   draft: ReviewMemoryProposalDraft
 ): ReviewMemoryProposalDraft {
   if (draft.status === 'no_change') return draft;

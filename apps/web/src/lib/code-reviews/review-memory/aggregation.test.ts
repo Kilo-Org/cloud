@@ -26,6 +26,7 @@ describe('review memory aggregation', () => {
       owner,
       platform: 'github',
       repoFullName: 'acme/widgets',
+      requestCorrelationId: 'request-proposal-created',
       generate: async () => ({
         draft: {
           status: 'propose',
@@ -66,6 +67,7 @@ describe('review memory aggregation', () => {
         owner,
         platform: 'github',
         repoFullName: 'acme/widgets',
+        requestCorrelationId: 'request-no-change',
         generate: async () => ({
           draft: {
             status: 'no_change',
@@ -74,7 +76,12 @@ describe('review memory aggregation', () => {
       })
     ).resolves.toEqual({ status: 'no_change' });
     await expect(
-      runReviewMemoryAnalysis({ owner, platform: 'github', repoFullName: 'acme/empty' })
+      runReviewMemoryAnalysis({
+        owner,
+        platform: 'github',
+        repoFullName: 'acme/empty',
+        requestCorrelationId: 'request-no-feedback',
+      })
     ).resolves.toEqual({ status: 'no_feedback' });
     await expect(db.select().from(code_review_memory_proposals)).resolves.toHaveLength(0);
   });

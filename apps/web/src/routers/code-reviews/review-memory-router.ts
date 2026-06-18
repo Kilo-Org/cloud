@@ -105,6 +105,7 @@ export const reviewMemoryRouter = createTRPCRouter({
         owner,
         platform: input.platform,
         repoFullName: input.repoFullName,
+        requestCorrelationId: ctx.requestCorrelationId,
       });
     }),
 
@@ -151,6 +152,7 @@ export const reviewMemoryRouter = createTRPCRouter({
         return await approveAndOpenReviewMemoryChangeRequest({
           owner,
           proposalId: input.proposalId,
+          requestCorrelationId: ctx.requestCorrelationId,
         });
       } catch (error) {
         if (error instanceof ReviewMemoryChangeRequestError) {

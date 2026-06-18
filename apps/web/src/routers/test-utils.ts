@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { TRPCContext } from '@/lib/trpc/init';
 import { createCallerFactory } from '@/lib/trpc/init';
 import { findUserById } from '@/lib/user';
@@ -13,6 +14,7 @@ const createTestTRPCContext = async (userId: string): Promise<TRPCContext> => {
   }
   return {
     user,
+    requestCorrelationId: randomUUID(),
   };
 };
 

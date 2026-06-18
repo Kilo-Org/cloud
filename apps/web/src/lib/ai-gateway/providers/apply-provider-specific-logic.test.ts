@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { applyGatewayModelsFallback } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import {
+  applyGatewayModelsFallback,
+  requireStructuredOutputParameters,
+} from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
@@ -46,3 +49,51 @@ describe('applyGatewayModelsFallback', () => {
     expect(request.body.models).toBeUndefined();
   });
 });
+
+describe('requireStructuredOutputParameters', () => {
+  it('requires structured-output support from OpenRouter providers', () => {
+    const request = makeStructuredOutputRequest();
+    request.body.provider = { only: ['anthropic'] };
+
+    requireStructuredOutputParameters('openrouter', request);
+
+    expect(request.body.provider).toEqual({
+      only: ['anthropic'],
+      require_parameters: true,
+    });
+  });
+
+  it.each<ProviderId>(['direct-byok', 'custom', 'experiment', 'vercel'])(
+    'does not send OpenRouter routing controls to %s',
+    providerId => {
+      const request = makeStructuredOutputRequest();
+
+      requireStructuredOutputParameters(providerId, request);
+
+      expect(request.body.provider).toBeUndefined();
+    }
+  );
+});
+
+function makeStructuredOutputRequest(): GatewayRequest {
+  return {
+    kind: 'chat_completions',
+    body: {
+      model: 'anthropic/claude-sonnet-4.6',
+      messages: [{ role: 'user', content: 'hello' }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'result',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: { result: { type: 'string' } },
+            required: ['result'],
+            additionalProperties: false,
+          },
+        },
+      },
+    },
+  };
+}

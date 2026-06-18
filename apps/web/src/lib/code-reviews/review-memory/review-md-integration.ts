@@ -1,4 +1,3 @@
-import { generateText } from 'ai';
 import * as z from 'zod';
 
 import type { CodeReviewMemoryProposal } from '@kilocode/db/schema';
@@ -6,7 +5,7 @@ import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';
 import type { ReviewMemoryOwner } from './db';
 import {
   createReviewMemoryGatewayProvider,
-  extractReviewMemoryJsonObject,
+  generateReviewMemoryStructuredOutput,
   resolveReviewMemoryActor,
   resolveReviewMemoryModel,
 } from './llm';
@@ -15,7 +14,7 @@ const MAX_REVIEW_MD_CHARS = 30_000;
 const REVIEW_MEMORY_BRANDING_PATTERN = /\b(?:kilo\s+)?review\s+memory\b/i;
 const REVIEW_MEMORY_HEADING_PATTERN = /^#{1,6}\s+(?:kilo\s+)?review\s+memory\b/im;
 
-const ReviewMdIntegrationOutputSchema = z.object({
+export const ReviewMdIntegrationOutputSchema = z.object({
   status: z.enum(['updated', 'already_present']),
   updatedReviewMd: z.string().min(1).max(MAX_REVIEW_MD_CHARS).nullable(),
   integrationSummary: z.string().min(1).max(1_000),
@@ -35,6 +34,7 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
   repoFullName: string;
   existingReviewMd: string | null;
   proposal: CodeReviewMemoryProposal;
+  requestCorrelationId: string;
 }): Promise<ReviewMdIntegrationResult> {
   if (input.existingReviewMd && input.existingReviewMd.length > MAX_REVIEW_MD_CHARS) {
     throw new Error(
@@ -53,22 +53,26 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
     userAgent: 'Kilo Review Memory Integrator',
   });
 
-  const result = await generateText({
+  const result = await generateReviewMemoryStructuredOutput({
     model: provider.chatModel(modelSlug),
+    modelSlug,
+    operation: 'review_md_integration',
+    requestCorrelationId: input.requestCorrelationId,
     prompt: buildReviewMdIntegrationPrompt(input),
     maxOutputTokens: 8_000,
+    schemaName: 'review_md_integration',
+    schema: ReviewMdIntegrationOutputSchema,
+    validate: validateReviewMdIntegrationOutput,
   });
-  const parsed = ReviewMdIntegrationOutputSchema.parse(extractReviewMemoryJsonObject(result.text));
-  const validated = validateReviewMdIntegrationOutput(parsed);
 
   return {
-    ...validated,
-    tokensIn: result.usage.inputTokens ?? null,
-    tokensOut: result.usage.outputTokens ?? null,
+    ...result.output,
+    tokensIn: result.diagnostics.inputTokens,
+    tokensOut: result.diagnostics.outputTokens,
   };
 }
 
-function validateReviewMdIntegrationOutput(
+export function validateReviewMdIntegrationOutput(
   output: z.infer<typeof ReviewMdIntegrationOutputSchema>
 ): ReviewMdIntegrationResult {
   if (output.status === 'already_present') {

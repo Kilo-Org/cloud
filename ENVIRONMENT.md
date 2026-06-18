@@ -18,7 +18,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 ### Configuration & Constant URLs
 
-- `APP_URL_OVERRIDE` - Override for the base application URL; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. [SERVER]
+- `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
 - `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `apps/web/src/lib/config.server.ts`. [SERVER]
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption; used across many auth-related files. `[SECRET]`

@@ -12,6 +12,8 @@ const configRow = {
   classifier_repetitions: 1,
   decider_repetitions: 1,
   classifier_max_p95_latency_ms: null,
+  auto_decider_min_cost_usd: 12,
+  auto_decider_max_cost_usd: 24,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: 'admin@example.com',
 };
@@ -23,23 +25,32 @@ const deciderRows: ConfigDeciderModelRow[] = [
   },
 ];
 
+const autoRows = [
+  {
+    model: 'auto/model',
+    reasoning_effort: null,
+    avg_attempt_cost_usd: 19.75,
+    synced_at: '2026-06-01T01:00:00.000Z',
+  },
+];
+
 describe('mapConfigRows', () => {
   it('returns null when config row is null', () => {
-    expect(mapConfigRows(null, ['some/model'], deciderRows)).toBeNull();
+    expect(mapConfigRows(null, ['some/model'], deciderRows, autoRows, [])).toBeNull();
   });
 
   it('returns null when classifierModels array is empty', () => {
-    expect(mapConfigRows(configRow, [], deciderRows)).toBeNull();
+    expect(mapConfigRows(configRow, [], deciderRows, autoRows, [])).toBeNull();
   });
 
   it('returns null when deciderModels array is empty', () => {
-    expect(mapConfigRows(configRow, ['some/model'], [])).toBeNull();
+    expect(mapConfigRows(configRow, ['some/model'], [], [], [])).toBeNull();
   });
 
   it('maps a full config row set to BenchmarkConfig', () => {
     const classifierModels = ['some/model-a', 'some/model-b'];
 
-    const result = mapConfigRows(configRow, classifierModels, deciderRows);
+    const result = mapConfigRows(configRow, classifierModels, deciderRows, autoRows, []);
 
     expect(result).not.toBeNull();
     expect(result?.minAccuracy).toBe(0.85);
@@ -50,11 +61,56 @@ describe('mapConfigRows', () => {
     expect(result?.updatedAt).toBe('2026-06-01T00:00:00.000Z');
     expect(result?.updatedBy).toBe('admin@example.com');
     expect(result?.classifierModels).toEqual(classifierModels);
-    expect(result?.deciderModels).toHaveLength(1);
+    expect(result?.deciderModels).toHaveLength(2);
     expect(result?.deciderModels[0].id).toBe('some/decider');
     expect(result?.deciderModels[0].reasoningEffort).toBe('high');
+    expect(result?.manualDeciderModels).toEqual([{ id: 'some/decider', reasoningEffort: 'high' }]);
+    expect(result?.autoDeciderModels).toEqual([
+      { id: 'auto/model', reasoningEffort: null, avgAttemptCostUsd: 19.75 },
+    ]);
     expect(result?.classifierRepetitions).toBe(1);
     expect(result?.deciderRepetitions).toBe(1);
     expect(result?.classifierMaxP95LatencyMs).toBeNull();
+    expect(result?.autoDeciderMinCostUsd).toBe(12);
+    expect(result?.autoDeciderMaxCostUsd).toBe(24);
+  });
+
+  it('excludes only auto decider models, leaving a manual model with the same id included', () => {
+    const result = mapConfigRows(
+      configRow,
+      ['some/model'],
+      [{ model: 'auto/model', reasoning_effort: 'medium' }],
+      autoRows,
+      ['auto/model']
+    );
+
+    expect(result?.deciderModels).toEqual([{ id: 'auto/model', reasoningEffort: 'medium' }]);
+    expect(result?.excludedAutoDeciderModels).toEqual(['auto/model']);
+  });
+
+  it('normalizes unsupported persisted reasoning effort values to null', () => {
+    const result = mapConfigRows(
+      configRow,
+      ['some/model'],
+      [{ model: 'manual/thinking', reasoning_effort: 'thinking' }],
+      [
+        {
+          model: 'auto/none',
+          reasoning_effort: 'none',
+          avg_attempt_cost_usd: 20,
+          synced_at: '2026-06-01T01:00:00.000Z',
+        },
+      ],
+      []
+    );
+
+    expect(result?.manualDeciderModels).toEqual([{ id: 'manual/thinking', reasoningEffort: null }]);
+    expect(result?.autoDeciderModels).toEqual([
+      { id: 'auto/none', reasoningEffort: null, avgAttemptCostUsd: 20 },
+    ]);
+    expect(result?.deciderModels).toEqual([
+      { id: 'manual/thinking', reasoningEffort: null },
+      { id: 'auto/none', reasoningEffort: null },
+    ]);
   });
 });

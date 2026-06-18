@@ -20,12 +20,37 @@ export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid'; // We pass X-
 export const LANDING_URL =
   process.env.NODE_ENV === 'production' ? 'https://kilo.ai' : 'http://localhost:3001';
 
-// In development, APP_URL derives from the PORT env var (set by scripts/dev.sh).
-// APP_URL_OVERRIDE takes precedence for tunnels (e.g. ngrok).
-export const APP_URL =
-  process.env.NODE_ENV === 'production'
-    ? 'https://app.kilo.ai'
-    : (process.env.APP_URL_OVERRIDE ?? `http://localhost:${process.env.PORT || '3000'}`);
+type AppUrlEnvironment = {
+  appUrlOverride?: string;
+  nodeEnv?: string;
+  port?: string;
+  vercelTargetEnv?: string;
+};
+
+export function resolveAppUrl({
+  appUrlOverride,
+  nodeEnv,
+  port,
+  vercelTargetEnv,
+}: AppUrlEnvironment): string {
+  if (appUrlOverride) {
+    return new URL(appUrlOverride).origin;
+  }
+  if (vercelTargetEnv === 'staging') {
+    return 'https://staging-app.kilo.ai';
+  }
+  if (nodeEnv === 'production') {
+    return 'https://app.kilo.ai';
+  }
+  return `http://localhost:${port || '3000'}`;
+}
+
+export const APP_URL = resolveAppUrl({
+  appUrlOverride: process.env.APP_URL_OVERRIDE,
+  nodeEnv: process.env.NODE_ENV,
+  port: process.env.PORT,
+  vercelTargetEnv: process.env.VERCEL_TARGET_ENV,
+});
 
 export const TRIAL_DURATION_DAYS = 14;
 

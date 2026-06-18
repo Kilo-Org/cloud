@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { KILO_MODEL_PREFIX, unprefixKiloGatewayModelId } from './kilo-model-id.js';
+import {
+  deriveModelStatsIdentity,
+  KILO_MODEL_PREFIX,
+  unprefixKiloGatewayModelId,
+} from './kilo-model-id.js';
 
 describe('kilo model ids', () => {
   it('exposes the shared Kilo model prefix', () => {
@@ -11,5 +15,18 @@ describe('kilo model ids', () => {
     expect(unprefixKiloGatewayModelId('kilo/openai/gpt-5.5')).toBe('openai/gpt-5.5');
     expect(unprefixKiloGatewayModelId('kilo/kilo/special-model')).toBe('kilo/special-model');
     expect(unprefixKiloGatewayModelId('kilo/special-model')).toBeUndefined();
+  });
+
+  it('derives model stats identity from provider-shaped model ids', () => {
+    expect(deriveModelStatsIdentity('MoonshotAI/Kimi-K2.7-Code')).toEqual({
+      slug: 'moonshotai-kimi-k2-7-code',
+      modelCreator: 'MoonshotAI',
+      creatorSlug: 'moonshotai',
+    });
+    expect(deriveModelStatsIdentity('special-model')).toEqual({
+      slug: 'special-model',
+      modelCreator: 'unknown',
+      creatorSlug: 'unknown',
+    });
   });
 });

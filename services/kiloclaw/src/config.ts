@@ -85,8 +85,17 @@ export const RESTARTING_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
 export const RESTARTING_MAX_TIMEOUT_MS = 15 * 60 * 1000; // 15 min
 /** Maximum time to stay in 'recovering' before surfacing a timeout */
 export const RECOVERING_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
-/** Destroying: retry pending deletes quickly */
+/** Destroying: initial retry interval for pending deletes */
 export const ALARM_INTERVAL_DESTROYING_MS = 60 * 1000; // 1 min
+/** Volume deletion retry tiers; the last tier repeats until the retry cap. */
+export const DESTROY_VOLUME_RETRY_DELAYS_MS = [
+  60 * 1000,
+  5 * 60 * 1000,
+  15 * 60 * 1000,
+  60 * 60 * 1000,
+  6 * 60 * 60 * 1000,
+  24 * 60 * 60 * 1000,
+] as const;
 /** Pending destroy age before emitting stuck-destroy telemetry */
 export const DESTROY_STUCK_THRESHOLD_MS = 15 * 60 * 1000; // 15 min
 /** Minimum interval between repeated stuck-destroy telemetry events */

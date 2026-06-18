@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
+import type { GatewayRequest } from './providers/openrouter/types';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -697,16 +698,131 @@ describe('parseTranscriptionUsageFromResponse', () => {
 });
 
 describe('makeErrorReadable', () => {
+  const request = {
+    kind: 'chat_completions',
+    body: { model: 'test', messages: [], stream: false },
+  } satisfies GatewayRequest;
+
   it('returns undefined for non-error responses', async () => {
     const response = new Response('{}', { status: 200 });
     const result = await makeErrorReadable({
       providerId: 'openrouter',
       requestedModel: 'anything',
-      request: { kind: 'chat_completions', body: { model: 'test', messages: [] } },
+      request,
       response,
       isUserByok: false,
     });
     expect(result).toBeUndefined();
+  });
+
+  it('returns an actionable error when no allowed provider serves the model', async () => {
+    const response = Response.json(
+      {
+        message: 'No allowed providers are available for the selected model.',
+        code: 404,
+        metadata: {
+          available_providers: ['alibaba'],
+          requested_providers: ['anthropic', 'openai'],
+        },
+      },
+      { status: 404 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'openrouter',
+      requestedModel: 'qwen/qwen3.7-plus',
+      request,
+      response,
+      isUserByok: false,
+    });
+
+    expect(result?.status).toBe(404);
+    await expect(result?.json()).resolves.toEqual({
+      error: 'No eligible provider can serve the selected model.',
+      error_type: 'provider_not_allowed',
+      message:
+        'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
+    });
+  });
+
+  it('recognizes the wrapped OpenRouter error response', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message: 'No allowed providers are available for the selected model.',
+          code: 404,
+          metadata: {
+            available_providers: ['alibaba'],
+            requested_providers: ['openai'],
+          },
+        },
+      },
+      { status: 404 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'openrouter',
+      requestedModel: 'qwen/qwen3.7-plus',
+      request,
+      response,
+      isUserByok: false,
+    });
+
+    expect(result).toBeDefined();
+    if (!result) throw new Error('Expected a readable provider error response');
+    expect(result.status).toBe(404);
+    expect((await result.json()).error_type).toBe('provider_not_allowed');
+  });
+
+  it('does not rewrite matching errors from other providers', async () => {
+    const response = Response.json(
+      {
+        message: 'No allowed providers are available for the selected model.',
+        code: 404,
+        metadata: {
+          available_providers: ['alibaba'],
+          requested_providers: ['openai'],
+        },
+      },
+      { status: 404 }
+    );
+
+    await expect(
+      makeErrorReadable({
+        providerId: 'vercel',
+        requestedModel: 'anything',
+        request,
+        response,
+        isUserByok: false,
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('leaves unrelated and malformed upstream errors unchanged', async () => {
+    const responses = [
+      Response.json(
+        {
+          message: 'No allowed providers are available for the selected model.',
+          code: 404,
+          metadata: { available_providers: ['alibaba'] },
+        },
+        { status: 404 }
+      ),
+      Response.json({ message: 'Model not found', code: 404 }, { status: 404 }),
+      new Response('not json', { status: 404 }),
+    ];
+
+    for (const response of responses) {
+      await expect(
+        makeErrorReadable({
+          providerId: 'openrouter',
+          requestedModel: 'anything',
+          request,
+          response,
+          isUserByok: false,
+        })
+      ).resolves.toBeUndefined();
+    }
   });
 });
 

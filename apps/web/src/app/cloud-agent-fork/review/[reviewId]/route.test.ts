@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { TRPCError } from '@trpc/server';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
 import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
 
@@ -12,7 +13,9 @@ type TrpcContextFixture = {
 
 type ReviewFixture = {
   id: string;
+  owned_by_user_id: string | null;
   owned_by_organization_id: string | null;
+  platform_integration_id: string | null;
   repo_full_name: string;
   pr_url: string;
   platform: string;
@@ -44,8 +47,12 @@ type PrepareSessionOutput = {
   cloudAgentSessionId: string;
 };
 
-type ReviewConfigOutput = {
-  modelSlug: string;
+type IntegrationFixture = {
+  id: string;
+  platform: string;
+  owned_by_user_id: string | null;
+  owned_by_organization_id: string | null;
+  metadata: unknown;
 };
 
 type RouteContext = {
@@ -56,10 +63,8 @@ type RouteGet = (request: NextRequest, context: RouteContext) => Promise<Respons
 
 const mockCreateTRPCContext = jest.fn<() => Promise<TrpcContextFixture>>();
 const mockCodeReviewsGet = jest.fn<(input: { reviewId: string }) => Promise<ReviewResult>>();
-const mockPersonalGetReviewConfig =
-  jest.fn<(input: { platform: 'github' }) => Promise<ReviewConfigOutput>>();
-const mockOrganizationGetReviewConfig =
-  jest.fn<(input: { organizationId: string; platform: 'github' }) => Promise<ReviewConfigOutput>>();
+const mockGetIntegrationById =
+  jest.fn<(integrationId: string) => Promise<IntegrationFixture | null>>();
 const mockPersonalPrepareSession =
   jest.fn<(input: PrepareSessionInput) => Promise<PrepareSessionOutput>>();
 const mockOrganizationPrepareSession =
@@ -71,16 +76,10 @@ const mockCaller = {
   codeReviews: {
     get: mockCodeReviewsGet,
   },
-  personalReviewAgent: {
-    getReviewConfig: mockPersonalGetReviewConfig,
-  },
   cloudAgentNext: {
     prepareSession: mockPersonalPrepareSession,
   },
   organizations: {
-    reviewAgent: {
-      getReviewConfig: mockOrganizationGetReviewConfig,
-    },
     cloudAgentNext: {
       prepareSession: mockOrganizationPrepareSession,
     },
@@ -98,26 +97,45 @@ jest.mock('@/routers/root-router', () => ({
   rootRouter: {},
 }));
 
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  getIntegrationById: mockGetIntegrationById,
+}));
+
 let getRoute: RouteGet;
 
 const REVIEW_ID = '00000000-0000-4000-8000-000000000001';
+const USER_ID = 'user_1';
+const OTHER_USER_ID = 'user_2';
 const ORG_ID = '11111111-1111-4111-8111-111111111111';
+const OTHER_ORG_ID = '22222222-2222-4222-8222-222222222222';
+const REVIEW_INTEGRATION_ID = '33333333-3333-4333-8333-333333333333';
 const PR_URL = 'https://github.com/owner/repo/pull/123';
-const PERSONAL_CONFIGURED_MODEL = 'z-ai/glm-5.2';
-const PERSONAL_USAGE_MODEL = 'z-ai/glm-5.2-20260616';
-const ORGANIZATION_CONFIGURED_MODEL = 'anthropic/claude-sonnet-4.6';
-const ORGANIZATION_USAGE_MODEL = 'anthropic/claude-4.6-sonnet-20260217';
+const CONFIGURED_BOT_MODEL = 'z-ai/glm-5.2';
+const RESOLVED_USAGE_MODEL = 'z-ai/glm-5.2-20260616';
 const PERSONAL_KILO_SESSION_ID = 'ses_12345678901234567890123456';
 const ORG_KILO_SESSION_ID = 'ses_abcdefabcdefabcdefabcdefab';
 
 function makeReview(overrides: Partial<ReviewFixture> = {}): ReviewFixture {
   return {
     id: REVIEW_ID,
+    owned_by_user_id: USER_ID,
     owned_by_organization_id: null,
+    platform_integration_id: REVIEW_INTEGRATION_ID,
     repo_full_name: 'owner/repo',
     pr_url: PR_URL,
     platform: 'github',
-    model: PERSONAL_USAGE_MODEL,
+    model: RESOLVED_USAGE_MODEL,
+    ...overrides,
+  };
+}
+
+function makeIntegration(overrides: Partial<IntegrationFixture> = {}): IntegrationFixture {
+  return {
+    id: REVIEW_INTEGRATION_ID,
+    platform: 'github',
+    owned_by_user_id: USER_ID,
+    owned_by_organization_id: null,
+    metadata: { model_slug: CONFIGURED_BOT_MODEL },
     ...overrides,
   };
 }
@@ -165,12 +183,9 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCreateTRPCContext.mockResolvedValue({ user: { id: 'user_1' } });
+    mockCreateTRPCContext.mockResolvedValue({ user: { id: USER_ID } });
     mockSuccessfulReview();
-    mockPersonalGetReviewConfig.mockResolvedValue({ modelSlug: PERSONAL_CONFIGURED_MODEL });
-    mockOrganizationGetReviewConfig.mockResolvedValue({
-      modelSlug: ORGANIZATION_CONFIGURED_MODEL,
-    });
+    mockGetIntegrationById.mockResolvedValue(makeIntegration());
     mockPersonalPrepareSession.mockResolvedValue({
       kiloSessionId: PERSONAL_KILO_SESSION_ID,
       cloudAgentSessionId: 'agent_personal',
@@ -207,29 +222,22 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     expectNoSessionCreation();
   });
 
-  it('starts personal review fix sessions with the configured catalog model', async () => {
+  it('starts personal review fix sessions with the exact linked integration bot model', async () => {
     const response = await requestReview();
     const redirectUrl = getRedirectUrl(response);
 
     expect(mockCodeReviewsGet).toHaveBeenCalledWith({ reviewId: REVIEW_ID });
-    expect(mockPersonalGetReviewConfig).toHaveBeenCalledWith({ platform: 'github' });
-    expect(mockOrganizationGetReviewConfig).not.toHaveBeenCalled();
+    expect(mockGetIntegrationById).toHaveBeenCalledWith(REVIEW_INTEGRATION_ID);
+    expect(mockGetIntegrationById).toHaveBeenCalledTimes(1);
     expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
       prompt: buildFixReviewPrompt(PR_URL),
       mode: DEFAULT_CODE_REVIEW_MODE,
-      model: PERSONAL_CONFIGURED_MODEL,
+      model: CONFIGURED_BOT_MODEL,
       autoInitiate: true,
       autoCommit: false,
     });
-    expect(mockPersonalPrepareSession).not.toHaveBeenCalledWith(
-      expect.objectContaining({ model: PERSONAL_USAGE_MODEL })
-    );
     expect(mockOrganizationPrepareSession).not.toHaveBeenCalled();
-
-    const input = mockPersonalPrepareSession.mock.calls[0][0] as Record<string, unknown>;
-    expect(input).not.toHaveProperty('upstreamBranch');
-    expect(input).not.toHaveProperty('initialPayload');
 
     expect(response.status).toBe(303);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
@@ -238,37 +246,31 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     );
   });
 
-  it('starts organization review fix sessions with the configured catalog model', async () => {
+  it('starts organization review fix sessions with the exact linked integration bot model', async () => {
     mockSuccessfulReview({
+      owned_by_user_id: null,
       owned_by_organization_id: ORG_ID,
-      model: ORGANIZATION_USAGE_MODEL,
+      model: RESOLVED_USAGE_MODEL,
     });
+    mockGetIntegrationById.mockResolvedValue(
+      makeIntegration({ owned_by_user_id: null, owned_by_organization_id: ORG_ID })
+    );
 
     const response = await requestReview();
     const redirectUrl = getRedirectUrl(response);
 
-    expect(mockPersonalGetReviewConfig).not.toHaveBeenCalled();
-    expect(mockOrganizationGetReviewConfig).toHaveBeenCalledWith({
-      organizationId: ORG_ID,
-      platform: 'github',
-    });
+    expect(mockGetIntegrationById).toHaveBeenCalledWith(REVIEW_INTEGRATION_ID);
+    expect(mockGetIntegrationById).toHaveBeenCalledTimes(1);
     expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
     expect(mockOrganizationPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
       prompt: buildFixReviewPrompt(PR_URL),
       mode: DEFAULT_CODE_REVIEW_MODE,
-      model: ORGANIZATION_CONFIGURED_MODEL,
+      model: CONFIGURED_BOT_MODEL,
       autoInitiate: true,
       autoCommit: false,
       organizationId: ORG_ID,
     });
-    expect(mockOrganizationPrepareSession).not.toHaveBeenCalledWith(
-      expect.objectContaining({ model: ORGANIZATION_USAGE_MODEL })
-    );
-
-    const input = mockOrganizationPrepareSession.mock.calls[0][0] as Record<string, unknown>;
-    expect(input).not.toHaveProperty('upstreamBranch');
-    expect(input).not.toHaveProperty('initialPayload');
 
     expect(response.status).toBe(303);
     expect(`${redirectUrl.pathname}${redirectUrl.search}`).toBe(
@@ -330,16 +332,86 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     const response = await requestReview();
 
     expectErrorRedirect(response, 'unsupported_platform');
+    expect(mockGetIntegrationById).not.toHaveBeenCalled();
     expectNoSessionCreation();
   });
 
-  it('redirects configuration lookup failures without creating a session', async () => {
-    mockPersonalGetReviewConfig.mockRejectedValue(new Error('configuration unavailable'));
+  it('uses the default bot model for unlinked reviews without owner-wide fallback lookup', async () => {
+    mockSuccessfulReview({ platform_integration_id: null });
+
+    const response = await requestReview();
+
+    expect(mockGetIntegrationById).not.toHaveBeenCalled();
+    expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
+      githubRepo: 'owner/repo',
+      prompt: buildFixReviewPrompt(PR_URL),
+      mode: DEFAULT_CODE_REVIEW_MODE,
+      model: DEFAULT_BOT_MODEL,
+      autoInitiate: true,
+      autoCommit: false,
+    });
+    expect(response.status).toBe(303);
+  });
+
+  it('uses the default bot model when the linked integration was deleted', async () => {
+    mockGetIntegrationById.mockResolvedValue(null);
+
+    const response = await requestReview();
+
+    expect(mockGetIntegrationById).toHaveBeenCalledWith(REVIEW_INTEGRATION_ID);
+    expect(mockGetIntegrationById).toHaveBeenCalledTimes(1);
+    expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
+      githubRepo: 'owner/repo',
+      prompt: buildFixReviewPrompt(PR_URL),
+      mode: DEFAULT_CODE_REVIEW_MODE,
+      model: DEFAULT_BOT_MODEL,
+      autoInitiate: true,
+      autoCommit: false,
+    });
+    expect(response.status).toBe(303);
+  });
+
+  it.each([
+    {
+      name: 'wrong platform',
+      integrationOverrides: { platform: 'gitlab' },
+    },
+    {
+      name: 'wrong personal owner',
+      integrationOverrides: { owned_by_user_id: OTHER_USER_ID },
+    },
+    {
+      name: 'wrong organization owner',
+      reviewOverrides: { owned_by_user_id: null, owned_by_organization_id: ORG_ID },
+      integrationOverrides: {
+        owned_by_user_id: null,
+        owned_by_organization_id: OTHER_ORG_ID,
+      },
+    },
+  ] satisfies Array<{
+    name: string;
+    reviewOverrides?: Partial<ReviewFixture>;
+    integrationOverrides: Partial<IntegrationFixture>;
+  }>)('redirects invalid linked integrations with $name provenance', async testCase => {
+    mockSuccessfulReview(testCase.reviewOverrides);
+    mockGetIntegrationById.mockResolvedValue(makeIntegration(testCase.integrationOverrides));
 
     const response = await requestReview();
 
     expectErrorRedirect(response, 'fix_session_failed');
-    expect(mockPersonalGetReviewConfig).toHaveBeenCalledTimes(1);
+    expect(mockGetIntegrationById).toHaveBeenCalledWith(REVIEW_INTEGRATION_ID);
+    expect(mockGetIntegrationById).toHaveBeenCalledTimes(1);
+    expectNoSessionCreation();
+  });
+
+  it('redirects integration lookup failures without creating a session', async () => {
+    mockGetIntegrationById.mockRejectedValue(new Error('integration unavailable'));
+
+    const response = await requestReview();
+
+    expectErrorRedirect(response, 'fix_session_failed');
+    expect(mockGetIntegrationById).toHaveBeenCalledWith(REVIEW_INTEGRATION_ID);
+    expect(mockGetIntegrationById).toHaveBeenCalledTimes(1);
     expectNoSessionCreation();
   });
 

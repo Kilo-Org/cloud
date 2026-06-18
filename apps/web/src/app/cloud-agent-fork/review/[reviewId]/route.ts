@@ -2,6 +2,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
 import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
+import { resolveBotModelSlug } from '@/lib/bot/model';
+import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCallerFactory, createTRPCContext } from '@/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { TRPCError } from '@trpc/server';
@@ -71,17 +73,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   try {
     const organizationId = review.owned_by_organization_id;
-    const reviewConfig = organizationId
-      ? await caller.organizations.reviewAgent.getReviewConfig({
-          organizationId,
-          platform: 'github',
-        })
-      : await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+    const integration = review.platform_integration_id
+      ? await getIntegrationById(review.platform_integration_id)
+      : null;
+
+    if (
+      integration &&
+      (integration.platform !== review.platform ||
+        integration.owned_by_user_id !== review.owned_by_user_id ||
+        integration.owned_by_organization_id !== review.owned_by_organization_id)
+    ) {
+      return redirectToError(url.origin, 'fix_session_failed');
+    }
+
     const sessionInput = {
       githubRepo: review.repo_full_name,
       prompt: buildFixReviewPrompt(review.pr_url),
       mode: DEFAULT_CODE_REVIEW_MODE,
-      model: reviewConfig.modelSlug,
+      model: resolveBotModelSlug(integration),
       autoInitiate: true,
       autoCommit: false,
     };

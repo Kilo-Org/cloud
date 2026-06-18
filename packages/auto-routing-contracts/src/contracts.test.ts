@@ -6,7 +6,12 @@ import {
   MirrorPayloadSchema,
   UpdateClassifierModelRequestSchema,
 } from './index';
-import { BenchmarkConfigSchema } from './benchmark';
+import {
+  BenchmarkConfigSchema,
+  DEFAULT_BENCHMARK_ORG_ID,
+  DEFAULT_BENCHMARK_USER_ID,
+  resolveBenchmarkIdentity,
+} from './benchmark';
 
 describe('auto routing contracts', () => {
   it('validates the cross-service request and response contracts', () => {
@@ -210,6 +215,27 @@ describe('BenchmarkConfigSchema defaults', () => {
         true
       );
     }
+  });
+});
+
+describe('resolveBenchmarkIdentity', () => {
+  it('uses worker defaults when benchmark identity overrides are null', () => {
+    expect(resolveBenchmarkIdentity({ benchmarkUserId: null, benchmarkOrgId: null })).toEqual({
+      benchmarkUserId: DEFAULT_BENCHMARK_USER_ID,
+      benchmarkOrgId: DEFAULT_BENCHMARK_ORG_ID,
+    });
+  });
+
+  it('preserves configured benchmark identity overrides', () => {
+    expect(
+      resolveBenchmarkIdentity({
+        benchmarkUserId: 'override-user',
+        benchmarkOrgId: 'override-org',
+      })
+    ).toEqual({
+      benchmarkUserId: 'override-user',
+      benchmarkOrgId: 'override-org',
+    });
   });
 });
 

@@ -6,6 +6,8 @@ import {
   BenchmarkConfigResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   BenchmarkRunsResponseSchema,
+  DEFAULT_BENCHMARK_ORG_ID,
+  DEFAULT_BENCHMARK_USER_ID,
   StartBenchmarkRunResponseSchema,
   type BenchmarkConfig,
   type BenchmarkKind,
@@ -124,9 +126,6 @@ type DeciderModelRow = {
 
 type AutoDeciderModelRow = AutoBenchmarkDeciderModel;
 
-const DEFAULT_BENCHMARK_USER_ID = 'ce12ef3d-ae95-4d77-b4f0-23735f0a0591';
-const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
-
 export function configToFormState(config: BenchmarkConfig | null): {
   classifierModels: string;
   deciderModels: DeciderModelRow[];
@@ -144,8 +143,8 @@ export function configToFormState(config: BenchmarkConfig | null): {
   autoDeciderMaxCostUsd: number;
 } {
   if (config === null) {
-    // No config saved yet: the worker fabricates nothing, so the form starts
-    // empty and the admin must enter and save a config before running.
+    // No config saved yet: identity fields are overrides, so blank means the
+    // worker uses its default benchmark user and org at run time.
     return {
       classifierModels: '',
       deciderModels: [],
@@ -154,8 +153,8 @@ export function configToFormState(config: BenchmarkConfig | null): {
       minAccuracy: 0.7,
       switchCostFactor: 3,
       maxConcurrency: 100,
-      benchmarkUserId: DEFAULT_BENCHMARK_USER_ID,
-      benchmarkOrgId: DEFAULT_BENCHMARK_ORG_ID,
+      benchmarkUserId: '',
+      benchmarkOrgId: '',
       classifierRepetitions: 1,
       deciderRepetitions: 1,
       classifierMaxP95LatencyMs: '1000',
@@ -652,37 +651,35 @@ function BenchmarkConfigEditor({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Benchmark user id */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-user-id" className="text-sm font-medium">
-              Benchmark user id
+              Benchmark user override
             </Label>
             <Input
               id="benchmark-user-id"
               value={form.benchmarkUserId}
               onChange={e => updateForm(prev => ({ ...prev, benchmarkUserId: e.target.value }))}
               className="h-8 font-mono text-xs"
-              placeholder="(unset)"
+              placeholder={`Default: ${DEFAULT_BENCHMARK_USER_ID}`}
             />
             <p className="text-muted-foreground text-xs">
-              Kilo user the decider CLI authenticates as.
+              Leave blank to run decider benchmarks as the default benchmark user.
             </p>
           </div>
 
-          {/* Benchmark org id */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-org-id" className="text-sm font-medium">
-              Benchmark org id
+              Benchmark org override
             </Label>
             <Input
               id="benchmark-org-id"
               value={form.benchmarkOrgId}
               onChange={e => updateForm(prev => ({ ...prev, benchmarkOrgId: e.target.value }))}
               className="h-8 font-mono text-xs"
-              placeholder="(personal credits)"
+              placeholder={`Default: ${DEFAULT_BENCHMARK_ORG_ID}`}
             />
             <p className="text-muted-foreground text-xs">
-              Optional org context; when set, decider runs bill org credits.
+              Leave blank to bill decider benchmarks to the default benchmark org.
             </p>
           </div>
         </div>
@@ -943,6 +940,7 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
                 <TableHeader>
                   <TableRow>
                     <TableHead>Model</TableHead>
+                    <TableHead className="w-36">Reasoning effort</TableHead>
                     <TableHead className="text-right">Accuracy</TableHead>
                     <TableHead className="text-right">Avg cost</TableHead>
                     <TableHead className="text-right">Cost / accuracy</TableHead>
@@ -954,6 +952,9 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
                     <TableRow key={`${routeKey}-${c.model}-${i}`}>
                       <TableCell className="max-w-56 truncate font-mono text-xs">
                         {c.model}
+                      </TableCell>
+                      <TableCell className="capitalize text-xs">
+                        {c.reasoningEffort ?? 'default'}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-xs">
                         {formatAccuracy(c.accuracy)}

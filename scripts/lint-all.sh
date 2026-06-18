@@ -6,7 +6,7 @@ set -euo pipefail
 
 PATH="node_modules/.bin:$PATH"
 
-lint_dirs=(apps/web/src)
+lint_dirs=(apps/web/src scripts/web-env)
 mobile_lint_dirs=()
 
 # Resolve workspace directories using pnpm (handles glob expansion)

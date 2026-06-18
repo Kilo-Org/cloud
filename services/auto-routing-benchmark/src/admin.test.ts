@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  BenchmarkConfig,
-  BenchmarkModelSummary,
-  RoutingTable,
+import {
+  DEFAULT_BENCHMARK_ORG_ID,
+  DEFAULT_BENCHMARK_USER_ID,
+  type BenchmarkConfig,
+  type BenchmarkModelSummary,
+  type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import { computeEngineIdentity } from './run';
@@ -423,6 +425,8 @@ describe('POST /admin/runs', () => {
     const [, runArg] = vi.mocked(insertRun).mock.calls[0];
     expect(runArg.min_accuracy).toBe(TEST_CONFIG.minAccuracy);
     expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
+    expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
+    expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
     const queuedMessages = queueSendBatch.mock.calls.flatMap(([messages]) => messages);
     expect(queueSendBatch).toHaveBeenCalledTimes(2);
     expect(queuedMessages).toHaveLength(
@@ -435,6 +439,25 @@ describe('POST /admin/runs', () => {
       caseIds: [CLASSIFIER_CASES[0].id],
       rep: 0,
     });
+  });
+
+  it('starts a decider run with default benchmark identity when overrides are null', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        benchmark_user_id: null,
+        benchmark_org_id: null,
+      },
+      deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+    expect(insertRun).toHaveBeenCalledOnce();
+    const [, runArg] = vi.mocked(insertRun).mock.calls[0];
+    expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
+    expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
   });
 
   it('carries a decider model only when its benchmark identity still matches', async () => {

@@ -2,6 +2,7 @@ import { classifyWithOpenRouter } from '@kilocode/auto-routing-contracts/classif
 import {
   CLASSIFIER_WINNER_KV_KEY,
   ROUTING_TABLE_KV_KEY,
+  resolveBenchmarkIdentity,
   type BenchmarkDeciderModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
@@ -345,14 +346,8 @@ export async function startRun(
   const skippedModels = models.filter(m => isCarryable(m));
   const carriedSummaries = skippedModels.flatMap(m => priorByModel.get(m)?.summaries ?? []);
 
-  // Decider runs execute through the kilo CLI under a real Kilo user's
-  // identity/billing. Fail fast (before inserting the run) when that user
-  // isn't configured so the admin POST surfaces the misconfiguration.
-  if (kind === 'decider' && enqueuedModelIds.length > 0 && !config.benchmarkUserId) {
-    throw new Error(
-      'benchmark user not configured: set benchmarkUserId before running the decider benchmark'
-    );
-  }
+  const benchmarkIdentity = resolveBenchmarkIdentity(config);
+
   const maxLiveDeciderContainers = Math.min(config.maxConcurrency, DECIDER_CONTAINER_INSTANCE_CAP);
   if (kind === 'decider') {
     validateDeciderContainerBudget({
@@ -383,8 +378,8 @@ export async function startRun(
         min_accuracy: config.minAccuracy,
         switch_cost_factor: config.switchCostFactor,
         max_concurrency: config.maxConcurrency,
-        benchmark_user_id: config.benchmarkUserId,
-        benchmark_org_id: config.benchmarkOrgId,
+        benchmark_user_id: benchmarkIdentity.benchmarkUserId,
+        benchmark_org_id: benchmarkIdentity.benchmarkOrgId,
         repetitions,
         classifier_max_p95_latency_ms:
           kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
@@ -423,8 +418,8 @@ export async function startRun(
       maxConcurrency: config.maxConcurrency,
       minAccuracy: config.minAccuracy,
       switchCostFactor: config.switchCostFactor,
-      benchmarkUserId: config.benchmarkUserId,
-      benchmarkOrgId: config.benchmarkOrgId,
+      benchmarkUserId: benchmarkIdentity.benchmarkUserId,
+      benchmarkOrgId: benchmarkIdentity.benchmarkOrgId,
       models: runModelRows,
       repetitions,
       classifierMaxP95LatencyMs: kind === 'classifier' ? config.classifierMaxP95LatencyMs : null,
@@ -596,8 +591,8 @@ async function processDeciderJob(
   }
 
   if (!state.benchmarkUserId) {
-    // startRun fails fast before enqueueing, so this only happens if the run
-    // snapshot was tampered with; throwing lets the queue retry/dead-letter.
+    // startRun snapshots the effective default/override identity, so this only
+    // happens if the run row was tampered with; throwing lets the queue retry.
     throw new Error(`run ${message.runId} has no benchmarkUserId`);
   }
 

@@ -2,6 +2,7 @@ import { renderTemplate, subjects } from '@/lib/email';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
 
 jest.mock('@/lib/email-mailgun', () => ({
+  getEmailVerificationRecipient: (email: string) => email,
   sendViaMailgun: jest.fn(),
 }));
 

@@ -3,7 +3,7 @@ import path from 'path';
 import type { Organization } from '@kilocode/db/schema';
 import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
 import { NEXTAUTH_URL } from '@/lib/config.server';
-import { sendViaMailgun } from '@/lib/email-mailgun';
+import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
 import { verifyEmail } from '@/lib/email-neverbounce';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
@@ -79,6 +79,10 @@ export class RawHtml {
 
 type TemplateVars = Record<string, string | RawHtml>;
 
+export function renderNonAutolinkedText(str: string): RawHtml {
+  return new RawHtml(escapeHtml(str).replace(/[/.]/g, '$&&#8203;'));
+}
+
 export function renderTemplate(name: string, vars: TemplateVars): string {
   const templatePath = path.join(process.cwd(), 'src', 'emails', `${name}.html`);
   const html = fs.readFileSync(templatePath, 'utf-8');
@@ -116,9 +120,12 @@ type SendParams = {
 };
 
 export async function send(params: SendParams): Promise<SendResult> {
-  const isSafeToSend = await verifyEmail(params.to);
-  if (!isSafeToSend) {
-    return { sent: false, reason: 'neverbounce_rejected' };
+  const verificationRecipient = getEmailVerificationRecipient(params.to);
+  if (verificationRecipient) {
+    const isSafeToSend = await verifyEmail(verificationRecipient);
+    if (!isSafeToSend) {
+      return { sent: false, reason: 'neverbounce_rejected' };
+    }
   }
 
   const subject = params.subjectOverride ?? subjects[params.templateName];
@@ -126,8 +133,13 @@ export async function send(params: SendParams): Promise<SendResult> {
     ...params.templateVars,
     year: String(new Date().getFullYear()),
   });
-  const result = await sendViaMailgun({ to: params.to, subject, html });
-  if (!result) return { sent: false, reason: 'provider_not_configured' as const };
+  const result = await sendViaMailgun({
+    to: params.to,
+    subject,
+    html,
+    category: params.templateName,
+  });
+  if (!result) return { sent: false, reason: 'provider_not_configured' };
   return { sent: true };
 }
 
@@ -195,7 +207,7 @@ export async function sendOrganizationInviteEmail(
     to: data.to,
     templateName: 'orgInvitation',
     templateVars: {
-      organization_name: data.organizationName,
+      organization_name: renderNonAutolinkedText(data.organizationName),
       inviter_name: data.inviterName,
       accept_invite_url: data.acceptInviteUrl,
     },
@@ -421,6 +433,7 @@ export async function sendAccountDeletionSupportNotification(
     subject: `Account Deletion Request — ${userEmail}`,
     html: `<p>User <strong>${userEmail}</strong> (ID: <code>${userId}</code>) has requested account deletion from the mobile app.</p>`,
     replyTo: userEmail,
+    category: 'accountDeletionSupport',
   });
 }
 

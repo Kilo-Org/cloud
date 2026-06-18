@@ -61,10 +61,7 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
   if (isDeepseekModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum.alibaba,
-      OpenRouterInferenceProviderIdSchema.enum.novita,
-    ];
+    return [OpenRouterInferenceProviderIdSchema.enum.alibaba];
   }
   if (isGlmModel(requestedModel)) {
     return [

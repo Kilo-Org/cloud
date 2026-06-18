@@ -6,6 +6,7 @@ import { PostHogProvider } from '../components/PostHogProvider';
 import { Providers } from '../components/Providers';
 import { DataLayerProvider } from '../components/DataLayerProvider';
 import { ImpactIdentify } from '@/components/ImpactIdentify';
+import { StagingEnvironmentBanner } from '@/components/shared/StagingEnvironmentBanner';
 import { APP_URL } from '@/lib/constants';
 
 const inter = Inter({
@@ -25,6 +26,9 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
   variable: '--font-jetbrains',
 });
+
+const isStagingEnvironment = process.env.VERCEL_TARGET_ENV === 'staging';
+const stagingFavicon = '/kilo-v1-STAGING.svg';
 
 export const metadata: Metadata = {
   title: 'Kilo Code - Open source AI agent VS Code extension',
@@ -47,8 +51,9 @@ export const metadata: Metadata = {
       'Write code more efficiently by generating code, automating tasks, and providing suggestions',
   },
   icons: {
-    icon:
-      process.env.NODE_ENV !== 'production'
+    icon: isStagingEnvironment
+      ? [{ url: stagingFavicon, type: 'image/svg+xml' }]
+      : process.env.NODE_ENV !== 'production'
         ? [{ url: '/kilo-v1-DEV.svg', type: 'image/svg+xml' }]
         : [
             { url: '/favicon.ico', sizes: '48x48', type: 'image/x-icon' },
@@ -59,24 +64,28 @@ export const metadata: Metadata = {
       sizes: '180x180',
       type: 'image/png',
     },
-    shortcut: { url: '/favicon.ico' },
+    shortcut: { url: isStagingEnvironment ? stagingFavicon : '/favicon.ico' },
     other: [
       {
         rel: 'manifest',
         url: '/site.webmanifest',
       },
-      {
-        rel: 'icon',
-        type: 'image/png',
-        sizes: '192x192',
-        url: '/favicon/android-chrome-192x192.png',
-      },
-      {
-        rel: 'icon',
-        type: 'image/png',
-        sizes: '512x512',
-        url: '/favicon/android-chrome-512x512.png',
-      },
+      ...(isStagingEnvironment
+        ? []
+        : [
+            {
+              rel: 'icon',
+              type: 'image/png',
+              sizes: '192x192',
+              url: '/favicon/android-chrome-192x192.png',
+            },
+            {
+              rel: 'icon',
+              type: 'image/png',
+              sizes: '512x512',
+              url: '/favicon/android-chrome-512x512.png',
+            },
+          ]),
     ],
   },
   other: {
@@ -107,6 +116,7 @@ export default function RootLayout({
     >
       <head />
       <body>
+        {isStagingEnvironment ? <StagingEnvironmentBanner /> : null}
         <Providers>
           <DataLayerProvider />
           <ImpactIdentify />

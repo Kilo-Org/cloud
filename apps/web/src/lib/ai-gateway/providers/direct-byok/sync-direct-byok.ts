@@ -70,7 +70,7 @@ function shortenDisplayName(id: string): string;
 function shortenDisplayName(id: string | undefined): string | undefined;
 function shortenDisplayName(id: string | undefined) {
   if (!id) return undefined;
-  const slash = Math.max(id.lastIndexOf(':'), id.lastIndexOf('/'));
+  const slash = id.lastIndexOf('/');
   return slash >= 0 ? id.slice(slash + 1).trim() : id;
 }
 

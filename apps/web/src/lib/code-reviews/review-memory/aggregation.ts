@@ -162,10 +162,6 @@ function buildReviewMemoryAnalysisPrompt(input: {
 
   return `You analyze maintainer replies to Kilo's automated code-review comments for one repository.
 
-Return strict JSON in one of these shapes:
-{"status":"no_change","title":null,"rationale":null,"proposedMarkdown":null,"positiveCount":0,"negativeCount":0,"neutralCount":0,"evidenceEventIds":[]}
-{"status":"propose","title":"short proposal title","rationale":"why this guidance is justified","proposedMarkdown":"standalone REVIEW.md guidance","positiveCount":0,"negativeCount":0,"neutralCount":0,"evidenceEventIds":["event ids"]}
-
 Rules:
 - Classify each maintainer reply as positive, negative, or neutral.
 - Propose the smallest possible REVIEW.md change only when there is a clear, repeated pattern.

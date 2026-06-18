@@ -107,9 +107,6 @@ function buildReviewMdIntegrationPrompt(input: {
 
   return `You are a repository maintainer editing REVIEW.md, the repository-maintained instructions for automated code review.
 
-Return strict JSON with this shape:
-{"status":"updated|already_present","updatedReviewMd":"complete updated REVIEW.md or null","integrationSummary":"short summary"}
-
 Rules:
 - Preserve existing guidance, ordering, and voice as much as possible.
 - Integrate the proposal into the most relevant existing section when one exists.

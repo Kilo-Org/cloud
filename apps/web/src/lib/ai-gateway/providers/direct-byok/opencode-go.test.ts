@@ -16,4 +16,8 @@ describe('isOpenCodeGoAnthropicMessagesModel', () => {
       expect(isOpenCodeGoAnthropicMessagesModel(model)).toBe(false);
     }
   );
+
+  test('keeps direct BYOK MiniMax models on the provider default', () => {
+    expect(getAiSdkProvider('other-provider/minimax-m3')).toBeUndefined();
+  });
 });

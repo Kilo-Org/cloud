@@ -144,7 +144,7 @@ export function getAiSdkProvider(
   }
   if (
     isClaudeModel(model) || // on Vercel AI Gateway, this is necessary to support document attachments
-    isMinimaxModel(model) // on Vercel AI Gateway, this is necessary for reasoning to show
+    (model.startsWith('minimax/') && isMinimaxModel(model)) // on Vercel AI Gateway, this is necessary for reasoning to show
   ) {
     return 'anthropic';
   }

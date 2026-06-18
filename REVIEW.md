@@ -9,6 +9,7 @@
 - Logic bugs (wrong conditions, off-by-one)
 - Typos that cause runtime errors
 - Breaking API changes
+- Audit log correctness issues: using stale pre-transaction state for audit events, silently swallowing audit write failures, or trusting persisted enum values without validation when computing audit counts
 
 **Skip these:**
 

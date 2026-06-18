@@ -80,22 +80,25 @@ else
 fi
 
 # Phase 1 (image-checks) builds the WORKING TREE; Phase 2 (smoke) builds committed
-# HEAD via worktrees. If tracked files differ from HEAD, the two phases validate
-# DIFFERENT candidates, so no single candidate passes both — refuse by default.
-# ALLOW_DIRTY_TREE=true is an explicit experimentation override; such a run is
-# flagged DIRTY_TREE and can never report a clean validation (see the summary).
+# HEAD via worktrees. ANY working-tree deviation from HEAD — tracked changes OR
+# untracked files (which can enter the Phase 1 image via the Dockerfile's COPY
+# inputs) — means the two phases could validate different candidates, so no single
+# candidate passes both. Refuse by default. ALLOW_DIRTY_TREE=true is an explicit
+# experimentation override; such a run is flagged DIRTY_TREE and can never report
+# a clean validation (see the summary).
 DIRTY_TREE=0
-if ! git diff --quiet HEAD 2>/dev/null; then
+if [ -n "$(git status --porcelain --untracked-files=all 2>/dev/null)" ]; then
   if [ "${ALLOW_DIRTY_TREE:-false}" != "true" ]; then
-    echo "✗ Uncommitted changes to tracked files. Phase 1 builds your working tree but"
-    echo "  Phase 2 builds committed HEAD — the two phases would validate different"
-    echo "  candidates. Commit your changes and re-run to validate exactly what merges."
+    echo "✗ Working tree is not clean (uncommitted or untracked files). Phase 1 builds"
+    echo "  your working tree but Phase 2 builds committed HEAD — the two phases would"
+    echo "  validate different candidates. Commit or stash (git stash -u) so the tree"
+    echo "  matches HEAD, then re-run to validate exactly what merges."
     echo "  (Experimentation only: set ALLOW_DIRTY_TREE=true — that run cannot report a"
     echo "  clean validation.)"
     exit 2
   fi
   DIRTY_TREE=1
-  echo "⚠ ALLOW_DIRTY_TREE=true and the tracked tree is dirty: Phase 1 builds your"
+  echo "⚠ ALLOW_DIRTY_TREE=true and the working tree is not clean: Phase 1 builds your"
   echo "  working tree, Phase 2 builds committed HEAD — this run will NOT report a"
   echo "  clean validation regardless of results."
 fi

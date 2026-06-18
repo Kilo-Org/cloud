@@ -20,6 +20,8 @@ export type BenchmarkDeciderModel = z.infer<typeof BenchmarkDeciderModelSchema>;
 
 export const AUTO_DECIDER_DEFAULT_MIN_COST_USD = 15;
 export const AUTO_DECIDER_DEFAULT_MAX_COST_USD = 25;
+export const DEFAULT_BENCHMARK_USER_ID = 'ce12ef3d-ae95-4d77-b4f0-23735f0a0591';
+export const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 
 export const AutoBenchmarkDeciderModelSchema = BenchmarkDeciderModelSchema.extend({
   avgAttemptCostUsd: z.number().nonnegative(),
@@ -61,12 +63,11 @@ export const BenchmarkConfigSchema = z
     // Benchmark-wide parallelism budget. Decider runs use it as a live
     // container budget; classifier runs use it for parallel OpenRouter calls.
     maxConcurrency: z.number().int().min(1).max(100),
-    // The Kilo user whose identity/billing the decider CLI runs execute under.
-    // Null until an admin configures it; decider runs fail fast while null.
+    // Optional override for the Kilo user whose identity/billing the decider
+    // CLI runs execute under. Null means the worker uses DEFAULT_BENCHMARK_USER_ID.
     benchmarkUserId: z.string().trim().min(1).nullable(),
-    // Optional organization context for the benchmark user. When present, the
-    // CLI token and container run execute in org context so usage bills org
-    // credits instead of personal credits.
+    // Optional override for the organization context. Null means the worker
+    // uses DEFAULT_BENCHMARK_ORG_ID.
     benchmarkOrgId: z.string().trim().min(1).nullable().default(null),
     // Session stickiness knob carried into published routing tables: a session
     // stays on its incumbent model while it meets the route's accuracy
@@ -121,6 +122,15 @@ export const BenchmarkConfigSchema = z
     }
   });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
+
+export function resolveBenchmarkIdentity(
+  config: Pick<BenchmarkConfig, 'benchmarkUserId' | 'benchmarkOrgId'>
+): { benchmarkUserId: string; benchmarkOrgId: string } {
+  return {
+    benchmarkUserId: config.benchmarkUserId ?? DEFAULT_BENCHMARK_USER_ID,
+    benchmarkOrgId: config.benchmarkOrgId ?? DEFAULT_BENCHMARK_ORG_ID,
+  };
+}
 
 export const AutoBenchmarkDeciderCandidatesResponseSchema = z.object({
   candidates: z.array(

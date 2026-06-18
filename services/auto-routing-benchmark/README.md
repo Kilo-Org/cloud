@@ -62,9 +62,10 @@ SECRET=$(grep '^INTERNAL_API_SECRET=' ../../.env.local | cut -d= -f2- | tr -d '"
 curl -s http://localhost:8814/admin/config -H "Authorization: Bearer $SECRET"
 ```
 
-Decider runs need a `benchmarkUserId` that exists locally with credits. When
-`benchmarkOrgId` is set, the benchmark user must belong to that org and usage
-bills org credits. The dev seed provides `auto-routing-cli-local`.
+Decider runs use the worker's default benchmark user and org unless
+`benchmarkUserId` / `benchmarkOrgId` overrides are saved in config. Any
+effective benchmark user must exist locally with credits and belong to the
+effective org. The dev seed provides `auto-routing-cli-local`.
 
 > Local KV/D1 writes from a *second* `wrangler` process are not seen by the
 > running dev process (miniflare holds its own view). After writing state out of

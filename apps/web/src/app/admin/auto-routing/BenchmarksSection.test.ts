@@ -149,7 +149,7 @@ describe('RoutingTableView', () => {
 });
 
 describe('configToFormState', () => {
-  it('yields defaults including classifierMaxP95LatencyMs "1000" when config is null', () => {
+  it('yields defaults with blank benchmark identity override fields when config is null', () => {
     const state = configToFormState(null);
     expect(state.classifierRepetitions).toBe(1);
     expect(state.deciderRepetitions).toBe(1);
@@ -161,8 +161,8 @@ describe('configToFormState', () => {
     expect(state.autoDeciderModels).toEqual([]);
     expect(state.excludedAutoDeciderModels).toBe('');
     expect(state.maxConcurrency).toBe(100);
-    expect(state.benchmarkUserId).toBe('ce12ef3d-ae95-4d77-b4f0-23735f0a0591');
-    expect(state.benchmarkOrgId).toBe('9d278969-5453-4ae3-a51f-a8d2274a7b56');
+    expect(state.benchmarkUserId).toBe('');
+    expect(state.benchmarkOrgId).toBe('');
   });
 });
 
@@ -222,6 +222,16 @@ describe('formStateToConfig round-trip', () => {
     const stateWithEmpty = { ...state, classifierMaxP95LatencyMs: '' };
     const result = formStateToConfig(stateWithEmpty, baseConfig);
     expect(result.classifierMaxP95LatencyMs).toBeNull();
+  });
+
+  it('converts blank benchmark identity override fields to null in config', () => {
+    const state = configToFormState(baseConfig);
+    const result = formStateToConfig(
+      { ...state, benchmarkUserId: '  ', benchmarkOrgId: '  ' },
+      baseConfig
+    );
+    expect(result.benchmarkUserId).toBeNull();
+    expect(result.benchmarkOrgId).toBeNull();
   });
 });
 

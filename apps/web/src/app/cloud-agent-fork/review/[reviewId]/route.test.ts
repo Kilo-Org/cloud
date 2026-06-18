@@ -1,10 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { TRPCError } from '@trpc/server';
-import {
-  DEFAULT_CODE_REVIEW_MODE,
-  DEFAULT_CODE_REVIEW_MODEL,
-} from '@/lib/code-reviews/core/constants';
+import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
 import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
 
 type TrpcContextFixture = {
@@ -47,6 +44,10 @@ type PrepareSessionOutput = {
   cloudAgentSessionId: string;
 };
 
+type ReviewConfigOutput = {
+  modelSlug: string;
+};
+
 type RouteContext = {
   params: Promise<{ reviewId: string }>;
 };
@@ -55,6 +56,10 @@ type RouteGet = (request: NextRequest, context: RouteContext) => Promise<Respons
 
 const mockCreateTRPCContext = jest.fn<() => Promise<TrpcContextFixture>>();
 const mockCodeReviewsGet = jest.fn<(input: { reviewId: string }) => Promise<ReviewResult>>();
+const mockPersonalGetReviewConfig =
+  jest.fn<(input: { platform: 'github' }) => Promise<ReviewConfigOutput>>();
+const mockOrganizationGetReviewConfig =
+  jest.fn<(input: { organizationId: string; platform: 'github' }) => Promise<ReviewConfigOutput>>();
 const mockPersonalPrepareSession =
   jest.fn<(input: PrepareSessionInput) => Promise<PrepareSessionOutput>>();
 const mockOrganizationPrepareSession =
@@ -66,10 +71,16 @@ const mockCaller = {
   codeReviews: {
     get: mockCodeReviewsGet,
   },
+  personalReviewAgent: {
+    getReviewConfig: mockPersonalGetReviewConfig,
+  },
   cloudAgentNext: {
     prepareSession: mockPersonalPrepareSession,
   },
   organizations: {
+    reviewAgent: {
+      getReviewConfig: mockOrganizationGetReviewConfig,
+    },
     cloudAgentNext: {
       prepareSession: mockOrganizationPrepareSession,
     },
@@ -92,6 +103,10 @@ let getRoute: RouteGet;
 const REVIEW_ID = '00000000-0000-4000-8000-000000000001';
 const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const PR_URL = 'https://github.com/owner/repo/pull/123';
+const PERSONAL_CONFIGURED_MODEL = 'z-ai/glm-5.2';
+const PERSONAL_USAGE_MODEL = 'z-ai/glm-5.2-20260616';
+const ORGANIZATION_CONFIGURED_MODEL = 'anthropic/claude-sonnet-4.6';
+const ORGANIZATION_USAGE_MODEL = 'anthropic/claude-4.6-sonnet-20260217';
 const PERSONAL_KILO_SESSION_ID = 'ses_12345678901234567890123456';
 const ORG_KILO_SESSION_ID = 'ses_abcdefabcdefabcdefabcdefab';
 
@@ -102,7 +117,7 @@ function makeReview(overrides: Partial<ReviewFixture> = {}): ReviewFixture {
     repo_full_name: 'owner/repo',
     pr_url: PR_URL,
     platform: 'github',
-    model: 'anthropic/custom-model',
+    model: PERSONAL_USAGE_MODEL,
     ...overrides,
   };
 }
@@ -152,6 +167,10 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     jest.clearAllMocks();
     mockCreateTRPCContext.mockResolvedValue({ user: { id: 'user_1' } });
     mockSuccessfulReview();
+    mockPersonalGetReviewConfig.mockResolvedValue({ modelSlug: PERSONAL_CONFIGURED_MODEL });
+    mockOrganizationGetReviewConfig.mockResolvedValue({
+      modelSlug: ORGANIZATION_CONFIGURED_MODEL,
+    });
     mockPersonalPrepareSession.mockResolvedValue({
       kiloSessionId: PERSONAL_KILO_SESSION_ID,
       cloudAgentSessionId: 'agent_personal',
@@ -188,19 +207,24 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     expectNoSessionCreation();
   });
 
-  it('starts personal review fix sessions with a free-text Cloud Agent Next prompt', async () => {
+  it('starts personal review fix sessions with the configured catalog model', async () => {
     const response = await requestReview();
     const redirectUrl = getRedirectUrl(response);
 
     expect(mockCodeReviewsGet).toHaveBeenCalledWith({ reviewId: REVIEW_ID });
+    expect(mockPersonalGetReviewConfig).toHaveBeenCalledWith({ platform: 'github' });
+    expect(mockOrganizationGetReviewConfig).not.toHaveBeenCalled();
     expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
       prompt: buildFixReviewPrompt(PR_URL),
       mode: DEFAULT_CODE_REVIEW_MODE,
-      model: 'anthropic/custom-model',
+      model: PERSONAL_CONFIGURED_MODEL,
       autoInitiate: true,
       autoCommit: false,
     });
+    expect(mockPersonalPrepareSession).not.toHaveBeenCalledWith(
+      expect.objectContaining({ model: PERSONAL_USAGE_MODEL })
+    );
     expect(mockOrganizationPrepareSession).not.toHaveBeenCalled();
 
     const input = mockPersonalPrepareSession.mock.calls[0][0] as Record<string, unknown>;
@@ -214,22 +238,33 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     );
   });
 
-  it('starts organization review fix sessions on the organization chat path with model fallback', async () => {
-    mockSuccessfulReview({ owned_by_organization_id: ORG_ID, model: null });
+  it('starts organization review fix sessions with the configured catalog model', async () => {
+    mockSuccessfulReview({
+      owned_by_organization_id: ORG_ID,
+      model: ORGANIZATION_USAGE_MODEL,
+    });
 
     const response = await requestReview();
     const redirectUrl = getRedirectUrl(response);
 
+    expect(mockPersonalGetReviewConfig).not.toHaveBeenCalled();
+    expect(mockOrganizationGetReviewConfig).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      platform: 'github',
+    });
     expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
     expect(mockOrganizationPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
       prompt: buildFixReviewPrompt(PR_URL),
       mode: DEFAULT_CODE_REVIEW_MODE,
-      model: DEFAULT_CODE_REVIEW_MODEL,
+      model: ORGANIZATION_CONFIGURED_MODEL,
       autoInitiate: true,
       autoCommit: false,
       organizationId: ORG_ID,
     });
+    expect(mockOrganizationPrepareSession).not.toHaveBeenCalledWith(
+      expect.objectContaining({ model: ORGANIZATION_USAGE_MODEL })
+    );
 
     const input = mockOrganizationPrepareSession.mock.calls[0][0] as Record<string, unknown>;
     expect(input).not.toHaveProperty('upstreamBranch');
@@ -295,6 +330,16 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     const response = await requestReview();
 
     expectErrorRedirect(response, 'unsupported_platform');
+    expectNoSessionCreation();
+  });
+
+  it('redirects configuration lookup failures without creating a session', async () => {
+    mockPersonalGetReviewConfig.mockRejectedValue(new Error('configuration unavailable'));
+
+    const response = await requestReview();
+
+    expectErrorRedirect(response, 'fix_session_failed');
+    expect(mockPersonalGetReviewConfig).toHaveBeenCalledTimes(1);
     expectNoSessionCreation();
   });
 

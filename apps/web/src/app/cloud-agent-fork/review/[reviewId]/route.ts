@@ -1,10 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
-import {
-  DEFAULT_CODE_REVIEW_MODE,
-  DEFAULT_CODE_REVIEW_MODEL,
-} from '@/lib/code-reviews/core/constants';
+import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
 import { createCallerFactory, createTRPCContext } from '@/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { TRPCError } from '@trpc/server';
@@ -72,17 +69,22 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return redirectToError(url.origin, 'unsupported_platform');
   }
 
-  const sessionInput = {
-    githubRepo: review.repo_full_name,
-    prompt: buildFixReviewPrompt(review.pr_url),
-    mode: DEFAULT_CODE_REVIEW_MODE,
-    model: review.model ?? DEFAULT_CODE_REVIEW_MODEL,
-    autoInitiate: true,
-    autoCommit: false,
-  };
-
   try {
     const organizationId = review.owned_by_organization_id;
+    const reviewConfig = organizationId
+      ? await caller.organizations.reviewAgent.getReviewConfig({
+          organizationId,
+          platform: 'github',
+        })
+      : await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+    const sessionInput = {
+      githubRepo: review.repo_full_name,
+      prompt: buildFixReviewPrompt(review.pr_url),
+      mode: DEFAULT_CODE_REVIEW_MODE,
+      model: reviewConfig.modelSlug,
+      autoInitiate: true,
+      autoCommit: false,
+    };
     const session = organizationId
       ? await caller.organizations.cloudAgentNext.prepareSession({
           ...sessionInput,

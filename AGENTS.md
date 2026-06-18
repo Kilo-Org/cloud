@@ -83,7 +83,7 @@ Schema is in `packages/db/src/schema.ts`. Migrations live in `packages/db/src/mi
 
 ## GDPR & PII
 
-When adding PII (email, name, IP address, etc.) to the database — whether as a new table or a new column — you **must** also update the GDPR soft-delete flow in `softDeleteUser` (`apps/web/src/lib/user.ts`) and add a corresponding test in `apps/web/src/lib/user.test.ts`.
+When adding PII (email, name, IP address, etc.) to the database — whether as a new table or a new column — you **must** also update the GDPR soft delete flow in `softDeleteUser` (`apps/web/src/lib/user/index.ts`) and add a corresponding test in `apps/web/src/lib/user/index.test.ts`.
 
 ## Logging & Sensitive Data
 

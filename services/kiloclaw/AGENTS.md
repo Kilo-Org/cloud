@@ -213,7 +213,8 @@ Before submitting any change:
 3. Do not reintroduce optional `userId` or `sandboxId` parameters (they are always required)
 4. If changing bootstrap behavior, update `controller/src/bootstrap.ts` and its tests
 5. If adding or changing user-facing features, add a changelog entry to `src/app/(app)/claw/components/changelog-data.ts` (newest first)
-6. If adding a new route that resolves a KiloClawInstance DO stub, accept optional `?instanceId=` and use it as the DO key when present (see "Multi-Instance Migration" section)
+6. If adding or changing an integration or an integration architecture, review and update `services/kiloclaw/INTEGRATIONS.md` in the same PR when its guidance, examples, requirements, or repository references are affected
+7. If adding a new route that resolves a KiloClawInstance DO stub, accept optional `?instanceId=` and use it as the DO key when present (see "Multi-Instance Migration" section)
 
 ## Test Targets by Change Type
 

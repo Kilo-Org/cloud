@@ -113,7 +113,7 @@ export function applyGatewayModelsFallback(
   delete requestToMutate.body.models;
 }
 
-export function requireStructuredOutputParameters(
+export function applyOpenRouterStructuredOutputRouting(
   providerId: ProviderId,
   requestToMutate: GatewayRequest
 ): void {
@@ -142,7 +142,7 @@ export function applyProviderSpecificLogic(
   taskId: string | null
 ) {
   applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
-  requireStructuredOutputParameters(provider.id, requestToMutate);
+  applyOpenRouterStructuredOutputRouting(provider.id, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

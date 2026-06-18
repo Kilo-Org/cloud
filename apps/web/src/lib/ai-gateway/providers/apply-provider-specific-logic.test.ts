@@ -1,8 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
+  applyOpenRouterStructuredOutputRouting,
   applyGatewayModelsFallback,
-  requireStructuredOutputParameters,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
@@ -50,12 +50,12 @@ describe('applyGatewayModelsFallback', () => {
   });
 });
 
-describe('requireStructuredOutputParameters', () => {
+describe('applyOpenRouterStructuredOutputRouting', () => {
   it('requires structured-output support from OpenRouter providers', () => {
     const request = makeStructuredOutputRequest();
     request.body.provider = { only: ['anthropic'] };
 
-    requireStructuredOutputParameters('openrouter', request);
+    applyOpenRouterStructuredOutputRouting('openrouter', request);
 
     expect(request.body.provider).toEqual({
       only: ['anthropic'],
@@ -68,7 +68,7 @@ describe('requireStructuredOutputParameters', () => {
     providerId => {
       const request = makeStructuredOutputRequest();
 
-      requireStructuredOutputParameters(providerId, request);
+      applyOpenRouterStructuredOutputRouting(providerId, request);
 
       expect(request.body.provider).toBeUndefined();
     }

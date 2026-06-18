@@ -289,6 +289,28 @@ describe('auto routing worker', () => {
     expect(String(logMessage)).not.toContain('user-1');
   });
 
+  it('filters denied routing-policy models from the full decide path', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const response = await decideRequest(
+      mirrorPayload({
+        routingPolicy: { deniedModelIds: ['google/gemini-2.5-flash-lite'] },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: {
+        model: 'google/gemini-2.5-flash',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
+        sticky: false,
+      },
+    });
+  });
+
   it('serves a cached classification for the session without calling the classifier', async () => {
     cacheGetEntry.mockResolvedValueOnce(mockClassification);
 

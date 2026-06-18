@@ -90,6 +90,27 @@ describe('computeDecision', () => {
   it('returns null when there is no routing table', () => {
     expect(computeDecision(classification, null, null)).toBeNull();
   });
+  it('skips denied fresh candidates', () => {
+    const decision = computeDecision(classification, table, null, new Set(['cheap/chat']));
+    expect(decision).toEqual({
+      model: 'mid/chat',
+      taskType: 'implementation',
+      subtaskType: 'code_generation',
+      source: 'benchmark',
+      tableVersion: 'run-1',
+      reasoningEffort: 'medium',
+      sticky: false,
+    });
+  });
+  it('returns null when every route candidate is denied', () => {
+    const decision = computeDecision(
+      classification,
+      table,
+      null,
+      new Set(['cheap/chat', 'mid/chat', 'pricey/chat', 'weak/chat'])
+    );
+    expect(decision).toBeNull();
+  });
 
   describe('session stickiness', () => {
     it('keeps the incumbent on route changes when it is within the switch-cost factor', () => {
@@ -134,6 +155,10 @@ describe('computeDecision', () => {
     it('switches when the fresh pick is cheaper by more than the factor', () => {
       // pricey/chat at 0.02 vs fresh 0.002 * 3 = 0.006: switch pays off.
       const decision = computeDecision(classification, table, 'pricey/chat');
+      expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
+    });
+    it('does not keep a denied incumbent', () => {
+      const decision = computeDecision(classification, table, 'mid/chat', new Set(['mid/chat']));
       expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
     });
     it('switches when the incumbent no longer meets the route threshold', () => {

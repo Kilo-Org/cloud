@@ -85,6 +85,20 @@ describe('fetchEfficientAutoDecision', () => {
     expect(result).toEqual({ decision: validDecision, costUsd: 0.001 });
   });
 
+  it('includes denied model ids in the worker payload', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(
+      { ...makeParams(), deniedModelIds: ['openai/gpt-4o'] },
+      options
+    );
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toMatchObject({
+      routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+    });
+  });
+
   it('returns null and calls onError on a non-OK response', async () => {
     const onError = jest.fn();
     mockedFetch.mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 }));

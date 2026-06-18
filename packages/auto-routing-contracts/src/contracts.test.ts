@@ -42,6 +42,14 @@ describe('auto routing contracts', () => {
       sessionId: 'session-123',
       userId: 'user-1',
     });
+    expect(
+      MirrorPayloadSchema.parse({
+        ...mirrorPayload,
+        routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+      })
+    ).toMatchObject({
+      routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+    });
 
     // One broken constraint per case: identity fields are null-or-nonempty,
     // never empty strings.

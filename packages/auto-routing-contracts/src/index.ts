@@ -20,6 +20,11 @@ export {
 // leaves it, and skips the mirror entirely when normalization fails.
 export const MirrorPayloadSchema = z.object({
   input: NormalizedClassifierInputSchema,
+  routingPolicy: z
+    .object({
+      deniedModelIds: z.array(z.string().trim().min(1)),
+    })
+    .optional(),
   // Authenticated user id, or the gateway's synthetic anonymous id
   // ('anon:<ip>'). Scopes the worker's conversation identity.
   userId: z.string().trim().min(1),

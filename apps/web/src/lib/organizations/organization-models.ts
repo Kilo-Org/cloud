@@ -40,6 +40,10 @@ export async function getAvailableModelsForOrganization(
     filteredModels = models;
   }
 
+  if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {
+    filteredModels = filteredModels.filter(model => model.mayTrainOnYourPrompts !== true);
+  }
+
   if (organization.plan !== 'enterprise' && organization.settings.data_collection !== 'deny') {
     filteredModels.push(...(await listAvailableExperimentModels()));
   }

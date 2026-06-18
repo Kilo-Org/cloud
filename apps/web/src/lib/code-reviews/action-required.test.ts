@@ -101,6 +101,12 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
 
     expect(
       classifyCodeReviewActionRequiredFailure(
+        'Not Found: {"error":"No eligible provider can serve the selected model.","error_type":"provider_not_allowed","message":"No eligible provider can serve the selected model. Select another model or update the provider routing settings."}'
+      )
+    ).toBe('selected_model_unavailable');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
         'No endpoints found matching your data policy (Free model training). Configure: https://openrouter.ai/settings/privacy'
       )
     ).toBe('selected_model_unavailable');

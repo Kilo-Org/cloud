@@ -1,4 +1,5 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
+import * as z from 'zod';
 import { FEATURE_HEADER, type FeatureValue } from '@/lib/feature-detection';
 import {
   countAndStoreUsage,
@@ -177,6 +178,49 @@ function byokErrorMessage(status: number): string | undefined {
   return byokErrorMessages[status];
 }
 
+const noAllowedProvidersErrorSchema = z.object({
+  message: z.literal('No allowed providers are available for the selected model.'),
+  code: z.literal(404),
+  metadata: z.object({
+    available_providers: z.array(z.string()),
+    requested_providers: z.array(z.string()),
+  }),
+});
+
+const openRouterErrorResponseSchema = z.object({
+  error: noAllowedProvidersErrorSchema.optional(),
+  message: z.string().optional(),
+  code: z.number().optional(),
+  metadata: z.unknown().optional(),
+});
+
+async function providerNotAllowedResponse(providerId: ProviderId, response: Response) {
+  if (providerId !== 'openrouter' || response.status !== 404) return undefined;
+
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return undefined;
+  }
+
+  const parsedBody = openRouterErrorResponseSchema.safeParse(body);
+  if (!parsedBody.success) return undefined;
+
+  const upstreamError = parsedBody.data.error ?? parsedBody.data;
+  if (!noAllowedProvidersErrorSchema.safeParse(upstreamError).success) return undefined;
+
+  const error = 'No eligible provider can serve the selected model.';
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} Select another model or update the provider routing settings.`,
+    },
+    { status: response.status }
+  );
+}
+
 export async function makeErrorReadable({
   providerId,
   requestedModel,
@@ -208,6 +252,9 @@ export async function makeErrorReadable({
       );
     }
   }
+
+  const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
+  if (providerErrorResponse) return providerErrorResponse;
 
   const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
   if (overflowResponse) return overflowResponse;

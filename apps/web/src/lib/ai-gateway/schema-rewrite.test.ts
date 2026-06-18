@@ -141,6 +141,7 @@ describe('rewriteChatCompletionsOneOfAsAnyOf logging', () => {
       event: 'ai_gateway_chat_completions_one_of_rewritten',
       model: 'zai/glm-4.6',
       count: 1,
+      toolNames: ['get_weather'],
     });
   });
 
@@ -150,7 +151,9 @@ describe('rewriteChatCompletionsOneOfAsAnyOf logging', () => {
     const request = makeRequest({
       tools: [
         toolWith('a', { type: 'object', oneOf: [{ type: 'string' }] }),
+        toolWith('a', { type: 'object', oneOf: [{ type: 'integer' }] }),
         toolWith('b', { type: 'object', oneOf: [{ type: 'number' }, { type: 'boolean' }] }),
+        toolWith('unchanged', { type: 'object' }),
       ],
       response_format: {
         type: 'json_schema',
@@ -161,8 +164,9 @@ describe('rewriteChatCompletionsOneOfAsAnyOf logging', () => {
     rewriteChatCompletionsOneOfAsAnyOf(request, log);
 
     expect(calls).toHaveLength(1);
-    const details = calls[0] as { count: number };
-    expect(details.count).toBe(3);
+    const details = calls[0] as { count: number; toolNames: string[] };
+    expect(details.count).toBe(4);
+    expect(details.toolNames).toEqual(['a', 'b', 'unchanged']);
   });
 
   it('does not log when nothing is rewritten', () => {

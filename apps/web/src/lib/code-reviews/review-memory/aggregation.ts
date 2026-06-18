@@ -15,7 +15,7 @@ import { reviewMemoryRetentionCutoff } from './retention';
 const REVIEW_MEMORY_FORBIDDEN_PROPOSAL_PATTERN =
   /\b(?:review\s+memory|kilo|feedback\s+systems?|this\s+analysis|llms?)\b/i;
 
-export const ReviewMemoryProposalDraftSchema = z.discriminatedUnion('status', [
+const ReviewMemoryProposalDraftSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('no_change') }),
   z.object({
     status: z.literal('propose'),
@@ -29,7 +29,7 @@ export const ReviewMemoryProposalDraftSchema = z.discriminatedUnion('status', [
   }),
 ]);
 
-export const ReviewMemoryProposalWireSchema = z.object({
+const ReviewMemoryProposalWireSchema = z.object({
   status: z.enum(['no_change', 'propose']),
   title: z.string().nullable(),
   rationale: z.string().nullable(),
@@ -47,7 +47,6 @@ export type GenerateReviewMemoryProposal = (input: {
   platform: ReviewMemoryPlatform;
   repoFullName: string;
   events: CodeReviewFeedbackEvent[];
-  requestCorrelationId: string;
 }) => Promise<{
   draft: ReviewMemoryProposalDraft;
   tokensIn?: number | null;
@@ -59,7 +58,6 @@ export async function generateReviewMemoryProposalWithGateway(input: {
   platform: ReviewMemoryPlatform;
   repoFullName: string;
   events: CodeReviewFeedbackEvent[];
-  requestCorrelationId: string;
 }): Promise<{
   draft: ReviewMemoryProposalDraft;
   tokensIn?: number | null;
@@ -77,9 +75,6 @@ export async function generateReviewMemoryProposalWithGateway(input: {
   });
   const result = await generateReviewMemoryStructuredOutput({
     model: provider.chatModel(modelSlug),
-    modelSlug,
-    operation: 'proposal_analysis',
-    requestCorrelationId: input.requestCorrelationId,
     prompt: buildReviewMemoryAnalysisPrompt(input),
     maxOutputTokens: 4_000,
     schemaName: 'review_memory_proposal',
@@ -90,8 +85,8 @@ export async function generateReviewMemoryProposalWithGateway(input: {
 
   return {
     draft: result.output,
-    tokensIn: result.diagnostics.inputTokens,
-    tokensOut: result.diagnostics.outputTokens,
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
   };
 }
 
@@ -99,7 +94,6 @@ export async function runReviewMemoryAnalysis(input: {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
   repoFullName: string;
-  requestCorrelationId: string;
   generate?: GenerateReviewMemoryProposal;
   now?: Date;
 }): Promise<{ status: 'proposed' | 'no_change' | 'no_feedback'; proposalId?: string }> {
@@ -119,7 +113,6 @@ export async function runReviewMemoryAnalysis(input: {
     platform: input.platform,
     repoFullName: input.repoFullName,
     events,
-    requestCorrelationId: input.requestCorrelationId,
   });
 
   if (draft.status === 'no_change') return { status: 'no_change' };
@@ -179,7 +172,7 @@ Feedback events:
 ${JSON.stringify(events, null, 2)}`;
 }
 
-export function validateReviewMemoryProposalDraft(
+function validateReviewMemoryProposalDraft(
   draft: ReviewMemoryProposalDraft
 ): ReviewMemoryProposalDraft {
   if (draft.status === 'no_change') return draft;

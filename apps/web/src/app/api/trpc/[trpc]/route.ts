@@ -9,8 +9,7 @@ const handler = (req: Request) =>
     endpoint: '/api/trpc',
     req,
     router: rootRouter,
-    createContext: () =>
-      createTRPCContext({ requestCorrelationId: req.headers.get('x-vercel-id') }),
+    createContext: createTRPCContext,
   });
 
 export { handler as GET, handler as POST };

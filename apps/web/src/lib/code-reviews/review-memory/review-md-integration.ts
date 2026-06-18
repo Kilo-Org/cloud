@@ -14,7 +14,7 @@ const MAX_REVIEW_MD_CHARS = 30_000;
 const REVIEW_MEMORY_BRANDING_PATTERN = /\b(?:kilo\s+)?review\s+memory\b/i;
 const REVIEW_MEMORY_HEADING_PATTERN = /^#{1,6}\s+(?:kilo\s+)?review\s+memory\b/im;
 
-export const ReviewMdIntegrationOutputSchema = z.object({
+const ReviewMdIntegrationOutputSchema = z.object({
   status: z.enum(['updated', 'already_present']),
   updatedReviewMd: z.string().min(1).max(MAX_REVIEW_MD_CHARS).nullable(),
   integrationSummary: z.string().min(1).max(1_000),
@@ -34,7 +34,6 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
   repoFullName: string;
   existingReviewMd: string | null;
   proposal: CodeReviewMemoryProposal;
-  requestCorrelationId: string;
 }): Promise<ReviewMdIntegrationResult> {
   if (input.existingReviewMd && input.existingReviewMd.length > MAX_REVIEW_MD_CHARS) {
     throw new Error(
@@ -55,9 +54,6 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
 
   const result = await generateReviewMemoryStructuredOutput({
     model: provider.chatModel(modelSlug),
-    modelSlug,
-    operation: 'review_md_integration',
-    requestCorrelationId: input.requestCorrelationId,
     prompt: buildReviewMdIntegrationPrompt(input),
     maxOutputTokens: 8_000,
     schemaName: 'review_md_integration',
@@ -67,12 +63,12 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
 
   return {
     ...result.output,
-    tokensIn: result.diagnostics.inputTokens,
-    tokensOut: result.diagnostics.outputTokens,
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
   };
 }
 
-export function validateReviewMdIntegrationOutput(
+function validateReviewMdIntegrationOutput(
   output: z.infer<typeof ReviewMdIntegrationOutputSchema>
 ): ReviewMdIntegrationResult {
   if (output.status === 'already_present') {

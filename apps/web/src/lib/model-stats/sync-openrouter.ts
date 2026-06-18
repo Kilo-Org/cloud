@@ -3,6 +3,7 @@ import { modelStats } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { OpenRouterModel as OpenRouterApiModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { deriveModelStatsIdentity } from '@kilocode/worker-utils/kilo-model-id';
 
 /**
  * Convert per-token price to per-million-tokens price
@@ -66,6 +67,7 @@ export async function syncOpenRouterModels(
         data: {
           isActive: true,
           isRecommended,
+          ...deriveModelStatsIdentity(model.id),
           name: model.name,
           description: model.description,
           priceInput: toPricePerMillion(model.pricing?.prompt),
@@ -83,11 +85,9 @@ export async function syncOpenRouterModels(
         isActive: true,
         isRecommended,
         openrouterId: model.id,
-        slug: generateSlug(model.id),
+        ...deriveModelStatsIdentity(model.id),
         name: model.name,
         description: model.description,
-        modelCreator: extractCreator(model.id),
-        creatorSlug: extractCreatorSlug(model.id),
         priceInput: toPricePerMillion(model.pricing?.prompt),
         priceOutput: toPricePerMillion(model.pricing?.completion),
         contextLength: model.context_length ?? null,
@@ -114,6 +114,7 @@ export async function syncOpenRouterModels(
         data: {
           // Note: NOT updating isActive - preserve user's setting
           isRecommended,
+          ...deriveModelStatsIdentity(updatedModelData.id),
           name: updatedModelData.name,
           description: updatedModelData.description,
           priceInput: toPricePerMillion(updatedModelData.pricing?.prompt),
@@ -153,32 +154,4 @@ export async function syncOpenRouterModels(
     updatedModels,
     totalProcessed: newModels.length + updatedModels.length,
   };
-}
-
-/**
- * Generate a URL-friendly slug from the model ID
- */
-function generateSlug(modelId: string): string {
-  return modelId
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-/**
- * Extract the creator/provider name from the model ID
- * e.g., "anthropic/claude-sonnet-4.5" -> "anthropic"
- */
-function extractCreator(modelId: string): string {
-  const parts = modelId.split('/');
-  return parts.length > 1 ? parts[0] : 'unknown';
-}
-
-/**
- * Extract and format the creator slug from the model ID
- */
-function extractCreatorSlug(modelId: string): string {
-  return extractCreator(modelId)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-');
 }

@@ -18,6 +18,14 @@ export const BenchmarkDeciderModelSchema = z.object({
 });
 export type BenchmarkDeciderModel = z.infer<typeof BenchmarkDeciderModelSchema>;
 
+export const AUTO_DECIDER_DEFAULT_MIN_COST_USD = 15;
+export const AUTO_DECIDER_DEFAULT_MAX_COST_USD = 25;
+
+export const AutoBenchmarkDeciderModelSchema = BenchmarkDeciderModelSchema.extend({
+  avgAttemptCostUsd: z.number().nonnegative(),
+});
+export type AutoBenchmarkDeciderModel = z.infer<typeof AutoBenchmarkDeciderModelSchema>;
+
 // Flags each list entry whose (trimmed) id already appeared earlier in the
 // array. Model ids are the D1 primary keys for config_classifier_models /
 // config_decider_models, so duplicates would otherwise reach the DB as an
@@ -40,6 +48,14 @@ export const BenchmarkConfigSchema = z
   .object({
     classifierModels: z.array(z.string().trim().min(1)).min(1),
     deciderModels: z.array(BenchmarkDeciderModelSchema).min(1),
+    // Manual additions are operator-pinned decider candidates. When omitted by
+    // older clients, the worker treats deciderModels as the manual list.
+    manualDeciderModels: z.array(BenchmarkDeciderModelSchema).optional(),
+    // Auto additions are refreshed from Kilo Bench cost data by the benchmark
+    // worker's scheduled sync. The effective deciderModels list is manual +
+    // non-excluded auto models.
+    autoDeciderModels: z.array(AutoBenchmarkDeciderModelSchema).optional(),
+    excludedAutoDeciderModels: z.array(z.string().trim().min(1)).optional(),
     // Accuracy threshold for "gets the job done" (per taxonomy route).
     minAccuracy: z.number().min(0).max(1),
     // Benchmark-wide parallelism budget. Decider runs use it as a live
@@ -67,6 +83,10 @@ export const BenchmarkConfigSchema = z
     // Maximum acceptable p95 latency for the classifier winner; null means no
     // constraint (cost-only selection).
     classifierMaxP95LatencyMs: z.number().int().positive().nullable().default(1000),
+    // Auto decider model selection includes terminal-bench models whose
+    // floored average run cost falls within this inclusive range.
+    autoDeciderMinCostUsd: z.number().nonnegative().default(AUTO_DECIDER_DEFAULT_MIN_COST_USD),
+    autoDeciderMaxCostUsd: z.number().nonnegative().default(AUTO_DECIDER_DEFAULT_MAX_COST_USD),
     updatedAt: z.string().nullable(),
     updatedBy: z.string().nullable(),
   })
@@ -77,8 +97,45 @@ export const BenchmarkConfigSchema = z
       'deciderModels',
       ctx
     );
+    addDuplicateModelIssues(
+      (config.manualDeciderModels ?? []).map(m => m.id),
+      'manualDeciderModels',
+      ctx
+    );
+    addDuplicateModelIssues(
+      (config.autoDeciderModels ?? []).map(m => m.id),
+      'autoDeciderModels',
+      ctx
+    );
+    addDuplicateModelIssues(
+      config.excludedAutoDeciderModels ?? [],
+      'excludedAutoDeciderModels',
+      ctx
+    );
+    if (config.autoDeciderMinCostUsd > config.autoDeciderMaxCostUsd) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['autoDeciderMaxCostUsd'],
+        message: 'Auto decider max cost must be greater than or equal to min cost',
+      });
+    }
   });
 export type BenchmarkConfig = z.infer<typeof BenchmarkConfigSchema>;
+
+export const AutoBenchmarkDeciderCandidatesResponseSchema = z.object({
+  candidates: z.array(
+    z.object({
+      id: z.string().trim().min(1),
+      avgAttemptCostUsd: z.number().nonnegative(),
+    })
+  ),
+  minCostUsd: z.number().nonnegative().optional(),
+  maxCostUsd: z.number().nonnegative().optional(),
+  generatedAt: z.string().optional(),
+});
+export type AutoBenchmarkDeciderCandidatesResponse = z.infer<
+  typeof AutoBenchmarkDeciderCandidatesResponseSchema
+>;
 
 export const BenchmarkRunStatusSchema = z.enum(['running', 'completed', 'failed']);
 export type BenchmarkRunStatus = z.infer<typeof BenchmarkRunStatusSchema>;

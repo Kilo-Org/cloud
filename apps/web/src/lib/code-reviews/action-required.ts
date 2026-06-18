@@ -125,6 +125,8 @@ export function classifyCodeReviewActionRequiredFailure(
   if (
     normalized.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
     normalized.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE) ||
+    normalized.includes('provider_not_allowed') ||
+    normalized.includes('no eligible provider can serve the selected model.') ||
     normalized.includes('no allowed providers are specified.') ||
     normalized.includes('no allowed providers are available for the selected model.') ||
     normalized.includes('no endpoints found matching your data policy')

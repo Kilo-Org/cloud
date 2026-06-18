@@ -17,7 +17,7 @@ scripts/          CI and one-off scripts
 - **Database schema**: `packages/db/src/schema.ts`
 - **Migrations**: `packages/db/src/migrations/`
 - **tRPC routers**: `apps/web/src/routers/`
-- **Env vars**: `.env.local` at repo root (pulled via `vercel env pull`)
+- **Env vars**: `.env.local` at repo root (pulled via `vercel env pull`). When a shared web env var needs to be added or rotated across tracked dotenv files, Vercel deployments, and 1Password, tell the user to run `pnpm web:env set <VARIABLE>`; agents must not run that command themselves because it prompts for secret values and writes to external systems.
 
 ## Domain Context
 

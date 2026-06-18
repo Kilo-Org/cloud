@@ -552,14 +552,19 @@ describe('codeReviewRouter attempts', () => {
           status: 'failed',
           error_message: 'Container shutdown: SIGTERM',
           terminal_reason: 'sandbox_error',
+          total_tokens_in: 1200,
+          total_tokens_out: 300,
         })
       )
       .returning({ id: cloud_agent_code_reviews.id });
 
     const caller = await createCallerForUser(testUser.id);
     const before = await caller.codeReviews.get({ reviewId: review.id });
-    expect(before.success).toBe(true);
-    expect(before.success ? before.attempts : []).toEqual([]);
+    if (!before.success) {
+      throw new Error('Expected successful code review get');
+    }
+    expect(before.attempts).toEqual([]);
+    expect(before.tokenUsage).toEqual({ input: 1200, output: 300, cached: null });
 
     await caller.codeReviews.retrigger({ reviewId: review.id });
 

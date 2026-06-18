@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStreamView';
+import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import {
   ExternalLink,
   GitPullRequest,
@@ -54,6 +55,10 @@ const statusConfig: Record<
 type CodeReviewDetailClientProps = {
   reviewId: string;
 };
+
+function formatAvailableTokenCount(count: number | null): string {
+  return count == null ? '—' : formatTokenCount(count);
+}
 
 export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps) {
   const trpc = useTRPC();
@@ -268,12 +273,15 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                 <dd>${(review.total_cost_musd / 1_000_000).toFixed(4)}</dd>
               </div>
             )}
-            {(review.total_tokens_in != null || review.total_tokens_out != null) && (
+            {(data.tokenUsage.input != null ||
+              data.tokenUsage.output != null ||
+              data.tokenUsage.cached != null) && (
               <div>
                 <dt className="text-muted-foreground">Tokens</dt>
-                <dd>
-                  {review.total_tokens_in?.toLocaleString() ?? '—'} in /{' '}
-                  {review.total_tokens_out?.toLocaleString() ?? '—'} out
+                <dd className="tabular-nums">
+                  Input {formatAvailableTokenCount(data.tokenUsage.input)} / Output{' '}
+                  {formatAvailableTokenCount(data.tokenUsage.output)} / Cached{' '}
+                  {formatAvailableTokenCount(data.tokenUsage.cached)}
                 </dd>
               </div>
             )}

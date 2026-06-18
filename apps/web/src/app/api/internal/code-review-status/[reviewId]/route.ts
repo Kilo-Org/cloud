@@ -573,8 +573,9 @@ const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
  * For v2 (cloud-agent-next) the orchestrator never writes usage — we
  * skip the poll and go straight to the billing tables.
  *
- * When the billing fallback is used we also back-fill the code_reviews
- * record so later reads (e.g. admin panel) don't repeat the aggregation.
+ * Billing usage is preferred when a CLI session is available because the
+ * persisted review columns do not include cache details. Raw cache-inclusive
+ * input, output, and cost totals are still back-filled for later reads.
  */
 async function getReviewUsageData(reviewId: string) {
   let review = await getCodeReviewById(reviewId);
@@ -591,19 +592,9 @@ async function getReviewUsageData(reviewId: string) {
     }
   }
 
-  if (review?.model) {
-    return {
-      model: review.model,
-      tokensIn: review.total_tokens_in ?? null,
-      tokensOut: review.total_tokens_out ?? null,
-    };
-  }
-
-  // Fallback: aggregate from billing tables (covers v2 / cloud-agent-next reviews)
   if (review?.cli_session_id && review.created_at) {
     const billing = await getSessionUsageFromBilling(review.cli_session_id, review.created_at);
     if (billing) {
-      // Back-fill the code_reviews record so we don't repeat this aggregation
       updateCodeReviewUsage(reviewId, {
         model: billing.model,
         totalTokensIn: billing.totalTokensIn,
@@ -615,13 +606,23 @@ async function getReviewUsageData(reviewId: string) {
 
       return {
         model: billing.model,
-        tokensIn: billing.totalTokensIn,
+        tokensIn: billing.totalUncachedTokens,
         tokensOut: billing.totalTokensOut,
+        cachedTokens: billing.totalCachedTokens,
       };
     }
   }
 
-  return { model: null, tokensIn: null, tokensOut: null };
+  if (review?.model) {
+    return {
+      model: review.model,
+      tokensIn: review.total_tokens_in ?? null,
+      tokensOut: review.total_tokens_out ?? null,
+      cachedTokens: null,
+    };
+  }
+
+  return { model: null, tokensIn: null, tokensOut: null, cachedTokens: null };
 }
 
 function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
@@ -1455,10 +1456,11 @@ export async function POST(
 
               // Summary history and footer (completed only)
               if (status === 'completed') {
-                const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+                const { model, tokensIn, tokensOut, cachedTokens } =
+                  await getReviewUsageData(reviewId);
                 const usage =
                   model && tokensIn != null && tokensOut != null
-                    ? { model, tokensIn, tokensOut }
+                    ? { model, tokensIn, tokensOut, cachedTokens }
                     : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
                 const summaryFooter = { usage, reviewGuidance };
@@ -1548,10 +1550,11 @@ export async function POST(
 
               // Summary history and footer (completed only)
               if (status === 'completed') {
-                const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
+                const { model, tokensIn, tokensOut, cachedTokens } =
+                  await getReviewUsageData(reviewId);
                 const usage =
                   model && tokensIn != null && tokensOut != null
-                    ? { model, tokensIn, tokensOut }
+                    ? { model, tokensIn, tokensOut, cachedTokens }
                     : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
 

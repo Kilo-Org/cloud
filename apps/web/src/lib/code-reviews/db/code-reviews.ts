@@ -1631,6 +1631,8 @@ export type SessionUsageSummary = {
   model: string;
   totalTokensIn: number;
   totalTokensOut: number;
+  totalCachedTokens: number;
+  totalUncachedTokens: number;
   totalCostMusd: number;
 };
 
@@ -1662,6 +1664,8 @@ export async function getSessionUsageFromBilling(
       .select({
         totalTokensIn: sum(microdollar_usage.input_tokens).mapWith(Number),
         totalTokensOut: sum(microdollar_usage.output_tokens).mapWith(Number),
+        totalCacheHitTokens: sum(microdollar_usage.cache_hit_tokens).mapWith(Number),
+        totalCacheWriteTokens: sum(microdollar_usage.cache_write_tokens).mapWith(Number),
         totalCostMusd: sum(microdollar_usage.cost).mapWith(Number),
       })
       .from(microdollar_usage)
@@ -1684,10 +1688,15 @@ export async function getSessionUsageFromBilling(
 
     if (!topModel?.model) return null;
 
+    const totalCachedTokens =
+      (totals.totalCacheHitTokens ?? 0) + (totals.totalCacheWriteTokens ?? 0);
+
     return {
       model: topModel.model,
       totalTokensIn: totals.totalTokensIn,
       totalTokensOut: totals.totalTokensOut ?? 0,
+      totalCachedTokens,
+      totalUncachedTokens: Math.max(0, totals.totalTokensIn - totalCachedTokens),
       totalCostMusd: totals.totalCostMusd ?? 0,
     };
   } catch (error) {

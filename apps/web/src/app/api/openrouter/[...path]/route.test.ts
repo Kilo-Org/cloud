@@ -447,7 +447,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
-        tier: 'low',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'v1',
         sticky: false,
@@ -481,7 +482,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
-        tier: 'low',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark' as const,
         tableVersion: 'v1',
         sticky: false,
@@ -510,7 +512,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
-        tier: 'low',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'v1',
         sticky: false,
@@ -560,7 +563,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
-        tier: 'low',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'v1',
         sticky: false,
@@ -582,6 +586,46 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(stats.cost_mUsd).toBe(3000);
   });
 
+  it('passes enterprise organization model deny list to the efficient decision worker', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        model_deny_list: ['openai/gpt-4o:free'],
+      },
+      plan: 'enterprise',
+    });
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0.003,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deniedModelIds: ['openai/gpt-4o'],
+      })
+    );
+  });
+
   it('bills classifier cost even when decision is null but cost > 0', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: null,
@@ -598,5 +642,42 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(stats.cost_mUsd).toBe(1000); // toMicrodollars(0.001)
+  });
+});
+
+describe('auto-routing shadow classifier', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
+    mockedRedisGet.mockResolvedValue(null);
+    mockedRedisSet.mockResolvedValue('OK');
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedUpstreamRequest.mockResolvedValue(
+      upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] })
+    );
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedApplyResolvedAutoModel.mockImplementation(async (_opts, request) => {
+      request.body.model = 'openai/gpt-4o';
+      return { kind: 'ok', resolved: { model: 'openai/gpt-4o' } };
+    });
+  });
+
+  it('does not schedule a background classifier request for non-efficient auto models', async () => {
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedAfter).not.toHaveBeenCalled();
   });
 });

@@ -28,9 +28,9 @@ iterating, then allow push hooks or the relevant release process to run broader 
 pnpm install --lockfile-only
 pnpm install --frozen-lockfile
 pnpm format
-bash -n services/kiloclaw/scripts/controller-smoke-helpers.sh
-bash -n services/kiloclaw/scripts/controller-live-provider-smoke-test.sh
-bash -n services/kiloclaw/scripts/controller-openclaw-upgrade-smoke-test.sh
+bash -n services/kiloclaw/scripts/tests/smoke-helpers.sh
+bash -n services/kiloclaw/scripts/tests/smoke-live-provider.sh
+bash -n services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh
 git diff --check
 bun run script/check-md-table-padding.ts
 pnpm --filter @kiloclaw/kilo-chat test
@@ -56,16 +56,19 @@ pnpm lint
 If a required final gate cannot be run, state that explicitly in the PR and handoff;
 do not describe narrow checks as full submission validation.
 
-## Official Upgrade Smoke
+## Official Validation Run
 
-Run only from a clean committed bump branch; the wrapper builds detached source
-worktrees so ignored local files do not enter either candidate image.
+Run only from a clean committed bump branch (the validator refuses a dirty tree).
+`openclaw-upgrade-validate.sh` is the entry point: it runs Phase 1 (keyless image
+checks, config-shape validation, grype CVE scan) and Phase 2 (the live smoke,
+whose wrapper builds detached source worktrees so ignored local files do not enter
+either candidate image). Set `KILOCODE_API_KEY` for Phase 2.
 
 ```bash
-bash services/kiloclaw/scripts/controller-openclaw-upgrade-smoke-test.sh
+bash services/kiloclaw/scripts/tests/openclaw-upgrade-validate.sh
 ```
 
-Expected behaviors:
+Phase 2 (live smoke) behaviors:
 
 - It refreshes `origin/main` by default; use `BASE_REF` only when the intended
   upgrade baseline differs and document that reason in the PR.

@@ -11,9 +11,12 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   switch_cost_factor: real('switch_cost_factor').notNull(),
   max_concurrency: integer('max_concurrency').notNull(),
   benchmark_user_id: text('benchmark_user_id'),
+  benchmark_org_id: text('benchmark_org_id'),
   classifier_repetitions: integer('classifier_repetitions').notNull().default(1),
   decider_repetitions: integer('decider_repetitions').notNull().default(1),
   classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
+  auto_decider_min_cost_usd: real('auto_decider_min_cost_usd').notNull().default(15),
+  auto_decider_max_cost_usd: real('auto_decider_max_cost_usd').notNull().default(25),
   updated_at: text('updated_at').notNull(),
   updated_by: text('updated_by'),
 });
@@ -25,6 +28,17 @@ export const configClassifierModels = sqliteTable('config_classifier_models', {
 export const configDeciderModels = sqliteTable('config_decider_models', {
   model: text('model').primaryKey(),
   reasoning_effort: text('reasoning_effort'),
+});
+
+export const configAutoDeciderModels = sqliteTable('config_auto_decider_models', {
+  model: text('model').primaryKey(),
+  reasoning_effort: text('reasoning_effort'),
+  avg_attempt_cost_usd: real('avg_attempt_cost_usd').notNull(),
+  synced_at: text('synced_at').notNull(),
+});
+
+export const configAutoDeciderExclusions = sqliteTable('config_auto_decider_exclusions', {
+  model: text('model').primaryKey(),
 });
 
 export const benchmarkRuns = sqliteTable(
@@ -41,6 +55,7 @@ export const benchmarkRuns = sqliteTable(
     switch_cost_factor: real('switch_cost_factor').notNull(),
     max_concurrency: integer('max_concurrency').notNull(),
     benchmark_user_id: text('benchmark_user_id'),
+    benchmark_org_id: text('benchmark_org_id'),
     repetitions: integer('repetitions').notNull().default(1),
     classifier_max_p95_latency_ms: integer('classifier_max_p95_latency_ms'),
     // Benchmark-identity snapshot: dataset content hash + engine version. A prior
@@ -77,7 +92,7 @@ export const modelSummaries = sqliteTable(
   {
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
-    tier: text('tier').notNull(),
+    route_key: text('route_key').notNull(),
     accuracy: real('accuracy').notNull(),
     avg_cost_usd: real('avg_cost_usd'),
     avg_latency_ms: real('avg_latency_ms').notNull(),
@@ -89,7 +104,7 @@ export const modelSummaries = sqliteTable(
     // carried=true rows are prior-run summaries copied in at startRun for skipped models.
     carried: integer('carried', { mode: 'boolean' }).notNull().default(false),
   },
-  table => [primaryKey({ columns: [table.run_id, table.model, table.tier] })]
+  table => [primaryKey({ columns: [table.run_id, table.model, table.route_key] })]
 );
 
 export const caseResults = sqliteTable(
@@ -98,7 +113,7 @@ export const caseResults = sqliteTable(
     run_id: text('run_id').notNull(),
     model: text('model').notNull(),
     case_id: text('case_id').notNull(),
-    tier: text('tier'),
+    route_key: text('route_key'),
     score: real('score').notNull(),
     latency_ms: integer('latency_ms').notNull(),
     cost_usd: real('cost_usd'),
@@ -134,7 +149,7 @@ export const routingTableCandidates = sqliteTable(
   'routing_table_candidates',
   {
     run_id: text('run_id').notNull(),
-    tier: text('tier').notNull(),
+    route_key: text('route_key').notNull(),
     rank: integer('rank').notNull(),
     model: text('model').notNull(),
     accuracy: real('accuracy').notNull(),
@@ -145,5 +160,5 @@ export const routingTableCandidates = sqliteTable(
     meets_threshold: integer('meets_threshold', { mode: 'boolean' }).notNull(),
     reasoning_effort: text('reasoning_effort'),
   },
-  table => [primaryKey({ columns: [table.run_id, table.tier, table.rank] })]
+  table => [primaryKey({ columns: [table.run_id, table.route_key, table.rank] })]
 );

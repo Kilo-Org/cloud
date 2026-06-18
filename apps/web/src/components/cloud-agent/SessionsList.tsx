@@ -78,6 +78,20 @@ export function SessionsList<T extends SessionsListItem>({
               Slack
             </span>
           );
+        } else if (platform === 'github') {
+          badge = (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-zinc-500/20 px-2 py-0.5 text-xs font-medium text-zinc-400">
+              <Bot className="h-3 w-3" />
+              GitHub
+            </span>
+          );
+        } else if (platform === 'linear') {
+          badge = (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-400">
+              <Bot className="h-3 w-3" />
+              Linear
+            </span>
+          );
         } else {
           // Default to Extension badge for unknown, vscode, etc.
           badge = (

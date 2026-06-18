@@ -3,13 +3,25 @@ import { clearClassifierConfigCache } from './classifier-config';
 import { clearRoutingTableCache } from './routing-table';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
+import type * as DbModule from '@kilocode/db';
 import type * as ModelClassifierModule from './model-classifier';
 
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
+const getWorkerDb = vi.hoisted(() => vi.fn());
+const dbSelect = vi.hoisted(() => vi.fn());
+const dbFrom = vi.hoisted(() => vi.fn());
+const dbInnerJoin = vi.hoisted(() => vi.fn());
+const dbWhere = vi.hoisted(() => vi.fn());
+const dbLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('./model-classifier', async importOriginal => {
   const actual = await importOriginal<typeof ModelClassifierModule>();
   return { ...actual, classifyNormalizedInput };
+});
+
+vi.mock('@kilocode/db', async importOriginal => {
+  const actual = await importOriginal<typeof DbModule>();
+  return { ...actual, getWorkerDb };
 });
 
 const writeDataPoint = vi.fn();
@@ -46,6 +58,9 @@ const env = {
   O11Y_CF_ACCOUNT_ID: 'test-account-id',
   O11Y_CF_AE_API_TOKEN: {
     get: analyticsTokenGet,
+  },
+  HYPERDRIVE: {
+    connectionString: 'postgres://worker',
   },
 };
 
@@ -87,17 +102,15 @@ const benchmarkRoutingTable = {
   minAccuracy: 0.7,
   switchCostFactor: 3,
   source: 'benchmark',
-  tiers: {
-    low: [
+  routes: {
+    'implementation/feature_development': [
       {
         model: 'google/gemini-2.5-flash-lite',
         accuracy: 0.9,
-        avgCostUsd: 0.001,
+        avgCostUsd: 0.002,
         meetsThreshold: true,
         reasoningEffort: null,
       },
-    ],
-    medium: [
       {
         model: 'google/gemini-2.5-flash',
         accuracy: 0.85,
@@ -105,9 +118,9 @@ const benchmarkRoutingTable = {
         meetsThreshold: true,
         reasoningEffort: null,
       },
-      // The high-tier model also qualifies for medium, within the 3x
+      // The planning route's model also qualifies for implementation, within the 3x
       // switch-cost factor of the fresh pick (0.002 * 3 >= 0.005): a session
-      // de-escalating from high stays on it.
+      // moving routes stays on it.
       {
         model: 'anthropic/claude-sonnet-4.6',
         accuracy: 0.8,
@@ -116,7 +129,7 @@ const benchmarkRoutingTable = {
         reasoningEffort: null,
       },
     ],
-    high: [
+    'planning_design/system_design': [
       {
         model: 'anthropic/claude-sonnet-4.6',
         accuracy: 0.8,
@@ -174,6 +187,18 @@ describe('auto routing worker', () => {
     clearRoutingTableCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
+    getWorkerDb.mockReset();
+    getWorkerDb.mockReturnValue({ select: dbSelect });
+    dbSelect.mockReset();
+    dbSelect.mockReturnValue({ from: dbFrom });
+    dbFrom.mockReset();
+    dbFrom.mockReturnValue({ innerJoin: dbInnerJoin });
+    dbInnerJoin.mockReset();
+    dbInnerJoin.mockReturnValue({ where: dbWhere });
+    dbWhere.mockReset();
+    dbWhere.mockReturnValue({ limit: dbLimit });
+    dbLimit.mockReset();
+    dbLimit.mockResolvedValue([]);
     writeDataPoint.mockReset();
     configGet.mockReset();
     // Real KV returns null for missing keys; an undefined here would send the
@@ -235,7 +260,8 @@ describe('auto routing worker', () => {
       cost: 0.00000123,
       decision: {
         model: expect.any(String),
-        tier: expect.stringMatching(/^(low|medium|high)$/),
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'bench-run-1',
         reasoningEffort: null,
@@ -290,6 +316,147 @@ describe('auto routing worker', () => {
     expect(String(logMessage)).not.toContain('user-1');
   });
 
+  it('filters denied routing-policy models from the full decide path', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const response = await decideRequest(
+      mirrorPayload({
+        routingPolicy: { deniedModelIds: ['google/gemini-2.5-flash-lite'] },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: {
+        model: 'google/gemini-2.5-flash',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
+        sticky: false,
+      },
+    });
+  });
+
+  it('serves a coding-plan default decision without classifying', async () => {
+    configGet.mockImplementation(async (key: string) =>
+      key.startsWith('coding_plan_preference:')
+        ? JSON.stringify({
+            active: true,
+            planId: 'minimax-token-plan-plus',
+            providerId: 'minimax',
+            modelId: 'minimax/minimax-m3',
+          })
+        : null
+    );
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      cost: 0,
+      decision: {
+        model: 'minimax/minimax-m3',
+        taskType: null,
+        subtaskType: null,
+        source: 'coding_plan_default',
+        tableVersion: 'coding-plan:v1',
+        reasoningEffort: null,
+        sticky: false,
+      },
+      classifierResult: null,
+    });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+    expect(cachePutEntry).not.toHaveBeenCalled();
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      indexes: ['coding_plan_default'],
+      blobs: [
+        'coding_plan_default',
+        'anthropic/claude-sonnet-4',
+        'coding_plan_default',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ],
+      doubles: [expect.any(Number), 0, -1, 0],
+    });
+  });
+
+  it('falls back to benchmark routing when the coding-plan default model is denied', async () => {
+    configGet.mockImplementation(async (key: string) =>
+      key.startsWith('coding_plan_preference:')
+        ? JSON.stringify({
+            active: true,
+            planId: 'minimax-token-plan-plus',
+            providerId: 'minimax',
+            modelId: 'minimax/minimax-m3',
+          })
+        : null
+    );
+
+    const response = await decideRequest(
+      mirrorPayload({
+        routingPolicy: { deniedModelIds: ['minimax/minimax-m3'] },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: mockClassifierResult.cost,
+      decision: {
+        model: 'google/gemini-2.5-flash-lite',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
+        sticky: false,
+      },
+    });
+    expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads and caches a coding-plan preference on cache miss', async () => {
+    dbLimit.mockResolvedValueOnce([{ planId: 'minimax-token-plan-plus', providerId: 'minimax' }]);
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: 0,
+      decision: {
+        model: 'minimax/minimax-m3',
+        source: 'coding_plan_default',
+      },
+      classifierResult: null,
+    });
+    expect(getWorkerDb).toHaveBeenCalledWith('postgres://worker', {
+      statement_timeout: 2_000,
+    });
+    expect(dbSelect).toHaveBeenCalledWith({
+      planId: expect.any(Object),
+      providerId: expect.any(Object),
+    });
+    expect(dbFrom).toHaveBeenCalledTimes(1);
+    expect(dbInnerJoin).toHaveBeenCalledTimes(1);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+    expect(dbLimit).toHaveBeenCalledWith(1);
+    expect(configPut).toHaveBeenCalledWith(
+      expect.stringMatching(/^coding_plan_preference:[0-9a-f]{16}$/),
+      JSON.stringify({
+        active: true,
+        planId: 'minimax-token-plan-plus',
+        providerId: 'minimax',
+        modelId: 'minimax/minimax-m3',
+      }),
+      { expirationTtl: 60 }
+    );
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
   it('serves a cached classification for the session without calling the classifier', async () => {
     cacheGetEntry.mockResolvedValueOnce(mockClassification);
 
@@ -300,7 +467,8 @@ describe('auto routing worker', () => {
       cost: 0,
       decision: {
         model: expect.any(String),
-        tier: expect.stringMatching(/^(low|medium|high)$/),
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
         source: 'benchmark',
         tableVersion: 'bench-run-1',
         reasoningEffort: null,
@@ -331,7 +499,7 @@ describe('auto routing worker', () => {
     );
   });
 
-  it('keeps the session on the incumbent model when the tier de-escalates', async () => {
+  it('keeps the session on the incumbent model when the taxonomy route changes', async () => {
     // Back the mocked DO stub with real storage so the sticky model written
     // by the first request is visible to the second.
     const store = new Map<string, unknown>();
@@ -344,19 +512,24 @@ describe('auto routing worker', () => {
       ...mockClassifierResult,
       classification: {
         ...mockClassification,
-        reasoningComplexity: 'high',
-        contextComplexity: 'large',
-        executionMode: 'multi_step_project',
+        taskType: 'planning_design',
+        subtaskType: 'system_design',
       },
     });
     const first = await decideRequest(mirrorPayload());
     expect(first.status).toBe(200);
     await expect(first.json()).resolves.toMatchObject({
-      decision: { model: 'anthropic/claude-sonnet-4.6', tier: 'high', sticky: false },
+      decision: {
+        model: 'anthropic/claude-sonnet-4.6',
+        taskType: 'planning_design',
+        subtaskType: 'system_design',
+        sticky: false,
+      },
     });
+    store.set('sticky', { model: 'anthropic/claude-sonnet-4.6' });
 
-    // The second turn (different prompt, same session) classifies as medium.
-    // The fresh medium pick is cheaper, but not by more than the switch-cost
+    // The second turn (different prompt, same session) classifies to a cheaper route.
+    // The fresh implementation pick is cheaper, but not by more than the switch-cost
     // factor, so the session keeps its incumbent.
     const second = await decideRequest(
       mirrorPayload({
@@ -365,7 +538,12 @@ describe('auto routing worker', () => {
     );
     expect(second.status).toBe(200);
     await expect(second.json()).resolves.toMatchObject({
-      decision: { model: 'anthropic/claude-sonnet-4.6', tier: 'medium', sticky: true },
+      decision: {
+        model: 'anthropic/claude-sonnet-4.6',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        sticky: true,
+      },
     });
   });
 

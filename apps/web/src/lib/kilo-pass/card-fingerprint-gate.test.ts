@@ -1,5 +1,11 @@
-import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+const mockSendKiloPassDuplicateCardCanceledEmail = jest.fn();
 
+jest.mock('@/lib/email', () => ({
+  sendKiloPassDuplicateCardCanceledEmail: (...args: unknown[]) =>
+    mockSendKiloPassDuplicateCardCanceledEmail(...args),
+}));
+
+import { beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import {
   kilo_pass_audit_log,
@@ -108,6 +114,8 @@ async function evaluateExistingClaim(params: {
 }
 
 beforeEach(async () => {
+  mockSendKiloPassDuplicateCardCanceledEmail.mockReset();
+  mockSendKiloPassDuplicateCardCanceledEmail.mockResolvedValue({ sent: true });
   await cleanupDbForTest();
 });
 
@@ -675,6 +683,10 @@ describe('duplicate-card provider enforcement and email', () => {
   });
 
   test('clears email marker when provider is unavailable so replay can retry', async () => {
+    mockSendKiloPassDuplicateCardCanceledEmail.mockResolvedValueOnce({
+      sent: false,
+      reason: 'provider_not_configured',
+    });
     const user = await insertTestUser();
     await maybeSendDuplicateCardCanceledEmail({ kiloUserId: user.id, stripeInvoiceId: 'in_email' });
 

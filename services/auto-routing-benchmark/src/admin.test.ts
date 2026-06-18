@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  BenchmarkConfig,
-  BenchmarkModelSummary,
-  RoutingTable,
+import {
+  DEFAULT_BENCHMARK_ORG_ID,
+  DEFAULT_BENCHMARK_USER_ID,
+  type BenchmarkConfig,
+  type BenchmarkModelSummary,
+  type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import { computeEngineIdentity } from './run';
@@ -12,7 +14,7 @@ import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 function makeSummary(model: string): BenchmarkModelSummary {
   return {
     model,
-    tier: 'low',
+    routeKey: 'implementation/code_generation',
     accuracy: 0.9,
     avgCostUsd: 0.001,
     avgLatencyMs: 100,
@@ -32,11 +34,14 @@ const TEST_CONFIG: BenchmarkConfig = {
   ],
   minAccuracy: 0.7,
   switchCostFactor: 3,
-  maxConcurrency: 4,
+  maxConcurrency: 100,
   benchmarkUserId: null,
+  benchmarkOrgId: null,
   classifierRepetitions: 1,
   deciderRepetitions: 1,
   classifierMaxP95LatencyMs: 1000,
+  autoDeciderMinCostUsd: 15,
+  autoDeciderMaxCostUsd: 25,
   updatedAt: null,
   updatedBy: null,
 };
@@ -49,9 +54,12 @@ const TEST_CONFIG_ROWS = {
     switch_cost_factor: TEST_CONFIG.switchCostFactor,
     max_concurrency: TEST_CONFIG.maxConcurrency,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
+    benchmark_org_id: TEST_CONFIG.benchmarkOrgId,
     classifier_repetitions: TEST_CONFIG.classifierRepetitions,
     decider_repetitions: TEST_CONFIG.deciderRepetitions,
     classifier_max_p95_latency_ms: TEST_CONFIG.classifierMaxP95LatencyMs,
+    auto_decider_min_cost_usd: TEST_CONFIG.autoDeciderMinCostUsd,
+    auto_decider_max_cost_usd: TEST_CONFIG.autoDeciderMaxCostUsd,
     updated_at: '2026-06-01T00:00:00.000Z',
     updated_by: null,
   },
@@ -60,6 +68,8 @@ const TEST_CONFIG_ROWS = {
     model: m.id,
     reasoning_effort: m.reasoningEffort ?? null,
   })),
+  autoDeciderModels: [],
+  excludedAutoDeciderModels: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -151,6 +161,8 @@ beforeEach(() => {
     config: null,
     classifierModels: [],
     deciderModels: [],
+    autoDeciderModels: [],
+    excludedAutoDeciderModels: [],
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
@@ -208,14 +220,19 @@ describe('GET /admin/config', () => {
         switch_cost_factor: 3,
         max_concurrency: 4,
         benchmark_user_id: null,
+        benchmark_org_id: null,
         classifier_repetitions: 1,
         decider_repetitions: 1,
         classifier_max_p95_latency_ms: null,
+        auto_decider_min_cost_usd: 12,
+        auto_decider_max_cost_usd: 24,
         updated_at: '2026-06-01T00:00:00.000Z',
         updated_by: 'admin@example.com',
       },
       classifierModels,
       deciderModels,
+      autoDeciderModels: [],
+      excludedAutoDeciderModels: [],
     });
 
     const res = await authedGet('/admin/config');
@@ -275,6 +292,13 @@ describe('PUT /admin/config', () => {
     const validConfig = {
       ...TEST_CONFIG,
       minAccuracy: 0.85,
+      deciderModels: [
+        { id: 'manual/model', reasoningEffort: 'low' },
+        { id: 'auto/model', reasoningEffort: null },
+      ],
+      manualDeciderModels: [{ id: 'manual/model', reasoningEffort: 'low' }],
+      autoDeciderModels: [{ id: 'auto/model', reasoningEffort: null, avgAttemptCostUsd: 20 }],
+      excludedAutoDeciderModels: ['auto/excluded'],
       updatedAt: null,
       updatedBy: null,
     };
@@ -292,10 +316,15 @@ describe('PUT /admin/config', () => {
     expect(typeof body.config.updatedAt).toBe('string');
 
     expect(replaceConfig).toHaveBeenCalledOnce();
-    const [, configArg] = vi.mocked(replaceConfig).mock.calls[0];
+    const [, configArg, , deciderModelRows, excludedAutoDeciderModels] =
+      vi.mocked(replaceConfig).mock.calls[0];
     expect(configArg.min_accuracy).toBe(0.85);
+    expect(configArg.auto_decider_min_cost_usd).toBe(15);
+    expect(configArg.auto_decider_max_cost_usd).toBe(25);
     expect(typeof configArg.updated_at).toBe('string');
     expect(configArg.updated_by).toBe('igor@kilocode.ai');
+    expect(deciderModelRows).toEqual([{ model: 'manual/model', reasoning_effort: 'low' }]);
+    expect(excludedAutoDeciderModels).toEqual(['auto/excluded']);
   });
 });
 
@@ -357,6 +386,7 @@ describe('POST /admin/runs', () => {
       switch_cost_factor: 3,
       max_concurrency: 4,
       benchmark_user_id: null,
+      benchmark_org_id: null,
       repetitions: 1,
       classifier_max_p95_latency_ms: 1000,
       engine_identity: 'v1:deadbeef',
@@ -395,6 +425,8 @@ describe('POST /admin/runs', () => {
     const [, runArg] = vi.mocked(insertRun).mock.calls[0];
     expect(runArg.min_accuracy).toBe(TEST_CONFIG.minAccuracy);
     expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
+    expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
+    expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
     const queuedMessages = queueSendBatch.mock.calls.flatMap(([messages]) => messages);
     expect(queueSendBatch).toHaveBeenCalledTimes(2);
     expect(queuedMessages).toHaveLength(
@@ -407,6 +439,25 @@ describe('POST /admin/runs', () => {
       caseIds: [CLASSIFIER_CASES[0].id],
       rep: 0,
     });
+  });
+
+  it('starts a decider run with default benchmark identity when overrides are null', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        benchmark_user_id: null,
+        benchmark_org_id: null,
+      },
+      deciderModels: [{ model: 'vendor/a', reasoning_effort: null }],
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+    expect(insertRun).toHaveBeenCalledOnce();
+    const [, runArg] = vi.mocked(insertRun).mock.calls[0];
+    expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
+    expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
   });
 
   it('carries a decider model only when its benchmark identity still matches', async () => {
@@ -471,9 +522,10 @@ describe('POST /admin/runs', () => {
     expect(body.enqueuedModels).toBe(1);
   });
 
-  it('slices a >100-message decider fan-out into sendBatch-sized batches', async () => {
-    // 7 decider models × 1 rep × ceil(76/5)=16 chunks = 112 messages, which
-    // exceeds Cloudflare Queues' 100-per-sendBatch cap and must be sliced.
+  it('seeds sharded decider lanes bounded by the container cap', async () => {
+    // Later chunks are chained by processJob within each shard lane. Start
+    // seeds as many lanes as fit under the 100-container cap so the benchmark
+    // runs much faster without creating one live container per chunk.
     const manyModels = Array.from({ length: 7 }, (_, i) => ({
       id: `vendor/model-${i}`,
       reasoningEffort: null,
@@ -487,11 +539,76 @@ describe('POST /admin/runs', () => {
     const res = await authedPost('/admin/runs', { kind: 'decider' });
     expect(res.status).toBe(200);
 
-    // 112 messages → two batches (100 + 12), neither over the limit.
-    expect(queueSendBatch).toHaveBeenCalledTimes(2);
+    expect(queueSendBatch).toHaveBeenCalledTimes(1);
     const batchSizes = queueSendBatch.mock.calls.map(([batch]) => (batch as unknown[]).length);
-    expect(batchSizes).toEqual([100, 12]);
+    expect(batchSizes).toEqual([98]);
     for (const size of batchSizes) expect(size).toBeLessThanOrEqual(100);
+    const queuedMessages = queueSendBatch.mock.calls.flatMap(([batch]) => batch as unknown[]);
+    for (const message of queuedMessages) {
+      expect(message).toMatchObject({
+        body: {
+          kind: 'decider',
+          shardCount: 14,
+        },
+      });
+    }
+  });
+
+  it('keeps 10 decider models with 3 repetitions under the 100-container cap', async () => {
+    const manyModels = Array.from({ length: 10 }, (_, i) => ({
+      id: `vendor/model-${i}`,
+      reasoningEffort: null,
+    }));
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        benchmark_user_id: 'user-123',
+        benchmark_org_id: 'org-123',
+        decider_repetitions: 3,
+      },
+      deciderModels: manyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(200);
+
+    expect(queueSendBatch).toHaveBeenCalledTimes(1);
+    const queuedMessages = queueSendBatch.mock.calls.flatMap(([batch]) => batch as unknown[]);
+    expect(queuedMessages).toHaveLength(90);
+    for (const message of queuedMessages) {
+      expect(message).toMatchObject({
+        body: {
+          kind: 'decider',
+          shardCount: 3,
+        },
+      });
+    }
+  });
+
+  it('rejects decider starts when model repetitions alone exceed the container cap', async () => {
+    const tooManyModels = Array.from({ length: 21 }, (_, i) => ({
+      id: `vendor/model-${i}`,
+      reasoningEffort: null,
+    }));
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: {
+        ...TEST_CONFIG_ROWS.config,
+        benchmark_user_id: 'user-123',
+        benchmark_org_id: 'org-123',
+        decider_repetitions: 5,
+      },
+      deciderModels: tooManyModels.map(m => ({ model: m.id, reasoning_effort: null })),
+    });
+
+    const res = await authedPost('/admin/runs', { kind: 'decider' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('requires at least one live container lane'),
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
   });
 });
 
@@ -519,7 +636,7 @@ describe('GET /admin/routing-table', () => {
       minAccuracy: 0.7,
       switchCostFactor: 3,
       source: 'benchmark',
-      tiers: { low: [candidate], medium: [candidate], high: [candidate] },
+      routes: { 'implementation/code_generation': [candidate] },
     };
     vi.mocked(getLatestRoutingTable).mockResolvedValueOnce({
       table: tableData as RoutingTable,

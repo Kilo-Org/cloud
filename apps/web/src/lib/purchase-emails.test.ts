@@ -69,6 +69,7 @@ const sendViaMailgunMock = jest.fn<Promise<boolean>, [SendViaMailgunParams]>(asy
 const verifyEmailMock = jest.fn<Promise<boolean>, [string]>(async () => true);
 
 jest.mock('@/lib/email-mailgun', () => ({
+  getEmailVerificationRecipient: (email: string) => email,
   sendViaMailgun: (params: SendViaMailgunParams) => sendViaMailgunMock(params),
 }));
 

@@ -32,6 +32,7 @@ import {
   addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
+  isReasoningExplicitlyEnabled,
   scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
@@ -60,10 +61,7 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
   if (isDeepseekModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum.alibaba,
-      OpenRouterInferenceProviderIdSchema.enum.novita,
-    ];
+    return [OpenRouterInferenceProviderIdSchema.enum.alibaba];
   }
   if (isGlmModel(requestedModel)) {
     return [
@@ -178,6 +176,17 @@ export function applyProviderSpecificLogic(
 
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
+  }
+
+  if (
+    isMinimaxModel(requestedModel) &&
+    requestedModel.includes('m3') &&
+    !isReasoningExplicitlyEnabled(requestToMutate) &&
+    requestToMutate.kind === 'messages'
+  ) {
+    // MiniMax defaults to thinking, but the Anthropic provider does not include thinking:disabled in the request, creating a mismatch.
+    // https://github.com/vercel/ai/blob/4a441d8fb584b231f771348de3e7f383ab7aa95b/packages/anthropic/src/anthropic-language-model.ts#L421-L453
+    requestToMutate.body.thinking = { type: 'disabled' };
   }
 
   provider.transformRequest({

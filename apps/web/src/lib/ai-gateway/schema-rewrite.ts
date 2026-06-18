@@ -14,6 +14,7 @@ type OneOfRewriteLogDetails = {
   event: 'ai_gateway_chat_completions_one_of_rewritten';
   model: string;
   count: number;
+  toolNames: string[];
 };
 
 type OneOfRewriteLogger = (message: string, details: OneOfRewriteLogDetails) => void;
@@ -86,11 +87,16 @@ export function rewriteChatCompletionsOneOfAsAnyOf(
   log: OneOfRewriteLogger = warnExceptInTest
 ): void {
   let rewritten = 0;
+  const toolNames = new Set<string>();
 
   if (Array.isArray(request.tools)) {
     for (const tool of request.tools) {
       if (!isRecord(tool) || tool.type !== 'function' || !isRecord(tool.function)) continue;
-      rewritten += rewriteOneOfAsAnyOf(tool.function.parameters);
+      const toolRewritten = rewriteOneOfAsAnyOf(tool.function.parameters);
+      rewritten += toolRewritten;
+      if (toolRewritten > 0 && typeof tool.function.name === 'string') {
+        toolNames.add(tool.function.name);
+      }
     }
   }
 
@@ -109,5 +115,6 @@ export function rewriteChatCompletionsOneOfAsAnyOf(
     event: 'ai_gateway_chat_completions_one_of_rewritten',
     model: request.model,
     count: rewritten,
+    toolNames: [...toolNames],
   });
 }

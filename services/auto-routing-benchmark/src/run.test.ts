@@ -5,7 +5,9 @@ import {
   buildClassifierMessages,
   buildDeciderMessages,
   chunkArray,
+  computeDeciderShardCount,
   computeEngineIdentity,
+  getDeciderContainerInstanceName,
   runCasesWithConcurrency,
   summarize,
 } from './run';
@@ -16,7 +18,7 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     run_id: 'run-1',
     model: 'model/a',
     case_id: 'case-1',
-    tier: null,
+    route_key: null,
     score: 1,
     latency_ms: 100,
     cost_usd: 0.001,
@@ -34,12 +36,12 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
 }
 
 describe('summarize — classifier kind', () => {
-  it('groups all classifier rows under * tier', () => {
+  it('groups all classifier rows under * route key', () => {
     const rows: CaseResultRow[] = [
       makeRow({
         model: 'model/a',
         case_id: 'c1',
-        tier: null,
+        route_key: null,
         score: 1,
         latency_ms: 100,
         cost_usd: 0.001,
@@ -47,7 +49,7 @@ describe('summarize — classifier kind', () => {
       makeRow({
         model: 'model/a',
         case_id: 'c2',
-        tier: null,
+        route_key: null,
         score: 0.5,
         latency_ms: 200,
         cost_usd: 0.002,
@@ -58,7 +60,7 @@ describe('summarize — classifier kind', () => {
     expect(summaries).toHaveLength(1);
     const [s] = summaries;
     expect(s.model).toBe('model/a');
-    expect(s.tier).toBe('*');
+    expect(s.routeKey).toBe('*');
     expect(s.cases).toBe(2);
   });
 
@@ -123,39 +125,65 @@ describe('summarize — classifier kind', () => {
 });
 
 describe('summarize — decider kind', () => {
-  it('groups by tier', () => {
+  it('groups by taxonomy route key', () => {
     const rows: CaseResultRow[] = [
-      makeRow({ model: 'model/a', case_id: 'low-1', tier: 'low', score: 1 }),
-      makeRow({ model: 'model/a', case_id: 'low-2', tier: 'low', score: 0 }),
-      makeRow({ model: 'model/a', case_id: 'med-1', tier: 'medium', score: 1 }),
-      makeRow({ model: 'model/b', case_id: 'low-3', tier: 'low', score: 1 }),
+      makeRow({
+        model: 'model/a',
+        case_id: 'impl-1',
+        route_key: 'implementation/code_generation',
+        score: 1,
+      }),
+      makeRow({
+        model: 'model/a',
+        case_id: 'impl-2',
+        route_key: 'implementation/code_generation',
+        score: 0,
+      }),
+      makeRow({
+        model: 'model/a',
+        case_id: 'debug-1',
+        route_key: 'debugging/bug_fixing',
+        score: 1,
+      }),
+      makeRow({
+        model: 'model/b',
+        case_id: 'impl-3',
+        route_key: 'implementation/code_generation',
+        score: 1,
+      }),
     ];
 
     const summaries = summarize(rows, 'decider');
     expect(summaries).toHaveLength(3);
 
-    const aLow = summaries.find(s => s.model === 'model/a' && s.tier === 'low');
-    expect(aLow?.cases).toBe(2);
-    expect(aLow?.accuracy).toBe(0.5);
+    const aImpl = summaries.find(
+      s => s.model === 'model/a' && s.routeKey === 'implementation/code_generation'
+    );
+    expect(aImpl?.cases).toBe(2);
+    expect(aImpl?.accuracy).toBe(0.5);
 
-    const aMed = summaries.find(s => s.model === 'model/a' && s.tier === 'medium');
-    expect(aMed?.cases).toBe(1);
-    expect(aMed?.accuracy).toBe(1);
+    const aDebug = summaries.find(
+      s => s.model === 'model/a' && s.routeKey === 'debugging/bug_fixing'
+    );
+    expect(aDebug?.cases).toBe(1);
+    expect(aDebug?.accuracy).toBe(1);
 
-    const bLow = summaries.find(s => s.model === 'model/b' && s.tier === 'low');
-    expect(bLow?.cases).toBe(1);
+    const bImpl = summaries.find(
+      s => s.model === 'model/b' && s.routeKey === 'implementation/code_generation'
+    );
+    expect(bImpl?.cases).toBe(1);
   });
 
-  it('uses * fallback when tier is null', () => {
-    const rows: CaseResultRow[] = [makeRow({ tier: null, score: 1 })];
+  it('uses * fallback when route key is null', () => {
+    const rows: CaseResultRow[] = [makeRow({ route_key: null, score: 1 })];
     const [s] = summarize(rows, 'decider');
-    expect(s.tier).toBe('*');
+    expect(s.routeKey).toBe('*');
   });
 
   it('computes avgLatencyMs as rounded mean', () => {
     const rows: CaseResultRow[] = [
-      makeRow({ case_id: 'c1', tier: 'low', latency_ms: 100 }),
-      makeRow({ case_id: 'c2', tier: 'low', latency_ms: 301 }),
+      makeRow({ case_id: 'c1', route_key: 'implementation/code_generation', latency_ms: 100 }),
+      makeRow({ case_id: 'c2', route_key: 'implementation/code_generation', latency_ms: 301 }),
     ];
 
     const [s] = summarize(rows, 'decider');
@@ -163,7 +191,9 @@ describe('summarize — decider kind', () => {
   });
 
   it('handles single-element groups for p50', () => {
-    const rows: CaseResultRow[] = [makeRow({ tier: 'high', latency_ms: 500 })];
+    const rows: CaseResultRow[] = [
+      makeRow({ route_key: 'implementation/code_generation', latency_ms: 500 }),
+    ];
     const [s] = summarize(rows, 'decider');
     expect(s.p50LatencyMs).toBe(500);
   });
@@ -266,7 +296,7 @@ describe('chunkArray', () => {
 describe('pickClassifierWinner', () => {
   const summary = (model: string, accuracy: number, avgCostUsd: number | null) => ({
     model,
-    tier: '*' as const,
+    routeKey: '*' as const,
     accuracy,
     avgCostUsd,
     avgLatencyMs: 100,
@@ -298,9 +328,12 @@ describe('pickClassifierWinner', () => {
     expect(winner?.model).toBe('cheap');
   });
 
-  it('ignores decider-tier summaries and returns null when nothing is graded', () => {
+  it('ignores decider route summaries and returns null when nothing is graded', () => {
     expect(
-      pickClassifierWinner([{ ...summary('m', 1, 0.001), tier: 'low' as const }], 0.7)
+      pickClassifierWinner(
+        [{ ...summary('m', 1, 0.001), routeKey: 'implementation/code_generation' as const }],
+        0.7
+      )
     ).toBeNull();
     expect(pickClassifierWinner([], 0.7)).toBeNull();
   });
@@ -313,7 +346,7 @@ describe('pickClassifierWinner', () => {
     p95: number | null = 90
   ) => ({
     model,
-    tier: '*' as const,
+    routeKey: '*' as const,
     accuracy,
     avgCostUsd,
     avgLatencyMs: 100,
@@ -412,8 +445,7 @@ describe('summarize — p95 and timeouts', () => {
 });
 
 describe('decider message fan-out', () => {
-  it('DECIDER_CHUNK_SIZE is 5 (chunk count for 76 cases)', () => {
-    // DECIDER_CASES = 76, chunk size 5 → ceil(76/5) = 16 chunks
+  it('DECIDER_CHUNK_SIZE is 5', () => {
     const chunks = chunkArray(
       Array.from({ length: 76 }, (_, i) => String(i)),
       5
@@ -429,45 +461,95 @@ describe('decider message fan-out', () => {
       kind: 'decider',
       model: 'm1',
       rep: 2,
+      shard: 1,
+      shardCount: 4,
       caseIds: ['a'],
       chunk: 0,
     });
     expect(withRep.rep).toBe(2);
+    expect(withRep.shard).toBe(1);
+    expect(withRep.shardCount).toBe(4);
   });
 
-  it('buildDeciderMessages: produces models × reps × ceil(76/5) messages with correct rep', () => {
-    // 76 cases, chunk size 5 → 16 chunks
-    const cases76 = Array.from({ length: 76 }, (_, i) => ({ id: `case-${i}` }));
-    const chunks = chunkArray(cases76, 5);
-    expect(chunks).toHaveLength(16);
+  it('computeDeciderShardCount maximizes shard lanes under the live container cap', () => {
+    expect(computeDeciderShardCount({ modelCount: 2, repetitions: 3, chunkCount: 36 })).toBe(16);
+    expect(
+      computeDeciderShardCount({
+        modelCount: 7,
+        repetitions: 1,
+        chunkCount: 36,
+        maxLiveContainers: 100,
+      })
+    ).toBe(14);
+    expect(
+      computeDeciderShardCount({
+        modelCount: 25,
+        repetitions: 1,
+        chunkCount: 36,
+        maxLiveContainers: 100,
+      })
+    ).toBe(4);
+    expect(
+      computeDeciderShardCount({
+        modelCount: 10,
+        repetitions: 3,
+        chunkCount: 36,
+        maxLiveContainers: 100,
+      })
+    ).toBe(3);
+    expect(
+      computeDeciderShardCount({
+        modelCount: 101,
+        repetitions: 1,
+        chunkCount: 36,
+        maxLiveContainers: 100,
+      })
+    ).toBe(0);
+  });
+
+  it('buildDeciderMessages: seeds sharded chunk lanes under the container cap', () => {
+    const cases180 = Array.from({ length: 180 }, (_, i) => ({ id: `case-${i}` }));
+    const chunks = chunkArray(cases180, 5);
+    expect(chunks).toHaveLength(36);
 
     const models = ['model/a', 'model/b'];
     const repetitions = 3;
     const messages = buildDeciderMessages('run-test', 'decider', models, repetitions, chunks);
+    const expectedShardCount = 16;
 
-    // Total: 2 models × 3 reps × 16 chunks = 96 messages
-    expect(messages).toHaveLength(models.length * repetitions * chunks.length);
+    // Initial fan-out is bounded by the 100-container budget while running
+    // multiple independent chunk lanes per model/repetition.
+    expect(messages).toHaveLength(models.length * repetitions * expectedShardCount);
+    expect(messages.length).toBeLessThanOrEqual(100);
 
-    // Each rep index (0..2) should appear exactly models.length × chunks.length times
     for (let rep = 0; rep < repetitions; rep++) {
       const forRep = messages.filter(m => m.body.rep === rep);
-      expect(forRep).toHaveLength(models.length * chunks.length);
+      expect(forRep).toHaveLength(models.length * expectedShardCount);
     }
 
-    // Every message carries the correct rep in its body
     for (const { body } of messages) {
       expect(typeof body.rep).toBe('number');
       expect(body.rep).toBeGreaterThanOrEqual(0);
       expect(body.rep).toBeLessThan(repetitions);
+      expect(body.shardCount).toBe(expectedShardCount);
+      expect(body.shard).toBeGreaterThanOrEqual(0);
+      expect(body.shard).toBeLessThan(expectedShardCount);
+      expect(body.chunk).toBe(body.shard);
+      expect(body.caseIds).toEqual(chunks[body.shard!]?.map(c => c.id));
     }
+  });
 
-    // caseIds on each message match the chunk
-    for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
-      const forChunk = messages.filter(m => m.body.chunk === chunkIdx);
-      for (const { body } of forChunk) {
-        expect(body.caseIds).toEqual(chunks[chunkIdx].map(c => c.id));
-      }
-    }
+  it('getDeciderContainerInstanceName reuses one container per model repetition shard', () => {
+    const base = { runId: 'run-test', kind: 'decider' as const, model: 'model/a', rep: 2 };
+    expect(getDeciderContainerInstanceName({ ...base, chunk: 0, shard: 0 })).toBe(
+      'run-test:model/a:2:0'
+    );
+    expect(getDeciderContainerInstanceName({ ...base, chunk: 16, shard: 0 })).toBe(
+      'run-test:model/a:2:0'
+    );
+    expect(getDeciderContainerInstanceName({ ...base, chunk: 1, shard: 1 })).toBe(
+      'run-test:model/a:2:1'
+    );
   });
 });
 

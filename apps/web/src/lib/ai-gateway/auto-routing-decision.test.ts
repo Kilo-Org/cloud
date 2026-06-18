@@ -47,7 +47,8 @@ const options = {
 
 const validDecision = {
   model: 'anthropic/claude-haiku-4',
-  tier: 'low' as const,
+  taskType: 'implementation' as const,
+  subtaskType: 'feature_development' as const,
   source: 'benchmark' as const,
   tableVersion: 'v1',
   sticky: false,
@@ -82,6 +83,20 @@ describe('fetchEfficientAutoDecision', () => {
     expect(headers.get('authorization')).toBe('Bearer classifier-token');
     expect(headers.get('content-type')).toBe('application/json');
     expect(result).toEqual({ decision: validDecision, costUsd: 0.001 });
+  });
+
+  it('includes denied model ids in the worker payload', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(
+      { ...makeParams(), deniedModelIds: ['openai/gpt-4o'] },
+      options
+    );
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toMatchObject({
+      routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+    });
   });
 
   it('returns null and calls onError on a non-OK response', async () => {

@@ -1,6 +1,6 @@
 import type { BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
 
-// Picks the best classifier candidate from summaries (tier '*') applying:
+// Picks the best classifier candidate from summaries (routeKey '*') applying:
 //   1. Accuracy gate: must meet minAccuracy.
 //   2. Optional p95 latency gate: when maxP95LatencyMs is non-null, prefer
 //      candidates whose measured p95 latency is within budget.
@@ -16,7 +16,7 @@ export function pickClassifierWinner(
   minAccuracy: number,
   maxP95LatencyMs: number | null = null
 ): BenchmarkModelSummary | null {
-  const graded = summaries.filter(s => s.tier === '*' && s.cases > 0);
+  const graded = summaries.filter(s => s.routeKey === '*' && s.cases > 0);
   if (graded.length === 0) return null;
   const cost = (s: BenchmarkModelSummary) => s.avgCostUsd ?? Number.POSITIVE_INFINITY;
   const p95 = (s: BenchmarkModelSummary) => s.p95LatencyMs ?? Number.POSITIVE_INFINITY;

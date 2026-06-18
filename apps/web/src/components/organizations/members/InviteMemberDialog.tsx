@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationPlan, OrganizationRole } from '@/lib/organizations/organization-types';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -68,6 +68,22 @@ type InviteMemberDialogProps = {
   blockClose?: boolean; // If true, prevents closing the dialog (hides close button and disables cancel)
 };
 
+type InviteSeatCapacity = {
+  plan: OrganizationPlan | undefined;
+  requireSeats: boolean | undefined;
+  usedSeats: number;
+  totalSeats: number;
+};
+
+export function hasInviteSeatCapacity({
+  plan,
+  requireSeats,
+  usedSeats,
+  totalSeats,
+}: InviteSeatCapacity): boolean {
+  return requireSeats === false || plan === 'enterprise' || totalSeats - usedSeats > 0;
+}
+
 export function InviteMemberDialog({
   open,
   onOpenChange,
@@ -111,11 +127,14 @@ export function InviteMemberDialog({
   // Calculate remaining seats
   const usedSeats = seatUsage?.usedSeats || 0;
   const totalSeats = seatUsage?.totalSeats || 0;
-  const remainingSeats = totalSeats - usedSeats;
   const isOrgEnterprise = organizationData?.plan === 'enterprise';
-  // Enterprise orgs have no seat-based invitation restrictions.
-  // For Teams orgs, seat capacity only gates seat-consuming roles (not billing_manager).
-  const seatCapacityAvailable = isOrgEnterprise || remainingSeats > 0;
+  // Seat capacity only gates seat-consuming roles when seat requirements apply.
+  const seatCapacityAvailable = hasInviteSeatCapacity({
+    plan: organizationData?.plan,
+    requireSeats: organizationData?.require_seats,
+    usedSeats,
+    totalSeats,
+  });
   const isSeatConsumingRole = role !== 'billing_manager';
   const hasSeatsAvailable = seatCapacityAvailable || !isSeatConsumingRole;
 

@@ -13,11 +13,13 @@ import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import { getVercelModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
   const vercelModelMetadata = await getVercelModelsMetadata();
   if (Object.keys(vercelModelMetadata).length === 0) {
-    console.error('[getModelUserByokProviders] no Vercel model metadata in the database');
+    console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
     return [];
   }
   const providers: UserByokProviderId[] =
@@ -33,6 +35,49 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
   }
   console.debug('[getModelUserByokProviders] found user byok providers for %s', modelId, providers);
   return providers;
+}
+
+export async function getUserByokProviderIds(
+  fromDb: typeof db,
+  userId: string
+): Promise<UserByokProviderId[]> {
+  const rows = await fromDb
+    .select({ provider_id: byok_api_keys.provider_id })
+    .from(byok_api_keys)
+    .where(and(eq(byok_api_keys.kilo_user_id, userId), eq(byok_api_keys.is_enabled, true)));
+
+  return rows.map(row => UserByokProviderIdSchema.parse(row.provider_id));
+}
+
+export async function getOrganizationByokProviderIds(
+  fromDb: typeof db,
+  organizationId: string
+): Promise<UserByokProviderId[]> {
+  const rows = await fromDb
+    .select({ provider_id: byok_api_keys.provider_id })
+    .from(byok_api_keys)
+    .where(
+      and(eq(byok_api_keys.organization_id, organizationId), eq(byok_api_keys.is_enabled, true))
+    );
+
+  return rows.map(row => UserByokProviderIdSchema.parse(row.provider_id));
+}
+
+export async function addUserByokAvailability(
+  models: OpenRouterModel[],
+  enabledProviderIds: UserByokProviderId[]
+): Promise<OpenRouterModel[]> {
+  const enabledProviders = new Set(enabledProviderIds);
+  return Promise.all(
+    models.map(async model => {
+      const hasUserByokAvailable =
+        !isKiloExclusiveModel(model.id) &&
+        (await getModelUserByokProviders(model.id)).some(provider =>
+          enabledProviders.has(provider)
+        );
+      return { ...model, hasUserByokAvailable };
+    })
+  );
 }
 
 export function decryptByokRow({

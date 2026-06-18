@@ -1,6 +1,12 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
-import { DifficultyTierSchema, ReasoningEffortSchema } from './tiers';
+import { ReasoningEffortSchema } from './reasoning';
+import {
+  ClassifierSubtaskTypeSchema,
+  ClassifierTaskTypeSchema,
+  SUBTYPES_BY_TASK_TYPE,
+  type ClassifierSubtaskType,
+} from './taxonomy';
 
 export {
   NormalizedClassifierInputSchema,
@@ -14,6 +20,11 @@ export {
 // leaves it, and skips the mirror entirely when normalization fails.
 export const MirrorPayloadSchema = z.object({
   input: NormalizedClassifierInputSchema,
+  routingPolicy: z
+    .object({
+      deniedModelIds: z.array(z.string().trim().min(1)),
+    })
+    .optional(),
   // Authenticated user id, or the gateway's synthetic anonymous id
   // ('anon:<ip>'). Scopes the worker's conversation identity.
   userId: z.string().trim().min(1),
@@ -28,47 +39,6 @@ export const MirrorPayloadSchema = z.object({
   bodyBytes: z.number().int().nonnegative(),
 });
 export type MirrorPayload = z.infer<typeof MirrorPayloadSchema>;
-
-export const ClassifierTaskTypeSchema = z.enum([
-  'implementation',
-  'debugging',
-  'refactoring',
-  'planning_design',
-  'investigation',
-  'agentic_execution',
-]);
-export type ClassifierTaskType = z.infer<typeof ClassifierTaskTypeSchema>;
-
-export const ClassifierSubtaskTypeSchema = z.enum([
-  'feature_development',
-  'code_generation',
-  'test_creation',
-  'bug_fixing',
-  'test_repair',
-  'root_cause_analysis',
-  'code_cleanup',
-  'architecture_improvement',
-  'migration',
-  'architecture_design',
-  'technical_planning',
-  'system_design',
-  'repo_exploration',
-  'codebase_understanding',
-  'external_research',
-  'tool_usage',
-  'terminal_operations',
-  'multi_step_execution',
-]);
-export type ClassifierSubtaskType = z.infer<typeof ClassifierSubtaskTypeSchema>;
-
-const subtypesByTaskType: Record<ClassifierTaskType, readonly ClassifierSubtaskType[]> = {
-  implementation: ['feature_development', 'code_generation', 'test_creation'],
-  debugging: ['bug_fixing', 'test_repair', 'root_cause_analysis'],
-  refactoring: ['code_cleanup', 'architecture_improvement', 'migration'],
-  planning_design: ['architecture_design', 'technical_planning', 'system_design'],
-  investigation: ['repo_exploration', 'codebase_understanding', 'external_research'],
-  agentic_execution: ['tool_usage', 'terminal_operations', 'multi_step_execution'],
-};
 
 export const ClassifierOutputSchema = z
   .strictObject({
@@ -87,7 +57,10 @@ export const ClassifierOutputSchema = z
     confidence: z.number().min(0).max(1),
   })
   .superRefine((output, ctx) => {
-    if (!subtypesByTaskType[output.taskType].includes(output.subtaskType)) {
+    const allowedSubtypes = SUBTYPES_BY_TASK_TYPE[
+      output.taskType
+    ] as readonly ClassifierSubtaskType[];
+    if (!allowedSubtypes.includes(output.subtaskType)) {
       ctx.addIssue({
         code: 'custom',
         path: ['subtaskType'],
@@ -97,10 +70,11 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
-export const AutoRoutingDecisionSchema = z.object({
+const BenchmarkAutoRoutingDecisionSchema = z.object({
   model: z.string(),
-  tier: DifficultyTierSchema,
-  source: z.enum(['benchmark']),
+  taskType: ClassifierTaskTypeSchema,
+  subtaskType: ClassifierSubtaskTypeSchema,
+  source: z.literal('benchmark'),
   tableVersion: z.string(),
   // Mirrors the effort the chosen model was benchmarked with, when set.
   reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -109,6 +83,21 @@ export const AutoRoutingDecisionSchema = z.object({
   // parse.
   sticky: z.boolean().default(false),
 });
+
+const CodingPlanDefaultDecisionSchema = z.object({
+  model: z.string(),
+  taskType: z.null(),
+  subtaskType: z.null(),
+  source: z.literal('coding_plan_default'),
+  tableVersion: z.string(),
+  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
+  sticky: z.boolean().default(false),
+});
+
+export const AutoRoutingDecisionSchema = z.discriminatedUnion('source', [
+  BenchmarkAutoRoutingDecisionSchema,
+  CodingPlanDefaultDecisionSchema,
+]);
 export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 
 export const AutoRoutingDecisionResponseSchema = z.object({
@@ -180,6 +169,7 @@ export type AutoRoutingClassifierAnalyticsResponse = z.infer<
 
 export { normalizeClassifierInput, redactProviderHints, type ClassifierApiKind } from './normalize';
 
-export * from './tiers';
+export * from './reasoning';
+export * from './taxonomy';
 export * from './routing-table';
 export * from './benchmark';

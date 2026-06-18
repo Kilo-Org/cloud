@@ -181,7 +181,7 @@ and a changelog entry. Prepared by automation.
 
 Validate per the kiloclaw-openclaw-upgrade skill before marking this PR ready:
 
-- [ ] Run the persisted-root live smoke: \`bash services/kiloclaw/scripts/controller-openclaw-upgrade-smoke-test.sh\`
+- [ ] Run the local upgrade validation (one command): \`bash services/kiloclaw/scripts/tests/openclaw-upgrade-validate.sh\` — builds + keyless checks + grype CVE scan, then the credentialed live smoke (set \`KILOCODE_API_KEY\` for the smoke).
 - [ ] Run the skill's final submission gates (typecheck, tests, lint) and review plugin diagnostics.
 - [ ] Record the upgrade evidence (before and after versions, smoke result, any diagnostics) in this PR.
 - [ ] Mark this PR ready once the above pass.

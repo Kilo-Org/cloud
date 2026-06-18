@@ -5,6 +5,7 @@
 import type { FeatureValue } from '@/lib/feature-detection';
 import {
   KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
 } from '@/lib/ai-gateway/auto-model';
@@ -49,6 +50,7 @@ export const autoFreeModels = [
 export const preferredModels = [
   KILO_AUTO_FRONTIER_MODEL.id,
   KILO_AUTO_BALANCED_MODEL.id,
+  KILO_AUTO_EFFICIENT_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
   ...autoFreeModels,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -92,15 +94,6 @@ export const kiloExclusiveModels = [
   claude_opus_4_6_stealth_model,
   stepfun_37_flash_free_model,
 ] as KiloExclusiveModel[];
-
-export function isKiloExclusiveModelRequiringDataCollection(model: string): boolean {
-  return kiloExclusiveModels.some(
-    m =>
-      m.public_id === model &&
-      m.status !== 'disabled' &&
-      (!m.pricing || m.flags.includes('requires-data-collection'))
-  );
-}
 
 export function isKiloStealthModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));

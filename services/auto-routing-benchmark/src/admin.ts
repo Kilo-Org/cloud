@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import {
   BenchmarkConfigSchema,
+  resolveBenchmarkIdentity,
   StartBenchmarkRunRequestSchema,
   type BenchmarkRun,
 } from '@kilocode/auto-routing-contracts';
@@ -8,7 +9,13 @@ import { zodJsonValidator } from '@kilocode/worker-utils';
 import type { Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
-import { fetchBenchmarkUserToken, RunAlreadyActiveError, startRun, sweepStaleRuns } from './run';
+import {
+  BenchmarkRunConfigError,
+  fetchBenchmarkUserToken,
+  RunAlreadyActiveError,
+  startRun,
+  sweepStaleRuns,
+} from './run';
 import { getClassifierWinner, getLatestRoutingTable, listRuns } from './db';
 import type { HonoEnv } from './hono-env';
 
@@ -59,6 +66,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         if (error instanceof RunAlreadyActiveError) {
           return c.json({ error: error.message }, 409);
         }
+        if (error instanceof BenchmarkRunConfigError) {
+          return c.json({ error: error.message }, 400);
+        }
         throw error;
       }
     }
@@ -84,11 +94,21 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     zodJsonValidator(DebugCliRequestSchema, { errorMessage: 'Invalid debug request' }),
     async c => {
       const config = await getBenchmarkConfig(c.env.BENCH_DB);
-      if (!config?.benchmarkUserId) {
-        return c.json({ error: 'benchmarkUserId is not configured' }, 400);
+      if (!config) {
+        return c.json({ error: 'benchmark config is not configured' }, 400);
       }
-      const kiloToken = await fetchBenchmarkUserToken(c.env, config.benchmarkUserId);
-      const result = await debugRunCli(c.env, { ...c.req.valid('json'), kiloToken });
+      const benchmarkIdentity = resolveBenchmarkIdentity(config);
+      const kiloToken = await fetchBenchmarkUserToken(
+        c.env,
+        benchmarkIdentity.benchmarkUserId,
+        benchmarkIdentity.benchmarkOrgId
+      );
+      const result = await debugRunCli(c.env, {
+        ...c.req.valid('json'),
+        kiloToken,
+        kiloApiUrl: c.env.KILO_CLI_API_URL,
+        orgId: benchmarkIdentity.benchmarkOrgId,
+      });
       return c.json(result);
     }
   );

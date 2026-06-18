@@ -225,13 +225,12 @@ when they appear in all capitals.
    assignment, config status, user eligibility, and instance state before issuing
    an authorization code.
 4. Interactive authorization MUST present dynamically registered client identity as
-   unverified and MUST distinguish the self-asserted client name from Kilo-controlled
-   identity.
+   unverified and MUST NOT present the self-asserted client name as verified identity.
 5. Before approval, the consent screen MUST display the exact validated redirect URI,
    client ID, connection name, configured endpoint host, owner context, granting Kilo
    account, and a truthful description of the effective MCP access.
-6. Raw gateway scope labels MUST NOT imply that MCP tools or actions are restricted
-   when the runtime does not enforce those restrictions.
+6. Consent MUST describe the effective MCP access independently of protocol scope
+   labels.
 7. Consent MUST provide explicit allow and deny actions. Denial MUST return
    `access_denied` only through the validated redirect URI, preserve OAuth `state`,
    and MUST NOT create authorization, provider, grant, or token state.

@@ -154,7 +154,6 @@ function clearConsentCookie(response: NextResponse, request: NextRequest, approv
 function consentDocument(params: {
   action: string;
   approvalState: string;
-  clientName: string;
   clientId: string;
   redirectUri: string;
   connectionName: string;
@@ -270,7 +269,6 @@ function consentDocument(params: {
         line-height: 1.55;
         text-wrap: pretty;
       }
-      .client-name { color: var(--foreground); font-weight: 700; }
       .client-id { color: var(--muted); font-size: 0.76rem; }
       .warning {
         margin-bottom: 1.25rem;
@@ -320,7 +318,6 @@ function consentDocument(params: {
         font-weight: 600;
       }
       .muted-scope { color: var(--muted); }
-      .scope-note { margin: 0.45rem 0 0; color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
       .actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -367,7 +364,7 @@ function consentDocument(params: {
           <header class="header">
             <div class="eyebrow"><span class="badge">Unverified app</span></div>
             <h1 id="authorization-title">Allow access to this MCP connection?</h1>
-            <p class="lead"><span class="client-name">${escapeHtml(params.clientName)}</span> is requesting access. This app name was provided by the app; Kilo has not verified who operates it.</p>
+            <p class="lead">An app is requesting access. Kilo has not verified who operates it.</p>
             <code class="client-id">${escapeHtml(params.clientId)}</code>
           </header>
           <div class="content">
@@ -394,7 +391,7 @@ function consentDocument(params: {
               </div>
               <div class="detail">
                 <dt>OAuth scopes</dt>
-                <dd><div class="scopes">${scopes}</div><p class="scope-note">These scope labels do not currently limit which MCP tools or actions the app can use.</p></dd>
+                <dd><div class="scopes">${scopes}</div></dd>
               </div>
             </dl>
           </div>
@@ -461,7 +458,6 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
     consentDocument({
       action: request.nextUrl.pathname,
       approvalState,
-      clientName: preview.clientName ?? preview.clientId,
       clientId: preview.clientId,
       redirectUri: preview.redirectUri,
       connectionName: preview.connectionName,

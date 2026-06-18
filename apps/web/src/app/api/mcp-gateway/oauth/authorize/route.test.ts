@@ -240,7 +240,9 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
 
     expect(response.status).toBe(200);
     expect(document).toContain('Unverified app');
-    expect(document).toContain('Kilo has not verified who operates it');
+    expect(document).toContain(
+      'An app is requesting access. Kilo has not verified who operates it.'
+    );
     expect(document).toContain('mcp:client');
     expect(document).toContain('Production GitHub');
     expect(document).toContain('mcp.github.example');
@@ -254,7 +256,8 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
     expect(document).toContain('Deny access');
     expect(document).toContain('Allow access');
     expect(document).not.toContain('<script>alert(1)</script>');
-    expect(document).toContain('Codex &lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(document).not.toContain('Codex');
+    expect(document).not.toContain('These scope labels do not currently limit');
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
     expect(response.headers.get('content-security-policy')).toContain("form-action 'self'");

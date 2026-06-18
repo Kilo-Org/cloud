@@ -406,7 +406,7 @@ function getSafeModelBoundaryMessage(
   }
 }
 
-function getSafeErrorClass(error: unknown): string {
+export function getSafeErrorClass(error: unknown): string {
   let name = 'UnknownError';
   if (error instanceof Error) {
     name = error.name;

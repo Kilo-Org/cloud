@@ -21,7 +21,11 @@ import {
   markProposalSuperseded,
   type ReviewMemoryOwner,
 } from './db';
-import { ReviewMemoryModelBoundaryError, sanitizeReviewMemoryDiagnosticMessage } from './llm';
+import {
+  getSafeErrorClass,
+  ReviewMemoryModelBoundaryError,
+  sanitizeReviewMemoryDiagnosticMessage,
+} from './llm';
 import { generateIntegratedReviewGuidanceWithGateway } from './review-md-integration';
 
 const REVIEW_MEMORY_TARGET_FILE_PATH = 'REVIEW.md';
@@ -448,19 +452,4 @@ function getSafeStackFrames(error: unknown): string | null {
     .slice(0, 20)
     .join('\n');
   return stackFrames ? sanitizeReviewMemoryDiagnosticMessage(stackFrames) : null;
-}
-
-function getSafeErrorClass(error: unknown): string {
-  let name = 'UnknownError';
-  if (error instanceof Error) {
-    name = error.name;
-  } else if (
-    typeof error === 'object' &&
-    error !== null &&
-    'name' in error &&
-    typeof error.name === 'string'
-  ) {
-    name = error.name;
-  }
-  return name.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 100) || 'UnknownError';
 }

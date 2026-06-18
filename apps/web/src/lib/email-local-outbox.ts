@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { access, chmod, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -45,6 +46,24 @@ function addDevelopmentBanner(html: string, banner: string): string {
   return `${html.slice(0, insertionPoint)}${banner}${html.slice(insertionPoint)}`;
 }
 
+function openEmail(filePath: string): void {
+  const command =
+    process.platform === 'darwin'
+      ? 'open'
+      : process.platform === 'win32'
+        ? 'explorer.exe'
+        : process.platform === 'linux'
+          ? 'xdg-open'
+          : null;
+  if (!command) return;
+
+  try {
+    execFile(command, [filePath], () => {});
+  } catch {
+    // Opening is best-effort for local desktops; headless environments still keep the file.
+  }
+}
+
 export async function writeEmailToLocalOutbox(
   params: LocalOutboxEmail,
   outboxDirectory?: string
@@ -58,5 +77,6 @@ export async function writeEmailToLocalOutbox(
   const filePath = path.join(directory, `${timestamp}-${randomUUID()}.html`);
   const html = addDevelopmentBanner(params.html, developmentBanner(params));
   await writeFile(filePath, html, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+  openEmail(filePath);
   return filePath;
 }

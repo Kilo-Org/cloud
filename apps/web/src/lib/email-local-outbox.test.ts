@@ -1,8 +1,12 @@
+import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { writeEmailToLocalOutbox } from '@/lib/email-local-outbox';
 
+jest.mock('node:child_process', () => ({ execFile: jest.fn() }));
+
+const execFileMock = jest.mocked(execFile);
 let temporaryDirectory: string;
 
 beforeEach(async () => {
@@ -10,6 +14,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  execFileMock.mockReset();
   await rm(temporaryDirectory, { recursive: true, force: true });
 });
 
@@ -36,6 +41,37 @@ describe('local email outbox', () => {
     expect(html).toContain('Subject: Sign in to Kilo Code');
     expect(html).toContain('Reply-To: reply@example.com');
     expect(html).toContain('href="http://localhost:3000/magic-link"');
+
+    const command =
+      process.platform === 'darwin'
+        ? 'open'
+        : process.platform === 'win32'
+          ? 'explorer.exe'
+          : process.platform === 'linux'
+            ? 'xdg-open'
+            : null;
+    if (command) {
+      expect(execFileMock).toHaveBeenCalledWith(command, [filePath], expect.any(Function));
+    } else {
+      expect(execFileMock).not.toHaveBeenCalled();
+    }
+  });
+
+  it('still captures the email when opening the file fails', async () => {
+    execFileMock.mockImplementationOnce(() => {
+      throw new Error('No desktop available');
+    });
+
+    await expect(
+      writeEmailToLocalOutbox(
+        {
+          to: 'developer@example.com',
+          subject: 'Local test',
+          html: '<p>Body</p>',
+        },
+        temporaryDirectory
+      )
+    ).resolves.toEqual(expect.stringMatching(/\.html$/));
   });
 
   it('escapes metadata before adding it to the captured HTML', async () => {

@@ -150,6 +150,12 @@ type CallbackTextFitResult =
       serializedByteLength: number;
     };
 
+function omittedStructuredOutputJob(job: CallbackJob): CallbackJob {
+  const payload = { ...job.payload };
+  delete payload.lastAssistantMessageStructured;
+  return { ...job, payload };
+}
+
 function omittedAssistantTextJob(job: CallbackJob, originalUtf8ByteLength: number): CallbackJob {
   const payload = { ...job.payload };
   delete payload.lastAssistantMessageText;
@@ -231,6 +237,14 @@ export function fitCallbackJobToQueueLimit(job: CallbackJob): CallbackJobQueueFi
   let serializedByteLength = serializedCallbackJobByteLength(candidateJob);
   if (serializedByteLength <= CALLBACK_QUEUE_MAX_SERIALIZED_BYTES) {
     return { status: 'ready', job: candidateJob, serializedByteLength };
+  }
+
+  if (candidateJob.payload.lastAssistantMessageStructured !== undefined) {
+    candidateJob = omittedStructuredOutputJob(candidateJob);
+    serializedByteLength = serializedCallbackJobByteLength(candidateJob);
+    if (serializedByteLength <= CALLBACK_QUEUE_MAX_SERIALIZED_BYTES) {
+      return { status: 'ready', job: candidateJob, serializedByteLength };
+    }
   }
 
   const assistantText = candidateJob.payload.lastAssistantMessageText;

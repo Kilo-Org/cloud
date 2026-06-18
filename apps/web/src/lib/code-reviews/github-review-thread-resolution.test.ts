@@ -1,4 +1,7 @@
+import { createHash } from 'node:crypto';
+
 const mockGraphql = jest.fn();
+const mockGenerateGitHubInstallationToken = jest.fn();
 
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
@@ -6,13 +9,17 @@ jest.mock('@octokit/rest', () => ({
   })),
 }));
 
+jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  generateGitHubInstallationToken: (...args: unknown[]) =>
+    mockGenerateGitHubInstallationToken(...args),
+}));
+
 import {
   fetchGitHubReviewThreadResolutionCandidates,
-  GITHUB_REVIEW_THREAD_RESOLUTION_MARKER_PREFIX,
   resolveAddressedGitHubReviewThreads,
 } from './github-review-thread-resolution';
+import type { GitHubReviewThreadResolutionCandidateState } from '@kilocode/db/schema-types';
 
-const SECRET = 'test-review-thread-resolution-secret';
 const ROOT_BODY = [
   '**WARNING:** The cache key omits the tenant id.',
   '',
@@ -23,18 +30,28 @@ const ROOT_BODY = [
 ].join('\n');
 
 const BASE_PARAMS = {
-  appType: 'standard' as const,
   owner: 'acme',
   repo: 'widgets',
   prNumber: 7,
-  reviewId: 'review-1',
   expectedHeadSha: 'head-sha',
-  secret: SECRET,
 };
 
 beforeEach(() => {
   mockGraphql.mockReset();
+  mockGenerateGitHubInstallationToken.mockReset();
+  mockGenerateGitHubInstallationToken.mockResolvedValue({
+    token: 'resolver-installation-token',
+    expires_at: '2099-01-01T00:00:00.000Z',
+  });
 });
+
+function rootBodySha256(body: string): string {
+  return createHash('sha256').update(body, 'utf8').digest('hex');
+}
+
+function structuredOutput(threadIds: string[]) {
+  return { addressedReviewThreadIds: threadIds };
+}
 
 function threadNode(
   overrides: Record<string, unknown> = {},
@@ -86,12 +103,19 @@ function reviewThreadState(
   };
 }
 
-function assistantMarker(entries: Array<{ id: string; token: string }>): string {
-  return `Review complete.\n${GITHUB_REVIEW_THREAD_RESOLUTION_MARKER_PREFIX}${JSON.stringify(entries)}`;
+function persistedCandidate(
+  threadId = 'PRRT_thread_1',
+  body = ROOT_BODY
+): GitHubReviewThreadResolutionCandidateState {
+  return { threadId, rootBodySha256: rootBodySha256(body) };
+}
+
+function mutationCalls() {
+  return mockGraphql.mock.calls.filter(call => String(call[0]).includes('resolveReviewThread'));
 }
 
 describe('github-review-thread-resolution', () => {
-  it('queries bounded candidates, validates the capability token, and resolves the exact thread', async () => {
+  it('queries bounded candidates, stores root body hashes, and resolves structured selections', async () => {
     mockGraphql
       .mockResolvedValueOnce(reviewThreadState({ hasNextPage: true }))
       .mockResolvedValueOnce(reviewThreadState())
@@ -109,15 +133,16 @@ describe('github-review-thread-resolution', () => {
       token: 'installation-token',
     });
 
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({
-      threadId: 'PRRT_thread_1',
-      path: 'src/cache.ts',
-      line: 42,
-      isOutdated: false,
-      body: ROOT_BODY,
-    });
-    expect(candidates[0].token).toMatch(/^[0-9a-f]{64}$/);
+    expect(candidates).toEqual([
+      expect.objectContaining({
+        threadId: 'PRRT_thread_1',
+        path: 'src/cache.ts',
+        line: 42,
+        isOutdated: false,
+        body: ROOT_BODY,
+        rootBodySha256: rootBodySha256(ROOT_BODY),
+      }),
+    ]);
     expect(mockGraphql.mock.calls[0][0]).toContain('reviewThreads(first: 100)');
     expect(mockGraphql.mock.calls[0][1]).toEqual({
       owner: 'acme',
@@ -125,150 +150,202 @@ describe('github-review-thread-resolution', () => {
       number: 7,
     });
 
-    const result = await resolveAddressedGitHubReviewThreads({
+    const resolvedCount = await resolveAddressedGitHubReviewThreads({
       ...BASE_PARAMS,
       installationId: 'installation-1',
-      assistantMessageText: assistantMarker([
-        { id: candidates[0].threadId, token: candidates[0].token },
-      ]),
+      persistedCandidates: candidates.map(candidate => ({
+        threadId: candidate.threadId,
+        rootBodySha256: candidate.rootBodySha256,
+      })),
+      structuredOutput: structuredOutput(['PRRT_thread_1']),
     });
 
-    expect(result).toEqual({ status: 'resolved', requestedCount: 1, resolvedCount: 1 });
+    expect(mockGenerateGitHubInstallationToken).toHaveBeenCalledWith('installation-1', 'standard');
+    expect(resolvedCount).toBe(1);
     expect(mockGraphql.mock.calls[2][0]).toContain('resolveReviewThread');
     expect(mockGraphql.mock.calls[2][1]).toEqual({ threadId: 'PRRT_thread_1' });
   });
 
-  it.each([
-    {
-      name: 'rejects comments not authored by the viewer',
-      run: async () => {
-        mockGraphql.mockResolvedValueOnce(
-          reviewThreadState({ nodes: [threadNode({}, { viewerDidAuthor: false })] })
-        );
-        const candidates = await fetchGitHubReviewThreadResolutionCandidates({
-          ...BASE_PARAMS,
-          token: 'installation-token',
-        });
-        expect(candidates).toEqual([]);
-      },
-    },
-    {
-      name: 'rejects threads with replies',
-      run: async () => {
-        mockGraphql.mockResolvedValueOnce(
-          reviewThreadState({ nodes: [threadNode({ comments: { totalCount: 2, nodes: [] } })] })
-        );
-        const candidates = await fetchGitHubReviewThreadResolutionCandidates({
-          ...BASE_PARAMS,
-          token: 'installation-token',
-        });
-        expect(candidates).toEqual([]);
-      },
-    },
-    {
-      name: 'rejects closed pull requests',
-      run: async () => {
-        mockGraphql.mockResolvedValueOnce(reviewThreadState({ state: 'CLOSED' }));
-        const candidates = await fetchGitHubReviewThreadResolutionCandidates({
-          ...BASE_PARAMS,
-          token: 'installation-token',
-        });
-        expect(candidates).toEqual([]);
-      },
-    },
-    {
-      name: 'rejects stale pull request heads before mutation',
-      run: async () => {
-        mockGraphql.mockResolvedValueOnce(reviewThreadState({ headRefOid: 'new-head' }));
-        const result = await resolveAddressedGitHubReviewThreads({
-          ...BASE_PARAMS,
-          installationId: 'installation-1',
-          assistantMessageText: assistantMarker([{ id: 'PRRT_thread_1', token: '0'.repeat(64) }]),
-        });
-        expect(result).toEqual({
-          status: 'stale-pull-request',
-          requestedCount: 1,
-          resolvedCount: 0,
-        });
-      },
-    },
-    {
-      name: 'rejects stale comment bodies before mutation',
-      run: async () => {
-        mockGraphql.mockResolvedValueOnce(reviewThreadState());
-        const [candidate] = await fetchGitHubReviewThreadResolutionCandidates({
-          ...BASE_PARAMS,
-          token: 'installation-token',
-        });
-        mockGraphql.mockResolvedValueOnce(
-          reviewThreadState({
-            nodes: [threadNode({}, { body: ROOT_BODY.replace('tenant id', 'workspace id') })],
-          })
-        );
-        const result = await resolveAddressedGitHubReviewThreads({
-          ...BASE_PARAMS,
-          installationId: 'installation-1',
-          assistantMessageText: assistantMarker([
-            { id: candidate.threadId, token: candidate.token },
-          ]),
-        });
-        expect(result).toEqual({ status: 'invalid-request', requestedCount: 1, resolvedCount: 0 });
-      },
-    },
-    {
-      name: 'rejects malformed markers',
-      run: async () => {
-        const result = await resolveAddressedGitHubReviewThreads({
-          ...BASE_PARAMS,
-          installationId: 'installation-1',
-          assistantMessageText: `Review complete.\n${GITHUB_REVIEW_THREAD_RESOLUTION_MARKER_PREFIX}{not-json}`,
-        });
-        expect(result).toEqual({ status: 'invalid-marker', requestedCount: 0, resolvedCount: 0 });
-      },
-    },
-    {
-      name: 'rejects tampered tokens before mutation',
-      run: async () => {
-        mockGraphql.mockResolvedValueOnce(reviewThreadState());
-        const result = await resolveAddressedGitHubReviewThreads({
-          ...BASE_PARAMS,
-          installationId: 'installation-1',
-          assistantMessageText: assistantMarker([{ id: 'PRRT_thread_1', token: '0'.repeat(64) }]),
-        });
-        expect(result).toEqual({ status: 'invalid-request', requestedCount: 1, resolvedCount: 0 });
-      },
-    },
-  ])('$name', async ({ run }) => {
-    await run();
-    const mutationCalls = mockGraphql.mock.calls.filter(call =>
-      String(call[0]).includes('resolveReviewThread')
+  it('hashes the complete root body before truncating candidate display text', async () => {
+    const longBody = [
+      '**WARNING:** ' + 'A'.repeat(2500),
+      '',
+      '---',
+      'Reply with `@kilocode-bot fix it` to have Kilo Code address this issue.',
+    ].join('\n');
+    mockGraphql.mockResolvedValueOnce(
+      reviewThreadState({ nodes: [threadNode({}, { body: longBody })] })
     );
-    expect(mutationCalls).toHaveLength(0);
-  });
-
-  it('throws when GitHub does not confirm a resolved mutation response', async () => {
-    mockGraphql
-      .mockResolvedValueOnce(reviewThreadState())
-      .mockResolvedValueOnce(reviewThreadState())
-      .mockResolvedValueOnce({
-        resolveReviewThread: {
-          thread: {
-            id: 'PRRT_thread_1',
-            isResolved: false,
-          },
-        },
-      });
 
     const [candidate] = await fetchGitHubReviewThreadResolutionCandidates({
       ...BASE_PARAMS,
       token: 'installation-token',
     });
 
+    expect(candidate.body).toHaveLength(2000);
+    expect(candidate.rootBodySha256).toBe(rootBodySha256(longBody));
+    expect(candidate.rootBodySha256).not.toBe(rootBodySha256(candidate.body));
+  });
+
+  it.each([
+    {
+      name: 'rejects comments not authored by the viewer',
+      nodes: [threadNode({}, { viewerDidAuthor: false })],
+    },
+    {
+      name: 'rejects threads with replies',
+      nodes: [threadNode({ comments: { totalCount: 2, nodes: [] } })],
+    },
+    {
+      name: 'rejects closed pull requests',
+      state: 'CLOSED' as const,
+      nodes: undefined,
+    },
+  ])('$name during candidate lookup', async ({ state, nodes }) => {
+    mockGraphql.mockResolvedValueOnce(reviewThreadState({ state, nodes }));
+
+    const candidates = await fetchGitHubReviewThreadResolutionCandidates({
+      ...BASE_PARAMS,
+      token: 'installation-token',
+    });
+
+    expect(candidates).toEqual([]);
+    expect(mutationCalls()).toHaveLength(0);
+  });
+
+  it.each([
+    { name: 'missing output', structuredOutput: undefined },
+    { name: 'malformed output', structuredOutput: { addressedReviewThreadIds: 'PRRT_thread_1' } },
+    {
+      name: 'additional output properties',
+      structuredOutput: { addressedReviewThreadIds: ['PRRT_thread_1'], extra: true },
+    },
+    {
+      name: 'duplicate selections',
+      structuredOutput: { addressedReviewThreadIds: ['PRRT_thread_1', 'PRRT_thread_1'] },
+    },
+    {
+      name: 'oversized selections',
+      structuredOutput: {
+        addressedReviewThreadIds: Array.from({ length: 21 }, (_, i) => `t-${i}`),
+      },
+    },
+    {
+      name: 'oversized IDs',
+      structuredOutput: { addressedReviewThreadIds: ['x'.repeat(513)] },
+    },
+  ])('returns 0 for $name before fetching GitHub state', async ({ structuredOutput }) => {
+    const resolvedCount = await resolveAddressedGitHubReviewThreads({
+      ...BASE_PARAMS,
+      installationId: 'installation-1',
+      persistedCandidates: [persistedCandidate()],
+      structuredOutput,
+    });
+
+    expect(resolvedCount).toBe(0);
+    expect(mockGraphql).not.toHaveBeenCalled();
+  });
+
+  it('returns 0 for empty or unknown selections before mutation', async () => {
     await expect(
       resolveAddressedGitHubReviewThreads({
         ...BASE_PARAMS,
         installationId: 'installation-1',
-        assistantMessageText: assistantMarker([{ id: candidate.threadId, token: candidate.token }]),
+        persistedCandidates: [persistedCandidate()],
+        structuredOutput: structuredOutput([]),
+      })
+    ).resolves.toBe(0);
+    await expect(
+      resolveAddressedGitHubReviewThreads({
+        ...BASE_PARAMS,
+        installationId: 'installation-1',
+        persistedCandidates: [persistedCandidate()],
+        structuredOutput: structuredOutput(['PRRT_unknown']),
+      })
+    ).resolves.toBe(0);
+
+    expect(mockGraphql).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'stale pull request heads',
+      state: reviewThreadState({ headRefOid: 'new-head' }),
+    },
+    {
+      name: 'changed root comment bodies',
+      state: reviewThreadState({
+        nodes: [threadNode({}, { body: ROOT_BODY.replace('tenant id', 'workspace id') })],
+      }),
+    },
+    {
+      name: 'resolved threads',
+      state: reviewThreadState({ nodes: [threadNode({ isResolved: true })] }),
+    },
+    {
+      name: 'lost resolution capability',
+      state: reviewThreadState({ nodes: [threadNode({ viewerCanResolve: false })] }),
+    },
+    {
+      name: 'new replies',
+      state: reviewThreadState({ nodes: [threadNode({ comments: { totalCount: 2, nodes: [] } })] }),
+    },
+    {
+      name: 'lost viewer ownership',
+      state: reviewThreadState({ nodes: [threadNode({}, { viewerDidAuthor: false })] }),
+    },
+  ])('returns 0 for $name before mutation', async ({ state }) => {
+    mockGraphql.mockResolvedValueOnce(state);
+
+    const resolvedCount = await resolveAddressedGitHubReviewThreads({
+      ...BASE_PARAMS,
+      installationId: 'installation-1',
+      persistedCandidates: [persistedCandidate()],
+      structuredOutput: structuredOutput(['PRRT_thread_1']),
+    });
+
+    expect(resolvedCount).toBe(0);
+    expect(mutationCalls()).toHaveLength(0);
+  });
+
+  it('validates every selection before resolving the first thread', async () => {
+    const secondBody = ROOT_BODY.replace('tenant id', 'workspace id');
+    mockGraphql.mockResolvedValueOnce(
+      reviewThreadState({
+        nodes: [
+          threadNode(),
+          threadNode({ id: 'PRRT_thread_2', line: 43 }, { id: 'PRRC_comment_2', body: secondBody }),
+        ],
+      })
+    );
+
+    const resolvedCount = await resolveAddressedGitHubReviewThreads({
+      ...BASE_PARAMS,
+      installationId: 'installation-1',
+      persistedCandidates: [persistedCandidate(), persistedCandidate('PRRT_thread_2', ROOT_BODY)],
+      structuredOutput: structuredOutput(['PRRT_thread_1', 'PRRT_thread_2']),
+    });
+
+    expect(resolvedCount).toBe(0);
+    expect(mutationCalls()).toHaveLength(0);
+  });
+
+  it('throws when GitHub does not confirm a resolved mutation response', async () => {
+    mockGraphql.mockResolvedValueOnce(reviewThreadState()).mockResolvedValueOnce({
+      resolveReviewThread: {
+        thread: {
+          id: 'PRRT_thread_1',
+          isResolved: false,
+        },
+      },
+    });
+
+    await expect(
+      resolveAddressedGitHubReviewThreads({
+        ...BASE_PARAMS,
+        installationId: 'installation-1',
+        persistedCandidates: [persistedCandidate()],
+        structuredOutput: structuredOutput(['PRRT_thread_1']),
       })
     ).rejects.toThrow('GitHub resolveReviewThread mutation did not confirm thread resolution');
   });

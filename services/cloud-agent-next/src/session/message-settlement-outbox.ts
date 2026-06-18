@@ -426,6 +426,7 @@ export function createMessageSettlementOutbox(
     const sessionId = await resolveCallbackSessionId(metadata);
 
     let lastAssistantMessageText: string | undefined;
+    let lastAssistantMessageStructured: unknown;
     if (state.status === 'completed' && metadata?.auth.kiloSessionId) {
       const assistantMessage = getAssistantMessageForUserMessage(
         sessionId,
@@ -434,6 +435,7 @@ export function createMessageSettlementOutbox(
       );
       if (assistantMessage) {
         lastAssistantMessageText = extractAssistantTextFromParts(assistantMessage.parts);
+        lastAssistantMessageStructured = assistantMessage.info.structured;
       }
     }
 
@@ -472,6 +474,7 @@ export function createMessageSettlementOutbox(
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,
       lastAssistantMessageText,
+      lastAssistantMessageStructured,
       idempotencyKey: state.messageId,
     };
 

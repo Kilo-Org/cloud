@@ -148,15 +148,25 @@ describe('getSessionMessageState / putSessionMessageState', () => {
       path: '123e4567-e89b-12d3-a456-426614174000',
       files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
     };
+    const format = {
+      type: 'json_schema' as const,
+      schema: { type: 'object', properties: { result: { type: 'string' } } },
+    };
     const state = createQueuedSessionMessageState({
-      turn: { type: 'prompt', messageId: VALID_MESSAGE_ID, prompt: 'document', attachments },
+      turn: {
+        type: 'prompt',
+        messageId: VALID_MESSAGE_ID,
+        prompt: 'document',
+        attachments,
+        format,
+      },
       agent: { mode: 'code', model: 'default-model' },
     });
     await putSessionMessageState(storage, state);
 
     const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
 
-    expect(loaded?.admissionSnapshot?.turn).toMatchObject({ attachments });
+    expect(loaded?.admissionSnapshot?.turn).toMatchObject({ attachments, format });
   });
 
   it('rejects stored admission snapshots containing legacy images', async () => {

@@ -395,11 +395,11 @@ const existingReviewStateWithHistory: ExistingReviewState = {
 
 const githubResolutionCandidate = {
   threadId: 'PRRT_thread_1',
+  rootBodySha256: 'b'.repeat(64),
   path: 'src/foo.ts',
   line: 10,
   isOutdated: false,
   body: '**WARNING:** Fixed issue body',
-  token: 'a'.repeat(64),
 } satisfies GitHubReviewThreadResolutionCandidate;
 
 describe('generateReviewPrompt (incremental review)', () => {
@@ -620,14 +620,18 @@ describe('generateReviewPrompt (incremental review)', () => {
 
       if (shouldIncludeProtocol) {
         expect(prompt).toContain('## Addressed Review Thread Resolution Candidates');
-        expect(prompt).toContain('KILO_RESOLVED_GITHUB_REVIEW_THREADS=');
+        expect(prompt).toContain('addressedReviewThreadIds');
         expect(prompt).toContain('git diff abc123prev..HEAD');
         expect(prompt).toContain('PRRT_thread_1');
-        expect(prompt).toContain('a'.repeat(64));
         expect(prompt).toContain('Fixed issue body');
+        expect(prompt).not.toContain('KILO_RESOLVED_GITHUB_REVIEW_THREADS=');
+        expect(prompt).not.toContain('| Thread ID | Token |');
+        expect(prompt).not.toContain('capability token');
+        expect(prompt).not.toContain('final non-empty line');
       } else {
         expect(prompt).not.toContain('## Addressed Review Thread Resolution Candidates');
         expect(prompt).not.toContain('KILO_RESOLVED_GITHUB_REVIEW_THREADS=');
+        expect(prompt).not.toContain('addressedReviewThreadIds');
       }
     }
   );

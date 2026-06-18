@@ -12,10 +12,27 @@ const mockFetchGitLabRootTextFileAtRef = jest.fn();
 const mockFetchGitLabRepositorySize = jest.fn();
 const mockGetOrCreateProjectAccessToken = jest.fn();
 const mockFindPreviousCompletedReview = jest.fn();
+const mockUpdateGitHubReviewThreadResolutionCandidates = jest.fn();
 const mockUpdatePreviousReviewSummary = jest.fn();
 const mockUpdateRepositoryReviewInstructionsMetadata = jest.fn();
 const mockGenerateReviewPrompt = jest.fn();
 const mockFetchGitHubReviewThreadResolutionCandidates = jest.fn();
+const mockCloudCodeReviewOutputFormat = {
+  type: 'json_schema',
+  schema: {
+    type: 'object',
+    properties: {
+      addressedReviewThreadIds: {
+        type: 'array',
+        items: { type: 'string', minLength: 1, maxLength: 512 },
+        uniqueItems: true,
+        maxItems: 20,
+      },
+    },
+    required: ['addressedReviewThreadIds'],
+    additionalProperties: false,
+  },
+} as const;
 
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import type * as CodeReviewsDb from '@/lib/code-reviews/db/code-reviews';
@@ -49,6 +66,22 @@ jest.mock('@/lib/code-reviews/prompts/generate-prompt', () => ({
 }));
 
 jest.mock('@/lib/code-reviews/github-review-thread-resolution', () => ({
+  CLOUD_CODE_REVIEW_OUTPUT_FORMAT: {
+    type: 'json_schema',
+    schema: {
+      type: 'object',
+      properties: {
+        addressedReviewThreadIds: {
+          type: 'array',
+          items: { type: 'string', minLength: 1, maxLength: 512 },
+          uniqueItems: true,
+          maxItems: 20,
+        },
+      },
+      required: ['addressedReviewThreadIds'],
+      additionalProperties: false,
+    },
+  },
   fetchGitHubReviewThreadResolutionCandidates: (...args: unknown[]) =>
     mockFetchGitHubReviewThreadResolutionCandidates(...args),
 }));
@@ -58,6 +91,8 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => {
   return {
     ...actual,
     findPreviousCompletedReview: (...args: unknown[]) => mockFindPreviousCompletedReview(...args),
+    updateGitHubReviewThreadResolutionCandidates: (...args: unknown[]) =>
+      mockUpdateGitHubReviewThreadResolutionCandidates(...args),
     updatePreviousReviewSummary: (...args: unknown[]) => mockUpdatePreviousReviewSummary(...args),
     updateRepositoryReviewInstructionsMetadata: (...args: unknown[]) =>
       mockUpdateRepositoryReviewInstructionsMetadata(...args),
@@ -181,6 +216,7 @@ describe('prepareReviewPayload', () => {
     mockFetchGitLabRepositorySize.mockResolvedValue('100 MB');
     mockGetOrCreateProjectAccessToken.mockResolvedValue('gitlab-project-token');
     mockFindPreviousCompletedReview.mockResolvedValue(null);
+    mockUpdateGitHubReviewThreadResolutionCandidates.mockResolvedValue(undefined);
     mockUpdatePreviousReviewSummary.mockResolvedValue(undefined);
     mockUpdateRepositoryReviewInstructionsMetadata.mockResolvedValue(undefined);
     mockFetchGitHubReviewThreadResolutionCandidates.mockResolvedValue([]);
@@ -209,6 +245,7 @@ describe('prepareReviewPayload', () => {
     mockFetchGitLabRepositorySize.mockReset();
     mockGetOrCreateProjectAccessToken.mockReset();
     mockFindPreviousCompletedReview.mockReset();
+    mockUpdateGitHubReviewThreadResolutionCandidates.mockReset();
     mockUpdatePreviousReviewSummary.mockReset();
     mockUpdateRepositoryReviewInstructionsMetadata.mockReset();
     mockFetchGitHubReviewThreadResolutionCandidates.mockReset();
@@ -264,6 +301,7 @@ describe('prepareReviewPayload', () => {
       body: null,
       headSha: null,
     });
+    expect(mockUpdateGitHubReviewThreadResolutionCandidates).toHaveBeenCalledWith(review.id, []);
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
       used: true,
       ref: 'main',
@@ -272,6 +310,10 @@ describe('prepareReviewPayload', () => {
     expect(mockUpdateRepositoryReviewInstructionsMetadata.mock.invocationCallOrder[0]).toBeLessThan(
       mockGenerateReviewPrompt.mock.invocationCallOrder[0]
     );
+    expect(
+      mockUpdateGitHubReviewThreadResolutionCandidates.mock.invocationCallOrder[0]
+    ).toBeLessThan(mockGenerateReviewPrompt.mock.invocationCallOrder[0]);
+    expect(payload.sessionInput.format).toEqual(mockCloudCodeReviewOutputFormat);
   });
 
   it('captures the previous summary before generating the update prompt', async () => {
@@ -302,6 +344,90 @@ describe('prepareReviewPayload', () => {
     });
     expect(mockUpdatePreviousReviewSummary.mock.invocationCallOrder[0]).toBeLessThan(
       mockGenerateReviewPrompt.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('persists the exact GitHub review-thread candidate projection before prompt generation', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    const previousSummaryBody = '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings';
+    const candidate = {
+      threadId: 'PRRT_thread_1',
+      rootBodySha256: 'a'.repeat(64),
+      path: 'src/cache.ts',
+      line: 42,
+      isOutdated: false,
+      body: '**WARNING:** stale cache key',
+    };
+    mockFindKiloReviewComment.mockResolvedValueOnce({ commentId: 99, body: previousSummaryBody });
+    mockFindPreviousCompletedReview.mockResolvedValueOnce({
+      head_sha: 'previous-head-sha',
+      session_id: null,
+    });
+    mockFetchGitHubReviewThreadResolutionCandidates.mockResolvedValueOnce([candidate]);
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockFetchGitHubReviewThreadResolutionCandidates).toHaveBeenCalledWith({
+      token: 'github-token',
+      owner: 'test-org',
+      repo: REPO.split('/')[1],
+      prNumber: 123,
+      expectedHeadSha: 'headsha123',
+    });
+    expect(mockUpdateGitHubReviewThreadResolutionCandidates).toHaveBeenCalledWith(review.id, [
+      { threadId: 'PRRT_thread_1', rootBodySha256: 'a'.repeat(64) },
+    ]);
+    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
+      expect.any(Object),
+      REPO,
+      123,
+      expect.objectContaining({
+        githubReviewThreadResolutionCandidates: [candidate],
+      })
+    );
+    expect(
+      mockUpdateGitHubReviewThreadResolutionCandidates.mock.invocationCallOrder[0]
+    ).toBeLessThan(mockGenerateReviewPrompt.mock.invocationCallOrder[0]);
+  });
+
+  it('clears persisted GitHub review-thread candidates when lookup fails', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    mockFindKiloReviewComment.mockResolvedValueOnce({
+      commentId: 99,
+      body: '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings',
+    });
+    mockFindPreviousCompletedReview.mockResolvedValueOnce({
+      head_sha: 'previous-head-sha',
+      session_id: null,
+    });
+    mockFetchGitHubReviewThreadResolutionCandidates.mockRejectedValueOnce(
+      new Error('GitHub unavailable')
+    );
+
+    await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockUpdateGitHubReviewThreadResolutionCandidates).toHaveBeenCalledWith(review.id, []);
+    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
+      expect.any(Object),
+      REPO,
+      123,
+      expect.objectContaining({ githubReviewThreadResolutionCandidates: [] })
     );
   });
 
@@ -420,6 +546,7 @@ describe('prepareReviewPayload', () => {
       gitUrl: `https://gitlab.example.com/${REPO}.git`,
       gitToken: 'gitlab-project-token',
       platform: 'gitlab',
+      format: mockCloudCodeReviewOutputFormat,
     });
     expect(payload.repositorySize).toBe('100 MB');
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
@@ -454,6 +581,7 @@ describe('prepareReviewPayload', () => {
       ref: 'main',
       truncated: false,
     });
+    expect(mockUpdateGitHubReviewThreadResolutionCandidates).toHaveBeenCalledWith(review.id, []);
   });
 
   it('skips GitLab continuation lookup when exact scope is unavailable', async () => {

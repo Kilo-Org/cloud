@@ -8,6 +8,7 @@ import type {
 import type { AgentMode } from '../../src/schema.js';
 import type { Attachments, Images } from '../../src/router/schemas.js';
 import type { SessionProfileBundle } from '../../src/session-profile.js';
+import type { JsonSchemaFormat } from '../../src/persistence/schemas.js';
 
 type RegisterSessionInput = Parameters<CloudAgentSession['registerSession']>[0];
 type RecordSessionReadyInput = Parameters<CloudAgentSession['recordSessionReady']>[0];
@@ -23,6 +24,7 @@ type QueueSessionUserMessageInput = {
   condenseOnComplete?: boolean;
   attachments?: Attachments;
   images?: Images;
+  format?: JsonSchemaFormat;
 };
 
 type TestRegisterSessionInput = {
@@ -48,6 +50,7 @@ type TestRegisterSessionInput = {
   callbackTarget?: CallbackTarget;
   attachments?: Attachments;
   images?: Images;
+  format?: JsonSchemaFormat;
   createdOnPlatform?: string;
   shallow?: boolean;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
@@ -58,6 +61,7 @@ type TestRegisterSessionInput = {
         prompt: string;
         attachments?: Attachments;
         images?: Images;
+        format?: JsonSchemaFormat;
       }
     | {
         type: 'command';
@@ -135,6 +139,7 @@ export function groupedRegisterSessionInput(input: TestRegisterSessionInput): Re
               id: input.initialMessageId,
               prompt: input.initialTurn.prompt,
               attachments: input.initialTurn.attachments ?? input.initialTurn.images,
+              format: input.initialTurn.format,
             }
           : { ...input.initialTurn, id: input.initialMessageId }
         : {
@@ -142,6 +147,7 @@ export function groupedRegisterSessionInput(input: TestRegisterSessionInput): Re
             id: input.initialMessageId,
             prompt: input.prompt,
             attachments: input.attachments ?? input.images,
+            format: input.format,
           },
     },
     agent: {
@@ -173,6 +179,7 @@ export function queueUserMessageInput(
       id: input.messageId,
       prompt: input.prompt,
       attachments: input.attachments ?? input.images,
+      format: input.format,
     },
     agent: {
       mode: input.mode,

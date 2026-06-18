@@ -1,45 +1,58 @@
 import { Octokit } from '@octokit/rest';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { deriveCallbackToken, verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
-import {
-  generateGitHubInstallationToken,
-  type GitHubAppType,
-} from '@/lib/integrations/platforms/github/adapter';
+import type { CloudAgentJsonSchemaFormat } from '@kilocode/worker-utils';
+import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { logExceptInTest } from '@/lib/utils.server';
-
-export const GITHUB_REVIEW_THREAD_RESOLUTION_MARKER_PREFIX = 'KILO_RESOLVED_GITHUB_REVIEW_THREADS=';
+import type { GitHubReviewThreadResolutionCandidateState } from '@kilocode/db/schema-types';
 
 const CANONICAL_KILO_INLINE_COMMENT_FOOTER =
   '---\nReply with `@kilocode-bot fix it` to have Kilo Code address this issue.';
 const REVIEW_THREAD_LOOKUP_LIMIT = 100;
 const REVIEW_THREAD_CANDIDATE_LIMIT = 20;
 const REVIEW_THREAD_PROMPT_BODY_LIMIT = 2000;
-const REVIEW_THREAD_RESOLUTION_TOKEN_SCOPE = 'github-review-thread-resolution';
-const CALLBACK_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
+const REVIEW_THREAD_ID_MAX_LENGTH = 512;
 
-export type GitHubReviewThreadResolutionCandidate = {
-  threadId: string;
+export const CloudCodeReviewStructuredOutputSchema = z
+  .object({
+    addressedReviewThreadIds: z
+      .array(z.string().min(1).max(REVIEW_THREAD_ID_MAX_LENGTH))
+      .max(REVIEW_THREAD_CANDIDATE_LIMIT)
+      .refine(values => new Set(values).size === values.length),
+  })
+  .strict();
+
+export type CloudCodeReviewStructuredOutput = z.infer<typeof CloudCodeReviewStructuredOutputSchema>;
+
+export const CLOUD_CODE_REVIEW_OUTPUT_FORMAT = {
+  type: 'json_schema',
+  schema: {
+    type: 'object',
+    properties: {
+      addressedReviewThreadIds: {
+        type: 'array',
+        items: { type: 'string', minLength: 1, maxLength: REVIEW_THREAD_ID_MAX_LENGTH },
+        uniqueItems: true,
+        maxItems: REVIEW_THREAD_CANDIDATE_LIMIT,
+      },
+    },
+    required: ['addressedReviewThreadIds'],
+    additionalProperties: false,
+  },
+} satisfies CloudAgentJsonSchemaFormat;
+
+export type GitHubReviewThreadResolutionCandidate = GitHubReviewThreadResolutionCandidateState & {
   path: string;
   line: number | null;
   isOutdated: boolean;
   body: string;
-  token: string;
-};
-
-export type GitHubReviewThreadResolutionResult = {
-  status: 'no-marker' | 'invalid-marker' | 'invalid-request' | 'stale-pull-request' | 'resolved';
-  requestedCount: number;
-  resolvedCount: number;
 };
 
 type GitHubReviewThreadResolutionBaseParams = {
-  appType: GitHubAppType;
   owner: string;
   repo: string;
   prNumber: number;
-  reviewId: string;
   expectedHeadSha: string;
-  secret: string;
 };
 
 type FetchGitHubReviewThreadResolutionCandidatesParams = GitHubReviewThreadResolutionBaseParams & {
@@ -48,7 +61,8 @@ type FetchGitHubReviewThreadResolutionCandidatesParams = GitHubReviewThreadResol
 
 type ResolveAddressedGitHubReviewThreadsParams = GitHubReviewThreadResolutionBaseParams & {
   installationId: string;
-  assistantMessageText?: string;
+  persistedCandidates: GitHubReviewThreadResolutionCandidateState[];
+  structuredOutput?: unknown;
 };
 
 const ReviewThreadCommentSchema = z.object({
@@ -102,20 +116,8 @@ const ResolveReviewThreadMutationResponseSchema = z.object({
     .nullable(),
 });
 
-const RequestedResolutionSchema = z
-  .object({
-    id: z.string().min(1),
-    token: z.string().regex(CALLBACK_TOKEN_PATTERN),
-  })
-  .strict();
-
-const RequestedResolutionsSchema = z
-  .array(RequestedResolutionSchema)
-  .max(REVIEW_THREAD_CANDIDATE_LIMIT);
-
 type ReviewThreadsQueryResponse = z.infer<typeof ReviewThreadsQueryResponseSchema>;
 type ReviewThreadNode = z.infer<typeof ReviewThreadNodeSchema>;
-type RequestedResolution = z.infer<typeof RequestedResolutionSchema>;
 
 type EligibleReviewThread = {
   id: string;
@@ -171,8 +173,6 @@ const RESOLVE_REVIEW_THREAD_MUTATION = `mutation KiloResolveReviewThread($thread
 export async function fetchGitHubReviewThreadResolutionCandidates(
   params: FetchGitHubReviewThreadResolutionCandidatesParams
 ): Promise<GitHubReviewThreadResolutionCandidate[]> {
-  if (params.appType !== 'standard') return [];
-
   const octokit = new Octokit({ auth: params.token });
   const state = await fetchReviewThreadState(octokit, params);
   const pullRequest = getOpenPullRequestAtExpectedHead(state, params.expectedHeadSha);
@@ -190,13 +190,7 @@ export async function fetchGitHubReviewThreadResolutionCandidates(
       line: thread.line,
       isOutdated: thread.isOutdated,
       body: thread.body.slice(0, REVIEW_THREAD_PROMPT_BODY_LIMIT),
-      token: await deriveReviewThreadResolutionToken({
-        secret: params.secret,
-        reviewId: params.reviewId,
-        expectedHeadSha: params.expectedHeadSha,
-        threadId: thread.id,
-        rootBody: thread.body,
-      }),
+      rootBodySha256: hashReviewThreadRootBody(thread.body),
     });
   }
 
@@ -205,32 +199,27 @@ export async function fetchGitHubReviewThreadResolutionCandidates(
 
 export async function resolveAddressedGitHubReviewThreads(
   params: ResolveAddressedGitHubReviewThreadsParams
-): Promise<GitHubReviewThreadResolutionResult> {
-  if (params.appType !== 'standard') {
-    return { status: 'no-marker', requestedCount: 0, resolvedCount: 0 };
+): Promise<number> {
+  const parsedOutput = CloudCodeReviewStructuredOutputSchema.safeParse(params.structuredOutput);
+  if (!parsedOutput.success) return 0;
+
+  const requestedThreadIds = parsedOutput.data.addressedReviewThreadIds;
+  if (requestedThreadIds.length === 0) return 0;
+
+  const persistedCandidatesById = new Map(
+    params.persistedCandidates.map(candidate => [candidate.threadId, candidate])
+  );
+  if (persistedCandidatesById.size !== params.persistedCandidates.length) return 0;
+
+  for (const threadId of requestedThreadIds) {
+    if (!persistedCandidatesById.has(threadId)) return 0;
   }
 
-  const parsedMarker = parseResolutionMarker(params.assistantMessageText);
-  if (parsedMarker.status !== 'requests') {
-    return { status: parsedMarker.status, requestedCount: 0, resolvedCount: 0 };
-  }
-
-  const requests = parsedMarker.requests;
-  if (requests.length === 0) {
-    return { status: 'resolved', requestedCount: 0, resolvedCount: 0 };
-  }
-
-  const tokenData = await generateGitHubInstallationToken(params.installationId, params.appType);
+  const tokenData = await generateGitHubInstallationToken(params.installationId, 'standard');
   const octokit = new Octokit({ auth: tokenData.token });
   const state = await fetchReviewThreadState(octokit, params);
   const pullRequest = getOpenPullRequestAtExpectedHead(state, params.expectedHeadSha);
-  if (!pullRequest) {
-    return {
-      status: 'stale-pull-request',
-      requestedCount: requests.length,
-      resolvedCount: 0,
-    };
-  }
+  if (!pullRequest) return 0;
 
   logIfLookupWasBounded(params, pullRequest.reviewThreads.pageInfo.hasNextPage);
 
@@ -239,34 +228,13 @@ export async function resolveAddressedGitHubReviewThreads(
   );
   const validatedThreadIds: string[] = [];
 
-  for (const request of requests) {
-    const thread = eligibleThreadsById.get(request.id);
-    if (!thread) {
-      return {
-        status: 'invalid-request',
-        requestedCount: requests.length,
-        resolvedCount: 0,
-      };
-    }
+  for (const threadId of requestedThreadIds) {
+    const thread = eligibleThreadsById.get(threadId);
+    if (!thread) return 0;
 
-    const validToken = await verifyCallbackToken({
-      token: request.token,
-      secret: params.secret,
-      scope: REVIEW_THREAD_RESOLUTION_TOKEN_SCOPE,
-      resourceParts: buildResolutionTokenResourceParts({
-        reviewId: params.reviewId,
-        expectedHeadSha: params.expectedHeadSha,
-        threadId: thread.id,
-        rootBody: thread.body,
-      }),
-    });
-    if (!validToken) {
-      return {
-        status: 'invalid-request',
-        requestedCount: requests.length,
-        resolvedCount: 0,
-      };
-    }
+    const persistedCandidate = persistedCandidatesById.get(threadId);
+    if (!persistedCandidate) return 0;
+    if (persistedCandidate.rootBodySha256 !== hashReviewThreadRootBody(thread.body)) return 0;
 
     validatedThreadIds.push(thread.id);
   }
@@ -277,49 +245,7 @@ export async function resolveAddressedGitHubReviewThreads(
     resolvedCount += 1;
   }
 
-  return { status: 'resolved', requestedCount: requests.length, resolvedCount };
-}
-
-function parseResolutionMarker(
-  assistantMessageText: string | undefined
-):
-  | { status: 'no-marker' | 'invalid-marker' }
-  | { status: 'requests'; requests: RequestedResolution[] } {
-  const finalLine = getFinalNonEmptyLine(assistantMessageText);
-  if (!finalLine?.startsWith(GITHUB_REVIEW_THREAD_RESOLUTION_MARKER_PREFIX)) {
-    return { status: 'no-marker' };
-  }
-
-  const serializedRequests = finalLine.slice(GITHUB_REVIEW_THREAD_RESOLUTION_MARKER_PREFIX.length);
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(serializedRequests);
-  } catch {
-    return { status: 'invalid-marker' };
-  }
-
-  const requests = RequestedResolutionsSchema.safeParse(parsedJson);
-  if (!requests.success) return { status: 'invalid-marker' };
-
-  const requestedIds = new Set<string>();
-  for (const request of requests.data) {
-    if (requestedIds.has(request.id)) return { status: 'invalid-marker' };
-    requestedIds.add(request.id);
-  }
-
-  return { status: 'requests', requests: requests.data };
-}
-
-function getFinalNonEmptyLine(value: string | undefined): string | null {
-  if (!value) return null;
-
-  const lines = value.split(/\r?\n/);
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index].trim();
-    if (line.length > 0) return line;
-  }
-
-  return null;
+  return resolvedCount;
 }
 
 async function fetchReviewThreadState(
@@ -392,27 +318,8 @@ function hasCanonicalInlineCommentFooter(body: string): boolean {
   );
 }
 
-async function deriveReviewThreadResolutionToken(params: {
-  secret: string;
-  reviewId: string;
-  expectedHeadSha: string;
-  threadId: string;
-  rootBody: string;
-}): Promise<string> {
-  return deriveCallbackToken({
-    secret: params.secret,
-    scope: REVIEW_THREAD_RESOLUTION_TOKEN_SCOPE,
-    resourceParts: buildResolutionTokenResourceParts(params),
-  });
-}
-
-function buildResolutionTokenResourceParts(params: {
-  reviewId: string;
-  expectedHeadSha: string;
-  threadId: string;
-  rootBody: string;
-}): readonly string[] {
-  return [params.reviewId, params.expectedHeadSha, params.threadId, params.rootBody];
+function hashReviewThreadRootBody(body: string): string {
+  return createHash('sha256').update(body, 'utf8').digest('hex');
 }
 
 async function resolveReviewThread(octokit: Octokit, threadId: string): Promise<void> {

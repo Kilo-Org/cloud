@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_agent_code_reviews" ADD COLUMN "github_review_thread_resolution_candidates" jsonb DEFAULT '[]'::jsonb NOT NULL;

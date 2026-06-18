@@ -238,6 +238,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
           type: 'prompt',
           prompt: input.prompt,
           attachments: input.attachments ?? input.images,
+          format: input.format,
           id: input.initialMessageId,
         };
 

@@ -110,6 +110,16 @@ import { appRouter } from './router.js';
 import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-prepare.js';
 import type { TRPCContext, SessionId } from './types.js';
 
+const structuredOutputFormat = {
+  type: 'json_schema' as const,
+  schema: {
+    type: 'object',
+    properties: { addressedReviewThreadIds: { type: 'array', items: { type: 'string' } } },
+    required: ['addressedReviewThreadIds'],
+    additionalProperties: false,
+  },
+};
+
 function createMockDOStub(
   overrides: {
     registerSession?: ReturnType<typeof vi.fn>;
@@ -428,6 +438,7 @@ describe('prepareSession endpoint', () => {
       prompt: 'Test prompt',
       mode: 'plan',
       model: 'claude-3',
+      format: structuredOutputFormat,
       githubRepo: 'acme/repo',
       githubToken: 'ghp_token',
       envVars: { API_KEY: 'secret' },
@@ -477,6 +488,7 @@ describe('prepareSession endpoint', () => {
             id: expect.stringMatching(/^msg_/) as unknown,
             prompt: 'Test prompt',
             attachments: undefined,
+            format: structuredOutputFormat,
           },
         },
         agent: {

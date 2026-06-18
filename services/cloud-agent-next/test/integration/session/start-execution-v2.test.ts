@@ -22,6 +22,10 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_grouped_start' as const;
     const sessionId = 'agent_grouped_start' as const;
     const messageId = 'msg_018f1e2d3c4bInitMsgAbCdEfG';
+    const format = {
+      type: 'json_schema' as const,
+      schema: { type: 'object', properties: { result: { type: 'string' } } },
+    };
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
@@ -41,6 +45,7 @@ describe('CloudAgentSession message admission', () => {
             type: 'prompt',
             messageId,
             prompt: 'admit my first turn',
+            format,
           },
         },
       });
@@ -57,9 +62,11 @@ describe('CloudAgentSession message admission', () => {
       compatibilityDelivery: 'queued',
     });
     expect(result.metadata?.initialMessage?.id).toBe(messageId);
+    expect(result.metadata?.initialMessage?.turn).toMatchObject({ format });
     expect(result.pending).toHaveLength(1);
     expect(result.pending[0]?.messageId).toBe(messageId);
     expect(result.pending[0]?.content).toBe('admit my first turn');
+    expect(result.pending[0]?.intent?.turn).toMatchObject({ format });
   });
 
   it('persists and admits canonical document attachments during grouped session creation', async () => {
@@ -189,6 +196,10 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_grouped_start_mismatch' as const;
     const sessionId = 'agent_grouped_start_mismatch' as const;
     const messageId = 'msg_018f1e2d3c4bMismatAbCdEfGh';
+    const originalFormat = {
+      type: 'json_schema' as const,
+      schema: { type: 'object', properties: { result: { type: 'string' } } },
+    };
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
@@ -204,16 +215,28 @@ describe('CloudAgentSession message admission', () => {
           kilocodeToken: 'token-grouped-start-mismatch',
         }),
         message: {
-          initialTurn: { type: 'prompt' as const, messageId, prompt: 'original prompt' },
+          initialTurn: {
+            type: 'prompt' as const,
+            messageId,
+            prompt: 'original prompt',
+            format: originalFormat,
+          },
         },
       };
       const first = await instance.createSessionWithInitialAdmission(original);
       const replay = await instance.createSessionWithInitialAdmission({
         ...original,
         message: {
-          initialTurn: { type: 'prompt', messageId, prompt: 'different prompt' },
+          initialTurn: {
+            type: 'prompt',
+            messageId,
+            prompt: 'original prompt',
+            format: {
+              ...originalFormat,
+              schema: { type: 'object', properties: { changed: { type: 'boolean' } } },
+            },
+          },
         },
-        agent: { ...original.agent, model: 'different-model' },
       });
       return { first, replay, pending: await listPendingSessionMessages(instance.ctx.storage) };
     });
@@ -723,6 +746,10 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_exec_prepared_initial_id' as const;
     const sessionId = 'agent_exec_prepared_initial_id' as const;
     const initialMessageId = 'msg_018f1e2d3c4bPrepInitAbCdEF';
+    const format = {
+      type: 'json_schema' as const,
+      schema: { type: 'object', properties: { result: { type: 'string' } } },
+    };
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
     const stub = env.CLOUD_AGENT_SESSION.get(doId);
 
@@ -738,6 +765,7 @@ describe('CloudAgentSession message admission', () => {
         gitUrl: 'https://example.com/repo.git',
         gitToken: 'old-token',
         initialMessageId,
+        format,
       });
 
       const firstResult = await instance.admitPreparedInitialMessage(
@@ -747,7 +775,8 @@ describe('CloudAgentSession message admission', () => {
         queueRegisteredInitialInput({ userId })
       );
       const pending = await listPendingSessionMessages(instance.ctx.storage);
-      return { firstResult, retryResult, pending };
+      const metadata = await instance.getMetadata();
+      return { firstResult, retryResult, pending, metadata };
     });
 
     expect(result.firstResult.success).toBe(true);
@@ -759,6 +788,8 @@ describe('CloudAgentSession message admission', () => {
     expect(result.pending).toHaveLength(1);
     expect(result.pending[0]?.messageId).toBe(initialMessageId);
     expect(result.pending[0]?.content).toBe('prepared prompt');
+    expect(result.metadata?.initialMessage?.turn).toMatchObject({ format });
+    expect(result.pending[0]?.intent?.turn).toMatchObject({ format });
   });
 
   it('uses the prepared initialMessageId for registered-initial queueing', async () => {

@@ -10,6 +10,7 @@ import type { ExecutionId, SessionId, UserId } from '../types/ids.js';
 import type { AgentMode } from '../schema.js';
 import type { Attachments } from '../router/schemas.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
+import type { JsonSchemaFormat } from '../persistence/schemas.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
 
 // ---------------------------------------------------------------------------
@@ -38,6 +39,7 @@ export type SessionScope = {
 export type PromptContent = {
   prompt: string;
   attachments?: Attachments;
+  format?: JsonSchemaFormat;
 };
 
 /** Prompt input submitted before queue admission settles the message identity. */

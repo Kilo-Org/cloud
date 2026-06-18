@@ -43,6 +43,7 @@ import { getIntegrationById } from '@/lib/integrations/db/platform-integrations'
 import {
   getCodeReviewById,
   findPreviousCompletedReview,
+  updateGitHubReviewThreadResolutionCandidates,
   updatePreviousReviewSummary,
   updateRepositoryReviewInstructionsMetadata,
   type ReviewContinuationScope,
@@ -52,7 +53,6 @@ import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { logExceptInTest, errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
-import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import type { CodeReviewPlatform } from '../core/schemas';
 import {
   normalizeRepositoryReviewInstructions,
@@ -62,9 +62,12 @@ import { getCurrentReviewSummaryForContext } from '../summary/history';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 import {
+  CLOUD_CODE_REVIEW_OUTPUT_FORMAT,
   fetchGitHubReviewThreadResolutionCandidates,
   type GitHubReviewThreadResolutionCandidate,
 } from '../github-review-thread-resolution';
+import type { CloudAgentJsonSchemaFormat } from '@kilocode/worker-utils';
+import type { GitHubReviewThreadResolutionCandidateState } from '@kilocode/db/schema-types';
 
 export type PreparePayloadParams = {
   reviewId: string;
@@ -97,6 +100,7 @@ export type SessionInput = {
   platform?: 'github' | 'gitlab';
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  format?: CloudAgentJsonSchemaFormat;
 };
 
 export type CodeReviewPayload = {
@@ -170,12 +174,10 @@ export async function prepareReviewPayload(
     let gitlabContext: GitLabDiffContext | undefined;
     let repositoryReviewInstructionsLookup = unusedRepositoryReviewInstructionsLookup();
     let repositorySize: string | null = null;
-    let githubReviewThreadResolutionContext: {
-      token: string;
-      appType: GitHubAppType;
-      repoOwner: string;
-      repoName: string;
-    } | null = null;
+    let githubResolutionInstallationToken: string | undefined;
+    let githubResolutionAppType: GitHubAppType | undefined;
+    let githubResolutionRepoOwner: string | undefined;
+    let githubResolutionRepoName: string | undefined;
 
     if (review.platform_integration_id) {
       const integration = await getIntegrationById(review.platform_integration_id);
@@ -193,12 +195,10 @@ export async function prepareReviewPayload(
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
         if (repoOwner && repoName) {
-          githubReviewThreadResolutionContext = {
-            token: installationToken,
-            appType,
-            repoOwner,
-            repoName,
-          };
+          githubResolutionInstallationToken = installationToken;
+          githubResolutionAppType = appType;
+          githubResolutionRepoOwner = repoOwner;
+          githubResolutionRepoName = repoName;
         }
 
         try {
@@ -499,23 +499,21 @@ export async function prepareReviewPayload(
     const currentHeadSha = existingReviewState?.headCommitSha ?? review.head_sha;
     if (
       platform === PLATFORM.GITHUB &&
-      githubReviewThreadResolutionContext &&
-      githubReviewThreadResolutionContext.appType === 'standard' &&
+      githubResolutionInstallationToken &&
+      githubResolutionAppType === 'standard' &&
+      githubResolutionRepoOwner &&
+      githubResolutionRepoName &&
       previousHeadSha &&
       existingReviewState?.summaryComment &&
-      currentHeadSha === review.head_sha &&
-      CALLBACK_TOKEN_SECRET
+      currentHeadSha === review.head_sha
     ) {
       try {
         githubReviewThreadResolutionCandidates = await fetchGitHubReviewThreadResolutionCandidates({
-          token: githubReviewThreadResolutionContext.token,
-          appType: githubReviewThreadResolutionContext.appType,
-          owner: githubReviewThreadResolutionContext.repoOwner,
-          repo: githubReviewThreadResolutionContext.repoName,
+          token: githubResolutionInstallationToken,
+          owner: githubResolutionRepoOwner,
+          repo: githubResolutionRepoName,
           prNumber: review.pr_number,
-          reviewId,
           expectedHeadSha: review.head_sha,
-          secret: CALLBACK_TOKEN_SECRET,
         });
       } catch (error) {
         logExceptInTest(
@@ -529,12 +527,21 @@ export async function prepareReviewPayload(
         );
       }
     }
+    const githubReviewThreadResolutionCandidateState: GitHubReviewThreadResolutionCandidateState[] =
+      githubReviewThreadResolutionCandidates.map(candidate => ({
+        threadId: candidate.threadId,
+        rootBodySha256: candidate.rootBodySha256,
+      }));
 
     await Promise.all([
       updatePreviousReviewSummary(reviewId, {
         body: existingReviewState?.summaryComment?.body ?? null,
         headSha: existingReviewState?.summaryComment ? previousHeadSha : null,
       }),
+      updateGitHubReviewThreadResolutionCandidates(
+        reviewId,
+        githubReviewThreadResolutionCandidateState
+      ),
       updateRepositoryReviewInstructionsMetadata(reviewId, {
         used: repositoryReviewInstructionsLookup.used,
         ref: repositoryReviewInstructionsLookup.ref,
@@ -591,6 +598,7 @@ export async function prepareReviewPayload(
             model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
             variant,
             upstreamBranch: review.head_ref,
+            format: CLOUD_CODE_REVIEW_OUTPUT_FORMAT,
             ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
           }
         : {
@@ -604,6 +612,7 @@ export async function prepareReviewPayload(
             model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
             variant,
             upstreamBranch: githubCheckoutRef,
+            format: CLOUD_CODE_REVIEW_OUTPUT_FORMAT,
             ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
           };
 

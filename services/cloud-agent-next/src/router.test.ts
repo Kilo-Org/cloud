@@ -1975,6 +1975,36 @@ describe('legacy V2 execution response compatibility', () => {
     );
   });
 
+  it('sendMessageV2 preserves JSON schema format in the submitted prompt turn', async () => {
+    const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
+    const format = {
+      type: 'json_schema' as const,
+      schema: {
+        type: 'object',
+        properties: { addressedReviewThreadIds: { type: 'array', items: { type: 'string' } } },
+        required: ['addressedReviewThreadIds'],
+        additionalProperties: false,
+      },
+    };
+
+    await caller.sendMessageV2({
+      cloudAgentSessionId: validSessionId,
+      payload: {
+        type: 'prompt',
+        prompt: 'Return structured output',
+        mode: 'code',
+        model: 'test-model',
+        format,
+      },
+    });
+
+    expect(admitSubmittedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turn: expect.objectContaining({ format }),
+      })
+    );
+  });
+
   it('sendMessageV2 accepts deprecated token fields without queueing token overrides', async () => {
     const { caller, admitSubmittedMessage } = createLegacyExecutionCaller();
 

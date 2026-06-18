@@ -138,6 +138,33 @@ describe('session metadata boundary', () => {
     expect(serializeSessionMetadata(current)).toEqual(current);
   });
 
+  it('preserves the structured output format on the current initial prompt turn', () => {
+    const format = {
+      type: 'json_schema' as const,
+      schema: {
+        type: 'object',
+        properties: { result: { type: 'string' } },
+        required: ['result'],
+        additionalProperties: false,
+      },
+      retryCount: 1,
+    };
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_structured', userId: 'user_structured' },
+      auth: {},
+      initialMessage: {
+        id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        prompt: 'Return structured output',
+        turn: { type: 'prompt' as const, prompt: 'Return structured output', format },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+  });
+
   it('maps legacy flat metadata into grouped current metadata', () => {
     const legacy = {
       version: 1234,

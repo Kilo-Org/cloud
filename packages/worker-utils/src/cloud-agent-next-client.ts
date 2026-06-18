@@ -17,6 +17,12 @@ export type CallbackTarget = {
   headers?: Record<string, string>;
 };
 
+export type CloudAgentJsonSchemaFormat = {
+  type: 'json_schema';
+  schema: Record<string, unknown>;
+  retryCount?: number;
+};
+
 export type CloudAgentPrepareSessionInput = {
   prompt: string;
   mode: string;
@@ -34,6 +40,7 @@ export type CloudAgentPrepareSessionInput = {
   callbackTarget?: CallbackTarget;
   createdOnPlatform?: string;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  format?: CloudAgentJsonSchemaFormat;
 };
 
 export type CloudAgentPrepareSessionOutput = {
@@ -64,6 +71,7 @@ export type CloudAgentSendMessageInput = {
   variant?: string;
   githubToken?: string;
   gitToken?: string;
+  format?: CloudAgentJsonSchemaFormat;
 };
 
 export type CloudAgentSendMessageOutput = {

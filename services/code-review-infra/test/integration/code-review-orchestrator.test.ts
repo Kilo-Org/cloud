@@ -5,6 +5,22 @@ import type { CodeReviewOrchestrator } from '../../src/code-review-orchestrator'
 import type { CodeReview, SessionInput } from '../../src/types';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 
+const TEST_JSON_SCHEMA_FORMAT = {
+  type: 'json_schema',
+  schema: {
+    type: 'object',
+    properties: {
+      addressedReviewThreadIds: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+    required: ['addressedReviewThreadIds'],
+    additionalProperties: false,
+  },
+  retryCount: 1,
+} satisfies NonNullable<SessionInput['format']>;
+
 function getReviewStub(name = `review-${crypto.randomUUID()}`) {
   const id = env.CODE_REVIEW_ORCHESTRATOR.idFromName(name);
   return env.CODE_REVIEW_ORCHESTRATOR.get(id);
@@ -17,6 +33,7 @@ function sessionInput(): SessionInput {
     mode: 'code',
     model: 'test-model',
     upstreamBranch: 'main',
+    format: TEST_JSON_SCHEMA_FORMAT,
   };
 }
 
@@ -325,6 +342,7 @@ describe('CodeReviewOrchestrator recovery', () => {
       headers: { 'X-Callback-Token': expectedCallbackToken },
     });
     expect(prepareBody.callbackTarget.headers).not.toHaveProperty('X-Internal-Secret');
+    expect(prepareBody.format).toEqual(TEST_JSON_SCHEMA_FORMAT);
     expect(prepareBody).not.toHaveProperty('repositorySize');
     expect(consoleLogSpy).toHaveBeenCalledWith(
       '[CodeReviewOrchestrator] Session prepared',
@@ -1491,6 +1509,9 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(true);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(false);
+    const sendCall = getFetchCall(fetchMock, '/trpc/sendMessageV2');
+    const sendBody = JSON.parse(String(sendCall?.[1]?.body));
+    expect(sendBody.format).toEqual(TEST_JSON_SCHEMA_FORMAT);
     const updateCall = getFetchCall(fetchMock, '/trpc/updateSession');
     const updateBody = JSON.parse(String(updateCall?.[1]?.body));
     expect(updateBody).not.toHaveProperty('gitlabCodeReviewTokenRef');
@@ -1549,6 +1570,9 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
     expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(true);
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    expect(prepareBody.format).toEqual(TEST_JSON_SCHEMA_FORMAT);
   });
 
   it('continues a session when abandoned legacy execution rows are omitted from current health', async () => {

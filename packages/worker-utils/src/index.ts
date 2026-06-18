@@ -33,6 +33,7 @@ export {
 export type {
   CloudAgentNextFetchClient,
   CallbackTarget,
+  CloudAgentJsonSchemaFormat,
   CloudAgentTerminalReason,
   CloudAgentPrepareSessionInput,
   CloudAgentPrepareSessionOutput,

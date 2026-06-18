@@ -116,6 +116,7 @@ type CloudAgentNextCallbackPayload = {
   modelNotFoundRuntimeDiagnostics?: unknown;
   failure?: unknown;
   lastAssistantMessageText?: string;
+  lastAssistantMessageStructured?: unknown;
   lastSeenBranch?: string;
   gateResult?: 'pass' | 'fail';
 };
@@ -986,8 +987,10 @@ export async function POST(
     const attemptId = callbackAttemptId || undefined;
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult, failure } =
       normalizePayload(rawPayload);
-    const lastAssistantMessageText =
-      'lastAssistantMessageText' in rawPayload ? rawPayload.lastAssistantMessageText : undefined;
+    const lastAssistantMessageStructured =
+      'lastAssistantMessageStructured' in rawPayload
+        ? rawPayload.lastAssistantMessageStructured
+        : undefined;
     const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;
 
     // Validate payload
@@ -1339,31 +1342,27 @@ export async function POST(
       !isGitLab &&
       integration.platform_installation_id &&
       (integration.github_app_type || 'standard') === 'standard' &&
-      review.previous_summary_body &&
-      review.previous_summary_head_sha &&
-      CALLBACK_TOKEN_SECRET
+      review.github_review_thread_resolution_candidates.length > 0
     ) {
       try {
         const [repoOwner, repoName] = review.repo_full_name.split('/');
         if (repoOwner && repoName) {
-          const result = await resolveAddressedGitHubReviewThreads({
+          const resolvedCount = await resolveAddressedGitHubReviewThreads({
             installationId: integration.platform_installation_id,
-            appType: 'standard',
             owner: repoOwner,
             repo: repoName,
             prNumber: review.pr_number,
-            reviewId,
             expectedHeadSha: review.head_sha,
-            secret: CALLBACK_TOKEN_SECRET,
-            assistantMessageText: lastAssistantMessageText,
+            persistedCandidates: review.github_review_thread_resolution_candidates,
+            structuredOutput: lastAssistantMessageStructured,
           });
 
-          if (result.resolvedCount > 0) {
+          if (resolvedCount > 0) {
             logExceptInTest('[code-review-status] Resolved addressed GitHub review threads', {
               reviewId,
               repoFullName: review.repo_full_name,
               prNumber: review.pr_number,
-              resolvedCount: result.resolvedCount,
+              resolvedCount,
             });
           }
         }

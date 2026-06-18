@@ -1114,6 +1114,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     const env = createEnv();
     env.WORKER_URL = 'https://cloud-agent.example.com';
     env.KILOCODE_TOKEN_OVERRIDE = 'provider-override-token';
+    const format = {
+      type: 'json_schema' as const,
+      schema: { type: 'object', properties: { result: { type: 'string' } } },
+    };
     const metadata = createMetadata({
       setupCommands: ['pnpm install'],
       envVars: { PUBLIC_VALUE: 'visible' },
@@ -1131,6 +1135,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           type: 'prompt',
           messageId: 'msg_018f1e2d3c4bPayloadTestAAAA',
           prompt: 'Do the work',
+          format,
         },
         agent: {
           mode: 'code',
@@ -1210,6 +1215,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         id: 'msg_018f1e2d3c4bPayloadTestAAAA',
         prompt: 'Do the work',
       },
+      format,
       agent: {
         model: { modelID: 'test-model' },
         variant: 'thinking',

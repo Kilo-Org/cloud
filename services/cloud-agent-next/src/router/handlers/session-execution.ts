@@ -88,6 +88,7 @@ export function createSessionExecutionV2Handlers() {
                   mode: input.mode,
                   model: input.model,
                   variant: input.variant,
+                  format: input.format,
                 }
               : 'payload' in input && input.payload.type === 'prompt'
                 ? input.payload
@@ -108,6 +109,7 @@ export function createSessionExecutionV2Handlers() {
               id: input.messageId ?? undefined,
               prompt: promptPayload.prompt,
               attachments: input.attachments ?? input.images,
+              format: promptPayload.format,
             };
             agent = {
               mode: promptPayload.mode,

@@ -1658,6 +1658,7 @@ export class SessionService {
         prompt: turn.prompt,
         ...(attachments.length > 0 ? { attachments } : {}),
       },
+      format: turn.format,
       agent: {
         mode: promptAgent,
         model: { modelID: agent.model },

@@ -854,6 +854,7 @@ export function createSessionMessageQueue(
                 messageId,
                 prompt: explicitTurn.prompt,
                 attachments: explicitTurn.attachments,
+                format: explicitTurn.format,
               }
             : {
                 type: 'command',

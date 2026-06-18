@@ -1474,6 +1474,11 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];
 
+export type GitHubReviewThreadResolutionCandidateState = {
+  threadId: string;
+  rootBodySha256: string;
+};
+
 // --- MCP Gateway enums ---
 
 export const MCPGatewayOwnerScope = {

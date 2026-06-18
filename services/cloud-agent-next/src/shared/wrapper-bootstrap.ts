@@ -90,6 +90,12 @@ export type WrapperPromptAgent = {
   tools?: Record<string, boolean>;
 };
 
+export type WrapperJsonSchemaFormat = {
+  type: 'json_schema';
+  schema: Record<string, unknown>;
+  retryCount?: number;
+};
+
 export type WrapperPromptRequest = {
   message: {
     id: string;
@@ -97,6 +103,7 @@ export type WrapperPromptRequest = {
     parts?: WrapperPromptPart[];
     attachments?: WrapperBootstrapAttachment[];
   };
+  format?: WrapperJsonSchemaFormat;
   agent?: WrapperPromptAgent;
   finalization?: {
     autoCommit?: boolean;

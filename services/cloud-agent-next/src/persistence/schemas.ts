@@ -40,6 +40,16 @@ export const AttachmentsSchema = z.object({
 });
 export type Attachments = z.infer<typeof AttachmentsSchema>;
 
+export const JsonSchemaFormatSchema = z
+  .object({
+    type: z.literal('json_schema'),
+    schema: z.record(z.string(), z.unknown()),
+    retryCount: z.number().optional(),
+  })
+  .strict();
+
+export type JsonSchemaFormat = z.infer<typeof JsonSchemaFormatSchema>;
+
 const imageFilenameSchema = z
   .string()
   .min(1)

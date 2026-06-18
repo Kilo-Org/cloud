@@ -1510,6 +1510,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         variant: this.state.sessionInput.variant,
         githubToken: this.state.sessionInput.githubToken,
         gitToken: this.state.sessionInput.gitToken,
+        format: this.state.sessionInput.format,
       });
 
       // Store session ID (reusing the previous one) and execution ID

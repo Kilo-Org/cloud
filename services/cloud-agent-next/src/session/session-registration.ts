@@ -68,6 +68,7 @@ function acceptInitialTurn(initialTurn: ExecutionTurnSubmission): AcceptedExecut
         messageId,
         prompt: initialTurn.prompt,
         attachments: initialTurn.attachments,
+        format: initialTurn.format,
       }
     : {
         type: 'command',
@@ -86,6 +87,7 @@ export function executionTurnSubmissionFromAcceptedTurn(
         id: turn.messageId,
         prompt: turn.prompt,
         attachments: turn.attachments,
+        format: turn.format,
       }
     : {
         type: 'command',

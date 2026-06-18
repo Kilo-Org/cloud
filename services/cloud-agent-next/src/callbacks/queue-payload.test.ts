@@ -38,6 +38,37 @@ describe('fitCallbackJobToQueueLimit', () => {
     expect(job.payload.lastAssistantMessageTextTruncation).toBeUndefined();
   });
 
+  it('preserves bounded structured output within the queue limit', () => {
+    const job = callbackJob('Done');
+    job.payload.lastAssistantMessageStructured = {
+      addressedReviewThreadIds: ['thread-1', 'thread-2'],
+    };
+
+    const result = fitCallbackJobToQueueLimit(job);
+
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.job).toBe(job);
+    expect(result.job.payload.lastAssistantMessageStructured).toEqual({
+      addressedReviewThreadIds: ['thread-1', 'thread-2'],
+    });
+  });
+
+  it('omits oversized generic structured output before dropping assistant text', () => {
+    const job = callbackJob('Keep this complete text');
+    job.payload.lastAssistantMessageStructured = {
+      result: 'x'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES * 2),
+    };
+
+    const result = fitCallbackJobToQueueLimit(job);
+
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.job.payload.lastAssistantMessageStructured).toBeUndefined();
+    expect(result.job.payload.lastAssistantMessageText).toBe('Keep this complete text');
+    expect(result.serializedByteLength).toBeLessThanOrEqual(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
+  });
+
   it('omits oversized assistant text so consumers cannot treat a prefix as complete', () => {
     const assistantText = 'a'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES * 2);
 

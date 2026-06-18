@@ -37,6 +37,8 @@ export type ExecutionCallbackPayload = {
    * Undefined when no assistant message has been recorded yet.
    */
   lastAssistantMessageText?: string;
+  /** Native structured output from the latest assistant message. */
+  lastAssistantMessageStructured?: unknown;
   /** Present when lastAssistantMessageText was omitted to fit the callback queue. */
   lastAssistantMessageTextTruncation?: CallbackTextTruncation;
   /**

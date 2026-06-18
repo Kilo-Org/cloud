@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   AttachmentsSchema,
   ImagesSchema,
+  JsonSchemaFormatSchema,
   MCPServerConfigSchema,
   MetadataSchema,
   RuntimeAgentSchema,
@@ -9,6 +10,28 @@ import {
   RuntimeSkillsSchema,
 } from './schemas.js';
 import type { MCPServerConfig } from './types.js';
+
+describe('JsonSchemaFormatSchema', () => {
+  const format = {
+    type: 'json_schema' as const,
+    schema: {
+      type: 'object',
+      properties: { result: { type: 'string' } },
+      required: ['result'],
+      additionalProperties: false,
+    },
+    retryCount: 2,
+  };
+
+  it('accepts the SDK-compatible JSON schema format contract', () => {
+    expect(JsonSchemaFormatSchema.parse(format)).toEqual(format);
+  });
+
+  it('rejects non-schema formats and unknown format fields', () => {
+    expect(JsonSchemaFormatSchema.safeParse({ type: 'text' }).success).toBe(false);
+    expect(JsonSchemaFormatSchema.safeParse({ ...format, name: 'result' }).success).toBe(false);
+  });
+});
 
 describe('AttachmentsSchema', () => {
   it('accepts image and document UUID filenames up to the message limit', () => {

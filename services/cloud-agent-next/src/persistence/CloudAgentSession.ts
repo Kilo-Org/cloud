@@ -262,7 +262,8 @@ function isSameAcceptedInitialTurn(
   return (
     stored.turn?.type === 'prompt' &&
     stored.turn.prompt === initialTurn.prompt &&
-    JSON.stringify(stored.turn.attachments) === JSON.stringify(initialTurn.attachments)
+    JSON.stringify(stored.turn.attachments) === JSON.stringify(initialTurn.attachments) &&
+    JSON.stringify(stored.turn.format) === JSON.stringify(initialTurn.format)
   );
 }
 
@@ -1651,6 +1652,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
                 type: 'prompt',
                 prompt: input.message.turn.prompt,
                 attachments: input.message.turn.attachments,
+                format: input.message.turn.format,
               }
             : {
                 type: 'command',
@@ -1751,6 +1753,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
                 id: initialTurn.messageId,
                 prompt: initialTurn.prompt,
                 attachments: initialTurn.attachments,
+                format: initialTurn.format,
               }
             : {
                 type: 'command',
@@ -2770,6 +2773,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               messageId: initialMessage.id,
               prompt: initialMessage.turn.prompt,
               attachments: initialMessage.turn.attachments,
+              format: initialMessage.turn.format,
             }
           : initialMessage.prompt
             ? {

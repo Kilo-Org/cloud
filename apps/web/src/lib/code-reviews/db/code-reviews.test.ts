@@ -18,6 +18,7 @@ import {
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   updateCodeReviewStatus,
+  updateGitHubReviewThreadResolutionCandidates,
 } from './code-reviews';
 
 const REPO = `test-org/session-continuation-${Date.now()}`;
@@ -436,6 +437,28 @@ describe('findPreviousCompletedReview', () => {
       .limit(1);
 
     expect(review?.agentVersion).toBe('v2');
+  });
+
+  it('replaces GitHub review-thread resolution candidates with the exact snapshot', async () => {
+    const id = await createReview('sha-review-thread-candidates');
+
+    await updateGitHubReviewThreadResolutionCandidates(id, [
+      { threadId: 'thread-1', rootBodySha256: 'a'.repeat(64) },
+      { threadId: 'thread-2', rootBodySha256: 'b'.repeat(64) },
+    ]);
+    await updateGitHubReviewThreadResolutionCandidates(id, [
+      { threadId: 'thread-3', rootBodySha256: 'c'.repeat(64) },
+    ]);
+
+    const [review] = await db
+      .select({
+        candidates: cloud_agent_code_reviews.github_review_thread_resolution_candidates,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, id))
+      .limit(1);
+
+    expect(review?.candidates).toEqual([{ threadId: 'thread-3', rootBodySha256: 'c'.repeat(64) }]);
   });
 
   it('creates, links, lists, and updates code review attempts', async () => {

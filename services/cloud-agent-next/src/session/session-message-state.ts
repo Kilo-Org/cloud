@@ -10,7 +10,7 @@ import type { CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agen
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
-import { AttachmentsSchema } from '../persistence/schemas.js';
+import { AttachmentsSchema, JsonSchemaFormatSchema } from '../persistence/schemas.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 import {
   WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH,
@@ -148,6 +148,7 @@ export const SessionMessageStateSchema = z
               messageId: z.string(),
               prompt: z.string(),
               attachments: AttachmentsSchema.optional(),
+              format: JsonSchemaFormatSchema.optional(),
             })
             .strict(),
           z.object({
@@ -176,6 +177,7 @@ export const SessionMessageStateSchema = z
                 messageId: z.string(),
                 prompt: z.string(),
                 attachments: AttachmentsSchema.optional(),
+                format: JsonSchemaFormatSchema.optional(),
               })
               .strict(),
             z.object({
@@ -302,6 +304,7 @@ function normalizeLegacyAdmissionConstraints(
             messageId: constraints.turn.messageId,
             prompt: constraints.turn.prompt,
             attachments: constraints.turn.attachments,
+            format: constraints.turn.format,
           }
         : constraints.turn,
   };
@@ -332,6 +335,7 @@ function normalizeParsedSessionMessageState(
                 messageId: admissionSnapshot.turn.messageId,
                 prompt: admissionSnapshot.turn.prompt,
                 attachments: admissionSnapshot.turn.attachments,
+                format: admissionSnapshot.turn.format,
               }
             : admissionSnapshot.turn,
       },
@@ -345,6 +349,7 @@ function normalizeParsedSessionMessageState(
           messageId: z.string(),
           prompt: z.string(),
           attachments: AttachmentsSchema.optional(),
+          format: JsonSchemaFormatSchema.optional(),
         })
         .strict(),
       z.object({
@@ -363,6 +368,7 @@ function normalizeParsedSessionMessageState(
             messageId: parsedTurn.data.messageId,
             prompt: parsedTurn.data.prompt,
             attachments: parsedTurn.data.attachments,
+            format: parsedTurn.data.format,
           }
         : parsedTurn.data
       : undefined,

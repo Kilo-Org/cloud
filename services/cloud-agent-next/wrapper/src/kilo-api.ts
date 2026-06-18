@@ -15,6 +15,7 @@ import type { KiloClient as SDKClient } from '@kilocode/sdk';
 import { createKiloClient as createV2Client } from '@kilocode/sdk/v2';
 import { logToFile } from './utils.js';
 import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slash-commands.js';
+import type { WrapperJsonSchemaFormat } from '../../src/shared/wrapper-bootstrap.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -165,6 +166,7 @@ export type WrapperKiloClient = {
       | { type: 'file'; mime: string; url: string; filename?: string }
     >;
     prompt?: string;
+    format?: WrapperJsonSchemaFormat;
     variant?: string;
     agent?: string;
     model?: { providerID?: string; modelID: string };
@@ -296,6 +298,7 @@ export function createWrapperKiloClient(
         sessionID: opts.sessionId,
         ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
         parts,
+        ...(opts.format ? { format: opts.format } : {}),
         ...(opts.variant ? { variant: opts.variant } : {}),
         ...(opts.model
           ? {

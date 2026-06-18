@@ -130,6 +130,7 @@ import type {
   SecurityFindingAnalysis,
   SecurityFindingNotificationKind as SecurityFindingNotificationKindType,
   SecurityFindingNotificationStatus as SecurityFindingNotificationStatusType,
+  GitHubReviewThreadResolutionCandidateState,
   NormalizedOpenRouterResponse,
   OpenRouterModel,
   StripeSubscriptionStatus,
@@ -3947,6 +3948,10 @@ export const cloud_agent_code_reviews = pgTable(
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),
     previous_summary_head_sha: text(),
+    github_review_thread_resolution_candidates: jsonb()
+      .$type<GitHubReviewThreadResolutionCandidateState[]>()
+      .default([])
+      .notNull(),
 
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')

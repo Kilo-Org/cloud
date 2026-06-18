@@ -17,7 +17,10 @@ import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, isNull } from 'd
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
-import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import type {
+  CodeReviewTerminalReason,
+  GitHubReviewThreadResolutionCandidateState,
+} from '@kilocode/db/schema-types';
 import { isCodeReviewActionRequiredReason } from '../action-required-shared';
 import {
   activeCodeReviewWorkCondition,
@@ -1121,6 +1124,27 @@ export async function updatePreviousReviewSummary(
     captureException(error, {
       tags: { operation: 'updatePreviousReviewSummary' },
       extra: { reviewId, hasBody: summary.body !== null, headSha: summary.headSha },
+    });
+    throw error;
+  }
+}
+
+export async function updateGitHubReviewThreadResolutionCandidates(
+  reviewId: string,
+  candidates: GitHubReviewThreadResolutionCandidateState[]
+): Promise<void> {
+  try {
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        github_review_thread_resolution_candidates: candidates,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateGitHubReviewThreadResolutionCandidates' },
+      extra: { reviewId, candidateCount: candidates.length },
     });
     throw error;
   }

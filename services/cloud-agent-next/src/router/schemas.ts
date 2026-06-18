@@ -15,6 +15,7 @@ import {
   RuntimeAgentSchema,
   RuntimeAgentsSchema,
   RuntimeKiloCommandsSchema,
+  JsonSchemaFormatSchema,
 } from '../persistence/schemas.js';
 import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
@@ -35,6 +36,7 @@ export {
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
   RuntimeAgentsSchema,
+  JsonSchemaFormatSchema,
 };
 
 export const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
@@ -45,7 +47,11 @@ export type {
   EncryptedSecrets,
   MCPSecretValue,
 } from '../persistence/schemas.js';
-export type { RuntimeSkillInput, RuntimeAgentInput } from '../persistence/schemas.js';
+export type {
+  RuntimeSkillInput,
+  RuntimeAgentInput,
+  JsonSchemaFormat,
+} from '../persistence/schemas.js';
 
 /**
  * Flexible mode slug — built-in agent enum value, `custom`, or any slug
@@ -103,6 +109,7 @@ export const PromptPayload = z.object({
     .max(50)
     .regex(/^[a-zA-Z]+$/)
     .optional(),
+  format: JsonSchemaFormatSchema.optional(),
 });
 
 /**
@@ -119,6 +126,7 @@ export const PromptSendPayload = z.object({
     .max(50)
     .regex(/^[a-zA-Z]+$/)
     .optional(),
+  format: JsonSchemaFormatSchema.optional(),
 });
 
 export const CommandSendPayload = z.object({
@@ -278,6 +286,7 @@ export const SendMessageV2Input = z
         mode: payload.mode,
         model: payload.model,
         variant: payload.variant,
+        format: payload.format,
       };
     }
 
@@ -367,6 +376,7 @@ export const PrepareSessionInput = z
       .max(50)
       .regex(/^[a-zA-Z]+$/)
       .optional(),
+    format: JsonSchemaFormatSchema.optional(),
 
     // Repository - one of these pairs required
     githubRepo: githubRepoSchema

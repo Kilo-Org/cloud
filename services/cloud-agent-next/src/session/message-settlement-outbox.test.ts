@@ -790,6 +790,40 @@ describe('MessageSettlementOutbox', () => {
     });
   });
 
+  it('includes native assistant structured output in completed callback jobs', async () => {
+    const structured = { addressedReviewThreadIds: ['thread-1', 'thread-2'] };
+    const harness = createHarness({
+      assistantMessage: {
+        eventId: 1 as LatestAssistantMessage['eventId'],
+        timestamp: 1,
+        info: { id: 'assistant_structured', role: 'assistant', structured },
+        parts: [
+          {
+            id: 'part_structured',
+            messageID: 'assistant_structured',
+            type: 'text',
+            text: 'Structured result ready',
+          },
+        ],
+      },
+    });
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/structured-callback' })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      lastAssistantMessageText: 'Structured result ready',
+      lastAssistantMessageStructured: structured,
+    });
+  });
+
   it('omits oversized assistant output before enqueueing the callback job', async () => {
     const assistantText = '😀"\\\n'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
     const harness = createHarness({

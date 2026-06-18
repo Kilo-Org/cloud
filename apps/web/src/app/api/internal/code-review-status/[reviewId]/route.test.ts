@@ -244,6 +244,7 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     repository_review_instructions_truncated: false,
     previous_summary_body: null,
     previous_summary_head_sha: null,
+    github_review_thread_resolution_candidates: [],
     model: null,
     total_tokens_in: null,
     total_tokens_out: null,
@@ -408,11 +409,7 @@ beforeEach(async () => {
       footer.usage || footer.reviewGuidance?.used ? 'body with footer' : body
   );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
-  mockResolveAddressedGitHubReviewThreads.mockResolvedValue({
-    status: 'no-marker',
-    requestedCount: 0,
-    resolvedCount: 0,
-  });
+  mockResolveAddressedGitHubReviewThreads.mockResolvedValue(0);
   ({ POST } = await import('./route'));
 });
 
@@ -2710,6 +2707,93 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
       expect(mockCreatePRComment).not.toHaveBeenCalled();
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GitHub addressed review-thread resolution', () => {
+    const persistedCandidates = [{ threadId: 'PRRT_thread_1', rootBodySha256: 'a'.repeat(64) }];
+    const structuredOutput = { addressedReviewThreadIds: ['PRRT_thread_1'] };
+
+    it('passes native structured output and persisted candidates directly to the resolver', async () => {
+      mockResolveAddressedGitHubReviewThreads.mockResolvedValue(1);
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ github_review_thread_resolution_candidates: persistedCandidates })
+      );
+
+      const response = await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageStructured: structuredOutput }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockResolveAddressedGitHubReviewThreads).toHaveBeenCalledWith({
+        installationId: 'inst-1',
+        owner: 'owner',
+        repo: 'repo',
+        prNumber: 1,
+        expectedHeadSha: 'abc123',
+        persistedCandidates,
+        structuredOutput,
+      });
+    });
+
+    it.each([
+      {
+        name: 'empty persisted candidates',
+        review: makeReview(),
+        integration: makeIntegration(),
+      },
+      {
+        name: 'GitLab review',
+        review: makeReview({
+          platform: 'gitlab',
+          platform_project_id: 42,
+          check_run_id: null,
+          github_review_thread_resolution_candidates: persistedCandidates,
+        }),
+        integration: makeIntegration(),
+      },
+      {
+        name: 'lite GitHub app',
+        review: makeReview({ github_review_thread_resolution_candidates: persistedCandidates }),
+        integration: makeIntegration({ github_app_type: 'lite' }),
+      },
+      {
+        name: 'missing GitHub installation',
+        review: makeReview({ github_review_thread_resolution_candidates: persistedCandidates }),
+        integration: makeIntegration({ platform_installation_id: null }),
+      },
+    ])('skips resolver for $name', async ({ review, integration }) => {
+      mockGetCodeReviewById.mockResolvedValue(review);
+      mockGetIntegrationById.mockResolvedValue(integration);
+
+      await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageStructured: structuredOutput }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockResolveAddressedGitHubReviewThreads).not.toHaveBeenCalled();
+    });
+
+    it('keeps resolver failures non-blocking', async () => {
+      const resolutionError = new Error('GitHub GraphQL failed');
+      mockResolveAddressedGitHubReviewThreads.mockRejectedValue(resolutionError);
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ github_review_thread_resolution_candidates: persistedCandidates })
+      );
+
+      const response = await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageStructured: structuredOutput }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        resolutionError,
+        expect.objectContaining({
+          tags: { source: 'code-review-status-thread-resolution' },
+        })
+      );
     });
   });
 

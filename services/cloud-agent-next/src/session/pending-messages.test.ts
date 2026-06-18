@@ -100,6 +100,10 @@ describe('createPendingSessionMessageFromIntent', () => {
         type: 'prompt',
         messageId: 'msg_018f1e2d3c4bNestedAbCdEfGh',
         prompt: 'nested intent',
+        format: {
+          type: 'json_schema',
+          schema: { type: 'object', properties: { result: { type: 'string' } } },
+        },
       },
       agent: { mode: 'code', model: 'claude' },
       finalization: { autoCommit: true },

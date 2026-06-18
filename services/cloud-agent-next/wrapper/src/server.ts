@@ -488,6 +488,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
         messageId,
         parts: prompt.message.parts,
         prompt: prompt.message.prompt,
+        format: prompt.format,
         variant: prompt.agent?.variant,
         agent: prompt.agent?.mode,
         model: prompt.agent?.model,

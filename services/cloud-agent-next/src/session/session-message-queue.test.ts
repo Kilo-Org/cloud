@@ -774,6 +774,65 @@ describe('SessionMessageQueue', () => {
     expect(harness.alarmDeadlines).toHaveLength(2);
   });
 
+  it('preserves prompt format through durable admission and delivery', async () => {
+    const harness = createQueueHarness();
+    const format = {
+      type: 'json_schema' as const,
+      schema: { type: 'object', properties: { result: { type: 'string' } } },
+      retryCount: 1,
+    };
+
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: {
+        type: 'prompt',
+        id: FIRST_MESSAGE_ID,
+        prompt: 'return structured output',
+        format,
+      },
+    });
+
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending?.intent?.turn).toMatchObject({ format });
+
+    await harness.queue.drainNextPendingMessage();
+    expect(harness.deliver).toHaveBeenCalledWith(
+      expect.objectContaining({ turn: expect.objectContaining({ format }) })
+    );
+  });
+
+  it('rejects a replay that changes only the prompt format', async () => {
+    const harness = createQueueHarness();
+    const originalFormat = {
+      type: 'json_schema' as const,
+      schema: { type: 'object', properties: { result: { type: 'string' } } },
+    };
+
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: {
+        type: 'prompt',
+        id: FIRST_MESSAGE_ID,
+        prompt: 'same prompt',
+        format: originalFormat,
+      },
+    });
+    const replay = await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: {
+        type: 'prompt',
+        id: FIRST_MESSAGE_ID,
+        prompt: 'same prompt',
+        format: {
+          ...originalFormat,
+          schema: { type: 'object', properties: { changed: { type: 'boolean' } } },
+        },
+      },
+    });
+
+    expect(replay).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+  });
+
   it('repairs submitted admission event/drain effects after an event persistence failure', async () => {
     const harness = createQueueHarness({ failQueuedEventOnce: true });
     const request = {

@@ -6,6 +6,7 @@ import {
   AttachmentsSchema,
   branchNameSchema,
   CallbackTargetSchema,
+  JsonSchemaFormatSchema,
   MetadataSchema as LegacySessionMetadataSchema,
   SessionProfileBundleSchema,
 } from './schemas.js';
@@ -78,6 +79,7 @@ const CurrentMetadataInitialTurnSchema = z.discriminatedUnion('type', [
       type: z.literal('prompt'),
       prompt: z.string(),
       attachments: AttachmentsSchema.optional(),
+      format: JsonSchemaFormatSchema.optional(),
     })
     .strip(),
   z

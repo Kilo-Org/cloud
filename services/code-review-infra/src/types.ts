@@ -3,7 +3,12 @@
  */
 
 import type { CodeReviewOrchestrator } from './code-review-orchestrator';
-import type { Owner, MCPServerConfig, CloudAgentTerminalReason } from '@kilocode/worker-utils';
+import type {
+  Owner,
+  MCPServerConfig,
+  CloudAgentJsonSchemaFormat,
+  CloudAgentTerminalReason,
+} from '@kilocode/worker-utils';
 import * as z from 'zod';
 
 export type { Owner, MCPServerConfig };
@@ -32,6 +37,7 @@ export interface SessionInput {
   mcpServers?: Record<string, MCPServerConfig>;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  format?: CloudAgentJsonSchemaFormat;
 }
 
 export interface CodeReviewEvent {

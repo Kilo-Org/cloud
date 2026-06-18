@@ -23,6 +23,16 @@ const validAttachments = {
   path: '123e4567-e89b-12d3-a456-426614174000',
   files: ['123e4567-e89b-12d3-a456-426614174001.csv'],
 };
+const validFormat = {
+  type: 'json_schema' as const,
+  schema: {
+    type: 'object',
+    properties: { addressedReviewThreadIds: { type: 'array', items: { type: 'string' } } },
+    required: ['addressedReviewThreadIds'],
+    additionalProperties: false,
+  },
+  retryCount: 2,
+};
 const basePromptInput = {
   prompt: 'continue',
   mode: 'code' as const,
@@ -181,6 +191,23 @@ describe('legacy live attachment input compatibility', () => {
       }).success
     ).toBe(false);
   });
+
+  it('accepts only the strict JSON schema format contract on prepareSession prompts', () => {
+    const input = {
+      prompt: 'Return structured output',
+      mode: 'code',
+      model: 'claude-sonnet-4-5-20250929',
+      githubRepo: 'acme/repo',
+    };
+
+    expect(PrepareSessionInput.parse({ ...input, format: validFormat }).format).toEqual(
+      validFormat
+    );
+    expect(
+      PrepareSessionInput.safeParse({ ...input, format: { ...validFormat, name: 'review' } })
+        .success
+    ).toBe(false);
+  });
 });
 
 describe('sendMessageV2 input compatibility', () => {
@@ -188,7 +215,7 @@ describe('sendMessageV2 input compatibility', () => {
     const result = SendMessageV2Input.safeParse({
       cloudAgentSessionId: validSessionId,
       messageId: validMessageId,
-      payload: { type: 'prompt', ...basePromptInput },
+      payload: { type: 'prompt', ...basePromptInput, format: validFormat },
       attachments: validAttachments,
     });
 
@@ -200,6 +227,7 @@ describe('sendMessageV2 input compatibility', () => {
       messageId: validMessageId,
       attachments: validAttachments,
       ...basePromptInput,
+      format: validFormat,
     });
   });
 

@@ -178,6 +178,75 @@ describe('wrapper health', () => {
   });
 });
 
+describe('wrapper prompt forwarding', () => {
+  it('passes JSON schema format to the Kilo prompt call', async () => {
+    const state = new WrapperState();
+    const promptCalls: Array<Parameters<WrapperKiloClient['sendPromptAsync']>[0]> = [];
+    const kiloClient = {
+      sendPromptAsync: async (input: Parameters<WrapperKiloClient['sendPromptAsync']>[0]) => {
+        promptCalls.push(input);
+      },
+    } as unknown as WrapperKiloClient;
+    const fetchHandler = createFetchHandler(
+      {
+        port: 5000,
+        workspacePath: '/workspace/repo',
+        version: 'test',
+        sessionId: 'kilo_sess_test',
+        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+        userId: 'user_test',
+      },
+      {
+        state,
+        kiloClient,
+        openConnection: async () => {},
+        closeConnection: async () => {},
+        setAborted: () => {},
+        resetLifecycle: () => {},
+        configureCommitCoAuthor: async () => {},
+      },
+      () => {}
+    );
+    const format = {
+      type: 'json_schema' as const,
+      schema: {
+        type: 'object',
+        properties: { addressedReviewThreadIds: { type: 'array', items: { type: 'string' } } },
+        required: ['addressedReviewThreadIds'],
+        additionalProperties: false,
+      },
+    };
+
+    const response = await fetchHandler(
+      new Request('http://wrapper.test/job/prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: { id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'Review the change' },
+          format,
+          session: {
+            ingestUrl: 'ws://worker.test/ingest',
+            workerAuthToken: 'worker-token',
+            wrapperRunId: 'run_1',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_1',
+          },
+        }),
+      })
+    );
+
+    if (!response) throw new Error('Expected prompt response');
+    expect(response.status).toBe(200);
+    expect(promptCalls).toHaveLength(1);
+    expect(promptCalls[0]).toMatchObject({
+      sessionId: 'kilo_sess_test',
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      prompt: 'Review the change',
+      format,
+    });
+  });
+});
+
 describe('wrapper PTY routes', () => {
   it('creates a workspace PTY and applies the requested size', async () => {
     const { fetchHandler, ptyCalls, resizeCalls } = createTestFetch();

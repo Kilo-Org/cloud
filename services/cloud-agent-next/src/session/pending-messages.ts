@@ -6,7 +6,11 @@ import type {
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { logger } from '../logger.js';
-import { AttachmentsSchema, CallbackTargetSchema } from '../persistence/schemas.js';
+import {
+  AttachmentsSchema,
+  CallbackTargetSchema,
+  JsonSchemaFormatSchema,
+} from '../persistence/schemas.js';
 import { Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 import { isWorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
@@ -50,7 +54,13 @@ const IntentEnvelopeFields = {
 };
 const SessionMessageIntentSchema = z.object({
   turn: z.discriminatedUnion('type', [
-    z.object({ ...PromptIntentTurnFields, attachments: AttachmentsSchema.optional() }).strict(),
+    z
+      .object({
+        ...PromptIntentTurnFields,
+        attachments: AttachmentsSchema.optional(),
+        format: JsonSchemaFormatSchema.optional(),
+      })
+      .strict(),
     z
       .object({
         type: z.literal('command'),

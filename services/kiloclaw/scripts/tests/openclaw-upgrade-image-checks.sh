@@ -16,17 +16,17 @@ set -euo pipefail
 # without starting the gateway, so no key is needed), and runs a full grype CVE
 # scan of the image (base OS + Go + npm, unfiltered).
 #
-# Run the credentialed live smoke (controller-openclaw-upgrade-smoke-test.sh)
-# next; this script prints exactly what that still covers.
+# Run the credentialed live smoke (openclaw-upgrade-smoke.sh) next; this script
+# prints exactly what that still covers.
 #
 # Env:
-#   IMAGE   image tag to build/use (default kiloclaw:openclaw-upgrade-verify)
+#   IMAGE   image tag to build/use (default kiloclaw:openclaw-upgrade-candidate)
 #   BUILD   build the candidate image first (default true; set false to reuse IMAGE)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
+KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 REPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"
-IMAGE="${IMAGE:-kiloclaw:openclaw-upgrade-verify}"
+IMAGE="${IMAGE:-kiloclaw:openclaw-upgrade-candidate}"
 BUILD="${BUILD:-true}"
 # Empty = report the CVE scan but do not change the exit code. Set to
 # critical|high to also fail the run when findings at/above that severity exist.
@@ -242,7 +242,7 @@ run the credentialed live smoke locally too (it loads a real key into the
 freshly released OpenClaw, which is why nothing here runs in CI):
 
   export KILOCODE_API_KEY=<dedicated free-model key>   # not your personal key
-  bash services/kiloclaw/scripts/controller-openclaw-upgrade-smoke-test.sh
+  bash services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh
 
 That covers what CI cannot without a credential:
   - persisted-root upgrade boot (baseline -> candidate on the same /root)

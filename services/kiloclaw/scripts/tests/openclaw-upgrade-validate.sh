@@ -19,7 +19,7 @@ set -uo pipefail
 # this is the gate a human runs locally before marking the bump PR ready.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
+KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 hr() { printf -- '----------------------------------------------------------------------\n'; }
 section() { echo; hr; echo "$1"; hr; }
@@ -149,7 +149,7 @@ fi
 
 # ── Phase 1: keyless verification ────────────────────────────────────────────
 section "Phase 1/2 — keyless verification (build, patches, config, CVE scan)"
-if bash "$SCRIPT_DIR/controller-openclaw-upgrade-verify.sh"; then
+if bash "$SCRIPT_DIR/openclaw-upgrade-image-checks.sh"; then
   VERIFY_RESULT="passed"
   echo
   echo "✓ Phase 1 passed"
@@ -179,7 +179,7 @@ else
   # smoke run when before/after pin the same version (mechanics mode).
   if ALLOW_DIRTY_CHECKOUT="${ALLOW_DIRTY_CHECKOUT:-true}" \
      ALLOW_SAME_OPENCLAW_VERSION="$SMOKE_SAME_VERSION" \
-     bash "$SCRIPT_DIR/controller-openclaw-upgrade-smoke-test.sh"; then
+     bash "$SCRIPT_DIR/openclaw-upgrade-smoke.sh"; then
     if [ "$PHASE2_MODE" = "mechanics" ]; then
       SMOKE_RESULT="passed (mechanics only)"
     else

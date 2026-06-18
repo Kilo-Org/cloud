@@ -5,7 +5,7 @@ set -euo pipefail
 # then runs the live persisted-root upgrade smoke against both images.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
+KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 REPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"
 BASE_REF="${BASE_REF:-origin/main}"
 IMAGE_BEFORE="${IMAGE_BEFORE:-kiloclaw:openclaw-upgrade-before}"
@@ -104,4 +104,4 @@ IMAGE_BEFORE="$IMAGE_BEFORE" \
 IMAGE_AFTER="$IMAGE_AFTER" \
 EXPECTED_VERSION_BEFORE="$VERSION_BEFORE" \
 EXPECTED_VERSION_AFTER="$VERSION_AFTER" \
-bash "$SCRIPT_DIR/controller-live-provider-smoke-test.sh" --upgrade
+bash "$SCRIPT_DIR/smoke-live-provider.sh" --upgrade

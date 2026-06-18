@@ -31,7 +31,7 @@ Before editing or reviewing, read:
    when the release is part of the change.
 4. Build the candidate image. If a Dockerfile patch guard fails, inspect the new
    OpenClaw package artifact or source rather than loosening the guard blindly.
-5. Run `bash services/kiloclaw/scripts/controller-openclaw-upgrade-smoke-test.sh`
+5. Run `bash services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh`
    from a clean committed bump branch. It compares refreshed `origin/main` by
    default, or an intentionally justified `BASE_REF`, to committed `HEAD` and retains
    `/root` between image phases.

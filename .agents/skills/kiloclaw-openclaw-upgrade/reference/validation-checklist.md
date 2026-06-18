@@ -28,9 +28,9 @@ iterating, then allow push hooks or the relevant release process to run broader 
 pnpm install --lockfile-only
 pnpm install --frozen-lockfile
 pnpm format
-bash -n services/kiloclaw/scripts/controller-smoke-helpers.sh
-bash -n services/kiloclaw/scripts/controller-live-provider-smoke-test.sh
-bash -n services/kiloclaw/scripts/controller-openclaw-upgrade-smoke-test.sh
+bash -n services/kiloclaw/scripts/tests/smoke-helpers.sh
+bash -n services/kiloclaw/scripts/tests/smoke-live-provider.sh
+bash -n services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh
 git diff --check
 bun run script/check-md-table-padding.ts
 pnpm --filter @kiloclaw/kilo-chat test
@@ -62,7 +62,7 @@ Run only from a clean committed bump branch; the wrapper builds detached source
 worktrees so ignored local files do not enter either candidate image.
 
 ```bash
-bash services/kiloclaw/scripts/controller-openclaw-upgrade-smoke-test.sh
+bash services/kiloclaw/scripts/tests/openclaw-upgrade-smoke.sh
 ```
 
 Expected behaviors:

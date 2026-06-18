@@ -25,11 +25,11 @@ EXPECTED_VERSION_BEFORE="${EXPECTED_VERSION_BEFORE:-}"
 EXPECTED_VERSION_AFTER="${EXPECTED_VERSION_AFTER:-}"
 MODE="fresh"
 
-source "$SCRIPT_DIR/controller-smoke-helpers.sh"
+source "$SCRIPT_DIR/smoke-helpers.sh"
 
 usage() {
   cat <<'EOF'
-Usage: bash scripts/controller-live-provider-smoke-test.sh [--upgrade]
+Usage: bash scripts/tests/smoke-live-provider.sh [--upgrade]
 
 Runs a packaged KiloClaw image against the real Kilo Gateway using the Auto Free
 model by default. Provide KILOCODE_API_KEY explicitly or authenticate with the

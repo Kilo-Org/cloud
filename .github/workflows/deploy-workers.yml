@@ -90,9 +90,66 @@ jobs:
           #
           # Production diffs against the SHA before the push so that multi-commit
           # pushes don't miss workers touched in earlier commits. Staging deploys
-          # all deployable workers into the named Wrangler environment.
+          # only workers that explicitly define the named Wrangler environment.
           BASE_SHA="${{ inputs.base_sha }}"
           TARGET_ENVIRONMENT="${{ inputs.target_environment }}"
+
+          has_named_environment() {
+            node - "$1" "$TARGET_ENVIRONMENT" <<'NODE'
+          const fs = require('node:fs');
+
+          const [file, targetEnvironment] = process.argv.slice(2);
+
+          function stripJsonComments(value) {
+            let output = '';
+            let inString = false;
+            let escaped = false;
+
+            for (let index = 0; index < value.length; index += 1) {
+              const current = value[index];
+              const next = value[index + 1];
+
+              if (inString) {
+                output += current;
+                if (escaped) escaped = false;
+                else if (current === '\\') escaped = true;
+                else if (current === '"') inString = false;
+                continue;
+              }
+
+              if (current === '"') {
+                inString = true;
+                output += current;
+                continue;
+              }
+
+              if (current === '/' && next === '/') {
+                while (index < value.length && value[index] !== '\n') index += 1;
+                output += '\n';
+                continue;
+              }
+
+              if (current === '/' && next === '*') {
+                index += 2;
+                while (index < value.length && !(value[index] === '*' && value[index + 1] === '/')) {
+                  if (value[index] === '\n') output += '\n';
+                  index += 1;
+                }
+                index += 1;
+                continue;
+              }
+
+              output += current;
+            }
+
+            return output;
+          }
+
+          const rawConfig = fs.readFileSync(file, 'utf8');
+          const config = JSON.parse(stripJsonComments(rawConfig).replace(/,\s*([}\]])/g, '$1'));
+          process.exit(config.env && Object.hasOwn(config.env, targetEnvironment) ? 0 : 1);
+          NODE
+          }
 
           # Workers excluded from this workflow (they have custom deploy pipelines):
           EXCLUDED=(
@@ -132,7 +189,14 @@ jobs:
               fi
             done
           else
-            CHANGED=("${DEPLOYABLE[@]}")
+            CHANGED=()
+            for dir in "${DEPLOYABLE[@]}"; do
+              if has_named_environment "$dir/wrangler.jsonc"; then
+                CHANGED+=("$dir")
+              else
+                echo "Skipping $dir: wrangler.jsonc does not define env.$TARGET_ENVIRONMENT"
+              fi
+            done
           fi
 
           if [ ${#CHANGED[@]} -eq 0 ]; then

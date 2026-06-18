@@ -1,5 +1,8 @@
 'use client';
 
+import type { ReactNode } from 'react';
+import { useId } from 'react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -155,9 +158,9 @@ function DistributionBarList({ items, label }: { items: BarItem[]; label: string
   const maxCount = Math.max(...items.map(item => item.count), 1);
 
   return (
-    <div className="space-y-3" aria-label={label}>
+    <div className="space-y-3" role="list" aria-label={label}>
       {items.map(item => (
-        <div key={item.key} className="space-y-1.5">
+        <div key={item.key} className="space-y-1.5" role="listitem">
           <div className="flex items-start justify-between gap-3 text-sm">
             <div className="min-w-0">
               <span>{item.label}</span>
@@ -191,38 +194,80 @@ function SeverityBarList<T extends string>({
   const maxTotal = Math.max(...rows.map(row => row.total), 1);
 
   return (
-    <div className="space-y-3" aria-label={label}>
-      {rows.map(row => (
-        <div key={row.value} className="space-y-1.5">
-          <div className="flex items-start justify-between gap-3 text-sm">
-            <span>{labels[row.value]}</span>
-            <span className="shrink-0 tabular-nums">{row.total.toLocaleString()}</span>
+    <div className="space-y-3" role="list" aria-label={label}>
+      {rows.map(row => {
+        const severityCounts = [
+          { label: 'Critical', count: row.critical },
+          { label: 'Warning', count: row.warning },
+          { label: 'Suggestion', count: row.suggestion },
+        ];
+        const visibleSummary = severityCounts
+          .filter(severity => severity.count > 0)
+          .map(severity => `${severity.label} ${severity.count.toLocaleString()}`)
+          .join(' / ');
+        const accessibleSummary = severityCounts
+          .map(severity => `${severity.label} ${severity.count.toLocaleString()}`)
+          .join(', ');
+
+        return (
+          <div key={row.value} className="space-y-1.5" role="listitem">
+            <div className="flex items-start justify-between gap-3 text-sm">
+              <span>{labels[row.value]}</span>
+              <span className="shrink-0 tabular-nums">{row.total.toLocaleString()}</span>
+            </div>
+            <div className="bg-muted flex h-2 overflow-hidden rounded-full" aria-hidden="true">
+              <div
+                className="bg-chart-5 h-full"
+                style={{ width: `${(row.critical / maxTotal) * 100}%` }}
+              />
+              <div
+                className="bg-chart-3 h-full"
+                style={{ width: `${(row.warning / maxTotal) * 100}%` }}
+              />
+              <div
+                className="bg-chart-2 h-full"
+                style={{ width: `${(row.suggestion / maxTotal) * 100}%` }}
+              />
+            </div>
+            <p className="text-muted-foreground text-xs tabular-nums">
+              <span className="sr-only">{accessibleSummary}.</span>
+              {visibleSummary && <span aria-hidden="true">{visibleSummary}</span>}
+            </p>
           </div>
-          <div className="bg-muted flex h-2 overflow-hidden rounded-full" aria-hidden="true">
-            <div
-              className="bg-chart-5 h-full"
-              style={{ width: `${(row.critical / maxTotal) * 100}%` }}
-            />
-            <div
-              className="bg-chart-3 h-full"
-              style={{ width: `${(row.warning / maxTotal) * 100}%` }}
-            />
-            <div
-              className="bg-chart-2 h-full"
-              style={{ width: `${(row.suggestion / maxTotal) * 100}%` }}
-            />
-          </div>
-          <p className="text-muted-foreground text-xs tabular-nums">
-            Critical {row.critical.toLocaleString()} / Warning {row.warning.toLocaleString()} /
-            Suggestion {row.suggestion.toLocaleString()}
-          </p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-function ImpactBreakdownCard({ impactBreakdown }: { impactBreakdown: ImpactBreakdown }) {
+function BreakdownCard({
+  headingId,
+  title,
+  children,
+}: {
+  headingId: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle>
+          <h3 id={headingId}>{title}</h3>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function ChangeProfileSection({
+  impactBreakdown,
+  headingId,
+}: {
+  impactBreakdown: ImpactBreakdown;
+  headingId: string;
+}) {
   const complexityByValue = new Map(
     impactBreakdown.complexity.map(row => [row.value, row] as const)
   );
@@ -251,74 +296,81 @@ function ImpactBreakdownCard({ impactBreakdown }: { impactBreakdown: ImpactBreak
       detail: lowConfidenceDetail(row.lowConfidenceCount),
       color: 'bg-chart-2' as const,
     }));
+  const impactHeadingId = `${headingId}-impact`;
+  const complexityHeadingId = `${headingId}-complexity`;
+  const changeTypeHeadingId = `${headingId}-change-type`;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Change profile</CardTitle>
+    <section className="space-y-4" aria-labelledby={headingId}>
+      <header className="space-y-1.5">
+        <h2 id={headingId} className="text-lg font-semibold tracking-tight">
+          Change profile
+        </h2>
         <CardDescription>
           AI-estimated impact, implementation complexity, and change type for the latest tracked
           version of each pull or merge request.
         </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <section className="space-y-3" aria-labelledby="analytics-impact-heading">
-          <h3 id="analytics-impact-heading" className="text-sm font-medium">
-            AI-estimated impact
-          </h3>
-          <DistributionBarList items={impactItems} label="AI-estimated impact distribution" />
-        </section>
-        <section className="space-y-3" aria-labelledby="analytics-complexity-heading">
-          <h3 id="analytics-complexity-heading" className="text-sm font-medium">
-            Complexity
-          </h3>
-          <DistributionBarList items={complexityItems} label="Complexity distribution" />
-        </section>
-        <section className="space-y-3" aria-labelledby="analytics-change-type-heading">
-          <h3 id="analytics-change-type-heading" className="text-sm font-medium">
-            Change type
-          </h3>
+      </header>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6">
+          <BreakdownCard headingId={impactHeadingId} title="AI-estimated impact">
+            <DistributionBarList items={impactItems} label="AI-estimated impact distribution" />
+          </BreakdownCard>
+          <BreakdownCard headingId={complexityHeadingId} title="Complexity">
+            <DistributionBarList items={complexityItems} label="Complexity distribution" />
+          </BreakdownCard>
+        </div>
+        <BreakdownCard headingId={changeTypeHeadingId} title="Change type">
           {changeTypeItems.length > 0 ? (
             <DistributionBarList items={changeTypeItems} label="Change type distribution" />
           ) : (
             <p className="text-muted-foreground text-sm">No change types in this selection.</p>
           )}
-        </section>
-      </CardContent>
-    </Card>
+        </BreakdownCard>
+      </div>
+    </section>
   );
 }
 
-function FindingBreakdownCard({
+function FindingTaxonomySection({
   findingBreakdown,
   securityBreakdown,
-}: Pick<AnalyticsBreakdownBarsProps, 'findingBreakdown' | 'securityBreakdown'>) {
+  headingId,
+}: Pick<AnalyticsBreakdownBarsProps, 'findingBreakdown' | 'securityBreakdown'> & {
+  headingId: string;
+}) {
+  const categoriesHeadingId = `${headingId}-categories`;
+  const securityHeadingId = `${headingId}-security`;
+  const hasSecurityBreakdown = securityBreakdown.length > 0;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Finding taxonomy</CardTitle>
-        <CardDescription>
-          Newly raised Code Review Findings grouped by controlled category and severity.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <section className="space-y-3" aria-labelledby="analytics-finding-category-heading">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 id="analytics-finding-category-heading" className="text-sm font-medium">
-              Categories
-            </h3>
-            <div className="text-muted-foreground flex flex-wrap gap-3 text-xs" aria-hidden="true">
-              <span className="flex items-center gap-1.5">
-                <span className="bg-chart-5 size-2 rounded-full" /> Critical
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="bg-chart-3 size-2 rounded-full" /> Warning
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="bg-chart-2 size-2 rounded-full" /> Suggestion
-              </span>
-            </div>
-          </div>
+    <section className="space-y-4" aria-labelledby={headingId}>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1.5">
+          <h2 id={headingId} className="text-lg font-semibold tracking-tight">
+            Finding taxonomy
+          </h2>
+          <CardDescription>
+            Newly raised Code Review Findings grouped by controlled category and severity.
+          </CardDescription>
+        </div>
+        <div
+          className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-2 text-xs sm:justify-end"
+          aria-hidden="true"
+        >
+          <span className="flex items-center gap-1.5">
+            <span className="bg-chart-5 size-2 rounded-full" /> Critical
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="bg-chart-3 size-2 rounded-full" /> Warning
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="bg-chart-2 size-2 rounded-full" /> Suggestion
+          </span>
+        </div>
+      </header>
+      <div className={cn('grid gap-6', hasSecurityBreakdown && 'lg:grid-cols-2 lg:items-start')}>
+        <BreakdownCard headingId={categoriesHeadingId} title="Categories">
           {findingBreakdown.length > 0 ? (
             <SeverityBarList
               rows={findingBreakdown}
@@ -330,21 +382,18 @@ function FindingBreakdownCard({
               No Code Review Findings were raised in captured results for this selection.
             </p>
           )}
-        </section>
-        {securityBreakdown.length > 0 && (
-          <section className="space-y-3 border-t pt-6" aria-labelledby="analytics-security-heading">
-            <h3 id="analytics-security-heading" className="text-sm font-medium">
-              Security concern classes
-            </h3>
+        </BreakdownCard>
+        {hasSecurityBreakdown && (
+          <BreakdownCard headingId={securityHeadingId} title="Security concern classes">
             <SeverityBarList
               rows={securityBreakdown}
               labels={securityClassLabels}
               label="Security concern class and severity distribution"
             />
-          </section>
+          </BreakdownCard>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -353,12 +402,15 @@ export function AnalyticsBreakdownBars({
   findingBreakdown,
   securityBreakdown,
 }: AnalyticsBreakdownBarsProps) {
+  const id = useId();
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <ImpactBreakdownCard impactBreakdown={impactBreakdown} />
-      <FindingBreakdownCard
+    <div className="space-y-8">
+      <ChangeProfileSection impactBreakdown={impactBreakdown} headingId={`${id}-change-profile`} />
+      <FindingTaxonomySection
         findingBreakdown={findingBreakdown}
         securityBreakdown={securityBreakdown}
+        headingId={`${id}-finding-taxonomy`}
       />
     </div>
   );

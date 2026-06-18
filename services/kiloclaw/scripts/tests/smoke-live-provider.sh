@@ -295,6 +295,8 @@ run_phase() {
   local label="$1"
   local image="$2"
   local expected_version="$3"
+  # 1 = run the app config-write assertions (they MUTATE openclaw.json). Default 1.
+  local mutate_config="${4:-1}"
 
   echo
   echo "=== $label: $image ==="
@@ -306,9 +308,15 @@ run_phase() {
   assert_control_ui_proxy
   assert_configured_model
   assert_kilo_chat_smoke "$CID" "$PORT" "$TOKEN"
-  assert_app_config_patch "$CID" "$PORT" "$TOKEN"
-  assert_app_config_agent_defaults "$CID" "$PORT" "$TOKEN"
-  assert_app_config_agents_crud "$CID" "$PORT" "$TOKEN"
+  # The app config-write routes rewrite openclaw.json. In --upgrade mode they run
+  # ONLY on the candidate — after it has booted on the UNTOUCHED baseline-generated
+  # root — so the baseline CLI does not rewrite the persisted config first and mask
+  # an incompatibility in how the candidate reads the original baseline config.
+  if [ "$mutate_config" = "1" ]; then
+    assert_app_config_patch "$CID" "$PORT" "$TOKEN"
+    assert_app_config_agent_defaults "$CID" "$PORT" "$TOKEN"
+    assert_app_config_agents_crud "$CID" "$PORT" "$TOKEN"
+  fi
   assert_exec_approvals_seeded "$CID"
   echo
   echo "--- live Auto Free agent turn ---"
@@ -325,10 +333,14 @@ else
 fi
 
 if [ "$MODE" = "upgrade" ]; then
-  run_phase "before-image" "$IMAGE_BEFORE" "$EXPECTED_VERSION_BEFORE"
-  run_phase "after-image persisted-root" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER"
+  # Baseline: no config mutations, so its persisted root stays the pristine
+  # baseline-generated config the candidate then boots against.
+  run_phase "before-image" "$IMAGE_BEFORE" "$EXPECTED_VERSION_BEFORE" 0
+  # Candidate: boots on the untouched baseline root, then exercises the config-write
+  # routes against the upgraded image.
+  run_phase "after-image persisted-root" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER" 1
 else
-  run_phase "candidate-image" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER"
+  run_phase "candidate-image" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER" 1
 fi
 
 echo

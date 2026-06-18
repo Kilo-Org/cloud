@@ -247,12 +247,29 @@ const confidenceLevels = Object.values(CodeReviewAnalyticsClassificationConfiden
 const findingSeverities = Object.values(CodeReviewFindingSeverity).join(' | ');
 const findingCategories = Object.values(CodeReviewFindingCategory).join(' | ');
 const securityClasses = Object.values(CodeReviewFindingSecurityClass).join(' | ');
+const exampleManifest = JSON.stringify({
+  schemaVersion: CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
+  taxonomyVersion: CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
+  change: {
+    type: CodeReviewAnalyticsChangeType.BugFix,
+    impact: CodeReviewAnalyticsImpactLevel.High,
+    complexity: CodeReviewAnalyticsComplexityLevel.Medium,
+    confidence: CodeReviewAnalyticsClassificationConfidence.High,
+  },
+  findings: [
+    {
+      severity: CodeReviewFindingSeverity.Warning,
+      category: CodeReviewFindingCategory.Correctness,
+      securityClass: null,
+    },
+  ],
+} satisfies CodeReviewAnalyticsManifest);
 
 export const CODE_REVIEW_ANALYTICS_PROMPT_APPENDIX = `# CODE REVIEW ANALYTICS MANIFEST
 
 After completing every review and publication instruction above, emit exactly one analytics marker as the final non-empty line of your assistant response. The marker line must contain no leading or trailing text and must use this exact wrapper:
 
-<!-- kilo-review-analytics:v1 {"schemaVersion":1,"taxonomyVersion":1,"change":{"type":"bug_fix","impact":"high","complexity":"medium","confidence":"high"},"findings":[{"severity":"warning","category":"correctness","securityClass":null}]} -->
+<!-- kilo-review-analytics:v1 ${exampleManifest} -->
 
 The JSON must be a single object with exactly these keys and shapes:
 - schemaVersion: exactly ${CODE_REVIEW_ANALYTICS_SCHEMA_VERSION}

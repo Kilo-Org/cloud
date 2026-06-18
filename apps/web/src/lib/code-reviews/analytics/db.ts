@@ -311,32 +311,25 @@ type DashboardInput = {
   canManage: boolean;
 };
 
-function numberValue(value: unknown): number {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'bigint') return Number(value);
-  if (typeof value === 'string') return Number(value);
-  return 0;
-}
+type DashboardAggregateRow = {
+  coverage: Omit<CodeReviewAnalyticsCoverage, 'capturePercentage'>;
+  summary: CodeReviewAnalyticsSummary;
+  repository_options: string[];
+  impact_breakdown: CodeReviewAnalyticsDashboard['impactBreakdown'];
+  finding_breakdown: CodeReviewAnalyticsDashboard['findingBreakdown'];
+  security_breakdown: CodeReviewAnalyticsDashboard['securityBreakdown'];
+  repositories: CodeReviewAnalyticsDashboard['repositories'];
+  contributor_rows: CodeReviewAnalyticsContributorRow[];
+};
 
-function analyticsBaseCte(input: DashboardInput, applyRepositoryFilter: boolean) {
-  const ownerCondition = sql`${cloud_agent_code_reviews.owned_by_organization_id} = ${input.owner.id}`;
-  const repositoryCondition =
-    applyRepositoryFilter && input.repository
-      ? sql`AND ${cloud_agent_code_reviews.repo_full_name} = ${input.repository}`
-      : sql``;
+function analyticsDashboardQuery(input: DashboardInput) {
+  const repositoryCondition = input.repository
+    ? sql`AND enrolled_reviews.repository = ${input.repository}`
+    : sql``;
 
   return sql`
-    WITH latest_attempts AS (
-      SELECT DISTINCT ON (${cloud_agent_code_review_attempts.code_review_id})
-        ${cloud_agent_code_review_attempts.id},
-        ${cloud_agent_code_review_attempts.code_review_id},
-        ${cloud_agent_code_review_attempts.status},
-        ${cloud_agent_code_review_attempts.analytics_enabled_at_dispatch}
-      FROM ${cloud_agent_code_review_attempts}
-      ORDER BY ${cloud_agent_code_review_attempts.code_review_id}, ${cloud_agent_code_review_attempts.attempt_number} DESC
-    ), eligible_results AS (
+    WITH enrolled_reviews AS MATERIALIZED (
       SELECT
-        ${code_review_analytics_results.id} AS analytics_result_id,
         ${cloud_agent_code_reviews.id} AS code_review_id,
         ${cloud_agent_code_reviews.repo_full_name} AS repository,
         ${cloud_agent_code_reviews.pr_number} AS pr_number,
@@ -344,45 +337,72 @@ function analyticsBaseCte(input: DashboardInput, applyRepositoryFilter: boolean)
         ${cloud_agent_code_reviews.platform_project_id} AS platform_project_id,
         ${cloud_agent_code_reviews.pr_author} AS pr_author,
         ${cloud_agent_code_reviews.pr_author_github_id} AS pr_author_github_id,
-        ${code_review_analytics_results.capture_status} AS capture_status,
+        latest_attempt.id AS source_attempt_id,
+        ${code_review_analytics_results.id} AS analytics_result_id,
+        COALESCE(${code_review_analytics_results.capture_status}, 'missing') AS capture_status,
         ${code_review_analytics_results.change_type} AS change_type,
         ${code_review_analytics_results.impact_level} AS impact_level,
         ${code_review_analytics_results.complexity_level} AS complexity_level,
         ${code_review_analytics_results.classification_confidence} AS classification_confidence,
-        ${code_review_analytics_results.finalized_at} AS finalized_at
-      FROM ${code_review_analytics_results}
-      INNER JOIN ${cloud_agent_code_reviews}
-        ON ${cloud_agent_code_reviews.id} = ${code_review_analytics_results.code_review_id}
-      INNER JOIN latest_attempts
-        ON latest_attempts.code_review_id = ${cloud_agent_code_reviews.id}
-        AND latest_attempts.id = ${code_review_analytics_results.source_attempt_id}
+        COALESCE(${code_review_analytics_results.finalized_at}, latest_attempt.completed_at) AS finalized_at
+      FROM ${cloud_agent_code_reviews}
+      INNER JOIN LATERAL (
+        SELECT
+          ${cloud_agent_code_review_attempts.id} AS id,
+          ${cloud_agent_code_review_attempts.status} AS status,
+          ${cloud_agent_code_review_attempts.analytics_enabled_at_dispatch} AS analytics_enabled_at_dispatch,
+          ${cloud_agent_code_review_attempts.completed_at} AS completed_at
+        FROM ${cloud_agent_code_review_attempts}
+        WHERE ${cloud_agent_code_review_attempts.code_review_id} = ${cloud_agent_code_reviews.id}
+        ORDER BY ${cloud_agent_code_review_attempts.attempt_number} DESC
+        LIMIT 1
+      ) latest_attempt ON TRUE
+      LEFT JOIN ${code_review_analytics_results}
+        ON ${code_review_analytics_results.code_review_id} = ${cloud_agent_code_reviews.id}
+        AND ${code_review_analytics_results.source_attempt_id} = latest_attempt.id
       WHERE ${cloud_agent_code_reviews.status} = 'completed'
-        AND latest_attempts.status = 'completed'
-        AND latest_attempts.analytics_enabled_at_dispatch IS TRUE
-        AND ${code_review_analytics_results.finalized_at} >= ${input.startDate}
-        AND ${code_review_analytics_results.finalized_at} < ${input.endDate}
         AND ${cloud_agent_code_reviews.platform} = ${input.platform}
-        AND ${ownerCondition}
-        ${repositoryCondition}
-    ), finding_counts AS (
+        AND ${cloud_agent_code_reviews.owned_by_organization_id} = ${input.owner.id}
+        AND latest_attempt.status = 'completed'
+        AND latest_attempt.analytics_enabled_at_dispatch IS TRUE
+        AND latest_attempt.completed_at >= ${input.startDate}
+        AND latest_attempt.completed_at < ${input.endDate}
+    ), eligible_results AS MATERIALIZED (
+      SELECT *
+      FROM enrolled_reviews
+      WHERE TRUE ${repositoryCondition}
+    ), captured_results_base AS MATERIALIZED (
+      SELECT *
+      FROM eligible_results
+      WHERE capture_status = 'captured'
+        AND analytics_result_id IS NOT NULL
+    ), scoped_findings AS MATERIALIZED (
       SELECT
         ${code_review_analytics_findings.analytics_result_id} AS analytics_result_id,
-        COUNT(*)::int AS total_findings,
-        COUNT(*) FILTER (WHERE ${code_review_analytics_findings.severity} = 'critical')::int AS critical_findings,
-        COUNT(*) FILTER (WHERE ${code_review_analytics_findings.severity} = 'warning')::int AS warning_findings,
-        COUNT(*) FILTER (WHERE ${code_review_analytics_findings.severity} = 'suggestion')::int AS suggestion_findings
+        ${code_review_analytics_findings.severity} AS severity,
+        ${code_review_analytics_findings.category} AS category,
+        ${code_review_analytics_findings.security_class} AS security_class
       FROM ${code_review_analytics_findings}
-      GROUP BY ${code_review_analytics_findings.analytics_result_id}
-    ), captured_results AS (
+      INNER JOIN captured_results_base
+        ON captured_results_base.analytics_result_id = ${code_review_analytics_findings.analytics_result_id}
+    ), finding_counts AS (
       SELECT
-        eligible_results.*,
+        analytics_result_id,
+        COUNT(*)::int AS total_findings,
+        (COUNT(*) FILTER (WHERE severity = 'critical'))::int AS critical_findings,
+        (COUNT(*) FILTER (WHERE severity = 'warning'))::int AS warning_findings,
+        (COUNT(*) FILTER (WHERE severity = 'suggestion'))::int AS suggestion_findings
+      FROM scoped_findings
+      GROUP BY analytics_result_id
+    ), captured_results AS MATERIALIZED (
+      SELECT
+        captured_results_base.*,
         COALESCE(finding_counts.total_findings, 0)::int AS total_findings,
         COALESCE(finding_counts.critical_findings, 0)::int AS critical_findings,
         COALESCE(finding_counts.warning_findings, 0)::int AS warning_findings,
         COALESCE(finding_counts.suggestion_findings, 0)::int AS suggestion_findings
-      FROM eligible_results
+      FROM captured_results_base
       LEFT JOIN finding_counts USING (analytics_result_id)
-      WHERE eligible_results.capture_status = 'captured'
     ), logical_ranked AS (
       SELECT
         captured_results.*,
@@ -393,9 +413,294 @@ function analyticsBaseCte(input: DashboardInput, applyRepositoryFilter: boolean)
           ORDER BY finalized_at DESC, code_review_id DESC
         ) AS logical_rank
       FROM captured_results
-    ), latest_logical AS (
+    ), latest_logical AS MATERIALIZED (
       SELECT * FROM logical_ranked WHERE logical_rank = 1
+    ), coverage_stats AS (
+      SELECT
+        COUNT(*)::int AS enrolled_completed_reviews,
+        (COUNT(*) FILTER (WHERE capture_status = 'captured'))::int AS captured,
+        (COUNT(*) FILTER (WHERE capture_status = 'missing'))::int AS missing,
+        (COUNT(*) FILTER (WHERE capture_status = 'invalid'))::int AS invalid,
+        (COUNT(*) FILTER (WHERE capture_status = 'omitted'))::int AS omitted
+      FROM eligible_results
+    ), captured_summary AS (
+      SELECT
+        COUNT(*)::int AS tracked_reviews,
+        COALESCE(SUM(total_findings), 0)::int AS total_findings,
+        COALESCE(SUM(critical_findings), 0)::int AS critical_findings,
+        COALESCE(SUM(warning_findings), 0)::int AS warning_findings
+      FROM captured_results
+    ), logical_summary AS (
+      SELECT
+        COUNT(*)::int AS tracked_prs,
+        (COUNT(*) FILTER (
+          WHERE classification_confidence <> 'low' AND impact_level = 'high'
+        ))::int AS high_impact_changes,
+        COALESCE(SUM(CASE
+          WHEN classification_confidence = 'low' THEN 0
+          WHEN impact_level = 'high' THEN 3
+          WHEN impact_level = 'medium' THEN 2
+          WHEN impact_level = 'low' THEN 1
+          ELSE 0 END), 0)::int AS estimated_impact_points,
+        (COUNT(*) FILTER (
+          WHERE classification_confidence <> 'low' AND impact_level = 'low'
+        ))::int AS impact_low,
+        (COUNT(*) FILTER (
+          WHERE classification_confidence <> 'low' AND impact_level = 'medium'
+        ))::int AS impact_medium,
+        (COUNT(*) FILTER (
+          WHERE classification_confidence <> 'low' AND impact_level = 'high'
+        ))::int AS impact_high,
+        (COUNT(*) FILTER (WHERE classification_confidence = 'low'))::int AS impact_unclassified
+      FROM latest_logical
+    ), distribution_rows AS (
+      SELECT
+        'complexity'::text AS kind,
+        complexity_level AS value,
+        COUNT(*)::int AS count,
+        (COUNT(*) FILTER (WHERE classification_confidence = 'low'))::int AS low_confidence_count
+      FROM latest_logical
+      GROUP BY complexity_level
+      UNION ALL
+      SELECT
+        'change_type'::text AS kind,
+        change_type AS value,
+        COUNT(*)::int AS count,
+        (COUNT(*) FILTER (WHERE classification_confidence = 'low'))::int AS low_confidence_count
+      FROM latest_logical
+      GROUP BY change_type
+    ), finding_breakdown_rows AS (
+      SELECT
+        category AS value,
+        COUNT(*)::int AS total,
+        (COUNT(*) FILTER (WHERE severity = 'critical'))::int AS critical,
+        (COUNT(*) FILTER (WHERE severity = 'warning'))::int AS warning,
+        (COUNT(*) FILTER (WHERE severity = 'suggestion'))::int AS suggestion
+      FROM scoped_findings
+      GROUP BY category
+    ), security_breakdown_rows AS (
+      SELECT
+        security_class AS value,
+        COUNT(*)::int AS total,
+        (COUNT(*) FILTER (WHERE severity = 'critical'))::int AS critical,
+        (COUNT(*) FILTER (WHERE severity = 'warning'))::int AS warning,
+        (COUNT(*) FILTER (WHERE severity = 'suggestion'))::int AS suggestion
+      FROM scoped_findings
+      WHERE category = 'security'
+      GROUP BY security_class
+    ), repository_impact AS (
+      SELECT
+        repository,
+        COUNT(*)::int AS tracked_prs,
+        COALESCE(SUM(CASE
+          WHEN classification_confidence = 'low' THEN 0
+          WHEN impact_level = 'high' THEN 3
+          WHEN impact_level = 'medium' THEN 2
+          WHEN impact_level = 'low' THEN 1
+          ELSE 0 END), 0)::int AS estimated_impact_points,
+        (COUNT(*) FILTER (
+          WHERE classification_confidence <> 'low' AND impact_level = 'high'
+        ))::int AS high_impact_changes
+      FROM latest_logical
+      GROUP BY repository
+    ), repository_findings AS (
+      SELECT
+        repository,
+        COALESCE(SUM(critical_findings), 0)::int AS critical_findings,
+        COALESCE(SUM(warning_findings), 0)::int AS warning_findings,
+        COALESCE(SUM(suggestion_findings), 0)::int AS suggestion_findings
+      FROM captured_results
+      GROUP BY repository
+    ), repository_rows AS (
+      SELECT
+        repository_impact.repository,
+        repository_impact.tracked_prs,
+        repository_impact.estimated_impact_points,
+        repository_impact.high_impact_changes,
+        COALESCE(repository_findings.critical_findings, 0)::int AS critical_findings,
+        COALESCE(repository_findings.warning_findings, 0)::int AS warning_findings,
+        COALESCE(repository_findings.suggestion_findings, 0)::int AS suggestion_findings
+      FROM repository_impact
+      LEFT JOIN repository_findings USING (repository)
+      ORDER BY
+        (COALESCE(repository_findings.critical_findings, 0) +
+          COALESCE(repository_findings.warning_findings, 0) +
+          COALESCE(repository_findings.suggestion_findings, 0)) DESC,
+        repository_impact.estimated_impact_points DESC,
+        repository_impact.repository ASC
+      LIMIT 50
+    ), logical_findings AS (
+      SELECT
+        repository,
+        pr_number,
+        COALESCE(SUM(critical_findings), 0)::int AS critical_findings,
+        COALESCE(SUM(warning_findings), 0)::int AS warning_findings,
+        COALESCE(SUM(suggestion_findings), 0)::int AS suggestion_findings
+      FROM captured_results
+      WHERE ${input.platform} = 'github'
+      GROUP BY repository, pr_number
+    ), contributor_prs AS (
+      SELECT
+        CASE
+          WHEN latest_logical.pr_author_github_id IS NOT NULL
+            THEN 'github-id:' || latest_logical.pr_author_github_id
+          ELSE 'legacy-login:' || CASE
+            WHEN BTRIM(latest_logical.pr_author) <> ''
+              THEN LOWER(BTRIM(latest_logical.pr_author))
+            ELSE 'unknown:' || latest_logical.repository || '#' || latest_logical.pr_number::text
+          END
+        END AS contributor_key,
+        latest_logical.pr_author AS display_name,
+        latest_logical.pr_author_github_id IS NULL AS limited_identity,
+        latest_logical.finalized_at,
+        latest_logical.classification_confidence,
+        latest_logical.impact_level,
+        COALESCE(logical_findings.critical_findings, 0)::int AS critical_findings,
+        COALESCE(logical_findings.warning_findings, 0)::int AS warning_findings,
+        COALESCE(logical_findings.suggestion_findings, 0)::int AS suggestion_findings
+      FROM latest_logical
+      LEFT JOIN logical_findings USING (repository, pr_number)
+      WHERE ${input.platform} = 'github'
+    ), contributor_rows AS (
+      SELECT
+        contributor_key,
+        (ARRAY_AGG(display_name ORDER BY finalized_at DESC, display_name))[1] AS display_name,
+        BOOL_OR(limited_identity) AS limited_identity,
+        COUNT(*)::int AS tracked_prs,
+        COALESCE(SUM(CASE
+          WHEN classification_confidence = 'low' THEN 0
+          WHEN impact_level = 'high' THEN 3
+          WHEN impact_level = 'medium' THEN 2
+          WHEN impact_level = 'low' THEN 1
+          ELSE 0 END), 0)::int AS estimated_impact_points,
+        (COUNT(*) FILTER (
+          WHERE classification_confidence <> 'low' AND impact_level = 'high'
+        ))::int AS high_impact_prs,
+        COALESCE(SUM(critical_findings), 0)::int AS critical_findings,
+        COALESCE(SUM(warning_findings), 0)::int AS warning_findings,
+        COALESCE(SUM(suggestion_findings), 0)::int AS suggestion_findings,
+        (COUNT(*) FILTER (WHERE critical_findings = 0))::int AS prs_without_critical_findings
+      FROM contributor_prs
+      GROUP BY contributor_key
+      ORDER BY
+        (COUNT(*) >= 5) DESC,
+        estimated_impact_points DESC,
+        high_impact_prs DESC,
+        tracked_prs DESC,
+        contributor_key ASC
+      LIMIT 50
     )
+    SELECT
+      jsonb_build_object(
+        'enrolledCompletedReviews', coverage_stats.enrolled_completed_reviews,
+        'captured', coverage_stats.captured,
+        'missing', coverage_stats.missing,
+        'invalid', coverage_stats.invalid,
+        'omitted', coverage_stats.omitted
+      ) AS coverage,
+      jsonb_build_object(
+        'trackedReviews', captured_summary.tracked_reviews,
+        'trackedPrsOrMrs', logical_summary.tracked_prs,
+        'totalFindings', captured_summary.total_findings,
+        'criticalFindings', captured_summary.critical_findings,
+        'warningFindings', captured_summary.warning_findings,
+        'highImpactChanges', logical_summary.high_impact_changes,
+        'estimatedImpactPoints', logical_summary.estimated_impact_points
+      ) AS summary,
+      COALESCE((
+        SELECT jsonb_agg(repository_options.repository ORDER BY repository_options.repository)
+        FROM (
+          SELECT DISTINCT repository
+          FROM enrolled_reviews
+          ORDER BY repository
+          LIMIT 100
+        ) repository_options
+      ), '[]'::jsonb) AS repository_options,
+      jsonb_build_object(
+        'impact', jsonb_build_object(
+          'low', logical_summary.impact_low,
+          'medium', logical_summary.impact_medium,
+          'high', logical_summary.impact_high,
+          'unclassified', logical_summary.impact_unclassified
+        ),
+        'complexity', COALESCE((
+          SELECT jsonb_agg(jsonb_build_object(
+            'value', value,
+            'count', count,
+            'lowConfidenceCount', low_confidence_count
+          ) ORDER BY value)
+          FROM distribution_rows
+          WHERE kind = 'complexity'
+        ), '[]'::jsonb),
+        'changeTypes', COALESCE((
+          SELECT jsonb_agg(jsonb_build_object(
+            'value', value,
+            'count', count,
+            'lowConfidenceCount', low_confidence_count
+          ) ORDER BY value)
+          FROM distribution_rows
+          WHERE kind = 'change_type'
+        ), '[]'::jsonb)
+      ) AS impact_breakdown,
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'value', value,
+          'total', total,
+          'critical', critical,
+          'warning', warning,
+          'suggestion', suggestion
+        ) ORDER BY total DESC, value ASC)
+        FROM finding_breakdown_rows
+      ), '[]'::jsonb) AS finding_breakdown,
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'value', value,
+          'total', total,
+          'critical', critical,
+          'warning', warning,
+          'suggestion', suggestion
+        ) ORDER BY total DESC, value ASC)
+        FROM security_breakdown_rows
+      ), '[]'::jsonb) AS security_breakdown,
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'repository', repository,
+          'trackedPrsOrMrs', tracked_prs,
+          'estimatedImpactPoints', estimated_impact_points,
+          'highImpactChanges', high_impact_changes,
+          'criticalFindings', critical_findings,
+          'warningFindings', warning_findings,
+          'suggestionFindings', suggestion_findings
+        ) ORDER BY
+          (critical_findings + warning_findings + suggestion_findings) DESC,
+          estimated_impact_points DESC,
+          repository ASC)
+        FROM repository_rows
+      ), '[]'::jsonb) AS repositories,
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'contributorKey', contributor_key,
+          'displayName', display_name,
+          'limitedIdentity', limited_identity,
+          'limitedData', tracked_prs < 5,
+          'trackedPrs', tracked_prs,
+          'estimatedImpactPoints', estimated_impact_points,
+          'highImpactPrs', high_impact_prs,
+          'criticalFindings', critical_findings,
+          'warningFindings', warning_findings,
+          'suggestionFindings', suggestion_findings,
+          'prsWithoutCriticalFindings', prs_without_critical_findings
+        ) ORDER BY
+          (tracked_prs >= 5) DESC,
+          estimated_impact_points DESC,
+          high_impact_prs DESC,
+          tracked_prs DESC,
+          contributor_key ASC)
+        FROM contributor_rows
+      ), '[]'::jsonb) AS contributor_rows
+    FROM coverage_stats
+    CROSS JOIN captured_summary
+    CROSS JOIN logical_summary
   `;
 }
 
@@ -412,290 +717,17 @@ export async function getCodeReviewAnalyticsDashboard(
     .from(agent_configs)
     .where(ownerCondition)
     .limit(1);
-
-  const repositoryOptionResult = await input.db.execute<{ repository: string }>(sql`
-    ${analyticsBaseCte(input, false)}
-    SELECT DISTINCT repository
-    FROM eligible_results
-    ORDER BY repository ASC
-    LIMIT 100
-  `);
-
-  const summaryResult = await input.db.execute<{
-    enrolled_completed_reviews: number | string;
-    captured: number | string;
-    missing: number | string;
-    invalid: number | string;
-    omitted: number | string;
-    tracked_reviews: number | string;
-    tracked_prs: number | string;
-    total_findings: number | string;
-    critical_findings: number | string;
-    warning_findings: number | string;
-    high_impact_changes: number | string;
-    estimated_impact_points: number | string;
-    impact_low: number | string;
-    impact_medium: number | string;
-    impact_high: number | string;
-    impact_unclassified: number | string;
-  }>(sql`
-    ${analyticsBaseCte(input, true)}
-    SELECT
-      (SELECT COUNT(*) FROM eligible_results) AS enrolled_completed_reviews,
-      (SELECT COUNT(*) FROM eligible_results WHERE capture_status = 'captured') AS captured,
-      (SELECT COUNT(*) FROM eligible_results WHERE capture_status = 'missing') AS missing,
-      (SELECT COUNT(*) FROM eligible_results WHERE capture_status = 'invalid') AS invalid,
-      (SELECT COUNT(*) FROM eligible_results WHERE capture_status = 'omitted') AS omitted,
-      (SELECT COUNT(*) FROM captured_results) AS tracked_reviews,
-      (SELECT COUNT(*) FROM latest_logical) AS tracked_prs,
-      (SELECT COALESCE(SUM(total_findings), 0) FROM captured_results) AS total_findings,
-      (SELECT COALESCE(SUM(critical_findings), 0) FROM captured_results) AS critical_findings,
-      (SELECT COALESCE(SUM(warning_findings), 0) FROM captured_results) AS warning_findings,
-      (SELECT COUNT(*) FROM latest_logical WHERE classification_confidence <> 'low' AND impact_level = 'high') AS high_impact_changes,
-      (SELECT COALESCE(SUM(CASE
-        WHEN classification_confidence = 'low' THEN 0
-        WHEN impact_level = 'high' THEN 3
-        WHEN impact_level = 'medium' THEN 2
-        WHEN impact_level = 'low' THEN 1
-        ELSE 0 END), 0) FROM latest_logical) AS estimated_impact_points,
-      (SELECT COUNT(*) FROM latest_logical WHERE classification_confidence <> 'low' AND impact_level = 'low') AS impact_low,
-      (SELECT COUNT(*) FROM latest_logical WHERE classification_confidence <> 'low' AND impact_level = 'medium') AS impact_medium,
-      (SELECT COUNT(*) FROM latest_logical WHERE classification_confidence <> 'low' AND impact_level = 'high') AS impact_high,
-      (SELECT COUNT(*) FROM latest_logical WHERE classification_confidence = 'low') AS impact_unclassified
-  `);
-  const summaryRow = summaryResult.rows[0];
-  if (!summaryRow) {
-    throw new Error('Code Reviewer analytics summary query returned no row');
+  const dashboardResult = await input.db.execute<DashboardAggregateRow>(
+    analyticsDashboardQuery(input)
+  );
+  const dashboard = dashboardResult.rows[0];
+  if (!dashboard) {
+    throw new Error('Code Reviewer analytics dashboard query returned no row');
   }
 
-  const distributionResult = await input.db.execute<{
-    kind: 'complexity' | 'change_type';
-    value: string;
-    count: number | string;
-    low_confidence_count: number | string;
-  }>(sql`
-    ${analyticsBaseCte(input, true)}
-    SELECT
-      'complexity' AS kind,
-      complexity_level AS value,
-      COUNT(*) AS count,
-      COUNT(*) FILTER (WHERE classification_confidence = 'low') AS low_confidence_count
-    FROM latest_logical
-    GROUP BY complexity_level
-    UNION ALL
-    SELECT
-      'change_type' AS kind,
-      change_type AS value,
-      COUNT(*) AS count,
-      COUNT(*) FILTER (WHERE classification_confidence = 'low') AS low_confidence_count
-    FROM latest_logical
-    GROUP BY change_type
-  `);
-
-  const findingBreakdownResult = await input.db.execute<{
-    value: CodeReviewFindingCategory;
-    total: number | string;
-    critical: number | string;
-    warning: number | string;
-    suggestion: number | string;
-  }>(sql`
-    ${analyticsBaseCte(input, true)}
-    SELECT
-      findings.category AS value,
-      COUNT(*) AS total,
-      COUNT(*) FILTER (WHERE findings.severity = 'critical') AS critical,
-      COUNT(*) FILTER (WHERE findings.severity = 'warning') AS warning,
-      COUNT(*) FILTER (WHERE findings.severity = 'suggestion') AS suggestion
-    FROM ${code_review_analytics_findings} findings
-    INNER JOIN captured_results ON captured_results.analytics_result_id = findings.analytics_result_id
-    GROUP BY findings.category
-    ORDER BY total DESC, value ASC
-  `);
-
-  const securityBreakdownResult = await input.db.execute<{
-    value: CodeReviewFindingSecurityClass;
-    total: number | string;
-    critical: number | string;
-    warning: number | string;
-    suggestion: number | string;
-  }>(sql`
-    ${analyticsBaseCte(input, true)}
-    SELECT
-      findings.security_class AS value,
-      COUNT(*) AS total,
-      COUNT(*) FILTER (WHERE findings.severity = 'critical') AS critical,
-      COUNT(*) FILTER (WHERE findings.severity = 'warning') AS warning,
-      COUNT(*) FILTER (WHERE findings.severity = 'suggestion') AS suggestion
-    FROM ${code_review_analytics_findings} findings
-    INNER JOIN captured_results ON captured_results.analytics_result_id = findings.analytics_result_id
-    WHERE findings.category = 'security'
-    GROUP BY findings.security_class
-    ORDER BY total DESC, value ASC
-  `);
-
-  const repositoryResult = await input.db.execute<{
-    repository: string;
-    tracked_prs: number | string;
-    estimated_impact_points: number | string;
-    high_impact_changes: number | string;
-    critical_findings: number | string;
-    warning_findings: number | string;
-    suggestion_findings: number | string;
-  }>(sql`
-    ${analyticsBaseCte(input, true)},
-    repository_impact AS (
-      SELECT
-        repository,
-        COUNT(*) AS tracked_prs,
-        COALESCE(SUM(CASE
-          WHEN classification_confidence = 'low' THEN 0
-          WHEN impact_level = 'high' THEN 3
-          WHEN impact_level = 'medium' THEN 2
-          WHEN impact_level = 'low' THEN 1
-          ELSE 0 END), 0) AS estimated_impact_points,
-        COUNT(*) FILTER (WHERE classification_confidence <> 'low' AND impact_level = 'high') AS high_impact_changes
-      FROM latest_logical
-      GROUP BY repository
-    ), repository_findings AS (
-      SELECT
-        repository,
-        COALESCE(SUM(critical_findings), 0) AS critical_findings,
-        COALESCE(SUM(warning_findings), 0) AS warning_findings,
-        COALESCE(SUM(suggestion_findings), 0) AS suggestion_findings
-      FROM captured_results
-      GROUP BY repository
-    )
-    SELECT
-      repository_impact.repository,
-      repository_impact.tracked_prs,
-      repository_impact.estimated_impact_points,
-      repository_impact.high_impact_changes,
-      COALESCE(repository_findings.critical_findings, 0) AS critical_findings,
-      COALESCE(repository_findings.warning_findings, 0) AS warning_findings,
-      COALESCE(repository_findings.suggestion_findings, 0) AS suggestion_findings
-    FROM repository_impact
-    LEFT JOIN repository_findings USING (repository)
-    ORDER BY
-      (COALESCE(repository_findings.critical_findings, 0) + COALESCE(repository_findings.warning_findings, 0) + COALESCE(repository_findings.suggestion_findings, 0)) DESC,
-      repository_impact.estimated_impact_points DESC,
-      repository_impact.repository ASC
-    LIMIT 50
-  `);
-
-  let contributorRows: CodeReviewAnalyticsContributorRow[] = [];
+  const { enrolledCompletedReviews, captured } = dashboard.coverage;
   const contributorCapability =
     input.platform === 'github' ? 'available' : 'stable_gitlab_author_attribution_unavailable';
-
-  if (contributorCapability === 'available') {
-    const contributorResult = await input.db.execute<{
-      contributor_key: string;
-      display_name: string;
-      limited_identity: boolean;
-      tracked_prs: number | string;
-      estimated_impact_points: number | string;
-      high_impact_prs: number | string;
-      critical_findings: number | string;
-      warning_findings: number | string;
-      suggestion_findings: number | string;
-      prs_without_critical_findings: number | string;
-    }>(sql`
-      ${analyticsBaseCte(input, true)},
-      logical_findings AS (
-        SELECT
-          repository,
-          pr_number,
-          COALESCE(SUM(critical_findings), 0) AS critical_findings,
-          COALESCE(SUM(warning_findings), 0) AS warning_findings,
-          COALESCE(SUM(suggestion_findings), 0) AS suggestion_findings
-        FROM captured_results
-        GROUP BY repository, pr_number
-      ), contributor_prs AS (
-        SELECT
-          CASE
-            WHEN latest_logical.pr_author_github_id IS NOT NULL
-              THEN 'github-id:' || latest_logical.pr_author_github_id
-            ELSE 'legacy-login:' || CASE
-              WHEN BTRIM(latest_logical.pr_author) <> ''
-                THEN LOWER(BTRIM(latest_logical.pr_author))
-              ELSE 'unknown:' || latest_logical.repository || '#' || latest_logical.pr_number::text
-            END
-          END AS contributor_key,
-          latest_logical.pr_author AS display_name,
-          latest_logical.pr_author_github_id IS NULL AS limited_identity,
-          latest_logical.finalized_at,
-          latest_logical.classification_confidence,
-          latest_logical.impact_level,
-          COALESCE(logical_findings.critical_findings, 0) AS critical_findings,
-          COALESCE(logical_findings.warning_findings, 0) AS warning_findings,
-          COALESCE(logical_findings.suggestion_findings, 0) AS suggestion_findings
-        FROM latest_logical
-        LEFT JOIN logical_findings USING (repository, pr_number)
-      )
-      SELECT
-        contributor_key,
-        (ARRAY_AGG(display_name ORDER BY finalized_at DESC, display_name))[1] AS display_name,
-        BOOL_OR(limited_identity) AS limited_identity,
-        COUNT(*) AS tracked_prs,
-        COALESCE(SUM(CASE
-          WHEN classification_confidence = 'low' THEN 0
-          WHEN impact_level = 'high' THEN 3
-          WHEN impact_level = 'medium' THEN 2
-          WHEN impact_level = 'low' THEN 1
-          ELSE 0 END), 0) AS estimated_impact_points,
-        COUNT(*) FILTER (WHERE classification_confidence <> 'low' AND impact_level = 'high') AS high_impact_prs,
-        COALESCE(SUM(critical_findings), 0) AS critical_findings,
-        COALESCE(SUM(warning_findings), 0) AS warning_findings,
-        COALESCE(SUM(suggestion_findings), 0) AS suggestion_findings,
-        COUNT(*) FILTER (WHERE critical_findings = 0) AS prs_without_critical_findings
-      FROM contributor_prs
-      GROUP BY contributor_key
-      ORDER BY
-        (COUNT(*) >= 5) DESC,
-        estimated_impact_points DESC,
-        high_impact_prs DESC,
-        tracked_prs DESC,
-        contributor_key ASC
-      LIMIT 50
-    `);
-
-    contributorRows = contributorResult.rows.map(row => {
-      const trackedPrs = numberValue(row.tracked_prs);
-      return {
-        contributorKey: row.contributor_key,
-        displayName: row.display_name,
-        limitedIdentity: row.limited_identity,
-        limitedData: trackedPrs < 5,
-        trackedPrs,
-        estimatedImpactPoints: numberValue(row.estimated_impact_points),
-        highImpactPrs: numberValue(row.high_impact_prs),
-        criticalFindings: numberValue(row.critical_findings),
-        warningFindings: numberValue(row.warning_findings),
-        suggestionFindings: numberValue(row.suggestion_findings),
-        prsWithoutCriticalFindings: numberValue(row.prs_without_critical_findings),
-      };
-    });
-  }
-
-  const enrolledCompletedReviews = numberValue(summaryRow.enrolled_completed_reviews);
-  const captured = numberValue(summaryRow.captured);
-  const complexity: CodeReviewAnalyticsDashboard['impactBreakdown']['complexity'] = [];
-  const changeTypes: CodeReviewAnalyticsDashboard['impactBreakdown']['changeTypes'] = [];
-  for (const row of distributionResult.rows) {
-    const normalized = {
-      value: row.value,
-      count: numberValue(row.count),
-      lowConfidenceCount: numberValue(row.low_confidence_count),
-    };
-    if (row.kind === 'complexity') {
-      complexity.push(
-        normalized as CodeReviewAnalyticsDistributionRow<CodeReviewAnalyticsComplexityLevel>
-      );
-    } else {
-      changeTypes.push(
-        normalized as CodeReviewAnalyticsDistributionRow<CodeReviewAnalyticsChangeType>
-      );
-    }
-  }
 
   return {
     settings: {
@@ -704,60 +736,19 @@ export async function getCodeReviewAnalyticsDashboard(
       platform: input.platform,
     },
     coverage: {
-      enrolledCompletedReviews,
-      captured,
-      missing: numberValue(summaryRow.missing),
-      invalid: numberValue(summaryRow.invalid),
-      omitted: numberValue(summaryRow.omitted),
+      ...dashboard.coverage,
       capturePercentage:
         enrolledCompletedReviews === 0 ? null : (captured / enrolledCompletedReviews) * 100,
     },
-    summary: {
-      trackedReviews: numberValue(summaryRow.tracked_reviews),
-      trackedPrsOrMrs: numberValue(summaryRow.tracked_prs),
-      totalFindings: numberValue(summaryRow.total_findings),
-      criticalFindings: numberValue(summaryRow.critical_findings),
-      warningFindings: numberValue(summaryRow.warning_findings),
-      highImpactChanges: numberValue(summaryRow.high_impact_changes),
-      estimatedImpactPoints: numberValue(summaryRow.estimated_impact_points),
-    },
-    repositoryOptions: repositoryOptionResult.rows.map(row => row.repository),
-    impactBreakdown: {
-      impact: {
-        low: numberValue(summaryRow.impact_low),
-        medium: numberValue(summaryRow.impact_medium),
-        high: numberValue(summaryRow.impact_high),
-        unclassified: numberValue(summaryRow.impact_unclassified),
-      },
-      complexity,
-      changeTypes,
-    },
-    findingBreakdown: findingBreakdownResult.rows.map(row => ({
-      value: row.value,
-      total: numberValue(row.total),
-      critical: numberValue(row.critical),
-      warning: numberValue(row.warning),
-      suggestion: numberValue(row.suggestion),
-    })),
-    securityBreakdown: securityBreakdownResult.rows.map(row => ({
-      value: row.value,
-      total: numberValue(row.total),
-      critical: numberValue(row.critical),
-      warning: numberValue(row.warning),
-      suggestion: numberValue(row.suggestion),
-    })),
-    repositories: repositoryResult.rows.map(row => ({
-      repository: row.repository,
-      trackedPrsOrMrs: numberValue(row.tracked_prs),
-      estimatedImpactPoints: numberValue(row.estimated_impact_points),
-      highImpactChanges: numberValue(row.high_impact_changes),
-      criticalFindings: numberValue(row.critical_findings),
-      warningFindings: numberValue(row.warning_findings),
-      suggestionFindings: numberValue(row.suggestion_findings),
-    })),
+    summary: dashboard.summary,
+    repositoryOptions: dashboard.repository_options,
+    impactBreakdown: dashboard.impact_breakdown,
+    findingBreakdown: dashboard.finding_breakdown,
+    securityBreakdown: dashboard.security_breakdown,
+    repositories: dashboard.repositories,
     contributors: {
       capability: contributorCapability,
-      rows: contributorRows,
+      rows: contributorCapability === 'available' ? dashboard.contributor_rows : [],
     },
   };
 }

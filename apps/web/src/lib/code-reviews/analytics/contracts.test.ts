@@ -248,6 +248,11 @@ describe('analytics prompt contract', () => {
     expect(appended).toContain('carried forward from a previous review');
     expect(appended).toContain('Do not include finding text or prose');
     expect(appended).toContain('path, file path, symbol, line, line range, code, code excerpt');
+    expect(appended).toContain(
+      marker(
+        manifest(undefined, [{ severity: 'warning', category: 'correctness', securityClass: null }])
+      )
+    );
   });
 
   it('refuses to exceed the shared Cloud Agent prompt limit', () => {

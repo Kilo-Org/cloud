@@ -42,7 +42,6 @@ type CodeReviewAnalyticsPanelProps = {
 type PeriodDays = 7 | 30 | 90;
 
 const ALL_REPOSITORIES = '__all_repositories__';
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function formatCount(value: number): string {
   return value.toLocaleString();
@@ -376,23 +375,14 @@ export function CodeReviewAnalyticsPanel({
   const [repository, setRepository] = useState<string>();
   const [hasObservedHistory, setHasObservedHistory] = useState(false);
 
-  const dateRange = useMemo(() => {
-    const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - period * DAY_IN_MS);
-    return {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-    };
-  }, [period]);
-
   const queryInput = useMemo(
     () => ({
       platform,
-      ...dateRange,
+      periodDays: period,
       organizationId,
       ...(repository ? { repository } : {}),
     }),
-    [dateRange, organizationId, platform, repository]
+    [organizationId, period, platform, repository]
   );
 
   const dashboardQuery = useQuery(

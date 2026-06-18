@@ -108,6 +108,30 @@ describe('Code Reviewer analytics router', () => {
     return reviewId;
   }
 
+  async function completeEnrolledReviewWithoutAnalyticsResult(repository: string) {
+    const completedAt = new Date();
+    const reviewId = await createCodeReview({
+      owner: { type: 'org', id: organizationId, userId: ownerId },
+      repoFullName: repository,
+      prNumber: 1,
+      prUrl: `https://github.com/${repository}/pull/1`,
+      prTitle: 'Missing analytics result',
+      prAuthor: 'octocat',
+      prAuthorGithubId: '1234',
+      baseRef: 'main',
+      headRef: 'feature-missing-result',
+      headSha: crypto.randomUUID(),
+      platform: 'github',
+    });
+    await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'completed',
+      completedAt,
+      analyticsEnabledAtDispatch: true,
+    });
+    await updateCodeReviewStatus(reviewId, 'completed', { completedAt });
+  }
+
   it('returns owner-scoped, deduplicated metrics and GitHub contributors to members', async () => {
     const repository = `analytics/router-${crypto.randomUUID()}`;
     await captureReview({
@@ -176,12 +200,10 @@ describe('Code Reviewer analytics router', () => {
     });
 
     const memberCaller = await createCallerForUser(memberId);
-    const now = Date.now();
     const dashboard = await memberCaller.codeReviews.analytics.getDashboard({
       organizationId,
       platform: 'github',
-      startDate: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
-      endDate: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+      periodDays: 7,
     });
 
     expect(dashboard.settings).toEqual({ enabled: true, canManage: false, platform: 'github' });
@@ -226,15 +248,45 @@ describe('Code Reviewer analytics router', () => {
     ]);
   });
 
+  it('counts an enrolled completion without a result as missing coverage', async () => {
+    const repository = `analytics/missing-${crypto.randomUUID()}`;
+    await completeEnrolledReviewWithoutAnalyticsResult(repository);
+    const memberCaller = await createCallerForUser(memberId);
+
+    const dashboard = await memberCaller.codeReviews.analytics.getDashboard({
+      organizationId,
+      platform: 'github',
+      periodDays: 7,
+      repository,
+    });
+
+    expect(dashboard.coverage).toEqual({
+      enrolledCompletedReviews: 1,
+      captured: 0,
+      missing: 1,
+      invalid: 0,
+      omitted: 0,
+      capturePercentage: 0,
+    });
+    expect(dashboard.summary).toEqual({
+      trackedReviews: 0,
+      trackedPrsOrMrs: 0,
+      totalFindings: 0,
+      criticalFindings: 0,
+      warningFindings: 0,
+      highImpactChanges: 0,
+      estimatedImpactPoints: 0,
+    });
+    expect(dashboard.repositoryOptions).toContain(repository);
+  });
+
   it('requires organization scope for reads and settings changes', async () => {
     const caller = await createCallerForUser(ownerId);
-    const now = Date.now();
 
     await expect(
       caller.codeReviews.analytics.getDashboard({
         platform: 'github',
-        startDate: new Date(now - 60_000).toISOString(),
-        endDate: new Date(now + 60_000).toISOString(),
+        periodDays: 7,
       } as never)
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     await expect(
@@ -249,7 +301,6 @@ describe('Code Reviewer analytics router', () => {
     const memberCaller = await createCallerForUser(memberId);
     const ownerCaller = await createCallerForUser(ownerId);
     const outsiderCaller = await createCallerForUser(outsiderId);
-    const now = Date.now();
 
     await expect(
       memberCaller.codeReviews.analytics.setEnabled({
@@ -269,8 +320,7 @@ describe('Code Reviewer analytics router', () => {
       outsiderCaller.codeReviews.analytics.getDashboard({
         organizationId,
         platform: 'github',
-        startDate: new Date(now - 60_000).toISOString(),
-        endDate: new Date(now + 60_000).toISOString(),
+        periodDays: 7,
       })
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });

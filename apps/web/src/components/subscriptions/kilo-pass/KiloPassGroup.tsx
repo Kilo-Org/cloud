@@ -132,13 +132,21 @@ export function KiloPassGroup({
                 : undefined
           }
           statusNote={subscriptionDisplay.cardNotice}
-          action={<KiloPassReferralButton className="w-full sm:w-auto" />}
+          action={
+            <KiloPassReferralButton
+              className="w-full sm:w-auto"
+              source="kilo_pass_group_subscription_card"
+            />
+          }
           actionPlacement="top-right"
         />
       ) : (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <KiloPassReferralButton className="w-full sm:w-auto" />
+            <KiloPassReferralButton
+              className="w-full sm:w-auto"
+              source="kilo_pass_group_subscribe_card"
+            />
           </div>
           <KiloPassSubscribeCard
             cadence={cadence}

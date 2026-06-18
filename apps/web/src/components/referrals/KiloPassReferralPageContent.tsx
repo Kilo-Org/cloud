@@ -1,8 +1,9 @@
 'use client';
 
-import React, { type ReactNode } from 'react';
+import React, { useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { CalendarDays, Gift, History, Info, Sparkles } from 'lucide-react';
+import { usePostHog } from 'posthog-js/react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -219,6 +220,12 @@ export function KiloPassReferralPageContent({
   errorMessage,
   children,
 }: KiloPassReferralPageContentProps) {
+  const posthog = usePostHog();
+
+  useEffect(() => {
+    posthog?.capture('kilo_pass_referral_page_viewed');
+  }, [posthog]);
+
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
       <div className="space-y-2">

@@ -79,6 +79,20 @@ export class RawHtml {
 
 type TemplateVars = Record<string, string | RawHtml>;
 
+const AUTOLINK_PROTOCOL_PATTERN = /\b(https?):\/\//gi;
+const AUTOLINK_WWW_PATTERN = /\bwww\./gi;
+const AUTOLINK_BARE_DOMAIN_PATTERN =
+  /\b([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\.)([a-z]{2,})(?=\b)/gi;
+
+export function renderNonAutolinkedText(str: string): RawHtml {
+  return new RawHtml(
+    escapeHtml(str)
+      .replace(AUTOLINK_PROTOCOL_PATTERN, '$1:&#8203;//')
+      .replace(AUTOLINK_WWW_PATTERN, 'www&#8203;.')
+      .replace(AUTOLINK_BARE_DOMAIN_PATTERN, '$1&#8203;$2$3')
+  );
+}
+
 export function renderTemplate(name: string, vars: TemplateVars): string {
   const templatePath = path.join(process.cwd(), 'src', 'emails', `${name}.html`);
   const html = fs.readFileSync(templatePath, 'utf-8');
@@ -195,7 +209,7 @@ export async function sendOrganizationInviteEmail(
     to: data.to,
     templateName: 'orgInvitation',
     templateVars: {
-      organization_name: data.organizationName,
+      organization_name: renderNonAutolinkedText(data.organizationName),
       inviter_name: data.inviterName,
       accept_invite_url: data.acceptInviteUrl,
     },

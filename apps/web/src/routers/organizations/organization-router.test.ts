@@ -338,6 +338,20 @@ describe('organizations trpc router', () => {
           name: longName,
         })
       ).rejects.toThrow('Organization name must be less than 100 characters');
+
+      await expect(
+        caller.organizations.update({
+          organizationId: testOrganization.id,
+          name: 'https://evil.example',
+        })
+      ).rejects.toThrow('Organization name cannot contain a URL');
+
+      await expect(
+        caller.organizations.create({
+          name: 'www.evil.example',
+          autoAddCreator: true,
+        })
+      ).rejects.toThrow('Organization name cannot contain a URL');
     });
 
     it('should trim whitespace from organization name', async () => {

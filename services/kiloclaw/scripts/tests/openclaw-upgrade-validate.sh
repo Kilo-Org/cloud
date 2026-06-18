@@ -21,6 +21,10 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KILOCLAW_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# Shared credential lookup so preflight decides "is a key available?" exactly the
+# way smoke-live-provider.sh does (active provider's token, not any occurrence).
+source "$SCRIPT_DIR/provider-creds.sh"
+
 hr() { printf -- '----------------------------------------------------------------------\n'; }
 section() { echo; hr; echo "$1"; hr; }
 
@@ -76,22 +80,24 @@ else
 fi
 
 # Phase 1 (image-checks) builds the WORKING TREE; Phase 2 (smoke) builds committed
-# HEAD via worktrees. If tracked files differ from HEAD, the two phases would
-# validate different candidates — guard so the report reflects exactly what merges.
+# HEAD via worktrees. If tracked files differ from HEAD, the two phases validate
+# DIFFERENT candidates, so no single candidate passes both — refuse by default.
+# ALLOW_DIRTY_TREE=true is an explicit experimentation override; such a run is
+# flagged DIRTY_TREE and can never report a clean validation (see the summary).
+DIRTY_TREE=0
 if ! git diff --quiet HEAD 2>/dev/null; then
-  echo "⚠ Uncommitted changes to tracked files detected. Phase 1 builds your working"
-  echo "  tree, but Phase 2 (and a real bump) build committed HEAD — the report could"
-  echo "  mix two different candidates. Commit your changes to validate what merges."
-  if [ -t 0 ]; then
-    printf '\nContinue anyway? [y/N] '
-    read -r reply_dirty
-    case "${reply_dirty:-}" in
-      [yY]*) echo "Continuing with a dirty tracked tree ..." ;;
-      *) echo "Stopped. Commit your changes and re-run."; exit 2 ;;
-    esac
-  else
-    echo "(non-interactive shell: continuing with a dirty tracked tree.)"
+  if [ "${ALLOW_DIRTY_TREE:-false}" != "true" ]; then
+    echo "✗ Uncommitted changes to tracked files. Phase 1 builds your working tree but"
+    echo "  Phase 2 builds committed HEAD — the two phases would validate different"
+    echo "  candidates. Commit your changes and re-run to validate exactly what merges."
+    echo "  (Experimentation only: set ALLOW_DIRTY_TREE=true — that run cannot report a"
+    echo "  clean validation.)"
+    exit 2
   fi
+  DIRTY_TREE=1
+  echo "⚠ ALLOW_DIRTY_TREE=true and the tracked tree is dirty: Phase 1 builds your"
+  echo "  working tree, Phase 2 builds committed HEAD — this run will NOT report a"
+  echo "  clean validation regardless of results."
 fi
 
 # Optional CVE scanner.
@@ -101,15 +107,16 @@ else
   echo "• grype not installed — CVE scan will be skipped (install: brew install grype)"
 fi
 
-# Credential for Phase 2: env var, or an active token in the Kilo CLI config.
+# Credential for Phase 2: env var, or the ACTIVE provider's token in the Kilo CLI
+# config (matching smoke-live-provider.sh — a stale/inactive-provider token does
+# not count, so preflight never schedules Phase 2 for creds the smoke would reject).
 HAVE_KEY=0
 if [ -n "${KILOCODE_API_KEY:-}" ]; then
   HAVE_KEY=1
   echo "✓ KILOCODE_API_KEY is set"
-elif [ -f "$HOME/.kilocode/cli/config.json" ] \
-  && grep -q 'kilocodeToken' "$HOME/.kilocode/cli/config.json" 2>/dev/null; then
+elif [ -n "$(read_active_provider_value kilocodeToken 2>/dev/null)" ]; then
   HAVE_KEY=1
-  echo "✓ Kilo CLI credentials found"
+  echo "✓ Active Kilo CLI credential found"
 else
   echo "• No Kilo API key set"
 fi
@@ -230,6 +237,12 @@ echo
 if [ "$VERIFY_RESULT" = "FAILED" ] || [ "$SMOKE_RESULT" = "FAILED" ]; then
   echo "✗ A phase failed — do not mark the PR ready. Fix the issues and re-run."
   exit 1
+fi
+if [ "$DIRTY_TREE" -eq 1 ]; then
+  echo "⚠ Not a clean validation — the tracked tree was dirty (ALLOW_DIRTY_TREE), so"
+  echo "  Phase 1 built your working tree and Phase 2 built committed HEAD. Commit and"
+  echo "  re-run to validate a single candidate before marking the PR ready."
+  exit 2
 fi
 if [ "$VERIFY_RESULT" = "passed" ] && [ "$SMOKE_RESULT" = "passed" ]; then
   echo "✓ Both phases passed. Record the evidence on the PR (versions, results, and"

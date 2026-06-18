@@ -26,6 +26,7 @@ EXPECTED_VERSION_AFTER="${EXPECTED_VERSION_AFTER:-}"
 MODE="fresh"
 
 source "$SCRIPT_DIR/smoke-helpers.sh"
+source "$SCRIPT_DIR/provider-creds.sh"
 
 usage() {
   cat <<'EOF'
@@ -50,38 +51,6 @@ case "${1:-}" in
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
-
-read_active_provider_value() {
-  local field="$1"
-  python3 - "$KILOCODE_CONFIG_PATH" "$field" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1]).expanduser()
-field = sys.argv[2]
-try:
-    document = json.loads(path.read_text())
-except FileNotFoundError:
-    raise SystemExit(0)
-except (OSError, json.JSONDecodeError) as error:
-    print(f'Unable to read Kilo CLI config at {path}: {error}', file=sys.stderr)
-    raise SystemExit(1)
-
-active_id = document.get('provider')
-providers = document.get('providers', [])
-if not isinstance(active_id, str) or not isinstance(providers, list):
-    raise SystemExit(0)
-
-for provider in providers:
-    if not isinstance(provider, dict) or provider.get('id') != active_id:
-        continue
-    value = provider.get(field)
-    if isinstance(value, str) and value:
-        sys.stdout.write(value)
-    raise SystemExit(0)
-PY
-}
 
 CREDENTIAL_SOURCE="environment"
 if [ -z "${KILOCODE_API_KEY:-}" ]; then

@@ -72,6 +72,29 @@ describe('auto routing contracts', () => {
     expect(
       AutoRoutingDecisionResponseSchema.parse({
         cost: 0,
+        decision: {
+          model: 'minimax/minimax-m3',
+          taskType: null,
+          subtaskType: null,
+          source: 'coding_plan_default',
+          tableVersion: 'coding-plan:v1',
+          reasoningEffort: null,
+          sticky: false,
+        },
+        classifierResult: null,
+      })
+    ).toMatchObject({
+      decision: {
+        model: 'minimax/minimax-m3',
+        taskType: null,
+        subtaskType: null,
+        source: 'coding_plan_default',
+      },
+    });
+
+    expect(
+      AutoRoutingDecisionResponseSchema.parse({
+        cost: 0,
         decision: null,
         classifierResult: {
           classification: {

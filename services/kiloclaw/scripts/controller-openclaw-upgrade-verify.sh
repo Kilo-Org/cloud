@@ -88,9 +88,22 @@ scan_image_cves() {
     return 0
   fi
 
-  local json
+  local json db_built
   json="$(mktemp)"
-  echo "Scanning $IMAGE ... (grype may refresh its vulnerability DB on first run)"
+
+  # Force the vulnerability DB to the latest before scanning, rather than relying
+  # on grype's implicit refresh — a security scan should use current data. If the
+  # update fails (e.g. offline), fall back to the existing DB and say so.
+  echo "Updating grype vulnerability database ..."
+  if grype db update -q >/dev/null 2>&1; then
+    db_built=$(grype db status 2>/dev/null | awk '/^Built:/{print $2; exit}')
+    echo "  DB updated (built: ${db_built:-unknown})"
+  else
+    db_built=$(grype db status 2>/dev/null | awk '/^Built:/{print $2; exit}')
+    echo "  WARN: grype db update failed — scanning against the existing DB (built: ${db_built:-unknown})"
+  fi
+
+  echo "Scanning $IMAGE (full image — base OS + Go + npm) ..."
   if ! grype "$IMAGE" -o "table=$CVE_REPORT" -o "json=$json" -q >/dev/null 2>&1; then
     echo "WARN: grype scan did not complete; skipping CVE report"
     rm -f "$json"

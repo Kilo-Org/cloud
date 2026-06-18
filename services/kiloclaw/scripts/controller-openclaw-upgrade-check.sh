@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# START HERE — single entry point for validating a KiloClaw OpenClaw bump locally.
+#
+# Run this and follow the guidance; you do not need to know the individual
+# scripts. It runs, in order:
+#
+#   Phase 1  keyless verification   — builds the candidate image, checks the
+#            version / bundle patches / plugins, validates config schema, and
+#            runs a full grype CVE scan. No Kilo API key needed.
+#
+#   Phase 2  credentialed live smoke — builds the before/after images, performs
+#            the persisted-root upgrade (boots baseline, then candidate on the
+#            same /root), and runs every assertion incl. a real Auto Free gateway
+#            turn. Needs a dedicated free-model Kilo API key.
+#
+# OpenClaw is never built or run in CI (it is a security-sensitive upstream), so
+# this is the gate a human runs locally before marking the bump PR ready.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
+
+hr() { printf -- '----------------------------------------------------------------------\n'; }
+section() { echo; hr; echo "$1"; hr; }
+
+# When Phase 2 cannot run, ask whether to do the keyless checks anyway or stop.
+# Stops by default so a missing key/branch is not silently treated as "done".
+ask_continue_keyless_or_stop() {
+  if [ -t 0 ]; then
+    printf '\nContinue with the keyless checks only? [y/N] '
+    read -r reply
+    case "${reply:-}" in
+      [yY]*) echo "Continuing with the keyless checks only ..." ;;
+      *) echo "Stopped."; exit 2 ;;
+    esac
+  else
+    echo
+    echo "(non-interactive shell: continuing with the keyless checks only.)"
+  fi
+}
+
+VERIFY_RESULT="not run"
+SMOKE_RESULT="not run"
+
+section "OpenClaw upgrade — local validation"
+echo "Validates an OpenClaw version bump end to end. Follow the notes below."
+
+# ── Preflight ────────────────────────────────────────────────────────────────
+section "Preflight"
+
+if ! docker info >/dev/null 2>&1; then
+  echo "✗ Docker is not running. Start Docker and re-run this script."
+  exit 1
+fi
+echo "✓ Docker is running"
+
+# Is this an actual bump branch? Compare the committed origin/main pin to HEAD.
+git fetch origin main -q 2>/dev/null || true
+VER_BEFORE=$(git show origin/main:services/kiloclaw/Dockerfile 2>/dev/null \
+  | grep -oE 'openclaw@[0-9]+\.[0-9]+\.[0-9]+' | head -1 | cut -d'@' -f2)
+VER_AFTER=$(grep -oE 'openclaw@[0-9]+\.[0-9]+\.[0-9]+' "$KILOCLAW_DIR/Dockerfile" \
+  | head -1 | cut -d'@' -f2)
+IS_BUMP=1
+if [ -z "$VER_AFTER" ]; then
+  echo "✗ Could not read the OpenClaw pin from the Dockerfile."
+  exit 1
+fi
+if [ -n "$VER_BEFORE" ] && [ "$VER_BEFORE" = "$VER_AFTER" ]; then
+  IS_BUMP=0
+  echo "• Not a bump branch — HEAD and origin/main both pin openclaw@$VER_AFTER"
+else
+  echo "✓ Bump branch: openclaw ${VER_BEFORE:-?} -> $VER_AFTER"
+fi
+
+# Optional CVE scanner.
+if command -v grype >/dev/null 2>&1; then
+  echo "✓ grype installed (CVE scan will run in Phase 1)"
+else
+  echo "• grype not installed — CVE scan will be skipped (install: brew install grype)"
+fi
+
+# Credential for Phase 2: env var, or an active token in the Kilo CLI config.
+HAVE_KEY=0
+if [ -n "${KILOCODE_API_KEY:-}" ]; then
+  HAVE_KEY=1
+  echo "✓ KILOCODE_API_KEY is set"
+elif [ -f "$HOME/.kilocode/cli/config.json" ] \
+  && grep -q 'kilocodeToken' "$HOME/.kilocode/cli/config.json" 2>/dev/null; then
+  HAVE_KEY=1
+  echo "✓ Kilo CLI credentials found"
+else
+  echo "• No Kilo API key set"
+fi
+
+# ── Will Phase 2 run? Decide and explain it now, before the long build. ───────
+# PHASE2_MODE: "upgrade"  = real before->after upgrade test (a bump branch),
+#              "mechanics" = same version both sides (exercises the harness only),
+#              ""          = skipped.
+PHASE2_MODE=""
+SMOKE_SAME_VERSION="false"
+
+echo
+echo "Plan for this run:"
+echo "  • Phase 1 — keyless checks (build, patches, config, CVE scan): will run"
+
+if [ "$IS_BUMP" -eq 1 ] && [ "$HAVE_KEY" -eq 1 ]; then
+  PHASE2_MODE="upgrade"
+  echo "  • Phase 2 — credentialed live smoke: will run"
+
+elif [ "$IS_BUMP" -eq 1 ]; then
+  echo "  • Phase 2 — credentialed live smoke: WILL BE SKIPPED (no Kilo API key is set)"
+  echo
+  echo "Phase 2 (the live smoke) is half the coverage and needs a Kilo API key."
+  echo "For the full validation, set a dedicated free-model key and re-run:"
+  echo "    export KILOCODE_API_KEY=<key>   # from https://app.kilo.ai/profile (bottom)"
+  echo "    bash $0"
+  ask_continue_keyless_or_stop
+
+elif [ "$HAVE_KEY" -eq 1 ]; then
+  # Not a bump branch, but a key is available — offer the mechanics-only run.
+  echo "  • Phase 2 — credentialed live smoke: optional (not a bump branch)"
+  echo
+  echo "You are not on a bump branch, so there is no real upgrade to compare. You can"
+  echo "still run the smoke to exercise the mechanics — it boots the same OpenClaw"
+  echo "version on both sides, checking the harness rather than an actual upgrade."
+  if [ -t 0 ]; then
+    printf '\nRun the smoke anyway to exercise the mechanics? [y/N] '
+    read -r reply_mech
+    case "${reply_mech:-}" in
+      [yY]*)
+        PHASE2_MODE="mechanics"
+        SMOKE_SAME_VERSION="true"
+        echo "Will run Phase 2 in mechanics mode (same version both sides)." ;;
+      *)
+        echo "Skipping Phase 2; running the keyless checks only." ;;
+    esac
+  else
+    echo "(non-interactive shell: skipping Phase 2; running the keyless checks only.)"
+  fi
+
+else
+  echo "  • Phase 2 — credentialed live smoke: WILL BE SKIPPED (not a bump branch, no API key)"
+  echo
+  echo "You are not on a bump branch (the kind the bump bot opens automatically), so"
+  echo "there is no upgrade to validate. Phase 2 runs on a feat/bump-openclaw-* branch."
+  ask_continue_keyless_or_stop
+fi
+
+# ── Phase 1: keyless verification ────────────────────────────────────────────
+section "Phase 1/2 — keyless verification (build, patches, config, CVE scan)"
+if bash "$SCRIPT_DIR/controller-openclaw-upgrade-verify.sh"; then
+  VERIFY_RESULT="passed"
+  echo
+  echo "✓ Phase 1 passed"
+else
+  VERIFY_RESULT="FAILED"
+  echo
+  echo "✗ Phase 1 FAILED — review the output above before going further."
+fi
+
+# ── Phase 2: credentialed live smoke ─────────────────────────────────────────
+section "Phase 2/2 — credentialed live smoke (persisted-root upgrade + gateway turn)"
+if [ -z "$PHASE2_MODE" ]; then
+  if [ "$IS_BUMP" -eq 0 ]; then
+    SMOKE_RESULT="skipped (not a bump branch)"
+  else
+    SMOKE_RESULT="skipped (no API key)"
+  fi
+  echo "Skipped — see the preflight note above."
+else
+  if [ "$PHASE2_MODE" = "mechanics" ]; then
+    echo "Mechanics mode: same OpenClaw version on both sides — this checks the harness,"
+    echo "not a real upgrade. (You are not on a bump branch.)"
+    echo
+  fi
+  # Build from committed HEAD via worktrees, so a dirty working tree (e.g.
+  # untracked notes) is safe and does not enter the image. ALLOW_SAME lets the
+  # smoke run when before/after pin the same version (mechanics mode).
+  if ALLOW_DIRTY_CHECKOUT="${ALLOW_DIRTY_CHECKOUT:-true}" \
+     ALLOW_SAME_OPENCLAW_VERSION="$SMOKE_SAME_VERSION" \
+     bash "$SCRIPT_DIR/controller-openclaw-upgrade-smoke-test.sh"; then
+    if [ "$PHASE2_MODE" = "mechanics" ]; then
+      SMOKE_RESULT="passed (mechanics only)"
+    else
+      SMOKE_RESULT="passed"
+    fi
+    echo
+    echo "✓ Phase 2 passed"
+  else
+    SMOKE_RESULT="FAILED"
+    echo
+    echo "✗ Phase 2 FAILED — review the output above."
+  fi
+fi
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+section "Summary"
+echo "  Phase 1 (keyless verification): $VERIFY_RESULT"
+echo "  Phase 2 (credentialed smoke):   $SMOKE_RESULT"
+echo
+
+if [ "$VERIFY_RESULT" = "FAILED" ] || [ "$SMOKE_RESULT" = "FAILED" ]; then
+  echo "✗ A phase failed — do not mark the PR ready. Fix the issues and re-run."
+  exit 1
+fi
+if [ "$VERIFY_RESULT" = "passed" ] && [ "$SMOKE_RESULT" = "passed" ]; then
+  echo "✓ Both phases passed. Record the evidence on the PR (versions, results, and"
+  echo "  any notable grype findings), then a human can mark it ready. Never paste"
+  echo "  API keys, tokens, or prompts into the PR."
+  exit 0
+fi
+if [ "$SMOKE_RESULT" = "passed (mechanics only)" ]; then
+  echo "✓ Keyless checks and the smoke mechanics passed — but this is NOT a bump branch,"
+  echo "  so no real upgrade was validated. Run on a feat/bump-openclaw-* branch for the"
+  echo "  actual upgrade validation."
+  exit 0
+fi
+echo "• Validation incomplete — Phase 2 did not run. Follow the guidance above,"
+echo "  then re-run this script before marking the PR ready."
+exit 2

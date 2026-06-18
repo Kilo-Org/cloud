@@ -560,22 +560,26 @@ describe('codeReviewRouter attempts', () => {
 
     const caller = await createCallerForUser(testUser.id);
     const before = await caller.codeReviews.get({ reviewId: review.id });
-    if (!before.success) {
-      throw new Error('Expected successful code review get');
-    }
-    expect(before.attempts).toEqual([]);
-    expect(before.tokenUsage).toEqual({ input: 1200, output: 300, cached: null });
+    expect(before).toEqual(
+      expect.objectContaining({
+        success: true,
+        attempts: [],
+        tokenUsage: { input: 1200, output: 300, cached: null },
+      })
+    );
 
     await caller.codeReviews.retrigger({ reviewId: review.id });
 
     const after = await caller.codeReviews.get({ reviewId: review.id });
-    if (!after.success) {
-      throw new Error('Expected successful code review get');
-    }
-
-    expect(after.attempts).toHaveLength(2);
-    expect(after.attempts.map(attempt => attempt.retry_reason)).toEqual([null, 'manual_retrigger']);
-    expect(after.attempts[0]?.session_id).toBe('agent-first');
+    expect(after).toEqual(
+      expect.objectContaining({
+        success: true,
+        attempts: [
+          expect.objectContaining({ session_id: 'agent-first', retry_reason: null }),
+          expect.objectContaining({ retry_reason: 'manual_retrigger' }),
+        ],
+      })
+    );
 
     const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
       where: eq(cloud_agent_code_reviews.id, review.id),

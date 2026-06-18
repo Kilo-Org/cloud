@@ -18,16 +18,16 @@ const setupSteps = [
 ];
 
 const guidanceItems = [
-  'Repository invariants and business rules that reviewers must preserve.',
-  'Severity calibration, including what Kilo should not flag.',
-  'Testing and verification expectations for changed code.',
-  'Security and performance concerns specific to the codebase.',
-  'Preferred review summary and comment style.',
+  'What Kilo should flag or skip, including repository invariants and codebase-specific concerns.',
+  'Severity calibration for review findings.',
+  'Evidence standards for deciding whether a repository-specific concern is a finding.',
 ];
 
 const limits = [
-  'Hard safety, tooling, platform, and read-only constraints still apply.',
-  'Custom instructions and focus areas are still applied around repository guidance.',
+  "Kilo's built-in system role and its safety, read-only, and noninteractive rules remain authoritative.",
+  'The built-in execution workflow and platform commands and API instructions remain authoritative.',
+  'Built-in comment and summary output formats remain authoritative.',
+  'Structured focus areas still apply. Legacy custom instructions do not.',
   '@ imports are not expanded. Keep the guidance directly in REVIEW.md.',
   'Content is truncated after 10,000 characters.',
   'Do not include secrets, credentials, tokens, or private operational data.',
@@ -38,17 +38,17 @@ const exampleReviewMd = `# REVIEW.md
 ## What matters in this repository
 - Preserve tenant isolation for every database query.
 - Treat billing, auth, and deletion flows as high-risk changes.
-- Prefer small, explicit fixes over broad refactors.
+- Flag changes that weaken repository-specific security boundaries.
 
 ## Severity calibration
 - Critical: data loss, privilege escalation, token exposure, billing errors.
 - Warning: missing validation, unsafe defaults, untested edge cases.
 - Do not flag formatting-only differences when tooling already enforces them.
 
-## Verification expectations
-- New business rules need tests that assert the observable result.
-- Database changes need migration coverage and rollback-aware review.
-- UI changes should preserve keyboard and screen reader behavior.
+## Evidence standards
+- Flag new business rules when tests do not assert the observable result.
+- Flag database changes without migration coverage or rollback-aware handling.
+- Flag UI changes that break keyboard or screen reader behavior.
 `;
 
 export function ReviewMdGuideContent({
@@ -77,7 +77,7 @@ export function ReviewMdGuideContent({
               Use REVIEW.md for repository review guidance
             </h1>
             <p className="text-muted-foreground text-base">
-              Add a root REVIEW.md file so Kilo applies repository-specific standards during
+              Add a root REVIEW.md file so Kilo applies repository-specific review policy during
               automated reviews. This keeps review policy with the codebase and gives teams a single
               place to document what matters.
             </p>
@@ -117,6 +117,11 @@ export function ReviewMdGuideContent({
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
               <p>
+                REVIEW.md supplies repository review policy only. It controls what Kilo should flag
+                or skip, severity calibration, and evidence standards for repository-specific
+                findings.
+              </p>
+              <p>
                 Kilo reads REVIEW.md from the pull request or merge request base branch, not from
                 the feature branch. This prevents an unreviewed change from rewriting the review
                 policy that evaluates it.
@@ -148,7 +153,7 @@ export function ReviewMdGuideContent({
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">What to include</CardTitle>
+              <CardTitle className="text-xl">What REVIEW.md controls</CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="space-y-3 text-sm text-muted-foreground">

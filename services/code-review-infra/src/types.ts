@@ -66,8 +66,9 @@ export interface CodeReview {
   /** Accumulated cost in dollars across all LLM calls */
   totalCost?: number;
   events?: CodeReviewEvent[];
-  skipBalanceCheck?: boolean; // Skip balance validation in cloud agent (for OSS sponsorship)
-  /** Which cloud agent backend to use: 'v1' (cloud-agent SSE) or 'v2' (cloud-agent-next) */
+  /** Bypass cloud-agent balance validation. */
+  skipBalanceCheck?: boolean;
+  /** New reviews persist v2; state without v2 retains legacy/replay SSE v1 compatibility. */
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
@@ -135,8 +136,9 @@ export interface CodeReviewRequest {
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
+  /** Bypass cloud-agent balance validation. */
   skipBalanceCheck?: boolean;
-  /** Which cloud agent backend to use: 'v1' (cloud-agent SSE) or 'v2' (cloud-agent-next) */
+  /** New reviews send v2; payloads without v2 are accepted only for legacy/replay compatibility. */
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
@@ -161,8 +163,9 @@ export interface Env {
   API_URL: string;
   INTERNAL_API_SECRET: string;
   CALLBACK_TOKEN_SECRET: string;
+  /** Legacy cloud-agent SSE v1 URL. */
   CLOUD_AGENT_URL: string;
-  /** cloud-agent-next URL (used when useCloudAgentNext feature flag is enabled) */
+  /** cloud-agent-next URL for the default v2 callback execution path for new reviews. */
   CLOUD_AGENT_NEXT_URL: string;
   BACKEND_AUTH_TOKEN: string;
 

@@ -6,24 +6,6 @@ export {
 export type { ManuallyAddedRepository, CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 
 /**
- * Zod schema for remote prompt template from PostHog
- * Used to fetch and validate prompt configurations remotely
- */
-export const RemotePromptTemplateSchema = z.object({
-  version: z.string(), // e.g., "v1.0.0"
-  securityBoundaries: z.string().optional(),
-  reviewInstructions: z.string().optional(),
-  styleGuidance: z.record(z.string(), z.string()).optional(),
-  focusAreaDetails: z.record(z.string(), z.string()).optional(),
-  commentFormatOverrides: z.record(z.string(), z.string()).optional(),
-  summaryFormatOverrides: z
-    .record(z.string(), z.object({ issuesFound: z.string(), noIssues: z.string() }))
-    .optional(),
-});
-
-export type RemotePromptTemplate = z.infer<typeof RemotePromptTemplateSchema>;
-
-/**
  * Zod schema for ReviewConfig validation
  * Ensures all config values are safe before workflow generation
  */

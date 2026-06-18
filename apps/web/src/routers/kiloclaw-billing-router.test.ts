@@ -155,7 +155,6 @@ jest.mock('@/lib/posthog', () => ({
     isFeatureEnabled: jest.fn(),
     getFeatureFlag: jest.fn(),
     debug: jest.fn(),
-    getFeatureFlagPayload: jest.fn(),
     alias: jest.fn(),
   }),
 }));

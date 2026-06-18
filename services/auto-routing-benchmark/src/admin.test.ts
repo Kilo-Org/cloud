@@ -425,6 +425,8 @@ describe('POST /admin/runs', () => {
     const [, runArg] = vi.mocked(insertRun).mock.calls[0];
     expect(runArg.min_accuracy).toBe(TEST_CONFIG.minAccuracy);
     expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
+    expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
+    expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
     const queuedMessages = queueSendBatch.mock.calls.flatMap(([messages]) => messages);
     expect(queueSendBatch).toHaveBeenCalledTimes(2);
     expect(queuedMessages).toHaveLength(

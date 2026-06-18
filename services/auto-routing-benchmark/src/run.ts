@@ -346,10 +346,7 @@ export async function startRun(
   const skippedModels = models.filter(m => isCarryable(m));
   const carriedSummaries = skippedModels.flatMap(m => priorByModel.get(m)?.summaries ?? []);
 
-  const benchmarkIdentity =
-    kind === 'decider'
-      ? resolveBenchmarkIdentity(config)
-      : { benchmarkUserId: config.benchmarkUserId, benchmarkOrgId: config.benchmarkOrgId };
+  const benchmarkIdentity = resolveBenchmarkIdentity(config);
 
   const maxLiveDeciderContainers = Math.min(config.maxConcurrency, DECIDER_CONTAINER_INSTANCE_CAP);
   if (kind === 'decider') {

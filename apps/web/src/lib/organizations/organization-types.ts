@@ -45,11 +45,7 @@ export const OrganizationNameSchema = z
   .string()
   .trim()
   .min(1, 'Organization name is required')
-  .max(100, 'Organization name must be less than 100 characters')
-  .regex(/^[\p{L}\p{N}][\p{L}\p{N} '&()-]*$/u, {
-    message:
-      'Organization name can only contain letters, numbers, spaces, apostrophes, ampersands, parentheses, and hyphens',
-  });
+  .max(100, 'Organization name must be less than 100 characters');
 
 export const OrganizationCreateRequestSchema = z.object({
   name: OrganizationNameSchema,

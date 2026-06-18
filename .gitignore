@@ -62,14 +62,6 @@ yarn-error.log*
 *.code-workspace
 *.orig
 
-# local plans & prototypes
-/plans/
-/.plans/*
-!/.plans/experimental-models-1.md
-!/.plans/experimental-models-2.md
-!/.plans/kilo-pass-welcome-promo-card-fingerprint-guard.md
-/.plan/
-.kilo/plans
 .superpowers/
 docs/superpowers/
 .kilo/node_modules
@@ -105,9 +97,6 @@ supabase/.temp
 
 # husky generated hook shims
 .husky/_/
-
-# agent plans
-.opencode/plans/
 
 # beads task workspace (per-agent local state)
 .beads/

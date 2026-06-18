@@ -55,9 +55,11 @@ if ! docker info >/dev/null 2>&1; then
 fi
 echo "✓ Docker is running"
 
-# Is this an actual bump branch? Compare the committed origin/main pin to HEAD.
-git fetch origin main -q 2>/dev/null || true
-VER_BEFORE=$(git show origin/main:services/kiloclaw/Dockerfile 2>/dev/null \
+# Is this an actual bump branch? Compare the baseline (BASE_REF, default
+# origin/main — the same "before" Phase 2 uses) to the candidate.
+BASE_REF="${BASE_REF:-origin/main}"
+[ "$BASE_REF" = "origin/main" ] && git fetch origin main -q 2>/dev/null || true
+VER_BEFORE=$(git show "$BASE_REF:services/kiloclaw/Dockerfile" 2>/dev/null \
   | grep -oE 'openclaw@[0-9]+\.[0-9]+\.[0-9]+' | head -1 | cut -d'@' -f2)
 VER_AFTER=$(grep -oE 'openclaw@[0-9]+\.[0-9]+\.[0-9]+' "$KILOCLAW_DIR/Dockerfile" \
   | head -1 | cut -d'@' -f2)
@@ -68,9 +70,28 @@ if [ -z "$VER_AFTER" ]; then
 fi
 if [ -n "$VER_BEFORE" ] && [ "$VER_BEFORE" = "$VER_AFTER" ]; then
   IS_BUMP=0
-  echo "• Not a bump branch — HEAD and origin/main both pin openclaw@$VER_AFTER"
+  echo "• Not a bump branch — $BASE_REF and the working tree both pin openclaw@$VER_AFTER"
 else
-  echo "✓ Bump branch: openclaw ${VER_BEFORE:-?} -> $VER_AFTER"
+  echo "✓ Bump branch: openclaw ${VER_BEFORE:-?} -> $VER_AFTER  (baseline: $BASE_REF)"
+fi
+
+# Phase 1 (image-checks) builds the WORKING TREE; Phase 2 (smoke) builds committed
+# HEAD via worktrees. If tracked files differ from HEAD, the two phases would
+# validate different candidates — guard so the report reflects exactly what merges.
+if ! git diff --quiet HEAD 2>/dev/null; then
+  echo "⚠ Uncommitted changes to tracked files detected. Phase 1 builds your working"
+  echo "  tree, but Phase 2 (and a real bump) build committed HEAD — the report could"
+  echo "  mix two different candidates. Commit your changes to validate what merges."
+  if [ -t 0 ]; then
+    printf '\nContinue anyway? [y/N] '
+    read -r reply_dirty
+    case "${reply_dirty:-}" in
+      [yY]*) echo "Continuing with a dirty tracked tree ..." ;;
+      *) echo "Stopped. Commit your changes and re-run."; exit 2 ;;
+    esac
+  else
+    echo "(non-interactive shell: continuing with a dirty tracked tree.)"
+  fi
 fi
 
 # Optional CVE scanner.
@@ -161,7 +182,13 @@ fi
 
 # ── Phase 2: credentialed live smoke ─────────────────────────────────────────
 section "Phase 2/2 — credentialed live smoke (persisted-root upgrade + gateway turn)"
-if [ -z "$PHASE2_MODE" ]; then
+if [ "$VERIFY_RESULT" = "FAILED" ]; then
+  # The overall result is already a failure; don't spend two more image builds and
+  # live gateway calls. Fix Phase 1 and re-run.
+  SMOKE_RESULT="skipped (Phase 1 failed)"
+  echo "Skipped — Phase 1 failed, so this run already fails. Fix the image issues"
+  echo "above and re-run before spending the live smoke's builds and gateway calls."
+elif [ -z "$PHASE2_MODE" ]; then
   if [ "$IS_BUMP" -eq 0 ]; then
     SMOKE_RESULT="skipped (not a bump branch)"
   else

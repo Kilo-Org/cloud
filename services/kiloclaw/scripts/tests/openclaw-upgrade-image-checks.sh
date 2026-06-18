@@ -105,7 +105,11 @@ scan_image_cves() {
 
   echo "Scanning $IMAGE (full image — base OS + Go + npm) ..."
   if ! grype "$IMAGE" -o "table=$CVE_REPORT" -o "json=$json" -q >/dev/null 2>&1; then
-    echo "WARN: grype scan did not complete; skipping CVE report"
+    # grype is installed but the scan itself failed (scanner error or image not
+    # accessible). The advertised CVE check did not run, so this is a failure —
+    # NOT a clean pass. ("grype not installed" above is an explicit skip.)
+    echo "FAIL: grype CVE scan did not run (scanner error or image access failure) — CVE posture unknown"
+    CVE_GATE_FAILED=1
     rm -f "$json"
     return 0
   fi

@@ -60,6 +60,7 @@ export async function finalizeCompletedCodeReviewWithAnalytics(input: {
       .limit(1);
 
     if (
+      review.owned_by_organization_id === null ||
       !attempt ||
       (input.sourceAttemptId !== undefined && input.sourceAttemptId !== attempt.id) ||
       (input.sessionId !== undefined &&
@@ -294,10 +295,7 @@ export type CodeReviewAnalyticsDashboard = {
   securityBreakdown: CodeReviewAnalyticsSeverityBreakdownRow<CodeReviewFindingSecurityClass>[];
   repositories: CodeReviewAnalyticsRepositoryRow[];
   contributors: {
-    capability:
-      | 'available'
-      | 'organization_scope_required'
-      | 'stable_gitlab_author_attribution_unavailable';
+    capability: 'available' | 'stable_gitlab_author_attribution_unavailable';
     rows: CodeReviewAnalyticsContributorRow[];
   };
 };
@@ -322,10 +320,7 @@ function numberValue(value: unknown): number {
 }
 
 function analyticsBaseCte(input: DashboardInput, applyRepositoryFilter: boolean) {
-  const ownerCondition =
-    input.owner.type === 'org'
-      ? sql`${cloud_agent_code_reviews.owned_by_organization_id} = ${input.owner.id}`
-      : sql`${cloud_agent_code_reviews.owned_by_user_id} = ${input.owner.id}`;
+  const ownerCondition = sql`${cloud_agent_code_reviews.owned_by_organization_id} = ${input.owner.id}`;
   const repositoryCondition =
     applyRepositoryFilter && input.repository
       ? sql`AND ${cloud_agent_code_reviews.repo_full_name} = ${input.repository}`
@@ -408,18 +403,11 @@ function analyticsBaseCte(input: DashboardInput, applyRepositoryFilter: boolean)
 export async function getCodeReviewAnalyticsDashboard(
   input: DashboardInput
 ): Promise<CodeReviewAnalyticsDashboard> {
-  const ownerCondition =
-    input.owner.type === 'org'
-      ? and(
-          eq(agent_configs.owned_by_organization_id, input.owner.id),
-          eq(agent_configs.agent_type, 'code_review'),
-          eq(agent_configs.platform, input.platform)
-        )
-      : and(
-          eq(agent_configs.owned_by_user_id, input.owner.id),
-          eq(agent_configs.agent_type, 'code_review'),
-          eq(agent_configs.platform, input.platform)
-        );
+  const ownerCondition = and(
+    eq(agent_configs.owned_by_organization_id, input.owner.id),
+    eq(agent_configs.agent_type, 'code_review'),
+    eq(agent_configs.platform, input.platform)
+  );
   const [config] = await input.db
     .select({ config: agent_configs.config })
     .from(agent_configs)
@@ -597,11 +585,7 @@ export async function getCodeReviewAnalyticsDashboard(
 
   let contributorRows: CodeReviewAnalyticsContributorRow[] = [];
   const contributorCapability =
-    input.owner.type !== 'org'
-      ? 'organization_scope_required'
-      : input.platform !== 'github'
-        ? 'stable_gitlab_author_attribution_unavailable'
-        : 'available';
+    input.platform === 'github' ? 'available' : 'stable_gitlab_author_attribution_unavailable';
 
   if (contributorCapability === 'available') {
     const contributorResult = await input.db.execute<{

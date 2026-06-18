@@ -35,7 +35,7 @@ import { AnalyticsBreakdownBars } from './AnalyticsBreakdownBars';
 import { AnalyticsTables } from './AnalyticsTables';
 
 type CodeReviewAnalyticsPanelProps = {
-  organizationId?: string;
+  organizationId: string;
   platform: 'github' | 'gitlab';
 };
 
@@ -48,10 +48,7 @@ function formatCount(value: number): string {
   return value.toLocaleString();
 }
 
-function AnalyticsLoadingState({
-  platform,
-  organizationId,
-}: Pick<CodeReviewAnalyticsPanelProps, 'platform' | 'organizationId'>) {
+function AnalyticsLoadingState({ platform }: Pick<CodeReviewAnalyticsPanelProps, 'platform'>) {
   const changeLabel = platform === 'github' ? 'Tracked PRs' : 'Tracked MRs';
 
   return (
@@ -127,7 +124,7 @@ function AnalyticsLoadingState({
         </CardContent>
       </Card>
 
-      {platform === 'github' && organizationId && (
+      {platform === 'github' && (
         <Card>
           <CardHeader>
             <Skeleton className="h-5 w-48" />
@@ -363,7 +360,7 @@ export function CodeReviewAnalyticsPanel({
     () => ({
       platform,
       ...dateRange,
-      ...(organizationId ? { organizationId } : {}),
+      organizationId,
       ...(repository ? { repository } : {}),
     }),
     [dateRange, organizationId, platform, repository]
@@ -420,7 +417,7 @@ export function CodeReviewAnalyticsPanel({
   );
 
   if (dashboardQuery.isPending && !dashboard) {
-    return <AnalyticsLoadingState platform={platform} organizationId={organizationId} />;
+    return <AnalyticsLoadingState platform={platform} />;
   }
 
   if (!dashboard) {
@@ -467,7 +464,7 @@ export function CodeReviewAnalyticsPanel({
           setEnabledMutation.mutate({
             platform,
             enabled,
-            ...(organizationId ? { organizationId } : {}),
+            organizationId,
           })
         }
       />
@@ -591,7 +588,6 @@ export function CodeReviewAnalyticsPanel({
 
           <AnalyticsTables
             platform={platform}
-            organizationId={organizationId}
             repositories={dashboard.repositories}
             contributors={dashboard.contributors}
           />

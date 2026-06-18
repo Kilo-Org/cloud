@@ -223,6 +223,25 @@ describe('Code Reviewer analytics router', () => {
     ]);
   });
 
+  it('requires organization scope for reads and settings changes', async () => {
+    const caller = await createCallerForUser(ownerId);
+    const now = Date.now();
+
+    await expect(
+      caller.codeReviews.analytics.getDashboard({
+        platform: 'github',
+        startDate: new Date(now - 60_000).toISOString(),
+        endDate: new Date(now + 60_000).toISOString(),
+      } as never)
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      caller.codeReviews.analytics.setEnabled({
+        platform: 'github',
+        enabled: true,
+      } as never)
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
   it('allows owner toggles while rejecting member mutation and non-member reads', async () => {
     const memberCaller = await createCallerForUser(memberId);
     const ownerCaller = await createCallerForUser(ownerId);

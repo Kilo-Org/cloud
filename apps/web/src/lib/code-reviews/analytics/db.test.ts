@@ -4,9 +4,11 @@ import {
   code_review_analytics_findings,
   code_review_analytics_results,
   kilocode_users,
+  organizations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   createCodeReview,
@@ -33,23 +35,34 @@ const capturedManifest: CodeReviewAnalyticsManifest = {
 
 describe('Code Reviewer analytics completion persistence', () => {
   let userId: string;
+  let organizationId: string;
   const reviewIds: string[] = [];
 
   beforeAll(async () => {
     userId = (await insertTestUser()).id;
+    organizationId = (
+      await createTestOrganization(
+        `Review Analytics Persistence ${crypto.randomUUID()}`,
+        userId,
+        0,
+        {},
+        false
+      )
+    ).id;
   });
 
   afterAll(async () => {
     for (const reviewId of reviewIds) {
       await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, reviewId));
     }
+    await db.delete(organizations).where(eq(organizations.id, organizationId));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
   });
 
   async function createRunningReview(analyticsEnabledAtDispatch: boolean) {
     const suffix = crypto.randomUUID();
     const reviewId = await createCodeReview({
-      owner: { type: 'user', id: userId, userId },
+      owner: { type: 'org', id: organizationId, userId },
       repoFullName: `analytics/repo-${suffix}`,
       prNumber: 1,
       prUrl: `https://github.com/analytics/repo-${suffix}/pull/1`,
@@ -224,5 +237,44 @@ describe('Code Reviewer analytics completion persistence', () => {
     expect(disabledResults).toEqual([]);
     expect(staleResults).toEqual([]);
     expect(newerAttempt.attempt_number).toBe(2);
+  });
+
+  it('rejects analytics persistence for personal reviews', async () => {
+    const suffix = crypto.randomUUID();
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: userId, userId },
+      repoFullName: `analytics/personal-${suffix}`,
+      prNumber: 1,
+      prUrl: `https://github.com/analytics/personal-${suffix}/pull/1`,
+      prTitle: 'Personal analytics test',
+      prAuthor: 'octocat',
+      prAuthorGithubId: '1234',
+      baseRef: 'main',
+      headRef: 'feature',
+      headSha: suffix,
+      platform: 'github',
+    });
+    reviewIds.push(reviewId);
+    const attempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      analyticsEnabledAtDispatch: true,
+    });
+    await updateCodeReviewStatus(reviewId, 'running');
+
+    await expect(
+      finalizeCompletedCodeReviewWithAnalytics({
+        codeReviewId: reviewId,
+        sourceAttemptId: attempt.id,
+        completedAt: new Date(),
+        capture: { status: 'captured', manifest: capturedManifest },
+      })
+    ).resolves.toEqual({ outcome: 'stale' });
+
+    const results = await db
+      .select()
+      .from(code_review_analytics_results)
+      .where(eq(code_review_analytics_results.code_review_id, reviewId));
+    expect(results).toEqual([]);
   });
 });

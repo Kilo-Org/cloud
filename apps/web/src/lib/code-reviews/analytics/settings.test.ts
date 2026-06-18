@@ -49,14 +49,6 @@ describe('Code Reviewer analytics settings', () => {
         .where(
           and(
             eq(agent_configs.agent_type, 'code_review'),
-            eq(agent_configs.owned_by_user_id, userId)
-          )
-        );
-      await db
-        .delete(agent_configs)
-        .where(
-          and(
-            eq(agent_configs.agent_type, 'code_review'),
             eq(agent_configs.owned_by_organization_id, organizationId)
           )
         );
@@ -68,7 +60,7 @@ describe('Code Reviewer analytics settings', () => {
     });
 
     it('inserts a complete main-disabled Code Reviewer config for a missing row', async () => {
-      const owner = { type: 'user' as const, id: userId };
+      const owner = { type: 'org' as const, id: organizationId };
 
       await expect(isReviewAnalyticsEnabled({ owner, platform: 'github' })).resolves.toBe(false);
       await expect(
@@ -84,7 +76,7 @@ describe('Code Reviewer analytics settings', () => {
         where: and(
           eq(agent_configs.agent_type, 'code_review'),
           eq(agent_configs.platform, 'github'),
-          eq(agent_configs.owned_by_user_id, userId)
+          eq(agent_configs.owned_by_organization_id, organizationId)
         ),
       });
 
@@ -106,9 +98,9 @@ describe('Code Reviewer analytics settings', () => {
     });
 
     it('atomically updates only analytics state on an existing row', async () => {
-      const owner = { type: 'user' as const, id: userId };
+      const owner = { type: 'org' as const, id: organizationId };
       await db.insert(agent_configs).values({
-        owned_by_user_id: userId,
+        owned_by_organization_id: organizationId,
         agent_type: 'code_review',
         platform: 'github',
         config: {
@@ -140,7 +132,7 @@ describe('Code Reviewer analytics settings', () => {
         where: and(
           eq(agent_configs.agent_type, 'code_review'),
           eq(agent_configs.platform, 'github'),
-          eq(agent_configs.owned_by_user_id, userId)
+          eq(agent_configs.owned_by_organization_id, organizationId)
         ),
       });
 
@@ -154,7 +146,6 @@ describe('Code Reviewer analytics settings', () => {
 
     it('looks up analytics state by owner and platform', async () => {
       const organizationOwner = { type: 'org' as const, id: organizationId };
-      const personalOwner = { type: 'user' as const, id: userId };
 
       await setReviewAnalyticsEnabled({
         owner: organizationOwner,
@@ -168,9 +159,6 @@ describe('Code Reviewer analytics settings', () => {
       ).resolves.toBe(true);
       await expect(
         isReviewAnalyticsEnabled({ owner: organizationOwner, platform: 'github' })
-      ).resolves.toBe(false);
-      await expect(
-        isReviewAnalyticsEnabled({ owner: personalOwner, platform: 'gitlab' })
       ).resolves.toBe(false);
     });
   });

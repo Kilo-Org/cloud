@@ -40,14 +40,10 @@ type ContributorRow = {
   prsWithoutCriticalOrWarningFindings: number;
 };
 
-type ContributorCapability =
-  | 'available'
-  | 'organization_scope_required'
-  | 'stable_gitlab_author_attribution_unavailable';
+type ContributorCapability = 'available' | 'stable_gitlab_author_attribution_unavailable';
 
 type AnalyticsTablesProps = {
   platform: 'github' | 'gitlab';
-  organizationId?: string;
   repositories: RepositoryRow[];
   contributors: {
     capability: ContributorCapability;
@@ -502,12 +498,7 @@ function ContributorLeaderboard({ rows }: { rows: ContributorRow[] }) {
   );
 }
 
-export function AnalyticsTables({
-  platform,
-  organizationId,
-  repositories,
-  contributors,
-}: AnalyticsTablesProps) {
+export function AnalyticsTables({ platform, repositories, contributors }: AnalyticsTablesProps) {
   return (
     <div className="space-y-6">
       <RepositoryAnalyticsTable platform={platform} rows={repositories} />
@@ -518,7 +509,7 @@ export function AnalyticsTables({
             Stable merge request author attribution is not available yet.
           </p>
         </div>
-      ) : organizationId && contributors.capability === 'available' ? (
+      ) : contributors.capability === 'available' ? (
         <ContributorLeaderboard rows={contributors.rows} />
       ) : null}
     </div>

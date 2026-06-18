@@ -484,9 +484,14 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     agentConfig,
     platform,
   });
-  const analyticsPrompt = appendCodeReviewAnalyticsPromptAppendix(payload.sessionInput.prompt);
+  const analyticsPrompt =
+    owner.type === 'org'
+      ? appendCodeReviewAnalyticsPromptAppendix(payload.sessionInput.prompt)
+      : null;
   const shouldEnrollAnalytics =
-    getReviewAnalyticsEnabledFromConfig(agentConfig.config) && analyticsPrompt !== null;
+    owner.type === 'org' &&
+    getReviewAnalyticsEnabledFromConfig(agentConfig.config) &&
+    analyticsPrompt !== null;
 
   if (!(await reviewIsStillReserved(review.id, dispatchReservationId))) {
     logExceptInTest('[dispatchReview] Review reservation changed after preparation', {
@@ -497,7 +502,8 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
 
   const agentVersion = 'v2';
   const attempt = await ensureCurrentCodeReviewAttemptFromReview(review, shouldEnrollAnalytics);
-  const analyticsEnabledAtDispatch = attempt.analytics_enabled_at_dispatch === true;
+  const analyticsEnabledAtDispatch =
+    owner.type === 'org' && attempt.analytics_enabled_at_dispatch === true;
 
   let dispatchPayload = payload;
   if (analyticsEnabledAtDispatch) {

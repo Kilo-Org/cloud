@@ -1341,6 +1341,47 @@ describe('tryDispatchPendingReviews', () => {
 
   it('snapshots analytics enrollment and appends the protocol only when enabled', async () => {
     const timestamp = minutesAgo(1);
+    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      id: 'test-agent-config',
+      config: { review_analytics_enabled: true },
+      is_enabled: true,
+      runtime_state: {},
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({
+      type: 'org',
+      id: testOrganizationId,
+      userId: testUser.id,
+    });
+
+    const [attempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
+
+    expect(attempt?.analytics_enabled_at_dispatch).toBe(true);
+    expect(dispatchedPayload.sessionInput.prompt).toContain('kilo-review-analytics:v1');
+    expect(dispatchedPayload.sessionInput.prompt.match(/kilo-review-analytics:v1/g)).toHaveLength(
+      1
+    );
+  });
+
+  it('ignores enabled analytics config for personal reviews', async () => {
+    const timestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
     await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
     mockGetAgentConfigForOwner.mockResolvedValue({
@@ -1374,47 +1415,11 @@ describe('tryDispatchPendingReviews', () => {
       .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
     const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
 
-    expect(attempt?.analytics_enabled_at_dispatch).toBe(true);
-    expect(dispatchedPayload.sessionInput.prompt).toContain('kilo-review-analytics:v1');
-    expect(dispatchedPayload.sessionInput.prompt.match(/kilo-review-analytics:v1/g)).toHaveLength(
-      1
-    );
-  });
-
-  it('dispatches the ordinary prompt with an explicit disabled snapshot', async () => {
-    const timestamp = minutesAgo(1);
-    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
-
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(
-        reviewValues({
-          owner,
-          status: 'pending',
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        })
-      )
-      .returning({ id: cloud_agent_code_reviews.id });
-
-    await tryDispatchPendingReviews({
-      type: 'user',
-      id: testUser.id,
-      userId: testUser.id,
-    });
-
-    const [attempt] = await db
-      .select()
-      .from(cloud_agent_code_review_attempts)
-      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
-    const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
-
     expect(attempt?.analytics_enabled_at_dispatch).toBe(false);
     expect(dispatchedPayload.sessionInput.prompt).toBe('Review this change.');
   });
 
-  it('keeps an existing enabled snapshot after collection is disabled', async () => {
+  it('ignores a legacy enabled analytics snapshot for personal reviews', async () => {
     const timestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
     await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
@@ -1440,6 +1445,38 @@ describe('tryDispatchPendingReviews', () => {
     await tryDispatchPendingReviews({
       type: 'user',
       id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
+    expect(dispatchedPayload.sessionInput.prompt).toBe('Review this change.');
+  });
+
+  it('keeps an existing organization analytics snapshot after collection is disabled', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'pending',
+      analytics_enabled_at_dispatch: true,
+    });
+
+    await tryDispatchPendingReviews({
+      type: 'org',
+      id: testOrganizationId,
       userId: testUser.id,
     });
 

@@ -1,10 +1,7 @@
 import * as z from 'zod';
 
 import { getCodeReviewAnalyticsDashboard } from '@/lib/code-reviews/analytics/db';
-import {
-  setReviewAnalyticsEnabled,
-  type ReviewAnalyticsOwner,
-} from '@/lib/code-reviews/analytics/settings';
+import { setReviewAnalyticsEnabled } from '@/lib/code-reviews/analytics/settings';
 import { readDb } from '@/lib/drizzle';
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import { timedUsageQuery } from '@/lib/usage-query';
@@ -16,7 +13,7 @@ const PlatformSchema = z.enum(['github', 'gitlab']);
 
 const GetDashboardInputSchema = z
   .object({
-    organizationId: z.uuid().optional(),
+    organizationId: z.uuid(),
     platform: PlatformSchema,
     startDate: z.string().datetime(),
     endDate: z.string().datetime(),
@@ -37,31 +34,23 @@ const GetDashboardInputSchema = z
   );
 
 const SetEnabledInputSchema = z.object({
-  organizationId: z.uuid().optional(),
+  organizationId: z.uuid(),
   platform: PlatformSchema,
   enabled: z.boolean(),
 });
 
 export const codeReviewAnalyticsRouter = createTRPCRouter({
   getDashboard: baseProcedure.input(GetDashboardInputSchema).query(async ({ ctx, input }) => {
-    let owner: ReviewAnalyticsOwner;
-    let canManage: boolean;
-
-    if (input.organizationId) {
-      const role = await ensureOrganizationAccess(ctx, input.organizationId);
-      owner = { type: 'org', id: input.organizationId };
-      canManage = role === 'owner' || role === 'billing_manager';
-    } else {
-      owner = { type: 'user', id: ctx.user.id };
-      canManage = true;
-    }
+    const role = await ensureOrganizationAccess(ctx, input.organizationId);
+    const owner = { type: 'org' as const, id: input.organizationId };
+    const canManage = role === 'owner' || role === 'billing_manager';
 
     return timedUsageQuery(
       {
         db: readDb,
         route: 'codeReviews.analytics.getDashboard',
         queryLabel: 'code_review_analytics_dashboard',
-        scope: owner.type === 'org' ? 'org' : 'user',
+        scope: 'org',
         period: `${input.startDate}/${input.endDate}`,
       },
       tx =>
@@ -78,16 +67,10 @@ export const codeReviewAnalyticsRouter = createTRPCRouter({
   }),
 
   setEnabled: baseProcedure.input(SetEnabledInputSchema).mutation(async ({ ctx, input }) => {
-    const owner: ReviewAnalyticsOwner = input.organizationId
-      ? { type: 'org', id: input.organizationId }
-      : { type: 'user', id: ctx.user.id };
-
-    if (input.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
-    }
+    await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
 
     const enabled = await setReviewAnalyticsEnabled({
-      owner,
+      owner: { type: 'org', id: input.organizationId },
       platform: input.platform,
       enabled: input.enabled,
       createdBy: ctx.user.id,

@@ -6,7 +6,7 @@ import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { db } from '@/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
 
-export type ReviewAnalyticsOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
+export type ReviewAnalyticsOwner = { type: 'org'; id: string };
 export type ReviewAnalyticsPlatform = 'github' | 'gitlab';
 
 const ReviewAnalyticsSettingsSchema = z.object({
@@ -50,36 +50,23 @@ export async function setReviewAnalyticsEnabled(input: {
     ${JSON.stringify(input.enabled)}::jsonb,
     true
   )`;
-  const values =
-    input.owner.type === 'org'
-      ? {
-          owned_by_organization_id: input.owner.id,
-          owned_by_user_id: null,
-          agent_type: 'code_review',
-          platform: input.platform,
-          config,
-          is_enabled: false,
-          created_by: input.createdBy,
-        }
-      : {
-          owned_by_organization_id: null,
-          owned_by_user_id: input.owner.id,
-          agent_type: 'code_review',
-          platform: input.platform,
-          config,
-          is_enabled: false,
-          created_by: input.createdBy,
-        };
-  const target =
-    input.owner.type === 'org'
-      ? [agent_configs.owned_by_organization_id, agent_configs.agent_type, agent_configs.platform]
-      : [agent_configs.owned_by_user_id, agent_configs.agent_type, agent_configs.platform];
-
   const [saved] = await db
     .insert(agent_configs)
-    .values(values)
+    .values({
+      owned_by_organization_id: input.owner.id,
+      owned_by_user_id: null,
+      agent_type: 'code_review',
+      platform: input.platform,
+      config,
+      is_enabled: false,
+      created_by: input.createdBy,
+    })
     .onConflictDoUpdate({
-      target,
+      target: [
+        agent_configs.owned_by_organization_id,
+        agent_configs.agent_type,
+        agent_configs.platform,
+      ],
       set: {
         config: updatedConfig,
         updated_at: new Date().toISOString(),
@@ -117,21 +104,16 @@ async function getReviewAnalyticsConfigRow(input: {
   owner: ReviewAnalyticsOwner;
   platform: ReviewAnalyticsPlatform;
 }) {
-  const conditions = [
-    eq(agent_configs.agent_type, 'code_review'),
-    eq(agent_configs.platform, input.platform),
-  ];
-
-  if (input.owner.type === 'org') {
-    conditions.push(eq(agent_configs.owned_by_organization_id, input.owner.id));
-  } else {
-    conditions.push(eq(agent_configs.owned_by_user_id, input.owner.id));
-  }
-
   const [config] = await db
     .select()
     .from(agent_configs)
-    .where(and(...conditions))
+    .where(
+      and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, input.platform),
+        eq(agent_configs.owned_by_organization_id, input.owner.id)
+      )
+    )
     .limit(1);
 
   return config ?? null;

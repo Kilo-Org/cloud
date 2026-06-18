@@ -597,8 +597,10 @@ Then run one of:
   - Uses a generated non-sensitive nonce prompt because Auto Free can route to upstream providers that log prompts.
   - Add `--upgrade` with `IMAGE_BEFORE` and `IMAGE_AFTER` to repeat the live checks after restarting on the same temporary `/root` volume. Set `EXPECTED_VERSION_BEFORE` and `EXPECTED_VERSION_AFTER` to assert the images contain the intended OpenClaw versions.
   - This is an opt-in/manual live validation; it is not a deterministic CI smoke or an image-promotion gate.
+- `bash scripts/tests/openclaw-upgrade-validate.sh`
+  - Entry point for validating an OpenClaw bump locally. Runs a preflight (Docker, bump branch, clean tree, grype, credential), then Phase 1 (keyless image checks: version, bundle patches, plugin pins, config-shape validation, and the grype CVE scan) and Phase 2 (the live smoke below). Prints a summary with per-phase pass/fail counts and the grype totals. Set `KILOCODE_API_KEY` for Phase 2. Use this for an OpenClaw bump; run the two scripts below directly only when you specifically need one phase alone.
 - `bash scripts/tests/openclaw-upgrade-smoke.sh`
-  - One-command workflow for an OpenClaw version-bump branch: refreshes and builds the baseline image from `origin/main`, builds the candidate image from a detached worktree at `HEAD`, then runs the persisted-root live smoke with installed-version assertions, `openclaw doctor` on candidate startup, and explicit config validation in both phases.
+  - The Phase 2 live smoke that `openclaw-upgrade-validate.sh` runs. Refreshes and builds the baseline image from `origin/main`, builds the candidate image from a detached worktree at `HEAD`, then runs the persisted-root live smoke with installed-version assertions, `openclaw doctor` on candidate startup, and explicit config validation in both phases.
   - The wrapper fails if the checked-in Dockerfile pin has not changed or the current checkout has uncommitted files. Use `ALLOW_SAME_OPENCLAW_VERSION=true` or `ALLOW_DIRTY_CHECKOUT=true` only to test wrapper mechanics locally; candidate image contents still come from committed `HEAD`.
   - Set `BASE_REF` when the upgrade baseline is not `origin/main`; set `IMAGE_BEFORE` and `IMAGE_AFTER` to choose local image tags. Built images remain in Docker for inspection or build-cache reuse until explicitly removed.
 

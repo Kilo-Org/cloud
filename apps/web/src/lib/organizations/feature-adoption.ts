@@ -22,91 +22,50 @@ export type FeatureAdoptionCheck = {
   actionUrl: string;
 };
 
-type AdoptionAgentConfig = {
-  agentType: string;
-  platform: string;
-  isEnabled: boolean;
-};
-
-type AdoptionIntegration = {
-  platform: string;
-  status: string | null;
-  suspendedAt: string | null;
-  authInvalidAt: string | null;
-};
-
 type FeatureAdoptionState = {
-  agentConfigs: AdoptionAgentConfig[];
-  integrations: AdoptionIntegration[];
+  sourceControlConnected: boolean;
+  codeReviewerEnabled: boolean;
+  securityAgentEnabled: boolean;
   hasActiveCloudAgentWebhook: boolean;
+  teamIntegrationConnected: boolean;
 };
 
 type FeatureAdoptionStateRow = {
-  agent_configs: AdoptionAgentConfig[];
-  integrations: AdoptionIntegration[];
+  source_control_connected: boolean;
+  code_reviewer_enabled: boolean;
+  security_agent_enabled: boolean;
   has_active_cloud_agent_webhook: boolean;
+  team_integration_connected: boolean;
 };
-
-const SOURCE_CONTROL_PLATFORMS = ['github', 'gitlab'];
-const TEAM_INTEGRATION_PLATFORMS = ['slack', 'discord', 'linear'];
-
-function hasHealthyIntegration(integrations: AdoptionIntegration[], platforms: string[]): boolean {
-  return integrations.some(
-    integration =>
-      platforms.includes(integration.platform) &&
-      integration.status === INTEGRATION_STATUS.ACTIVE &&
-      integration.suspendedAt === null &&
-      integration.authInvalidAt === null
-  );
-}
 
 export function buildFeatureAdoptionChecks(
   organizationId: string,
   state: FeatureAdoptionState
 ): FeatureAdoptionCheck[] {
-  const sourceControlConnected = hasHealthyIntegration(
-    state.integrations,
-    SOURCE_CONTROL_PLATFORMS
-  );
-  const teamIntegrationConnected = hasHealthyIntegration(
-    state.integrations,
-    TEAM_INTEGRATION_PLATFORMS
-  );
-  const codeReviewerEnabled = state.agentConfigs.some(
-    config =>
-      config.agentType === 'code_review' &&
-      SOURCE_CONTROL_PLATFORMS.includes(config.platform) &&
-      config.isEnabled
-  );
-  const securityAgentEnabled = state.agentConfigs.some(
-    config =>
-      config.agentType === 'security_scan' && config.platform === 'github' && config.isEnabled
-  );
-
   return [
     {
       key: 'source-control-integration',
       title: 'Source control connected',
       description:
         'Connect GitHub or GitLab to bring repositories and development workflows into Kilo.',
-      adopted: sourceControlConnected,
-      actionLabel: sourceControlConnected ? 'Manage integrations' : 'Connect source control',
+      adopted: state.sourceControlConnected,
+      actionLabel: state.sourceControlConnected ? 'Manage integrations' : 'Connect source control',
       actionUrl: `/organizations/${organizationId}/integrations`,
     },
     {
       key: 'code-reviewer',
       title: 'Code Reviewer enabled',
       description: 'Run AI assisted reviews on pull requests or merge requests.',
-      adopted: codeReviewerEnabled,
-      actionLabel: codeReviewerEnabled ? 'Review settings' : 'Enable Code Reviewer',
+      adopted: state.codeReviewerEnabled,
+      actionLabel: state.codeReviewerEnabled ? 'Review settings' : 'Enable Code Reviewer',
       actionUrl: `/organizations/${organizationId}/code-reviews`,
     },
     {
       key: 'security-agent',
       title: 'Security Agent enabled',
       description: 'Monitor repositories for Security Findings and remediation opportunities.',
-      adopted: securityAgentEnabled,
-      actionLabel: securityAgentEnabled ? 'Review settings' : 'Enable Security Agent',
+      adopted: state.securityAgentEnabled,
+      actionLabel: state.securityAgentEnabled ? 'Review settings' : 'Enable Security Agent',
       actionUrl: `/organizations/${organizationId}/security-agent/config`,
     },
     {
@@ -121,8 +80,10 @@ export function buildFeatureAdoptionChecks(
       key: 'team-integration',
       title: 'Team workflow connected',
       description: 'Connect Slack, Discord, or Linear to bring Kilo into your team workflow.',
-      adopted: teamIntegrationConnected,
-      actionLabel: teamIntegrationConnected ? 'Manage integrations' : 'Connect an integration',
+      adopted: state.teamIntegrationConnected,
+      actionLabel: state.teamIntegrationConnected
+        ? 'Manage integrations'
+        : 'Connect an integration',
       actionUrl: `/organizations/${organizationId}/integrations`,
     },
   ];
@@ -131,40 +92,51 @@ export function buildFeatureAdoptionChecks(
 async function getFeatureAdoptionState(organizationId: string): Promise<FeatureAdoptionState> {
   const result = await readDb.execute(sql`
     SELECT
-      COALESCE((
-        SELECT jsonb_agg(jsonb_build_object(
-          'agentType', agent_type,
-          'platform', platform,
-          'isEnabled', is_enabled
-        ))
-        FROM agent_configs
-        WHERE owned_by_organization_id = ${organizationId}
-          AND agent_type IN ('code_review', 'security_scan')
-      ), '[]'::jsonb) AS agent_configs,
-      COALESCE((
-        SELECT jsonb_agg(jsonb_build_object(
-          'platform', platform,
-          'status', integration_status,
-          'suspendedAt', suspended_at,
-          'authInvalidAt', auth_invalid_at
-        ))
-        FROM platform_integrations
-        WHERE owned_by_organization_id = ${organizationId}
-      ), '[]'::jsonb) AS integrations,
       EXISTS (
-        SELECT 1
-        FROM cloud_agent_webhook_triggers
+        SELECT 1 FROM platform_integrations
+        WHERE owned_by_organization_id = ${organizationId}
+          AND platform IN ('github', 'gitlab')
+          AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
+          AND suspended_at IS NULL
+          AND auth_invalid_at IS NULL
+      ) AS source_control_connected,
+      EXISTS (
+        SELECT 1 FROM agent_configs
+        WHERE owned_by_organization_id = ${organizationId}
+          AND agent_type = 'code_review'
+          AND platform IN ('github', 'gitlab')
+          AND is_enabled = true
+      ) AS code_reviewer_enabled,
+      EXISTS (
+        SELECT 1 FROM agent_configs
+        WHERE owned_by_organization_id = ${organizationId}
+          AND agent_type = 'security_scan'
+          AND platform = 'github'
+          AND is_enabled = true
+      ) AS security_agent_enabled,
+      EXISTS (
+        SELECT 1 FROM cloud_agent_webhook_triggers
         WHERE organization_id = ${organizationId}
           AND target_type = 'cloud_agent'
           AND activation_mode = 'webhook'
           AND is_active = true
-      ) AS has_active_cloud_agent_webhook
+      ) AS has_active_cloud_agent_webhook,
+      EXISTS (
+        SELECT 1 FROM platform_integrations
+        WHERE owned_by_organization_id = ${organizationId}
+          AND platform IN ('slack', 'discord', 'linear')
+          AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
+          AND suspended_at IS NULL
+          AND auth_invalid_at IS NULL
+      ) AS team_integration_connected
   `);
   const row = result.rows[0] as FeatureAdoptionStateRow | undefined;
   return {
-    agentConfigs: row?.agent_configs ?? [],
-    integrations: row?.integrations ?? [],
+    sourceControlConnected: row?.source_control_connected ?? false,
+    codeReviewerEnabled: row?.code_reviewer_enabled ?? false,
+    securityAgentEnabled: row?.security_agent_enabled ?? false,
     hasActiveCloudAgentWebhook: row?.has_active_cloud_agent_webhook ?? false,
+    teamIntegrationConnected: row?.team_integration_connected ?? false,
   };
 }
 

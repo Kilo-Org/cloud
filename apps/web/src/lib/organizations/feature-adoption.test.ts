@@ -6,9 +6,11 @@ function buildState(
   overrides: Partial<Parameters<typeof buildFeatureAdoptionChecks>[1]> = {}
 ): Parameters<typeof buildFeatureAdoptionChecks>[1] {
   return {
-    agentConfigs: [],
-    integrations: [],
+    sourceControlConnected: false,
+    codeReviewerEnabled: false,
+    securityAgentEnabled: false,
     hasActiveCloudAgentWebhook: false,
+    teamIntegrationConnected: false,
     ...overrides,
   };
 }
@@ -27,67 +29,35 @@ describe('buildFeatureAdoptionChecks', () => {
     expect(checks.every(check => !check.adopted)).toBe(true);
   });
 
-  it('marks enabled agents and an active webhook as adopted', () => {
+  it('maps shared adoption state to every fixed check', () => {
     const checks = buildFeatureAdoptionChecks(
       organizationId,
       buildState({
-        agentConfigs: [
-          { agentType: 'code_review', platform: 'gitlab', isEnabled: true },
-          { agentType: 'security_scan', platform: 'github', isEnabled: true },
-        ],
+        sourceControlConnected: true,
+        codeReviewerEnabled: true,
+        securityAgentEnabled: true,
         hasActiveCloudAgentWebhook: true,
+        teamIntegrationConnected: true,
       })
     );
 
-    expect(checks.find(check => check.key === 'code-reviewer')?.adopted).toBe(true);
+    expect(checks.every(check => check.adopted)).toBe(true);
+  });
+
+  it('keeps individual checks independent', () => {
+    const checks = buildFeatureAdoptionChecks(
+      organizationId,
+      buildState({
+        sourceControlConnected: true,
+        securityAgentEnabled: true,
+      })
+    );
+
+    expect(checks.find(check => check.key === 'source-control-integration')?.adopted).toBe(true);
     expect(checks.find(check => check.key === 'security-agent')?.adopted).toBe(true);
-    expect(checks.find(check => check.key === 'cloud-agent-webhook')?.adopted).toBe(true);
-  });
-
-  it('does not count disabled agent configurations', () => {
-    const checks = buildFeatureAdoptionChecks(
-      organizationId,
-      buildState({
-        agentConfigs: [
-          { agentType: 'code_review', platform: 'github', isEnabled: false },
-          { agentType: 'security_scan', platform: 'github', isEnabled: false },
-        ],
-      })
-    );
-
     expect(checks.find(check => check.key === 'code-reviewer')?.adopted).toBe(false);
-    expect(checks.find(check => check.key === 'security-agent')?.adopted).toBe(false);
-  });
-
-  it('requires healthy active integrations', () => {
-    const checks = buildFeatureAdoptionChecks(
-      organizationId,
-      buildState({
-        integrations: [
-          {
-            platform: 'github',
-            status: 'active',
-            suspendedAt: null,
-            authInvalidAt: '2026-06-19T00:00:00.000Z',
-          },
-          {
-            platform: 'slack',
-            status: 'suspended',
-            suspendedAt: '2026-06-19T00:00:00.000Z',
-            authInvalidAt: null,
-          },
-          {
-            platform: 'linear',
-            status: 'active',
-            suspendedAt: null,
-            authInvalidAt: null,
-          },
-        ],
-      })
-    );
-
-    expect(checks.find(check => check.key === 'source-control-integration')?.adopted).toBe(false);
-    expect(checks.find(check => check.key === 'team-integration')?.adopted).toBe(true);
+    expect(checks.find(check => check.key === 'cloud-agent-webhook')?.adopted).toBe(false);
+    expect(checks.find(check => check.key === 'team-integration')?.adopted).toBe(false);
   });
 
   it('returns organization-scoped actions', () => {

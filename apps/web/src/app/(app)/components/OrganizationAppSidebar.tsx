@@ -29,7 +29,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import HeaderLogo from '@/components/HeaderLogo';
@@ -61,9 +61,21 @@ export default function OrganizationAppSidebar({
       organizationId,
     }),
     enabled: organizationData?.plan === 'enterprise',
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   const pendingFeatureAdoptionCount = featureAdoptionQuery.data?.pendingCount ?? 0;
+  const previousPathname = useRef(pathname);
+  useEffect(() => {
+    if (
+      organizationData?.plan === 'enterprise' &&
+      previousPathname.current !== pathname &&
+      previousPathname.current !== `/organizations/${organizationId}/usage-details`
+    ) {
+      void featureAdoptionQuery.refetch();
+    }
+    previousPathname.current = pathname;
+  }, [featureAdoptionQuery.refetch, organizationData?.plan, organizationId, pathname]);
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags

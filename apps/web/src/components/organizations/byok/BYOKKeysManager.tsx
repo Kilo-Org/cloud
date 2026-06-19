@@ -756,6 +756,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             you may need to wait a few minutes and restart your client for this
                             entry to appear.
                           </p>
+                          <p className="mt-2 font-medium">
+                            Organization restrictions: Direct providers are considered trusted in
+                            the context of organization-defined restrictions.
+                          </p>
                         </AlertDescription>
                       </Alert>
                     );
@@ -764,9 +768,15 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <Alert>
                       <Info className="size-4" />
                       <AlertDescription>
-                        Once saved, your key will automatically be used whenever your client
-                        requests one of the supported models above. If multiple keys apply to the
-                        same model, they are tried in unspecified order until one succeeds.
+                        <p>
+                          Once saved, your key will automatically be used whenever your client
+                          requests one of the supported models above. If multiple keys apply to the
+                          same model, they are tried in unspecified order until one succeeds.
+                        </p>
+                        <p className="mt-2 font-medium">
+                          Organization restrictions: This Vercel-backed provider is subject to
+                          organization-configured model and provider restrictions.
+                        </p>
                       </AlertDescription>
                     </Alert>
                   );

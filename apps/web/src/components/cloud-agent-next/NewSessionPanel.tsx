@@ -936,7 +936,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       'Connect a GitHub or GitLab integration to select a repository for the cloud agent.';
 
     return (
-      <div className="relative flex h-full flex-col items-center justify-end p-4 pb-8">
+      <div className="relative flex h-full flex-col items-center justify-center p-4">
         <SetPageTitle title="Cloud Agent">
           <Badge variant="new">new</Badge>
         </SetPageTitle>

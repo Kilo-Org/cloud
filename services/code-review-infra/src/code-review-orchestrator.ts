@@ -1,9 +1,9 @@
 /**
  * CodeReviewOrchestrator - Durable Object for managing code review lifecycle.
  *
- * New reviews use cloud-agent-next v2 callback execution via prepareSession and
- * initiateFromKilocodeSessionV2. Legacy/replay payloads or persisted state without
- * agentVersion v2 retain cloud-agent SSE v1 execution via initiateSessionAsync.
+ * Supports two execution modes based on the useCloudAgentNext flag:
+ * - Default (cloud-agent): SSE streaming via initiateSessionAsync
+ * - cloud-agent-next: prepareSession + initiateFromKilocodeSessionV2, callback-based completion
  */
 
 import { DurableObject } from 'cloudflare:workers';
@@ -1217,7 +1217,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       return;
     }
 
-    // New review state carries v2; legacy/replay state without v2 retains SSE v1 compatibility.
+    // Branch based on agent version
     const agentVersion = this.state.agentVersion;
     console.log('[CodeReviewOrchestrator] runReview routing decision', {
       reviewId: this.state.reviewId,
@@ -1238,7 +1238,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   }
 
   // ---------------------------------------------------------------------------
-  // cloud-agent-next v2 flow (default for new reviews)
+  // cloud-agent-next flow (feature-flagged)
   // Uses prepareSession + initiateFromKilocodeSessionV2 with callback-based completion.
   // ---------------------------------------------------------------------------
 
@@ -1599,8 +1599,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   }
 
   // ---------------------------------------------------------------------------
-  // cloud-agent SSE v1 compatibility flow
-  // Used for legacy/replay payloads or persisted state without agentVersion v2.
+  // cloud-agent flow (default / legacy)
+  // Uses SSE streaming via initiateSessionAsync.
   // ---------------------------------------------------------------------------
 
   /**

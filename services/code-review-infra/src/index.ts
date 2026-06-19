@@ -11,10 +11,9 @@
  * - GET /health - Health check endpoint
  *
  * Features:
- * - New reviews use cloud-agent-next v2 callback execution
- *   (prepareSession + initiateFromKilocodeSessionV2)
- * - cloud-agent SSE v1 is retained for legacy/replay payloads or persisted state
- *   without agentVersion v2
+ * - Durable Objects support two execution modes (feature-flagged):
+ *   - Default: cloud-agent SSE streaming (initiateSessionAsync)
+ *   - cloud-agent-next: prepareSession + initiateFromKilocodeSessionV2 with callback
  * - Concurrency control handled in Next.js (dispatch logic)
  * - Fire-and-forget from Next.js dispatch
  */
@@ -101,8 +100,7 @@ app.post('/review', async (c: Context<HonoEnv>) => {
   );
 
   // Fire-and-forget: trigger review execution via HTTP context (no 15-min wall time limit)
-  // New reviews use cloud-agent-next v2; legacy/replay payloads or persisted state
-  // without agentVersion v2 use cloud-agent SSE v1.
+  // Routes to cloud-agent SSE or cloud-agent-next based on useCloudAgentNext flag
   c.executionCtx.waitUntil(
     withDORetry(
       () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),

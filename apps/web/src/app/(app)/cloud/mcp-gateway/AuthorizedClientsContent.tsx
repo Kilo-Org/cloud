@@ -27,11 +27,16 @@ function permissionLabel(scope: string) {
   return scope;
 }
 
-export function AuthorizedClientsContent() {
+type AuthorizedClientsContentProps = {
+  organizationId?: string;
+};
+
+export function AuthorizedClientsContent({ organizationId }: AuthorizedClientsContentProps = {}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [revokeGrantId, setRevokeGrantId] = useState<string | null>(null);
-  const listQuery = useQuery(trpc.mcpGatewayAuthorizations.listMine.queryOptions());
+  const queryInput = organizationId ? { organizationId } : ({ ownerScope: 'personal' } as const);
+  const listQuery = useQuery(trpc.mcpGatewayAuthorizations.listMine.queryOptions(queryInput));
   const revokeTarget = (listQuery.data ?? []).find(grant => grant.grantId === revokeGrantId);
   const revokeMutation = useMutation(
     trpc.mcpGatewayAuthorizations.revoke.mutationOptions({
@@ -39,14 +44,14 @@ export function AuthorizedClientsContent() {
         toast.success('Client access revoked');
         if (revokeGrantId) {
           queryClient.setQueryData(
-            trpc.mcpGatewayAuthorizations.listMine.queryKey(),
+            trpc.mcpGatewayAuthorizations.listMine.queryKey(queryInput),
             (current: typeof listQuery.data) =>
               current?.filter(grant => grant.grantId !== revokeGrantId) ?? current
           );
         }
         setRevokeGrantId(null);
         void queryClient.invalidateQueries({
-          queryKey: trpc.mcpGatewayAuthorizations.listMine.queryKey(),
+          queryKey: trpc.mcpGatewayAuthorizations.listMine.queryKey(queryInput),
         });
       },
       onError: error => toast.error(error.message || "We couldn't revoke client access"),
@@ -54,7 +59,7 @@ export function AuthorizedClientsContent() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4">
+    <div className="space-y-4">
       {listQuery.isLoading && !listQuery.data && (
         <div className="space-y-3">
           <Skeleton className="h-32 w-full rounded-xl" />

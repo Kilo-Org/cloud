@@ -19,7 +19,6 @@ import {
   Database,
   List,
   Shield,
-  ShieldCheck,
   ListChecks,
   Download,
   BookOpen,
@@ -259,11 +258,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'Connected Accounts',
       icon: UserCog,
       url: '/connected-accounts',
-    },
-    {
-      title: 'Authorized Clients',
-      icon: ShieldCheck,
-      url: '/cloud/mcp-gateway/authorized-clients',
     },
     {
       title: 'Bring Your Own Key (BYOK)',

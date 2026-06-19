@@ -42,18 +42,19 @@ const modeOptions: Array<{ value: AutoRoutingMode; label: string; description: s
   },
 ];
 
-function inheritedOption(organizationId: string | undefined) {
+function unsetModeOption(organizationId: string | undefined) {
   return organizationId
     ? {
         value: 'inherit' as const,
-        label: 'Inherit user or default setting',
+        label: 'Use member or default setting',
         description:
-          "Uses the member's personal setting, or the default best-accuracy-per-dollar mode if they have not set one.",
+          "Uses the member's personal setting. If they have not set one, Kilo uses best accuracy per dollar.",
       }
     : {
         value: 'inherit' as const,
         label: 'Use default setting',
-        description: modeOptions[0].description,
+        description:
+          'Uses best accuracy per dollar: the model that passes the accuracy threshold and delivers the best accuracy per dollar within the efficient model pool.',
       };
 }
 
@@ -118,7 +119,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     },
   });
 
-  const resetOption = inheritedOption(organizationId);
+  const resetOption = unsetModeOption(organizationId);
   const selectedOption =
     selectedMode === 'inherit'
       ? resetOption

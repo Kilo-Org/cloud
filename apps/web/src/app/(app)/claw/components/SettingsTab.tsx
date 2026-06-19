@@ -2367,7 +2367,11 @@ export function SettingsTab({
           <div className="mt-4 space-y-6 border-t pt-4">
             <VersionPinCard
               trackedImageTag={status.trackedImageTag}
+              trackedOpenClawVersion={runningVersion ?? trackedVersion}
               latestImageTag={variantsMatch ? (latestVersion?.imageTag ?? null) : null}
+              latestOpenClawVersion={
+                variantsMatch ? cleanVersion(latestVersion?.openclawVersion) : null
+              }
               mutations={mutations}
             />
             <EarlyAccessCard />

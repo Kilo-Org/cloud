@@ -81,9 +81,9 @@ describe('generateReviewPrompt', () => {
 
     expect(prompt).toContain('# SUB-AGENT USAGE');
     expect(prompt).toContain('Tiny: up to 2 files and under 100 changed lines: use 0 sub-agents');
-    expect(prompt).toContain('Small: 3-5 files or 100-299 changed lines: use at most 1 sub-agent');
+    expect(prompt).toContain('Small: 3-5 files or 100-300 changed lines: use at most 1 sub-agent');
     expect(prompt).toContain(
-      'Very large: more than 30 files or 2500+ changed lines: use at most 5 sub-agents'
+      'Medium and larger: 6+ files or more than 300 changed lines: use the full 6 sub-agents'
     );
   });
 
@@ -95,9 +95,9 @@ describe('generateReviewPrompt', () => {
 
     expect(prompt).toContain('# SUB-AGENT USAGE');
     expect(prompt).toContain('Tiny: up to 2 files and under 100 changed lines: use 0 sub-agents');
-    expect(prompt).toContain('Small: 3-5 files or 100-299 changed lines: use at most 1 sub-agent');
+    expect(prompt).toContain('Small: 3-5 files or 100-300 changed lines: use at most 1 sub-agent');
     expect(prompt).toContain(
-      'Very large: more than 30 files or 2500+ changed lines: use at most 5 sub-agents'
+      'Medium and larger: 6+ files or more than 300 changed lines: use the full 6 sub-agents'
     );
   });
 

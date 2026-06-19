@@ -3,7 +3,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { insertUsageWithOverrides } from '@/tests/helpers/microdollar-usage.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { db, pool } from '@/lib/drizzle';
-import { microdollar_usage } from '@kilocode/db/schema';
+import { microdollar_usage, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 
@@ -54,6 +54,37 @@ describe('organizations usage details trpc router', () => {
     await db
       .delete(microdollar_usage)
       .where(eq(microdollar_usage.organization_id, testOrganization.id));
+  });
+
+  describe('getFeatureAdoption procedure', () => {
+    it('returns feature checks to a member of an Enterprise organization', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getFeatureAdoption({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.checks).toHaveLength(5);
+      expect(result.checks.every(check => !check.adopted)).toBe(true);
+    });
+
+    it('rejects feature adoption reporting for a Teams organization', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'teams' })
+        .where(eq(organizations.id, testOrganization.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.usageDetails.getFeatureAdoption({
+          organizationId: testOrganization.id,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
   });
 
   describe('get procedure', () => {

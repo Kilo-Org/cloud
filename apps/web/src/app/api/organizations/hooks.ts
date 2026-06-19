@@ -553,7 +553,8 @@ export type OrganizationAIAdoptionProps = Partial<
 export function useOrganizationAIAdoptionTimeseries(
   organizationId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  options?: { enabled?: boolean }
 ) {
   const trpc = useTRPC();
   const { data, error, isLoading } = useQuery(
@@ -576,7 +577,7 @@ export function useOrganizationAIAdoptionTimeseries(
         }
       ),
       {
-        enabled: true,
+        enabled: options?.enabled ?? true,
       }
     )
   );

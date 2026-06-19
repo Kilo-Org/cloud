@@ -34,6 +34,8 @@ import OrganizationSwitcher from './OrganizationSwitcher';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import HeaderLogo from '@/components/HeaderLogo';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
 import { useOrgKiloClawNavState } from '@/hooks/useOrgKiloClaw';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
@@ -53,6 +55,13 @@ export default function OrganizationAppSidebar({
   const { assumedRole, setAssumedRole, setOriginalRole } = useRoleTesting();
   // Fetch full organization data to access settings
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
+  const trpc = useTRPC();
+  const featureAdoptionQuery = useQuery({
+    ...trpc.organizations.usageDetails.getFeatureAdoption.queryOptions({ organizationId }),
+    enabled: organizationData?.plan === 'enterprise',
+  });
+  const pendingFeatureAdoptionCount =
+    featureAdoptionQuery.data?.checks.filter(check => !check.adopted).length ?? 0;
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags
@@ -105,6 +114,8 @@ export default function OrganizationAppSidebar({
     icon: React.ElementType;
     url: string;
     className?: string;
+    badge?: string;
+    badgeVariant?: 'brand' | 'alert';
   }> = [
     ...(showWelcome
       ? [
@@ -124,6 +135,8 @@ export default function OrganizationAppSidebar({
       title: 'Usage',
       icon: ChartColumnIncreasing,
       url: `/organizations/${organizationId}/usage-details`,
+      badge: pendingFeatureAdoptionCount > 0 ? String(pendingFeatureAdoptionCount) : undefined,
+      badgeVariant: 'alert',
     },
   ];
 

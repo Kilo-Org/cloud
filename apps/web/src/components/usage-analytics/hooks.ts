@@ -160,25 +160,30 @@ function commonFilters(args: CommonArgs) {
   };
 }
 
-export function useUsageSummary(args: CommonArgs) {
+export function useUsageSummary(args: CommonArgs & { enabled?: boolean }) {
   const trpc = useTRPC();
-  return useQuery(trpc.usageAnalytics.getSummary.queryOptions(commonFilters(args)));
+  return useQuery({
+    ...trpc.usageAnalytics.getSummary.queryOptions(commonFilters(args)),
+    enabled: args.enabled ?? true,
+  });
 }
 
 export function useUsageTimeseries(
   args: CommonArgs & {
     metric: MetricKey;
     splitBy?: Dimension;
+    enabled?: boolean;
   }
 ) {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.usageAnalytics.getTimeseries.queryOptions({
+  return useQuery({
+    ...trpc.usageAnalytics.getTimeseries.queryOptions({
       ...commonFilters(args),
       metric: args.metric,
       splitBy: args.splitBy,
-    })
-  );
+    }),
+    enabled: args.enabled ?? true,
+  });
 }
 
 export function useUsageBreakdown(
@@ -205,16 +210,18 @@ export function useUsageTable(
   args: CommonArgs & {
     groupBy: Dimension[];
     limit?: number;
+    enabled?: boolean;
   }
 ) {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.usageAnalytics.getTable.queryOptions({
+  return useQuery({
+    ...trpc.usageAnalytics.getTable.queryOptions({
       ...commonFilters(args),
       groupBy: args.groupBy,
       limit: args.limit ?? 1000,
-    })
-  );
+    }),
+    enabled: args.enabled ?? true,
+  });
 }
 
 export function useResolveOrgUsers(organizationId: string | null, userIds: string[]) {

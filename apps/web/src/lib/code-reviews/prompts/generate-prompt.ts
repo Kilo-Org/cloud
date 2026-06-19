@@ -49,6 +49,7 @@ export const PromptTemplateSchema = z
     version: z.string(),
     systemRole: z.string(),
     hardConstraints: z.string(),
+    diffLineGuidance: z.string().optional(),
     workflow: z.string(),
     whatToReview: z.string(),
     commentFormat: z.string(),
@@ -188,6 +189,10 @@ export async function generateReviewPrompt(
 
   // 4. Hard constraints (MOST IMPORTANT - always included)
   prompt += template.hardConstraints + '\n\n';
+
+  if (template.diffLineGuidance) {
+    prompt += replacePlaceholders(template.diffLineGuidance) + '\n\n';
+  }
 
   // 5. Workflow with placeholders replaced
   // Use incremental workflow when we have a previous completed review SHA and a summary comment

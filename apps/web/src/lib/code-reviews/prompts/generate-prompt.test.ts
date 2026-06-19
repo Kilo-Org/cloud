@@ -58,6 +58,24 @@ describe('generateReviewPrompt', () => {
     expect(prompt).not.toContain(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`);
   });
 
+  it('includes GitHub diff line-number safeguards', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain('# GITHUB DIFF LINE RULES');
+    expect(prompt).toContain('gh pr diff 1');
+    expect(prompt).toContain('Use the NEW file line number from the RIGHT side of the diff');
+    expect(prompt).toContain('Line could not be resolved');
+  });
+
+  it('does not include GitHub diff line-number safeguards for GitLab', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+    });
+
+    expect(prompt).not.toContain('# GITHUB DIFF LINE RULES');
+  });
+
   it('replaces built-in review guidance with REVIEW.md instructions at the same prompt point', async () => {
     const repositoryReviewInstructions = [
       'Only flag regressions with direct evidence.',

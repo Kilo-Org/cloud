@@ -38,6 +38,8 @@ next-env.d.ts
 /dev/*/.dev-logs/
 /dev/fixtures/
 /dev/*/fixtures/
+!/dev/review/fixtures/
+!/dev/review/fixtures/*.json
 dev-debug-request-logs/*
 **/dev-debug-request-logs/
 /dev/logs/

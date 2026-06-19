@@ -212,7 +212,13 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     PATH: sessionPath,
     WRANGLER_REGISTRY_PATH: wranglerRegistryPath,
   };
-  for (const key of ['PNPM_HOME', 'COREPACK_HOME', 'npm_execpath']) {
+  for (const key of [
+    'PNPM_HOME',
+    'COREPACK_HOME',
+    'npm_execpath',
+    'CODE_REVIEW_LOCAL_FAKE_PROVIDER',
+    'KILOCODE_DEV_FAKE_REPOSITORY',
+  ]) {
     const value = process.env[key];
     if (value !== undefined && value !== '') {
       sessionEnv[key] = value;
@@ -534,7 +540,7 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   }
 }
 
-async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
+async function cmdRestart(serviceName: string): Promise<void> {
   if (!services.has(serviceName)) {
     console.error(`Unknown service: ${serviceName}`);
     process.exit(1);
@@ -656,7 +662,7 @@ async function main() {
         console.error('Usage: dev:restart <service>');
         process.exit(1);
       }
-      await cmdRestart(serviceName, repoRoot);
+      await cmdRestart(serviceName);
       break;
     }
     case 'env':

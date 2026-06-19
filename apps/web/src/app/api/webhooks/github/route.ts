@@ -1,6 +1,5 @@
 import { NextRequest, after } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { bot } from '@/lib/bot';
 import { handleGitHubWebhook } from '@/lib/integrations/platforms/github/webhook-handler';
 
 function cloneGitHubRequest(request: NextRequest, rawBody: string) {
@@ -24,6 +23,7 @@ export async function POST(request: NextRequest) {
 
   after(async () => {
     try {
+      const { bot } = await import('@/lib/bot');
       const response = await bot.webhooks.github(botRequest, {
         waitUntil: task => after(() => task),
       });

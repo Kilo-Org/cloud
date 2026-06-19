@@ -79,6 +79,19 @@ import {
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
+const DEV_FAKE_REPOSITORY_TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
+
+function isDevFakeRepositoryEnabled(
+  env: PersistenceEnv,
+  metadata: CloudAgentSessionState
+): boolean {
+  const value = env.KILOCODE_DEV_FAKE_REPOSITORY?.trim().toLowerCase();
+  return (
+    value !== undefined &&
+    DEV_FAKE_REPOSITORY_TRUE_VALUES.has(value) &&
+    metadata.identity.createdOnPlatform === 'code-review'
+  );
+}
 
 function gitLabTokenLookupFailureMessage(reason: string): string {
   switch (reason) {
@@ -1413,6 +1426,27 @@ export class SessionService {
     let githubCommitCoAuthor: GitAuthorConfig | undefined;
     let githubFallbackReason: ManagedGitHubFallbackReason | undefined;
 
+    if (isDevFakeRepositoryEnabled(env, metadata)) {
+      if (github) {
+        logger.withTags({ githubRepo: github.repo }).info('Using local fake GitHub credentials');
+        return {
+          githubToken: 'kilocode-local-fake-github-token',
+          githubAppType: github.githubAppType ?? 'standard',
+          githubSource: 'installation',
+          githubGitAuthor: { name: 'Kilo Code Local', email: 'local-review@kilocode.dev' },
+        };
+      }
+
+      if (git?.url && repositoryPlatform(metadata) === 'gitlab') {
+        logger.withTags({ gitUrl: git.url }).info('Using local fake GitLab credentials');
+        return {
+          gitToken: 'kilocode-local-fake-gitlab-token',
+          gitlabTokenManaged: false,
+          glabIsOAuth2: false,
+        };
+      }
+    }
+
     if (github) {
       const result = await resolveCloudAgentGitHubAuthForRepo(env, {
         githubRepo: github.repo,
@@ -1862,6 +1896,10 @@ export class SessionService {
     onProgress?.('workspace_setup', 'Setting up workspace…');
     await setupWorkspace(sandbox, userId, orgId, sessionId);
 
+    if (isDevFakeRepositoryEnabled(env, metadata)) {
+      await this.createDevFakeRepository(sandbox, workspacePath, metadata);
+    }
+
     const session = await this.buildSessionForContext(
       sandbox,
       context,
@@ -1875,7 +1913,7 @@ export class SessionService {
     let dockerEnv: Record<string, string> | undefined;
     try {
       onProgress?.('cloning', 'Cloning repository…');
-      await this.cloneRepository(session, workspacePath, metadata, resolvedTokens);
+      await this.cloneRepository(session, workspacePath, env, metadata, resolvedTokens);
 
       onProgress?.('branch', 'Setting up branch…');
       await this.prepareBranch(session, workspacePath, branchName, metadata);
@@ -2024,12 +2062,73 @@ export class SessionService {
     }
   }
 
+  private async createDevFakeRepository(
+    executor: SandboxInstance | ExecutionSession,
+    workspacePath: string,
+    metadata: CloudAgentSessionState
+  ): Promise<void> {
+    const originPath = `${workspacePath}.origin.git`;
+    const upstreamBranch = metadata.repository?.upstreamBranch;
+    const pushUpstreamCommand = upstreamBranch
+      ? `git push origin HEAD:${shellQuote(upstreamBranch)}`
+      : 'git push origin HEAD:feature/local-code-review';
+    const repoLabel =
+      githubRepository(metadata)?.repo ?? gitRepository(metadata)?.url ?? 'local fake repository';
+
+    logger
+      .withTags({ workspacePath, originPath, upstreamBranch })
+      .info('Bootstrapping local fake repository for code-review dev session');
+
+    const command = [
+      `rm -rf ${shellQuote(workspacePath)} ${shellQuote(originPath)}`,
+      `mkdir -p ${shellQuote(workspacePath)}`,
+      `git init --bare ${shellQuote(originPath)}`,
+      `git init -b main ${shellQuote(workspacePath)}`,
+      `cd ${shellQuote(workspacePath)}`,
+      "git config user.name 'Kilo Code Local'",
+      "git config user.email 'local-review@kilocode.dev'",
+      `printf '%s\n' ${shellQuote(`# Local code review fixture\n\nSynthetic repository for ${repoLabel}.`)} > README.md`,
+      'git add README.md',
+      "git commit -m 'Seed local review fixture'",
+      `git remote add origin ${shellQuote(originPath)}`,
+      'git push origin HEAD:main',
+      'git checkout -b feature/local-code-review',
+      `printf '%s\n' ${shellQuote('This line exists so local fake review fixtures have a changed branch.')} > fixture.txt`,
+      'git add fixture.txt',
+      "git commit -m 'Add local review fixture change'",
+      pushUpstreamCommand,
+      'git checkout main',
+      "printf 'ready\n' > .git/kilo-bootstrap-complete",
+    ].join(' && ');
+
+    const result = await timedExec(
+      executor,
+      command,
+      'session.prepareWorkspace.devFakeRepository',
+      {
+        timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+      }
+    );
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Failed to bootstrap local fake repository: ${result.stderr || result.stdout || result.exitCode}`
+      );
+    }
+  }
+
   private async cloneRepository(
     session: ExecutionSession,
     workspacePath: string,
+    env: PersistenceEnv,
     metadata: CloudAgentSessionState,
     tokens: ResolvedWorkspaceTokens
   ): Promise<void> {
+    if (isDevFakeRepositoryEnabled(env, metadata)) {
+      if (await this.workspaceHasGit(session, workspacePath)) return;
+      await this.createDevFakeRepository(session, workspacePath, metadata);
+      return;
+    }
+
     const cloneOptions = repositoryShallow(metadata) ? { shallow: true } : undefined;
     const git = gitRepository(metadata);
     if (git) {

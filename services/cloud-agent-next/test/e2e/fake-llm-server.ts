@@ -61,6 +61,17 @@ type ServerState = {
   nextRequestId: number;
   /** Count of dispatched completions, exposed for fail-fast scenario assertions. */
   chatCompletionRequests: number;
+  /** Recent user prompts observed by chat.completions, for local harness assertions. */
+  capturedPrompts: CapturedPrompt[];
+};
+
+type CapturedPrompt = {
+  reqId: number;
+  model?: string;
+  scenario?: string;
+  text: string;
+  messageCount: number;
+  recordedAt: string;
 };
 
 type LogFields = Record<string, string | number | boolean | undefined>;
@@ -509,6 +520,16 @@ async function handleChatCompletions(
   const prompt = extractLastUserMessageText(body);
   const directive = parseDirective(prompt);
 
+  state.capturedPrompts.push({
+    reqId: reqLogId,
+    model: bodyModel,
+    scenario: directive?.scenario,
+    text: prompt,
+    messageCount,
+    recordedAt: new Date().toISOString(),
+  });
+  state.capturedPrompts = state.capturedPrompts.slice(-20);
+
   logEvent('request.start', {
     reqId: reqLogId,
     route: 'POST /api/openrouter/chat/completions',
@@ -651,6 +672,16 @@ function handleRequestCounts(res: ServerResponse, state: ServerState): void {
   res.end(JSON.stringify({ chatCompletions: state.chatCompletionRequests }));
 }
 
+function handlePrompts(res: ServerResponse, state: ServerState): void {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(
+    JSON.stringify({
+      count: state.capturedPrompts.length,
+      prompts: state.capturedPrompts,
+    })
+  );
+}
+
 /**
  * Snapshot of all currently parked gate waiters, grouped by tag. Tests use
  * this after expected completions to assert the fake server has no stale
@@ -682,6 +713,7 @@ export async function startFakeLlmServer(opts?: {
     liveResponses: new Set(),
     nextRequestId: 0,
     chatCompletionRequests: 0,
+    capturedPrompts: [],
   };
 
   const sockets = new Set<Socket>();
@@ -734,6 +766,10 @@ export async function startFakeLlmServer(opts?: {
     }
     if (route === 'GET /test/requests') {
       handleRequestCounts(res, state);
+      return;
+    }
+    if (route === 'GET /test/prompts') {
+      handlePrompts(res, state);
       return;
     }
 

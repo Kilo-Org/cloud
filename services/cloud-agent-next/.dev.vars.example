@@ -31,6 +31,11 @@ KILOCODE_BACKEND_BASE_URL=http://localhost:3000
 # @url nextjs/api
 KILO_OPENROUTER_BASE=http://localhost:3000/api
 
+# Local code-review webhook harness only. Prefer setting
+# CODE_REVIEW_LOCAL_FAKE_PROVIDER=1 on `pnpm dev:start code-review`; the dev
+# runner passes this flag and routes KILO_OPENROUTER_BASE to fake-llm for you.
+KILOCODE_DEV_FAKE_REPOSITORY=0
+
 # Worker base URL used by the wrapper to connect to /ingest.
 # Sandbox containers reach the host via `host.docker.internal`.
 # @url cloud-agent-next

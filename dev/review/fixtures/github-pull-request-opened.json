@@ -1,0 +1,44 @@
+{
+  "action": "opened",
+  "number": 123,
+  "pull_request": {
+    "number": 123,
+    "title": "Exercise local code review webhook flow",
+    "body": "Fixture PR used to test the local Kilo Code review webhook path.",
+    "state": "open",
+    "draft": false,
+    "html_url": "https://github.com/kilo-dev/review-fixture/pull/123",
+    "user": {
+      "id": 583231,
+      "login": "octocat",
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif"
+    },
+    "head": {
+      "sha": "1111111111111111111111111111111111111111",
+      "ref": "feature/local-review-fixture",
+      "repo": {
+        "full_name": "kilo-dev/review-fixture",
+        "clone_url": "https://github.com/kilo-dev/review-fixture.git"
+      }
+    },
+    "base": {
+      "sha": "2222222222222222222222222222222222222222",
+      "ref": "main"
+    }
+  },
+  "repository": {
+    "id": 987654,
+    "name": "review-fixture",
+    "full_name": "kilo-dev/review-fixture",
+    "private": false,
+    "owner": {
+      "login": "kilo-dev"
+    }
+  },
+  "installation": {
+    "id": 987654321
+  },
+  "sender": {
+    "login": "octocat"
+  }
+}

@@ -386,9 +386,51 @@ export function getAllInfraProfiles(): string[] {
 const CONTAINER_EGRESS_IMAGE_ARM64 =
   'cloudflare/proxy-everything:3cb1195@sha256:78c7910f4575a511d928d7824b1cbcaec6b7c4bf4dbb3fafaeeae3104030e73c';
 
+const LOCAL_TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
+const LOCAL_REVIEW_CALLBACK_TOKEN_SECRET = 'kilocode-local-review-callback-secret';
+
 function containerEgressImageEnvPrefix(): string[] {
   if (process.arch !== 'arm64') return [];
   return ['env', `MINIFLARE_CONTAINER_EGRESS_IMAGE=${CONTAINER_EGRESS_IMAGE_ARM64}`];
+}
+
+function envFlagEnabled(name: string): boolean {
+  const value = process.env[name]?.trim().toLowerCase();
+  return value !== undefined && LOCAL_TRUE_VALUES.has(value);
+}
+
+function workerDevVarArgs(serviceName: string): string[] {
+  if (
+    !envFlagEnabled('CODE_REVIEW_LOCAL_FAKE_PROVIDER') &&
+    !envFlagEnabled('KILOCODE_DEV_FAKE_REPOSITORY')
+  ) {
+    return [];
+  }
+
+  if (serviceName === 'cloudflare-code-review-infra') {
+    return ['--var', `CALLBACK_TOKEN_SECRET:${LOCAL_REVIEW_CALLBACK_TOKEN_SECRET}`];
+  }
+
+  if (serviceName !== 'cloud-agent-next') return [];
+
+  const fakeLlmPort = 8811 + portOffset;
+  return [
+    '--var',
+    'KILOCODE_DEV_FAKE_REPOSITORY:1',
+    '--var',
+    `KILO_OPENROUTER_BASE:http://localhost:${fakeLlmPort}/api`,
+  ];
+}
+
+function nextjsCommand(): string[] {
+  if (!envFlagEnabled('CODE_REVIEW_LOCAL_FAKE_PROVIDER')) return ['pnpm', 'run', 'dev'];
+  return [
+    'env',
+    `CALLBACK_TOKEN_SECRET=${LOCAL_REVIEW_CALLBACK_TOKEN_SECRET}`,
+    'pnpm',
+    'run',
+    'dev',
+  ];
 }
 
 function buildServiceDefs(): ServiceDef[] {
@@ -405,7 +447,7 @@ function buildServiceDefs(): ServiceDef[] {
         dir: 'apps/web',
         port: nextjsTargetPort,
         dependsOn: meta.dependsOn,
-        command: ['pnpm', 'run', 'dev'],
+        command: nextjsCommand(),
         group: meta.group,
       });
       continue;
@@ -547,6 +589,7 @@ function buildServiceDefs(): ServiceDef[] {
       String(inspectorPort),
       '--ip',
       '0.0.0.0',
+      ...workerDevVarArgs(name),
     ];
 
     defs.push({

@@ -28,6 +28,7 @@ import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
 import { APP_URL } from '@/lib/constants';
 import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
+import { isLocalCodeReviewFakeProviderEnabled } from '@/lib/code-reviews/local-dev';
 
 /**
  * GitHub Pull Request Event Handler
@@ -155,6 +156,7 @@ export async function handlePullRequestCodeReview(
     const appType = integration.github_app_type ?? 'standard';
     const headFullName = checkoutRef.headRepoFullName ?? repository.full_name;
     const [headOwner, headRepoName] = headFullName.split('/');
+    const useLocalFakeProvider = isLocalCodeReviewFakeProviderEnabled();
 
     // 4. Skip merge commits on synchronize (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
@@ -320,7 +322,7 @@ export async function handlePullRequestCodeReview(
     const [repoOwner, repoName] = repository.full_name.split('/');
 
     // 8. Create GitHub Check Run (PR gate) — skip for lite (read-only) app
-    if (appType !== 'lite') {
+    if (appType !== 'lite' && !useLocalFakeProvider) {
       let checkRunId: number | undefined;
       try {
         const detailsUrl = `${APP_URL}/code-reviews/${reviewId}`;
@@ -369,18 +371,26 @@ export async function handlePullRequestCodeReview(
     }
 
     // 9. Post 👀 reaction to show Kilo is reviewing
-    try {
-      await addReactionToPR(
-        integration.platform_installation_id as string,
-        repoOwner,
-        repoName,
-        pull_request.number,
-        'eyes'
-      );
-      logExceptInTest(`Added eyes reaction to ${repository.full_name}#${pull_request.number}`);
-    } catch (reactionError) {
-      // Non-blocking - log but don't fail the review
-      logExceptInTest('Failed to add eyes reaction:', reactionError);
+    if (!useLocalFakeProvider) {
+      try {
+        await addReactionToPR(
+          integration.platform_installation_id as string,
+          repoOwner,
+          repoName,
+          pull_request.number,
+          'eyes'
+        );
+        logExceptInTest(`Added eyes reaction to ${repository.full_name}#${pull_request.number}`);
+      } catch (reactionError) {
+        // Non-blocking - log but don't fail the review
+        logExceptInTest('Failed to add eyes reaction:', reactionError);
+      }
+    } else {
+      logExceptInTest('Skipping GitHub provider side effects for local fake review', {
+        reviewId,
+        repo: repository.full_name,
+        prNumber: pull_request.number,
+      });
     }
 
     // 10. Try to dispatch pending reviews (including this new one)

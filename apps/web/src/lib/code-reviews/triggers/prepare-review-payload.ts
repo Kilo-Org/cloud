@@ -60,6 +60,7 @@ import {
 import { getCurrentReviewSummaryForContext } from '../summary/history';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
+import { isLocalCodeReviewFakeProviderEnabled } from '../local-dev';
 
 export type PreparePayloadParams = {
   reviewId: string;
@@ -120,6 +121,7 @@ export async function prepareReviewPayload(
   const { reviewId, owner, agentConfig, platform = 'github' } = params;
   const config = agentConfig.config as CodeReviewAgentConfig;
   const shouldUseReviewMd = config.disable_review_md === false;
+  const useLocalFakeProvider = isLocalCodeReviewFakeProviderEnabled();
 
   logExceptInTest('[prepareReviewPayload] Starting payload preparation', {
     reviewId,
@@ -170,97 +172,117 @@ export async function prepareReviewPayload(
       const integration = await getIntegrationById(review.platform_integration_id);
 
       if (platform === 'github' && integration?.platform_installation_id) {
-        const installationId = integration.platform_installation_id;
-        // Use the stored app type (defaults to 'standard' for existing integrations)
-        const appType: GitHubAppType = integration.github_app_type || 'standard';
-        // GitHub: Use installation token. Auth failures here (e.g. IP allow list
-        // blocking, suspended/uninstalled app) are hard failures: without a token
-        // we cannot clone private repos or post review comments. Let the error
-        // propagate so the user sees a meaningful failure on the review.
-        const tokenData = await generateGitHubInstallationToken(installationId, appType);
-        const installationToken = tokenData.token;
-        githubToken = installationToken;
-        const [repoOwner, repoName] = review.repo_full_name.split('/');
-
-        try {
-          repositorySize = await fetchGitHubRepositorySize({
-            token: installationToken,
-            owner: repoOwner,
-            repo: repoName,
-          });
-          logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
-            platform,
+        if (useLocalFakeProvider) {
+          githubToken = 'kilocode-local-fake-github-token';
+          logExceptInTest('[prepareReviewPayload] Using local fake GitHub provider', {
+            reviewId,
             repoFullName: review.repo_full_name,
-            repositorySize,
-            repositorySizeKnown: repositorySize !== null,
           });
-        } catch (error) {
-          warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
-            platform,
-            repoFullName: review.repo_full_name,
-            error: getReviewInstructionsFetchErrorMetadata(error),
-          });
-        }
+        } else {
+          const installationId = integration.platform_installation_id;
+          // Use the stored app type (defaults to 'standard' for existing integrations)
+          const appType: GitHubAppType = integration.github_app_type || 'standard';
+          // GitHub: Use installation token. Auth failures here (e.g. IP allow list
+          // blocking, suspended/uninstalled app) are hard failures: without a token
+          // we cannot clone private repos or post review comments. Let the error
+          // propagate so the user sees a meaningful failure on the review.
+          const tokenData = await generateGitHubInstallationToken(installationId, appType);
+          const installationToken = tokenData.token;
+          githubToken = installationToken;
+          const [repoOwner, repoName] = review.repo_full_name.split('/');
 
-        const repositoryReviewInstructionsPromise =
-          shouldUseReviewMd && repoOwner && repoName
-            ? fetchRepositoryReviewInstructions({
+          try {
+            repositorySize = await fetchGitHubRepositorySize({
+              token: installationToken,
+              owner: repoOwner,
+              repo: repoName,
+            });
+            logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
+              platform,
+              repoFullName: review.repo_full_name,
+              repositorySize,
+              repositorySizeKnown: repositorySize !== null,
+            });
+          } catch (error) {
+            warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
+              platform,
+              repoFullName: review.repo_full_name,
+              error: getReviewInstructionsFetchErrorMetadata(error),
+            });
+          }
+
+          const repositoryReviewInstructionsPromise =
+            shouldUseReviewMd && repoOwner && repoName
+              ? fetchRepositoryReviewInstructions({
+                  platform,
+                  repoFullName: review.repo_full_name,
+                  baseRef: review.base_ref,
+                  fetchInstructions: () =>
+                    fetchGitHubRootTextFileAtRef({
+                      token: installationToken,
+                      owner: repoOwner,
+                      repo: repoName,
+                      path: REVIEW_INSTRUCTIONS_FILE,
+                      ref: review.base_ref,
+                    }),
+                })
+              : undefined;
+
+          if (shouldUseReviewMd && (!repoOwner || !repoName)) {
+            warnExceptInTest(
+              '[prepareReviewPayload] Cannot fetch REVIEW.md for invalid GitHub repo',
+              {
                 platform,
                 repoFullName: review.repo_full_name,
                 baseRef: review.base_ref,
-                fetchInstructions: () =>
-                  fetchGitHubRootTextFileAtRef({
-                    token: installationToken,
-                    owner: repoOwner,
-                    repo: repoName,
-                    path: REVIEW_INSTRUCTIONS_FILE,
-                    ref: review.base_ref,
-                  }),
-              })
-            : undefined;
-
-        if (shouldUseReviewMd && (!repoOwner || !repoName)) {
-          warnExceptInTest(
-            '[prepareReviewPayload] Cannot fetch REVIEW.md for invalid GitHub repo',
-            {
-              platform,
-              repoFullName: review.repo_full_name,
-              baseRef: review.base_ref,
-            }
-          );
-        }
-
-        // Build complete review state for intelligent update/create decisions
-        try {
-          // Fetch all state in parallel for efficiency
-          const [summaryComment, inlineComments, headCommitSha, reviewInstructions] =
-            await Promise.all([
-              findKiloReviewComment(installationId, repoOwner, repoName, review.pr_number, appType),
-              fetchPRInlineComments(installationId, repoOwner, repoName, review.pr_number, appType),
-              getPRHeadCommit(installationId, repoOwner, repoName, review.pr_number, appType),
-              repositoryReviewInstructionsPromise ??
-                Promise.resolve(repositoryReviewInstructionsLookup),
-            ]);
-          repositoryReviewInstructionsLookup = reviewInstructions;
-
-          existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
-
-          logExceptInTest('[prepareReviewPayload] Built GitHub review state', {
-            reviewId,
-            hasSummary: !!summaryComment,
-            inlineCount: inlineComments.length,
-            previousStatus: existingReviewState.previousStatus,
-            headCommitSha: headCommitSha.substring(0, 8),
-          });
-        } catch (stateLookupError) {
-          if (repositoryReviewInstructionsPromise) {
-            repositoryReviewInstructionsLookup = await repositoryReviewInstructionsPromise;
+              }
+            );
           }
-          // Non-critical - continue without state info
-          logExceptInTest('[prepareReviewPayload] Failed to build GitHub review state:', {
-            reviewId,
-            error: stateLookupError,
-          });
+
+          // Build complete review state for intelligent update/create decisions
+          try {
+            // Fetch all state in parallel for efficiency
+            const [summaryComment, inlineComments, headCommitSha, reviewInstructions] =
+              await Promise.all([
+                findKiloReviewComment(
+                  installationId,
+                  repoOwner,
+                  repoName,
+                  review.pr_number,
+                  appType
+                ),
+                fetchPRInlineComments(
+                  installationId,
+                  repoOwner,
+                  repoName,
+                  review.pr_number,
+                  appType
+                ),
+                getPRHeadCommit(installationId, repoOwner, repoName, review.pr_number, appType),
+                repositoryReviewInstructionsPromise ??
+                  Promise.resolve(repositoryReviewInstructionsLookup),
+              ]);
+            repositoryReviewInstructionsLookup = reviewInstructions;
+
+            existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
+
+            logExceptInTest('[prepareReviewPayload] Built GitHub review state', {
+              reviewId,
+              hasSummary: !!summaryComment,
+              inlineCount: inlineComments.length,
+              previousStatus: existingReviewState.previousStatus,
+              headCommitSha: headCommitSha.substring(0, 8),
+            });
+          } catch (stateLookupError) {
+            if (repositoryReviewInstructionsPromise) {
+              repositoryReviewInstructionsLookup = await repositoryReviewInstructionsPromise;
+            }
+            // Non-critical - continue without state info
+            logExceptInTest('[prepareReviewPayload] Failed to build GitHub review state:', {
+              reviewId,
+              error: stateLookupError,
+            });
+          }
         }
       } else if (platform === 'gitlab' && integration) {
         // GitLab: Use Project Access Token (PrAT) for all operations
@@ -279,140 +301,149 @@ export async function prepareReviewPayload(
           instanceUrl,
         });
 
-        // Get or create Project Access Token (PrAT) for all GitLab operations
-        const projectId = review.platform_project_id;
-
-        if (!projectId) {
-          throw new Error(
-            `GitLab code review requires platform_project_id. ` +
-              `Review ${reviewId} for ${review.repo_full_name} is missing this field.`
-          );
-        }
-
-        try {
-          gitlabToken = await getOrCreateProjectAccessToken(integration, projectId);
-          reviewContinuationScope = {
-            platform: 'gitlab',
-            integrationId: integration.id,
-            projectId,
-          };
-          logExceptInTest('[prepareReviewPayload] Using PrAT for code review', {
+        if (useLocalFakeProvider) {
+          gitlabToken = 'kilocode-local-fake-gitlab-token';
+          logExceptInTest('[prepareReviewPayload] Using local fake GitLab provider', {
             reviewId,
             repoFullName: review.repo_full_name,
-            projectId,
+            instanceUrl,
           });
-        } catch (pratError) {
-          if (pratError instanceof GitLabProjectAccessTokenPermissionError) {
+        } else {
+          // Get or create Project Access Token (PrAT) for all GitLab operations
+          const projectId = review.platform_project_id;
+
+          if (!projectId) {
             throw new Error(
-              `Cannot create Project Access Token for GitLab code review. ` +
-                `You need Maintainer role or higher on project ${review.repo_full_name}. ` +
-                `Error: ${pratError.message}`
+              `GitLab code review requires platform_project_id. ` +
+                `Review ${reviewId} for ${review.repo_full_name} is missing this field.`
             );
           }
-          throw new Error(
-            `Failed to create Project Access Token for GitLab code review on ${review.repo_full_name}. ` +
-              `Error: ${pratError instanceof Error ? pratError.message : String(pratError)}`
-          );
-        }
-        const projectAccessToken = gitlabToken;
 
-        try {
-          repositorySize = await fetchGitLabRepositorySize(
-            projectAccessToken,
-            review.repo_full_name,
-            instanceUrl
-          );
-          logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
-            platform,
-            repoFullName: review.repo_full_name,
-            repositorySize,
-            repositorySizeKnown: repositorySize !== null,
-          });
-        } catch (error) {
-          warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
-            platform,
-            repoFullName: review.repo_full_name,
-            error: getReviewInstructionsFetchErrorMetadata(error),
-          });
-        }
+          try {
+            gitlabToken = await getOrCreateProjectAccessToken(integration, projectId);
+            reviewContinuationScope = {
+              platform: 'gitlab',
+              integrationId: integration.id,
+              projectId,
+            };
+            logExceptInTest('[prepareReviewPayload] Using PrAT for code review', {
+              reviewId,
+              repoFullName: review.repo_full_name,
+              projectId,
+            });
+          } catch (pratError) {
+            if (pratError instanceof GitLabProjectAccessTokenPermissionError) {
+              throw new Error(
+                `Cannot create Project Access Token for GitLab code review. ` +
+                  `You need Maintainer role or higher on project ${review.repo_full_name}. ` +
+                  `Error: ${pratError.message}`
+              );
+            }
+            throw new Error(
+              `Failed to create Project Access Token for GitLab code review on ${review.repo_full_name}. ` +
+                `Error: ${pratError instanceof Error ? pratError.message : String(pratError)}`
+            );
+          }
+          const projectAccessToken = gitlabToken;
 
-        const repositoryReviewInstructionsPromise = shouldUseReviewMd
-          ? fetchRepositoryReviewInstructions({
+          try {
+            repositorySize = await fetchGitLabRepositorySize(
+              projectAccessToken,
+              review.repo_full_name,
+              instanceUrl
+            );
+            logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
               platform,
               repoFullName: review.repo_full_name,
-              baseRef: review.base_ref,
-              fetchInstructions: () =>
-                fetchGitLabRootTextFileAtRef(
-                  projectAccessToken,
-                  review.repo_full_name,
-                  REVIEW_INSTRUCTIONS_FILE,
-                  review.base_ref,
-                  instanceUrl
-                ),
-            })
-          : undefined;
-
-        // Build complete review state for GitLab (using PrAT for reading)
-        try {
-          const mrIid = review.pr_number;
-          // Use repo_full_name as the project path for GitLab API calls
-          const repoPath = review.repo_full_name;
-
-          // Fetch all state in parallel for efficiency (using PrAT)
-          const [summaryNote, inlineComments, headCommitSha, diffRefs, reviewInstructions] =
-            await Promise.all([
-              findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
-              fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
-              getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
-              getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
-              repositoryReviewInstructionsPromise ??
-                Promise.resolve(repositoryReviewInstructionsLookup),
-            ]);
-          repositoryReviewInstructionsLookup = reviewInstructions;
-
-          // Convert GitLab note format to common format
-          const summaryComment = summaryNote
-            ? { commentId: summaryNote.noteId, body: summaryNote.body }
-            : null;
-
-          // Convert GitLab inline comments to common format
-          const convertedInlineComments = inlineComments.map(c => ({
-            id: c.id,
-            path: c.path,
-            line: c.line,
-            body: c.body,
-            isOutdated: c.isOutdated,
-          }));
-
-          existingReviewState = buildReviewState(
-            summaryComment,
-            convertedInlineComments,
-            headCommitSha
-          );
-
-          // Store GitLab diff context for prompt generation
-          gitlabContext = {
-            baseSha: diffRefs.baseSha,
-            startSha: diffRefs.startSha,
-            headSha: diffRefs.headSha,
-          };
-
-          logExceptInTest('[prepareReviewPayload] Built GitLab review state', {
-            reviewId,
-            hasSummary: !!summaryNote,
-            inlineCount: inlineComments.length,
-            previousStatus: existingReviewState.previousStatus,
-            headCommitSha: headCommitSha.substring(0, 8),
-          });
-        } catch (stateLookupError) {
-          if (repositoryReviewInstructionsPromise) {
-            repositoryReviewInstructionsLookup = await repositoryReviewInstructionsPromise;
+              repositorySize,
+              repositorySizeKnown: repositorySize !== null,
+            });
+          } catch (error) {
+            warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
+              platform,
+              repoFullName: review.repo_full_name,
+              error: getReviewInstructionsFetchErrorMetadata(error),
+            });
           }
-          // Non-critical - continue without state info
-          logExceptInTest('[prepareReviewPayload] Failed to build GitLab review state:', {
-            reviewId,
-            error: stateLookupError,
-          });
+
+          const repositoryReviewInstructionsPromise = shouldUseReviewMd
+            ? fetchRepositoryReviewInstructions({
+                platform,
+                repoFullName: review.repo_full_name,
+                baseRef: review.base_ref,
+                fetchInstructions: () =>
+                  fetchGitLabRootTextFileAtRef(
+                    projectAccessToken,
+                    review.repo_full_name,
+                    REVIEW_INSTRUCTIONS_FILE,
+                    review.base_ref,
+                    instanceUrl
+                  ),
+              })
+            : undefined;
+
+          // Build complete review state for GitLab (using PrAT for reading)
+          try {
+            const mrIid = review.pr_number;
+            // Use repo_full_name as the project path for GitLab API calls
+            const repoPath = review.repo_full_name;
+
+            // Fetch all state in parallel for efficiency (using PrAT)
+            const [summaryNote, inlineComments, headCommitSha, diffRefs, reviewInstructions] =
+              await Promise.all([
+                findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
+                fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
+                getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
+                getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
+                repositoryReviewInstructionsPromise ??
+                  Promise.resolve(repositoryReviewInstructionsLookup),
+              ]);
+            repositoryReviewInstructionsLookup = reviewInstructions;
+
+            // Convert GitLab note format to common format
+            const summaryComment = summaryNote
+              ? { commentId: summaryNote.noteId, body: summaryNote.body }
+              : null;
+
+            // Convert GitLab inline comments to common format
+            const convertedInlineComments = inlineComments.map(c => ({
+              id: c.id,
+              path: c.path,
+              line: c.line,
+              body: c.body,
+              isOutdated: c.isOutdated,
+            }));
+
+            existingReviewState = buildReviewState(
+              summaryComment,
+              convertedInlineComments,
+              headCommitSha
+            );
+
+            // Store GitLab diff context for prompt generation
+            gitlabContext = {
+              baseSha: diffRefs.baseSha,
+              startSha: diffRefs.startSha,
+              headSha: diffRefs.headSha,
+            };
+
+            logExceptInTest('[prepareReviewPayload] Built GitLab review state', {
+              reviewId,
+              hasSummary: !!summaryNote,
+              inlineCount: inlineComments.length,
+              previousStatus: existingReviewState.previousStatus,
+              headCommitSha: headCommitSha.substring(0, 8),
+            });
+          } catch (stateLookupError) {
+            if (repositoryReviewInstructionsPromise) {
+              repositoryReviewInstructionsLookup = await repositoryReviewInstructionsPromise;
+            }
+            // Non-critical - continue without state info
+            logExceptInTest('[prepareReviewPayload] Failed to build GitLab review state:', {
+              reviewId,
+              error: stateLookupError,
+            });
+          }
         }
       }
     }

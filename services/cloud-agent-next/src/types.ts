@@ -221,6 +221,8 @@ export type Env = {
   KILOCODE_BACKEND_BASE_URL?: string;
   /** Base URL override for OpenRouter-compatible Kilo API */
   KILO_OPENROUTER_BASE?: string;
+  /** Local dev only: bootstrap a synthetic git repo instead of cloning provider remotes. */
+  KILOCODE_DEV_FAKE_REPOSITORY?: string;
   /** Kilocode CLI timeout override (seconds) */
   CLI_TIMEOUT_SECONDS?: string;
   /** Reaper interval override (ms) */

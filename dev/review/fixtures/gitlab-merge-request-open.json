@@ -1,0 +1,38 @@
+{
+  "object_kind": "merge_request",
+  "event_type": "merge_request",
+  "user": {
+    "id": 583231,
+    "name": "Mona Octocat",
+    "username": "octocat"
+  },
+  "project": {
+    "id": 987654,
+    "name": "gitlab-review-fixture",
+    "web_url": "https://gitlab.example.com/kilo-dev/gitlab-review-fixture",
+    "namespace": "kilo-dev",
+    "path_with_namespace": "kilo-dev/gitlab-review-fixture",
+    "default_branch": "main"
+  },
+  "object_attributes": {
+    "id": 456789,
+    "iid": 123,
+    "title": "Exercise local GitLab review webhook flow",
+    "state": "opened",
+    "action": "open",
+    "source_branch": "feature/local-review-fixture",
+    "target_branch": "main",
+    "source_project_id": 987654,
+    "target_project_id": 987654,
+    "author_id": 583231,
+    "created_at": "2026-06-19T00:00:00Z",
+    "updated_at": "2026-06-19T00:00:00Z",
+    "url": "https://gitlab.example.com/kilo-dev/gitlab-review-fixture/-/merge_requests/123",
+    "draft": false,
+    "work_in_progress": false,
+    "last_commit": {
+      "id": "3333333333333333333333333333333333333333",
+      "message": "Add local review fixture change"
+    }
+  }
+}

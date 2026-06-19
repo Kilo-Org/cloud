@@ -35,6 +35,7 @@ import {
   getValidGitLabToken,
 } from '@/lib/integrations/gitlab-service';
 import { APP_URL } from '@/lib/constants';
+import { isLocalCodeReviewFakeProviderEnabled } from '@/lib/code-reviews/local-dev';
 
 /**
  * Handles merge request events that trigger code review
@@ -321,6 +322,7 @@ export async function handleMergeRequestCodeReview(
 
     // 8. Resolve checkout ref (fork MRs use refs/merge-requests/<iid>/head)
     const { checkoutRef } = resolveMergeRequestCheckoutRef(payload);
+    const useLocalFakeProvider = isLocalCodeReviewFakeProviderEnabled();
 
     // 9. Create review record (session_id will be updated async)
     const reviewId = await createCodeReview({
@@ -341,7 +343,7 @@ export async function handleMergeRequestCodeReview(
     logExceptInTest(`Created code review ${reviewId} for ${project.path_with_namespace}!${mr.iid}`);
 
     // 10. Post 👀 reaction and set commit status (using PrAT for bot identity)
-    if (fullIntegration) {
+    if (fullIntegration && !useLocalFakeProvider) {
       try {
         const pratToken = await getOrCreateProjectAccessToken(fullIntegration, project.id);
         logExceptInTest(`Got PrAT for project ${project.path_with_namespace}`, {
@@ -379,6 +381,12 @@ export async function handleMergeRequestCodeReview(
           error: reactionError instanceof Error ? reactionError.message : String(reactionError),
         });
       }
+    } else if (useLocalFakeProvider) {
+      logExceptInTest('Skipping GitLab provider side effects for local fake review', {
+        reviewId,
+        project: project.path_with_namespace,
+        mrIid: mr.iid,
+      });
     }
 
     // 11. Try to dispatch pending reviews (including this new one)

@@ -24,7 +24,6 @@ import { buildInstallationData } from '../webhook-helpers';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
-import { bot } from '@/lib/bot';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 
 /**
@@ -124,6 +123,7 @@ export async function handleInstallationDeleted(payload: InstallationDeletedPayl
   );
 
   try {
+    const { bot } = await import('@/lib/bot');
     await bot.initialize();
     await unlinkTeamKiloUsers(bot.getState(), PLATFORM.GITHUB, installationIdStr);
   } catch (error) {

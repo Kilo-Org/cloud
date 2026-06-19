@@ -33,6 +33,7 @@ import {
 } from '../../workspace.js';
 import {
   FAST_SANDBOX_COMMAND_TIMEOUT_MS,
+  GIT_COMMAND_TIMEOUT_MS,
   logSandboxOperationTimeout,
   timedExec,
 } from '../../sandbox-timeout-logging.js';
@@ -40,6 +41,7 @@ import { SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE } from '../../sandbox-recovery.
 import { withTimeout } from '@kilocode/worker-utils';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
 import { ExecutionError } from '../../execution/errors.js';
+import { shellQuote } from '../../kilo/utils.js';
 import {
   isSandboxFilesystemUnusableError,
   SandboxCapacityInspectionError,
@@ -48,6 +50,24 @@ import {
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
+const DEV_FAKE_REPOSITORY_TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
+
+function isDevFakeRepositoryEnabled(env: Env, metadata: SessionMetadata): boolean {
+  const value = env.KILOCODE_DEV_FAKE_REPOSITORY?.trim().toLowerCase();
+  return (
+    value !== undefined &&
+    DEV_FAKE_REPOSITORY_TRUE_VALUES.has(value) &&
+    metadata.identity.createdOnPlatform === 'code-review'
+  );
+}
+
+function devFakeRepositoryLabel(metadata: SessionMetadata): string {
+  const repository = metadata.repository;
+  if (!repository) return 'local fake repository';
+  if (repository.type === 'github') return repository.repo;
+  if ('url' in repository) return repository.url;
+  return 'local fake repository';
+}
 
 function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string): Promise<T> {
   return withTimeout(
@@ -175,6 +195,51 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     return this.usesDevcontainerRuntime() ? sessionId : `${sessionId}-bootstrap`;
   }
 
+  private async createDevFakeRepository(sandbox: SandboxInstance, workspacePath: string) {
+    const originPath = `${workspacePath}.origin.git`;
+    const upstreamBranch = this.metadata.repository?.upstreamBranch;
+    const pushUpstreamCommand = upstreamBranch
+      ? `git push origin HEAD:${shellQuote(upstreamBranch)}`
+      : 'git push origin HEAD:feature/local-code-review';
+    const repoLabel = devFakeRepositoryLabel(this.metadata);
+
+    const command = [
+      `rm -rf ${shellQuote(workspacePath)} ${shellQuote(originPath)}`,
+      `mkdir -p ${shellQuote(workspacePath)}`,
+      `git init --bare ${shellQuote(originPath)}`,
+      `git init -b main ${shellQuote(workspacePath)}`,
+      `cd ${shellQuote(workspacePath)}`,
+      "git config user.name 'Kilo Code Local'",
+      "git config user.email 'local-review@kilocode.dev'",
+      `printf '%s\n' ${shellQuote(`# Local code review fixture\n\nSynthetic repository for ${repoLabel}.`)} > README.md`,
+      'git add README.md',
+      "git commit -m 'Seed local review fixture'",
+      `git remote add origin ${shellQuote(originPath)}`,
+      'git push origin HEAD:main',
+      'git checkout -b feature/local-code-review',
+      `printf '%s\n' ${shellQuote('This line exists so local fake review fixtures have a changed branch.')} > fixture.txt`,
+      'git add fixture.txt',
+      "git commit -m 'Add local review fixture change'",
+      pushUpstreamCommand,
+      'git checkout main',
+      "printf 'ready\n' > .git/kilo-bootstrap-complete",
+    ].join(' && ');
+
+    const result = await timedExec(sandbox, command, 'agentSandbox.devFakeRepository', {
+      timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+    });
+    if (result.exitCode !== 0) {
+      throw ExecutionError.workspaceSetupFailed(
+        `Failed to bootstrap local fake repository: ${result.stderr || result.stdout || result.exitCode}`,
+        undefined,
+        {
+          subtype: 'workspace_setup_unknown',
+          safeFailureMessage: 'Failed to bootstrap local fake repository',
+        }
+      );
+    }
+  }
+
   async ensureWrapper(request: EnsureWrapperRequest) {
     const { plan, prepared } = request;
     const { sessionId, userId, orgId } = plan.scope;
@@ -259,6 +324,9 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId, {
         inspectContainers: sandboxId.startsWith('dind-'),
       });
+      if (isDevFakeRepositoryEnabled(this.env, this.metadata)) {
+        await this.createDevFakeRepository(sandbox, prepared.context.workspacePath);
+      }
     }
     request.onProgress?.('kilo_server', 'Starting Kilo...');
     const bootstrapSession = await sandbox.createSession({

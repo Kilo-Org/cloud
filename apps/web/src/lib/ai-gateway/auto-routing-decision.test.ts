@@ -32,6 +32,7 @@ function makeParams(): EfficientDecisionParams {
     providerHints: { provider: null, providerOptions: null },
     bodyBytes: 512,
     userId: 'user-1',
+    organizationId: 'org-1',
     sessionId: 'task-123',
     machineId: 'machine-1',
     clientRequestId: 'req-1',
@@ -96,6 +97,18 @@ describe('fetchEfficientAutoDecision', () => {
     const [, init] = mockedFetch.mock.calls[0];
     expect(JSON.parse(init?.body as string)).toMatchObject({
       routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+    });
+  });
+
+  it('includes the organization id in the worker payload when present', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(makeParams(), options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toMatchObject({
+      userId: 'user-1',
+      organizationId: 'org-1',
     });
   });
 

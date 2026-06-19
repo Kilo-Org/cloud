@@ -3,6 +3,7 @@ import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-util
 import { authMiddleware } from './auth';
 import { classifierAnalyticsHandler } from './admin-classifier-analytics';
 import { getClassifierModelHandler, putClassifierModelHandler } from './admin-classifier-model';
+import { getRoutingModeHandler, putRoutingModeHandler } from './admin-routing-mode';
 import { decideHandler } from './decide';
 import type { HonoEnv } from './hono-env';
 
@@ -16,6 +17,8 @@ app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing' }));
 
 app.get('/admin/classifier-model', getClassifierModelHandler);
 app.put('/admin/classifier-model', putClassifierModelHandler);
+app.get('/admin/routing-mode', getRoutingModeHandler);
+app.put('/admin/routing-mode', putRoutingModeHandler);
 app.get('/admin/classifier-analytics', classifierAnalyticsHandler);
 
 app.post('/decide', decideHandler);

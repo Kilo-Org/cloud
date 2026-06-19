@@ -79,6 +79,26 @@ describe('computeDecision', () => {
       sticky: false,
     });
   });
+  it('defaults to the least cost per accuracy candidate', () => {
+    const decision = computeDecision(classification, table, null);
+    expect(decision?.model).toBe('cheap/chat');
+  });
+  it('picks the most accurate candidate when best accuracy mode is selected', () => {
+    const decision = computeDecision(classification, table, null, new Set(), 'best_accuracy');
+    expect(decision).toEqual({
+      model: 'pricey/chat',
+      taskType: 'implementation',
+      subtaskType: 'code_generation',
+      source: 'benchmark',
+      tableVersion: 'run-1',
+      reasoningEffort: null,
+      sticky: false,
+    });
+  });
+  it('does not keep a lower-accuracy incumbent in best accuracy mode', () => {
+    const decision = computeDecision(classification, table, 'mid/chat', new Set(), 'best_accuracy');
+    expect(decision).toMatchObject({ model: 'pricey/chat', sticky: false });
+  });
   it('uses the classifier task type and subtype directly', () => {
     const debugging: ClassifierOutput = {
       ...classification,

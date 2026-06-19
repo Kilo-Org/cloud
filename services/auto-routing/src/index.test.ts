@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearClassifierConfigCache } from './classifier-config';
+import { clearAutoRoutingModeCache } from './routing-mode';
 import { clearRoutingTableCache } from './routing-table';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
@@ -184,6 +185,7 @@ function decideRequest(payload: unknown) {
 describe('auto routing worker', () => {
   beforeEach(() => {
     clearClassifierConfigCache();
+    clearAutoRoutingModeCache();
     clearRoutingTableCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
@@ -314,6 +316,151 @@ describe('auto routing worker', () => {
     // The raw user id (which embeds the client IP for anonymous users) must
     // never reach persisted logs.
     expect(String(logMessage)).not.toContain('user-1');
+  });
+
+  it('uses organization best-accuracy mode for auto routing decisions', async () => {
+    configGet.mockImplementation(async (key: string) => {
+      if (key === 'auto_routing_mode:org:org-1') return 'best_accuracy';
+      return null;
+    });
+    benchmarkFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes('/admin/classifier-winner')) {
+        return { ok: true, status: 200, json: async () => ({ winner: null }) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          table: {
+            ...benchmarkRoutingTable,
+            routes: {
+              ...benchmarkRoutingTable.routes,
+              'implementation/feature_development': [
+                {
+                  model: 'cheap/model',
+                  accuracy: 0.8,
+                  avgCostUsd: 0.001,
+                  meetsThreshold: true,
+                  reasoningEffort: null,
+                },
+                {
+                  model: 'accurate/model',
+                  accuracy: 0.95,
+                  avgCostUsd: 0.1,
+                  meetsThreshold: true,
+                  reasoningEffort: null,
+                },
+              ],
+            },
+          },
+          publishedAt: benchmarkRoutingTable.generatedAt,
+        }),
+      };
+    });
+
+    const response = await decideRequest(mirrorPayload({ organizationId: 'org-1' }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: {
+        model: 'accurate/model',
+        sticky: false,
+      },
+    });
+  });
+
+  it('falls back to user auto routing mode when org mode is unset', async () => {
+    configGet.mockImplementation(async (key: string) => {
+      if (key === 'auto_routing_mode:user:user-1') return 'best_accuracy';
+      return null;
+    });
+    benchmarkFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes('/admin/classifier-winner')) {
+        return { ok: true, status: 200, json: async () => ({ winner: null }) };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          table: {
+            ...benchmarkRoutingTable,
+            routes: {
+              ...benchmarkRoutingTable.routes,
+              'implementation/feature_development': [
+                {
+                  model: 'cheap/model',
+                  accuracy: 0.8,
+                  avgCostUsd: 0.001,
+                  meetsThreshold: true,
+                  reasoningEffort: null,
+                },
+                {
+                  model: 'accurate/model',
+                  accuracy: 0.95,
+                  avgCostUsd: 0.1,
+                  meetsThreshold: true,
+                  reasoningEffort: null,
+                },
+              ],
+            },
+          },
+          publishedAt: benchmarkRoutingTable.generatedAt,
+        }),
+      };
+    });
+
+    const response = await decideRequest(mirrorPayload({ organizationId: 'org-1' }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: {
+        model: 'accurate/model',
+        sticky: false,
+      },
+    });
+  });
+
+  it('reads and updates owner routing mode through admin endpoints', async () => {
+    let storedMode: string | null = null;
+    configGet.mockImplementation(async (key: string) =>
+      key === 'auto_routing_mode:user:user-1' ? storedMode : null
+    );
+    configPut.mockImplementation(async (_key: string, value: string) => {
+      storedMode = value;
+    });
+    configDelete.mockImplementation(async () => {
+      storedMode = null;
+    });
+
+    const updateResponse = await request('/admin/routing-mode', {
+      method: 'PUT',
+      headers: {
+        authorization: 'Bearer classifier-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        ownerType: 'user',
+        ownerId: 'user-1',
+        mode: 'best_accuracy',
+      }),
+    });
+    expect(updateResponse.status).toBe(200);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      ownerType: 'user',
+      ownerId: 'user-1',
+      mode: 'best_accuracy',
+      configuredMode: 'best_accuracy',
+      defaultMode: 'cost_per_accuracy',
+    });
+
+    const getResponse = await request('/admin/routing-mode?ownerType=user&ownerId=user-1', {
+      headers: { authorization: 'Bearer classifier-token' },
+    });
+    expect(getResponse.status).toBe(200);
+    await expect(getResponse.json()).resolves.toMatchObject({
+      mode: 'best_accuracy',
+      configuredMode: 'best_accuracy',
+    });
   });
 
   it('filters denied routing-policy models from the full decide path', async () => {

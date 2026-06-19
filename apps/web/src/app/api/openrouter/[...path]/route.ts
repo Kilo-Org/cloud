@@ -297,6 +297,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               providerHints: autoRoutingProviderHints,
               bodyBytes: Buffer.byteLength(requestBodyText),
               userId: user.id,
+              organizationId: authOrganizationId ?? null,
               sessionId: taskId ?? sessionHeader,
               machineId: machineIdHeader,
               clientRequestId,

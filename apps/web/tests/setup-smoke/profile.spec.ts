@@ -13,6 +13,38 @@ test.describe('local setup smoke', () => {
     const signInUrl = `/users/sign_in?fakeUser=${encodeURIComponent(testEmail)}&callbackPath=${encodeURIComponent('/profile')}`;
     const postgresUrl = process.env.POSTGRES_URL;
     if (!postgresUrl) throw new Error('POSTGRES_URL must be set for setup smoke tests');
+    const savedModes: unknown[] = [];
+
+    await page.route('**/api/auto-routing/mode', async route => {
+      const request = route.request();
+      if (request.method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ownerType: 'user',
+            ownerId: `setup-smoke-${uniqueId}`,
+            mode: 'cost_per_accuracy',
+            configuredMode: null,
+            defaultMode: 'cost_per_accuracy',
+          }),
+        });
+        return;
+      }
+
+      savedModes.push(request.postDataJSON());
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ownerType: 'user',
+          ownerId: `setup-smoke-${uniqueId}`,
+          mode: 'best_accuracy',
+          configuredMode: 'best_accuracy',
+          defaultMode: 'cost_per_accuracy',
+        }),
+      });
+    });
 
     const { db, pool } = createDrizzleClient({
       connectionString: postgresUrl,
@@ -46,5 +78,12 @@ test.describe('local setup smoke', () => {
     await expect(page.getByRole('link', { name: 'Your Profile' })).toBeVisible();
     await expect(profileCard.getByRole('button', { name: 'Edit profile' })).toBeVisible();
     await expect(profileCard.getByText(testEmail, { exact: true })).toBeVisible();
+
+    await expect(page.getByText('Auto routing', { exact: true })).toBeVisible();
+    await page.getByRole('combobox', { name: 'Routing mode' }).click();
+    await page.getByRole('option', { name: 'Best accuracy' }).click();
+    await page.getByRole('button', { name: 'Save routing mode' }).click();
+    await expect(page.getByText('Auto routing mode saved')).toBeVisible();
+    expect(savedModes).toContainEqual({ mode: 'best_accuracy' });
   });
 });

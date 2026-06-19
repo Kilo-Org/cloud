@@ -64,7 +64,7 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Match the KiloCode chunk explicitly because OpenClaw also ships other provider
 # discovery timeout constants. Remove this patch once the timeout is configurable.
-RUN npm install -g pnpm openclaw@2026.6.5 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
+RUN npm install -g pnpm openclaw@2026.6.8 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && PM_FILES=$(grep -l 'KILOCODE_MODELS_URL' "$OC_DIST"/provider-models-*.js 2>/dev/null || true) \
     && PM_FILE_COUNT=$(printf '%s\n' "$PM_FILES" | grep -c .) \
@@ -98,7 +98,7 @@ RUN COMPOSIO_INSTALL_TAG="%40composio%2Fcli%40${COMPOSIO_CLI_VERSION}" \
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
 # boot is pure startup — no npm install from `openclaw doctor` or gateway plugin
 # load on shared-cpu Fly machines. The stage-root naming mirrors OpenClaw
-# 2026.6.5's resolveExternalBundledRuntimeDepsInstallRoot().
+# 2026.6.8's resolveExternalBundledRuntimeDepsInstallRoot().
 RUN cd /usr/local/lib/node_modules/openclaw \
     && OPENCLAW_PACKAGE_ROOT="$(pwd -P)" \
     && OPENCLAW_PACKAGE_VERSION="$(node -p "require('./package.json').version")" \
@@ -117,8 +117,10 @@ RUN cd /usr/local/lib/node_modules/openclaw \
     && rm -f /tmp/bundled-plugin-specs.raw /tmp/bundled-plugin-specs.txt \
     && rm -rf /root/.npm
 
-# Install Go (available at runtime for users to `go install` additional tools)
-ENV GO_VERSION=1.26.2
+# Install Go (available at runtime for users to `go install` additional tools).
+# Keep on the latest patch release so the toolchain and the tools built with it
+# below do not ship stale Go stdlib CVEs.
+ENV GO_VERSION=1.26.4
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz -o /tmp/go.tar.gz \
     && EXPECTED_SHA256="$(curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz.sha256)" \
@@ -257,8 +259,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-06-10-v70-openclaw-2026.6.5
-RUN echo "15"
+# Build cache bust: 2026-06-17-v71-openclaw-2026.6.8
+RUN echo "16"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

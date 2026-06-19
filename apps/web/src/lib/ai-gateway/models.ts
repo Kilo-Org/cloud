@@ -5,6 +5,7 @@
 import type { FeatureValue } from '@/lib/feature-detection';
 import {
   KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
 } from '@/lib/ai-gateway/auto-model';
@@ -49,6 +50,7 @@ export const autoFreeModels = [
 export const preferredModels = [
   KILO_AUTO_FRONTIER_MODEL.id,
   KILO_AUTO_BALANCED_MODEL.id,
+  KILO_AUTO_EFFICIENT_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
   ...autoFreeModels,
   CLAUDE_OPUS_CURRENT_MODEL_ID,

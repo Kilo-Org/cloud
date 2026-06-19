@@ -107,7 +107,6 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import { scheduleAutoRoutingMirror } from '@/lib/ai-gateway/auto-routing-mirror';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import {
   createStreamLifecycleTracker,
@@ -230,9 +229,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  // Captured for the auto-routing mirror before auto-model resolution and
-  // provider transforms mutate the parsed body.
-  const mirrorProviderHints = redactProviderHints(requestBodyParsed.body);
+  // Captured before auto-model resolution and provider transforms mutate the
+  // parsed body; efficient routing classifies the original user request.
+  const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
 
   const feature = validateFeatureHeader(
     request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
@@ -286,11 +285,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
             // This stops anonymous/abusive traffic from repeatedly spending
             // Kilo-funded classification with no user to attribute it to.
             if (!user || authFailedResponse) return null;
+            const { settings, plan } = await balanceAndSettingsPromise;
+            const deniedModelIds =
+              plan === 'enterprise'
+                ? [...new Set(settings?.model_deny_list?.map(normalizeModelId) ?? [])]
+                : undefined;
             const result = await fetchEfficientAutoDecision({
               apiKind: requestBodyParsed.kind,
               body: requestBodyParsed.body,
               requestedModel,
-              providerHints: mirrorProviderHints,
+              providerHints: autoRoutingProviderHints,
               bodyBytes: Buffer.byteLength(requestBodyText),
               userId: user.id,
               sessionId: taskId ?? sessionHeader,
@@ -298,6 +302,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               clientRequestId,
               mode: modeHeader,
               userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+              deniedModelIds,
             });
             classifierCostUsd = result?.costUsd ?? 0;
             return result?.decision ?? null;
@@ -831,23 +836,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (rulesEngineDecision.delayMs > 0) {
     await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
-  }
-
-  if (autoModel !== KILO_AUTO_EFFICIENT_MODEL.id) {
-    scheduleAutoRoutingMirror({
-      apiKind: requestBodyParsed.kind,
-      body: requestBodyParsed.body,
-      requestedModel,
-      providerHints: mirrorProviderHints,
-      bodyBytes: Buffer.byteLength(requestBodyText),
-      userId: user.id,
-      sessionId: taskId ?? sessionHeader,
-      machineId: machineIdHeader,
-      clientRequestId,
-      mode: modeHeader,
-      userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
-      authContext: Promise.resolve({ organizationId }),
-    });
   }
 
   const observesProvider = effectiveProviderContext.provider.id === 'custom';

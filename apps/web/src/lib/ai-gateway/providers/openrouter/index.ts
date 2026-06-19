@@ -18,7 +18,7 @@ import {
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
-import { getOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
+import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
@@ -34,7 +34,7 @@ import { addMonths } from 'date-fns';
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 function buildAutoModels(): OpenRouterModel[] {
-  return AUTO_MODELS.filter(m => m.status === 'public').map(m => {
+  return AUTO_MODELS.map(m => {
     const input_modalities = ['text'];
     if (m.supports_images) {
       input_modalities.push('image');
@@ -178,7 +178,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
           isFree: model.isFree ?? isFree,
           mayTrainOnYourPrompts: model.mayTrainOnYourPrompts ?? isFree,
-          opencode: model.opencode ?? getOpenCodeSettings(model.id),
+          opencode: model.opencode ?? getGatewayOpenCodeSettings(model.id),
           architecture: addPdf
             ? {
                 ...model.architecture,

@@ -19,7 +19,7 @@ import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import { isOpenCodeGoAnthropicMessagesModel } from '@/lib/ai-gateway/providers/direct-byok/opencode-go';
+import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 const REASONING_VARIANTS_THINKING_ONLY = {
   thinking: { reasoning: { enabled: true, effort: 'high' } },
@@ -110,7 +110,6 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (
     isMinimaxModel(model) ||
     isKimiModel(model) ||
-    isGlmModel(model) ||
     isGrokToggleableReasoningModel(model) ||
     isQwenModel(model) ||
     isGemmaModel(model) ||
@@ -127,25 +126,26 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (isStepModel(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
   }
-  if (isDeepseekModel(model)) {
+  if (isDeepseekModel(model) || isGlmModel(model)) {
     return REASONING_VARIANTS_NONE_HIGH_XHIGH;
   }
   return undefined;
 }
 
 export function getAiSdkProvider(
-  model: string
+  model: string,
+  directProviderId: DirectUserByokInferenceProviderId | null
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
   if (seed_20_code_free_model.public_id === model) {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
   }
-  if (isOpenCodeGoAnthropicMessagesModel(model)) {
+  if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
     return 'anthropic';
   }
   if (
     isClaudeModel(model) || // on Vercel AI Gateway, this is necessary to support document attachments
-    isMinimaxModel(model) // on Vercel AI Gateway, this is necessary for reasoning to show
+    (!directProviderId && isMinimaxModel(model)) // on Vercel AI Gateway, this is necessary for reasoning to show
   ) {
     return 'anthropic';
   }
@@ -164,8 +164,8 @@ function getOpenCodePrompt(model: string): OpenCodePrompt | undefined {
   return undefined;
 }
 
-export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined {
-  const ai_sdk_provider = getAiSdkProvider(model);
+export function getGatewayOpenCodeSettings(model: string): OpenCodeSettings | undefined {
+  const ai_sdk_provider = getAiSdkProvider(model, null);
   const variants = getModelVariants(model);
   const prompt = getOpenCodePrompt(model);
   return { ai_sdk_provider, variants, prompt };

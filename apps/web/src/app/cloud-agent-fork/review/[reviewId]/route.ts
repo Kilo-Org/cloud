@@ -1,10 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
-import {
-  DEFAULT_CODE_REVIEW_MODE,
-  DEFAULT_CODE_REVIEW_MODEL,
-} from '@/lib/code-reviews/core/constants';
+import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
+import { resolveBotModelSlug } from '@/lib/bot/model';
+import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCallerFactory, createTRPCContext } from '@/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { TRPCError } from '@trpc/server';
@@ -72,17 +71,29 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return redirectToError(url.origin, 'unsupported_platform');
   }
 
-  const sessionInput = {
-    githubRepo: review.repo_full_name,
-    prompt: buildFixReviewPrompt(review.pr_url),
-    mode: DEFAULT_CODE_REVIEW_MODE,
-    model: review.model ?? DEFAULT_CODE_REVIEW_MODEL,
-    autoInitiate: true,
-    autoCommit: false,
-  };
-
   try {
     const organizationId = review.owned_by_organization_id;
+    const integration = review.platform_integration_id
+      ? await getIntegrationById(review.platform_integration_id)
+      : null;
+
+    if (
+      integration &&
+      (integration.platform !== review.platform ||
+        integration.owned_by_user_id !== review.owned_by_user_id ||
+        integration.owned_by_organization_id !== review.owned_by_organization_id)
+    ) {
+      return redirectToError(url.origin, 'fix_session_failed');
+    }
+
+    const sessionInput = {
+      githubRepo: review.repo_full_name,
+      prompt: buildFixReviewPrompt(review.pr_url),
+      mode: DEFAULT_CODE_REVIEW_MODE,
+      model: resolveBotModelSlug(integration),
+      autoInitiate: true,
+      autoCommit: false,
+    };
     const session = organizationId
       ? await caller.organizations.cloudAgentNext.prepareSession({
           ...sessionInput,

@@ -1543,8 +1543,9 @@ export async function tryDeleteMachine(
 
 /**
  * Cap on retries against a single `pendingDestroyVolumeId` before the DO gives
- * up. At the current ~1 retry/minute alarm cadence, 50 attempts is roughly an
- * hour of wall-clock retries. Past this point the volume is treated as
+ * up. Retry alarms back off from one minute to a jittered daily cadence, so this
+ * cap represents a long-lived provider failure rather than a short outage.
+ * Past this point the volume is treated as
  * permanently stuck — the DO emits `destroy_volume_abandoned_after_max_retries`
  * (for alerting), clears the pending pointer so the destroy loop can finalize,
  * and the volume will be picked up by the org-wide volume janitor (if any).
@@ -1563,7 +1564,16 @@ export async function tryDeleteMachine(
  * needs human attention" rather than "this volume is leaked," and re-check
  * actual Fly state before acting.
  */
-const MAX_DESTROY_VOLUME_ATTEMPTS = 50;
+const MAX_DESTROY_VOLUME_ATTEMPTS = 100;
+/**
+ * Attempt at which to emit `destroy_volume_retry_escalated` as an early signal.
+ * The retry backoff reaches its daily tier when scheduling after attempt 6
+ * (~7h of accumulated retries), which is the point a short outage becomes a
+ * long-lived provider failure worth alerting on. Firing later (e.g. at attempt
+ * 10, ~4 days in) would just trail the daily-tier transition instead of
+ * surfacing it while still actionable.
+ */
+const DESTROY_VOLUME_ESCALATION_ATTEMPTS = 6;
 
 export async function tryDeleteVolume(
   flyConfig: FlyClientConfig,
@@ -1597,6 +1607,14 @@ export async function tryDeleteVolume(
       await persistDestroyError(ctx, state, 'volume', status, message);
 
       const attempts = state.destroyVolumeAttempts + 1;
+      if (attempts === DESTROY_VOLUME_ESCALATION_ATTEMPTS) {
+        rctx.log('destroy_volume_retry_escalated', {
+          volume_id: state.pendingDestroyVolumeId,
+          attempts,
+          last_error: message,
+          last_status: status,
+        });
+      }
       if (attempts >= MAX_DESTROY_VOLUME_ATTEMPTS) {
         rctx.log('destroy_volume_abandoned_after_max_retries', {
           volume_id: state.pendingDestroyVolumeId,

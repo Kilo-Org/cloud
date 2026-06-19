@@ -22,9 +22,6 @@ type AutoModel = {
   supports_images: boolean;
   supports_pdf: boolean;
   opencode_settings: OpenCodeSettings | undefined;
-  // Mirrors KiloExclusiveModel['status']. 'hidden' auto models are excluded
-  // from the /models listing but stay usable by anyone who knows the id.
-  status: 'public' | 'hidden';
 };
 
 export type ResolvedAutoModel = {
@@ -108,7 +105,6 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
     family: 'claude',
     prompt: 'anthropic',
   },
-  status: 'public',
 };
 
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
@@ -126,7 +122,6 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   supports_images: false,
   supports_pdf: false,
   opencode_settings: undefined,
-  status: 'public',
 };
 
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
@@ -142,7 +137,6 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   supports_images: true,
   supports_pdf: false,
   opencode_settings: undefined,
-  status: 'public',
 };
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {
@@ -158,18 +152,14 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   supports_images: true,
   supports_pdf: false,
   opencode_settings: undefined,
-  status: 'public',
 };
 
-// Same catalog properties as balanced (it is intended to eventually replace
-// it); hidden while the routing engine is validated on Kilo team traffic.
 export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
   ...KILO_AUTO_BALANCED_MODEL,
   id: 'kilo-auto/efficient',
   name: 'Auto Efficient',
   description:
     'Routes each request to the cheapest model that gets the job done, based on continuously benchmarked accuracy and cost.',
-  status: 'hidden',
 };
 
 export const AUTO_MODELS = [

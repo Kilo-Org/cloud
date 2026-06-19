@@ -17,7 +17,7 @@ scripts/          CI and one-off scripts
 - **Database schema**: `packages/db/src/schema.ts`
 - **Migrations**: `packages/db/src/migrations/`
 - **tRPC routers**: `apps/web/src/routers/`
-- **Env vars**: `.env.local` at repo root (pulled via `vercel env pull`)
+- **Env vars**: `.env.local` at repo root (pulled via `vercel env pull`). When a shared web env var needs to be added or rotated across tracked dotenv files and Vercel deployments, tell the user to run `pnpm web:env set <VARIABLE>`; agents must not run that command themselves because it prompts for secret values and writes to external systems.
 
 ## Domain Context
 
@@ -83,7 +83,7 @@ Schema is in `packages/db/src/schema.ts`. Migrations live in `packages/db/src/mi
 
 ## GDPR & PII
 
-When adding PII (email, name, IP address, etc.) to the database — whether as a new table or a new column — you **must** also update the GDPR soft-delete flow in `softDeleteUser` (`apps/web/src/lib/user.ts`) and add a corresponding test in `apps/web/src/lib/user.test.ts`.
+When adding PII (email, name, IP address, etc.) to the database — whether as a new table or a new column — you **must** also update the GDPR soft delete flow in `softDeleteUser` (`apps/web/src/lib/user/index.ts`) and add a corresponding test in `apps/web/src/lib/user/index.test.ts`.
 
 ## Logging & Sensitive Data
 

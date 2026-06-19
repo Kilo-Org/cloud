@@ -200,6 +200,7 @@ const OpenRouterModelSchema = z.object({
   preferredIndex: z.number().optional(),
   isFree: z.boolean().optional(),
   mayTrainOnYourPrompts: z.boolean().optional(),
+  hasUserByokAvailable: z.boolean().optional(),
   terminalBench: z
     .object({
       overallScore: z.number(),

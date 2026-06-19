@@ -10,6 +10,7 @@ type UsageFooterData = {
   model: string;
   tokensIn: number;
   tokensOut: number;
+  cachedTokens: number;
 };
 
 type ReviewGuidanceFooterData = {
@@ -27,21 +28,23 @@ function formatModelName(modelSlug: string): string {
   return parts.length > 1 ? parts.slice(1).join('/') : modelSlug;
 }
 
-/**
- * Format a token count with thousands separators
- */
-function formatTokenCount(count: number): string {
-  return count.toLocaleString('en-US');
+const tokenCountFormatter = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+
+export function formatTokenCount(count: number): string {
+  return tokenCountFormatter.format(count);
 }
 
-/**
- * Build the usage footer line
- * e.g., "Model: claude-sonnet-4.6 · Tokens: 12,345 in, 1,234 out"
- */
-export function buildUsageFooter(model: string, tokensIn: number, tokensOut: number): string {
+export function buildUsageFooter(
+  model: string,
+  tokensIn: number,
+  tokensOut: number,
+  cachedTokens: number
+): string {
   const displayModel = formatModelName(model);
-  const totalTokens = formatTokenCount(tokensIn + tokensOut);
-  return `${USAGE_FOOTER_MARKER}\n<sub>Reviewed by ${displayModel} · ${totalTokens} tokens</sub>`;
+  return `${USAGE_FOOTER_MARKER}\n<sub>Reviewed by ${displayModel} · Input: ${formatTokenCount(tokensIn)} · Output: ${formatTokenCount(tokensOut)} · Cached: ${formatTokenCount(cachedTokens)}</sub>`;
 }
 
 export function buildReviewGuidanceFooter(guidance: ReviewGuidanceFooterData): string {
@@ -59,7 +62,12 @@ export function buildReviewSummaryFooter(footer: {
 
   if (footer.usage) {
     footerLines.push(
-      buildUsageFooter(footer.usage.model, footer.usage.tokensIn, footer.usage.tokensOut)
+      buildUsageFooter(
+        footer.usage.model,
+        footer.usage.tokensIn,
+        footer.usage.tokensOut,
+        footer.usage.cachedTokens
+      )
     );
   }
 
@@ -106,7 +114,9 @@ export function appendUsageFooter(
   tokensIn: number,
   tokensOut: number
 ): string {
-  return appendReviewSummaryFooter(existingBody, { usage: { model, tokensIn, tokensOut } });
+  return appendReviewSummaryFooter(existingBody, {
+    usage: { model, tokensIn, tokensOut, cachedTokens: 0 },
+  });
 }
 
 function findBackendFooterStart(body: string, markerIdx: number): number | null {

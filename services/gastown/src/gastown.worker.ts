@@ -266,13 +266,15 @@ app.use('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/*', async (c, next
 
 // ── CORS ────────────────────────────────────────────────────────────────
 // Allow browser requests from the main Kilo app. In development, allow
-// localhost origins for the Next.js dev server.
+// localhost and LAN origins for the Next.js dev server.
+
+const localIpPattern =
+  /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+|192\.168\.\d+\.\d+|\[(::1|fd[0-9a-f]{2}:[0-9a-f:]+|fe80:[0-9a-f:]+)\])(:\d+)?$/i;
 
 const corsMiddleware = cors({
   origin: (origin, c: Context<GastownEnv>) => {
     if (c.env.ENVIRONMENT === 'development') {
-      // Allow any localhost origin in dev
-      if (origin.startsWith('http://localhost:')) return origin;
+      if (localIpPattern.test(origin)) return origin;
     }
     // Production origins
     const allowed = ['https://app.kilo.ai', 'https://kilo.ai'];

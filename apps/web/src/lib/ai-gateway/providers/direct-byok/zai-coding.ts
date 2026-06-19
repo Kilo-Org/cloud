@@ -16,9 +16,9 @@ export default {
     providerId: 'zai-coding',
     recommendedModels: [
       {
-        id: 'glm-5.1',
-        name: 'GLM-5.1',
-        context_length: 200000,
+        id: 'glm-5.2',
+        name: 'GLM-5.2',
+        context_length: 1000000,
         max_completion_tokens: 131072,
       },
     ],

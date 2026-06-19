@@ -15,6 +15,20 @@
       "when": 1781696079415,
       "tag": "0001_special_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1781713850969,
+      "tag": "0002_magical_wendell_rand",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1781717243859,
+      "tag": "0003_chunky_ogun",
+      "breakpoints": true
     }
   ]
 }

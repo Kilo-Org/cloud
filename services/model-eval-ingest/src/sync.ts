@@ -1,6 +1,9 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { model_eval_ingestions, modelStats } from '@kilocode/db/schema';
-import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
+import {
+  deriveModelStatsIdentity,
+  unprefixKiloGatewayModelId,
+} from '@kilocode/worker-utils/kilo-model-id';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   PromotionRecordSchema,
@@ -71,7 +74,12 @@ function storedPromotionValues({ promotion, modelStatsId }: PromotionInsert) {
 
 export type PromotionStore = {
   getLatestPromotedAtMs(): Promise<number>;
+  listOrphanedTerminalBenchModels(): Promise<string[]>;
+  ensureModelStatsTargets(models: string[]): Promise<void>;
   findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>>;
+  linkOrphanedTerminalBenchPromotions(
+    targets: Map<string, ModelStatsTarget>
+  ): Promise<PromotionTuple[]>;
   insertPromotions(promotions: PromotionInsert[]): Promise<Set<string>>;
   refreshPromotion(promotion: PromotionInsert): Promise<void>;
   listLatestPromotions(tuple: Omit<PromotionTuple, 'modelStatsId'>): Promise<LatestPromotion[]>;
@@ -93,6 +101,46 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
         .limit(1);
 
       return latest ? Date.parse(latest.promotedAt) : 0;
+    },
+
+    async listOrphanedTerminalBenchModels(): Promise<string[]> {
+      const rows = await db
+        .selectDistinct({ model: model_eval_ingestions.model })
+        .from(model_eval_ingestions)
+        .where(
+          and(
+            eq(model_eval_ingestions.task_source, 'terminal-bench'),
+            isNull(model_eval_ingestions.model_stats_id)
+          )
+        );
+      return rows.map(row => row.model);
+    },
+
+    async ensureModelStatsTargets(models: string[]): Promise<void> {
+      const candidates = [...new Set(models)];
+      if (candidates.length === 0) return;
+
+      const existing = await this.findModelStatsTargets(candidates);
+      const missing = [
+        ...new Set(
+          candidates
+            .filter(model => !existing.has(model))
+            .map(model => unprefixKiloGatewayModelId(model) ?? model)
+        ),
+      ];
+      if (missing.length === 0) return;
+
+      await db
+        .insert(modelStats)
+        .values(
+          missing.map(model => ({
+            openrouterId: model,
+            ...deriveModelStatsIdentity(model),
+            name: model,
+            openrouterData: sql`'{}'::jsonb`,
+          }))
+        )
+        .onConflictDoNothing();
     },
 
     async findModelStatsTargets(models: string[]): Promise<Map<string, ModelStatsTarget>> {
@@ -121,6 +169,34 @@ export function createPromotionStore(db: WorkerDb): PromotionStore {
       }
 
       return resolvedTargets;
+    },
+
+    async linkOrphanedTerminalBenchPromotions(
+      targets: Map<string, ModelStatsTarget>
+    ): Promise<PromotionTuple[]> {
+      const tuples = new Map<string, PromotionTuple>();
+      for (const [model, target] of targets) {
+        const rows = await db
+          .update(model_eval_ingestions)
+          .set({ model_stats_id: target.id })
+          .where(
+            and(
+              eq(model_eval_ingestions.model, model),
+              eq(model_eval_ingestions.task_source, 'terminal-bench'),
+              isNull(model_eval_ingestions.model_stats_id)
+            )
+          )
+          .returning({
+            provider: model_eval_ingestions.provider,
+            model: model_eval_ingestions.model,
+            variant: model_eval_ingestions.variant,
+          });
+        for (const row of rows) {
+          const tuple = { ...row, modelStatsId: target.id } satisfies PromotionTuple;
+          tuples.set(tupleKey(tuple), tuple);
+        }
+      }
+      return [...tuples.values()];
     },
 
     async insertPromotions(promotions: PromotionInsert[]): Promise<Set<string>> {
@@ -274,9 +350,22 @@ export async function syncPromotionsFromBench(
   let inserted = 0;
   let alreadyHad = 0;
   const tuplesToRecompute = new Map<string, PromotionTuple>();
-  const modelStatsTargets = await store.findModelStatsTargets([
-    ...new Set(promotions.map(promotion => promotion.model)),
-  ]);
+  const fetchedModels = [...new Set(promotions.map(promotion => promotion.model))];
+  const terminalModels = promotions
+    .filter(promotion => promotion.task_source === 'terminal-bench')
+    .map(promotion => promotion.model);
+  const orphanedModels = await store.listOrphanedTerminalBenchModels();
+  const models = [...new Set([...fetchedModels, ...orphanedModels])];
+  await store.ensureModelStatsTargets([...terminalModels, ...orphanedModels]);
+  const modelStatsTargets = await store.findModelStatsTargets(models);
+  const orphanedTargets = new Map(
+    orphanedModels.flatMap(model => {
+      const target = modelStatsTargets.get(model);
+      return target ? [[model, target]] : [];
+    })
+  );
+  const repaired = await store.linkOrphanedTerminalBenchPromotions(orphanedTargets);
+  for (const tuple of repaired) tuplesToRecompute.set(tupleKey(tuple), tuple);
   const promotionsToInsert = promotions.map(promotion => {
     const modelStatsTarget = modelStatsTargets.get(promotion.model);
     return {

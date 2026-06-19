@@ -272,7 +272,13 @@
       "triggers": {
         "crons": ["17 2 * * *"],
       },
-      "routes": [],
+      "routes": [
+        {
+          "pattern": "staging.cloud-agent-next.kilosessions.ai",
+          "zone_name": "kilosessions.ai",
+          "custom_domain": true,
+        },
+      ],
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
@@ -287,7 +293,7 @@
         "GITHUB_APP_BOT_USER_ID": "242397087",
         "GITHUB_LITE_APP_SLUG": "",
         "GITHUB_LITE_APP_BOT_USER_ID": "",
-        "WORKER_URL": "https://cloud-agent-next-staging.engineering-e11.workers.dev",
+        "WORKER_URL": "https://staging.cloud-agent-next.kilosessions.ai",
         "CLI_TIMEOUT_SECONDS": "900",
         "REAPER_INTERVAL_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-staging",

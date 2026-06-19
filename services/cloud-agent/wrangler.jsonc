@@ -200,6 +200,87 @@
    * https://developers.cloudflare.com/workers/wrangler/configuration/#named-environments
    */
   "env": {
+    "staging": {
+      "name": "cloud-agent-staging",
+      "workers_dev": true,
+      "preview_urls": false,
+      "routes": [],
+      "vars": {
+        "KILOCODE_BACKEND_BASE_URL": "https://staging.kilo.ai",
+        "GITHUB_APP_SLUG": "kiloconnect-development",
+        "GITHUB_APP_BOT_USER_ID": "242397087",
+        "GITHUB_APP_ID": "2245043",
+        "GITHUB_LITE_APP_ID": "",
+        "GITHUB_LITE_APP_SLUG": "",
+        "GITHUB_LITE_APP_BOT_USER_ID": "",
+        "WORKER_URL": "https://cloud-agent-staging.engineering-e11.workers.dev",
+        "WRAPPER_IDLE_TIMEOUT_MS": "240000",
+        "CLI_TIMEOUT_SECONDS": "700",
+        "REAPER_INTERVAL_MS": "300000",
+        "STALE_THRESHOLD_MS": "600000",
+        "PENDING_START_TIMEOUT_MS": "300000",
+        "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-staging",
+        "WS_ALLOWED_ORIGINS": "https://staging.kilo.ai",
+      },
+      "r2_buckets": [
+        {
+          "binding": "R2_BUCKET",
+          "bucket_name": "kilocode-sessions-staging",
+        },
+      ],
+      "hyperdrive": [],
+      "kv_namespaces": [],
+      "containers": [
+        {
+          "class_name": "Sandbox",
+          "image": "./Dockerfile",
+          "instance_type": "standard-4",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "v0.26.0",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 300,
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "class_name": "Sandbox",
+            "name": "Sandbox",
+          },
+          {
+            "class_name": "CloudAgentSession",
+            "name": "CLOUD_AGENT_SESSION",
+          },
+        ],
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "EXECUTION_QUEUE",
+            "queue": "cloud-agent-executions-staging",
+          },
+          {
+            "binding": "CALLBACK_QUEUE",
+            "queue": "cloud-agent-callback-queue-staging",
+          },
+        ],
+        "consumers": [
+          {
+            "queue": "cloud-agent-executions-staging",
+            "max_batch_size": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "cloud-agent-executions-dlq-staging",
+            "max_concurrency": 5,
+          },
+          {
+            "queue": "cloud-agent-callback-queue-staging",
+            "max_batch_size": 5,
+            "max_retries": 0,
+          },
+        ],
+      },
+    },
     "dev": {
       "name": "cloud-agent-dev",
       "hyperdrive": [

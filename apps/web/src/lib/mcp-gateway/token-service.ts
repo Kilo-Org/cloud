@@ -658,6 +658,13 @@ export function createTokenService(params: {
     if (claims.token_source !== 'oauth_client') {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 401);
     }
+    const expectedAudiencePrefix = new URL(
+      '/mcp-connect/',
+      params.config.gatewayBaseUrl
+    ).toString();
+    if (!claims.aud || !claims.aud.startsWith(expectedAudiencePrefix)) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Token audience is invalid', 401);
+    }
     const oauthGrant = await params.oauthGrantService.findActiveGrant(claims.oauth_grant_id);
     if (!oauthGrant || !oauthGrant.granted_scopes.includes('profile')) {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 401);

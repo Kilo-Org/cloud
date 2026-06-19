@@ -13,6 +13,7 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { createGatewayRepository } from '@/lib/mcp-gateway/repository';
 import { createOAuthGrantService } from '@/lib/mcp-gateway/oauth-grant-service';
+import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
 
 function serializeTimestamp(value: string) {
@@ -30,6 +31,15 @@ export const mcpGatewayAuthorizationsRouter = createTRPCRouter({
         .optional()
     )
     .query(async ({ ctx, input }) => {
+      if (input?.organizationId) {
+        const isMember = await isOrganizationMember(input.organizationId, ctx.user.id);
+        if (!isMember) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You are not a member of this organization',
+          });
+        }
+      }
       const filterConditions = [
         eq(mcp_gateway_oauth_grants.kilo_user_id, ctx.user.id),
         eq(mcp_gateway_oauth_grants.grant_status, MCPGatewayOAuthGrantStatus.Active),

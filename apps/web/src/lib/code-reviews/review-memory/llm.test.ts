@@ -4,8 +4,10 @@ import * as z from 'zod';
 import { createReviewMemoryGatewayProvider, generateReviewMemoryStructuredOutput } from './llm';
 
 const TestOutputSchema = z.object({
-  status: z.literal('ok'),
-  value: z.string(),
+  proposal: z.discriminatedUnion('status', [
+    z.object({ status: z.literal('no_change') }),
+    z.object({ status: z.literal('propose'), value: z.string() }),
+  ]),
 });
 
 describe('Review Memory structured model output', () => {
@@ -25,7 +27,7 @@ describe('Review Memory structured model output', () => {
               index: 0,
               message: {
                 role: 'assistant',
-                content: '{"status":"ok","value":"accepted"}',
+                content: '{"proposal":{"status":"propose","value":"accepted"}}',
               },
               finish_reason: 'stop',
             },
@@ -63,17 +65,50 @@ describe('Review Memory structured model output', () => {
     });
 
     expect(result).toEqual({
-      output: { status: 'ok', value: 'accepted' },
+      output: { proposal: { status: 'propose', value: 'accepted' } },
       tokensIn: 12,
       tokensOut: 5,
     });
     expect(requestBody).toEqual(
       expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            content: expect.stringContaining('JSON Schema:'),
+          }),
+        ]),
         response_format: expect.objectContaining({
           type: 'json_schema',
           json_schema: expect.objectContaining({ strict: true }),
         }),
+        provider: expect.objectContaining({
+          require_parameters: true,
+        }),
       })
     );
+
+    const gatewayRequest = requestBody as {
+      response_format: {
+        json_schema: {
+          schema: {
+            properties?: {
+              proposal?: {
+                anyOf?: Array<{
+                  properties?: Record<string, unknown>;
+                  required?: string[];
+                }>;
+              };
+            };
+          };
+        };
+      };
+    };
+    const schema = gatewayRequest.response_format.json_schema.schema;
+    const proposalSchema = schema.properties?.proposal;
+    const proposeBranch = proposalSchema?.anyOf?.find(branch => branch.required?.includes('value'));
+
+    expect(proposalSchema?.anyOf).toHaveLength(2);
+    expect(proposeBranch?.properties?.value).toEqual(expect.objectContaining({ type: 'string' }));
+    expect(JSON.stringify(proposeBranch?.properties?.value)).not.toContain('null');
+    expect(JSON.stringify(schema)).not.toContain('oneOf');
   });
 });

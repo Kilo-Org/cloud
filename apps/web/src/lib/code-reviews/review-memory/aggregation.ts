@@ -25,19 +25,12 @@ const ReviewMemoryProposalDraftSchema = z.discriminatedUnion('status', [
     positiveCount: z.number().int().min(0),
     negativeCount: z.number().int().min(0),
     neutralCount: z.number().int().min(0),
-    evidenceEventIds: z.array(z.string()).max(20).default([]),
+    evidenceEventIds: z.array(z.string()).max(20),
   }),
 ]);
 
-const ReviewMemoryProposalWireSchema = z.object({
-  status: z.enum(['no_change', 'propose']),
-  title: z.string().nullable(),
-  rationale: z.string().nullable(),
-  proposedMarkdown: z.string().nullable(),
-  positiveCount: z.number().int(),
-  negativeCount: z.number().int(),
-  neutralCount: z.number().int(),
-  evidenceEventIds: z.array(z.string()),
+const ReviewMemoryProposalOutputSchema = z.object({
+  proposal: ReviewMemoryProposalDraftSchema,
 });
 
 export type ReviewMemoryProposalDraft = z.infer<typeof ReviewMemoryProposalDraftSchema>;
@@ -78,13 +71,14 @@ export async function generateReviewMemoryProposalWithGateway(input: {
     prompt: buildReviewMemoryAnalysisPrompt(input),
     maxOutputTokens: 4_000,
     schemaName: 'review_memory_proposal',
-    schema: ReviewMemoryProposalDraftSchema,
-    wireSchema: ReviewMemoryProposalWireSchema,
-    validate: validateReviewMemoryProposalDraft,
+    schema: ReviewMemoryProposalOutputSchema,
+    validate: output => ({
+      proposal: validateReviewMemoryProposalDraft(output.proposal),
+    }),
   });
 
   return {
-    draft: result.output,
+    draft: result.output.proposal,
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,
   };
@@ -157,13 +151,14 @@ function buildReviewMemoryAnalysisPrompt(input: {
 
 Rules:
 - Classify each maintainer reply as positive, negative, or neutral.
-- Propose the smallest possible REVIEW.md change only when there is a clear, repeated pattern.
-- Make your proposed markdown precise and evidence-backed: prefer one sentence or bullet that names the specific file pattern, API, workflow, or review rule from the feedback; avoid broad rewrites or generic best practices.
-- Return status "no_change" when the signal is weak, one-off, contradictory, or already too repo-specific to generalize.
-- Do not mention Review Memory, Kilo, feedback systems, this analysis, or LLMs in proposedMarkdown.
+- Set proposal.status to "propose" only when there is a clear, repeated pattern, and populate every proposal field.
+- Set proposal.status to "no_change" when the signal is weak, one-off, contradictory, or already too repo-specific to generalize.
+- Make proposal.proposedMarkdown precise and evidence-backed: prefer one sentence or bullet that names the specific file pattern, API, workflow, or review rule from the feedback; avoid broad rewrites or generic best practices.
+- Use non-empty proposal title, rationale, and proposedMarkdown values and non-negative integer counts.
+- Do not mention Review Memory, Kilo, feedback systems, this analysis, or LLMs in proposal.proposedMarkdown.
 - Do not create a catch-all section. Write standalone repository guidance that a maintainer could edit.
-- Use only the provided event ids in evidenceEventIds.
-- Keep proposedMarkdown focused and under 4,000 characters.
+- Use only the provided event ids in proposal.evidenceEventIds, with at most 20 ids.
+- Keep proposal.proposedMarkdown focused and under 4,000 characters.
 
 Platform: ${input.platform}
 Repository: ${input.repoFullName}

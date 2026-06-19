@@ -113,24 +113,6 @@ export function applyGatewayModelsFallback(
   delete requestToMutate.body.models;
 }
 
-export function applyOpenRouterStructuredOutputRouting(
-  providerId: ProviderId,
-  requestToMutate: GatewayRequest
-): void {
-  if (
-    providerId !== 'openrouter' ||
-    requestToMutate.kind !== 'chat_completions' ||
-    requestToMutate.body.response_format?.type !== 'json_schema'
-  ) {
-    return;
-  }
-
-  requestToMutate.body.provider = {
-    ...requestToMutate.body.provider,
-    require_parameters: true,
-  };
-}
-
 export function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
@@ -142,7 +124,6 @@ export function applyProviderSpecificLogic(
   taskId: string | null
 ) {
   applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
-  applyOpenRouterStructuredOutputRouting(provider.id, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

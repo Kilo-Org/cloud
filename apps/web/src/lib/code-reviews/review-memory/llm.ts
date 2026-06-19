@@ -100,6 +100,16 @@ export function createReviewMemoryGatewayProvider(input: {
     headers,
     fetch: input.fetch,
     supportsStructuredOutputs: true,
+    transformRequestBody: args => {
+      if (args.response_format?.type !== 'json_schema') return args;
+      return {
+        ...args,
+        provider: {
+          ...args.provider,
+          require_parameters: true,
+        },
+      };
+    },
   });
 }
 
@@ -112,18 +122,23 @@ export async function generateReviewMemoryStructuredOutput<OUTPUT>(
 }> {
   const sourceSchema = zodSchema(input.schema);
   const providerSchema = zodSchema(input.wireSchema ?? input.schema);
-  const wireSchema = jsonSchema<OUTPUT>(
-    Promise.resolve(providerSchema.jsonSchema).then(schema => {
-      const transformed = structuredClone(schema);
-      transformReviewMemoryWireSchema(transformed);
-      return transformed;
-    }),
-    { validate: sourceSchema.validate }
-  );
+  const transformedProviderSchema = structuredClone(await providerSchema.jsonSchema);
+  transformReviewMemoryWireSchema(transformedProviderSchema);
+  const wireSchema = jsonSchema<OUTPUT>(transformedProviderSchema, {
+    validate: sourceSchema.validate,
+  });
+  const prompt = `${input.prompt}
+
+Output requirements:
+- Return only a JSON object matching the schema below.
+- Do not include Markdown fences or explanatory text.
+
+JSON Schema:
+${JSON.stringify(transformedProviderSchema)}`;
 
   const result = await generateText({
     model: input.model,
-    prompt: input.prompt,
+    prompt,
     maxOutputTokens: input.maxOutputTokens,
     output: Output.object({
       schema: wireSchema,

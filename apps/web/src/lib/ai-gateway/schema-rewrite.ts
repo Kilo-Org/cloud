@@ -92,8 +92,9 @@ export function rewriteChatCompletionsOneOfAsAnyOf(
   if (Array.isArray(request.tools)) {
     for (const tool of request.tools) {
       if (!isRecord(tool) || tool.type !== 'function' || !isRecord(tool.function)) continue;
-      rewritten += rewriteOneOfAsAnyOf(tool.function.parameters);
-      if (typeof tool.function.name === 'string') {
+      const toolRewritten = rewriteOneOfAsAnyOf(tool.function.parameters);
+      rewritten += toolRewritten;
+      if (toolRewritten > 0 && typeof tool.function.name === 'string') {
         toolNames.add(tool.function.name);
       }
     }

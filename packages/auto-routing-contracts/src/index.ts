@@ -20,6 +20,11 @@ export {
 // leaves it, and skips the mirror entirely when normalization fails.
 export const MirrorPayloadSchema = z.object({
   input: NormalizedClassifierInputSchema,
+  routingPolicy: z
+    .object({
+      deniedModelIds: z.array(z.string().trim().min(1)),
+    })
+    .optional(),
   // Authenticated user id, or the gateway's synthetic anonymous id
   // ('anon:<ip>'). Scopes the worker's conversation identity.
   userId: z.string().trim().min(1),
@@ -65,11 +70,11 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
-export const AutoRoutingDecisionSchema = z.object({
+const BenchmarkAutoRoutingDecisionSchema = z.object({
   model: z.string(),
   taskType: ClassifierTaskTypeSchema,
   subtaskType: ClassifierSubtaskTypeSchema,
-  source: z.enum(['benchmark']),
+  source: z.literal('benchmark'),
   tableVersion: z.string(),
   // Mirrors the effort the chosen model was benchmarked with, when set.
   reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -78,6 +83,21 @@ export const AutoRoutingDecisionSchema = z.object({
   // parse.
   sticky: z.boolean().default(false),
 });
+
+const CodingPlanDefaultDecisionSchema = z.object({
+  model: z.string(),
+  taskType: z.null(),
+  subtaskType: z.null(),
+  source: z.literal('coding_plan_default'),
+  tableVersion: z.string(),
+  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
+  sticky: z.boolean().default(false),
+});
+
+export const AutoRoutingDecisionSchema = z.discriminatedUnion('source', [
+  BenchmarkAutoRoutingDecisionSchema,
+  CodingPlanDefaultDecisionSchema,
+]);
 export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 
 export const AutoRoutingDecisionResponseSchema = z.object({

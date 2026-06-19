@@ -3,13 +3,25 @@ import { clearClassifierConfigCache } from './classifier-config';
 import { clearRoutingTableCache } from './routing-table';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
+import type * as DbModule from '@kilocode/db';
 import type * as ModelClassifierModule from './model-classifier';
 
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
+const getWorkerDb = vi.hoisted(() => vi.fn());
+const dbSelect = vi.hoisted(() => vi.fn());
+const dbFrom = vi.hoisted(() => vi.fn());
+const dbInnerJoin = vi.hoisted(() => vi.fn());
+const dbWhere = vi.hoisted(() => vi.fn());
+const dbLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('./model-classifier', async importOriginal => {
   const actual = await importOriginal<typeof ModelClassifierModule>();
   return { ...actual, classifyNormalizedInput };
+});
+
+vi.mock('@kilocode/db', async importOriginal => {
+  const actual = await importOriginal<typeof DbModule>();
+  return { ...actual, getWorkerDb };
 });
 
 const writeDataPoint = vi.fn();
@@ -46,6 +58,9 @@ const env = {
   O11Y_CF_ACCOUNT_ID: 'test-account-id',
   O11Y_CF_AE_API_TOKEN: {
     get: analyticsTokenGet,
+  },
+  HYPERDRIVE: {
+    connectionString: 'postgres://worker',
   },
 };
 
@@ -172,6 +187,18 @@ describe('auto routing worker', () => {
     clearRoutingTableCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
+    getWorkerDb.mockReset();
+    getWorkerDb.mockReturnValue({ select: dbSelect });
+    dbSelect.mockReset();
+    dbSelect.mockReturnValue({ from: dbFrom });
+    dbFrom.mockReset();
+    dbFrom.mockReturnValue({ innerJoin: dbInnerJoin });
+    dbInnerJoin.mockReset();
+    dbInnerJoin.mockReturnValue({ where: dbWhere });
+    dbWhere.mockReset();
+    dbWhere.mockReturnValue({ limit: dbLimit });
+    dbLimit.mockReset();
+    dbLimit.mockResolvedValue([]);
     writeDataPoint.mockReset();
     configGet.mockReset();
     // Real KV returns null for missing keys; an undefined here would send the
@@ -287,6 +314,147 @@ describe('auto routing worker', () => {
     // The raw user id (which embeds the client IP for anonymous users) must
     // never reach persisted logs.
     expect(String(logMessage)).not.toContain('user-1');
+  });
+
+  it('filters denied routing-policy models from the full decide path', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const response = await decideRequest(
+      mirrorPayload({
+        routingPolicy: { deniedModelIds: ['google/gemini-2.5-flash-lite'] },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: {
+        model: 'google/gemini-2.5-flash',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
+        sticky: false,
+      },
+    });
+  });
+
+  it('serves a coding-plan default decision without classifying', async () => {
+    configGet.mockImplementation(async (key: string) =>
+      key.startsWith('coding_plan_preference:')
+        ? JSON.stringify({
+            active: true,
+            planId: 'minimax-token-plan-plus',
+            providerId: 'minimax',
+            modelId: 'minimax/minimax-m3',
+          })
+        : null
+    );
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      cost: 0,
+      decision: {
+        model: 'minimax/minimax-m3',
+        taskType: null,
+        subtaskType: null,
+        source: 'coding_plan_default',
+        tableVersion: 'coding-plan:v1',
+        reasoningEffort: null,
+        sticky: false,
+      },
+      classifierResult: null,
+    });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+    expect(cachePutEntry).not.toHaveBeenCalled();
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      indexes: ['coding_plan_default'],
+      blobs: [
+        'coding_plan_default',
+        'anthropic/claude-sonnet-4',
+        'coding_plan_default',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ],
+      doubles: [expect.any(Number), 0, -1, 0],
+    });
+  });
+
+  it('falls back to benchmark routing when the coding-plan default model is denied', async () => {
+    configGet.mockImplementation(async (key: string) =>
+      key.startsWith('coding_plan_preference:')
+        ? JSON.stringify({
+            active: true,
+            planId: 'minimax-token-plan-plus',
+            providerId: 'minimax',
+            modelId: 'minimax/minimax-m3',
+          })
+        : null
+    );
+
+    const response = await decideRequest(
+      mirrorPayload({
+        routingPolicy: { deniedModelIds: ['minimax/minimax-m3'] },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: mockClassifierResult.cost,
+      decision: {
+        model: 'google/gemini-2.5-flash-lite',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'bench-run-1',
+        sticky: false,
+      },
+    });
+    expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads and caches a coding-plan preference on cache miss', async () => {
+    dbLimit.mockResolvedValueOnce([{ planId: 'minimax-token-plan-plus', providerId: 'minimax' }]);
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: 0,
+      decision: {
+        model: 'minimax/minimax-m3',
+        source: 'coding_plan_default',
+      },
+      classifierResult: null,
+    });
+    expect(getWorkerDb).toHaveBeenCalledWith('postgres://worker', {
+      statement_timeout: 2_000,
+    });
+    expect(dbSelect).toHaveBeenCalledWith({
+      planId: expect.any(Object),
+      providerId: expect.any(Object),
+    });
+    expect(dbFrom).toHaveBeenCalledTimes(1);
+    expect(dbInnerJoin).toHaveBeenCalledTimes(1);
+    expect(dbWhere).toHaveBeenCalledTimes(1);
+    expect(dbLimit).toHaveBeenCalledWith(1);
+    expect(configPut).toHaveBeenCalledWith(
+      expect.stringMatching(/^coding_plan_preference:[0-9a-f]{16}$/),
+      JSON.stringify({
+        active: true,
+        planId: 'minimax-token-plan-plus',
+        providerId: 'minimax',
+        modelId: 'minimax/minimax-m3',
+      }),
+      { expirationTtl: 60 }
+    );
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('serves a cached classification for the session without calling the classifier', async () => {

@@ -9,9 +9,10 @@ export const WELCOME_CREDIT_EXPIRY_HRS = 30 * 24; // 30 days in hours
 export const OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS = 48; // 2 days in hours
 
 export const allow_fake_login =
-  !!process.env.DEBUG_SHOW_DEV_UI &&
-  process.env.NODE_ENV !== 'production' &&
-  !process.env.VERCEL_ENV;
+  (!!process.env.DEBUG_SHOW_DEV_UI &&
+    process.env.NODE_ENV !== 'production' &&
+    !process.env.VERCEL_ENV) ||
+  process.env.VERCEL_TARGET_ENV === 'staging';
 
 export const MINIMUM_TOP_UP_AMOUNT = 10;
 export const MAXIMUM_TOP_UP_AMOUNT = 10_000;

@@ -21,6 +21,7 @@ export type EfficientDecisionParams = {
   clientRequestId: string | null;
   mode: string | null;
   userAgent: string | null;
+  deniedModelIds?: ReadonlyArray<string>;
 };
 
 type FetchEfficientDecisionOptions = {
@@ -39,6 +40,9 @@ function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | nu
 
   return {
     input: normalizedInput,
+    ...(params.deniedModelIds?.length
+      ? { routingPolicy: { deniedModelIds: [...params.deniedModelIds] } }
+      : {}),
     userId: params.userId,
     sessionId: params.sessionId,
     machineId: params.machineId,

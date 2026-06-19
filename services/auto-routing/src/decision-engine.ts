@@ -8,11 +8,12 @@ import {
 export function computeDecision(
   classification: ClassifierOutput,
   table: RoutingTable | null,
-  incumbentModel: string | null
+  incumbentModel: string | null,
+  deniedModelIds: ReadonlySet<string> = new Set()
 ): AutoRoutingDecision | null {
   if (!table) return null;
   const routeKey = taxonomyRouteKey(classification);
-  const candidates = table.routes[routeKey];
+  const candidates = table.routes[routeKey]?.filter(c => !deniedModelIds.has(c.model));
   if (!candidates?.length) return null;
   const freshPick = candidates[0];
 

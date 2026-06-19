@@ -1,6 +1,7 @@
 import { custom_llm2 } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { orderOpenCodeSettings } from './order-opencode-variants';
 
 function convert(publicId: string, model: CustomLlmDefinition) {
   return {
@@ -36,7 +37,7 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
-    opencode: model.opencode_settings,
+    opencode: orderOpenCodeSettings(model.opencode_settings),
   };
 }
 

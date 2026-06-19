@@ -14,6 +14,7 @@ const users = [
 
 const organizations = [
   '3f48333c176a29aaeeb25f3475e38511fc7184b34321a1605a3c0db54cae6df4', // kilo
+  'e01114329f1378b3bc2add5a30a3782d1c1702d02decaaae182d7f9ad80ff66e', // https://kilo-code.slack.com/archives/C0B8KPSBUTH/p1781869766329419?thread_ts=1781778627.058599&cid=C0B8KPSBUTH
 ];
 
 async function isLoggingEnabledForUser(

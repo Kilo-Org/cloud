@@ -42,6 +42,14 @@ describe('auto routing contracts', () => {
       sessionId: 'session-123',
       userId: 'user-1',
     });
+    expect(
+      MirrorPayloadSchema.parse({
+        ...mirrorPayload,
+        routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+      })
+    ).toMatchObject({
+      routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+    });
 
     // One broken constraint per case: identity fields are null-or-nonempty,
     // never empty strings.
@@ -60,6 +68,29 @@ describe('auto routing contracts', () => {
         classifierResult: null,
       })
     ).toEqual({ cost: 0, decision: null, classifierResult: null });
+
+    expect(
+      AutoRoutingDecisionResponseSchema.parse({
+        cost: 0,
+        decision: {
+          model: 'minimax/minimax-m3',
+          taskType: null,
+          subtaskType: null,
+          source: 'coding_plan_default',
+          tableVersion: 'coding-plan:v1',
+          reasoningEffort: null,
+          sticky: false,
+        },
+        classifierResult: null,
+      })
+    ).toMatchObject({
+      decision: {
+        model: 'minimax/minimax-m3',
+        taskType: null,
+        subtaskType: null,
+        source: 'coding_plan_default',
+      },
+    });
 
     expect(
       AutoRoutingDecisionResponseSchema.parse({

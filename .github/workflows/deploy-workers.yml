@@ -7,11 +7,30 @@ on:
         description: 'Worker folder to deploy (e.g. services/app-builder)'
         required: true
         type: string
+      target_environment:
+        description: 'Worker environment to deploy to'
+        required: false
+        default: production
+        type: choice
+        options:
+          - production
+          - staging
   workflow_call:
     inputs:
+      worker:
+        description: 'Worker folder to deploy for single-worker calls'
+        required: false
+        default: ''
+        type: string
       base_sha:
         description: 'Base SHA to diff against when detecting changed workers'
-        required: true
+        required: false
+        default: ''
+        type: string
+      target_environment:
+        description: 'Worker environment to deploy to'
+        required: false
+        default: production
         type: string
 
 permissions:
@@ -23,10 +42,11 @@ concurrency:
 
 jobs:
   deploy-manual:
-    if: github.event_name == 'workflow_dispatch'
+    if: inputs.worker != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     name: Deploy ${{ inputs.worker }}
+    environment: ${{ inputs.target_environment }}
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -53,10 +73,10 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: deploy
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
 
   detect-changes:
-    if: inputs.base_sha != ''
+    if: inputs.worker == '' && (inputs.base_sha != '' || inputs.target_environment != 'production')
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -73,10 +93,68 @@ jobs:
           # Auto-discover all deployable workers (folders containing wrangler.jsonc)
           # and exclude workers that have their own deploy pipelines.
           #
-          # Diff against the SHA before the push so that multi-commit pushes
-          # (e.g. a merge commit that squashes several commits) don't miss workers
-          # that were only touched in earlier commits of the same push.
+          # Production diffs against the SHA before the push so that multi-commit
+          # pushes don't miss workers touched in earlier commits. Staging deploys
+          # only workers that explicitly define the named Wrangler environment.
           BASE_SHA="${{ inputs.base_sha }}"
+          TARGET_ENVIRONMENT="${{ inputs.target_environment }}"
+
+          has_named_environment() {
+            node - "$1" "$TARGET_ENVIRONMENT" <<'NODE'
+          const fs = require('node:fs');
+
+          const [file, targetEnvironment] = process.argv.slice(2);
+
+          function stripJsonComments(value) {
+            let output = '';
+            let inString = false;
+            let escaped = false;
+
+            for (let index = 0; index < value.length; index += 1) {
+              const current = value[index];
+              const next = value[index + 1];
+
+              if (inString) {
+                output += current;
+                if (escaped) escaped = false;
+                else if (current === '\\') escaped = true;
+                else if (current === '"') inString = false;
+                continue;
+              }
+
+              if (current === '"') {
+                inString = true;
+                output += current;
+                continue;
+              }
+
+              if (current === '/' && next === '/') {
+                while (index < value.length && value[index] !== '\n') index += 1;
+                output += '\n';
+                continue;
+              }
+
+              if (current === '/' && next === '*') {
+                index += 2;
+                while (index < value.length && !(value[index] === '*' && value[index + 1] === '/')) {
+                  if (value[index] === '\n') output += '\n';
+                  index += 1;
+                }
+                index += 1;
+                continue;
+              }
+
+              output += current;
+            }
+
+            return output;
+          }
+
+          const rawConfig = fs.readFileSync(file, 'utf8');
+          const config = JSON.parse(stripJsonComments(rawConfig).replace(/,\s*([}\]])/g, '$1'));
+          process.exit(config.env && Object.hasOwn(config.env, targetEnvironment) ? 0 : 1);
+          NODE
+          }
 
           # Workers excluded from this workflow (they have custom deploy pipelines):
           EXCLUDED=(
@@ -108,12 +186,23 @@ jobs:
             fi
           done
 
-          CHANGED=()
-          for dir in "${DEPLOYABLE[@]}"; do
-            if git diff --name-only "$BASE_SHA" HEAD -- "$dir/" | grep -q .; then
-              CHANGED+=("$dir")
-            fi
-          done
+          if [ "$TARGET_ENVIRONMENT" = "production" ]; then
+            CHANGED=()
+            for dir in "${DEPLOYABLE[@]}"; do
+              if git diff --name-only "$BASE_SHA" HEAD -- "$dir/" | grep -q .; then
+                CHANGED+=("$dir")
+              fi
+            done
+          else
+            CHANGED=()
+            for dir in "${DEPLOYABLE[@]}"; do
+              if has_named_environment "$dir/wrangler.jsonc"; then
+                CHANGED+=("$dir")
+              else
+                echo "Skipping $dir: wrangler.jsonc does not define env.$TARGET_ENVIRONMENT"
+              fi
+            done
+          fi
 
           if [ ${#CHANGED[@]} -eq 0 ]; then
             echo "matrix=[]" >> "$GITHUB_OUTPUT"
@@ -127,6 +216,7 @@ jobs:
     if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
+    environment: ${{ inputs.target_environment }}
     strategy:
       fail-fast: false
       matrix:
@@ -158,4 +248,4 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: deploy
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}

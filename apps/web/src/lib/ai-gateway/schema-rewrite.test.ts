@@ -166,7 +166,7 @@ describe('rewriteChatCompletionsOneOfAsAnyOf logging', () => {
     expect(calls).toHaveLength(1);
     const details = calls[0] as { count: number; toolNames: string[] };
     expect(details.count).toBe(4);
-    expect(details.toolNames).toEqual(['a', 'b', 'unchanged']);
+    expect(details.toolNames).toEqual(['a', 'b']);
   });
 
   it('does not log when nothing is rewritten', () => {

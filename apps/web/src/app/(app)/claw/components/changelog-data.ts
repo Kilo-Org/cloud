@@ -11,6 +11,12 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-06-18',
+    description: 'OpenClaw 2026.6.8 is available now as an Early Access upgrade.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
     date: '2026-06-16',
     description:
       "Fixed image recognition for KiloClaw agents. Images sent to an agent could not be processed and failed with 'model does not support images', because the models that support images were not being offered to the image pipeline. KiloClaw now refreshes the model list so image understanding works again. Redeploy your instance to pick up the fix.",

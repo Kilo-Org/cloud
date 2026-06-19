@@ -13,7 +13,7 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, isNull } from 'drizzle-orm';
+import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, lte, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
@@ -1631,6 +1631,9 @@ export type SessionUsageSummary = {
   model: string;
   totalTokensIn: number;
   totalTokensOut: number;
+  tokensIn: number;
+  tokensOut: number;
+  cachedTokens: number;
   totalCostMusd: number;
 };
 
@@ -1642,19 +1645,22 @@ export type SessionUsageSummary = {
  * system (processUsage → microdollar_usage) already records per-request
  * usage keyed by session_id, so we aggregate here.
  *
- * The `reviewCreatedAt` lower bound lets Postgres use the existing
+ * The review time bounds let Postgres use the existing
  * `idx_microdollar_usage_metadata_created_at` index instead of seq-scanning
- * the full table (~469 M rows). Billing rows cannot exist before the review.
+ * the full table (~469 M rows). The upper bound prevents later reviews that
+ * continue the same session from changing a completed review's totals.
  */
 export async function getSessionUsageFromBilling(
   cliSessionId: string,
-  reviewCreatedAt: string
+  reviewCreatedAt: string,
+  reviewCompletedAt?: string
 ): Promise<SessionUsageSummary | null> {
   try {
     const joinCondition = eq(microdollar_usage.id, microdollar_usage_metadata.id);
     const sessionFilter = and(
       eq(microdollar_usage_metadata.session_id, cliSessionId),
-      gte(microdollar_usage_metadata.created_at, reviewCreatedAt)
+      gte(microdollar_usage_metadata.created_at, reviewCreatedAt),
+      reviewCompletedAt ? lte(microdollar_usage_metadata.created_at, reviewCompletedAt) : undefined
     );
 
     // 1. Session-wide totals (all models combined)
@@ -1662,6 +1668,8 @@ export async function getSessionUsageFromBilling(
       .select({
         totalTokensIn: sum(microdollar_usage.input_tokens).mapWith(Number),
         totalTokensOut: sum(microdollar_usage.output_tokens).mapWith(Number),
+        totalCacheHitTokens: sum(microdollar_usage.cache_hit_tokens).mapWith(Number),
+        totalCacheWriteTokens: sum(microdollar_usage.cache_write_tokens).mapWith(Number),
         totalCostMusd: sum(microdollar_usage.cost).mapWith(Number),
       })
       .from(microdollar_usage)
@@ -1684,10 +1692,15 @@ export async function getSessionUsageFromBilling(
 
     if (!topModel?.model) return null;
 
+    const cachedTokens = (totals.totalCacheHitTokens ?? 0) + (totals.totalCacheWriteTokens ?? 0);
+
     return {
       model: topModel.model,
       totalTokensIn: totals.totalTokensIn,
       totalTokensOut: totals.totalTokensOut ?? 0,
+      tokensIn: Math.max(0, totals.totalTokensIn - cachedTokens),
+      tokensOut: totals.totalTokensOut ?? 0,
+      cachedTokens,
       totalCostMusd: totals.totalCostMusd ?? 0,
     };
   } catch (error) {

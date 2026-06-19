@@ -16,6 +16,8 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 ## App (apps/web)
 
+Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-global-app` Vercel deployments, and 1Password storage for sensitive Production values. See `DEVELOPMENT.md` for the full workflow.
+
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]

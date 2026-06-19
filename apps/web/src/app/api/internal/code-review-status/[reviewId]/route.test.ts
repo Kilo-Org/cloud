@@ -1317,6 +1317,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 100_001,
           totalTokensOut: 0,
+          tokensIn: 100_001,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 200_000,
         },
       },
@@ -1326,6 +1329,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 60_000,
           totalTokensOut: 40_000,
+          tokensIn: 60_000,
+          tokensOut: 40_000,
+          cachedTokens: 0,
           totalCostMusd: 200_000,
         },
       },
@@ -1335,6 +1341,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 100_001,
           totalTokensOut: 0,
+          tokensIn: 100_001,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 199_999,
         },
       },
@@ -1344,6 +1353,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 99_999,
           totalTokensOut: 0,
+          tokensIn: 99_999,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 200_000,
         },
       },
@@ -1575,6 +1587,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         model: 'anthropic/claude-sonnet-4.6',
         totalTokensIn: 99_999,
         totalTokensOut: 0,
+        tokensIn: 99_999,
+        tokensOut: 0,
+        cachedTokens: 0,
         totalCostMusd: 200_000,
       });
 
@@ -1614,6 +1629,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 99_999,
           totalTokensOut: 0,
+          tokensIn: 99_999,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 199_999,
         },
       },
@@ -2762,11 +2780,22 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         repository_review_instructions_used: true,
         repository_review_instructions_ref: 'main',
         repository_review_instructions_truncated: false,
+        cli_session_id: 'ses_review_with_cache',
         model: 'anthropic/claude-sonnet-4.6',
         total_tokens_in: 1000,
         total_tokens_out: 200,
+        completed_at: '2025-01-01T00:10:00Z',
       });
       mockGetCodeReviewById.mockResolvedValue(review);
+      mockGetSessionUsageFromBilling.mockResolvedValue({
+        model: 'openai/gpt-4o',
+        totalTokensIn: 1000,
+        totalTokensOut: 200,
+        tokensIn: 200,
+        tokensOut: 200,
+        cachedTokens: 800,
+        totalCostMusd: 100,
+      });
 
       await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
@@ -2783,8 +2812,23 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         null,
         { maxBodyCharacters: 65_536, reservedCharacters: 8 }
       );
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_review_with_cache',
+        '2025-01-01T00:00:00Z',
+        '2025-01-01T00:10:00Z'
+      );
+      expect(mockUpdateCodeReviewUsage).toHaveBeenCalledWith(REVIEW_ID, {
+        totalTokensIn: 1000,
+        totalTokensOut: 200,
+        totalCostMusd: 100,
+      });
       expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
-        usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 1000, tokensOut: 200 },
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          tokensIn: 200,
+          tokensOut: 200,
+          cachedTokens: 800,
+        },
         reviewGuidance: { used: true, ref: 'main', truncated: false },
       });
       expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
@@ -2820,7 +2864,12 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'https://gitlab.com'
       );
       expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing note body', {
-        usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 1000, tokensOut: 200 },
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          tokensIn: 1000,
+          tokensOut: 200,
+          cachedTokens: 0,
+        },
         reviewGuidance: { used: true, ref: 'main', truncated: true },
       });
       expect(mockUpdateKiloReviewNote).toHaveBeenCalledWith(

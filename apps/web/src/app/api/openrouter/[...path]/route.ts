@@ -285,6 +285,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
             // This stops anonymous/abusive traffic from repeatedly spending
             // Kilo-funded classification with no user to attribute it to.
             if (!user || authFailedResponse) return null;
+            const { settings, plan } = await balanceAndSettingsPromise;
+            const deniedModelIds =
+              plan === 'enterprise'
+                ? [...new Set(settings?.model_deny_list?.map(normalizeModelId) ?? [])]
+                : undefined;
             const result = await fetchEfficientAutoDecision({
               apiKind: requestBodyParsed.kind,
               body: requestBodyParsed.body,
@@ -297,6 +302,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               clientRequestId,
               mode: modeHeader,
               userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+              deniedModelIds,
             });
             classifierCostUsd = result?.costUsd ?? 0;
             return result?.decision ?? null;

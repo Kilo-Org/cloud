@@ -4,29 +4,51 @@ import {
   buildReviewGuidanceFooter,
   buildReviewSummaryFooter,
   buildUsageFooter,
+  formatTokenCount,
   stripReviewSummaryFooter,
 } from './usage-footer';
 import { REVIEW_SUMMARY_HISTORY_END, REVIEW_SUMMARY_HISTORY_START } from './history';
 
+describe('formatTokenCount', () => {
+  it.each([
+    [999, '999'],
+    [1100, '1.1K'],
+    [1_000_000, '1M'],
+  ])('formats %i as %s', (count, expected) => {
+    expect(formatTokenCount(count)).toBe(expected);
+  });
+});
+
 describe('buildUsageFooter', () => {
   it('strips provider prefix from model slug', () => {
-    const footer = buildUsageFooter('anthropic/claude-sonnet-4.6', 1000, 200);
+    const footer = buildUsageFooter('anthropic/claude-sonnet-4.6', 1000, 200, 300);
     expect(footer).toContain('claude-sonnet-4.6');
     expect(footer).not.toContain('anthropic/');
   });
 
   it('keeps model name as-is when no provider prefix', () => {
-    const footer = buildUsageFooter('gpt-4o', 500, 100);
+    const footer = buildUsageFooter('gpt-4o', 500, 100, 0);
     expect(footer).toContain('gpt-4o');
   });
 
-  it('sums input and output tokens', () => {
-    const footer = buildUsageFooter('model', 10000, 2345);
-    expect(footer).toContain('12,345 tokens');
+  it('renders the exact split token usage', () => {
+    const footer = buildUsageFooter('provider/minimax-m3', 64_730, 5_400, 919_981);
+
+    expect(footer).toBe(
+      '<!-- kilo-usage -->\n<sub>Reviewed by minimax-m3 · Input: 64.7K · Output: 5.4K · Cached: 920K</sub>'
+    );
+  });
+
+  it('renders zero cached tokens', () => {
+    const footer = buildUsageFooter('provider/minimax-m3', 1000, 200, 0);
+
+    expect(footer).toBe(
+      '<!-- kilo-usage -->\n<sub>Reviewed by minimax-m3 · Input: 1K · Output: 200 · Cached: 0</sub>'
+    );
   });
 
   it('includes usage marker comment', () => {
-    const footer = buildUsageFooter('model', 1, 2);
+    const footer = buildUsageFooter('model', 1, 2, 3);
     expect(footer).toContain('<!-- kilo-usage -->');
   });
 });
@@ -61,7 +83,12 @@ describe('buildReviewGuidanceFooter', () => {
 describe('buildReviewSummaryFooter', () => {
   it('returns the exact suffix appended to the summary body', () => {
     const footerData = {
-      usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 5000, tokensOut: 1000 },
+      usage: {
+        model: 'anthropic/claude-sonnet-4.6',
+        tokensIn: 5000,
+        tokensOut: 1000,
+        cachedTokens: 2000,
+      },
       reviewGuidance: { used: true, ref: 'main', truncated: false },
     };
     const footer = buildReviewSummaryFooter(footerData);
@@ -79,12 +106,17 @@ describe('appendReviewSummaryFooter', () => {
   it('appends usage and guidance in one footer block', () => {
     const body = '## Code Review Summary\n\nLooks good!';
     const result = appendReviewSummaryFooter(body, {
-      usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 5000, tokensOut: 1000 },
+      usage: {
+        model: 'anthropic/claude-sonnet-4.6',
+        tokensIn: 5000,
+        tokensOut: 1000,
+        cachedTokens: 2000,
+      },
       reviewGuidance: { used: true, ref: 'main', truncated: false },
     });
 
     expect(result).toMatch(/^## Code Review Summary\n\nLooks good!\n\n---\n<!-- kilo-usage -->/);
-    expect(result).toContain('6,000 tokens');
+    expect(result).toContain('Input: 5K · Output: 1K · Cached: 2K');
     expect(result).toContain('<!-- kilo-review-guidance -->');
     expect(result).toContain('Review guidance: REVIEW.md from base branch `main`');
     expect(result.match(/^---$/gm)?.length).toBe(1);
@@ -103,12 +135,12 @@ describe('appendReviewSummaryFooter', () => {
       '<sub>Review guidance: REVIEW.md from base branch `develop`</sub>',
     ].join('\n');
     const result = appendReviewSummaryFooter(body, {
-      usage: { model: 'new/new-model', tokensIn: 2000, tokensOut: 500 },
+      usage: { model: 'new/new-model', tokensIn: 2000, tokensOut: 500, cachedTokens: 1500 },
       reviewGuidance: { used: true, ref: 'main', truncated: true },
     });
 
     expect(result).toContain('new-model');
-    expect(result).toContain('2,500 tokens');
+    expect(result).toContain('Input: 2K · Output: 500 · Cached: 1.5K');
     expect(result).toContain('`main` (truncated)');
     expect(result).not.toContain('old-model');
     expect(result).not.toContain('develop');
@@ -129,7 +161,7 @@ describe('appendReviewSummaryFooter', () => {
   it('preserves unrelated horizontal rules in the body', () => {
     const body = '## Summary\n\n---\n\nSome section\n\nMore content';
     const result = appendReviewSummaryFooter(body, {
-      usage: { model: 'x/m', tokensIn: 1, tokensOut: 1 },
+      usage: { model: 'x/m', tokensIn: 1, tokensOut: 1, cachedTokens: 0 },
     });
 
     expect(result).toContain('## Summary\n\n---\n\nSome section\n\nMore content');
@@ -187,7 +219,7 @@ describe('appendReviewSummaryFooter', () => {
       REVIEW_SUMMARY_HISTORY_END,
     ].join('\n');
     const result = appendReviewSummaryFooter(body, {
-      usage: { model: 'x/m', tokensIn: 1, tokensOut: 2 },
+      usage: { model: 'x/m', tokensIn: 1, tokensOut: 2, cachedTokens: 3 },
     });
 
     expect(result).toContain(REVIEW_SUMMARY_HISTORY_START);
@@ -204,7 +236,7 @@ describe('appendUsageFooter', () => {
     const result = appendUsageFooter('body', 'provider/org/model-name', 100, 200);
 
     expect(result).toContain('org/model-name');
-    expect(result).toContain('300 tokens');
+    expect(result).toContain('Input: 100 · Output: 200 · Cached: 0');
     expect(result).toContain('<!-- kilo-usage -->');
   });
 });

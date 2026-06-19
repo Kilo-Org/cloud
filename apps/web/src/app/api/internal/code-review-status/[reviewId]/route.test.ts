@@ -80,6 +80,8 @@ const mockBuildReviewSummaryFooter = jest.fn<any>();
 const mockRetryReviewFresh = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDisableCodeReviewForRepeatedCloneTimeoutsToday = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -160,6 +162,8 @@ jest.mock('@/lib/code-reviews/action-required', () => {
     ...actual,
     disableCodeReviewForActionRequiredFailure: (...args: unknown[]) =>
       mockDisableCodeReviewForActionRequiredFailure(...args),
+    disableCodeReviewForRepeatedCloneTimeoutsToday: (...args: unknown[]) =>
+      mockDisableCodeReviewForRepeatedCloneTimeoutsToday(...args),
   };
 });
 
@@ -401,6 +405,7 @@ beforeEach(async () => {
       footer.usage || footer.reviewGuidance?.used ? 'body with footer' : body
   );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
+  mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
   ({ POST } = await import('./route'));
 });
 
@@ -2041,6 +2046,205 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           errorMessage: 'Unexpected backend failure after prior infra retry',
           terminalReason: 'upstream_error',
         })
+      );
+    });
+
+    it('publishes a normal failure for a below-threshold repository clone timeout', async () => {
+      const errorMessage = 'Repository clone timed out: termination hard_timeout, elapsed 300041ms';
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-clone-timeout-retry' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000451',
+          status: 'failed',
+          session_id: 'agent-clone-timeout-retry',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000450',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000451',
+          status: 'failed',
+          session_id: 'agent-clone-timeout-retry',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000450',
+        })
+      );
+      mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-clone-timeout-retry',
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ errorMessage, terminalReason: 'sandbox_error' })
+      );
+      expect(mockDisableCodeReviewForRepeatedCloneTimeoutsToday).toHaveBeenCalledWith({
+        owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+        platform: 'github',
+        reviewId: REVIEW_ID,
+        errorMessage,
+      });
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          conclusion: 'failure',
+          output: expect.objectContaining({
+            title: 'Kilo Code Review failed',
+            summary: expect.stringContaining(errorMessage),
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    it('publishes action-required GitHub check output on the third repository clone timeout', async () => {
+      const errorMessage = 'Repository clone timed out: termination hard_timeout, elapsed 300041ms';
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-third-clone-timeout' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000461',
+          status: 'failed',
+          session_id: 'agent-third-clone-timeout',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000460',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000461',
+          status: 'failed',
+          session_id: 'agent-third-clone-timeout',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000460',
+        })
+      );
+      mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(
+        'repeated_repository_clone_timeout'
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-third-clone-timeout',
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ errorMessage, terminalReason: 'sandbox_error' })
+      );
+      expect(mockDisableCodeReviewForRepeatedCloneTimeoutsToday).toHaveBeenCalledWith({
+        owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+        platform: 'github',
+        reviewId: REVIEW_ID,
+        errorMessage,
+      });
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'action_required',
+          output: expect.objectContaining({
+            title: 'Repeated repository clone timeouts',
+            summary:
+              'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    it('publishes action-required GitLab commit status on the third repository clone timeout', async () => {
+      const errorMessage = 'Repository clone timed out: termination hard_timeout, elapsed 300041ms';
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({
+          status: 'running',
+          session_id: 'agent-third-gitlab-clone-timeout',
+          platform: 'gitlab',
+          platform_project_id: 42,
+          check_run_id: null,
+        })
+      );
+      mockGetIntegrationById.mockResolvedValue(
+        makeIntegration({ platform: 'gitlab', platform_installation_id: null })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000471',
+          status: 'failed',
+          session_id: 'agent-third-gitlab-clone-timeout',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000470',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000471',
+          status: 'failed',
+          session_id: 'agent-third-gitlab-clone-timeout',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000470',
+        })
+      );
+      mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(
+        'repeated_repository_clone_timeout'
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-third-gitlab-clone-timeout',
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockDisableCodeReviewForRepeatedCloneTimeoutsToday).toHaveBeenCalledWith({
+        owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+        platform: 'gitlab',
+        reviewId: REVIEW_ID,
+        errorMessage,
+      });
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'Code Reviewer disabled after three repository clone timeouts today',
+        }),
+        'https://gitlab.com'
       );
     });
 

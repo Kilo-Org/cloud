@@ -6,6 +6,7 @@ export const CODE_REVIEW_ACTION_REQUIRED_REASONS = [
   'gitlab_project_access_required',
   'byok_invalid_key',
   'selected_model_unavailable',
+  'repeated_repository_clone_timeout',
 ] as const;
 
 export type CodeReviewActionRequiredReason = (typeof CODE_REVIEW_ACTION_REQUIRED_REASONS)[number];
@@ -85,6 +86,17 @@ const COPY_BY_REASON = {
       'Code Reviewer was disabled because the selected model is not available for cloud agent sessions. Choose an available model, then enable Code Reviewer again.',
     gitlabDescription: 'Selected model unavailable for Code Reviewer',
   },
+  repeated_repository_clone_timeout: {
+    title: 'Code Reviewer needs attention',
+    description:
+      'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
+    recoveryLabel: 'Contact support',
+    emailReason: 'Repository cloning timed out for three code reviews today.',
+    checkTitle: 'Repeated repository clone timeouts',
+    checkSummary:
+      'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
+    gitlabDescription: 'Code Reviewer disabled after three repository clone timeouts today',
+  },
 } satisfies Record<CodeReviewActionRequiredReason, CodeReviewActionRequiredCopy>;
 
 const ACTION_REQUIRED_REASON_SET = new Set<string>(CODE_REVIEW_ACTION_REQUIRED_REASONS);
@@ -113,6 +125,10 @@ export function getCodeReviewActionRequiredRecoveryHref(
 
   if (reason === 'github_ip_allow_list') {
     return 'mailto:hi@kilocode.ai?subject=GitHub%20IP%20allow%20list%20for%20Code%20Reviewer';
+  }
+
+  if (reason === 'repeated_repository_clone_timeout') {
+    return 'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer';
   }
 
   if (reason === 'gitlab_project_access_required') {

@@ -1,10 +1,6 @@
 import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
 
-export function isOpenCodeGoAnthropicMessagesModel(model: string): boolean {
-  return model.startsWith('opencode-go/') && (model.includes('minimax') || model.includes('qwen'));
-}
-
 export default {
   id: 'opencode-go',
   base_url: 'https://opencode.ai/zen/go/v1',

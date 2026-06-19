@@ -1,60 +1,82 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  AUTO_ROUTING_MODE_CONFIG_PREFIX,
+  AutoRoutingModeConfigDO,
   getConfiguredAutoRoutingMode,
   getAutoRoutingMode,
   setAutoRoutingMode,
 } from './routing-mode';
+import type { AutoRoutingMode } from '@kilocode/auto-routing-contracts';
 
-type ModeEnvStub = Pick<Env, 'AUTO_ROUTING_CONFIG' | 'AUTO_ROUTING_DB'>;
+type ModeStub = {
+  getMode: ReturnType<typeof vi.fn<() => Promise<AutoRoutingMode | null>>>;
+  setMode: ReturnType<typeof vi.fn<(mode: AutoRoutingMode | null) => Promise<void>>>;
+};
 
-function makeEnv(
-  params: {
-    kvValues?: Record<string, string | null>;
-    dbValues?: Record<string, string | null>;
-  } = {}
-) {
-  const kvValues = params.kvValues ?? {};
-  const dbValues = params.dbValues ?? {};
-  const configGet = vi.fn(async (key: string) => kvValues[key] ?? null);
-  const configPut = vi.fn(async (key: string, value: string) => {
-    kvValues[key] = value;
-  });
-  const configDelete = vi.fn(async (key: string) => {
-    kvValues[key] = null;
-  });
-  const dbPrepare = vi.fn((sql: string) => ({
-    bind: (...args: string[]) => ({
-      first: vi.fn(async () => {
-        if (!sql.startsWith('SELECT')) return null;
-        const [ownerType, ownerId] = args;
-        const mode = dbValues[`${ownerType}:${ownerId}`] ?? null;
-        return mode ? { mode } : null;
+function makeEnv(initialModes: Record<string, AutoRoutingMode | null> = {}) {
+  const modes = new Map<string, AutoRoutingMode | null>(Object.entries(initialModes));
+  const stubs = new Map<string, ModeStub>();
+  const idFromName = vi.fn((name: string) => name);
+  const get = vi.fn((id: string) => {
+    const existing = stubs.get(id);
+    if (existing) return existing;
+    const stub = {
+      getMode: vi.fn(async () => modes.get(id) ?? null),
+      setMode: vi.fn(async (mode: AutoRoutingMode | null) => {
+        modes.set(id, mode);
       }),
-      run: vi.fn(async () => {
-        const [ownerType, ownerId, mode] = args;
-        if (sql.startsWith('DELETE')) {
-          dbValues[`${ownerType}:${ownerId}`] = null;
-          return {};
-        }
-        dbValues[`${ownerType}:${ownerId}`] = mode;
-        return {};
-      }),
-    }),
-  }));
+    };
+    stubs.set(id, stub);
+    return stub;
+  });
   const env = {
-    AUTO_ROUTING_CONFIG: {
-      get: configGet,
-      put: configPut,
-      delete: configDelete,
+    AUTO_ROUTING_MODE_CONFIG: {
+      idFromName,
+      get,
     },
-    AUTO_ROUTING_DB: {
-      prepare: dbPrepare,
-    },
-  } as unknown as ModeEnvStub;
+  } as unknown as Pick<Env, 'AUTO_ROUTING_MODE_CONFIG'>;
 
-  return { env, configGet, configPut, configDelete, dbPrepare, kvValues, dbValues };
+  return { env, modes, stubs, idFromName, get };
 }
+
+function createFakeStorage() {
+  const entries = new Map<string, unknown>();
+
+  return {
+    entries,
+    get: async (key: string) => entries.get(key),
+    put: async (key: string, value: unknown) => {
+      entries.set(key, value);
+    },
+    delete: async (key: string) => {
+      entries.delete(key);
+    },
+  };
+}
+
+function createModeDO() {
+  const storage = createFakeStorage();
+  const modeDO = new AutoRoutingModeConfigDO(
+    { storage } as unknown as DurableObjectState,
+    {} as Env
+  );
+  return { modeDO, storage };
+}
+
+describe('AutoRoutingModeConfigDO', () => {
+  it('persists, clears, and validates the stored mode', async () => {
+    const { modeDO, storage } = createModeDO();
+
+    await expect(modeDO.getMode()).resolves.toBeNull();
+    await modeDO.setMode('best_accuracy');
+    await expect(modeDO.getMode()).resolves.toBe('best_accuracy');
+
+    storage.entries.set('mode', 'fastest');
+    await expect(modeDO.getMode()).resolves.toBeNull();
+
+    await modeDO.setMode(null);
+    expect(storage.entries.has('mode')).toBe(false);
+  });
+});
 
 describe('auto routing mode config', () => {
   beforeEach(() => {
@@ -74,24 +96,20 @@ describe('auto routing mode config', () => {
   });
 
   it('uses organization mode before user mode', async () => {
-    const { env, configGet } = makeEnv({
-      kvValues: {
-        [`${AUTO_ROUTING_MODE_CONFIG_PREFIX}:user:user-1`]: 'best_accuracy',
-        [`${AUTO_ROUTING_MODE_CONFIG_PREFIX}:org:org-1`]: 'cost_per_accuracy',
-      },
+    const { env, idFromName } = makeEnv({
+      'user:user-1': 'best_accuracy',
+      'org:org-1': 'cost_per_accuracy',
     });
 
     await expect(
       getAutoRoutingMode(env, { userId: 'user-1', organizationId: 'org-1' })
     ).resolves.toBe('cost_per_accuracy');
-    expect(configGet).toHaveBeenNthCalledWith(1, `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:org:org-1`);
+    expect(idFromName).toHaveBeenNthCalledWith(1, 'org:org-1');
   });
 
   it('falls back to user mode when organization mode is absent', async () => {
     const { env } = makeEnv({
-      kvValues: {
-        [`${AUTO_ROUTING_MODE_CONFIG_PREFIX}:user:user-1`]: 'best_accuracy',
-      },
+      'user:user-1': 'best_accuracy',
     });
 
     await expect(
@@ -99,128 +117,46 @@ describe('auto routing mode config', () => {
     ).resolves.toBe('best_accuracy');
   });
 
-  it('reads through D1 after a KV miss', async () => {
-    const { env, configPut, dbPrepare } = makeEnv({
-      dbValues: {
-        'user:user-1': 'best_accuracy',
-      },
-    });
-
-    await expect(getAutoRoutingMode(env, { userId: 'user-1', organizationId: null })).resolves.toBe(
-      'best_accuracy'
-    );
-    expect(dbPrepare).toHaveBeenCalledWith(
-      'SELECT mode FROM auto_routing_modes WHERE owner_type = ? AND owner_id = ? LIMIT 1'
-    );
-    expect(configPut).toHaveBeenCalledWith(
-      `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:user:user-1`,
-      'best_accuracy',
-      { expirationTtl: 60 }
-    );
-  });
-
-  it('returns the D1 mode when read-through cache population fails', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { env, configPut } = makeEnv({
-      dbValues: {
-        'user:user-1': 'best_accuracy',
-      },
-    });
-    configPut.mockRejectedValueOnce(new Error('kv unavailable'));
-
-    await expect(getAutoRoutingMode(env, { userId: 'user-1', organizationId: null })).resolves.toBe(
-      'best_accuracy'
-    );
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('auto_routing_config_cache_write_failed')
-    );
-  });
-
-  it('ignores invalid cached values and returns the default mode', async () => {
-    const { env, configPut } = makeEnv({
-      kvValues: {
-        [`${AUTO_ROUTING_MODE_CONFIG_PREFIX}:user:user-1`]: 'fastest',
-      },
-    });
-
-    await expect(getAutoRoutingMode(env, { userId: 'user-1', organizationId: null })).resolves.toBe(
-      'cost_per_accuracy'
-    );
-    expect(configPut).toHaveBeenCalledWith(
-      `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:user:user-1`,
-      '__default__',
-      { expirationTtl: 60 }
-    );
-  });
-
-  it('uses the cached null sentinel without hitting D1', async () => {
-    const { env, dbPrepare } = makeEnv({
-      kvValues: {
-        [`${AUTO_ROUTING_MODE_CONFIG_PREFIX}:user:user-1`]: '__default__',
-      },
-      dbValues: {
-        'user:user-1': 'best_accuracy',
-      },
-    });
-
-    await expect(
-      getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' })
-    ).resolves.toBe(null);
-    expect(dbPrepare).not.toHaveBeenCalled();
-  });
-
-  it('reads the backing cache on every lookup instead of serving a stale module value', async () => {
-    const key = `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:user:user-1`;
-    const { env, kvValues, configGet } = makeEnv({
-      kvValues: {
-        [key]: 'best_accuracy',
-      },
+  it('reads the owner object on every lookup instead of serving a stale module value', async () => {
+    const { env, modes, stubs } = makeEnv({
+      'user:user-1': 'best_accuracy',
     });
 
     await expect(
       getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' })
     ).resolves.toBe('best_accuracy');
 
-    kvValues[key] = 'cost_per_accuracy';
+    modes.set('user:user-1', 'cost_per_accuracy');
 
     await expect(
       getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' })
     ).resolves.toBe('cost_per_accuracy');
-    expect(configGet).toHaveBeenCalledTimes(2);
+    expect(stubs.get('user:user-1')?.getMode).toHaveBeenCalledTimes(2);
   });
 
-  it('writes and clears owner-specific modes in D1 and cache', async () => {
-    const { env, configPut, dbValues } = makeEnv();
+  it('writes and clears owner-specific modes in the owner object', async () => {
+    const { env, modes, stubs } = makeEnv();
 
     await setAutoRoutingMode(env, { ownerType: 'org', ownerId: 'org-1' }, 'best_accuracy');
-    expect(dbValues['org:org-1']).toBe('best_accuracy');
-    expect(configPut).toHaveBeenCalledWith(
-      `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:org:org-1`,
-      'best_accuracy',
-      { expirationTtl: 60 }
-    );
+    expect(modes.get('org:org-1')).toBe('best_accuracy');
+    expect(stubs.get('org:org-1')?.setMode).toHaveBeenCalledWith('best_accuracy');
 
     await setAutoRoutingMode(env, { ownerType: 'org', ownerId: 'org-1' }, null);
-    expect(dbValues['org:org-1']).toBeNull();
-    expect(configPut).toHaveBeenLastCalledWith(
-      `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:org:org-1`,
-      '__default__',
-      { expirationTtl: 60 }
-    );
+    expect(modes.get('org:org-1')).toBeNull();
+    expect(stubs.get('org:org-1')?.setMode).toHaveBeenLastCalledWith(null);
   });
 
-  it('does not fail a D1-backed mode write when cache update fails', async () => {
+  it('returns null when reading an owner object fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { env, configPut, dbValues } = makeEnv();
-    configPut.mockRejectedValueOnce(new Error('kv unavailable'));
+    const { env, stubs } = makeEnv();
+    await getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' });
+    stubs.get('user:user-1')?.getMode.mockRejectedValueOnce(new Error('do unavailable'));
 
     await expect(
-      setAutoRoutingMode(env, { ownerType: 'org', ownerId: 'org-1' }, 'best_accuracy')
-    ).resolves.toBeUndefined();
-
-    expect(dbValues['org:org-1']).toBe('best_accuracy');
+      getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' })
+    ).resolves.toBeNull();
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('auto_routing_config_cache_write_failed')
+      expect.stringContaining('auto_routing_config_read_failed')
     );
   });
 });

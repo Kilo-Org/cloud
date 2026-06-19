@@ -8,6 +8,7 @@ import { decideHandler } from './decide';
 import type { HonoEnv } from './hono-env';
 
 export { AutoRoutingDecisionCacheDO } from './decision-cache';
+export { AutoRoutingModeConfigDO } from './routing-mode';
 
 export const app = new Hono<HonoEnv>();
 

@@ -28,11 +28,12 @@ const writeDataPoint = vi.fn();
 const configGet = vi.fn();
 const configDelete = vi.fn();
 const configPut = vi.fn();
-const autoRoutingDbPrepare = vi.fn();
 const analyticsTokenGet = vi.fn();
 const cacheGetEntry = vi.fn();
 const cachePutEntry = vi.fn();
 const cacheIdFromName = vi.fn(() => 'cache-do-id');
+const modeConfigIdFromName = vi.fn((name: string) => name);
+const modeConfigGet = vi.fn();
 const benchmarkFetch = vi.fn();
 const originalFetch = globalThis.fetch;
 const mockedFetch = vi.fn<typeof globalThis.fetch>();
@@ -46,9 +47,6 @@ const env = {
     delete: configDelete,
     put: configPut,
   },
-  AUTO_ROUTING_DB: {
-    prepare: autoRoutingDbPrepare,
-  },
   BENCHMARK_SERVICE: {
     fetch: benchmarkFetch,
   },
@@ -58,6 +56,10 @@ const env = {
   AUTO_ROUTING_DECISION_CACHE: {
     idFromName: cacheIdFromName,
     get: () => ({ getEntry: cacheGetEntry, putEntry: cachePutEntry }),
+  },
+  AUTO_ROUTING_MODE_CONFIG: {
+    idFromName: modeConfigIdFromName,
+    get: modeConfigGet,
   },
   O11Y_CF_ACCOUNT_ID: 'test-account-id',
   O11Y_CF_AE_API_TOKEN: {
@@ -213,12 +215,12 @@ describe('auto routing worker', () => {
     configDelete.mockResolvedValue(undefined);
     configPut.mockReset();
     configPut.mockResolvedValue(undefined);
-    autoRoutingDbPrepare.mockReset();
-    autoRoutingDbPrepare.mockReturnValue({
-      bind: () => ({
-        first: async () => null,
-        run: async () => ({}),
-      }),
+    modeConfigIdFromName.mockReset();
+    modeConfigIdFromName.mockImplementation((name: string) => name);
+    modeConfigGet.mockReset();
+    modeConfigGet.mockReturnValue({
+      getMode: vi.fn(async () => null),
+      setMode: vi.fn(async () => undefined),
     });
     benchmarkFetch.mockReset();
     benchmarkFetch.mockImplementation(async (url: string) => {
@@ -329,10 +331,13 @@ describe('auto routing worker', () => {
   });
 
   it('uses organization best-accuracy mode for auto routing decisions', async () => {
-    configGet.mockImplementation(async (key: string) => {
-      if (key === 'auto_routing_mode:org:org-1') return 'best_accuracy';
-      return null;
-    });
+    const modes = new Map<string, string | null>([['org:org-1', 'best_accuracy']]);
+    modeConfigGet.mockImplementation((id: string) => ({
+      getMode: vi.fn(async () => modes.get(id) ?? null),
+      setMode: vi.fn(async (mode: string | null) => {
+        modes.set(id, mode);
+      }),
+    }));
     benchmarkFetch.mockImplementation(async (url: string) => {
       if (String(url).includes('/admin/classifier-winner')) {
         return { ok: true, status: 200, json: async () => ({ winner: null }) };
@@ -380,10 +385,13 @@ describe('auto routing worker', () => {
   });
 
   it('falls back to user auto routing mode when org mode is unset', async () => {
-    configGet.mockImplementation(async (key: string) => {
-      if (key === 'auto_routing_mode:user:user-1') return 'best_accuracy';
-      return null;
-    });
+    const modes = new Map<string, string | null>([['user:user-1', 'best_accuracy']]);
+    modeConfigGet.mockImplementation((id: string) => ({
+      getMode: vi.fn(async () => modes.get(id) ?? null),
+      setMode: vi.fn(async (mode: string | null) => {
+        modes.set(id, mode);
+      }),
+    }));
     benchmarkFetch.mockImplementation(async (url: string) => {
       if (String(url).includes('/admin/classifier-winner')) {
         return { ok: true, status: 200, json: async () => ({ winner: null }) };
@@ -432,14 +440,13 @@ describe('auto routing worker', () => {
 
   it('reads and updates owner routing mode through admin endpoints', async () => {
     let storedMode: string | null = null;
-    configGet.mockImplementation(async (key: string) =>
-      key === 'auto_routing_mode:user:user-1' ? storedMode : null
-    );
-    configPut.mockImplementation(async (_key: string, value: string) => {
-      storedMode = value;
-    });
-    configDelete.mockImplementation(async () => {
-      storedMode = null;
+    modeConfigGet.mockImplementation(() => {
+      return {
+        getMode: vi.fn(async () => storedMode),
+        setMode: vi.fn(async (mode: string | null) => {
+          storedMode = mode;
+        }),
+      };
     });
 
     const updateResponse = await request('/admin/routing-mode', {

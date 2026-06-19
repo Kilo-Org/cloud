@@ -1,55 +1,9 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "00da265e-0371-47cc-8554-f89ac4273627",
+  "id": "5a8061af-29a3-47f4-bba8-8c84c9ed2901",
   "prevId": "a7348ac7-ad74-4ab4-89c4-534ae4b73500",
   "tables": {
-    "auto_routing_modes": {
-      "name": "auto_routing_modes",
-      "columns": {
-        "owner_type": {
-          "name": "owner_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "owner_id": {
-          "name": "owner_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "mode": {
-          "name": "mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "auto_routing_modes_owner_type_owner_id_pk": {
-          "columns": [
-            "owner_type",
-            "owner_id"
-          ],
-          "name": "auto_routing_modes_owner_type_owner_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "benchmark_config": {
       "name": "benchmark_config",
       "columns": {
@@ -73,6 +27,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "best_accuracy_switch_threshold": {
+          "name": "best_accuracy_switch_threshold",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0.05
         },
         "max_concurrency": {
           "name": "max_concurrency",
@@ -213,6 +175,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "best_accuracy_switch_threshold": {
+          "name": "best_accuracy_switch_threshold",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0.05
         },
         "max_concurrency": {
           "name": "max_concurrency",
@@ -721,6 +691,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "best_accuracy_switch_threshold": {
+          "name": "best_accuracy_switch_threshold",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0.05
         },
         "source": {
           "name": "source",

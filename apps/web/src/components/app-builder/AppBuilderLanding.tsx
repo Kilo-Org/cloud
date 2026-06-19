@@ -639,6 +639,7 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
           supportsVision,
           isFree: m.isFree,
           mayTrainOnYourPrompts: m.mayTrainOnYourPrompts,
+          hasUserByokAvailable: m.hasUserByokAvailable,
         };
       }),
     [availableModels]

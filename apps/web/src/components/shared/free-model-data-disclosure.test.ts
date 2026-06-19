@@ -1,8 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  BYOK_MODEL_LABEL,
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataTooltip,
+  hasUserByokAvailable,
   isFreeModelOption,
   mayTrainOnYourPrompts,
 } from './free-model-data-disclosure';
@@ -11,6 +13,7 @@ describe('free model data disclosure', () => {
   it('uses the disclosure label expected in model pickers', () => {
     expect(FREE_MODEL_DATA_LABEL).toBe('Data collected');
     expect(FREE_MODEL_FREE_LABEL).toBe('Free');
+    expect(BYOK_MODEL_LABEL).toBe('BYOK');
   });
 
   it('detects explicit and known free model options', () => {
@@ -37,6 +40,22 @@ describe('free model data disclosure', () => {
       })
     ).toBe(false);
     expect(mayTrainOnYourPrompts({ id: 'free-model', isFree: true })).toBe(false);
+  });
+
+  it('detects only explicit user BYOK availability', () => {
+    expect(
+      hasUserByokAvailable({
+        id: 'anthropic/claude',
+        hasUserByokAvailable: true,
+      })
+    ).toBe(true);
+    expect(
+      hasUserByokAvailable({
+        id: 'anthropic/claude',
+        hasUserByokAvailable: false,
+      })
+    ).toBe(false);
+    expect(hasUserByokAvailable({ id: 'anthropic/claude' })).toBe(false);
   });
 
   it('uses the short disclosure text as tooltip content', () => {

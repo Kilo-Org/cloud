@@ -124,6 +124,9 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`);
     expect(prompt).toContain('Only flag regressions with direct evidence.');
     expect(prompt).toContain('```ts\nconst markdown = true;\n```');
+    expect(prompt).toContain('# SUB-AGENT USAGE');
+    expect(prompt).toContain("replace Kilo's default review guidance for sub-agent usage");
+    expect(prompt).toContain('formatting/output requirements');
     expect(prompt).not.toContain('# WHAT TO REVIEW');
     expect(prompt).not.toContain('Security vulnerabilities (injection, XSS, auth bypass)');
 
@@ -141,6 +144,7 @@ describe('generateReviewPrompt', () => {
     const repositoryPolicyIndex = prompt.indexOf(
       `# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`
     );
+    expect(prompt.indexOf('# SUB-AGENT USAGE')).toBeLessThan(repositoryPolicyIndex);
     expect(prompt.indexOf('# CUSTOM INSTRUCTIONS')).toBeLessThan(repositoryPolicyIndex);
     expect(prompt.indexOf('# HARD CONSTRAINTS (READ FIRST)')).toBeLessThan(repositoryPolicyIndex);
     expect(prompt.indexOf('# WORKFLOW')).toBeLessThan(repositoryPolicyIndex);
@@ -158,6 +162,9 @@ describe('generateReviewPrompt', () => {
 
     expect(version).toBe(DEFAULT_PROMPT_TEMPLATE_GITLAB.version);
     expect(prompt).toContain('Only flag regressions with evidence.');
+    expect(prompt).toContain('# SUB-AGENT USAGE');
+    expect(prompt).toContain("replace Kilo's default review guidance for sub-agent usage");
+    expect(prompt).toContain('formatting/output requirements');
     expect(prompt).not.toContain('Security vulnerabilities (injection, XSS, auth bypass)');
     expect(prompt).toContain('operating in READ-ONLY, NON-INTERACTIVE mode');
     expect(prompt).toContain('# HARD CONSTRAINTS (READ FIRST)');

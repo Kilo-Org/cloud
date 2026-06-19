@@ -50,6 +50,7 @@ export const PromptTemplateSchema = z
     systemRole: z.string(),
     hardConstraints: z.string(),
     diffLineGuidance: z.string().optional(),
+    subAgentGuidance: z.string().optional(),
     workflow: z.string(),
     whatToReview: z.string(),
     commentFormat: z.string(),
@@ -192,6 +193,10 @@ export async function generateReviewPrompt(
 
   if (template.diffLineGuidance) {
     prompt += replacePlaceholders(template.diffLineGuidance) + '\n\n';
+  }
+
+  if (template.subAgentGuidance) {
+    prompt += template.subAgentGuidance + '\n\n';
   }
 
   // 5. Workflow with placeholders replaced

@@ -76,6 +76,31 @@ describe('generateReviewPrompt', () => {
     expect(prompt).not.toContain('# GITHUB DIFF LINE RULES');
   });
 
+  it('includes tiered sub-agent usage guidance for GitHub', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain('# SUB-AGENT USAGE');
+    expect(prompt).toContain('Tiny: up to 2 files and under 100 changed lines: use 0 sub-agents');
+    expect(prompt).toContain('Small: 3-5 files or 100-299 changed lines: use at most 1 sub-agent');
+    expect(prompt).toContain(
+      'Very large: more than 30 files or 2500+ changed lines: use at most 5 sub-agents'
+    );
+  });
+
+  it('includes tiered sub-agent usage guidance for GitLab', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+    });
+
+    expect(prompt).toContain('# SUB-AGENT USAGE');
+    expect(prompt).toContain('Tiny: up to 2 files and under 100 changed lines: use 0 sub-agents');
+    expect(prompt).toContain('Small: 3-5 files or 100-299 changed lines: use at most 1 sub-agent');
+    expect(prompt).toContain(
+      'Very large: more than 30 files or 2500+ changed lines: use at most 5 sub-agents'
+    );
+  });
+
   it('replaces built-in review guidance with REVIEW.md instructions at the same prompt point', async () => {
     const repositoryReviewInstructions = [
       'Only flag regressions with direct evidence.',

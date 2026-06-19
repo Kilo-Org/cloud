@@ -346,9 +346,9 @@ export const codeReviewRouter = createTRPCRouter({
       ]);
       const tokenUsage = billingUsage
         ? {
-            input: billingUsage.totalUncachedTokens,
-            output: billingUsage.totalTokensOut,
-            cached: billingUsage.totalCachedTokens,
+            input: billingUsage.tokensIn,
+            output: billingUsage.tokensOut,
+            cached: billingUsage.cachedTokens,
           }
         : { input: 0, output: 0, cached: 0 };
 

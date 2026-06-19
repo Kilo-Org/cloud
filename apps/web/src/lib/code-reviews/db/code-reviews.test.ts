@@ -686,8 +686,9 @@ describe('getSessionUsageFromBilling', () => {
       model: 'anthropic/claude-sonnet-4.6',
       totalTokensIn: 1000,
       totalTokensOut: 100,
-      totalCachedTokens: 700,
-      totalUncachedTokens: 300,
+      tokensIn: 300,
+      tokensOut: 100,
+      cachedTokens: 700,
       totalCostMusd: 100,
     });
   });

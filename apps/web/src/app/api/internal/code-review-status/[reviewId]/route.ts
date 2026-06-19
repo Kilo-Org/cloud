@@ -604,9 +604,9 @@ async function getReviewUsageData(reviewId: string) {
 
   return {
     model: review.model ?? billing.model,
-    tokensIn: billing.totalUncachedTokens,
-    tokensOut: billing.totalTokensOut,
-    cachedTokens: billing.totalCachedTokens,
+    tokensIn: billing.tokensIn,
+    tokensOut: billing.tokensOut,
+    cachedTokens: billing.cachedTokens,
   };
 }
 

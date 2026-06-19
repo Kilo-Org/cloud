@@ -403,6 +403,18 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('INCREMENTAL REVIEW MODE');
     expect(prompt).toContain('abc123prev');
     expect(prompt).toContain('git diff abc123prev..HEAD');
+    expect(prompt).toContain('gh api graphql');
+    expect(prompt).toContain('reviewThreads');
+    expect(prompt).toContain('comments(first:1)');
+    expect(prompt).toContain('nodes{body viewerDidAuthor}');
+    expect(prompt).not.toContain('comments(first:2)');
+    expect(prompt).toContain('resolveReviewThread');
+    expect(prompt).toContain(
+      'canonical footer line from the "Inline Comment Footer" section exactly once'
+    );
+    expect(
+      prompt.split('Reply with `@kilocode-bot fix it` to have Kilo Code address this issue.')
+    ).toHaveLength(2);
     expect(prompt).toContain('2 Issues Found');
     expect(prompt).not.toContain('stale-model');
     expect(prompt).not.toContain('Review guidance: REVIEW.md');
@@ -420,6 +432,7 @@ describe('generateReviewPrompt (incremental review)', () => {
     });
 
     expect(prompt).not.toContain('INCREMENTAL REVIEW MODE');
+    expect(prompt).not.toContain('resolveReviewThread');
     expect(prompt).toContain('gh pr diff 42');
   });
 
@@ -552,6 +565,7 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('glab mr diff');
     expect(prompt).toContain('git pull');
     expect(prompt).toContain('git diff prevsha456..HEAD');
+    expect(prompt).not.toContain('resolveReviewThread');
     expect(prompt).not.toContain('DO NOT fetch or pull');
     expect(prompt).not.toContain('Do not run `git fetch`');
   });

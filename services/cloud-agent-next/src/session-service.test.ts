@@ -111,6 +111,8 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab api --method POST *merge_requests/*/discussions*']).toBe('allow');
 
     expect(bashPermissions['gh pr diff']).toBe('allow');
+    expect(bashPermissions['gh api graphql']).toBe('allow');
+    expect(bashPermissions['gh api graphql *']).toBe('allow');
     expect(bashPermissions['gh api repos/*/pulls/*/reviews']).toBe('allow');
     expect(bashPermissions['gh api repos/*/pulls/*/reviews *']).toBe('allow');
     expect(bashPermissions['gh api repos/*/pulls/*/comments']).toBe('allow');

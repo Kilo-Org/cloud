@@ -132,6 +132,7 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'git pull',
   'gh pr diff',
   'gh pr view',
+  'gh api graphql',
   'gh api repos/*/pulls/*/reviews',
   'gh api repos/*/pulls/*/comments',
   'gh api repos/*/issues/*/comments',

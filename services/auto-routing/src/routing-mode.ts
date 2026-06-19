@@ -80,6 +80,24 @@ async function cacheConfiguredMode(
   });
 }
 
+async function cacheConfiguredModeBestEffort(
+  env: AutoRoutingModeEnv,
+  key: string,
+  mode: AutoRoutingMode | null
+): Promise<void> {
+  try {
+    await cacheConfiguredMode(env, key, mode);
+  } catch (error: unknown) {
+    console.warn(
+      JSON.stringify({
+        event: 'auto_routing_config_cache_write_failed',
+        key,
+        ...formatError(error),
+      })
+    );
+  }
+}
+
 async function loadConfiguredMode(
   env: AutoRoutingModeEnv,
   ownerType: AutoRoutingModeOwnerType,
@@ -101,7 +119,7 @@ async function loadConfiguredMode(
     }
 
     const dbMode = await readConfiguredModeFromDb(env, ownerType, ownerId);
-    await cacheConfiguredMode(env, key, dbMode);
+    await cacheConfiguredModeBestEffort(env, key, dbMode);
     return dbMode;
   })();
   rememberMode(key, promise);
@@ -170,6 +188,6 @@ export async function setAutoRoutingMode(
       .bind(owner.ownerType, owner.ownerId, mode, new Date().toISOString())
       .run();
   }
-  await cacheConfiguredMode(env, key, mode);
   updateModeCache(key, mode);
+  await cacheConfiguredModeBestEffort(env, key, mode);
 }

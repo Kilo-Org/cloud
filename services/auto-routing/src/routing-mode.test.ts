@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTO_ROUTING_MODE_CONFIG_PREFIX,
   clearAutoRoutingModeCache,
@@ -62,6 +62,10 @@ describe('auto routing mode config', () => {
     clearAutoRoutingModeCache();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('defaults to least cost per accuracy when no owner config exists', async () => {
     const { env } = makeEnv();
 
@@ -116,6 +120,23 @@ describe('auto routing mode config', () => {
     );
   });
 
+  it('returns the D1 mode when read-through cache population fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { env, configPut } = makeEnv({
+      dbValues: {
+        'user:user-1': 'best_accuracy',
+      },
+    });
+    configPut.mockRejectedValueOnce(new Error('kv unavailable'));
+
+    await expect(getAutoRoutingMode(env, { userId: 'user-1', organizationId: null })).resolves.toBe(
+      'best_accuracy'
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('auto_routing_config_cache_write_failed')
+    );
+  });
+
   it('ignores invalid cached values and returns the default mode', async () => {
     const { env, configPut } = makeEnv({
       kvValues: {
@@ -166,6 +187,21 @@ describe('auto routing mode config', () => {
       `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:org:org-1`,
       '__default__',
       { expirationTtl: 60 }
+    );
+  });
+
+  it('does not fail a D1-backed mode write when cache update fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { env, configPut, dbValues } = makeEnv();
+    configPut.mockRejectedValueOnce(new Error('kv unavailable'));
+
+    await expect(
+      setAutoRoutingMode(env, { ownerType: 'org', ownerId: 'org-1' }, 'best_accuracy')
+    ).resolves.toBeUndefined();
+
+    expect(dbValues['org:org-1']).toBe('best_accuracy');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('auto_routing_config_cache_write_failed')
     );
   });
 });

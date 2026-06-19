@@ -2859,9 +2859,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing note body', {
         usage: {
           model: 'anthropic/claude-sonnet-4.6',
-          tokensIn: 1000,
-          tokensOut: 200,
-          cachedTokens: null,
+          tokensIn: 0,
+          tokensOut: 0,
+          cachedTokens: 0,
         },
         reviewGuidance: { used: true, ref: 'main', truncated: true },
       });

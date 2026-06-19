@@ -56,10 +56,6 @@ type CodeReviewDetailClientProps = {
   reviewId: string;
 };
 
-function formatAvailableTokenCount(count: number | null): string {
-  return count == null ? '—' : formatTokenCount(count);
-}
-
 export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -161,8 +157,6 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
           : 'border-destructive/30 bg-destructive/10 text-destructive',
       }
     : null;
-  const inputTokenLabel = data.tokenUsage.cached == null ? 'Input (including cached)' : 'Input';
-
   return (
     <PageContainer>
       {/* Back link */}
@@ -274,18 +268,14 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                 <dd>${(review.total_cost_musd / 1_000_000).toFixed(4)}</dd>
               </div>
             )}
-            {(data.tokenUsage.input != null ||
-              data.tokenUsage.output != null ||
-              data.tokenUsage.cached != null) && (
-              <div>
-                <dt className="text-muted-foreground">Tokens</dt>
-                <dd className="tabular-nums">
-                  {inputTokenLabel} {formatAvailableTokenCount(data.tokenUsage.input)} / Output{' '}
-                  {formatAvailableTokenCount(data.tokenUsage.output)} / Cached{' '}
-                  {formatAvailableTokenCount(data.tokenUsage.cached)}
-                </dd>
-              </div>
-            )}
+            <div>
+              <dt className="text-muted-foreground">Tokens</dt>
+              <dd className="tabular-nums">
+                Input {formatTokenCount(data.tokenUsage.input)} / Output{' '}
+                {formatTokenCount(data.tokenUsage.output)} / Cached{' '}
+                {formatTokenCount(data.tokenUsage.cached)}
+              </dd>
+            </div>
           </dl>
 
           {reviewMessage && (

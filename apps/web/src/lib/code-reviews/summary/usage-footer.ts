@@ -10,7 +10,7 @@ type UsageFooterData = {
   model: string;
   tokensIn: number;
   tokensOut: number;
-  cachedTokens: number | null;
+  cachedTokens: number;
 };
 
 type ReviewGuidanceFooterData = {
@@ -41,12 +41,10 @@ export function buildUsageFooter(
   model: string,
   tokensIn: number,
   tokensOut: number,
-  cachedTokens: number | null
+  cachedTokens: number
 ): string {
   const displayModel = formatModelName(model);
-  const inputLabel = cachedTokens == null ? 'Input (including cached)' : 'Input';
-  const cached = cachedTokens == null ? '—' : formatTokenCount(cachedTokens);
-  return `${USAGE_FOOTER_MARKER}\n<sub>Reviewed by ${displayModel} · ${inputLabel}: ${formatTokenCount(tokensIn)} · Output: ${formatTokenCount(tokensOut)} · Cached: ${cached}</sub>`;
+  return `${USAGE_FOOTER_MARKER}\n<sub>Reviewed by ${displayModel} · Input: ${formatTokenCount(tokensIn)} · Output: ${formatTokenCount(tokensOut)} · Cached: ${formatTokenCount(cachedTokens)}</sub>`;
 }
 
 export function buildReviewGuidanceFooter(guidance: ReviewGuidanceFooterData): string {
@@ -117,7 +115,7 @@ export function appendUsageFooter(
   tokensOut: number
 ): string {
   return appendReviewSummaryFooter(existingBody, {
-    usage: { model, tokensIn, tokensOut, cachedTokens: null },
+    usage: { model, tokensIn, tokensOut, cachedTokens: 0 },
   });
 }
 

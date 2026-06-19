@@ -344,19 +344,13 @@ export const codeReviewRouter = createTRPCRouter({
             )
           : Promise.resolve(null),
       ]);
-      const splitBillingTokenUsage = billingUsage
+      const tokenUsage = billingUsage
         ? {
             input: billingUsage.totalUncachedTokens,
             output: billingUsage.totalTokensOut,
             cached: billingUsage.totalCachedTokens,
           }
-        : null;
-      const storedCombinedTokenUsage = {
-        input: review.total_tokens_in ?? null,
-        output: review.total_tokens_out ?? null,
-        cached: null,
-      };
-      const tokenUsage = splitBillingTokenUsage ?? storedCombinedTokenUsage;
+        : { input: 0, output: 0, cached: 0 };
 
       return successResult({ review, attempts, tokenUsage });
     } catch (error) {

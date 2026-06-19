@@ -568,65 +568,46 @@ const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
 /**
  * Read a review's usage data.
  *
- * For v1 (SSE) reviews the orchestrator writes usage to the record just
- * before the completion callback, so a short poll handles the race.
- * For v2 (cloud-agent-next) the orchestrator never writes usage — we
- * skip the poll and go straight to the billing tables.
- *
- * Billing usage is preferred when a CLI session is available because the
- * persisted review columns do not include cache details. Raw cache-inclusive
- * input, output, and cost totals are still back-filled for later reads.
+ * Billing rows are the source of truth for review token usage. If no billing
+ * usage exists, the review used zero tokens.
  */
 async function getReviewUsageData(reviewId: string) {
-  let review = await getCodeReviewById(reviewId);
+  const review = await getCodeReviewById(reviewId);
+  const zeroUsage = {
+    model: review?.model ?? null,
+    tokensIn: 0,
+    tokensOut: 0,
+    cachedTokens: 0,
+  };
 
-  // v1 only: poll briefly — usage may arrive from the orchestrator
-  // right before the callback. v2 never writes usage to the record,
-  // so polling would just waste ~1.4s for nothing.
-  if (review && !review.model && review.agent_version !== 'v2') {
-    const MAX_RETRIES = 3;
-    const BASE_DELAY_MS = 200;
-    for (let attempt = 0; attempt < MAX_RETRIES && review && !review.model; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, BASE_DELAY_MS * 2 ** attempt));
-      review = await getCodeReviewById(reviewId);
-    }
+  if (!review?.cli_session_id || !review.created_at) {
+    return zeroUsage;
   }
 
-  if (review?.cli_session_id && review.created_at) {
-    const billing = await getSessionUsageFromBilling(
-      review.cli_session_id,
-      review.created_at,
-      review.completed_at ?? undefined
-    );
-    if (billing) {
-      updateCodeReviewUsage(reviewId, {
-        ...(review.model == null ? { model: billing.model } : {}),
-        totalTokensIn: billing.totalTokensIn,
-        totalTokensOut: billing.totalTokensOut,
-        totalCostMusd: billing.totalCostMusd,
-      }).catch(err => {
-        logExceptInTest('[code-review-status] Failed to back-fill usage from billing', err);
-      });
-
-      return {
-        model: review.model ?? billing.model,
-        tokensIn: billing.totalUncachedTokens,
-        tokensOut: billing.totalTokensOut,
-        cachedTokens: billing.totalCachedTokens,
-      };
-    }
+  const billing = await getSessionUsageFromBilling(
+    review.cli_session_id,
+    review.created_at,
+    review.completed_at ?? undefined
+  );
+  if (!billing) {
+    return zeroUsage;
   }
 
-  if (review?.model) {
-    return {
-      model: review.model,
-      tokensIn: review.total_tokens_in ?? null,
-      tokensOut: review.total_tokens_out ?? null,
-      cachedTokens: null,
-    };
-  }
+  updateCodeReviewUsage(reviewId, {
+    ...(review.model == null ? { model: billing.model } : {}),
+    totalTokensIn: billing.totalTokensIn,
+    totalTokensOut: billing.totalTokensOut,
+    totalCostMusd: billing.totalCostMusd,
+  }).catch(err => {
+    logExceptInTest('[code-review-status] Failed to back-fill usage from billing', err);
+  });
 
-  return { model: null, tokensIn: null, tokensOut: null, cachedTokens: null };
+  return {
+    model: review.model ?? billing.model,
+    tokensIn: billing.totalUncachedTokens,
+    tokensOut: billing.totalTokensOut,
+    cachedTokens: billing.totalCachedTokens,
+  };
 }
 
 function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
@@ -1462,10 +1443,7 @@ export async function POST(
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut, cachedTokens } =
                   await getReviewUsageData(reviewId);
-                const usage =
-                  model && tokensIn != null && tokensOut != null
-                    ? { model, tokensIn, tokensOut, cachedTokens }
-                    : undefined;
+                const usage = model ? { model, tokensIn, tokensOut, cachedTokens } : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
                 const summaryFooter = { usage, reviewGuidance };
                 const reservedFooterCharacters = buildReviewSummaryFooter(summaryFooter).length;
@@ -1556,10 +1534,7 @@ export async function POST(
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut, cachedTokens } =
                   await getReviewUsageData(reviewId);
-                const usage =
-                  model && tokensIn != null && tokensOut != null
-                    ? { model, tokensIn, tokensOut, cachedTokens }
-                    : undefined;
+                const usage = model ? { model, tokensIn, tokensOut, cachedTokens } : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
 
                 const existing = await findKiloReviewNote(

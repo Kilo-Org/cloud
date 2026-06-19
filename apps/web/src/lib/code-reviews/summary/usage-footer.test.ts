@@ -27,7 +27,7 @@ describe('buildUsageFooter', () => {
   });
 
   it('keeps model name as-is when no provider prefix', () => {
-    const footer = buildUsageFooter('gpt-4o', 500, 100, null);
+    const footer = buildUsageFooter('gpt-4o', 500, 100, 0);
     expect(footer).toContain('gpt-4o');
   });
 
@@ -39,11 +39,11 @@ describe('buildUsageFooter', () => {
     );
   });
 
-  it('labels combined input when cached tokens are unavailable', () => {
-    const footer = buildUsageFooter('provider/minimax-m3', 1000, 200, null);
+  it('renders zero cached tokens', () => {
+    const footer = buildUsageFooter('provider/minimax-m3', 1000, 200, 0);
 
     expect(footer).toBe(
-      '<!-- kilo-usage -->\n<sub>Reviewed by minimax-m3 · Input (including cached): 1K · Output: 200 · Cached: —</sub>'
+      '<!-- kilo-usage -->\n<sub>Reviewed by minimax-m3 · Input: 1K · Output: 200 · Cached: 0</sub>'
     );
   });
 
@@ -161,7 +161,7 @@ describe('appendReviewSummaryFooter', () => {
   it('preserves unrelated horizontal rules in the body', () => {
     const body = '## Summary\n\n---\n\nSome section\n\nMore content';
     const result = appendReviewSummaryFooter(body, {
-      usage: { model: 'x/m', tokensIn: 1, tokensOut: 1, cachedTokens: null },
+      usage: { model: 'x/m', tokensIn: 1, tokensOut: 1, cachedTokens: 0 },
     });
 
     expect(result).toContain('## Summary\n\n---\n\nSome section\n\nMore content');
@@ -236,7 +236,7 @@ describe('appendUsageFooter', () => {
     const result = appendUsageFooter('body', 'provider/org/model-name', 100, 200);
 
     expect(result).toContain('org/model-name');
-    expect(result).toContain('Input (including cached): 100 · Output: 200 · Cached: —');
+    expect(result).toContain('Input: 100 · Output: 200 · Cached: 0');
     expect(result).toContain('<!-- kilo-usage -->');
   });
 });

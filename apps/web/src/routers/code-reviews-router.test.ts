@@ -552,8 +552,6 @@ describe('codeReviewRouter attempts', () => {
           status: 'failed',
           error_message: 'Container shutdown: SIGTERM',
           terminal_reason: 'sandbox_error',
-          total_tokens_in: 1200,
-          total_tokens_out: 300,
         })
       )
       .returning({ id: cloud_agent_code_reviews.id });
@@ -564,7 +562,7 @@ describe('codeReviewRouter attempts', () => {
       expect.objectContaining({
         success: true,
         attempts: [],
-        tokenUsage: { input: 1200, output: 300, cached: null },
+        tokenUsage: { input: 0, output: 0, cached: 0 },
       })
     );
 

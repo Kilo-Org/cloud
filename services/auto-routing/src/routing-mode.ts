@@ -12,15 +12,6 @@ export const AUTO_ROUTING_MODE_CONFIG_PREFIX = 'auto_routing_mode';
 
 const DEFAULT_CACHE_SENTINEL = '__default__';
 const KV_CACHE_TTL_SECONDS = 60;
-const MODE_CACHE_TTL_MS = 30_000;
-const MAX_MODE_CACHE_ENTRIES = 512;
-
-type CacheEntry = {
-  promise: Promise<AutoRoutingMode | null>;
-  expiresAt: number;
-};
-
-const modeCache = new Map<string, CacheEntry>();
 
 function modeKey(ownerType: AutoRoutingModeOwnerType, ownerId: string): string {
   return `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:${ownerType}:${ownerId}`;
@@ -36,25 +27,6 @@ function parseCachedMode(raw: string | null): AutoRoutingMode | null | undefined
   if (raw === DEFAULT_CACHE_SENTINEL) return null;
   const parsed = AutoRoutingModeSchema.safeParse(raw);
   return parsed.success ? parsed.data : undefined;
-}
-
-function rememberMode(key: string, promise: Promise<AutoRoutingMode | null>): CacheEntry {
-  const entry = { promise, expiresAt: Date.now() + MODE_CACHE_TTL_MS };
-  modeCache.set(key, entry);
-  if (modeCache.size > MAX_MODE_CACHE_ENTRIES) {
-    const oldestKey = modeCache.keys().next().value;
-    if (oldestKey) modeCache.delete(oldestKey);
-  }
-  promise.catch(() => {
-    if (modeCache.get(key) === entry) {
-      modeCache.delete(key);
-    }
-  });
-  return entry;
-}
-
-function updateModeCache(key: string, mode: AutoRoutingMode | null): void {
-  rememberMode(key, Promise.resolve(mode));
 }
 
 async function readConfiguredModeFromDb(
@@ -104,30 +76,14 @@ async function loadConfiguredMode(
   ownerId: string
 ): Promise<AutoRoutingMode | null> {
   const key = modeKey(ownerType, ownerId);
-  const cached = modeCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.promise;
-  }
-  if (cached) {
-    modeCache.delete(key);
+  const cachedMode = parseCachedMode(await env.AUTO_ROUTING_CONFIG.get(key));
+  if (cachedMode !== undefined) {
+    return cachedMode;
   }
 
-  const promise = (async () => {
-    const cachedMode = parseCachedMode(await env.AUTO_ROUTING_CONFIG.get(key));
-    if (cachedMode !== undefined) {
-      return cachedMode;
-    }
-
-    const dbMode = await readConfiguredModeFromDb(env, ownerType, ownerId);
-    await cacheConfiguredModeBestEffort(env, key, dbMode);
-    return dbMode;
-  })();
-  rememberMode(key, promise);
-  return promise;
-}
-
-export function clearAutoRoutingModeCache(): void {
-  modeCache.clear();
+  const dbMode = await readConfiguredModeFromDb(env, ownerType, ownerId);
+  await cacheConfiguredModeBestEffort(env, key, dbMode);
+  return dbMode;
 }
 
 export async function getConfiguredAutoRoutingMode(
@@ -188,6 +144,5 @@ export async function setAutoRoutingMode(
       .bind(owner.ownerType, owner.ownerId, mode, new Date().toISOString())
       .run();
   }
-  updateModeCache(key, mode);
   await cacheConfiguredModeBestEffort(env, key, mode);
 }

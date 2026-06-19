@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearClassifierConfigCache } from './classifier-config';
-import { clearAutoRoutingModeCache } from './routing-mode';
 import { clearRoutingTableCache } from './routing-table';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
@@ -190,7 +189,6 @@ function decideRequest(payload: unknown) {
 describe('auto routing worker', () => {
   beforeEach(() => {
     clearClassifierConfigCache();
-    clearAutoRoutingModeCache();
     clearRoutingTableCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);

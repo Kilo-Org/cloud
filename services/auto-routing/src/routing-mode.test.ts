@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTO_ROUTING_MODE_CONFIG_PREFIX,
-  clearAutoRoutingModeCache,
   getConfiguredAutoRoutingMode,
   getAutoRoutingMode,
   setAutoRoutingMode,
@@ -59,7 +58,7 @@ function makeEnv(
 
 describe('auto routing mode config', () => {
   beforeEach(() => {
-    clearAutoRoutingModeCache();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -168,6 +167,26 @@ describe('auto routing mode config', () => {
       getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' })
     ).resolves.toBe(null);
     expect(dbPrepare).not.toHaveBeenCalled();
+  });
+
+  it('reads the backing cache on every lookup instead of serving a stale module value', async () => {
+    const key = `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:user:user-1`;
+    const { env, kvValues, configGet } = makeEnv({
+      kvValues: {
+        [key]: 'best_accuracy',
+      },
+    });
+
+    await expect(
+      getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' })
+    ).resolves.toBe('best_accuracy');
+
+    kvValues[key] = 'cost_per_accuracy';
+
+    await expect(
+      getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' })
+    ).resolves.toBe('cost_per_accuracy');
+    expect(configGet).toHaveBeenCalledTimes(2);
   });
 
   it('writes and clears owner-specific modes in D1 and cache', async () => {

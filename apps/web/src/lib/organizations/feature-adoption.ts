@@ -4,7 +4,7 @@ import {
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { readDb } from '@/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 
@@ -125,6 +125,70 @@ export function buildFeatureAdoptionChecks(
       actionUrl: `/organizations/${organizationId}/integrations`,
     },
   ];
+}
+
+export async function getOrganizationPendingFeatureAdoptionCount(
+  organizationId: string
+): Promise<{ plan: 'teams' | 'enterprise'; pendingCount: number }> {
+  const organizationRows = await readDb
+    .select({ plan: organizations.plan })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  const organization = organizationRows[0];
+  if (!organization) {
+    throw new Error('Organization not found');
+  }
+  if (organization.plan !== 'enterprise') {
+    return { plan: organization.plan, pendingCount: 0 };
+  }
+
+  const rows = await readDb.execute(sql`
+    SELECT
+      (CASE WHEN EXISTS (
+        SELECT 1 FROM platform_integrations
+        WHERE owned_by_organization_id = ${organizationId}
+          AND platform IN ('github', 'gitlab')
+          AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
+          AND suspended_at IS NULL
+          AND auth_invalid_at IS NULL
+      ) THEN 0 ELSE 1 END) +
+      (CASE WHEN EXISTS (
+        SELECT 1 FROM agent_configs
+        WHERE owned_by_organization_id = ${organizationId}
+          AND agent_type = 'code_review'
+          AND platform IN ('github', 'gitlab')
+          AND is_enabled = true
+      ) THEN 0 ELSE 1 END) +
+      (CASE WHEN EXISTS (
+        SELECT 1 FROM agent_configs
+        WHERE owned_by_organization_id = ${organizationId}
+          AND agent_type = 'security_scan'
+          AND platform = 'github'
+          AND is_enabled = true
+      ) THEN 0 ELSE 1 END) +
+      (CASE WHEN EXISTS (
+        SELECT 1 FROM cloud_agent_webhook_triggers
+        WHERE organization_id = ${organizationId}
+          AND target_type = 'cloud_agent'
+          AND activation_mode = 'webhook'
+          AND is_active = true
+      ) THEN 0 ELSE 1 END) +
+      (CASE WHEN EXISTS (
+        SELECT 1 FROM platform_integrations
+        WHERE owned_by_organization_id = ${organizationId}
+          AND platform IN ('slack', 'discord', 'linear')
+          AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
+          AND suspended_at IS NULL
+          AND auth_invalid_at IS NULL
+      ) THEN 0 ELSE 1 END) AS pending_count
+  `);
+
+  const pendingCount = Number(rows.rows[0]?.pending_count);
+  return {
+    plan: organization.plan,
+    pendingCount: Number.isFinite(pendingCount) ? pendingCount : FEATURE_ADOPTION_KEYS.length,
+  };
 }
 
 export async function getOrganizationFeatureAdoption(organizationId: string): Promise<{

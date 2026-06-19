@@ -23,7 +23,7 @@ export function AIAdoptionSummaryCard({
     dateRange.endDate
   );
   const latest = adoption.timeseries?.at(-1);
-  const score = latest ? Math.round(latest.frequency + latest.depth + latest.coverage) : 0;
+  const score = latest ? Math.round(latest.frequency + latest.depth + latest.coverage) : null;
 
   if (adoption.error) {
     return (
@@ -33,6 +33,36 @@ export function AIAdoptionSummaryCard({
           <div>
             <p className="font-medium">AI adoption score is unavailable</p>
             <p className="text-muted-foreground mt-1 text-sm">Open AI usage to try again.</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={onViewDetails}>
+            View AI usage
+            <ArrowRight className="size-4" />
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!adoption.isLoading && (adoption.isNewOrganization || score === null)) {
+    return (
+      <Card className="h-full">
+        <CardHeader className="gap-3">
+          <div className="bg-muted flex size-9 items-center justify-center rounded-lg">
+            <TrendingUp className="size-4" />
+          </div>
+          <div className="space-y-1.5">
+            <CardTitle className="text-lg">AI adoption score</CardTitle>
+            <p className="text-muted-foreground text-sm">
+              Frequency, depth, and coverage of AI usage.
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div>
+            <p className="font-medium">Not enough activity yet</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              The score appears after at least three days of AI usage.
+            </p>
           </div>
           <Button variant="secondary" size="sm" onClick={onViewDetails}>
             View AI usage

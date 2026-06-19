@@ -72,6 +72,20 @@ describe('organizations usage details trpc router', () => {
       expect(result.checks.every(check => !check.adopted)).toBe(true);
     });
 
+    it('returns the pending feature count to an Enterprise member', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getPendingFeatureAdoptionCount({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result).toEqual({ pendingCount: 5 });
+    });
+
     it('rejects feature adoption reporting for a Teams organization', async () => {
       await db
         .update(organizations)

@@ -57,11 +57,13 @@ export default function OrganizationAppSidebar({
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
   const trpc = useTRPC();
   const featureAdoptionQuery = useQuery({
-    ...trpc.organizations.usageDetails.getFeatureAdoption.queryOptions({ organizationId }),
+    ...trpc.organizations.usageDetails.getPendingFeatureAdoptionCount.queryOptions({
+      organizationId,
+    }),
     enabled: organizationData?.plan === 'enterprise',
+    staleTime: 5 * 60 * 1000,
   });
-  const pendingFeatureAdoptionCount =
-    featureAdoptionQuery.data?.checks.filter(check => !check.adopted).length ?? 0;
+  const pendingFeatureAdoptionCount = featureAdoptionQuery.data?.pendingCount ?? 0;
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags

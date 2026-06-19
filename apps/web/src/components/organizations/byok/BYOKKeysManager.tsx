@@ -775,7 +775,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         </p>
                         <p className="mt-2 font-medium">
                           Organization restrictions: This Vercel-backed provider is subject to
-                          organization-configured model and provider restrictions.
+                          organization-configured model restrictions, but the provider itself is
+                          considered trusted.
                         </p>
                       </AlertDescription>
                     </Alert>

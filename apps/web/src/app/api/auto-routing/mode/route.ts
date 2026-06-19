@@ -24,7 +24,14 @@ function workerResultResponse(result: { status: number; body: unknown }): NextRe
 
 function trpcErrorResponse(error: unknown): NextResponse<{ error: string }> | null {
   if (!(error instanceof TRPCError)) return null;
-  const status = error.code === 'UNAUTHORIZED' ? 401 : error.code === 'FORBIDDEN' ? 403 : 500;
+  const status =
+    error.code === 'UNAUTHORIZED'
+      ? 401
+      : error.code === 'FORBIDDEN'
+        ? 403
+        : error.code === 'NOT_FOUND'
+          ? 404
+          : 500;
   return NextResponse.json({ error: error.message }, { status });
 }
 

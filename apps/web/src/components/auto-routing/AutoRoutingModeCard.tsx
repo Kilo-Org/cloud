@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  DEFAULT_AUTO_ROUTING_MODE,
   AutoRoutingModeSchema,
   AutoRoutingModeResponseSchema,
   type AutoRoutingMode,
@@ -26,18 +25,36 @@ type Props = {
   readonly?: boolean;
 };
 
+type ModeSelection = AutoRoutingMode | 'inherit';
+
 const modeOptions: Array<{ value: AutoRoutingMode; label: string; description: string }> = [
   {
     value: 'cost_per_accuracy',
-    label: 'Least $/accuracy',
-    description: 'Routes to the benchmarked candidate with the lowest cost per accuracy point.',
+    label: 'Best accuracy per dollar',
+    description:
+      'Default. Chooses the model that passes the accuracy threshold and delivers the best accuracy per dollar among efficient workers.',
   },
   {
     value: 'best_accuracy',
     label: 'Best accuracy',
-    description: 'Routes to the highest-accuracy benchmarked candidate, regardless of cost.',
+    description: 'Chooses the highest-accuracy efficient worker, regardless of cost.',
   },
 ];
+
+function inheritedOption(organizationId: string | undefined) {
+  return organizationId
+    ? {
+        value: 'inherit' as const,
+        label: 'Inherit user or default setting',
+        description:
+          "Uses the member's personal setting, or the default best-accuracy-per-dollar mode if they have not set one.",
+      }
+    : {
+        value: 'inherit' as const,
+        label: 'Use default setting',
+        description: modeOptions[0].description,
+      };
+}
 
 function endpoint(organizationId: string | undefined): string {
   if (!organizationId) return '/api/auto-routing/mode';
@@ -58,7 +75,7 @@ async function fetchMode(organizationId: string | undefined) {
   return AutoRoutingModeResponseSchema.parse(body);
 }
 
-async function saveMode(organizationId: string | undefined, mode: AutoRoutingMode) {
+async function saveMode(organizationId: string | undefined, mode: AutoRoutingMode | null) {
   const response = await fetch(endpoint(organizationId), {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
@@ -82,15 +99,15 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     queryKey,
     queryFn: () => fetchMode(organizationId),
   });
-  const [selectedMode, setSelectedMode] = useState<AutoRoutingMode>(DEFAULT_AUTO_ROUTING_MODE);
-  const currentMode = query.data?.mode ?? DEFAULT_AUTO_ROUTING_MODE;
+  const [selectedMode, setSelectedMode] = useState<ModeSelection>('inherit');
+  const currentSelection: ModeSelection = query.data?.configuredMode ?? 'inherit';
 
   useEffect(() => {
-    setSelectedMode(currentMode);
-  }, [currentMode]);
+    setSelectedMode(currentSelection);
+  }, [currentSelection]);
 
   const mutation = useMutation({
-    mutationFn: (mode: AutoRoutingMode) => saveMode(organizationId, mode),
+    mutationFn: (mode: ModeSelection) => saveMode(organizationId, mode === 'inherit' ? null : mode),
     onSuccess: data => {
       queryClient.setQueryData(queryKey, data);
       toast.success('Auto routing mode saved');
@@ -100,10 +117,13 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     },
   });
 
+  const resetOption = inheritedOption(organizationId);
   const selectedOption =
-    modeOptions.find(option => option.value === selectedMode) ?? modeOptions[0];
+    selectedMode === 'inherit'
+      ? resetOption
+      : (modeOptions.find(option => option.value === selectedMode) ?? modeOptions[0]);
   const disabled = readonly || query.isLoading || mutation.isPending;
-  const hasChanges = selectedMode !== currentMode;
+  const hasChanges = selectedMode !== currentSelection;
 
   return (
     <Card className="w-full">
@@ -113,7 +133,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
           Auto routing
         </CardTitle>
         <CardDescription>
-          Choose how Kilo ranks benchmarked candidates for kilo-auto/efficient.
+          Choose how Kilo ranks efficient-worker candidates for kilo-auto/efficient.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -123,13 +143,16 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
           </Label>
           <Select
             value={selectedMode}
-            onValueChange={value => setSelectedMode(AutoRoutingModeSchema.parse(value))}
+            onValueChange={value =>
+              setSelectedMode(value === 'inherit' ? 'inherit' : AutoRoutingModeSchema.parse(value))
+            }
             disabled={disabled}
           >
             <SelectTrigger id={organizationId ? 'org-auto-routing-mode' : 'user-auto-routing-mode'}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={resetOption.value}>{resetOption.label}</SelectItem>
               {modeOptions.map(option => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}

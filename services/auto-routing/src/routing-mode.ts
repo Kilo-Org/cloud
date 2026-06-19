@@ -6,11 +6,14 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 
-type AutoRoutingModeEnv = Pick<Env, 'AUTO_ROUTING_CONFIG'>;
+type AutoRoutingModeEnv = Pick<Env, 'AUTO_ROUTING_CONFIG' | 'AUTO_ROUTING_DB'>;
 
 export const AUTO_ROUTING_MODE_CONFIG_PREFIX = 'auto_routing_mode';
 
-const MODE_CACHE_TTL_MS = 60_000;
+const DEFAULT_CACHE_SENTINEL = '__default__';
+const KV_CACHE_TTL_SECONDS = 60;
+const MODE_CACHE_TTL_MS = 30_000;
+const MAX_MODE_CACHE_ENTRIES = 512;
 
 type CacheEntry = {
   promise: Promise<AutoRoutingMode | null>;
@@ -23,6 +26,60 @@ function modeKey(ownerType: AutoRoutingModeOwnerType, ownerId: string): string {
   return `${AUTO_ROUTING_MODE_CONFIG_PREFIX}:${ownerType}:${ownerId}`;
 }
 
+function parseStoredMode(raw: unknown): AutoRoutingMode | null {
+  const parsed = AutoRoutingModeSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+function parseCachedMode(raw: string | null): AutoRoutingMode | null | undefined {
+  if (raw === null) return undefined;
+  if (raw === DEFAULT_CACHE_SENTINEL) return null;
+  const parsed = AutoRoutingModeSchema.safeParse(raw);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function rememberMode(key: string, promise: Promise<AutoRoutingMode | null>): CacheEntry {
+  const entry = { promise, expiresAt: Date.now() + MODE_CACHE_TTL_MS };
+  modeCache.set(key, entry);
+  if (modeCache.size > MAX_MODE_CACHE_ENTRIES) {
+    const oldestKey = modeCache.keys().next().value;
+    if (oldestKey) modeCache.delete(oldestKey);
+  }
+  promise.catch(() => {
+    if (modeCache.get(key) === entry) {
+      modeCache.delete(key);
+    }
+  });
+  return entry;
+}
+
+function updateModeCache(key: string, mode: AutoRoutingMode | null): void {
+  rememberMode(key, Promise.resolve(mode));
+}
+
+async function readConfiguredModeFromDb(
+  env: AutoRoutingModeEnv,
+  ownerType: AutoRoutingModeOwnerType,
+  ownerId: string
+): Promise<AutoRoutingMode | null> {
+  const row = await env.AUTO_ROUTING_DB.prepare(
+    'SELECT mode FROM auto_routing_modes WHERE owner_type = ? AND owner_id = ? LIMIT 1'
+  )
+    .bind(ownerType, ownerId)
+    .first<{ mode: string }>();
+  return parseStoredMode(row?.mode);
+}
+
+async function cacheConfiguredMode(
+  env: AutoRoutingModeEnv,
+  key: string,
+  mode: AutoRoutingMode | null
+): Promise<void> {
+  await env.AUTO_ROUTING_CONFIG.put(key, mode ?? DEFAULT_CACHE_SENTINEL, {
+    expirationTtl: KV_CACHE_TTL_SECONDS,
+  });
+}
+
 async function loadConfiguredMode(
   env: AutoRoutingModeEnv,
   ownerType: AutoRoutingModeOwnerType,
@@ -33,18 +90,21 @@ async function loadConfiguredMode(
   if (cached && cached.expiresAt > Date.now()) {
     return cached.promise;
   }
+  if (cached) {
+    modeCache.delete(key);
+  }
 
-  const promise = env.AUTO_ROUTING_CONFIG.get(key).then(raw => {
-    const parsed = AutoRoutingModeSchema.safeParse(raw);
-    return parsed.success ? parsed.data : null;
-  });
-  const entry = { promise, expiresAt: Date.now() + MODE_CACHE_TTL_MS };
-  modeCache.set(key, entry);
-  promise.catch(() => {
-    if (modeCache.get(key) === entry) {
-      modeCache.delete(key);
+  const promise = (async () => {
+    const cachedMode = parseCachedMode(await env.AUTO_ROUTING_CONFIG.get(key));
+    if (cachedMode !== undefined) {
+      return cachedMode;
     }
-  });
+
+    const dbMode = await readConfiguredModeFromDb(env, ownerType, ownerId);
+    await cacheConfiguredMode(env, key, dbMode);
+    return dbMode;
+  })();
+  rememberMode(key, promise);
   return promise;
 }
 
@@ -94,9 +154,22 @@ export async function setAutoRoutingMode(
 ): Promise<void> {
   const key = modeKey(owner.ownerType, owner.ownerId);
   if (mode === null) {
-    await env.AUTO_ROUTING_CONFIG.delete(key);
+    await env.AUTO_ROUTING_DB.prepare(
+      'DELETE FROM auto_routing_modes WHERE owner_type = ? AND owner_id = ?'
+    )
+      .bind(owner.ownerType, owner.ownerId)
+      .run();
   } else {
-    await env.AUTO_ROUTING_CONFIG.put(key, mode);
+    await env.AUTO_ROUTING_DB.prepare(
+      `INSERT INTO auto_routing_modes (owner_type, owner_id, mode, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(owner_type, owner_id) DO UPDATE SET
+         mode = excluded.mode,
+         updated_at = excluded.updated_at`
+    )
+      .bind(owner.ownerType, owner.ownerId, mode, new Date().toISOString())
+      .run();
   }
-  modeCache.delete(key);
+  await cacheConfiguredMode(env, key, mode);
+  updateModeCache(key, mode);
 }

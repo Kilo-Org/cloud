@@ -103,6 +103,30 @@ describe('/api/auto-routing/mode', () => {
     });
   });
 
+  test('clears an organization auto-routing mode override', async () => {
+    mockedUpdateAutoRoutingMode.mockResolvedValue({
+      status: 200,
+      body: {
+        ownerType: 'org',
+        ownerId: ORGANIZATION_ID,
+        mode: 'cost_per_accuracy',
+        configuredMode: null,
+        defaultMode: 'cost_per_accuracy',
+      },
+    });
+
+    const response = await PUT(
+      makeRequest(`/api/auto-routing/mode?organizationId=${ORGANIZATION_ID}`, { mode: null })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpdateAutoRoutingMode).toHaveBeenCalledWith({
+      ownerType: 'org',
+      ownerId: ORGANIZATION_ID,
+      mode: null,
+    });
+  });
+
   test('maps organization authorization failures to HTTP 401', async () => {
     mockedEnsureOrganizationAccess.mockRejectedValue(
       new TRPCError({
@@ -120,6 +144,27 @@ describe('/api/auto-routing/mode', () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({
       error: 'You do not have access to this organization',
+    });
+    expect(mockedUpdateAutoRoutingMode).not.toHaveBeenCalled();
+  });
+
+  test('maps missing organization entitlements to HTTP 404', async () => {
+    mockedRequireActiveSubscriptionOrTrial.mockRejectedValue(
+      new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Organization subscription not found',
+      })
+    );
+
+    const response = await PUT(
+      makeRequest(`/api/auto-routing/mode?organizationId=${ORGANIZATION_ID}`, {
+        mode: 'best_accuracy',
+      })
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Organization subscription not found',
     });
     expect(mockedUpdateAutoRoutingMode).not.toHaveBeenCalled();
   });

@@ -145,6 +145,17 @@ export const routingTables = sqliteTable('routing_tables', {
   source: text('source').notNull(),
 });
 
+export const autoRoutingModes = sqliteTable(
+  'auto_routing_modes',
+  {
+    owner_type: text('owner_type').$type<'user' | 'org'>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    mode: text('mode').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [primaryKey({ columns: [table.owner_type, table.owner_id] })]
+);
+
 export const routingTableCandidates = sqliteTable(
   'routing_table_candidates',
   {

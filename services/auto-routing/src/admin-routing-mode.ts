@@ -51,6 +51,5 @@ export const putRoutingModeHandler: Handler<HonoEnv> = async c => {
   }
 
   await setAutoRoutingMode(c.env, parsed.data, parsed.data.mode);
-  const configuredMode = await getConfiguredAutoRoutingMode(c.env, parsed.data);
-  return c.json(responseBody({ ...parsed.data, configuredMode }));
+  return c.json(responseBody({ ...parsed.data, configuredMode: parsed.data.mode }));
 };

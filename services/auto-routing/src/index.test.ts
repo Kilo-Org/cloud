@@ -29,6 +29,7 @@ const writeDataPoint = vi.fn();
 const configGet = vi.fn();
 const configDelete = vi.fn();
 const configPut = vi.fn();
+const autoRoutingDbPrepare = vi.fn();
 const analyticsTokenGet = vi.fn();
 const cacheGetEntry = vi.fn();
 const cachePutEntry = vi.fn();
@@ -45,6 +46,9 @@ const env = {
     get: configGet,
     delete: configDelete,
     put: configPut,
+  },
+  AUTO_ROUTING_DB: {
+    prepare: autoRoutingDbPrepare,
   },
   BENCHMARK_SERVICE: {
     fetch: benchmarkFetch,
@@ -210,6 +214,13 @@ describe('auto routing worker', () => {
     configDelete.mockResolvedValue(undefined);
     configPut.mockReset();
     configPut.mockResolvedValue(undefined);
+    autoRoutingDbPrepare.mockReset();
+    autoRoutingDbPrepare.mockReturnValue({
+      bind: () => ({
+        first: async () => null,
+        run: async () => ({}),
+      }),
+    });
     benchmarkFetch.mockReset();
     benchmarkFetch.mockImplementation(async (url: string) => {
       if (String(url).includes('/admin/classifier-winner')) {

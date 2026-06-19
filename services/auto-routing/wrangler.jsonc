@@ -55,6 +55,14 @@
   ],
   "services": [{ "binding": "BENCHMARK_SERVICE", "service": "auto-routing-benchmark" }],
 
+  "d1_databases": [
+    {
+      "binding": "AUTO_ROUTING_DB",
+      "database_name": "auto-routing-benchmark",
+      "database_id": "92f2c88a-5ee6-4fd0-b118-75bd141b5cac",
+    },
+  ],
+
   "kv_namespaces": [
     {
       "binding": "AUTO_ROUTING_CONFIG",

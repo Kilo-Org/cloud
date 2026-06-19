@@ -87,7 +87,7 @@ describe('auto routing mode config', () => {
     vi.restoreAllMocks();
   });
 
-  it('defaults to least cost per accuracy when no owner config exists', async () => {
+  it('defaults to best accuracy per dollar when no owner config exists', async () => {
     const { env } = makeEnv();
 
     await expect(getAutoRoutingMode(env, { userId: 'user-1', organizationId: null })).resolves.toBe(

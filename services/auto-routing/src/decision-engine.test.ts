@@ -80,7 +80,7 @@ describe('computeDecision', () => {
       sticky: false,
     });
   });
-  it('defaults to the least cost per accuracy candidate', () => {
+  it('defaults to the best accuracy per dollar candidate', () => {
     const decision = computeDecision(classification, table, null);
     expect(decision?.model).toBe('cheap/chat');
   });

@@ -32,13 +32,12 @@ const modeOptions: Array<{ value: AutoRoutingMode; label: string; description: s
     value: 'cost_per_accuracy',
     label: 'Best accuracy per dollar',
     description:
-      'Default. Chooses the model that passes the accuracy threshold and delivers the best accuracy per dollar within the efficient model pool.',
+      'Chooses the model that passes the accuracy threshold and delivers the best accuracy per dollar.',
   },
   {
     value: 'best_accuracy',
     label: 'Best accuracy',
-    description:
-      'Chooses the highest-accuracy model in the efficient model pool, regardless of cost.',
+    description: 'Chooses the highest-accuracy model in the efficient model pool.',
   },
 ];
 
@@ -46,15 +45,13 @@ function unsetModeOption(organizationId: string | undefined) {
   return organizationId
     ? {
         value: 'inherit' as const,
-        label: 'Use member or default setting',
-        description:
-          "Uses the member's personal setting. If they have not set one, Kilo uses best accuracy per dollar.",
+        label: 'No organization override',
+        description: "Uses the member's personal setting, then the default.",
       }
     : {
         value: 'inherit' as const,
         label: 'Use default setting',
-        description:
-          'Uses best accuracy per dollar: the model that passes the accuracy threshold and delivers the best accuracy per dollar within the efficient model pool.',
+        description: 'Uses best accuracy per dollar.',
       };
 }
 
@@ -134,9 +131,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
           <Route className="size-5" />
           Auto routing
         </CardTitle>
-        <CardDescription>
-          Choose how Kilo ranks models in the efficient model pool for kilo-auto/efficient.
-        </CardDescription>
+        <CardDescription>Choose how Kilo ranks models for kilo-auto/efficient.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">

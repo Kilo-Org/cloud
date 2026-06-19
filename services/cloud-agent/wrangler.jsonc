@@ -206,7 +206,7 @@
       "preview_urls": false,
       "routes": [],
       "vars": {
-        "KILOCODE_BACKEND_BASE_URL": "https://staging.kilo.ai",
+        "KILOCODE_BACKEND_BASE_URL": "https://staging-app.kilo.ai",
         "GITHUB_APP_SLUG": "kiloconnect-development",
         "GITHUB_APP_BOT_USER_ID": "242397087",
         "GITHUB_APP_ID": "2245043",
@@ -220,7 +220,7 @@
         "STALE_THRESHOLD_MS": "600000",
         "PENDING_START_TIMEOUT_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-staging",
-        "WS_ALLOWED_ORIGINS": "https://staging.kilo.ai",
+        "WS_ALLOWED_ORIGINS": "https://staging-app.kilo.ai",
       },
       "r2_buckets": [
         {
